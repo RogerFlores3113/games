@@ -126,12 +126,68 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated during roadmap creation) | — | Pending |
+| ROOM-01 | Phase 1 | Pending |
+| ROOM-02 | Phase 1 | Pending |
+| ROOM-03 | Phase 1 | Pending |
+| ROOM-04 | Phase 1 | Pending |
+| ROOM-05 | Phase 1 | Pending |
+| ROOM-06 | Phase 1 | Pending |
+| ROOM-07 | Phase 1 | Pending |
+| ROOM-08 | Phase 1 | Pending |
+| RT-01 | Phase 4 | Pending |
+| RT-02 | Phase 1 | Pending |
+| RT-03 | Phase 4 | Pending |
+| RT-04 | Phase 5 | Pending |
+| RT-05 | Phase 5 | Pending |
+| RT-06 | Phase 5 | Pending |
+| RT-07 | Phase 1 | Pending |
+| RT-08 | Phase 5 | Pending |
+| RT-09 | Phase 4 | Pending |
+| HIDE-01 | Phase 2 | Pending |
+| HIDE-02 | Phase 2 | Pending |
+| HIDE-03 | Phase 2 | Pending |
+| HIDE-04 | Phase 2 | Pending |
+| HIDE-05 | Phase 3 | Pending |
+| RULES-01 | Phase 3 | Pending |
+| RULES-02 | Phase 3 | Pending |
+| RULES-03 | Phase 3 | Pending |
+| RULES-04 | Phase 3 | Pending |
+| RULES-05 | Phase 3 | Pending |
+| RULES-06 | Phase 3 | Pending |
+| RULES-07 | Phase 3 | Pending |
+| RULES-08 | Phase 3 | Pending |
+| RULES-09 | Phase 3 | Pending |
+| RULES-10 | Phase 3 | Pending |
+| RULES-11 | Phase 6 | Pending |
+| RULES-12 | Phase 3 | Pending |
+| RULES-13 | Phase 3 | Pending |
+| RULES-14 | Phase 7 | Pending |
+| RULES-15 | Phase 3 | Pending |
+| RULES-16 | Phase 3 | Pending |
+| RULES-17 | Phase 3 | Pending |
+| RULES-18 | Phase 3 | Pending |
+| RULES-19 | Phase 3 | Pending |
+| RULES-20 | Phase 3 | Pending |
+| UI-01 | Phase 6 | Pending |
+| UI-02 | Phase 6 | Pending |
+| UI-03 | Phase 6 | Pending |
+| UI-04 | Phase 6 | Pending |
+| UI-05 | Phase 6 | Pending |
+| UI-06 | Phase 6 | Pending |
+| UI-07 | Phase 7 | Pending |
+| UI-08 | Phase 6 | Pending |
+| UI-09 | Phase 6 | Pending |
+| UI-10 | Phase 6 | Pending |
+| UI-11 | Phase 6 | Pending |
+| FDN-01 | Phase 1 | Pending |
+| FDN-02 | Phase 3 | Pending |
+| FDN-03 | Phase 1 | Pending |
+| FDN-04 | Phase 1 | Pending |
 
 **Coverage:**
 - v1 requirements: 57 total
-- Mapped to phases: 0
-- Unmapped: 57 ⚠️
+- Mapped to phases: 57
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-01*
