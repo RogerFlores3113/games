@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-09-02T07:31:36.008Z"
-last_activity: 2026-09-02 -- Phase 01 planning complete
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-09-02T07:49:23.227Z"
+last_activity: 2026-09-02
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 11
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-01)
 
 **Core value:** A friend clicks a link and is playing Hanabi within seconds — and the game does not break, stall, or lose their seat for the next 25 minutes.
-**Current focus:** Phase 1 (Room & Transport Skeleton)
+**Current focus:** Phase 01 — room-transport-skeleton
 
 ## Current Position
 
-Phase: 1 of 7 (Room & Transport Skeleton)
-Plan: Not yet planned
+Phase: 01 (room-transport-skeleton) — EXECUTING
+Plan: 2 of 11
 Status: Ready to execute
-Last activity: 2026-09-02 -- Phase 01 planning complete
+Last activity: 2026-09-02
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 9%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01 P01 | 13 | 4 tasks | 33 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,9 @@ Recent decisions affecting current work:
 - Roadmap: Horizontal-layers structure chosen deliberately (per user/research) over vertical slices — transport/redaction proven on a toy game, then a pure rules engine, then wiring, then reconnect hardening, then UI, then variants.
 - Roadmap: RULES-03 (parametrized suit count) placed in Phase 3 so the engine is variant-ready from the start; Phase 7 only enables/tests Rainbow and Black, not restructure the engine.
 - Roadmap: HIDE-02 and HIDE-04 placed in Phase 2, before the real rules engine exists, so the redaction contract is proven cheaply against a toy game.
+- [Phase ?]: TypeScript pinned to exact 5.9.3 (pin-5x), matching CLAUDE.md's 5.7+ constraint and the major every other pinned tool in research was validated against
+- [Phase ?]: vitest's slopcheck TYPOSQUAT_RISK flag accepted as false positive (name-similarity to vite only)
+- [Phase ?]: apps/worker/src/index.ts must never re-export plain constants as top-level named exports (wrangler Modules format reserves top-level named exports for Worker entrypoints)
 
 ### Pending Todos
 
@@ -83,6 +87,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-02T06:44:21.239Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-room-transport-skeleton/01-CONTEXT.md
+Last session: 2026-09-02T07:49:23.219Z
+Stopped at: Completed 01-01-PLAN.md
+Resume file: None

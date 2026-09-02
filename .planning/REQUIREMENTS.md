@@ -77,7 +77,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Foundation
 
-- [ ] **FDN-01**: Room, seating, connection, and reconnect machinery is separated from Hanabi-specific rules behind a game-adapter interface
+- [x] **FDN-01**: Room, seating, connection, and reconnect machinery is separated from Hanabi-specific rules behind a game-adapter interface
 - [ ] **FDN-02**: The rules engine is a pure package with no networking or storage dependencies, testable in isolation
 - [ ] **FDN-03**: The deployed system runs entirely within free tiers, with no service requiring a paid plan or stored payment method to remain reachable
 - [ ] **FDN-04**: games.rogerflores.dev resolves to the deployed application
@@ -179,7 +179,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-09 | Phase 6 | Pending |
 | UI-10 | Phase 6 | Pending |
 | UI-11 | Phase 6 | Pending |
-| FDN-01 | Phase 1 | Pending |
+| FDN-01 | Phase 1 | Complete |
 | FDN-02 | Phase 3 | Pending |
 | FDN-03 | Phase 1 | Pending |
 | FDN-04 | Phase 1 | Pending |
