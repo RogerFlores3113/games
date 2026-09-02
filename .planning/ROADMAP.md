@@ -53,7 +53,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 01-07-PLAN.md — RoomDO assembly on `partyserver`: hibernation, dispatch, per-seat push, onAlarm, idle GC
+- [x] 01-07-PLAN.md — RoomDO assembly on `partyserver`: hibernation, dispatch, per-seat push, onAlarm, idle GC
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -161,7 +161,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Room & Transport Skeleton | 7/11 | In Progress|  |
+| 1. Room & Transport Skeleton | 8/11 | In Progress|  |
 | 2. Per-Seat Redaction Contract | 0/TBD | Not started | - |
 | 3. Hanabi Rules Engine | 0/TBD | Not started | - |
 | 4. Wire Engine Into Room Actor | 0/TBD | Not started | - |

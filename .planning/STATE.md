@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-08-PLAN.md
-last_updated: "2026-09-02T16:01:18.674Z"
+stopped_at: Completed 01-07-PLAN.md
+last_updated: "2026-09-02T16:24:49.396Z"
 last_activity: 2026-09-02
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 11
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 01 (room-transport-skeleton) — EXECUTING
-Plan: 8 of 11
+Plan: 9 of 11
 Status: Ready to execute
 Last activity: 2026-09-02
 
-Progress: [██████░░░░] 64%
+Progress: [███████░░░] 73%
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [██████░░░░] 64%
 | Phase 01 P05 | 15min | 2 tasks | 4 files |
 | Phase 01 P06 | 6min | 2 tasks | 4 files |
 | Phase 01 P08 | 25min | 3 tasks | 13 files |
+| Phase 01 P07 | 25min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,9 @@ Recent decisions affecting current work:
 - [Phase ?]: lucide-react pinned to exact 1.39.0 (was 'latest' in Wave 0 scaffold), matching the project's exact-pin convention
 - [Phase ?]: nanoid added to apps/web at exact 6.0.1, mirroring apps/worker's Plan 05 pin; both mint room codes independently from the same @games/schema constants
 - [Phase ?]: sessionStorage key room:{code}:displayName carries the host's entered name into the lobby so Plan 09 can auto-join without a retype (D-03)
+- [Phase 01-07]: RoomDO integration tests spawn wrangler dev as a detached process group and kill it via process.kill(-pid) to prove D-17 persistence survives genuine eviction, not just a closed socket
+- [Phase 01-07]: toSeatView wrapped in a single private #viewFor method so the literal call-site count stays 1 even though both the joined reply and #pushState need a view
+- [Phase 01-07]: apps/worker/tsconfig.json types widened to include node alongside @cloudflare/workers-types since the integration test needs Node builtins; no global type conflicts
 
 ### Pending Todos
 
@@ -106,6 +110,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-02T16:01:18.667Z
-Stopped at: Completed 01-08-PLAN.md
+Last session: 2026-09-02T16:24:49.387Z
+Stopped at: Completed 01-07-PLAN.md
 Resume file: None
