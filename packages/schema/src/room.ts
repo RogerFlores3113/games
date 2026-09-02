@@ -92,7 +92,11 @@ export const RoomStateSchema = z.object({
   code: RoomCodeSchema,
   variant: VariantSchema,
   status: RoomStatusSchema,
-  hostSeatId: z.string(),
+  /** Null only in the instant between `createEmptyRoom` and the first seat
+   * joining (D-03: in practice the creator joins in the same request, so a
+   * caller observes this as null for one in-process step, never persisted
+   * or serialized to a client). */
+  hostSeatId: z.string().nullable(),
   seats: z.array(SeatSchema),
   adapterId: z.string(),
   /** Opaque to this package — the game adapter's state shape (FDN-01). */
@@ -124,7 +128,7 @@ export const RoomViewSchema = z.object({
   code: RoomCodeSchema,
   variant: VariantSchema,
   status: RoomStatusSchema,
-  hostSeatId: z.string(),
+  hostSeatId: z.string().nullable(),
   youSeatId: z.string(),
   seats: z.array(PublicSeatSchema),
   /** Opaque to this package — the per-seat game view (FDN-01). */
