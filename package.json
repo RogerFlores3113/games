@@ -1,0 +1,22 @@
+{
+  "name": "games.rogerflores.dev",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc -b",
+    "build:worker": "npm run build --workspace apps/worker",
+    "build:web": "npm run build --workspace apps/web"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vitest": "4.1.11",
+    "fast-check": "4.9.0",
+    "@playwright/test": "1.62.1"
+  }
+}
