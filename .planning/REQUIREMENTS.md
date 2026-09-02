@@ -9,7 +9,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Room Lifecycle
 
-- [ ] **ROOM-01**: Host can create a Hanabi room and receive a shareable link
+- [x] **ROOM-01**: Host can create a Hanabi room and receive a shareable link
 - [x] **ROOM-02**: Player opening the link can join by entering a display name, with no account or email
 - [x] **ROOM-03**: Two players entering the same display name are disambiguated rather than colliding
 - [ ] **ROOM-04**: All players in a room see the current seat list, with each seat's connection status, before the game starts (amended 2026-09-01 during Phase 1 discussion: per-player ready state cut from scope — the host starts the game at will)
@@ -126,7 +126,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ROOM-01 | Phase 1 | Pending |
+| ROOM-01 | Phase 1 | Complete |
 | ROOM-02 | Phase 1 | Complete |
 | ROOM-03 | Phase 1 | Complete |
 | ROOM-04 | Phase 1 | Pending |

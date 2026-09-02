@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-05-PLAN.md
-last_updated: "2026-09-02T15:50:56.611Z"
+stopped_at: Completed 01-08-PLAN.md
+last_updated: "2026-09-02T16:01:18.674Z"
 last_activity: 2026-09-02
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 11
-  completed_plans: 6
+  completed_plans: 7
   percent: 0
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 01 (room-transport-skeleton) — EXECUTING
-Plan: 7 of 11
+Plan: 8 of 11
 Status: Ready to execute
 Last activity: 2026-09-02
 
-Progress: [██████░░░░] 55%
+Progress: [██████░░░░] 64%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [██████░░░░] 55%
 | Phase 01 P04 | 18min | 3 tasks | 5 files |
 | Phase 01 P05 | 15min | 2 tasks | 4 files |
 | Phase 01 P06 | 6min | 2 tasks | 4 files |
+| Phase 01 P08 | 25min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,9 @@ Recent decisions affecting current work:
 - [Phase ?]: resolveSeatByToken/rebindSeatConnection take plain seat/binding shapes, never a room-state parameter, structurally preventing D-08 rebinding from corrupting persisted seat state
 - [Phase ?]: scheduler.ts computeRoomTimers recomputes the whole timer table from RoomState on every call rather than mutating incrementally, structurally preventing the single-alarm-slot clobber bug (RESEARCH.md Pitfall 1)
 - [Phase ?]: persistence.ts reads schemaVersion from its own top-level storage key before ever touching the room blob; a version mismatch resets via deleteAll() without deserializing the old blob (D-17, RESEARCH.md Pitfall 3)
+- [Phase ?]: lucide-react pinned to exact 1.39.0 (was 'latest' in Wave 0 scaffold), matching the project's exact-pin convention
+- [Phase ?]: nanoid added to apps/web at exact 6.0.1, mirroring apps/worker's Plan 05 pin; both mint room codes independently from the same @games/schema constants
+- [Phase ?]: sessionStorage key room:{code}:displayName carries the host's entered name into the lobby so Plan 09 can auto-join without a retype (D-03)
 
 ### Pending Todos
 
@@ -102,6 +106,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-02T15:50:52.547Z
-Stopped at: Completed 01-05-PLAN.md
+Last session: 2026-09-02T16:01:18.667Z
+Stopped at: Completed 01-08-PLAN.md
 Resume file: None
