@@ -1,10 +1,11 @@
 ---
 phase: 1
 slug: room-transport-skeleton
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-09-01
+reviewed_at: 2026-09-02
 ---
 
 # Phase 1 — UI Design Contract
@@ -41,7 +42,7 @@ Declared values (must be multiples of 4):
 | 2xl | 48px | Major section breaks (space above/below the room-code display) |
 | 3xl | 64px | Page-level spacing (vertical centering offset on create/join/refusal screens) |
 
-Exceptions: Icon-only buttons (copy-link icon button) use a 44×44px minimum touch/click target regardless of their visible icon size, per standard accessible-target-size practice — the icon itself renders at 20px inside that target.
+Exceptions: `--size-touch-min: 44px` — every interactive control uses a 44×44px minimum touch/click target regardless of its rendered content size, per standard accessible-target-size practice. This applies to the "Copy link" button, which **always ships with its visible text label** (icon + "Copy link" text, never icon-only); its 20px icon and label sit inside that minimum target. Named as a token rather than left as a bare exception so Phase 6 inherits the convention.
 
 ---
 
@@ -80,6 +81,10 @@ Palette: dark "fireworks night" (D-16). Values below are the CSS custom properti
 | `--color-border` | `#232B45` | Hairline borders/dividers between seat rows and around cards |
 | `--color-status-connected` | `#34D399` | Connection-status dot — **always paired with the text label "Connected", never color alone** (see Accessibility note below) |
 | `--color-status-disconnected` | `#6B7280` (slate, not destructive red) | Connection-status dot — **always paired with the text label "Disconnected"**. Deliberately not the destructive-red token: a disconnected teammate is an expected, non-error state (someone's wifi dropped), not a failure needing alarm-red |
+
+**Contrast rule for accent fills (verified, load-bearing):** text or icons sitting *on* an `--color-accent` fill MUST use `--color-bg` (`#0B0F1A`) — that pairing computes to ≈10.9:1 and passes WCAG AA. `--color-text` (`#F4F6FB`) on `--color-accent` computes to ≈1.63:1 and fails AA for both normal and large text; it must never be used. Accent as *text* on `--color-bg` (the room-code Display role) is the inverse pairing and passes at ≈10.9:1.
+
+**Verified token pairs:** text-muted/bg ≈6.2:1 · text-muted/surface ≈5.6:1 · text/surface ≈16:1 · accent-text/bg ≈10.9:1 · destructive/surface ≈4.6:1 — all AA-passing.
 
 **Accent reserved for (explicit list, repeated for clarity):** primary CTA button fill, room-code Display text, own-seat "you" ring, active-turn indicator (counter game), focus rings. No other element — not links, not secondary buttons, not icons — uses the accent color.
 
@@ -121,11 +126,11 @@ Palette: dark "fireworks night" (D-16). Values below are the CSS custom properti
 
 Supplemental to the template's core contract — describes how the tokens above apply to each of Phase 1's five screens, per the `<scope>` block this spec was generated against.
 
-1. **Create-room screen** (D-03) — single screen, centered card on `--color-bg`. Display-name text input, variant picker (Base/Rainbow/Black, three equal-weight options, no default pre-selected bias implied beyond Base being first), "Create room" primary CTA (accent fill). No intermediate share screen — submitting routes directly into the lobby, already seated as host.
+1. **Create-room screen** (D-03) — single screen, centered card on `--color-bg`. Display-name text input, variant picker (Base/Rainbow/Black, three equal-weight options, no default pre-selected bias implied beyond Base being first), "Create room" primary CTA (accent fill, `--color-bg` label). No intermediate share screen — submitting routes directly into the lobby, already seated as host.
 2. **Join screen** (`/room/ABC123` without a seat token) — same visual shell as create-room (centered card), room code shown in Display typography above the form so the joining player can confirm they're entering the right room before typing their name. Display-name input + "Join room" CTA. No variant picker (locked by host).
 3. **Lobby** — full-width panel on `--color-surface`. Room code in Display role at the top with an adjacent "Copy link" button. Seat list below: each row shows display name (auto-suffixed per D-09), a connection-status dot + label (`--color-status-connected` / `--color-status-disconnected`, always with text), and a host badge on the current host's row. The current viewer's own row carries the accent "you" ring. Host-only: variant picker (editable until start, D-13) and "Start game" CTA, disabled/inert until 2–5 seats are filled — no separate error message needed for the disabled state; the disabled button plus a small `--color-text-muted` caption ("Need 2–5 players") communicates why.
 4. **Refusal screen** — one shared component for both "room full" (D-06) and "game in progress" (D-14): centered card, `--color-destructive` icon/border accent, heading + body per the Copywriting Contract, no CTA back into the room (nothing to retry into). Structurally identical markup/props for both cases; only the heading/body copy and an internal `reason: "full" | "in-progress"` prop differ — this is the shared-shape requirement from CONTEXT.md's `<specifics>`.
-5. **Placeholder counter game** (D-15) — deliberately minimal: a single large number (reuse the Display typography role, `--color-text`, not accent, to keep it visually distinct from the room code), a turn indicator ("Your turn" / "Waiting for {name}", accent-colored only for the active player's own view), and a single "+1" button (accent fill, disabled for non-active players). No card art, no board chrome — this screen exists to prove turn order and broadcast, not to look finished, and its minimalism is intentional so its Phase 2 deletion is a small, legible diff (per the `<specifics>` note in CONTEXT.md).
+5. **Placeholder counter game** (D-15) — deliberately minimal: a single large number (reuse the Display typography role, `--color-text`, not accent, to keep it visually distinct from the room code), a turn indicator ("Your turn" / "Waiting for {name}", accent-colored only for the active player's own view), and a single "+1" button (accent fill with a `--color-bg` label, matching the primary-button contract, disabled for non-active players). No card art, no board chrome — this screen exists to prove turn order and broadcast, not to look finished, and its minimalism is intentional so its Phase 2 deletion is a small, legible diff (per the `<specifics>` note in CONTEXT.md).
 
 ---
 
@@ -133,18 +138,18 @@ Supplemental to the template's core contract — describes how the tokens above 
 
 - **Seat row** is the one component reused across the lobby and (implicitly) later phases — build it now as a small, isolated component (`SeatRow`) taking `{name, connected, isHost, isSelf}` props, since Phase 6's in-game player list is a near-identical shape.
 - **RefusalCard** should be built as the single shared component described above, parametrized by a `reason` prop — do not create two separate components for "full" vs "in-progress".
-- **Buttons**: exactly two visual variants needed this phase — primary (accent fill, `--color-text` on top for contrast) and a plain/ghost variant for "Copy link" (border `--color-border`, `--color-text` label, no fill). Do not introduce a third button variant in Phase 1.
+- **Buttons**: exactly two visual variants needed this phase — primary (accent fill `--color-accent`, with a **`--color-bg` (`#0B0F1A`) label**, ≈10.9:1 contrast, WCAG AA pass) and a plain/ghost variant for "Copy link" (border `--color-border`, `--color-text` label, no fill). Do not introduce a third button variant in Phase 1. **Never put `--color-text` on an accent fill** — that pairing computes to ≈1.63:1 and fails AA badly; every accent-filled surface in this phase and in Phase 6 takes the dark `--color-bg` label.
 - Use `clsx` for conditional class composition (own-seat ring, disabled button states, connection-status dot color) per `CLAUDE.md`'s locked stack — no `tailwind-merge` needed at this phase's component complexity.
 
 ---
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-09-02 (gsd-ui-checker, 6/6 dimensions PASS after 1 revision)
