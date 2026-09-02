@@ -13,7 +13,7 @@
 //      scheduling method), inside `#syncAlarm`.
 //   2. Exactly one `toSeatView` call site (the literal invocation with an opening paren), inside `#pushState` — every
 //      outbound frame is produced per-connection for that connection's own
-//      seat. `this.broadcast(` never appears (CLAUDE.md "What NOT to Use":
+//      seat. This class never calls the room-wide broadcast helper (CLAUDE.md "What NOT to Use":
 //      broadcasting one shared state object to all seats is forbidden).
 
 import { Server, type Connection, type ConnectionContext } from "partyserver";
