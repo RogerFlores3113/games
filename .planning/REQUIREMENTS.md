@@ -16,7 +16,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **ROOM-05**: Host can configure the variant at room creation: base, Rainbow, or Black
 - [x] **ROOM-06**: Host can start the game once between 2 and 5 players are seated and ready
 - [x] **ROOM-07**: A player arriving at a link for a game already in progress is told so clearly rather than silently failing or joining a broken state
-- [ ] **ROOM-08**: Abandoned rooms are garbage collected without manual intervention
+- [x] **ROOM-08**: Abandoned rooms are garbage collected without manual intervention
 
 ### Realtime & Session Durability
 
@@ -133,7 +133,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ROOM-05 | Phase 1 | Complete |
 | ROOM-06 | Phase 1 | Complete |
 | ROOM-07 | Phase 1 | Complete |
-| ROOM-08 | Phase 1 | Pending |
+| ROOM-08 | Phase 1 | Complete |
 | RT-01 | Phase 4 | Pending |
 | RT-02 | Phase 1 | Pending |
 | RT-03 | Phase 4 | Pending |

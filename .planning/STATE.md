@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 01-05-PLAN.md
-last_updated: "2026-09-02T15:42:36.416Z"
+last_updated: "2026-09-02T15:50:56.611Z"
 last_activity: 2026-09-02
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 11
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 01 (room-transport-skeleton) — EXECUTING
-Plan: 6 of 11
+Plan: 7 of 11
 Status: Ready to execute
 Last activity: 2026-09-02
 
-Progress: [█████░░░░░] 45%
+Progress: [██████░░░░] 55%
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Progress: [█████░░░░░] 45%
 | Phase 01 P03 | 12 | 2 tasks | 6 files |
 | Phase 01 P04 | 18min | 3 tasks | 5 files |
 | Phase 01 P05 | 15min | 2 tasks | 4 files |
+| Phase 01 P06 | 6min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ Recent decisions affecting current work:
 - [Phase ?]: AdapterError collapses onto RefusalReason's bad_request rather than widening the shared wire enum for a placeholder game Phase 2 deletes (Plan 04)
 - [Phase ?]: nanoid pinned to exact 6.0.1 as explicit apps/worker dependency (was only transitive/mismatched before)
 - [Phase ?]: resolveSeatByToken/rebindSeatConnection take plain seat/binding shapes, never a room-state parameter, structurally preventing D-08 rebinding from corrupting persisted seat state
+- [Phase ?]: scheduler.ts computeRoomTimers recomputes the whole timer table from RoomState on every call rather than mutating incrementally, structurally preventing the single-alarm-slot clobber bug (RESEARCH.md Pitfall 1)
+- [Phase ?]: persistence.ts reads schemaVersion from its own top-level storage key before ever touching the room blob; a version mismatch resets via deleteAll() without deserializing the old blob (D-17, RESEARCH.md Pitfall 3)
 
 ### Pending Todos
 
@@ -99,6 +102,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-02T15:42:36.408Z
+Last session: 2026-09-02T15:50:52.547Z
 Stopped at: Completed 01-05-PLAN.md
 Resume file: None
