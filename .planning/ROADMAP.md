@@ -32,7 +32,19 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Host can start the game at will once 2-5 players are seated; a player arriving at a link for a game already in progress sees a clear message rather than a broken or blank table. (Amended 2026-09-01: no ready gate.)
   4. A returning player's browser reattaches automatically to its previously assigned seat via a saved token, and a seat already claimed by one person cannot be taken over by a second person holding the same link.
   5. The room/seat/connection machinery contains no Hanabi-specific logic (proven by routing a trivial placeholder game through it), the whole stack runs entirely on free-tier services with no paid plan, room state survives a forced actor restart, a cold link click after a week of inactivity succeeds within seconds with no manual step, and abandoned rooms are cleaned up automatically.
-**Plans**: TBD
+**Plans**: 11 plans
+Plans:
+- [ ] 01-01-PLAN.md — Monorepo scaffold, Vitest 4 `projects` + Playwright harness, deploy-shape smoke tests (Wave 0)
+- [ ] 01-02-PLAN.md — Game-adapter interface + D-15 shared-counter placeholder (`packages/rules`)
+- [ ] 01-03-PLAN.md — Zod wire protocol, room/seat schemas, phase constants (`packages/schema`)
+- [ ] 01-04-PLAN.md — Pure room state machine: seating, name disambiguation, variant lock, start gating, refusals
+- [ ] 01-05-PLAN.md — Seat identity: room-code vs seat-token minting, reclaim, newest-socket-wins rebinding
+- [ ] 01-06-PLAN.md — Unified single-slot alarm scheduler + versioned persistence with D-17 reset
+- [ ] 01-07-PLAN.md — RoomDO assembly on `partyserver`: hibernation, dispatch, per-seat push, onAlarm, idle GC
+- [ ] 01-08-PLAN.md — Tailwind v4 `@theme` dark palette, shared components, `POST /api/room`, create-room screen
+- [ ] 01-09-PLAN.md — partysocket client, seat-token persistence, join/lobby/counter screens (human verification)
+- [ ] 01-10-PLAN.md — Playwright E2E: create, join, live seat list, seat takeover, in-progress refusal, start game
+- [ ] 01-11-PLAN.md — Deploy, custom domain, free-tier confirmation, RT-02 cold-start procedure (manual)
 **Research note**: Cloudflare Durable Objects / `partyserver` API surface moves quickly — re-verify exact library version, hibernation lifecycle hooks, and free-tier limits against current docs immediately before planning this phase (research flagged MEDIUM confidence here).
 
 ### Phase 2: Per-Seat Redaction Contract
@@ -109,7 +121,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Room & Transport Skeleton | 0/TBD | Not started | - |
+| 1. Room & Transport Skeleton | 0/11 | Not started | - |
 | 2. Per-Seat Redaction Contract | 0/TBD | Not started | - |
 | 3. Hanabi Rules Engine | 0/TBD | Not started | - |
 | 4. Wire Engine Into Room Actor | 0/TBD | Not started | - |
