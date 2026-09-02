@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/*
+ * Phase 1 (D-16) establishes the dark "fireworks night" palette here, once,
+ * as Tailwind v4 CSS-first `@theme` tokens. Phase 6 builds the real game
+ * board on TOP of these tokens and must NOT redefine them here or hardcode
+ * a hex value anywhere outside this block.
+ *
+ * `--color-accent` is reserved for EXACTLY five uses, per the
+ * approved UI-SPEC: primary CTA fill ("Create room" / "Join room" /
+ * "Start game"), the room-code Display text, the own-seat "you are here"
+ * ring, the active-turn indicator (placeholder counter game), and focus
+ * rings. Nothing else may use it.
+ *
+ * Contrast rule (load-bearing, verified): anything sitting ON an
+ * --color-accent fill MUST use --color-bg as its label color (~10.9:1,
+ * WCAG AA pass). --color-text on --color-accent is ~1.63:1 and FAILS AA —
+ * it must never be used.
+ */
+@theme {
+  --color-bg: #0B0F1A;
+  --color-surface: #141A2E;
+  --color-accent: #F5B942;
+  --color-destructive: #F0453D;
+  --color-text: #F4F6FB;
+  --color-text-muted: #8B93A8;
+  --color-border: #232B45;
+  --color-status-connected: #34D399;
+  --color-status-disconnected: #6B7280;
+
+  --size-touch-min: 44px;
+
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  --spacing-3xl: 64px;
+
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /*
+   * Typographic roles (only two weights exist in this app: 400 and 600 —
+   * do not introduce a third). "Display" is reserved exclusively for the
+   * room code — it is read aloud digit-by-digit over a voice call, so it
+   * is the one piece of typography here that is explicitly NOT decorative.
+   */
+  --text-body: 16px;
+  --text-body--line-height: 1.5;
+  --text-body--font-weight: 400;
+
+  --text-label: 14px;
+  --text-label--line-height: 1.5;
+  --text-label--font-weight: 600;
+
+  --text-heading: 24px;
+  --text-heading--line-height: 1.2;
+  --text-heading--font-weight: 600;
+
+  --text-display: 40px;
+  --text-display--line-height: 1.2;
+  --text-display--font-weight: 600;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  color-scheme: dark;
+}
