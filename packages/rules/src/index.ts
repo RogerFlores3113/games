@@ -14,3 +14,6 @@ export type {
   GameEndResult,
   Variant,
 } from "./adapter";
+
+export { counterGame } from "./counter-game";
+export type { CounterAction, CounterState, CounterView } from "./counter-game";
