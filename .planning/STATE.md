@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-09-02T15:34:10.170Z"
+stopped_at: Completed 01-05-PLAN.md
+last_updated: "2026-09-02T15:42:36.416Z"
 last_activity: 2026-09-02
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 11
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 01 (room-transport-skeleton) — EXECUTING
-Plan: 5 of 11
+Plan: 6 of 11
 Status: Ready to execute
 Last activity: 2026-09-02
 
-Progress: [████░░░░░░] 36%
+Progress: [█████░░░░░] 45%
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Progress: [████░░░░░░] 36%
 | Phase 01 P02 | 10 | 3 tasks | 5 files |
 | Phase 01 P03 | 12 | 2 tasks | 6 files |
 | Phase 01 P04 | 18min | 3 tasks | 5 files |
+| Phase 01 P05 | 15min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ Recent decisions affecting current work:
 - [Phase ?]: SeatTokenSchema/RoomCodeSchema use zod4's z.brand() for the RT-07 seat-hijack boundary, making conflation a compile error rather than a review convention
 - [Phase ?]: packages/schema/src/room.ts hostSeatId widened to nullable to represent the pre-first-seat empty-room state (Plan 04, Rule 1 fix)
 - [Phase ?]: AdapterError collapses onto RefusalReason's bad_request rather than widening the shared wire enum for a placeholder game Phase 2 deletes (Plan 04)
+- [Phase ?]: nanoid pinned to exact 6.0.1 as explicit apps/worker dependency (was only transitive/mismatched before)
+- [Phase ?]: resolveSeatByToken/rebindSeatConnection take plain seat/binding shapes, never a room-state parameter, structurally preventing D-08 rebinding from corrupting persisted seat state
 
 ### Pending Todos
 
@@ -96,6 +99,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-02T15:32:01.684Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-09-02T15:42:36.408Z
+Stopped at: Completed 01-05-PLAN.md
 Resume file: None
