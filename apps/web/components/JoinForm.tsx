@@ -1,0 +1,83 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { Button } from "./Button";
+import { RoomCode } from "./RoomCode";
+
+export interface JoinFormProps {
+  /** The room code from the URL — shown above the form so the joining
+   * player can confirm they're entering the right room before typing
+   * their name (UI-SPEC § Screens & States, item 2). */
+  code: string;
+  /** Called with the trimmed display name once the player submits. The
+   * caller owns opening the socket connection. */
+  onJoin: (displayName: string) => void;
+}
+
+/**
+ * The join screen for a `/room/[code]` visitor with no saved seat token.
+ * Display name only — no variant picker (locked to the host's choice) and
+ * nothing else to fill out (ROOM-02).
+ */
+export function JoinForm({ code, onJoin }: JoinFormProps) {
+  const [displayName, setDisplayName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const shareUrl =
+    typeof window !== "undefined" ? window.location.href : `https://games.rogerflores.dev/room/${code}`;
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = displayName.trim();
+    if (!trimmed) {
+      return;
+    }
+    setSubmitting(true);
+    onJoin(trimmed);
+  }
+
+  return (
+    <main
+      className="flex min-h-screen items-center justify-center px-[length:var(--spacing-md)]"
+      style={{ backgroundColor: "var(--color-bg)" }}
+    >
+      <form
+        onSubmit={handleSubmit}
+        className="flex w-full max-w-sm flex-col gap-[length:var(--spacing-md)] rounded-lg p-[length:var(--spacing-lg)]"
+        style={{ backgroundColor: "var(--color-surface)" }}
+      >
+        <RoomCode code={code} shareUrl={shareUrl} />
+
+        <div className="flex flex-col gap-[length:var(--spacing-sm)]">
+          <label
+            htmlFor="displayName"
+            className="text-[length:var(--text-label)] font-semibold"
+            style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
+          >
+            Your name
+          </label>
+          <input
+            id="displayName"
+            name="displayName"
+            type="text"
+            required
+            maxLength={24}
+            autoFocus
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            className="rounded-md border px-[length:var(--spacing-sm)] py-[length:var(--spacing-sm)] text-[length:var(--text-body)]"
+            style={{
+              backgroundColor: "var(--color-bg)",
+              borderColor: "var(--color-border)",
+              color: "var(--color-text)",
+            }}
+          />
+        </div>
+
+        <Button type="submit" variant="primary" disabled={submitting}>
+          {submitting ? "Joining..." : "Join room"}
+        </Button>
+      </form>
+    </main>
+  );
+}
