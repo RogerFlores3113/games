@@ -122,3 +122,6 @@ None.
 ---
 *Phase: 01-room-transport-skeleton*
 *Completed: 2026-09-02*
+
+## Self-Check: PASSED
+All 4 created files verified present on disk. All 4 commit hashes (2e0d9bd, ff12559, 0f9fa7c, 52987db) verified in git log.
