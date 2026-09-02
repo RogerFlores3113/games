@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --port 8787",
-    "build": "wrangler deploy --dry-run --outdir dist"
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "test:integration": "vitest run --project worker room-do"
   },
   "dependencies": {
     "@games/rules": "*",
@@ -14,6 +15,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260902.1",
+    "@types/node": "26.4.1",
     "wrangler": "4.128.0"
   }
 }

@@ -37,6 +37,12 @@ export default defineConfig({
           name: "worker",
           root: "apps/worker",
           include: ["src/**/*.test.ts"],
+          // room-do.test.ts drives a real `wrangler dev` process over real
+          // WebSockets; the default 5s test timeout is too tight for that
+          // suite's network round trips (the D-17 restart test overrides
+          // this per-test to allow for the forced process kill/respawn).
+          testTimeout: 15000,
+          hookTimeout: 30000,
           // `partyserver`'s compiled JS imports "cloudflare:workers" itself
           // (RoomDO extends its Server class) — Vite externalizes node_modules
           // deps by default, which skips `resolve.alias` entirely. Inlining
