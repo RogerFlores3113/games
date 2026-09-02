@@ -167,3 +167,6 @@ None — no external service configuration required. `POST /api/room` runs entir
 ---
 *Phase: 01-room-transport-skeleton*
 *Completed: 2026-09-02*
+
+## Self-Check: PASSED
+All 10 created files verified present on disk. All 4 commit hashes (384b350, 3959959, 6f44c7e, efeb396) verified in git log.
