@@ -6,3 +6,11 @@
 // game land in later plans of this phase.
 
 export const RULES_SMOKE = "rules-smoke-ok";
+
+export type {
+  AdapterError,
+  AdapterResult,
+  GameAdapter,
+  GameEndResult,
+  Variant,
+} from "./adapter";
