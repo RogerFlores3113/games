@@ -28,8 +28,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Requirements**: ROOM-01, ROOM-02, ROOM-03, ROOM-04, ROOM-05, ROOM-06, ROOM-07, ROOM-08, RT-02, RT-07, FDN-01, FDN-03, FDN-04
 **Success Criteria** (what must be TRUE):
   1. Host can create a room at games.rogerflores.dev, choose a variant (base/Rainbow/Black), and receive a shareable link.
-  2. A player joins via the link by entering a display name (no account), is assigned a seat, and every player in the room sees the live seat list and ready states update, with duplicate display names shown as distinct entries rather than colliding.
-  3. Host can start the game only once 2-5 seated players are ready; a player arriving at a link for a game already in progress sees a clear message rather than a broken or blank table.
+  2. A player joins via the link by entering a display name (no account), is assigned a seat, and every player in the room sees the live seat list and each seat's connection status update, with duplicate display names shown as distinct entries rather than colliding. (Amended 2026-09-01: ready states cut from scope.)
+  3. Host can start the game at will once 2-5 players are seated; a player arriving at a link for a game already in progress sees a clear message rather than a broken or blank table. (Amended 2026-09-01: no ready gate.)
   4. A returning player's browser reattaches automatically to its previously assigned seat via a saved token, and a seat already claimed by one person cannot be taken over by a second person holding the same link.
   5. The room/seat/connection machinery contains no Hanabi-specific logic (proven by routing a trivial placeholder game through it), the whole stack runs entirely on free-tier services with no paid plan, room state survives a forced actor restart, a cold link click after a week of inactivity succeeds within seconds with no manual step, and abandoned rooms are cleaned up automatically.
 **Plans**: TBD

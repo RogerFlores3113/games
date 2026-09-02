@@ -12,7 +12,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **ROOM-01**: Host can create a Hanabi room and receive a shareable link
 - [ ] **ROOM-02**: Player opening the link can join by entering a display name, with no account or email
 - [ ] **ROOM-03**: Two players entering the same display name are disambiguated rather than colliding
-- [ ] **ROOM-04**: All players in a room see the current seat list and each player's ready state before the game starts
+- [ ] **ROOM-04**: All players in a room see the current seat list, with each seat's connection status, before the game starts (amended 2026-09-01 during Phase 1 discussion: per-player ready state cut from scope — the host starts the game at will)
 - [ ] **ROOM-05**: Host can configure the variant at room creation: base, Rainbow, or Black
 - [ ] **ROOM-06**: Host can start the game once between 2 and 5 players are seated and ready
 - [ ] **ROOM-07**: A player arriving at a link for a game already in progress is told so clearly rather than silently failing or joining a broken state
