@@ -37,6 +37,17 @@ export default defineConfig({
           name: "worker",
           root: "apps/worker",
           include: ["src/**/*.test.ts"],
+          // `partyserver`'s compiled JS imports "cloudflare:workers" itself
+          // (RoomDO extends its Server class) — Vite externalizes node_modules
+          // deps by default, which skips `resolve.alias` entirely. Inlining
+          // forces `partyserver` through the same transform/alias pipeline as
+          // our own source, so the shim below also covers this transitive
+          // import (Plan 07 finding, Rule 3 blocking fix).
+          server: {
+            deps: {
+              inline: ["partyserver"],
+            },
+          },
         },
         resolve: {
           alias: {
