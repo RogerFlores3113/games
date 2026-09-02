@@ -9,10 +9,11 @@
   "dependencies": {
     "@games/rules": "*",
     "@games/schema": "*",
+    "nanoid": "6.0.1",
     "partyserver": "0.5.10"
   },
   "devDependencies": {
-    "wrangler": "4.128.0",
-    "@cloudflare/workers-types": "5.20260902.1"
+    "@cloudflare/workers-types": "5.20260902.1",
+    "wrangler": "4.128.0"
   }
 }
