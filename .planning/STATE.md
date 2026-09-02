@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-09-02T07:51:15.258Z"
+last_updated: "2026-09-02T07:57:23.993Z"
 last_activity: 2026-09-02
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 11
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 01 (room-transport-skeleton) — EXECUTING
-Plan: 3 of 11
+Plan: 4 of 11
 Status: Ready to execute
 Last activity: 2026-09-02
 
-Progress: [██░░░░░░░░] 18%
+Progress: [███░░░░░░░] 27%
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Progress: [██░░░░░░░░] 18%
 *Updated after each plan completion*
 | Phase 01 P01 | 13 | 4 tasks | 33 files |
 | Phase 01 P02 | 10 | 3 tasks | 5 files |
+| Phase 01 P03 | 12 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,8 @@ Recent decisions affecting current work:
 - [Phase ?]: apps/worker/src/index.ts must never re-export plain constants as top-level named exports (wrangler Modules format reserves top-level named exports for Worker entrypoints)
 - [Phase ?]: Variant type duplicated locally in packages/rules/src/adapter.ts (not imported from @games/schema) to keep packages/rules at zero runtime dependencies per FDN-02; Plan 04 adds a compile-time mutual-assignability check
 - [Phase ?]: GameAdapter interface has no whole-state serializer; toPlayerView is the only exit point from adapter state to the wire, enforced by grep in the plan's acceptance criteria
+- [Phase ?]: Sequenced schema/src/index.ts re-exports to match Plan 03 task order (constants+room, then +messages) so each task commit is independently buildable
+- [Phase ?]: SeatTokenSchema/RoomCodeSchema use zod4's z.brand() for the RT-07 seat-hijack boundary, making conflation a compile error rather than a review convention
 
 ### Pending Todos
 
@@ -90,6 +93,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-02T07:51:15.251Z
+Last session: 2026-09-02T07:57:19.835Z
 Stopped at: Completed 01-02-PLAN.md
 Resume file: None

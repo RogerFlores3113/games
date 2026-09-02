@@ -10,12 +10,12 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Room Lifecycle
 
 - [ ] **ROOM-01**: Host can create a Hanabi room and receive a shareable link
-- [ ] **ROOM-02**: Player opening the link can join by entering a display name, with no account or email
+- [x] **ROOM-02**: Player opening the link can join by entering a display name, with no account or email
 - [ ] **ROOM-03**: Two players entering the same display name are disambiguated rather than colliding
 - [ ] **ROOM-04**: All players in a room see the current seat list, with each seat's connection status, before the game starts (amended 2026-09-01 during Phase 1 discussion: per-player ready state cut from scope — the host starts the game at will)
-- [ ] **ROOM-05**: Host can configure the variant at room creation: base, Rainbow, or Black
+- [x] **ROOM-05**: Host can configure the variant at room creation: base, Rainbow, or Black
 - [ ] **ROOM-06**: Host can start the game once between 2 and 5 players are seated and ready
-- [ ] **ROOM-07**: A player arriving at a link for a game already in progress is told so clearly rather than silently failing or joining a broken state
+- [x] **ROOM-07**: A player arriving at a link for a game already in progress is told so clearly rather than silently failing or joining a broken state
 - [ ] **ROOM-08**: Abandoned rooms are garbage collected without manual intervention
 
 ### Realtime & Session Durability
@@ -26,7 +26,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **RT-04**: A player who loses connection or whose mobile tab is suspended rejoins their same seat and resumes the game in progress
 - [ ] **RT-05**: Reconnecting a player uses the same state-delivery path as initial join, not a separate resume path
 - [ ] **RT-06**: Remaining players see a clear disconnected indicator for an absent player, and the game pauses in place rather than freezing or erroring
-- [ ] **RT-07**: An occupied seat cannot be taken over by another person holding the room link
+- [x] **RT-07**: An occupied seat cannot be taken over by another person holding the room link
 - [ ] **RT-08**: A player opening the room in a second tab does not corrupt or duplicate their seat
 - [ ] **RT-09**: Submitting the same action twice (double-click, retry after a dropped response) applies it once
 
@@ -127,12 +127,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | ROOM-01 | Phase 1 | Pending |
-| ROOM-02 | Phase 1 | Pending |
+| ROOM-02 | Phase 1 | Complete |
 | ROOM-03 | Phase 1 | Pending |
 | ROOM-04 | Phase 1 | Pending |
-| ROOM-05 | Phase 1 | Pending |
+| ROOM-05 | Phase 1 | Complete |
 | ROOM-06 | Phase 1 | Pending |
-| ROOM-07 | Phase 1 | Pending |
+| ROOM-07 | Phase 1 | Complete |
 | ROOM-08 | Phase 1 | Pending |
 | RT-01 | Phase 4 | Pending |
 | RT-02 | Phase 1 | Pending |
@@ -140,7 +140,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RT-04 | Phase 5 | Pending |
 | RT-05 | Phase 5 | Pending |
 | RT-06 | Phase 5 | Pending |
-| RT-07 | Phase 1 | Pending |
+| RT-07 | Phase 1 | Complete |
 | RT-08 | Phase 5 | Pending |
 | RT-09 | Phase 4 | Pending |
 | HIDE-01 | Phase 2 | Pending |
