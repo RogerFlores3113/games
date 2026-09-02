@@ -61,7 +61,7 @@ export function mintSeatId(): string {
 // ---------------------------------------------------------------------------
 
 /** A minimal seat shape this module needs to resolve a token — deliberately
- * NOT importing the full persisted `Seat`/`RoomState` types, so this file
+ * NOT importing the full persisted seat/room-state types, so this file
  * stays provably free of room-state concerns (see `rebindSeatConnection`
  * below for why that separation matters). */
 export interface TokenBearingSeat {
@@ -131,8 +131,8 @@ export interface RebindResult {
  * `SUPERSEDED_CLOSE_CODE` — the stale tab is told explicitly, rather than
  * the seat silently reassigning underneath it.
  *
- * This function's signature has no `RoomState` parameter and its body never
- * reads or writes persisted room state: rebinding is a connection-layer
+ * This function's signature has no persisted-room-state parameter and its
+ * body never reads or writes persisted room state: rebinding is a connection-layer
  * concern only, which is how "Phase 1 only needs this to not corrupt seat
  * state" is guaranteed structurally rather than by convention. */
 export function rebindSeatConnection(
