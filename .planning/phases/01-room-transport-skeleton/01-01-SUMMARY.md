@@ -147,3 +147,6 @@ Both are flagged in the plan's `user_setup` frontmatter and recorded as a checkl
 ---
 *Phase: 01-room-transport-skeleton*
 *Completed: 2026-09-02*
+
+## Self-Check: PASSED
+All 12 created files verified present on disk. All 4 commit hashes (8f80322, cb5d804, 83f7046, ad5d09f) verified in git log.
