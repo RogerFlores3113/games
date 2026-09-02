@@ -1,8 +1,8 @@
 ---
 phase: 1
 slug: room-transport-skeleton
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-09-01
 ---
@@ -39,22 +39,22 @@ created: 2026-09-01
 
 ## Per-Task Verification Map
 
-| Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | TBD | 0 | — | — | N/A | setup | `npx vitest run` (exits 0, discovers projects) | ❌ W0 | ⬜ pending |
-| TBD | TBD | 1 | FDN-01 | — | Adapter takes an action *request*, never a state patch | unit | `npx vitest run packages/rules` | ❌ W0 | ⬜ pending |
-| TBD | TBD | 1 | ROOM-05 | T-1-04 | Variant locks at game start; client cannot re-assert it | unit | `npx vitest run apps/worker` | ❌ W0 | ⬜ pending |
-| TBD | TBD | 2 | ROOM-03 | — | Display-name suffixing is display-only; seat ID is authority | unit | `npx vitest run apps/worker` | ❌ W0 | ⬜ pending |
-| TBD | TBD | 2 | RT-07 | T-1-01 | Seat token is server-minted, long `nanoid`; possession-checked server-side on every connect | unit | `npx vitest run apps/worker` | ❌ W0 | ⬜ pending |
-| TBD | TBD | 2 | ROOM-08 | — | Unified single-slot alarm scheduler; no independent `setAlarm` calls | unit (fake timers) | `npx vitest run apps/worker` | ❌ W0 | ⬜ pending |
-| TBD | TBD | 2 | ROOM-06 | T-1-04 | Start gated 2–5 seated, host-only, server-authoritative | unit | `npx vitest run apps/worker` | ❌ W0 | ⬜ pending |
-| TBD | TBD | 3 | ROOM-01 | — | Room code is short/speakable; seat token is NOT | unit + E2E | `npx playwright test` | ❌ W0 | ⬜ pending |
-| TBD | TBD | 3 | ROOM-02 | T-1-03 | Join requires no account; inbound msgs Zod-validated | E2E | `npx playwright test` | ❌ W0 | ⬜ pending |
-| TBD | TBD | 3 | ROOM-04 | — | Per-seat connection status broadcast live | E2E (2 clients) | `npx playwright test` | ❌ W0 | ⬜ pending |
-| TBD | TBD | 3 | ROOM-07 | — | In-progress arrival blocked with a message, no partial state | E2E | `npx playwright test` | ❌ W0 | ⬜ pending |
+| Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
+|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
+| 01-01 | 0 | FDN-01 | — | Test harness + deploy-shape smoke (retires RESEARCH A3) | setup | `npx vitest run` · `wrangler deploy --dry-run` | ❌ W0 | ⬜ pending |
+| 01-02 | 1 | FDN-01 | — | Adapter takes an action *request*, never a state patch; no whole-state serializer | unit | `npx vitest run --project rules` | ❌ W0 | ⬜ pending |
+| 01-03 | 1 | ROOM-02, ROOM-05, ROOM-07, RT-07 | V5 | Zod-validate every inbound message before dispatch; room code and seat token are distinct branded types | unit | `npx vitest run --project schema` | ❌ W0 | ⬜ pending |
+| 01-04 | 2 | ROOM-03, ROOM-05, ROOM-06, ROOM-07, FDN-01 | V4 | Server-authoritative room state; start gated 2–5 seated, host-only; variant locks at start | unit | `npx vitest run --project worker` | ❌ W0 | ⬜ pending |
+| 01-05 | 2 | RT-07 | V3, V4 | Seat token server-minted, 24-char nanoid, validated server-side every connect | unit | `npx vitest run --project worker` | ❌ W0 | ⬜ pending |
+| 01-06 | 2 | ROOM-08 | — | Unified single-slot timer table; pure scheduler makes alarm clobbering impossible by construction | unit (explicit timestamps) | `npx vitest run --project worker` | ❌ W0 | ⬜ pending |
+| 01-07 | 3 | ROOM-04, ROOM-07, ROOM-08, RT-07, FDN-01 | V3, V4, V5 | Single `setAlarm` call site; `toSeatView` chokepoint (no shared-state broadcast); forged-token rejection; **D-17 restart durability via forced DO eviction** | integration (live WS) | `npx vitest run --project worker` | ❌ W0 | ⬜ pending |
+| 01-08 | 2 | ROOM-01, ROOM-05 | — | Lazy DO creation; `@theme` dark tokens (D-16), no light-mode default | unit + build | `npx vitest run` · `npm run build --workspace apps/web` | ❌ W0 | ⬜ pending |
+| 01-09 | 4 | ROOM-01, ROOM-02, ROOM-04, ROOM-06, ROOM-07 | V3 | Live seat list + connection status; superseded-tab notice (D-08); no ready toggle (D-10) | build + **human-verify (13 steps)** | `npx vitest run && npm run build` | ❌ W0 | ⬜ pending |
+| 01-10 | 5 | ROOM-01, ROOM-02, ROOM-04, ROOM-06, ROOM-07, RT-07 | V3, V4 | Adversarial forged-seat-token E2E proves RT-07 with an executable attacker | E2E | `npx playwright test` | ❌ W0 | ⬜ pending |
+| 01-11 | 6 | RT-02, FDN-03, FDN-04 | — | N/A — deploy, DNS, billing verification | **manual-only** | N/A — see Manual-Only Verifications | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
-*Task IDs are filled in by the planner; waves above are the research's expected shape, not a binding assignment.*
+*Synced against the 11 finalized plans on 2026-09-02.*
 
 ---
 
@@ -81,11 +81,11 @@ created: 2026-09-01
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-09-02 — synced against the 11 finalized plans; gsd-plan-checker confirmed no `--watch` flags and no 3-consecutive-tasks-without-automated-verify.

@@ -415,7 +415,9 @@ async onStart() {
 
 **If this table is empty:** N/A — see entries above.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> Both questions below were resolved during planning (2026-09-02) by adopting the stated recommendation. Plan 01-08 explicitly implements lazy DO creation; no plan performs a server-to-server Vercel→Worker HTTP call. Retained for the reasoning trail.
 
 1. **Does the Next.js API route (`POST /api/room`) need to create the DO's storage state directly, or is lazy creation on first WebSocket connect sufficient?**
    - What we know: `routePartykitRequest`/`getServerByName` will instantiate a DO on first access regardless of whether it "exists" yet — DOs don't have a separate creation step distinct from first access.
