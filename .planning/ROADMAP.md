@@ -41,7 +41,7 @@ Plans:
 **Wave 1**
 
 - [x] 01-01-PLAN.md — Monorepo scaffold, Vitest 4 `projects` + Playwright harness, deploy-shape smoke tests (Wave 0)
-- [ ] 01-02-PLAN.md — Game-adapter interface + D-15 shared-counter placeholder (`packages/rules`)
+- [x] 01-02-PLAN.md — Game-adapter interface + D-15 shared-counter placeholder (`packages/rules`)
 - [ ] 01-03-PLAN.md — Zod wire protocol, room/seat schemas, phase constants (`packages/schema`)
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -161,7 +161,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Room & Transport Skeleton | 1/11 | In Progress|  |
+| 1. Room & Transport Skeleton | 2/11 | In Progress|  |
 | 2. Per-Seat Redaction Contract | 0/TBD | Not started | - |
 | 3. Hanabi Rules Engine | 0/TBD | Not started | - |
 | 4. Wire Engine Into Room Actor | 0/TBD | Not started | - |
