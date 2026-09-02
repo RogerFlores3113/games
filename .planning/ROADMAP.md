@@ -46,7 +46,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-04-PLAN.md — Pure room state machine: seating, name disambiguation, variant lock, start gating, refusals
+- [x] 01-04-PLAN.md — Pure room state machine: seating, name disambiguation, variant lock, start gating, refusals
 - [ ] 01-05-PLAN.md — Seat identity: room-code vs seat-token minting, reclaim, newest-socket-wins rebinding
 - [ ] 01-06-PLAN.md — Unified single-slot alarm scheduler + versioned persistence with D-17 reset
 - [ ] 01-08-PLAN.md — Tailwind v4 `@theme` dark palette, shared components, `POST /api/room`, create-room screen
@@ -161,7 +161,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Room & Transport Skeleton | 3/11 | In Progress|  |
+| 1. Room & Transport Skeleton | 4/11 | In Progress|  |
 | 2. Per-Seat Redaction Contract | 0/TBD | Not started | - |
 | 3. Hanabi Rules Engine | 0/TBD | Not started | - |
 | 4. Wire Engine Into Room Actor | 0/TBD | Not started | - |

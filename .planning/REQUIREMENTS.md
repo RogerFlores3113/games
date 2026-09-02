@@ -11,10 +11,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **ROOM-01**: Host can create a Hanabi room and receive a shareable link
 - [x] **ROOM-02**: Player opening the link can join by entering a display name, with no account or email
-- [ ] **ROOM-03**: Two players entering the same display name are disambiguated rather than colliding
+- [x] **ROOM-03**: Two players entering the same display name are disambiguated rather than colliding
 - [ ] **ROOM-04**: All players in a room see the current seat list, with each seat's connection status, before the game starts (amended 2026-09-01 during Phase 1 discussion: per-player ready state cut from scope — the host starts the game at will)
 - [x] **ROOM-05**: Host can configure the variant at room creation: base, Rainbow, or Black
-- [ ] **ROOM-06**: Host can start the game once between 2 and 5 players are seated and ready
+- [x] **ROOM-06**: Host can start the game once between 2 and 5 players are seated and ready
 - [x] **ROOM-07**: A player arriving at a link for a game already in progress is told so clearly rather than silently failing or joining a broken state
 - [ ] **ROOM-08**: Abandoned rooms are garbage collected without manual intervention
 
@@ -128,10 +128,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | ROOM-01 | Phase 1 | Pending |
 | ROOM-02 | Phase 1 | Complete |
-| ROOM-03 | Phase 1 | Pending |
+| ROOM-03 | Phase 1 | Complete |
 | ROOM-04 | Phase 1 | Pending |
 | ROOM-05 | Phase 1 | Complete |
-| ROOM-06 | Phase 1 | Pending |
+| ROOM-06 | Phase 1 | Complete |
 | ROOM-07 | Phase 1 | Complete |
 | ROOM-08 | Phase 1 | Pending |
 | RT-01 | Phase 4 | Pending |

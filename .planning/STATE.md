@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-09-02T07:57:23.993Z"
+last_updated: "2026-09-02T15:34:10.170Z"
 last_activity: 2026-09-02
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 11
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 01 (room-transport-skeleton) — EXECUTING
-Plan: 4 of 11
+Plan: 5 of 11
 Status: Ready to execute
 Last activity: 2026-09-02
 
-Progress: [███░░░░░░░] 27%
+Progress: [████░░░░░░] 36%
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Progress: [███░░░░░░░] 27%
 | Phase 01 P01 | 13 | 4 tasks | 33 files |
 | Phase 01 P02 | 10 | 3 tasks | 5 files |
 | Phase 01 P03 | 12 | 2 tasks | 6 files |
+| Phase 01 P04 | 18min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,8 @@ Recent decisions affecting current work:
 - [Phase ?]: GameAdapter interface has no whole-state serializer; toPlayerView is the only exit point from adapter state to the wire, enforced by grep in the plan's acceptance criteria
 - [Phase ?]: Sequenced schema/src/index.ts re-exports to match Plan 03 task order (constants+room, then +messages) so each task commit is independently buildable
 - [Phase ?]: SeatTokenSchema/RoomCodeSchema use zod4's z.brand() for the RT-07 seat-hijack boundary, making conflation a compile error rather than a review convention
+- [Phase ?]: packages/schema/src/room.ts hostSeatId widened to nullable to represent the pre-first-seat empty-room state (Plan 04, Rule 1 fix)
+- [Phase ?]: AdapterError collapses onto RefusalReason's bad_request rather than widening the shared wire enum for a placeholder game Phase 2 deletes (Plan 04)
 
 ### Pending Todos
 
@@ -93,6 +96,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-02T07:57:19.835Z
+Last session: 2026-09-02T15:32:01.684Z
 Stopped at: Completed 01-02-PLAN.md
 Resume file: None
