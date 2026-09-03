@@ -61,7 +61,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 01-10-PLAN.md — Playwright E2E: create, join, live seat list, seat takeover, in-progress refusal, start game
+- [x] 01-10-PLAN.md — Playwright E2E: create, join, live seat list, seat takeover, in-progress refusal, start game
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -161,7 +161,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Room & Transport Skeleton | 9/11 | In Progress|  |
+| 1. Room & Transport Skeleton | 10/11 | In Progress|  |
 | 2. Per-Seat Redaction Contract | 0/TBD | Not started | - |
 | 3. Hanabi Rules Engine | 0/TBD | Not started | - |
 | 4. Wire Engine Into Room Actor | 0/TBD | Not started | - |
