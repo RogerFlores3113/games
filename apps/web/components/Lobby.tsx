@@ -58,10 +58,11 @@ export function Lobby({ view, onSetVariant, onStartGame }: LobbyProps) {
           </div>
         )}
 
-        <div className="flex flex-col gap-[length:var(--space-sm)]">
+        <div data-testid="seat-list" className="flex flex-col gap-[length:var(--space-sm)]">
           {view.seats.map((seat) => (
             <SeatRow
               key={seat.seatId}
+              seatId={seat.seatId}
               name={seat.displayLabel}
               connected={seat.connected}
               isHost={seat.isHost}
@@ -76,7 +77,7 @@ export function Lobby({ view, onSetVariant, onStartGame }: LobbyProps) {
           className="flex flex-col gap-[length:var(--space-md)] rounded-lg p-[length:var(--space-lg)]"
           style={{ backgroundColor: "var(--color-surface)" }}
         >
-          <fieldset className="flex flex-col gap-[length:var(--space-sm)]">
+          <fieldset data-testid="variant-picker" className="flex flex-col gap-[length:var(--space-sm)]">
             <legend
               className="text-[length:var(--text-label)] font-semibold"
               style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
@@ -104,7 +105,7 @@ export function Lobby({ view, onSetVariant, onStartGame }: LobbyProps) {
           </fieldset>
 
           <div className="flex flex-col gap-[length:var(--space-xs)]">
-            <Button variant="primary" onClick={onStartGame} disabled={!canStart}>
+            <Button data-testid="start-game" variant="primary" onClick={onStartGame} disabled={!canStart}>
               Start game
             </Button>
             {!canStart && (

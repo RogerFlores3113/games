@@ -35,6 +35,7 @@ export function RoomCode({ code, shareUrl }: RoomCodeProps) {
   return (
     <div className="flex items-center gap-[length:var(--space-md)]">
       <span
+        data-testid="room-code"
         className="font-mono font-semibold tracking-wide"
         style={{
           color: "var(--color-accent)",
