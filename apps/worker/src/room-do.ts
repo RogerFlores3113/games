@@ -38,23 +38,13 @@ import {
 import { mintSeatId, mintSeatToken, rebindSeatConnection, type SeatBindings } from "./seat-identity";
 import { computeRoomTimers, dueTimers, nextDueAt, type TimerEvent } from "./scheduler";
 import { loadRoom, loadTimers, saveRoom } from "./persistence";
+import { isOriginAllowed } from "./origin";
 
 /** The Durable Object namespace binding declared in wrangler.jsonc. */
 export interface Env {
   ROOM: DurableObjectNamespace<RoomDO>;
 }
 
-/** Allowed WebSocket handshake origins. Browsers do NOT CORS-gate the WS
- * handshake (RESEARCH.md Pitfall 7 / T-1-05), so this is enforced here or
- * nowhere. A request with NO `Origin` header (non-browser clients, this
- * plan's own integration test) is allowed through — origin checking is
- * defense-in-depth against a browser-based scraper, not the confidentiality
- * control (per-seat projection is). */
-const ALLOWED_ORIGINS = [
-  "https://games.rogerflores.dev",
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-];
 
 export class RoomDO extends Server<Env> {
   static options = { hibernate: true };
@@ -78,8 +68,7 @@ export class RoomDO extends Server<Env> {
   }
 
   async onConnect(connection: Connection, ctx: ConnectionContext): Promise<void> {
-    const origin = ctx.request.headers.get("Origin");
-    if (origin !== null && !ALLOWED_ORIGINS.includes(origin)) {
+    if (!isOriginAllowed(ctx.request.headers.get("Origin"))) {
       connection.close(1008, "origin not allowed");
       return;
     }

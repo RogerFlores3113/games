@@ -96,13 +96,24 @@ function ConnectedRoom({ code, displayName }: { code: string; displayName: strin
 
   if (!view) {
     // "connecting" / "joining" — the socket hasn't produced a server view
-    // yet. No board, no partial state (ROOM-07/D-14 applies structurally
-    // here too: there is nothing to render until the server says so).
+    // yet. Still no board and no partial state (ROOM-07/D-14 applies
+    // structurally here too), but this MUST render something visible: an
+    // empty <main> made every connection failure indistinguishable from a
+    // broken app. A rejected handshake (wrong origin, worker down) left a
+    // permanently blank page with no signal to the player or to us.
     return (
       <main
         className="flex min-h-screen items-center justify-center px-[length:var(--spacing-md)]"
         style={{ backgroundColor: "var(--color-bg)" }}
-      />
+      >
+        <p
+          role="status"
+          className="text-[length:var(--text-body)]"
+          style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-body--line-height)" }}
+        >
+          Connecting to room {code}…
+        </p>
+      </main>
     );
   }
 
