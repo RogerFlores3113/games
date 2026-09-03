@@ -7,6 +7,7 @@ import {
   mintSeatId,
   resolveSeatByToken,
   rebindSeatConnection,
+  bindingsFromConnections,
   type TokenBearingSeat,
   type SeatBindings,
 } from "./seat-identity";
@@ -127,5 +128,46 @@ describe("rebindSeatConnection — D-08 newest-socket-wins", () => {
     // this call exercises the exact three-parameter shape.
     const result = rebindSeatConnection({}, "s1", "c1");
     expect(Object.keys(result)).toEqual(["bindings", "supersededConnectionId"]);
+  });
+});
+
+describe("bindingsFromConnections", () => {
+  it("rebuilds the seat map from connection attachments", () => {
+    expect(
+      bindingsFromConnections([
+        { id: "c1", state: { seatId: "s1" } },
+        { id: "c2", state: { seatId: "s2" } },
+      ]),
+    ).toEqual({ s1: "c1", s2: "c2" });
+  });
+
+  it("ignores connections that hold no seat", () => {
+    expect(
+      bindingsFromConnections([
+        { id: "c1", state: null },
+        { id: "c2", state: undefined },
+        { id: "c3", state: {} },
+        { id: "c4", state: { seatId: "" } },
+        { id: "c5", state: { seatId: "s5" } },
+      ]),
+    ).toEqual({ s5: "c5" });
+  });
+
+  // REGRESSION (ROOM-04): the map used to be a plain in-memory field. A
+  // hibernation wake wiped it while the sockets survived, so #pushState
+  // iterated an empty map and nobody was told a new player had joined —
+  // the lobby only updated on a manual reload. Deriving it from the
+  // surviving connections is what makes a wake self-healing.
+  it("reconstructs every binding after a wake that kept the sockets", () => {
+    const survivors = [
+      { id: "c1", state: { seatId: "host" } },
+      { id: "c2", state: { seatId: "guest" } },
+    ];
+    expect(bindingsFromConnections(survivors)).toEqual({ host: "c1", guest: "c2" });
+    expect(Object.keys(bindingsFromConnections(survivors))).toHaveLength(2);
+  });
+
+  it("returns an empty map when there are no connections", () => {
+    expect(bindingsFromConnections([])).toEqual({});
   });
 });

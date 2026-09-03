@@ -35,7 +35,13 @@ import {
   applyGameAction,
   toSeatView,
 } from "./room-state";
-import { mintSeatId, mintSeatToken, rebindSeatConnection, type SeatBindings } from "./seat-identity";
+import {
+  mintSeatId,
+  mintSeatToken,
+  rebindSeatConnection,
+  bindingsFromConnections,
+  type SeatBindings,
+} from "./seat-identity";
 import { computeRoomTimers, dueTimers, nextDueAt, type TimerEvent } from "./scheduler";
 import { loadRoom, loadTimers, saveRoom } from "./persistence";
 import { isOriginAllowed } from "./origin";
@@ -46,6 +52,18 @@ export interface Env {
 }
 
 
+/** The shape this class attaches to each connection. Hibernation-safe:
+ * `partyserver`'s `setState` is backed by `serializeAttachment`. */
+interface SeatAttachment {
+  readonly seatId?: string;
+}
+
+/** A connection carrying `SeatAttachment`, for the derived `bindings` getter. */
+interface ConnectionWithSeat {
+  readonly id: string;
+  readonly state?: SeatAttachment | null;
+}
+
 export class RoomDO extends Server<Env> {
   static options = { hibernate: true };
 
@@ -54,9 +72,19 @@ export class RoomDO extends Server<Env> {
    * maintenance restarts (RESEARCH.md anti-patterns). */
   room: RoomState | null = null;
 
-  /** In-memory, non-persisted seatId -> connectionId map (Plan 05). Empty on
-   * every wake; connection ids are meaningless after hibernation eviction. */
-  bindings: SeatBindings = {};
+  /** seatId -> connectionId, DERIVED from the live connections on every read
+   * rather than cached in a field.
+   *
+   * It used to be an in-memory field. Durable Object memory is wiped on a
+   * hibernation wake while the hibernated WebSockets survive, so the room
+   * woke holding zero bindings, `#pushState` iterated an empty map, and
+   * nobody already in the lobby was told a new player had joined — the seat
+   * list only updated on a manual reload (ROOM-04). The seat id now rides on
+   * each connection's own attachment (`setState`), which IS hibernation-safe,
+   * so there is no cached copy left to go stale. */
+  get bindings(): SeatBindings {
+    return bindingsFromConnections(this.getConnections() as unknown as Iterable<ConnectionWithSeat>);
+  }
 
   async onStart(): Promise<void> {
     const { room } = await loadRoom(this.ctx.storage, () =>
@@ -96,7 +124,7 @@ export class RoomDO extends Server<Env> {
     // Every other message type resolves the actor's seat from the
     // connection-layer `bindings` map — NEVER from the message body, which
     // has no `seatId` field to supply (T-1-04 boundary).
-    const actorSeatId = this.#seatIdFor(connection.id);
+    const actorSeatId = this.#seatIdFor(connection as unknown as ConnectionWithSeat);
     if (actorSeatId === null) {
       connection.send(encodeServerMessage({ type: "error", code: "not_seated" }));
       return;
@@ -137,7 +165,7 @@ export class RoomDO extends Server<Env> {
 
     if (msg.type === "leave") {
       const nextState = releaseSeat(room, actorSeatId, now);
-      delete this.bindings[actorSeatId];
+      connection.setState(null);
       await this.#commit(nextState, now);
       await this.#pushState();
       return;
@@ -145,15 +173,13 @@ export class RoomDO extends Server<Env> {
   }
 
   async onClose(connection: Connection): Promise<void> {
-    const seatId = this.#seatIdFor(connection.id);
+    const seatId = this.#seatIdFor(connection as unknown as ConnectionWithSeat);
     if (seatId === null) return;
 
-    // Only clear the binding if THIS connection is still the bound one — a
-    // superseded connection's close() must not clobber the newer binding
-    // that already replaced it (D-08).
-    if (this.bindings[seatId] === connection.id) {
-      delete this.bindings[seatId];
-    }
+    // Clearing THIS connection's own attachment cannot clobber a newer
+    // connection that already took the seat (D-08) — the superseded socket
+    // only ever owned its own attachment.
+    connection.setState(null);
 
     const room = await this.#ensureRoom();
     const now = Date.now();
@@ -192,7 +218,6 @@ export class RoomDO extends Server<Env> {
           for (const connection of this.getConnections()) {
             connection.close(1000, "room abandoned");
           }
-          this.bindings = {};
           this.room = null;
           await this.ctx.storage.deleteAll();
           return;
@@ -224,11 +249,15 @@ export class RoomDO extends Server<Env> {
     return this.room as RoomState;
   }
 
-  #seatIdFor(connectionId: string): string | null {
-    for (const [seatId, boundConnectionId] of Object.entries(this.bindings)) {
-      if (boundConnectionId === connectionId) return seatId;
-    }
-    return null;
+  /** Read the seat straight off the connection's own attachment.
+   *
+   * Deliberately NOT via the derived `bindings` map: by the time `onClose`
+   * runs, the closing connection is already out of `getConnections()`, so a
+   * map lookup returns null and the room never marks the seat disconnected —
+   * the other players would keep seeing a departed teammate as "Connected". */
+  #seatIdFor(connection: ConnectionWithSeat): string | null {
+    const seatId = connection.state?.seatId;
+    return typeof seatId === "string" && seatId.length > 0 ? seatId : null;
   }
 
   async #handleJoin(
@@ -253,7 +282,9 @@ export class RoomDO extends Server<Env> {
     }
 
     const rebind = rebindSeatConnection(this.bindings, result.seatId, connection.id);
-    this.bindings = rebind.bindings;
+    // Ride the seat id on the connection attachment: survives hibernation,
+    // unlike an instance field (see the `bindings` getter).
+    connection.setState({ seatId: result.seatId });
 
     if (rebind.supersededConnectionId !== null) {
       const superseded = this.getConnection(rebind.supersededConnectionId);
@@ -298,7 +329,7 @@ export class RoomDO extends Server<Env> {
   async #pushState(): Promise<void> {
     const room = await this.#ensureRoom();
     for (const connection of this.getConnections()) {
-      const seatId = this.#seatIdFor(connection.id);
+      const seatId = this.#seatIdFor(connection as unknown as ConnectionWithSeat);
       if (seatId === null) continue;
       connection.send(encodeServerMessage({ type: "state", view: this.#viewFor(room, seatId) }));
     }

@@ -151,3 +151,33 @@ export function rebindSeatConnection(
   const supersededConnectionId = previous === undefined ? null : previous;
   return { bindings: nextBindings, supersededConnectionId };
 }
+
+/** A connection carrying its hibernation-safe attached state. Structural so
+ * it can be satisfied by a `partyserver` `Connection` or a plain test double. */
+export interface BoundConnection {
+  readonly id: string;
+  readonly state?: { readonly seatId?: string } | null;
+}
+
+/**
+ * Rebuild the seatId -> connectionId map from the live connections themselves.
+ *
+ * This exists because holding the map as a plain in-memory field silently
+ * broke every push after a hibernation wake: Durable Object memory is wiped
+ * while the WebSockets survive, so the room woke up holding zero bindings and
+ * pushed state to nobody. A joining player was invisible to everyone already
+ * in the lobby until they reloaded (ROOM-04).
+ *
+ * Deriving from connection attachments removes the failure mode rather than
+ * repairing it on wake: there is no cached copy left to go stale.
+ */
+export function bindingsFromConnections(connections: Iterable<BoundConnection>): SeatBindings {
+  const bindings: SeatBindings = {};
+  for (const connection of connections) {
+    const seatId = connection.state?.seatId;
+    if (typeof seatId === "string" && seatId.length > 0) {
+      bindings[seatId] = connection.id;
+    }
+  }
+  return bindings;
+}
