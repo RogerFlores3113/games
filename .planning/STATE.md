@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-07-PLAN.md
-last_updated: "2026-09-02T16:24:49.396Z"
-last_activity: 2026-09-02
+stopped_at: Completed 01-09-PLAN.md
+last_updated: "2026-09-03T02:20:51.102Z"
+last_activity: 2026-09-03
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 11
-  completed_plans: 8
+  completed_plans: 9
   percent: 0
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 01 (room-transport-skeleton) — EXECUTING
-Plan: 9 of 11
+Plan: 10 of 11
 Status: Ready to execute
-Last activity: 2026-09-02
+Last activity: 2026-09-03
 
-Progress: [███████░░░] 73%
+Progress: [████████░░] 82%
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [███████░░░] 73%
 | Phase 01 P06 | 6min | 2 tasks | 4 files |
 | Phase 01 P08 | 25min | 3 tasks | 13 files |
 | Phase 01 P07 | 25min | 3 tasks | 10 files |
+| Phase 01 P09 | 70min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,9 @@ Recent decisions affecting current work:
 - [Phase 01-07]: RoomDO integration tests spawn wrangler dev as a detached process group and kill it via process.kill(-pid) to prove D-17 persistence survives genuine eviction, not just a closed socket
 - [Phase 01-07]: toSeatView wrapped in a single private #viewFor method so the literal call-site count stays 1 even though both the joined reply and #pushState need a view
 - [Phase 01-07]: apps/worker/tsconfig.json types widened to include node alongside @cloudflare/workers-types since the integration test needs Node builtins; no global type conflicts
+- [Phase ?]: [Phase 01-09]: RECONNECT_PLACEHOLDER_NAME ("Player") sent as displayName when only a saved seat token is known — server treats any seatToken match as a reclaim and ignores the presented name
+- [Phase ?]: [Phase 01-09]: origin allowlist changed from an exact-port match to loopback-any-port (apps/worker/src/origin.ts) after port 3000 being occupied blanked the lobby in verification
+- [Phase ?]: [Phase 01-09]: Tailwind v4 custom spacing tokens renamed --spacing-* to --space-* to avoid the reserved Tailwind namespace collision that collapsed every page's layout
 
 ### Pending Todos
 
@@ -99,6 +103,7 @@ None yet.
 
 - Phase 1 needs a pre-planning research refresh: Cloudflare Durable Objects / `partyserver` API surface and free-tier limits were flagged MEDIUM confidence and move quickly — re-verify before planning.
 - Phase 6 needs original design work at plan time: no existing implementation combines luminosity-as-signal theming with colorblind-safe rendering.
+- Plan 01-09 checkpoint left D-08 (second-tab supersede) and ROOM-07/D-14 (in-progress refusal screen) without browser-level manual verification — flagged as must-cover Playwright scenarios for Plan 01-10
 
 ## Deferred Items
 
@@ -110,6 +115,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-02T16:24:49.387Z
-Stopped at: Completed 01-07-PLAN.md
+Last session: 2026-09-03T02:20:51.096Z
+Stopped at: Completed 01-09-PLAN.md
 Resume file: None
