@@ -32,17 +32,17 @@ export function Lobby({ view, onSetVariant, onStartGame }: LobbyProps) {
 
   return (
     <main
-      className="mx-auto flex min-h-screen max-w-2xl flex-col gap-[length:var(--spacing-xl)] px-[length:var(--spacing-md)] py-[length:var(--spacing-2xl)]"
+      className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-[length:var(--space-xl)] px-[length:var(--space-md)] py-[length:var(--space-2xl)] lg:max-w-3xl lg:justify-center lg:py-[length:var(--space-3xl)]"
       style={{ backgroundColor: "var(--color-bg)" }}
     >
       <RoomCode code={view.code} shareUrl={shareUrl} />
 
       <div
-        className="flex flex-col gap-[length:var(--spacing-sm)] rounded-lg p-[length:var(--spacing-lg)]"
+        className="flex flex-col gap-[length:var(--space-sm)] rounded-lg p-[length:var(--space-lg)]"
         style={{ backgroundColor: "var(--color-surface)" }}
       >
         {seatCount < MIN_PLAYERS && (
-          <div className="flex flex-col gap-[length:var(--spacing-xs)] text-center">
+          <div className="flex flex-col gap-[length:var(--space-xs)] text-center">
             <h2
               className="text-[length:var(--text-heading)] font-semibold"
               style={{ color: "var(--color-text)", lineHeight: "var(--text-heading--line-height)" }}
@@ -58,7 +58,7 @@ export function Lobby({ view, onSetVariant, onStartGame }: LobbyProps) {
           </div>
         )}
 
-        <div className="flex flex-col gap-[length:var(--spacing-sm)]">
+        <div className="flex flex-col gap-[length:var(--space-sm)]">
           {view.seats.map((seat) => (
             <SeatRow
               key={seat.seatId}
@@ -73,21 +73,21 @@ export function Lobby({ view, onSetVariant, onStartGame }: LobbyProps) {
 
       {isHost && (
         <div
-          className="flex flex-col gap-[length:var(--spacing-md)] rounded-lg p-[length:var(--spacing-lg)]"
+          className="flex flex-col gap-[length:var(--space-md)] rounded-lg p-[length:var(--space-lg)]"
           style={{ backgroundColor: "var(--color-surface)" }}
         >
-          <fieldset className="flex flex-col gap-[length:var(--spacing-sm)]">
+          <fieldset className="flex flex-col gap-[length:var(--space-sm)]">
             <legend
               className="text-[length:var(--text-label)] font-semibold"
               style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
             >
               Variant
             </legend>
-            <div className="flex gap-[length:var(--spacing-md)]">
+            <div className="flex gap-[length:var(--space-md)]">
               {VARIANT_OPTIONS.map(({ value, label }) => (
                 <label
                   key={value}
-                  className="flex items-center gap-[length:var(--spacing-xs)] text-[length:var(--text-body)]"
+                  className="flex items-center gap-[length:var(--space-xs)] text-[length:var(--text-body)]"
                   style={{ color: "var(--color-text)" }}
                 >
                   <input
@@ -103,7 +103,7 @@ export function Lobby({ view, onSetVariant, onStartGame }: LobbyProps) {
             </div>
           </fieldset>
 
-          <div className="flex flex-col gap-[length:var(--spacing-xs)]">
+          <div className="flex flex-col gap-[length:var(--space-xs)]">
             <Button variant="primary" onClick={onStartGame} disabled={!canStart}>
               Start game
             </Button>

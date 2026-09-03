@@ -81,7 +81,7 @@ function ConnectedRoom({ code, displayName }: { code: string; displayName: strin
   if (status === "superseded") {
     return (
       <main
-        className="flex min-h-screen items-center justify-center px-[length:var(--spacing-md)]"
+        className="flex min-h-screen items-center justify-center px-[length:var(--space-md)]"
         style={{ backgroundColor: "var(--color-bg)" }}
       >
         <p
@@ -103,7 +103,7 @@ function ConnectedRoom({ code, displayName }: { code: string; displayName: strin
     // permanently blank page with no signal to the player or to us.
     return (
       <main
-        className="flex min-h-screen items-center justify-center px-[length:var(--spacing-md)]"
+        className="flex min-h-screen items-center justify-center px-[length:var(--space-md)]"
         style={{ backgroundColor: "var(--color-bg)" }}
       >
         <p

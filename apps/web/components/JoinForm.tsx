@@ -38,17 +38,17 @@ export function JoinForm({ code, onJoin }: JoinFormProps) {
 
   return (
     <main
-      className="flex min-h-screen items-center justify-center px-[length:var(--spacing-md)]"
+      className="flex min-h-screen items-center justify-center px-[length:var(--space-md)]"
       style={{ backgroundColor: "var(--color-bg)" }}
     >
       <form
         onSubmit={handleSubmit}
-        className="flex w-full max-w-sm flex-col gap-[length:var(--spacing-md)] rounded-lg p-[length:var(--spacing-lg)]"
+        className="flex w-full max-w-sm flex-col gap-[length:var(--space-md)] rounded-lg p-[length:var(--space-lg)]"
         style={{ backgroundColor: "var(--color-surface)" }}
       >
         <RoomCode code={code} shareUrl={shareUrl} />
 
-        <div className="flex flex-col gap-[length:var(--spacing-sm)]">
+        <div className="flex flex-col gap-[length:var(--space-sm)]">
           <label
             htmlFor="displayName"
             className="text-[length:var(--text-label)] font-semibold"
@@ -65,7 +65,7 @@ export function JoinForm({ code, onJoin }: JoinFormProps) {
             autoFocus
             value={displayName}
             onChange={(event) => setDisplayName(event.target.value)}
-            className="rounded-md border px-[length:var(--spacing-sm)] py-[length:var(--spacing-sm)] text-[length:var(--text-body)]"
+            className="rounded-md border px-[length:var(--space-sm)] py-[length:var(--space-sm)] text-[length:var(--text-body)]"
             style={{
               backgroundColor: "var(--color-bg)",
               borderColor: "var(--color-border)",

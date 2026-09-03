@@ -16,7 +16,7 @@ export function SeatRow({ name, connected, isHost, isSelf }: SeatRowProps) {
   return (
     <div
       className={clsx(
-        "flex items-center justify-between gap-[length:var(--spacing-sm)] rounded-md border px-[length:var(--spacing-sm)] py-[length:var(--spacing-sm)]",
+        "flex items-center justify-between gap-[length:var(--space-sm)] rounded-md border px-[length:var(--space-sm)] py-[length:var(--space-sm)]",
         isSelf && "ring-2",
       )}
       style={{
@@ -25,7 +25,7 @@ export function SeatRow({ name, connected, isHost, isSelf }: SeatRowProps) {
         ...(isSelf ? { boxShadow: "0 0 0 2px var(--color-accent)" } : {}),
       }}
     >
-      <div className="flex items-center gap-[length:var(--spacing-sm)]">
+      <div className="flex items-center gap-[length:var(--space-sm)]">
         <span
           className="text-[length:var(--text-body)]"
           style={{ color: "var(--color-text)", lineHeight: "var(--text-body--line-height)" }}
@@ -34,7 +34,7 @@ export function SeatRow({ name, connected, isHost, isSelf }: SeatRowProps) {
         </span>
         {isHost && (
           <span
-            className="rounded px-[length:var(--spacing-xs)] text-[length:var(--text-label)] font-semibold"
+            className="rounded px-[length:var(--space-xs)] text-[length:var(--text-label)] font-semibold"
             style={{
               color: "var(--color-text-muted)",
               border: "1px solid var(--color-border)",
@@ -45,7 +45,7 @@ export function SeatRow({ name, connected, isHost, isSelf }: SeatRowProps) {
           </span>
         )}
       </div>
-      <div className="flex items-center gap-[length:var(--spacing-xs)]">
+      <div className="flex items-center gap-[length:var(--space-xs)]">
         <span
           aria-hidden="true"
           className="inline-block h-2 w-2 rounded-full"

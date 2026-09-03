@@ -54,12 +54,12 @@ export default function HomePage() {
 
   return (
     <main
-      className="flex min-h-screen items-center justify-center px-[length:var(--spacing-md)]"
+      className="flex min-h-screen items-center justify-center px-[length:var(--space-md)]"
       style={{ backgroundColor: "var(--color-bg)" }}
     >
       <form
         onSubmit={handleSubmit}
-        className="flex w-full max-w-sm flex-col gap-[length:var(--spacing-md)] rounded-lg p-[length:var(--spacing-lg)]"
+        className="flex w-full max-w-sm flex-col gap-[length:var(--space-md)] rounded-lg p-[length:var(--space-lg)]"
         style={{ backgroundColor: "var(--color-surface)" }}
       >
         <h1
@@ -69,7 +69,7 @@ export default function HomePage() {
           games.rogerflores.dev
         </h1>
 
-        <div className="flex flex-col gap-[length:var(--spacing-sm)]">
+        <div className="flex flex-col gap-[length:var(--space-sm)]">
           <label
             htmlFor="displayName"
             className="text-[length:var(--text-label)] font-semibold"
@@ -85,7 +85,7 @@ export default function HomePage() {
             maxLength={24}
             value={displayName}
             onChange={(event) => setDisplayName(event.target.value)}
-            className="rounded-md border px-[length:var(--spacing-sm)] py-[length:var(--spacing-sm)] text-[length:var(--text-body)]"
+            className="rounded-md border px-[length:var(--space-sm)] py-[length:var(--space-sm)] text-[length:var(--text-body)]"
             style={{
               backgroundColor: "var(--color-bg)",
               borderColor: "var(--color-border)",
@@ -102,18 +102,18 @@ export default function HomePage() {
           )}
         </div>
 
-        <fieldset className="flex flex-col gap-[length:var(--spacing-sm)]">
+        <fieldset className="flex flex-col gap-[length:var(--space-sm)]">
           <legend
             className="text-[length:var(--text-label)] font-semibold"
             style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
           >
             Variant
           </legend>
-          <div className="flex gap-[length:var(--spacing-md)]">
+          <div className="flex gap-[length:var(--space-md)]">
             {VARIANTS.map(({ value, label }) => (
               <label
                 key={value}
-                className="flex items-center gap-[length:var(--spacing-xs)] text-[length:var(--text-body)]"
+                className="flex items-center gap-[length:var(--space-xs)] text-[length:var(--text-body)]"
                 style={{ color: "var(--color-text)" }}
               >
                 <input

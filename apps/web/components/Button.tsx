@@ -22,8 +22,12 @@ export function Button({ variant = "primary", className, children, ...rest }: Bu
   return (
     <button
       className={clsx(
-        "inline-flex items-center justify-center gap-2 rounded-md px-4 text-[length:var(--text-label)] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50",
-        variant === "primary" && "bg-[var(--color-accent)] text-[var(--color-bg)] hover:brightness-95",
+        "inline-flex items-center justify-center gap-2 rounded-md px-4 text-[length:var(--text-label)] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed",
+        variant === "primary" &&
+          // Disabled drops the accent entirely rather than fading it. A 50%-opacity
+          // gold over the dark ground rendered as a muddy brown that read as broken
+          // rather than disabled — and accent is reserved for things you can act on.
+          "bg-[var(--color-accent)] text-[var(--color-bg)] hover:brightness-95 disabled:bg-[var(--color-surface)] disabled:text-[var(--color-text-muted)] disabled:ring-1 disabled:ring-[var(--color-border)] disabled:hover:brightness-100",
         variant === "ghost" &&
           "border border-[var(--color-border)] bg-transparent text-[var(--color-text)] hover:bg-[var(--color-surface)]",
         className,

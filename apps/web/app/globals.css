@@ -30,13 +30,21 @@
 
   --size-touch-min: 44px;
 
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  --spacing-2xl: 48px;
-  --spacing-3xl: 64px;
+  /* NAMESPACE WARNING: these are `--space-*`, NOT `--spacing-*`.
+   * `--spacing-*` is a RESERVED Tailwind v4 theme namespace that feeds the
+   * sizing scale. Defining `--spacing-2xl: 48px` there made `max-w-2xl`
+   * resolve to 48px and `max-w-sm` to 8px, which collapsed every page to an
+   * unreadable one-word-per-line column. Keep custom spacing out of the
+   * reserved namespace. Same applies to --color-*, --text-*, --radius-*,
+   * --container-*, --breakpoint-*: only put values there that you intend to
+   * become Tailwind scale values. */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
 
   --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;

@@ -33,7 +33,7 @@ export function RoomCode({ code, shareUrl }: RoomCodeProps) {
   }
 
   return (
-    <div className="flex items-center gap-[length:var(--spacing-md)]">
+    <div className="flex items-center gap-[length:var(--space-md)]">
       <span
         className="font-mono font-semibold tracking-wide"
         style={{

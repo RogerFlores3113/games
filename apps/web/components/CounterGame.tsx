@@ -32,7 +32,7 @@ export function CounterGame({ view, onIncrement }: CounterGameProps) {
 
   return (
     <main
-      className="flex min-h-screen flex-col items-center justify-center gap-[length:var(--spacing-xl)] px-[length:var(--spacing-md)]"
+      className="flex min-h-screen flex-col items-center justify-center gap-[length:var(--space-xl)] px-[length:var(--space-md)]"
       style={{ backgroundColor: "var(--color-bg)" }}
     >
       <span
