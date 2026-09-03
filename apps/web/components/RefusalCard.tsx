@@ -29,6 +29,7 @@ export function RefusalCard({ reason }: RefusalCardProps) {
   return (
     <div
       role="alert"
+      data-testid="refusal-card"
       className="mx-auto flex max-w-md flex-col items-center gap-4 rounded-lg border-2 p-[length:var(--space-lg)] text-center"
       style={{
         backgroundColor: "var(--color-surface)",

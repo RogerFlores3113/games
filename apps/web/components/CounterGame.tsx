@@ -36,6 +36,7 @@ export function CounterGame({ view, onIncrement }: CounterGameProps) {
       style={{ backgroundColor: "var(--color-bg)" }}
     >
       <span
+        data-testid="counter-value"
         className="font-mono font-semibold"
         style={{
           color: "var(--color-text)",
@@ -47,6 +48,7 @@ export function CounterGame({ view, onIncrement }: CounterGameProps) {
       </span>
 
       <p
+        data-testid="turn-indicator"
         className="text-[length:var(--text-body)]"
         style={{
           color: isYourTurn ? "var(--color-accent)" : "var(--color-text-muted)",
