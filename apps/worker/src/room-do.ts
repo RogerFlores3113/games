@@ -49,6 +49,10 @@ import { isOriginAllowed } from "./origin";
 /** The Durable Object namespace binding declared in wrangler.jsonc. */
 export interface Env {
   ROOM: DurableObjectNamespace<RoomDO>;
+  /** Optional comma-separated extra WebSocket origins, set at deploy time in
+   * wrangler.jsonc `vars`. Used to allow a Vercel production/preview origin
+   * without a code change. See `origin.ts`. */
+  ALLOWED_ORIGINS?: string;
 }
 
 
@@ -96,7 +100,7 @@ export class RoomDO extends Server<Env> {
   }
 
   async onConnect(connection: Connection, ctx: ConnectionContext): Promise<void> {
-    if (!isOriginAllowed(ctx.request.headers.get("Origin"))) {
+    if (!isOriginAllowed(ctx.request.headers.get("Origin"), this.env.ALLOWED_ORIGINS)) {
       connection.close(1008, "origin not allowed");
       return;
     }

@@ -35,3 +35,32 @@ describe("isOriginAllowed", () => {
     expect(isOriginAllowed("")).toBe(false);
   });
 });
+
+describe("isOriginAllowed with deploy-time ALLOWED_ORIGINS", () => {
+  // Vercel serves the app from *.vercel.app before a custom domain resolves.
+  // Without a way to allow that origin, the deployed site connects, is closed
+  // 1008, and renders as a room that never loads.
+  it("allows an origin supplied via the env var", () => {
+    expect(isOriginAllowed("https://games-abc123.vercel.app")).toBe(false);
+    expect(
+      isOriginAllowed("https://games-abc123.vercel.app", "https://games-abc123.vercel.app"),
+    ).toBe(true);
+  });
+
+  it("accepts a comma-separated list and tolerates whitespace", () => {
+    const extra = " https://a.vercel.app , https://b.vercel.app ";
+    expect(isOriginAllowed("https://a.vercel.app", extra)).toBe(true);
+    expect(isOriginAllowed("https://b.vercel.app", extra)).toBe(true);
+    expect(isOriginAllowed("https://c.vercel.app", extra)).toBe(false);
+  });
+
+  it("still rejects an unlisted remote origin when the var is set", () => {
+    expect(isOriginAllowed("https://evil.example.com", "https://a.vercel.app")).toBe(false);
+  });
+
+  it("is a no-op when the var is empty or undefined", () => {
+    expect(isOriginAllowed("https://games.rogerflores.dev", "")).toBe(true);
+    expect(isOriginAllowed("https://evil.example.com", "")).toBe(false);
+    expect(isOriginAllowed("https://evil.example.com", undefined)).toBe(false);
+  });
+});

@@ -22,15 +22,34 @@ export const ALLOWED_ORIGINS = ["https://games.rogerflores.dev"];
 const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
 
 /**
+ * Extra origins supplied at deploy time via the `ALLOWED_ORIGINS` Worker var
+ * (comma-separated). This exists so a new front-end origin — a Vercel
+ * production or preview URL, say — can be allowed by setting a var and
+ * redeploying, instead of editing this list in code.
+ *
+ * Concretely: Vercel serves the app from `*.vercel.app` before a custom
+ * domain resolves. Without this, that deployment connects, gets closed 1008,
+ * and renders as a room that never loads.
+ */
+function configuredOrigins(extra: string | undefined): string[] {
+  if (!extra) return [];
+  return extra
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+}
+
+/**
  * @param origin The handshake's `Origin` header, or null when absent.
+ * @param extraOrigins Optional comma-separated origins from `env.ALLOWED_ORIGINS`.
  * @returns true when the connection should be accepted.
  */
-export function isOriginAllowed(origin: string | null): boolean {
+export function isOriginAllowed(origin: string | null, extraOrigins?: string): boolean {
   // No Origin header: not a browser. Allowed by design (see module comment).
   if (origin === null) {
     return true;
   }
-  if (ALLOWED_ORIGINS.includes(origin)) {
+  if (ALLOWED_ORIGINS.includes(origin) || configuredOrigins(extraOrigins).includes(origin)) {
     return true;
   }
   let url: URL;
