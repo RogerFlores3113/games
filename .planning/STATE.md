@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-04-PLAN.md
-last_updated: "2026-09-15T19:51:44.246Z"
+stopped_at: Completed 02-05-PLAN.md
+last_updated: "2026-09-15T19:58:36.831Z"
 last_activity: 2026-09-15
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 16
   percent: 14
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 2 (Per-Seat Redaction Contract) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Ready to execute
 Last activity: 2026-09-15
 
-Progress: [█████████░] 88%
+Progress: [█████████░] 94%
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [█████████░] 88%
 | Phase 02 P02 | 15min | 3 tasks | 8 files |
 | Phase 02 P03 | 35min | 3 tasks | 9 files |
 | Phase 02 P04 | 9min | 3 tasks | 3 files |
+| Phase 02 P05 | 25min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,7 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-03: ROOM_SCHEMA_VERSION bump alone closes the persisted adapterId=counter gap; no second reset trigger added to persistence.ts
 - [Phase 02]: 02-04: source-structure.test.ts uses a character-scanner comment stripper (not regex) and exact-count structural assertions to enforce D-08/D-09/D-10 chokepoints in apps/worker/src
 - [Phase 02]: 02-04: source-structure.test.ts derives SRC_DIR via URL.pathname rather than fileURLToPath, avoiding a tsc type clash between @cloudflare/workers-types and node's URL types
+- [Phase 02]: 02-05: isForeheadCardView narrows through explicit otherCards/revealed in-checks before array casts, avoiding a too-narrow TS intersection type from a single-property guard
 
 ### Pending Todos
 
@@ -129,6 +131,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-15T19:51:44.239Z
-Stopped at: Completed 02-04-PLAN.md
+Last session: 2026-09-15T19:58:36.823Z
+Stopped at: Completed 02-05-PLAN.md
 Resume file: None
