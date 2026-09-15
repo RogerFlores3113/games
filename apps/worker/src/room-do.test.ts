@@ -366,6 +366,32 @@ describe("RoomDO integration (live wrangler dev)", () => {
     ws2.close();
   });
 
+  it("WR-03: a second join on an already-seated connection is refused and mints no ghost seat", async () => {
+    const code = mintRoomCode();
+    const ws1 = await openSocket(code);
+    const c1 = collectMessages(ws1);
+    send(ws1, { type: "join", displayName: "Alice" });
+    await c1.waitFor((m) => m.type === "joined");
+    const joinedBefore = c1.parsed.filter((m) => m.type === "joined").length;
+
+    send(ws1, { type: "join", displayName: "Mallory" });
+    const refusal = (await c1.waitFor((m) => m.type === "error", 5000)) as Parsed & { code: string };
+    expect(refusal.code).toBe("bad_request");
+    expect(c1.parsed.filter((m) => m.type === "joined").length).toBe(joinedBefore);
+
+    // A second player sees exactly two seats: Alice and themself.
+    const ws2 = await openSocket(code);
+    const c2 = collectMessages(ws2);
+    send(ws2, { type: "join", displayName: "Bob" });
+    const joined2 = (await c2.waitFor((m) => m.type === "joined")) as Parsed & {
+      view: { seats: { displayLabel: string }[] };
+    };
+    expect(joined2.view.seats.map((s) => s.displayLabel)).toEqual(["Alice", "Bob"]);
+
+    ws1.close();
+    ws2.close();
+  });
+
   it("CR-03: a leave sent mid-game is refused and the seat stays in turn order", async () => {
     const code = mintRoomCode();
     const ws1 = await openSocket(code);

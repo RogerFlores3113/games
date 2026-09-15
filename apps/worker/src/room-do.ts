@@ -317,6 +317,17 @@ export class RoomDO extends Server<Env> {
     seatToken: string | undefined,
     now: number,
   ): Promise<void> {
+    // WR-03: a connection that already holds a seat may not join again.
+    // Without this, one socket could mint a fresh seat per `join` — each old
+    // seat left `connected: true` forever, never released, possibly still
+    // host — and fill the whole room by itself. A seat that no longer exists
+    // (e.g. released) does not count.
+    const existingSeatId = this.#seatIdFor(connection as unknown as ConnectionWithSeat);
+    if (existingSeatId !== null && room.seats.some((seat) => seat.seatId === existingSeatId)) {
+      connection.send(encodeServerMessage({ type: "error", code: "bad_request" }));
+      return;
+    }
+
     const result = joinRoom(room, {
       displayName,
       seatToken: seatToken as RoomState["seats"][number]["seatToken"] | undefined,
