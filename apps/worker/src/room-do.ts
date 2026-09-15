@@ -179,11 +179,18 @@ export class RoomDO extends Server<Env> {
   async onClose(connection: Connection): Promise<void> {
     const seatId = this.#seatIdFor(connection as unknown as ConnectionWithSeat);
     if (seatId === null) return;
-
-    // Clearing THIS connection's own attachment cannot clobber a newer
-    // connection that already took the seat (D-08) — the superseded socket
-    // only ever owned its own attachment.
     connection.setState(null);
+
+    // CR-01: a closing socket's attachment can be stale. A superseded tab
+    // (D-08), or a half-dead socket from before a wifi blip, can close AFTER
+    // a newer connection already reclaimed the same seat. `#handleJoin`
+    // detaches superseded sockets before closing them, but a stale close
+    // must still never mark a seat disconnected while another live
+    // connection holds it — in the lobby that would release a player who
+    // is sitting right there. `getConnections()` only yields OPEN sockets,
+    // so any binding found here belongs to a different, live connection.
+    const liveOwner = this.bindings[seatId];
+    if (liveOwner !== undefined && liveOwner !== connection.id) return;
 
     const room = await this.#ensureRoom();
     const now = Date.now();
@@ -293,6 +300,10 @@ export class RoomDO extends Server<Env> {
     if (rebind.supersededConnectionId !== null) {
       const superseded = this.getConnection(rebind.supersededConnectionId);
       if (superseded !== undefined) {
+        // Detach BEFORE closing (CR-01): the superseded socket's `onClose`
+        // must find no seat on its attachment, or it would mark the seat the
+        // new connection now holds as disconnected.
+        superseded.setState(null);
         superseded.send(encodeServerMessage({ type: "superseded" }));
         superseded.close(SUPERSEDED_CLOSE_CODE, "superseded");
       }

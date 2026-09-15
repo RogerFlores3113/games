@@ -29,6 +29,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { LOBBY_SEAT_RELEASE_GRACE_MS } from "@games/schema";
 import { mintRoomCode } from "./seat-identity";
 
 const PORT = 18787;
@@ -273,6 +274,50 @@ describe("RoomDO integration (live wrangler dev)", () => {
 
     ws2.close();
   });
+
+  it("CR-01: the superseded socket's close does not mark the surviving connection's seat disconnected, and the lobby grace timer never releases it", async () => {
+    const code = mintRoomCode();
+    const ws1 = await openSocket(code);
+    const c1 = collectMessages(ws1);
+    send(ws1, { type: "join", displayName: "Alice" });
+    const joined1 = (await c1.waitFor((m) => m.type === "joined")) as Parsed & {
+      seatId: string;
+      seatToken: string;
+    };
+
+    const ws2 = await openSocket(code);
+    const c2 = collectMessages(ws2);
+    send(ws2, { type: "join", displayName: "Alice", seatToken: joined1.seatToken });
+    await c2.waitFor((m) => m.type === "joined");
+
+    // Let the superseded socket's close handshake fully complete, so its
+    // server-side `onClose` has run before anything is asserted.
+    await c1.waitForClose(8000);
+    await new Promise((r) => setTimeout(r, 1000));
+
+    type SeatViewShape = { hostSeatId: string | null; seats: { seatId: string; connected: boolean }[] };
+    const seatIn = (m: Parsed) => (m.view as SeatViewShape).seats.find((s) => s.seatId === joined1.seatId);
+    for (const m of c2.parsed.filter((msg) => msg.type === "state" || msg.type === "joined")) {
+      expect(seatIn(m)?.connected).toBe(true);
+    }
+
+    // Wait past the lobby seat-release grace. A seat wrongly marked
+    // disconnected would be deleted by the alarm here, and the surviving
+    // connection would lose host (set_variant then fails with not_host).
+    await new Promise((r) => setTimeout(r, LOBBY_SEAT_RELEASE_GRACE_MS + 3000));
+
+    const before = c2.parsed.length;
+    send(ws2, { type: "set_variant", variant: "rainbow" });
+    const after = await c2.waitFor(
+      (m) => c2.parsed.indexOf(m) >= before && (m.type === "state" || m.type === "error"),
+      5000,
+    );
+    expect(after.type).toBe("state");
+    expect((after.view as SeatViewShape).hostSeatId).toBe(joined1.seatId);
+    expect(seatIn(after)?.connected).toBe(true);
+
+    ws2.close();
+  }, LOBBY_SEAT_RELEASE_GRACE_MS + 20_000);
 
   it("RT-07: a fabricated seat token never reclaims an existing seat — it gets a brand NEW seat", async () => {
     const code = mintRoomCode();
