@@ -15,7 +15,7 @@ import {
 import { RefusalCard, type RefusalCardReason } from "../../../components/RefusalCard";
 import { JoinForm } from "../../../components/JoinForm";
 import { Lobby } from "../../../components/Lobby";
-import { CounterGame } from "../../../components/CounterGame";
+import { ForeheadCardGame } from "../../../components/ForeheadCardGame";
 
 export interface RoomClientProps {
   code: string;
@@ -207,9 +207,9 @@ function ConnectedRoom({
   }
 
   return (
-    <CounterGame
+    <ForeheadCardGame
       view={view}
-      onIncrement={() => send({ type: "game_action", request: { type: "increment" } })}
+      onGuess={(value) => send({ type: "game_action", request: { type: "guess", value } })}
     />
   );
 }
