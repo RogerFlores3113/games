@@ -1,0 +1,8 @@
+{
+  // Production type-check config used by `next build` (see next.config.ts).
+  // Vercel installs only this workspace's dependencies, not the monorepo
+  // root's devDependencies, so test files importing `vitest` cannot resolve
+  // there. Tests are type-checked by the editor and vitest via tsconfig.json.
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "**/*.test.ts", "**/*.test.tsx", "__tests__"]
+}
