@@ -14,6 +14,10 @@ export default defineConfig({
         },
         resolve: {
           alias: {
+            // Subpath key MUST come before "@games/schema": Vite alias
+            // matching is prefix-based in insertion order, so the generic
+            // key would otherwise swallow this more-specific one.
+            "@games/schema/games/forehead-card": alias("./packages/schema/src/games/forehead-card.ts"),
             "@games/schema": alias("./packages/schema/src/index.ts"),
             "@games/rules": alias("./packages/rules/src/index.ts"),
           },
@@ -27,6 +31,7 @@ export default defineConfig({
         },
         resolve: {
           alias: {
+            "@games/schema/games/forehead-card": alias("./packages/schema/src/games/forehead-card.ts"),
             "@games/schema": alias("./packages/schema/src/index.ts"),
             "@games/rules": alias("./packages/rules/src/index.ts"),
           },
@@ -57,6 +62,7 @@ export default defineConfig({
         },
         resolve: {
           alias: {
+            "@games/schema/games/forehead-card": alias("./packages/schema/src/games/forehead-card.ts"),
             "@games/schema": alias("./packages/schema/src/index.ts"),
             "@games/rules": alias("./packages/rules/src/index.ts"),
             // "cloudflare:workers" only exists inside workerd; shim it for
@@ -74,6 +80,7 @@ export default defineConfig({
         },
         resolve: {
           alias: {
+            "@games/schema/games/forehead-card": alias("./packages/schema/src/games/forehead-card.ts"),
             "@games/schema": alias("./packages/schema/src/index.ts"),
             "@games/rules": alias("./packages/rules/src/index.ts"),
           },
