@@ -16,14 +16,14 @@ A friend clicks a link and is playing Hanabi within seconds — and the game doe
 
 <!-- Shipped and confirmed valuable. -->
 
-(None yet — ship to validate)
+- ✓ Players join by opening the link and picking a display name — no account, no email — *Validated in Phase 1: Room & Transport Skeleton (live at games.rogerflores.dev)*
+- ✓ Room and realtime layer are built game-agnostic so Innovation can be added without rewriting the foundation — *Validated in Phase 1: `GameAdapter` seam, counter game as the stand-in*
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
 - [ ] Host can create a Hanabi room and get a shareable link
-- [ ] Players join by opening the link and picking a display name — no account, no email
 - [ ] Room supports 2–5 players, matching Hanabi's player count rules
 - [ ] Host can configure variant at room creation: base, Rainbow (6th suit touched by every color clue), or Black (one copy of each rank)
 - [ ] Server is authoritative over game state and sends each player a per-seat filtered view — a player never receives the identity of cards in their own hand
@@ -36,7 +36,6 @@ A friend clicks a link and is playing Hanabi within seconds — and the game doe
 - [ ] A player who refreshes, drops connection, or sleeps their tab can rejoin the same seat and resume the game in progress
 - [ ] Remaining players see a clear disconnected indicator for an absent player rather than a frozen or broken table
 - [ ] Interface uses a dark "fireworks night" visual direction where card luminosity carries real signal about what has been clued
-- [ ] Room and realtime layer are built game-agnostic so Innovation can be added without rewriting the foundation
 
 ### Out of Scope
 
@@ -83,17 +82,19 @@ A friend clicks a link and is playing Hanabi within seconds — and the game doe
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Standalone repo and Vercel project, not part of the main site | Independent deploys; the games app has different infrastructure needs than a personal site | — Pending |
+| Standalone repo and Vercel project, not part of the main site | Independent deploys; the games app has different infrastructure needs than a personal site | ✓ Good — Vercel project `games-web` deploys independently |
 | Hanabi first, Innovation as a later milestone | Prove the multiplayer foundation on one game before committing to a second, much heavier rules engine | — Pending |
-| Link-based rooms with display names, no accounts | Known friend group; auth is friction with no payoff at this scale | — Pending |
+| Link-based rooms with display names, no accounts | Known friend group; auth is friction with no payoff at this scale | ✓ Good — shipped in Phase 1 |
 | Box variants only (base, Rainbow, Black) | Hanab Live's catalogue would make the rules engine the entire project | — Pending |
 | No in-app chat | Players are already on a voice call; chat adds scope and message volume for no gain | — Pending |
 | Server-authoritative with per-seat filtered views | Forced by Hanabi's hidden-information design — you cannot see your own hand | — Pending |
 | Reconnect-and-resume required; ephemeral games rejected | Losing a 25-minute co-op game to a wifi blip is unacceptable | — Pending |
-| Supabase free tier rejected as primary backend | Projects pause after ~1 week idle; a paused backend breaks the core "click a link and play" promise | — Pending |
+| Supabase free tier rejected as primary backend | Projects pause after ~1 week idle; a paused backend breaks the core "click a link and play" promise | ✓ Good — Cloudflare Workers Free + Durable Objects live; no payment method, no pause notice (FDN-03) |
 | Invocation efficiency as a principle, not a hard budget | At one-table scale the free tier ceiling is ~100x away from binding; availability is the real constraint | — Pending |
 | Dark "fireworks night" visual direction | Fits the theme, and card luminosity can carry genuine signal about clue state rather than being decoration | — Pending |
-| Room and realtime layer built game-agnostic from the start | Innovation is a known future milestone; retrofitting a second game onto a Hanabi-shaped foundation would be costly | — Pending |
+| Room and realtime layer built game-agnostic from the start | Innovation is a known future milestone; retrofitting a second game onto a Hanabi-shaped foundation would be costly | ✓ Good — `GameAdapter` seam held through Phase 1 |
+| RT-02 7-day idle cold-start check waived at Phase 1 close | DO hibernation + SQLite persistence and within-seconds production connects judged sufficient; re-run `docs/manual-checks/cold-start.md` if cold starts ever feel slow | ✓ Accepted (owner, 2026-09-15) |
+| Vercel installs only `apps/web`'s own dependencies | Workspace build tools must be declared in `apps/web`; production type-check excludes tests via `tsconfig.build.json` | ✓ Adopted in Phase 1 |
 
 ## Evolution
 
@@ -113,4 +114,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-01 after initialization*
+*Last updated: 2026-09-15 after Phase 1 (Room & Transport Skeleton)*

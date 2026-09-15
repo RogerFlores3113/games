@@ -21,7 +21,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Realtime & Session Durability
 
 - [ ] **RT-01**: A player's action appears on every other player's screen without manual refresh
-- [ ] **RT-02**: The backend serves a cold link click after a week of total inactivity with no manual intervention and no perceptible wake delay
+- [x] **RT-02**: The backend serves a cold link click after a week of total inactivity with no manual intervention and no perceptible wake delay
 - [ ] **RT-03**: A player who refreshes the page rejoins their same seat with full game state and no lost turn
 - [ ] **RT-04**: A player who loses connection or whose mobile tab is suspended rejoins their same seat and resumes the game in progress
 - [ ] **RT-05**: Reconnecting a player uses the same state-delivery path as initial join, not a separate resume path
@@ -79,8 +79,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **FDN-01**: Room, seating, connection, and reconnect machinery is separated from Hanabi-specific rules behind a game-adapter interface
 - [ ] **FDN-02**: The rules engine is a pure package with no networking or storage dependencies, testable in isolation
-- [ ] **FDN-03**: The deployed system runs entirely within free tiers, with no service requiring a paid plan or stored payment method to remain reachable
-- [ ] **FDN-04**: games.rogerflores.dev resolves to the deployed application
+- [x] **FDN-03**: The deployed system runs entirely within free tiers, with no service requiring a paid plan or stored payment method to remain reachable
+- [x] **FDN-04**: games.rogerflores.dev resolves to the deployed application
 
 ## v2 Requirements
 
@@ -135,7 +135,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ROOM-07 | Phase 1 | Complete |
 | ROOM-08 | Phase 1 | Complete |
 | RT-01 | Phase 4 | Pending |
-| RT-02 | Phase 1 | Pending |
+| RT-02 | Phase 1 | Complete (waived 2026-09-15 by owner) |
 | RT-03 | Phase 4 | Pending |
 | RT-04 | Phase 5 | Pending |
 | RT-05 | Phase 5 | Pending |
@@ -181,8 +181,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-11 | Phase 6 | Pending |
 | FDN-01 | Phase 1 | Complete |
 | FDN-02 | Phase 3 | Pending |
-| FDN-03 | Phase 1 | Pending |
-| FDN-04 | Phase 1 | Pending |
+| FDN-03 | Phase 1 | Complete |
+| FDN-04 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 57 total
