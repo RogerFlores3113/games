@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-09-15T19:39:29.102Z"
+stopped_at: Completed 02-04-PLAN.md
+last_updated: "2026-09-15T19:51:44.246Z"
 last_activity: 2026-09-15
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 17
-  completed_plans: 14
+  completed_plans: 15
   percent: 14
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 2 (Per-Seat Redaction Contract) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
 Last activity: 2026-09-15
 
-Progress: [████████░░] 82%
+Progress: [█████████░] 88%
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [████████░░] 82%
 | Phase 02 P01 | 20min | 3 tasks | 9 files |
 | Phase 02 P02 | 15min | 3 tasks | 8 files |
 | Phase 02 P03 | 35min | 3 tasks | 9 files |
+| Phase 02 P04 | 9min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-03: game-registration.ts's compile-time contract check uses one-element-tuple-wrapped conditional types assigned to underscore-prefixed consts
 - [Phase 02]: 02-03: seat-projection.ts's OutboundFrame built now with Exclude/Extract/Omit over ServerMessage, ready for Plan 04's #send/#viewFor consolidation
 - [Phase 02]: 02-03: ROOM_SCHEMA_VERSION bump alone closes the persisted adapterId=counter gap; no second reset trigger added to persistence.ts
+- [Phase 02]: 02-04: source-structure.test.ts uses a character-scanner comment stripper (not regex) and exact-count structural assertions to enforce D-08/D-09/D-10 chokepoints in apps/worker/src
+- [Phase 02]: 02-04: source-structure.test.ts derives SRC_DIR via URL.pathname rather than fileURLToPath, avoiding a tsc type clash between @cloudflare/workers-types and node's URL types
 
 ### Pending Todos
 
@@ -126,6 +129,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-15T19:39:29.094Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-09-15T19:51:44.239Z
+Stopped at: Completed 02-04-PLAN.md
 Resume file: None
