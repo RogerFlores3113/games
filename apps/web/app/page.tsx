@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "../components/Button";
 import { writeDisplayName } from "../lib/seat-token";
+import { writePendingVariant } from "../lib/pending-variant";
 
 type VariantOption = "base" | "rainbow" | "black";
 
@@ -47,6 +48,9 @@ export default function HomePage() {
       // message automatically. localStorage, not sessionStorage (WR-06), so
       // it survives into a new tab alongside the seat token.
       writeDisplayName(json.code, displayName.trim());
+      // WR-04: the Durable Object always starts a room on "base"; the host's
+      // client applies this choice with `set_variant` after its first join.
+      writePendingVariant(json.code, variant);
       router.push(json.path);
     } catch {
       setError("Couldn't create a room — check your connection and try again.");

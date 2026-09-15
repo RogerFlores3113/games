@@ -27,6 +27,10 @@ test.describe("create room (ROOM-01)", () => {
     await expect(selfRow).toContainText("Roger");
     await expect(selfRow).toContainText("Host");
 
+    // WR-04: the variant picked on the create screen is the lobby's variant,
+    // not silently reset to Base.
+    await expect(page.getByRole("radio", { name: "Rainbow" })).toBeChecked();
+
     // "Copy link" swaps its label to "Copied!" after a click.
     const copyButton = page.getByRole("button", { name: "Copy link" });
     await copyButton.click();

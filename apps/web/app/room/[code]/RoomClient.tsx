@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { ClientMessage, Variant } from "@games/schema";
 import { useRoomSocket } from "../../../lib/room-socket";
 import { useRoomStore } from "../../../lib/room-store";
+import { clearPendingVariant, readPendingVariant, variantToApply } from "../../../lib/pending-variant";
 import {
   clearDisplayName,
   readDisplayName,
@@ -118,6 +119,18 @@ function ConnectedRoom({
     useRoomStore.getState().reset();
     onJoinFailed();
   }, [status, code, onJoinFailed]);
+
+  useEffect(() => {
+    if (!view) return;
+    // WR-04: apply the variant picked on the create screen, once, through
+    // the ordinary host-only `set_variant` message. Cleared on the first
+    // seated view either way, so it can never fire later or for a joiner.
+    const target = variantToApply(view, readPendingVariant(code));
+    clearPendingVariant(code);
+    if (target !== null) {
+      socket.send(JSON.stringify({ type: "set_variant", variant: target } satisfies ClientMessage));
+    }
+  }, [view, code, socket]);
 
   function send(message: ClientMessage) {
     socket.send(JSON.stringify(message));
