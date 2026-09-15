@@ -1,9 +1,8 @@
-// Framework-free package: the game-adapter interface and game rules engines.
-// Deliberately declares ZERO dependencies (not even @games/schema) so it builds
-// and tests in complete isolation, per FDN-02.
-// This file currently only carries the Wave 0 monorepo-resolution smoke sentinel.
-// The applyAction/toPlayerView/checkGameEnd adapter contract and the D-15 counter
-// game land in later plans of this phase.
+// Framework-free package: carries the GameAdapter contract (adapter.ts), the
+// forehead-card toy (Phase 2's D-01 secret-holding game, deleted in Phase 4
+// once the real Hanabi engine lands), and its shared leak checker. Declares
+// ZERO dependencies (not even @games/schema) so it builds and tests in
+// complete isolation, per FDN-02.
 
 export const RULES_SMOKE = "rules-smoke-ok";
 
@@ -14,9 +13,6 @@ export type {
   GameEndResult,
   Variant,
 } from "./adapter";
-
-export { counterGame } from "./counter-game";
-export type { CounterAction, CounterState, CounterView } from "./counter-game";
 
 export { FOREHEAD_CARD_VALUES, foreheadCardGame } from "./forehead-card";
 export type {

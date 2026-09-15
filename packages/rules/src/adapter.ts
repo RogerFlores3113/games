@@ -1,6 +1,6 @@
 // The game-adapter seam. This is the ONLY interface through which the room
 // layer (Phase 1) talks to a game's rules engine (Phase 3/4's real Hanabi
-// engine, or the D-15 counter placeholder in this phase).
+// engine, or Phase 2's forehead-card toy).
 //
 // A conforming adapter MUST uphold these three invariants:
 //   1. `applyAction` never mutates its `state` argument — it returns a new
@@ -34,7 +34,7 @@ export type GameEndResult = { score: number; reason: string };
  */
 export interface GameAdapter<TState, TAction> {
   /** Stable adapter identifier persisted alongside room state, so a deploy
-   * that swaps adapters is detectable. `"counter"` for the D-15 placeholder. */
+   * that swaps adapters is detectable. `"forehead-card"` for Phase 2's toy. */
   readonly id: string;
 
   /** Deterministic given its inputs — the same seatIds/variant/seed always
@@ -58,7 +58,7 @@ export interface GameAdapter<TState, TAction> {
 
   /** Returns the projection for exactly ONE seat. There is deliberately no
    * spectator-view variant and no zero-argument serializer — every outbound
-   * send goes through this function, per seat, even for the trivial counter
+   * send goes through this function, per seat, even for the trivial toy
    * game. */
   toPlayerView(state: TState, seatId: string): unknown;
 

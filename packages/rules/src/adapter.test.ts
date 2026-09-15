@@ -4,13 +4,12 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import type { GameAdapter } from "./adapter";
-import { counterGame } from "./counter-game";
 import { foreheadCardGame } from "./forehead-card";
 
 /**
  * Reusable adapter-conformance suite. Phase 2 and Phase 4 call this same
  * function for their own adapters — that reuse is the point, so keep it free
- * of counter-specific assumptions.
+ * of game-specific assumptions.
  */
 export function describeAdapterConformance(
   name: string,
@@ -83,7 +82,6 @@ export function describeAdapterConformance(
   });
 }
 
-describeAdapterConformance("counter", counterGame, [{ type: "increment" }]);
 describeAdapterConformance("forehead-card", foreheadCardGame, [{ type: "guess", value: "Altair" }]);
 
 describe("packages/rules purity", () => {
@@ -99,7 +97,6 @@ describe("packages/rules purity", () => {
     const forbidden = ["node:", "from \"fs\"", "from 'fs'", "partyserver", "cloudflare:"];
     const files = [
       "adapter.ts",
-      "counter-game.ts",
       "index.ts",
       "shuffle.ts",
       "forehead-card.ts",
