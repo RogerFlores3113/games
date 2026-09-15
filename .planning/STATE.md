@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-09-15T19:24:11.993Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-09-15T19:30:23.108Z"
 last_activity: 2026-09-15
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 17
-  completed_plans: 12
+  completed_plans: 13
   percent: 14
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 2 (Per-Seat Redaction Contract) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-09-15
 
-Progress: [███████░░░] 71%
+Progress: [████████░░] 76%
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Progress: [███████░░░] 71%
 | Phase 01 P09 | 70min | 3 tasks | 11 files |
 | Phase 01 P10 | ~50min | 2 tasks | 13 files |
 | Phase 02 P01 | 20min | 3 tasks | 9 files |
+| Phase 02 P02 | 15min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,8 @@ Recent decisions affecting current work:
 - [Phase 01]: SeatRow gained an optional test-only seatId prop (data-seat-id attribute) for E2E observability, additive to the UI-SPEC's required prop shape
 - [Phase 02-01]: sfc32 seeded with all 4 cyrb128 words (128-bit state) for shuffle.ts, matching mintGameSeed's 128-bit secret — a 32-bit PRNG seed space is brute-forceable against visible cards; 128-bit state keeps deck order unguessable
 - [Phase 02-01]: checkSeatViewForLeaks/secretsForSeat live in packages/rules, designed for reuse by apps/worker's later D-11 layers 2/3 — avoids duplicating the checker; the file header documents the intended cross-layer reuse
+- [Phase 02-02]: ForeheadCardViewSchema lives under packages/schema/src/games/, reachable only via subpath export/alias, never re-exported from the generic barrel (D-06, FDN-01)
+- [Phase 02-02]: ErrorMessageSchema.detail closed to z.enum(["view_unavailable"]) — error frames can no longer carry free-text state (D-08)
 
 ### Pending Todos
 
@@ -119,6 +122,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-15T19:24:11.986Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-09-15T19:30:23.102Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None

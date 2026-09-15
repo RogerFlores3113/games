@@ -108,3 +108,7 @@ None - no external service configuration required.
 ---
 *Phase: 02-per-seat-redaction-contract*
 *Completed: 2026-09-15*
+
+## Self-Check: PASSED
+
+All 3 created source/test files and this SUMMARY.md verified present on disk; all 4 commit hashes (`5310a14`, `36e9016`, `f153a08`, `44364bc`) verified in `git log`.

@@ -85,7 +85,7 @@ Plans:
 **Wave 1**
 
 - [x] 02-01-PLAN.md — Forehead-card toy adapter, 128-bit seeded shuffle, shared leak checker + D-13 canary + D-11 layer-1 property test (`packages/rules`)
-- [ ] 02-02-PLAN.md — Strict game-namespaced Zod view schema at `@games/schema/games/forehead-card`, closed error-detail enum
+- [x] 02-02-PLAN.md — Strict game-namespaced Zod view schema at `@games/schema/games/forehead-card`, closed error-detail enum
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -180,7 +180,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Room & Transport Skeleton | 11/11 | Complete   | 2026-09-15 |
-| 2. Per-Seat Redaction Contract | 1/6 | In Progress|  |
+| 2. Per-Seat Redaction Contract | 2/6 | In Progress|  |
 | 3. Hanabi Rules Engine | 0/TBD | Not started | - |
 | 4. Wire Engine Into Room Actor | 0/TBD | Not started | - |
 | 5. Reconnect & Session Durability Hardening | 0/TBD | Not started | - |
