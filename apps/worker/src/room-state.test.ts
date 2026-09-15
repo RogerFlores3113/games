@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { RoomCode, RoomState, SeatToken } from "@games/schema";
 import { IDLE_GC_LOBBY_MS, MAX_PLAYERS } from "@games/schema";
+import { FOREHEAD_CARD_VALUES } from "@games/rules";
+import type { ForeheadCardView } from "@games/rules";
 import { computeRoomTimers } from "./scheduler";
+import { activeGame } from "./game-registration";
+import type { ActiveGameState } from "./game-registration";
 import {
   applyGameAction,
   createEmptyRoom,
@@ -396,11 +400,11 @@ describe("WR-02: deferring idle GC while connections are live", () => {
 });
 
 // ---------------------------------------------------------------------------
-// D-15 / FDN-01: game action delegation through the adapter only
+// D-02 / FDN-01: game action delegation through the registered adapter only
 // ---------------------------------------------------------------------------
 
-describe("D-15 / FDN-01: game actions are delegated to the adapter only", () => {
-  it("D-15 / FDN-01: applyGameAction increments the counter for the active seat and refuses others", () => {
+describe("D-02 / FDN-01: game actions are delegated to the registered adapter only", () => {
+  it("D-02 / FDN-01: applyGameAction accepts the active seat's guess and refuses a repeat from the same seat", () => {
     const minter = makeMinter();
     let state = freshRoom();
     const hostJoin = join(state, "Host", 1, minter);
@@ -413,25 +417,76 @@ describe("D-15 / FDN-01: game actions are delegated to the adapter only", () => 
     if (!thirdJoin.ok) throw new Error("unreachable");
     state = thirdJoin.state;
 
-    const started = startGame(state, hostJoin.seatId, 4, "seed");
+    const started = startGame(state, hostJoin.seatId, 4, "0123456789abcdef0123456789abcdef");
     if (!started.ok) throw new Error("unreachable");
     state = started.state;
 
-    // Active seat (join order = turn order for the counter game) succeeds.
-    const activeAttempt = applyGameAction(state, hostJoin.seatId, { type: "increment" }, 5);
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+
+    const activeAttempt = applyGameAction(state, activeSeatId, { type: "guess", value: "Altair" }, 5);
     expect(activeAttempt.ok).toBe(true);
     if (!activeAttempt.ok) throw new Error("unreachable");
     state = activeAttempt.state;
 
-    // A non-active seat is refused.
-    const wrongTurn = applyGameAction(state, hostJoin.seatId, { type: "increment" }, 6);
+    // The same seat going again (now off-turn) is refused.
+    const wrongTurn = applyGameAction(state, activeSeatId, { type: "guess", value: "Sirius" }, 6);
     expect(wrongTurn.ok).toBe(false);
 
     // Exactly one seat's view reports isYourTurn === true.
     const yourTurnFlags = state.seats.map(
-      (seat) => (toSeatView(state, seat.seatId).game as { isYourTurn: boolean }).isYourTurn,
+      (seat) => (toSeatView(state, seat.seatId).game as ForeheadCardView).isYourTurn,
     );
     expect(yourTurnFlags.filter(Boolean)).toHaveLength(1);
+  });
+
+  it("D-02 / FDN-01: a 2-seat game played to deck exhaustion ends, refuses further actions, and every yourCard has sorted keys [\"hidden\",\"id\"]", () => {
+    const minter = makeMinter();
+    let state = freshRoom();
+    const hostJoin = join(state, "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+    state = hostJoin.state;
+    const guestJoin = join(state, "Guest", 2, minter);
+    if (!guestJoin.ok) throw new Error("unreachable");
+    state = guestJoin.state;
+
+    const started = startGame(state, hostJoin.seatId, 3, "fedcba9876543210fedcba9876543210");
+    if (!started.ok) throw new Error("unreachable");
+    state = started.state;
+
+    for (let i = 0; i < 14; i++) {
+      const game = state.game as ActiveGameState;
+      const activeSeatId = game.seatIds[game.turnIndex]!;
+      const result = applyGameAction(
+        state,
+        activeSeatId,
+        { type: "guess", value: FOREHEAD_CARD_VALUES[i % FOREHEAD_CARD_VALUES.length] },
+        10 + i,
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("unreachable");
+      state = result.state;
+    }
+
+    expect(state.status).toBe("ended");
+
+    const game = state.game as ActiveGameState;
+    const stillActiveSeatId = game.seatIds[game.turnIndex]!;
+    const fifteenth = applyGameAction(state, stillActiveSeatId, { type: "guess", value: "Altair" }, 30);
+    expect(fifteenth.ok).toBe(false);
+
+    for (const seat of state.seats) {
+      const view = toSeatView(state, seat.seatId).game as ForeheadCardView;
+      expect(Object.keys(view.yourCard).sort()).toEqual(["hidden", "id"]);
+    }
+  });
+
+  it("D-02: createEmptyRoom registers the active adapter's id", () => {
+    expect(createEmptyRoom(ROOM_CODE, "base", 0).adapterId).toBe("forehead-card");
+  });
+
+  it("D-06: activeGame.adapter.id matches the registered game view schema's game id", () => {
+    expect(activeGame.adapter.id).toBe(activeGame.gameId);
   });
 });
 
@@ -526,8 +581,10 @@ describe("purity: room-state functions never mutate their input", () => {
 
     const started = startGame(baseState, hostJoin.seatId, 9, "seed");
     if (!started.ok) throw new Error("unreachable");
+    const startedGame = started.state.game as ActiveGameState;
+    const startedActiveSeatId = startedGame.seatIds[startedGame.turnIndex]!;
     const clone7 = structuredClone(started.state);
-    applyGameAction(clone7, hostJoin.seatId, { type: "increment" }, 10);
+    applyGameAction(clone7, startedActiveSeatId, { type: "guess", value: "Altair" }, 10);
     expect(clone7).toEqual(structuredClone(started.state));
   });
 });

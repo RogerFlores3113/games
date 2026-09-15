@@ -10,8 +10,8 @@
 // `applyAction`, `toPlayerView`, `checkGameEnd`) — it never reaches into
 // `state.game`'s fields directly.
 
-import { counterGame } from "@games/rules";
-import type { CounterAction, CounterState } from "@games/rules";
+import { activeGame } from "./game-registration";
+import type { ActiveGameState } from "./game-registration";
 import { MAX_PLAYERS, MIN_PLAYERS } from "@games/schema";
 import type {
   PublicSeat,
@@ -25,14 +25,13 @@ import type {
 import { deriveDisplayLabel } from "./seat-naming";
 
 // ---------------------------------------------------------------------------
-// D-15 placeholder adapter wiring
-//
-// Module-level constant, not threaded as a parameter through every function
-// below — Phase 2 swaps this one line for the secret-holding toy adapter,
-// and that is the whole diff (D-15's "small, legible diff" property).
+// D-02: the active game adapter, reached solely through the single
+// registration point (./game-registration). Module-level constant, not
+// threaded as a parameter through every function below — Phase 4 swaps
+// game-registration.ts's two imports for Hanabi, and that is the whole diff.
 // ---------------------------------------------------------------------------
 
-const adapter = counterGame;
+const adapter = activeGame.adapter;
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -306,8 +305,8 @@ export function applyGameAction(
     return { ok: false, reason: "bad_request" };
   }
 
-  const gameState = state.game as CounterState;
-  const result = adapter.applyAction(gameState, actorSeatId, request as CounterAction);
+  const gameState = state.game as ActiveGameState;
+  const result = adapter.applyAction(gameState, actorSeatId, request);
   if (!result.ok) {
     return { ok: false, reason: mapAdapterError() };
   }
@@ -349,6 +348,6 @@ export function toSeatView(state: RoomState, seatId: string): RoomView {
     hostSeatId: state.hostSeatId,
     youSeatId: seatId,
     seats,
-    game: state.game === null ? null : adapter.toPlayerView(state.game as CounterState, seatId),
+    game: state.game === null ? null : adapter.toPlayerView(state.game as ActiveGameState, seatId),
   };
 }

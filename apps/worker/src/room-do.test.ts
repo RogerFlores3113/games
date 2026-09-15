@@ -414,9 +414,9 @@ describe("RoomDO integration (live wrangler dev)", () => {
 
     // Alice takes her turn; the resulting state still has both seats, and it
     // is now Bob's turn — the game did not lose a seat it will need.
-    send(ws1, { type: "game_action", request: { type: "increment" } });
+    send(ws1, { type: "game_action", request: { type: "guess", value: "Altair" } });
     const afterTurn = await c2.waitFor(
-      (m) => m.type === "state" && (m.view as { game: { turnsTaken: number } | null }).game?.turnsTaken === 1,
+      (m) => m.type === "state" && (m.view as { game: { revealed: unknown[] } | null }).game?.revealed.length === 1,
       5000,
     );
     const view = afterTurn.view as { seats: unknown[]; game: { isYourTurn: boolean } };
