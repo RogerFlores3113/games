@@ -46,5 +46,10 @@ export const LOBBY_SEAT_RELEASE_GRACE_MS = 30_000;
 /** D-08: WebSocket close code used when a newer tab takes over a seat. */
 export const SUPERSEDED_CLOSE_CODE = 4001;
 
+/** D-02 / WR-01: WebSocket close code used when idle GC deletes the room.
+ * Terminal for the client — reconnecting would only mint a fresh empty
+ * lobby under the same code. */
+export const ROOM_ABANDONED_CLOSE_CODE = 4002;
+
 export const MAX_DISPLAY_NAME_LENGTH = 24;
 export const MIN_DISPLAY_NAME_LENGTH = 1;

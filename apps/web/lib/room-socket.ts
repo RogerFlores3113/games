@@ -3,8 +3,9 @@
 import { useEffect, useRef } from "react";
 import usePartySocket from "partysocket/react";
 import type { PartySocket } from "partysocket";
-import { ServerMessageSchema, type DisplayName } from "@games/schema";
-import { readSeatToken, writeSeatToken } from "./seat-token";
+import { ROOM_ABANDONED_CLOSE_CODE, ServerMessageSchema, type DisplayName } from "@games/schema";
+import { clearSeatToken, readSeatToken, writeSeatToken } from "./seat-token";
+import { isTerminalCloseCode } from "./close-codes";
 import { useRoomStore } from "./room-store";
 
 /**
@@ -39,7 +40,16 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Part
     minReconnectionDelay: 1000,
     maxReconnectionDelay: 30000,
     reconnectionDelayGrowFactor: 1.5,
-    shouldReconnectOnClose: () => !stopReconnectingRef.current,
+    shouldReconnectOnClose: (event) => !stopReconnectingRef.current && !isTerminalCloseCode(event.code),
+    onClose: (event) => {
+      if (event.code === ROOM_ABANDONED_CLOSE_CODE) {
+        // WR-01: the room was garbage-collected. Its seat token is dead, and
+        // reconnecting would only create a fresh empty lobby.
+        stopReconnectingRef.current = true;
+        clearSeatToken(code);
+        setStatus("abandoned");
+      }
+    },
     onOpen: () => {
       // One code path for first join AND every automatic reconnect — the
       // seat token is re-read and replayed on every `open`, never only on

@@ -12,7 +12,10 @@ export type RoomConnectionStatus =
   | "joining"
   | "seated"
   | "refused"
-  | "superseded";
+  | "superseded"
+  /** WR-01: the server garbage-collected the room and closed the socket
+   * with `ROOM_ABANDONED_CLOSE_CODE`. Terminal — no reconnect. */
+  | "abandoned";
 
 export interface RoomStoreState {
   view: RoomView | null;

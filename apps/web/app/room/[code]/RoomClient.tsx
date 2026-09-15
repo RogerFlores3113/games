@@ -94,6 +94,22 @@ function ConnectedRoom({ code, displayName }: { code: string; displayName: strin
     );
   }
 
+  if (status === "abandoned") {
+    return (
+      <main
+        className="flex min-h-screen items-center justify-center px-[length:var(--space-md)]"
+        style={{ backgroundColor: "var(--color-bg)" }}
+      >
+        <p
+          className="text-[length:var(--text-body)]"
+          style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-body--line-height)" }}
+        >
+          This room closed after sitting idle.
+        </p>
+      </main>
+    );
+  }
+
   if (!view) {
     // "connecting" / "joining" — the socket hasn't produced a server view
     // yet. Still no board and no partial state (ROOM-07/D-14 applies

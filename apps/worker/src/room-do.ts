@@ -20,6 +20,7 @@ import { Server, type Connection, type ConnectionContext } from "partyserver";
 import {
   encodeServerMessage,
   parseClientMessage,
+  ROOM_ABANDONED_CLOSE_CODE,
   SUPERSEDED_CLOSE_CODE,
   type RoomCode,
   type RoomState,
@@ -204,6 +205,10 @@ export class RoomDO extends Server<Env> {
     if (liveOwner !== undefined && liveOwner !== connection.id) return;
 
     const room = await this.#ensureRoom();
+    // WR-01: nothing to mark when the seat is already gone — released, or
+    // the whole room garbage-collected. Committing here would resurrect a
+    // deleted room and re-arm its alarm.
+    if (!this.#persisted || !room.seats.some((seat) => seat.seatId === seatId)) return;
     const now = Date.now();
     const nextState = markConnected(room, seatId, false, now);
     await this.#commit(nextState, now);
@@ -246,8 +251,13 @@ export class RoomDO extends Server<Env> {
           // Abandoned room: close every connection, wipe all storage, and
           // return WITHOUT rescheduling (ROOM-08). A deleted room must not
           // keep waking itself up.
+          // WR-01: detach each socket BEFORE closing it, so its `onClose`
+          // finds no seat and cannot write a fresh room back into the
+          // storage just wiped. The terminal close code stops `partysocket`
+          // from reconnecting into a brand-new empty lobby.
           for (const connection of this.getConnections()) {
-            connection.close(1000, "room abandoned");
+            connection.setState(null);
+            connection.close(ROOM_ABANDONED_CLOSE_CODE, "room abandoned");
           }
           this.room = null;
           this.#persisted = false;
