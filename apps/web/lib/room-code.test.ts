@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from "@games/schema";
-import { mintRoomCode } from "./room-code";
+import { mintRoomCode, parseRoomCodeParam } from "./room-code";
+
+describe("parseRoomCodeParam (CR-02)", () => {
+  it("accepts a canonical code as-is", () => {
+    expect(parseRoomCodeParam("ABCDEF")).toEqual({ kind: "ok", code: "ABCDEF" });
+  });
+
+  it("asks for a redirect to the uppercase code when a friend typed it in lowercase", () => {
+    expect(parseRoomCodeParam("abcdef")).toEqual({ kind: "redirect", code: "ABCDEF" });
+    expect(parseRoomCodeParam("AbCdEf")).toEqual({ kind: "redirect", code: "ABCDEF" });
+  });
+
+  it("rejects codes outside the speakable alphabet or of the wrong length", () => {
+    for (const raw of ["ABCDE0", "ABCDEI", "abcde1", "ABCDE", "ABCDEFG", "", "AB%20CD", "ABC/EF"]) {
+      expect(parseRoomCodeParam(raw)).toEqual({ kind: "invalid" });
+    }
+  });
+});
 
 const CODE_PATTERN = new RegExp(`^[${ROOM_CODE_ALPHABET}]{${ROOM_CODE_LENGTH}}$`);
 

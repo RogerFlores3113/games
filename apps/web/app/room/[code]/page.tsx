@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { notFound, redirect } from "next/navigation";
+import { parseRoomCodeParam } from "../../../lib/room-code";
 import { RoomClient } from "./RoomClient";
 
 interface RoomPageParams {
@@ -15,7 +17,12 @@ interface RoomPageProps {
  * clicking matters (CLAUDE.md § "Next.js vs Plain Vite SPA").
  */
 export async function generateMetadata({ params }: RoomPageProps): Promise<Metadata> {
-  const { code } = await params;
+  const { code: raw } = await params;
+  const parsed = parseRoomCodeParam(raw);
+  if (parsed.kind === "invalid") {
+    return { title: "Room not found — games.rogerflores.dev" };
+  }
+  const { code } = parsed;
   return {
     title: `Join room ${code} — games.rogerflores.dev`,
     description: `Click to join room ${code}. No account, no download — just a name.`,
@@ -27,6 +34,11 @@ export async function generateMetadata({ params }: RoomPageProps): Promise<Metad
 }
 
 export default async function RoomPage({ params }: RoomPageProps) {
-  const { code } = await params;
-  return <RoomClient code={code} />;
+  const { code: raw } = await params;
+  // CR-02: normalize before anything dials the Worker — a lowercase code
+  // redirects to its canonical form, anything else is a 404.
+  const parsed = parseRoomCodeParam(raw);
+  if (parsed.kind === "invalid") notFound();
+  if (parsed.kind === "redirect") redirect(`/room/${parsed.code}`);
+  return <RoomClient code={parsed.code} />;
 }

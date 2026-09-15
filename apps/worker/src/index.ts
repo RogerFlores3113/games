@@ -10,7 +10,7 @@
 // entry ... not of type 'function or ExportedHandler'" (Plan 01 finding).
 
 import { routePartykitRequest } from "partyserver";
-import { SCHEMA_SMOKE } from "@games/schema";
+import { RoomCodeSchema, SCHEMA_SMOKE } from "@games/schema";
 import { RULES_SMOKE } from "@games/rules";
 import { RoomDO, type Env } from "./room-do";
 
@@ -29,8 +29,28 @@ export default {
       });
     }
 
+    // CR-02: refuse a non-canonical room name at the edge, BEFORE a Durable
+    // Object is created for it. `RoomState.code` must match RoomCodeSchema,
+    // so a DO named e.g. `abcdef` could never persist a room: every write
+    // would throw inside `onMessage` and the client would hang on
+    // "Connecting…" forever.
+    const roomPath = url.pathname.match(/^\/parties\/[^/]+\/([^/]+)/);
+    if (roomPath !== null && !isCanonicalRoomName(roomPath[1] as string)) {
+      return new Response("Not Found", { status: 404 });
+    }
+
     return (
       (await routePartykitRequest(request, env)) ?? new Response("Not Found", { status: 404 })
     );
   },
 };
+
+function isCanonicalRoomName(encoded: string): boolean {
+  let name: string;
+  try {
+    name = decodeURIComponent(encoded);
+  } catch {
+    return false;
+  }
+  return RoomCodeSchema.safeParse(name).success;
+}
