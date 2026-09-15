@@ -7,14 +7,24 @@
 // dispatch, alarm scheduling, and persistence, wired through `ctx.storage`
 // and `partyserver`'s hibernation-aware WebSocket lifecycle.
 //
-// Two structural invariants a reviewer (or Phase 2's HIDE-02 audit) can
-// grep-verify directly in this file:
+// Three structural invariants a reviewer (or Phase 2's HIDE-02/HIDE-03/D-09
+// structural audit, apps/worker/src/source-structure.test.ts) can
+// mechanically verify directly in this file:
 //   1. Exactly one alarm-arming call site (`ctx.storage.` + the Alarm API's
 //      scheduling method), inside `#syncAlarm`.
-//   2. Exactly one `toSeatView` call site (the literal invocation with an opening paren), inside `#pushState` — every
-//      outbound frame is produced per-connection for that connection's own
-//      seat. This class never calls the room-wide broadcast helper (CLAUDE.md "What NOT to Use":
-//      broadcasting one shared state object to all seats is forbidden).
+//   2. Exactly one socket writer: `#send` is the ONLY method that ever calls
+//      `connection.send`. Every other method builds a `ServerMessage`/
+//      `OutboundFrame` value and hands it to `this.#send(...)`. This class
+//      never calls the room-wide broadcast helper (CLAUDE.md "What NOT to
+//      Use": broadcasting one shared state object to all seats is
+//      forbidden) — every connection gets its own frame from its own
+//      `#viewFor` call.
+//   3. Exactly one view source: `#viewFor` is the ONLY method that produces
+//      a view for a `joined`/`state` frame, and it does so by calling
+//      `projectSeatView` (seat-projection.ts) — never `toSeatView` directly.
+//      `projectSeatView` is itself the sole `toSeatView` call site in the
+//      whole worker. Join, live update, and reconnect all share this one
+//      path (D-10): there is no separate resume serializer anywhere.
 
 import { Server, type Connection, type ConnectionContext } from "partyserver";
 import {
@@ -35,7 +45,6 @@ import {
   deferIdleGc,
   startGame,
   applyGameAction,
-  toSeatView,
 } from "./room-state";
 import {
   mintGameSeed,
@@ -48,6 +57,7 @@ import {
 import { computeRoomTimers, dueTimers, nextDueAt, type TimerEvent } from "./scheduler";
 import { loadRoom, loadTimers, saveRoom } from "./persistence";
 import { isOriginAllowed } from "./origin";
+import { projectSeatView, type OutboundFrame, type ProjectedRoomView } from "./seat-projection";
 
 /** The Durable Object namespace binding declared in wrangler.jsonc. */
 export interface Env {
@@ -122,7 +132,7 @@ export class RoomDO extends Server<Env> {
   async onMessage(connection: Connection, raw: string | ArrayBuffer | ArrayBufferView): Promise<void> {
     const parsed = parseClientMessage(String(raw));
     if (!parsed.ok) {
-      connection.send(encodeServerMessage({ type: "error", code: "bad_request" }));
+      this.#send(connection, { type: "error", code: "bad_request" });
       return;
     }
     const msg = parsed.message;
@@ -139,14 +149,14 @@ export class RoomDO extends Server<Env> {
     // has no `seatId` field to supply (T-1-04 boundary).
     const actorSeatId = this.#seatIdFor(connection as unknown as ConnectionWithSeat);
     if (actorSeatId === null) {
-      connection.send(encodeServerMessage({ type: "error", code: "not_seated" }));
+      this.#send(connection, { type: "error", code: "not_seated" });
       return;
     }
 
     if (msg.type === "set_variant") {
       const result = setVariant(room, actorSeatId, msg.variant, now);
       if (!result.ok) {
-        connection.send(encodeServerMessage({ type: "error", code: result.reason }));
+        this.#send(connection, { type: "error", code: result.reason });
         return;
       }
       await this.#commit(result.state, now);
@@ -158,7 +168,7 @@ export class RoomDO extends Server<Env> {
       // WR-07: a secret seed, never the public room code (see mintGameSeed).
       const result = startGame(room, actorSeatId, now, mintGameSeed());
       if (!result.ok) {
-        connection.send(encodeServerMessage({ type: "error", code: result.reason }));
+        this.#send(connection, { type: "error", code: result.reason });
         return;
       }
       await this.#commit(result.state, now);
@@ -169,7 +179,7 @@ export class RoomDO extends Server<Env> {
     if (msg.type === "game_action") {
       const result = applyGameAction(room, actorSeatId, msg.request, now);
       if (!result.ok) {
-        connection.send(encodeServerMessage({ type: "error", code: result.reason }));
+        this.#send(connection, { type: "error", code: result.reason });
         return;
       }
       await this.#commit(result.state, now);
@@ -181,7 +191,7 @@ export class RoomDO extends Server<Env> {
       // CR-03: `releaseSeat` refuses mid-game — the seat stays in turn order.
       const result = releaseSeat(room, actorSeatId, now);
       if (!result.ok) {
-        connection.send(encodeServerMessage({ type: "error", code: result.reason }));
+        this.#send(connection, { type: "error", code: result.reason });
         return;
       }
       connection.setState(null);
@@ -326,7 +336,7 @@ export class RoomDO extends Server<Env> {
     // (e.g. released) does not count.
     const existingSeatId = this.#seatIdFor(connection as unknown as ConnectionWithSeat);
     if (existingSeatId !== null && room.seats.some((seat) => seat.seatId === existingSeatId)) {
-      connection.send(encodeServerMessage({ type: "error", code: "bad_request" }));
+      this.#send(connection, { type: "error", code: "bad_request" });
       return;
     }
 
@@ -339,7 +349,7 @@ export class RoomDO extends Server<Env> {
     });
 
     if (!result.ok) {
-      connection.send(encodeServerMessage({ type: "refused", reason: result.reason }));
+      this.#send(connection, { type: "refused", reason: result.reason });
       connection.close(1000, result.reason);
       return;
     }
@@ -356,49 +366,76 @@ export class RoomDO extends Server<Env> {
         // must find no seat on its attachment, or it would mark the seat the
         // new connection now holds as disconnected.
         superseded.setState(null);
-        superseded.send(encodeServerMessage({ type: "superseded" }));
+        this.#send(superseded, { type: "superseded" });
         superseded.close(SUPERSEDED_CLOSE_CODE, "superseded");
       }
     }
 
     await this.#commit(result.state, now);
 
-    // The only message that ever carries a seat token — sent to exactly the
-    // one connection that just claimed the seat.
-    connection.send(
-      encodeServerMessage({
+    // D-07 fail-closed: a view that fails the active game's strict schema
+    // sends an error frame (no view) instead of `joined` — the seat claim
+    // itself already succeeded (result.ok above), so this is reported as a
+    // view failure, not a join failure.
+    const view = this.#viewFor(result.state, result.seatId);
+    if (view === null) {
+      this.#send(connection, { type: "error", code: "bad_request", detail: "view_unavailable" });
+    } else {
+      // The only message that ever carries a seat token — sent to exactly
+      // the one connection that just claimed the seat.
+      this.#send(connection, {
         type: "joined",
         seatId: result.seatId,
         seatToken: result.seatToken,
-        view: this.#viewFor(result.state, result.seatId),
-      }),
-    );
+        view,
+      });
+    }
 
-    // Push the fresh state to everyone else (ROOM-04 live seat list).
+    // Push the fresh state to everyone else (ROOM-04 live seat list), in
+    // both branches above — a view failure for this connection must not
+    // stop the rest of the room from hearing about the seat change.
     await this.#pushState();
   }
 
-  /** The sole wrapper around `toSeatView` — the literal call site
-   * the literal invocation of `toSeatView` with its call parenthesis appears exactly once in this file, right here. Both
-   * `#pushState` and the `joined` reply above route through this one
-   * method, so there is exactly one place in the whole worker that turns a
-   * `RoomState` into anything sent over a socket (Phase 2's HIDE-02 audit
-   * reads this file). */
-  #viewFor(room: RoomState, seatId: string) {
-    return toSeatView(room, seatId);
+  /** The sole wrapper around `projectSeatView` — the literal call site
+   * appears exactly once in this file, right here. Both `#pushState` and
+   * the `joined` reply above route through this one method, so there is
+   * exactly one place in the whole worker that turns a `RoomState` into a
+   * view sent over a socket, and that view can only ever have passed
+   * `projectSeatView`'s fail-closed schema gate (Phase 2's HIDE-02/D-09
+   * structural audit reads this file). Returns `null` on a validation
+   * failure (D-07) — callers must send an `error` frame with `detail:
+   * "view_unavailable"` instead of a `joined`/`state` frame. */
+  #viewFor(room: RoomState, seatId: string): ProjectedRoomView | null {
+    return projectSeatView(room, seatId);
+  }
+
+  /** The ONE method in this class that ever calls `connection.send` (D-08).
+   * Every other method builds an `OutboundFrame` value and hands it here —
+   * never `connection.send` directly. `joined`/`state` frames can only
+   * carry a view obtained from `#viewFor`, which is branded so a
+   * hand-constructed view cannot type-check here even by accident. */
+  #send(connection: Connection, frame: OutboundFrame): void {
+    connection.send(encodeServerMessage(frame));
   }
 
   /** The ONLY outbound path other than the `joined`/`refused`/`superseded`/
    * `error` replies above. Every connection gets its OWN `#viewFor` call
-   * with its OWN seat id — there is no shared payload to leak. No other
-   * method in this class may call `connection.send` with a payload it did
-   * not obtain from `#viewFor` (Phase 2's HIDE-02 audit reads this file). */
+   * with its OWN seat id — there is no shared payload to leak. A view
+   * failure for one connection (D-07) sends that connection an `error`
+   * frame and continues serving the rest of the room; it never skips a
+   * connection silently and never falls back to an unvalidated view. */
   async #pushState(): Promise<void> {
     const room = await this.#ensureRoom();
     for (const connection of this.getConnections()) {
       const seatId = this.#seatIdFor(connection as unknown as ConnectionWithSeat);
       if (seatId === null) continue;
-      connection.send(encodeServerMessage({ type: "state", view: this.#viewFor(room, seatId) }));
+      const view = this.#viewFor(room, seatId);
+      if (view === null) {
+        this.#send(connection, { type: "error", code: "bad_request", detail: "view_unavailable" });
+        continue;
+      }
+      this.#send(connection, { type: "state", view });
     }
   }
 
