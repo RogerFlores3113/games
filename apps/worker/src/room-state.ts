@@ -229,6 +229,7 @@ export function setVariant(
   state: RoomState,
   actorSeatId: string,
   variant: Variant,
+  now: number,
 ): RoomResult {
   if (actorSeatId !== state.hostSeatId) {
     return { ok: false, reason: "not_host" };
@@ -236,7 +237,18 @@ export function setVariant(
   if (state.status !== "lobby") {
     return { ok: false, reason: "bad_request" };
   }
-  return { ok: true, state: { ...state, variant } };
+  return { ok: true, state: { ...state, variant, lastActivityAt: now } };
+}
+
+/** WR-02 / D-02: idle GC measures idleness, and a room with live connected
+ * players is not idle — even if nobody has changed anything for an hour
+ * (a lobby waiting for a late friend). When `idle_gc` comes due while
+ * connections are live, the DO calls this instead of deleting the room,
+ * restarting the idle clock at `now`. The decision is made from the DO's
+ * actual open sockets, not the persisted `connected` flags, so a flag left
+ * stale by a missed close can never keep a room alive forever. */
+export function deferIdleGc(state: RoomState, now: number): RoomState {
+  return { ...state, lastActivityAt: now };
 }
 
 /** ROOM-06, D-10/D-11: gated ONLY on host + a 2-5 seat count. There is

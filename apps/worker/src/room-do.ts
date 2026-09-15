@@ -32,6 +32,7 @@ import {
   markConnected,
   transferHost,
   setVariant,
+  deferIdleGc,
   startGame,
   applyGameAction,
   toSeatView,
@@ -142,7 +143,7 @@ export class RoomDO extends Server<Env> {
     }
 
     if (msg.type === "set_variant") {
-      const result = setVariant(room, actorSeatId, msg.variant);
+      const result = setVariant(room, actorSeatId, msg.variant, now);
       if (!result.ok) {
         connection.send(encodeServerMessage({ type: "error", code: result.reason }));
         return;
@@ -248,6 +249,13 @@ export class RoomDO extends Server<Env> {
           const released = releaseSeat(current, event.seatId, now);
           if (released.ok) current = released.state;
         } else if (event.type === "idle_gc") {
+          // WR-02: a room with a live, seated socket is not idle. Restart
+          // the idle clock instead of deleting it — decided from the actual
+          // open sockets, never from the persisted `connected` flags.
+          if (Object.keys(this.bindings).length > 0) {
+            current = deferIdleGc(current, now);
+            continue;
+          }
           // Abandoned room: close every connection, wipe all storage, and
           // return WITHOUT rescheduling (ROOM-08). A deleted room must not
           // keep waking itself up.

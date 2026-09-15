@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { RoomCode, RoomState, SeatToken } from "@games/schema";
-import { MAX_PLAYERS } from "@games/schema";
+import { IDLE_GC_LOBBY_MS, MAX_PLAYERS } from "@games/schema";
+import { computeRoomTimers } from "./scheduler";
 import {
   applyGameAction,
   createEmptyRoom,
+  deferIdleGc,
   joinRoom,
   markConnected,
   releaseSeat,
@@ -95,16 +97,26 @@ describe("ROOM-05: variant lock", () => {
     if (!hostJoin.ok) throw new Error("unreachable");
     let state = hostJoin.state;
 
-    const r1 = setVariant(state, hostJoin.seatId, "rainbow");
+    const r1 = setVariant(state, hostJoin.seatId, "rainbow", 2);
     expect(r1.ok).toBe(true);
     if (!r1.ok) throw new Error("unreachable");
     expect(r1.state.variant).toBe("rainbow");
     state = r1.state;
 
-    const r2 = setVariant(state, hostJoin.seatId, "black");
+    const r2 = setVariant(state, hostJoin.seatId, "black", 3);
     expect(r2.ok).toBe(true);
     if (!r2.ok) throw new Error("unreachable");
     expect(r2.state.variant).toBe("black");
+  });
+
+  it("WR-02: a variant change counts as lobby activity", () => {
+    const minter = makeMinter();
+    const hostJoin = join(freshRoom(), "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+
+    const result = setVariant(hostJoin.state, hostJoin.seatId, "rainbow", 99);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.state.lastActivityAt).toBe(99);
   });
 
   it("ROOM-05: a non-host setVariant is refused not_host", () => {
@@ -114,7 +126,7 @@ describe("ROOM-05: variant lock", () => {
     const guestJoin = join(hostJoin.state, "Guest", 2, minter);
     if (!guestJoin.ok) throw new Error("unreachable");
 
-    const result = setVariant(guestJoin.state, guestJoin.seatId, "rainbow");
+    const result = setVariant(guestJoin.state, guestJoin.seatId, "rainbow", 3);
     expect(result).toEqual({ ok: false, reason: "not_host" });
   });
 
@@ -133,7 +145,7 @@ describe("ROOM-05: variant lock", () => {
     if (!started.ok) throw new Error("unreachable");
     state = started.state;
 
-    const attempt = setVariant(state, hostJoin.seatId, "black");
+    const attempt = setVariant(state, hostJoin.seatId, "black", 4);
     expect(attempt).toEqual({ ok: false, reason: "bad_request" });
     expect(state.variant).toBe("base");
   });
@@ -365,6 +377,25 @@ describe("D-07: host transfer on disconnect", () => {
 });
 
 // ---------------------------------------------------------------------------
+// WR-02: idle GC never collects a room players are still connected to
+// ---------------------------------------------------------------------------
+
+describe("WR-02: deferring idle GC while connections are live", () => {
+  it("deferIdleGc restarts the idle clock at now, pushing idle_gc a full threshold out", () => {
+    const minter = makeMinter();
+    const hostJoin = join(freshRoom(), "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+    const idleAt = hostJoin.state.lastActivityAt + IDLE_GC_LOBBY_MS;
+
+    const deferred = deferIdleGc(hostJoin.state, idleAt);
+
+    expect(deferred.seats).toEqual(hostJoin.state.seats);
+    const idleGc = computeRoomTimers(deferred, idleAt).find((t) => t.type === "idle_gc");
+    expect(idleGc?.dueAt).toBe(idleAt + IDLE_GC_LOBBY_MS);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // D-15 / FDN-01: game action delegation through the adapter only
 // ---------------------------------------------------------------------------
 
@@ -463,7 +494,7 @@ describe("purity: room-state functions never mutate their input", () => {
     expect(clone3).toEqual(structuredClone(baseState));
 
     const clone4 = structuredClone(baseState);
-    setVariant(clone4, hostJoin.seatId, "rainbow");
+    setVariant(clone4, hostJoin.seatId, "rainbow", 6);
     expect(clone4).toEqual(structuredClone(baseState));
 
     const clone5 = structuredClone(baseState);
