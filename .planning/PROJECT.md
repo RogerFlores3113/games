@@ -18,6 +18,7 @@ A friend clicks a link and is playing Hanabi within seconds — and the game doe
 
 - ✓ Players join by opening the link and picking a display name — no account, no email — *Validated in Phase 1: Room & Transport Skeleton (live at games.rogerflores.dev)*
 - ✓ Room and realtime layer are built game-agnostic so Innovation can be added without rewriting the foundation — *Validated in Phase 1: `GameAdapter` seam, counter game as the stand-in*
+- ✓ Server sends each player a per-seat filtered view — a player never receives the identity of cards in their own hand — *Validated in Phase 2: whitelist-serialize projection proven against a toy secret-holding game, with a hidden card structurally lacking its value field, one enforced send chokepoint, and three automated leak-test layers*
 
 ### Active
 
@@ -87,7 +88,7 @@ A friend clicks a link and is playing Hanabi within seconds — and the game doe
 | Link-based rooms with display names, no accounts | Known friend group; auth is friction with no payoff at this scale | ✓ Good — shipped in Phase 1 |
 | Box variants only (base, Rainbow, Black) | Hanab Live's catalogue would make the rules engine the entire project | — Pending |
 | No in-app chat | Players are already on a voice call; chat adds scope and message volume for no gain | — Pending |
-| Server-authoritative with per-seat filtered views | Forced by Hanabi's hidden-information design — you cannot see your own hand | — Pending |
+| Server-authoritative with per-seat filtered views | Forced by Hanabi's hidden-information design — you cannot see your own hand | ✓ Good — shipped in Phase 2: one projection chokepoint, strict fail-closed view schema, structural no-bypass test, three leak-test layers |
 | Reconnect-and-resume required; ephemeral games rejected | Losing a 25-minute co-op game to a wifi blip is unacceptable | — Pending |
 | Supabase free tier rejected as primary backend | Projects pause after ~1 week idle; a paused backend breaks the core "click a link and play" promise | ✓ Good — Cloudflare Workers Free + Durable Objects live; no payment method, no pause notice (FDN-03) |
 | Invocation efficiency as a principle, not a hard budget | At one-table scale the free tier ceiling is ~100x away from binding; availability is the real constraint | — Pending |
@@ -114,4 +115,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-15 after Phase 1 (Room & Transport Skeleton)*
+*Last updated: 2026-09-15 after Phase 2 (Per-Seat Redaction Contract)*
