@@ -126,6 +126,26 @@ describe("D-17: version mismatch resets without reading the old blob", () => {
   });
 });
 
+describe("Phase 2 adapter swap (RESEARCH Pitfall 1): pre-swap counter rooms reset", () => {
+  it("a schemaVersion 1 room with adapterId counter and a counter-shaped game resets without reading the room blob", async () => {
+    expect(ROOM_SCHEMA_VERSION).toBeGreaterThan(1);
+
+    const { storage, getCalls } = makeFakeStorage();
+    await storage.put(STORAGE_KEYS.schemaVersion, 1);
+    await storage.put(STORAGE_KEYS.room, {
+      ...fallbackRoom(),
+      adapterId: "counter",
+      game: { count: 3, seatIds: ["s1", "s2"], turnIndex: 0 },
+    });
+    getCalls.length = 0; // reset instrumentation after seeding
+
+    const result = await loadRoom(storage, fallbackRoom);
+
+    expect(result.wasReset).toBe(true);
+    expect(getCalls).not.toContain(STORAGE_KEYS.room);
+  });
+});
+
 describe("corrupt-but-versioned storage", () => {
   it("returns wasReset: true rather than throwing when the room blob fails RoomStateSchema", async () => {
     const { storage, map } = makeFakeStorage();

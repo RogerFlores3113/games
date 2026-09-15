@@ -6,8 +6,12 @@
 /** D-17: persisted room state carries this version. On mismatch, reset to an
  * empty lobby rather than deserializing state written by an incompatible
  * deploy (see RESEARCH.md Pitfall 3 — stored as its own top-level storage
- * key by Plan 06, checked BEFORE parsing the room blob). */
-export const ROOM_SCHEMA_VERSION = 1;
+ * key by Plan 06, checked BEFORE parsing the room blob).
+ *
+ * Bumped to 2 in Phase 2 when the D-15 counter adapter was replaced by the
+ * forehead-card toy (RESEARCH.md Pitfall 1): persisted adapterId counter
+ * rooms must reset, not deserialize into a different game. */
+export const ROOM_SCHEMA_VERSION = 2;
 
 /** D-01: 32 uppercase-safe characters — no `I`, `O`, `0`, `1` — because the
  * room code is read aloud over a voice call. Do not add lowercase. */
