@@ -366,6 +366,41 @@ describe("RoomDO integration (live wrangler dev)", () => {
     ws2.close();
   });
 
+  it("CR-03: a leave sent mid-game is refused and the seat stays in turn order", async () => {
+    const code = mintRoomCode();
+    const ws1 = await openSocket(code);
+    const c1 = collectMessages(ws1);
+    send(ws1, { type: "join", displayName: "Alice" });
+    await c1.waitFor((m) => m.type === "joined");
+
+    const ws2 = await openSocket(code);
+    const c2 = collectMessages(ws2);
+    send(ws2, { type: "join", displayName: "Bob" });
+    await c2.waitFor((m) => m.type === "joined");
+    await c1.waitFor((m) => m.type === "state" && (m.view as { seats: unknown[] }).seats.length === 2);
+
+    send(ws1, { type: "start_game" });
+    await c2.waitFor((m) => m.type === "state" && (m.view as { status: string }).status === "in_progress", 8000);
+
+    send(ws2, { type: "leave" });
+    const refusal = (await c2.waitFor((m) => m.type === "error", 5000)) as Parsed & { code: string };
+    expect(refusal.code).toBe("bad_request");
+
+    // Alice takes her turn; the resulting state still has both seats, and it
+    // is now Bob's turn — the game did not lose a seat it will need.
+    send(ws1, { type: "game_action", request: { type: "increment" } });
+    const afterTurn = await c2.waitFor(
+      (m) => m.type === "state" && (m.view as { game: { turnsTaken: number } | null }).game?.turnsTaken === 1,
+      5000,
+    );
+    const view = afterTurn.view as { seats: unknown[]; game: { isYourTurn: boolean } };
+    expect(view.seats).toHaveLength(2);
+    expect(view.game.isYourTurn).toBe(true);
+
+    ws1.close();
+    ws2.close();
+  });
+
   it("robustness: non-JSON input yields an error message and the connection stays usable for a subsequent legal message", async () => {
     const code = mintRoomCode();
     const ws1 = await openSocket(code);

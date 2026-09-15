@@ -156,21 +156,34 @@ export function joinRoom(state: RoomState, input: JoinInput): JoinResult {
 
 /** D-12: leaving the lobby frees the seat entirely. If the departing seat
  * was host and other seats remain, host reassigns to the earliest-joined
- * remaining seat (seats are stored in join order). Called only for lobby
- * seats — Plan 06 owns the grace period that decides when this fires. */
-export function releaseSeat(state: RoomState, seatId: string, now: number): RoomState {
+ * CONNECTED remaining seat (D-07, WR-09), falling back to the earliest
+ * remaining seat when nobody is connected (seats are stored in join order).
+ * Plan 06 owns the grace period that decides when this fires.
+ *
+ * CR-03: refused outside the lobby. Once a game starts its turn order holds
+ * every seat id, so removing a seat would stall the game permanently when
+ * its turn came up. */
+export function releaseSeat(state: RoomState, seatId: string, now: number): RoomResult {
+  if (state.status !== "lobby") {
+    return { ok: false, reason: "bad_request" };
+  }
+
   const remaining = state.seats.filter((seat) => seat.seatId !== seatId);
 
   let hostSeatId = state.hostSeatId;
   if (state.hostSeatId === seatId) {
-    hostSeatId = remaining.length > 0 ? (remaining[0] as Seat).seatId : null;
+    const nextHost = remaining.find((seat) => seat.connected) ?? remaining[0];
+    hostSeatId = nextHost !== undefined ? nextHost.seatId : null;
   }
 
   return {
-    ...state,
-    seats: remaining,
-    hostSeatId,
-    lastActivityAt: now,
+    ok: true,
+    state: {
+      ...state,
+      seats: remaining,
+      hostSeatId,
+      lastActivityAt: now,
+    },
   };
 }
 

@@ -256,9 +256,10 @@ describe("D-12: releasing a lobby seat frees it", () => {
     if (!guestJoin.ok) throw new Error("unreachable");
 
     const afterRelease = releaseSeat(guestJoin.state, guestJoin.seatId, 3);
-    expect(afterRelease.seats).toHaveLength(1);
+    if (!afterRelease.ok) throw new Error("unreachable");
+    expect(afterRelease.state.seats).toHaveLength(1);
 
-    const rejoin = join(afterRelease, "NewGuest", 4, minter);
+    const rejoin = join(afterRelease.state, "NewGuest", 4, minter);
     if (!rejoin.ok) throw new Error("unreachable");
     expect(rejoin.state.seats).toHaveLength(2);
   });
@@ -273,7 +274,50 @@ describe("D-12: releasing a lobby seat frees it", () => {
     if (!thirdJoin.ok) throw new Error("unreachable");
 
     const afterHostLeaves = releaseSeat(thirdJoin.state, hostJoin.seatId, 4);
-    expect(afterHostLeaves.hostSeatId).toBe(guestJoin.seatId);
+    if (!afterHostLeaves.ok) throw new Error("unreachable");
+    expect(afterHostLeaves.state.hostSeatId).toBe(guestJoin.seatId);
+  });
+
+  it("CR-03: releaseSeat refuses once the game has started, leaving seats and turn order intact", () => {
+    const minter = makeMinter();
+    const hostJoin = join(freshRoom(), "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+    const guestJoin = join(hostJoin.state, "Guest", 2, minter);
+    if (!guestJoin.ok) throw new Error("unreachable");
+    const started = startGame(guestJoin.state, hostJoin.seatId, 3, "seed");
+    if (!started.ok) throw new Error("unreachable");
+
+    const attempt = releaseSeat(started.state, guestJoin.seatId, 4);
+    expect(attempt).toEqual({ ok: false, reason: "bad_request" });
+    expect(started.state.seats).toHaveLength(2);
+  });
+
+  it("WR-09: releasing the host skips a disconnected earliest seat and hands host to the earliest CONNECTED one", () => {
+    const minter = makeMinter();
+    const hostJoin = join(freshRoom(), "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+    const guestJoin = join(hostJoin.state, "Guest", 2, minter);
+    if (!guestJoin.ok) throw new Error("unreachable");
+    const thirdJoin = join(guestJoin.state, "Third", 3, minter);
+    if (!thirdJoin.ok) throw new Error("unreachable");
+    const guestAway = markConnected(thirdJoin.state, guestJoin.seatId, false, 4);
+
+    const afterHostLeaves = releaseSeat(guestAway, hostJoin.seatId, 5);
+    if (!afterHostLeaves.ok) throw new Error("unreachable");
+    expect(afterHostLeaves.state.hostSeatId).toBe(thirdJoin.seatId);
+  });
+
+  it("WR-09: with no connected seat left, host still falls back to the earliest remaining seat", () => {
+    const minter = makeMinter();
+    const hostJoin = join(freshRoom(), "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+    const guestJoin = join(hostJoin.state, "Guest", 2, minter);
+    if (!guestJoin.ok) throw new Error("unreachable");
+    const guestAway = markConnected(guestJoin.state, guestJoin.seatId, false, 3);
+
+    const afterHostLeaves = releaseSeat(guestAway, hostJoin.seatId, 4);
+    if (!afterHostLeaves.ok) throw new Error("unreachable");
+    expect(afterHostLeaves.state.hostSeatId).toBe(guestJoin.seatId);
   });
 });
 

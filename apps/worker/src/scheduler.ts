@@ -105,7 +105,7 @@ export function dueTimers(
  *
  * Derivation rules:
  * - always one `idle_gc` at `lastActivityAt + (in_progress ? 12h : 1h)` (D-02)
- * - one `host_transfer` at `hostSeat.disconnectedAt + 45s`, ONLY when
+ * - one `host_transfer` at `hostSeat.disconnectedAt + 20s`, ONLY when
  *   status is "lobby", the host seat exists, and it is disconnected (D-07 —
  *   host transfer never applies mid-game)
  * - one `seat_release` per disconnected seat at `seat.disconnectedAt + 30s`,

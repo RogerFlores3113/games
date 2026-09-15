@@ -145,7 +145,7 @@ describe("unified scheduler: host transfer does not clobber idle GC (RESEARCH Pi
 
     // The soonest of the three is the one passed to setAlarm (a disconnected
     // host is also a disconnected lobby seat, so seat_release fires too,
-    // sooner than host_transfer here).
+    // after host_transfer — see the WR-09 test below).
     const seatRelease = timers.find((t) => t.type === "seat_release");
     expect(seatRelease).toBeDefined();
     expect(nextDueAt(timers)).toBe(Math.min(idleGc!.dueAt, hostTransfer!.dueAt, seatRelease!.dueAt));
@@ -205,7 +205,7 @@ describe("D-02: idle GC thresholds", () => {
 });
 
 // ---------------------------------------------------------------------------
-// D-07: host-transfer grace — lobby only, +45s, scoped to disconnected host.
+// D-07: host-transfer grace — lobby only, +20s, scoped to disconnected host.
 // ---------------------------------------------------------------------------
 
 describe("D-07: host-transfer grace", () => {
@@ -217,6 +217,18 @@ describe("D-07: host-transfer grace", () => {
     const hostTransfer = timers.find((t) => t.type === "host_transfer");
     expect(hostTransfer).toBeDefined();
     expect(hostTransfer!.dueAt).toBe(disconnectedAt + HOST_TRANSFER_GRACE_MS);
+  });
+
+  it("WR-09: a disconnected lobby host's host_transfer comes due BEFORE that seat's own seat_release", () => {
+    // Otherwise D-07 never runs: releasing the seat first removes the host
+    // seat, and the host_transfer timer disappears with it.
+    const disconnectedAt = 1000;
+    const host = makeSeat({ seatId: "host", connected: false, disconnectedAt });
+    const state = makeRoom({ status: "lobby", hostSeatId: "host", seats: [host] });
+    const timers = computeRoomTimers(state, disconnectedAt);
+    const hostTransfer = timers.find((t) => t.type === "host_transfer");
+    const seatRelease = timers.find((t) => t.type === "seat_release" && t.seatId === "host");
+    expect(hostTransfer!.dueAt).toBeLessThan(seatRelease!.dueAt);
   });
 
   it("a disconnected host in an in_progress room produces NO host_transfer timer", () => {

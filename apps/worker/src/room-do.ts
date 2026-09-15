@@ -168,9 +168,14 @@ export class RoomDO extends Server<Env> {
     }
 
     if (msg.type === "leave") {
-      const nextState = releaseSeat(room, actorSeatId, now);
+      // CR-03: `releaseSeat` refuses mid-game — the seat stays in turn order.
+      const result = releaseSeat(room, actorSeatId, now);
+      if (!result.ok) {
+        connection.send(encodeServerMessage({ type: "error", code: result.reason }));
+        return;
+      }
       connection.setState(null);
-      await this.#commit(nextState, now);
+      await this.#commit(result.state, now);
       await this.#pushState();
       return;
     }
@@ -221,7 +226,10 @@ export class RoomDO extends Server<Env> {
         if (event.type === "host_transfer") {
           current = transferHost(current, now);
         } else if (event.type === "seat_release" && event.seatId !== undefined) {
-          current = releaseSeat(current, event.seatId, now);
+          // Defense in depth (CR-03): a stale lobby timer that outlived the
+          // game start is refused by `releaseSeat` and simply dropped.
+          const released = releaseSeat(current, event.seatId, now);
+          if (released.ok) current = released.state;
         } else if (event.type === "idle_gc") {
           // Abandoned room: close every connection, wipe all storage, and
           // return WITHOUT rescheduling (ROOM-08). A deleted room must not

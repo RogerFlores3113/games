@@ -32,9 +32,12 @@ export const IDLE_GC_LOBBY_MS = 60 * 60 * 1000;
 /** D-02: 12 hours idle for a room with a game in progress. */
 export const IDLE_GC_IN_PROGRESS_MS = 12 * 60 * 60 * 1000;
 
-/** D-07: host auto-transfers to the next connected seat after 45s
- * disconnected, in the lobby only. */
-export const HOST_TRANSFER_GRACE_MS = 45_000;
+/** D-07: host auto-transfers to the next connected seat after 20s
+ * disconnected, in the lobby only. Must stay SHORTER than
+ * `LOBBY_SEAT_RELEASE_GRACE_MS` (WR-09): the host's seat is released at
+ * that deadline, which removes the host_transfer timer with it, so a longer
+ * host grace would never run. */
+export const HOST_TRANSFER_GRACE_MS = 20_000;
 
 /** D-12: a disconnected lobby seat is freed for someone else after 30s.
  * In-progress seats are NEVER auto-released in this phase. */
