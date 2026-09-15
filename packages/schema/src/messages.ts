@@ -75,10 +75,18 @@ const SupersededMessageSchema = z.strictObject({
   type: z.literal("superseded"),
 });
 
+/** D-08: error frames must never carry state. `detail` is a CLOSED enum, not
+ * a free string — the only current member, "view_unavailable", is sent when
+ * a projected view fails its strict game schema (D-07 fail-closed). There is
+ * deliberately no way to widen this into a free-text/state-bearing channel
+ * without an explicit code change to this schema. */
+export const ErrorDetailSchema = z.enum(["view_unavailable"]);
+export type ErrorDetail = z.infer<typeof ErrorDetailSchema>;
+
 const ErrorMessageSchema = z.strictObject({
   type: z.literal("error"),
   code: RefusalReasonSchema,
-  detail: z.string().optional(),
+  detail: ErrorDetailSchema.optional(),
 });
 
 export const ServerMessageSchema = z.discriminatedUnion("type", [

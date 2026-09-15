@@ -141,3 +141,29 @@ describe("closed unions", () => {
     expect(ServerMessageSchema.options).toHaveLength(5);
   });
 });
+
+describe("ErrorMessageSchema.detail (D-08 closed enum)", () => {
+  it("encodes an error frame without a detail (detail stays optional)", () => {
+    const msg: ServerMessage = { type: "error", code: "bad_request" };
+    expect(() => encodeServerMessage(msg)).not.toThrow();
+  });
+
+  it("encodes an error frame with detail: 'view_unavailable' and the output contains it", () => {
+    const msg: ServerMessage = { type: "error", code: "bad_request", detail: "view_unavailable" };
+    const encoded = encodeServerMessage(msg);
+    expect(encoded).toContain("view_unavailable");
+  });
+
+  it("throws for an error frame with an arbitrary free-text detail", () => {
+    const msg = { type: "error", code: "bad_request", detail: "anything else" };
+    // @ts-expect-error — deliberately not a member of the closed ErrorDetailSchema enum
+    expect(() => encodeServerMessage(msg)).toThrow();
+  });
+
+  it("rejects an error frame carrying an extra key such as view or game", () => {
+    const result = ServerMessageSchema.safeParse({ type: "error", code: "bad_request", view: sampleRoomView });
+    expect(result.success).toBe(false);
+    const result2 = ServerMessageSchema.safeParse({ type: "error", code: "bad_request", game: { score: 1 } });
+    expect(result2.success).toBe(false);
+  });
+});
