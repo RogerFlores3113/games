@@ -25,10 +25,14 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const SRC_DIR = fileURLToPath(new URL("./", import.meta.url));
+// `fileURLToPath` is avoided here: this project's worker tsconfig loads both
+// `@cloudflare/workers-types` and `node` types, whose global `URL` and
+// `node:url`'s `URL` type are not mutually assignable, so passing
+// `import.meta.url`'s `URL` object into `fileURLToPath` fails to type-check.
+// `.pathname` on a `file://` URL is a plain string and sidesteps that clash.
+const SRC_DIR = new URL("./", import.meta.url).pathname;
 
 /**
  * Strips `//` line comments and `/* *\/` block comments from `source`,
