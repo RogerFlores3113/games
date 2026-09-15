@@ -28,3 +28,6 @@ export type {
   RevealedCard,
   VisibleCardView,
 } from "./forehead-card";
+
+export { checkSeatViewForLeaks, secretsForSeat } from "./forehead-card-leak-check";
+export type { SeatSecrets } from "./forehead-card-leak-check";

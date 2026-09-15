@@ -97,7 +97,14 @@ describe("packages/rules purity", () => {
   it("imports no Node/Worker-specific runtime modules from src", () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const forbidden = ["node:", "from \"fs\"", "from 'fs'", "partyserver", "cloudflare:"];
-    const files = ["adapter.ts", "counter-game.ts", "index.ts", "shuffle.ts", "forehead-card.ts"];
+    const files = [
+      "adapter.ts",
+      "counter-game.ts",
+      "index.ts",
+      "shuffle.ts",
+      "forehead-card.ts",
+      "forehead-card-leak-check.ts",
+    ];
     for (const file of files) {
       // Do not scan this test file itself — it legitimately uses node:fs/node:url
       // to read package.json for the purity check above.
