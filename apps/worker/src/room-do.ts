@@ -76,6 +76,11 @@ export class RoomDO extends Server<Env> {
    * maintenance restarts (RESEARCH.md anti-patterns). */
   room: RoomState | null = null;
 
+  /** WR-08: whether `room` exists in storage. A room nobody has joined is
+   * held in memory only, and must arm no alarm either — recomputed from
+   * storage in `onStart` on every wake, set by `#commit`. */
+  #persisted = false;
+
   /** seatId -> connectionId, DERIVED from the live connections on every read
    * rather than cached in a field.
    *
@@ -91,12 +96,13 @@ export class RoomDO extends Server<Env> {
   }
 
   async onStart(): Promise<void> {
-    const { room } = await loadRoom(this.ctx.storage, () =>
+    const { room, wasReset } = await loadRoom(this.ctx.storage, () =>
       createEmptyRoom(this.name as RoomCode, "base", Date.now()),
     );
     this.room = room;
-    const timers = computeRoomTimers(room, Date.now());
-    await this.#syncAlarm(timers);
+    this.#persisted = !wasReset;
+    // An unpersisted room schedules nothing (and clears any stale alarm).
+    await this.#syncAlarm(this.#persisted ? computeRoomTimers(room, Date.now()) : []);
   }
 
   async onConnect(connection: Connection, ctx: ConnectionContext): Promise<void> {
@@ -215,6 +221,12 @@ export class RoomDO extends Server<Env> {
   async onAlarm(): Promise<void> {
     try {
       const room = await this.#ensureRoom();
+      if (!this.#persisted) {
+        // A stale alarm for a room with nothing in storage: never save
+        // (that would resurrect it), just make sure nothing stays armed.
+        await this.#syncAlarm([]);
+        return;
+      }
       const timers = await loadTimers(this.ctx.storage);
       const { due } = dueTimers(timers, Date.now());
 
@@ -238,6 +250,7 @@ export class RoomDO extends Server<Env> {
             connection.close(1000, "room abandoned");
           }
           this.room = null;
+          this.#persisted = false;
           await this.ctx.storage.deleteAll();
           return;
         }
@@ -253,7 +266,7 @@ export class RoomDO extends Server<Env> {
       // Re-sync even on failure so one bad event cannot permanently disarm
       // a room's GC.
       const room = await this.#ensureRoom();
-      await this.#syncAlarm(computeRoomTimers(room, Date.now()));
+      await this.#syncAlarm(this.#persisted ? computeRoomTimers(room, Date.now()) : []);
     }
   }
 
@@ -365,6 +378,7 @@ export class RoomDO extends Server<Env> {
     this.room = room;
     const timers = computeRoomTimers(room, now);
     await saveRoom(this.ctx.storage, room, timers);
+    this.#persisted = true;
     await this.#syncAlarm(timers);
   }
 

@@ -35,8 +35,15 @@ export default {
     // would throw inside `onMessage` and the client would hang on
     // "Connecting…" forever.
     const roomPath = url.pathname.match(/^\/parties\/[^/]+\/([^/]+)/);
-    if (roomPath !== null && !isCanonicalRoomName(roomPath[1] as string)) {
-      return new Response("Not Found", { status: 404 });
+    if (roomPath !== null) {
+      if (!isCanonicalRoomName(roomPath[1] as string)) {
+        return new Response("Not Found", { status: 404 });
+      }
+      // WR-08: rooms are WebSocket-only. A plain HTTP request would still
+      // wake the Durable Object and run `onStart` for nothing.
+      if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+        return new Response("Not Found", { status: 404 });
+      }
     }
 
     return (

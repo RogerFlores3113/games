@@ -11,6 +11,12 @@
 // blob at all — D-17's explicit preference: a friend group can re-click a
 // link, a corrupted mid-game state is worse.
 //
+// WR-08: a room that has never been saved is held in memory only. Loading
+// it writes nothing — the first `saveRoom` (the first successful join)
+// persists the version and the room together. Otherwise every request for
+// an arbitrary room name would burn Free-plan row writes before anyone
+// joined.
+//
 // `loadRoom` is safe to call on EVERY hibernation wake: it only reads and
 // returns, and it never arms an alarm. `onStart` (Plan 07) is exactly where
 // the tempting mistake of unconditionally calling `setAlarm` lives
@@ -35,13 +41,17 @@ export const STORAGE_KEYS = {
 
 export type LoadRoomResult = {
   room: RoomState;
+  /** True whenever `room` is the fallback rather than persisted state —
+   * i.e. nothing for this room is in storage right now. */
   wasReset: boolean;
 };
 
 /**
- * Loads persisted room state, resetting to a fresh empty lobby (D-17) if the
- * stored schema version does not match `ROOM_SCHEMA_VERSION`, or if the
- * room blob fails validation despite a matching version (corrupt storage).
+ * Loads persisted room state. Returns the fallback lobby, held in memory
+ * only, when nothing has been saved yet (WR-08). Resets to the fallback
+ * (D-17) if the stored schema version does not match `ROOM_SCHEMA_VERSION`,
+ * or if the room blob fails validation despite a matching version (corrupt
+ * storage).
  *
  * Safe to call on every hibernation wake — read-only aside from the reset
  * path, and NEVER arms an alarm. Do not add `setAlarm` here or in any
@@ -53,9 +63,14 @@ export async function loadRoom(
 ): Promise<LoadRoomResult> {
   const storedVersion = await storage.get<number>(STORAGE_KEYS.schemaVersion);
 
-  if (storedVersion === undefined || storedVersion !== ROOM_SCHEMA_VERSION) {
-    // Version missing (fresh room) or mismatched (old deploy's shape) — do
-    // NOT read or parse the room blob at all. Reset unconditionally.
+  if (storedVersion === undefined) {
+    // Fresh room: nothing to reset and nothing to write yet.
+    return { room: fallback(), wasReset: true };
+  }
+
+  if (storedVersion !== ROOM_SCHEMA_VERSION) {
+    // Mismatched (old deploy's shape) — do NOT read or parse the room blob
+    // at all. Reset unconditionally.
     return resetRoom(storage, fallback);
   }
 
@@ -70,22 +85,22 @@ export async function loadRoom(
   return { room: parsed.data, wasReset: false };
 }
 
+/** Wipes the stale room and hands back the in-memory fallback. Nothing is
+ * rewritten here: the next wake sees no version and takes the fresh-room
+ * path, and the first `saveRoom` persists the new room. */
 async function resetRoom(
   storage: RoomStorage,
   fallback: () => RoomState,
 ): Promise<LoadRoomResult> {
   await storage.deleteAll();
-  await storage.put(STORAGE_KEYS.schemaVersion, ROOM_SCHEMA_VERSION);
-  const room = fallback();
-  await storage.put(STORAGE_KEYS.room, room);
-  return { room, wasReset: true };
+  return { room: fallback(), wasReset: true };
 }
 
 /**
- * Persists the room blob and the timer table. Validates `room` with
- * `RoomStateSchema.parse` FIRST (throws on a server-side shape bug) so a
- * malformed write is caught at the write site rather than discovered on a
- * later load.
+ * Persists the schema version, the room blob, and the timer table.
+ * Validates `room` with `RoomStateSchema.parse` FIRST (throws on a
+ * server-side shape bug) so a malformed write is caught at the write site
+ * rather than discovered on a later load.
  */
 export async function saveRoom(
   storage: RoomStorage,
@@ -93,6 +108,7 @@ export async function saveRoom(
   timers: TimerEvent[],
 ): Promise<void> {
   const validated = RoomStateSchema.parse(room);
+  await storage.put(STORAGE_KEYS.schemaVersion, ROOM_SCHEMA_VERSION);
   await storage.put(STORAGE_KEYS.room, validated);
   await storage.put(STORAGE_KEYS.timers, timers);
 }

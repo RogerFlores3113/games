@@ -49,18 +49,44 @@ function makeFakeStorage() {
 }
 
 describe("loadRoom: fresh storage", () => {
-  it("returns wasReset: true, writes ROOM_SCHEMA_VERSION, and the persisted room deep-equals the fallback", async () => {
+  it("WR-08: returns the fallback room in memory with wasReset: true and performs NO storage writes", async () => {
     const { storage, map } = makeFakeStorage();
-    const result = await loadRoom(storage, fallbackRoom);
+    let writes = 0;
+    const counting: RoomStorage = {
+      ...storage,
+      async put(key, value) {
+        writes++;
+        return storage.put(key, value);
+      },
+      async deleteAll() {
+        writes++;
+        return storage.deleteAll();
+      },
+    };
+
+    const result = await loadRoom(counting, fallbackRoom);
 
     expect(result.wasReset).toBe(true);
     expect(result.room).toEqual(fallbackRoom());
-    expect(map.get(STORAGE_KEYS.schemaVersion)).toBe(ROOM_SCHEMA_VERSION);
-    expect(map.get(STORAGE_KEYS.room)).toEqual(fallbackRoom());
+    // A request for a room nobody has joined yet must not burn row writes.
+    expect(writes).toBe(0);
+    expect(map.size).toBe(0);
   });
 });
 
 describe("saveRoom + loadRoom: round trip", () => {
+  it("WR-08: the first saveRoom persists ROOM_SCHEMA_VERSION, so the next load does not reset", async () => {
+    const { storage, map } = makeFakeStorage();
+    const room = { ...fallbackRoom(), lastActivityAt: 42 };
+
+    await saveRoom(storage, room, []);
+
+    expect(map.get(STORAGE_KEYS.schemaVersion)).toBe(ROOM_SCHEMA_VERSION);
+    const result = await loadRoom(storage, fallbackRoom);
+    expect(result.wasReset).toBe(false);
+    expect(result.room).toEqual(room);
+  });
+
   it("returns wasReset: false and a deep-equal room after a save", async () => {
     const { storage } = makeFakeStorage();
     // Seed a valid version + room via a normal reset/save cycle first.
@@ -95,7 +121,8 @@ describe("D-17: version mismatch resets without reading the old blob", () => {
     expect(result.room).toEqual(fallbackRoom());
     expect(result.room.seats).toHaveLength(0);
     expect(getCalls).not.toContain(STORAGE_KEYS.room);
-    expect(map.get(STORAGE_KEYS.schemaVersion)).toBe(ROOM_SCHEMA_VERSION);
+    // The stale blob is wiped; the fresh lobby is persisted on its first save.
+    expect(map.has(STORAGE_KEYS.room)).toBe(false);
   });
 });
 
@@ -115,7 +142,7 @@ describe("corrupt-but-versioned storage", () => {
 describe("idempotent wake", () => {
   it("calling loadRoom three times in a row on a healthy room returns identical results and performs no writes after the first", async () => {
     const { storage, map } = makeFakeStorage();
-    await loadRoom(storage, fallbackRoom); // first load establishes the room
+    await saveRoom(storage, fallbackRoom(), []); // first save establishes the room
 
     const snapshotBefore = new Map(map);
     const results = [];

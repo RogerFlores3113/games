@@ -20,3 +20,10 @@ describe("worker fetch: room-name validation (CR-02)", () => {
     expect(response.status).toBe(404);
   });
 });
+
+describe("worker fetch: rooms are WebSocket-only (WR-08)", () => {
+  it("returns 404 for a plain HTTP GET to a valid room name, without waking its Durable Object", async () => {
+    const response = await worker.fetch(new Request("http://localhost/parties/room/ABCDEF"), {} as never);
+    expect(response.status).toBe(404);
+  });
+});
