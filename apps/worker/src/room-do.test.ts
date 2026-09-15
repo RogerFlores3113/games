@@ -30,6 +30,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LOBBY_SEAT_RELEASE_GRACE_MS } from "@games/schema";
+import { FOREHEAD_CARD_VALUES, checkSeatViewForLeaks } from "@games/rules";
 import { mintRoomCode } from "./seat-identity";
 
 const PORT = 18787;
@@ -492,6 +493,195 @@ describe("RoomDO integration (live wrangler dev)", () => {
 
     ws1.close();
   });
+
+  it(
+    "HIDE-01 / HIDE-04 (D-11 layer 3): no seat's raw frames carry its own card, the undealt deck, across join, live update, and seat-token reconnect",
+    async () => {
+      type GameCardHidden = { id: string; hidden: true };
+      type GameCardVisible = { id: string; hidden: false; value: string };
+      type GameViewShape = {
+        yourCard: GameCardHidden;
+        otherCards: { seatId: string; card: GameCardHidden | GameCardVisible }[];
+        revealed: { id: string; seatId: string; value: string; correct: boolean }[];
+        deckCount: number;
+        activeSeatId: string;
+        isYourTurn: boolean;
+        score: number;
+      };
+      type RoomViewShape = { status: string; game: GameViewShape | null };
+
+      const code = mintRoomCode();
+
+      const wsAlice = await openSocket(code);
+      const cAlice = collectMessages(wsAlice);
+      send(wsAlice, { type: "join", displayName: "Alice" });
+      const joinedAlice = (await cAlice.waitFor((m) => m.type === "joined")) as Parsed & {
+        seatId: string;
+        seatToken: string;
+        view: RoomViewShape;
+      };
+      expect(joinedAlice.view.game).toBeNull();
+
+      const wsBob = await openSocket(code);
+      const cBob = collectMessages(wsBob);
+      send(wsBob, { type: "join", displayName: "Bob" });
+      const joinedBob = (await cBob.waitFor((m) => m.type === "joined")) as Parsed & {
+        seatId: string;
+        seatToken: string;
+        view: RoomViewShape;
+      };
+      expect(joinedBob.view.game).toBeNull();
+
+      const wsCara = await openSocket(code);
+      const cCara = collectMessages(wsCara);
+      send(wsCara, { type: "join", displayName: "Cara" });
+      const joinedCara = (await cCara.waitFor((m) => m.type === "joined")) as Parsed & {
+        seatId: string;
+        seatToken: string;
+        view: RoomViewShape;
+      };
+      expect(joinedCara.view.game).toBeNull();
+
+      // All three see the full 3-seat lobby before the host starts the game.
+      for (const c of [cAlice, cBob, cCara]) {
+        await c.waitFor((m) => m.type === "state" && (m.view as { seats: unknown[] }).seats.length === 3, 8000);
+      }
+
+      send(wsAlice, { type: "start_game" });
+      for (const c of [cAlice, cBob, cCara]) {
+        await c.waitFor((m) => m.type === "state" && (m.view as RoomViewShape).status === "in_progress", 8000);
+      }
+
+      const seats = [
+        { seatId: joinedAlice.seatId, ws: wsAlice, c: cAlice },
+        { seatId: joinedBob.seatId, ws: wsBob, c: cBob },
+        { seatId: joinedCara.seatId, ws: wsCara, c: cCara },
+      ];
+
+      function findActiveSeat(): (typeof seats)[number] {
+        for (const seat of seats) {
+          const latestGameFrame = [...seat.c.parsed]
+            .reverse()
+            .find((m) => (m.type === "state" || m.type === "joined") && (m.view as RoomViewShape).game !== null);
+          const view = latestGameFrame?.view as RoomViewShape | undefined;
+          if (view?.game?.isYourTurn === true) return seat;
+        }
+        throw new Error("no active seat found among the latest game-bearing frames");
+      }
+
+      const firstActive = findActiveSeat();
+      send(firstActive.ws, { type: "game_action", request: { type: "guess", value: FOREHEAD_CARD_VALUES[0] } });
+      for (const seat of seats) {
+        await seat.c.waitFor(
+          (m) => m.type === "state" && (m.view as RoomViewShape).game?.revealed.length === 1,
+          8000,
+        );
+      }
+
+      const secondActive = findActiveSeat();
+      send(secondActive.ws, { type: "game_action", request: { type: "guess", value: FOREHEAD_CARD_VALUES[1] } });
+      for (const seat of seats) {
+        await seat.c.waitFor(
+          (m) => m.type === "state" && (m.view as RoomViewShape).game?.revealed.length === 2,
+          8000,
+        );
+      }
+
+      // Reconnect: close Bob's socket and rejoin with his saved seat token.
+      // This frame — the reconnect `joined` capture — must be checked
+      // explicitly (D-11 layer 3's reconnect requirement).
+      wsBob.close();
+      const wsBobReconnect = await openSocket(code);
+      const cBobReconnect = collectMessages(wsBobReconnect);
+      send(wsBobReconnect, { type: "join", displayName: "Bob", seatToken: joinedBob.seatToken });
+      const reconnectJoined = (await cBobReconnect.waitFor(
+        (m) => m.type === "joined" && (m.view as RoomViewShape).game !== null,
+        8000,
+      )) as Parsed & { view: RoomViewShape };
+
+      type FrameEntry = { seatId: string; raw: string; parsed: Parsed };
+      const frames: FrameEntry[] = [];
+      function addFrames(seatId: string, raws: string[], parseds: Parsed[]): void {
+        for (let i = 0; i < raws.length; i++) {
+          frames.push({ seatId, raw: raws[i]!, parsed: parseds[i]! });
+        }
+      }
+      addFrames(joinedAlice.seatId, cAlice.raw, cAlice.parsed);
+      addFrames(joinedBob.seatId, cBob.raw, cBob.parsed);
+      addFrames(joinedBob.seatId, cBobReconnect.raw, cBobReconnect.parsed);
+      addFrames(joinedCara.seatId, cCara.raw, cCara.parsed);
+
+      // cardValueById: every value legitimately visible to SOME seat (another
+      // seat's live card, or a publicly revealed card) — never a seat's own
+      // yourCard (structurally hidden) or an undealt deck entry (never sent).
+      const cardValueById = new Map<string, string>();
+      for (const frame of frames) {
+        const game = (frame.parsed as { view?: RoomViewShape }).view?.game;
+        if (game === null || game === undefined) continue;
+        for (const other of game.otherCards) {
+          if (!other.card.hidden) cardValueById.set(other.card.id, other.card.value);
+        }
+        for (const entry of game.revealed) {
+          cardValueById.set(entry.id, entry.value);
+        }
+      }
+
+      const seenValues = new Set(cardValueById.values());
+      const forbiddenTokens = FOREHEAD_CARD_VALUES.filter((v) => !seenValues.has(v));
+      expect(
+        forbiddenTokens.length,
+        `expected at least 10 never-seen deck values (non-vacuous check); saw ${seenValues.size}: ${[...seenValues].join(", ")}`,
+      ).toBeGreaterThanOrEqual(10);
+
+      const gameFrameCountBySeat = new Map<string, number>();
+      let reconnectFrameChecked = false;
+
+      for (const frame of frames) {
+        const view = (frame.parsed as { view?: RoomViewShape }).view;
+        const game = view?.game ?? null;
+        let ownCard: { id: string; value: string } | null = null;
+
+        if (game !== null) {
+          const ownId = game.yourCard.id;
+          const ownValue = cardValueById.get(ownId);
+          expect(
+            ownValue,
+            `seat ${frame.seatId}'s own card id ${ownId} was never observed as a visible/revealed value in any captured frame`,
+          ).toBeDefined();
+          ownCard = { id: ownId, value: ownValue as string };
+          gameFrameCountBySeat.set(frame.seatId, (gameFrameCountBySeat.get(frame.seatId) ?? 0) + 1);
+          if (frame.parsed === reconnectJoined) reconnectFrameChecked = true;
+        }
+
+        const leaks = checkSeatViewForLeaks({
+          view: frame.parsed,
+          serialized: frame.raw,
+          secrets: { ownCard, forbiddenTokens },
+        });
+        expect(leaks, `seat ${frame.seatId} leaked in raw frame: ${frame.raw}`).toEqual([]);
+      }
+
+      for (const seatId of [joinedAlice.seatId, joinedBob.seatId, joinedCara.seatId]) {
+        expect(
+          gameFrameCountBySeat.get(seatId) ?? 0,
+          `expected at least 3 game-bearing frames checked for seat ${seatId}`,
+        ).toBeGreaterThanOrEqual(3);
+      }
+      expect(reconnectFrameChecked, "expected the reconnect joined frame to be among the checked frames").toBe(true);
+
+      // D-14 (the server-only seed) is not observable from the client side
+      // at all and is covered by layers 1/2 (fast-check + wire-string
+      // property tests directly over in-memory RoomState.seed); this layer
+      // proves own value and the undealt deck are absent from genuine
+      // workerd frames, including across a real reconnect.
+
+      wsAlice.close();
+      wsBob.close();
+      wsCara.close();
+      wsBobReconnect.close();
+    },
+    40_000,
+  );
 
   it("D-17: persisted room state survives a FORCED wrangler dev restart (real eviction, not a socket reconnect) — same seatId, seat list, and variant come back", async () => {
     const code = mintRoomCode();
