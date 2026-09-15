@@ -32,10 +32,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Hidden Information Integrity
 
-- [ ] **HIDE-01**: A player's client never receives the suit or rank of any card in that player's own hand, verifiable by inspecting the network payload
-- [ ] **HIDE-02**: Every outbound payload — initial join, live update, reconnect, and error responses — is produced by a single per-seat projection function, with no path that bypasses it
-- [ ] **HIDE-03**: The wire format for a hidden card structurally lacks suit and rank fields rather than nulling or emptying them
-- [ ] **HIDE-04**: An automated test fails if a serialized seat view contains the true identity of any card in that seat's own hand
+- [x] **HIDE-01**: A player's client never receives the suit or rank of any card in that player's own hand, verifiable by inspecting the network payload
+- [x] **HIDE-02**: Every outbound payload — initial join, live update, reconnect, and error responses — is produced by a single per-seat projection function, with no path that bypasses it
+- [x] **HIDE-03**: The wire format for a hidden card structurally lacks suit and rank fields rather than nulling or emptying them
+- [x] **HIDE-04**: An automated test fails if a serialized seat view contains the true identity of any card in that seat's own hand
 - [ ] **HIDE-05**: The server rejects any client-supplied action payload that asserts game state rather than requesting an action
 
 ### Hanabi Rules Engine
@@ -143,10 +143,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RT-07 | Phase 1 | Complete |
 | RT-08 | Phase 5 | Pending |
 | RT-09 | Phase 4 | Pending |
-| HIDE-01 | Phase 2 | Pending |
-| HIDE-02 | Phase 2 | Pending |
-| HIDE-03 | Phase 2 | Pending |
-| HIDE-04 | Phase 2 | Pending |
+| HIDE-01 | Phase 2 | Complete |
+| HIDE-02 | Phase 2 | Complete |
+| HIDE-03 | Phase 2 | Complete |
+| HIDE-04 | Phase 2 | Complete |
 | HIDE-05 | Phase 3 | Pending |
 | RULES-01 | Phase 3 | Pending |
 | RULES-02 | Phase 3 | Pending |
