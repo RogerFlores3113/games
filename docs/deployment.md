@@ -58,6 +58,63 @@ setup was complete.
 | Cloudflare account on the Workers Free plan + `npx wrangler login` run locally | Deploying `apps/worker` and its Durable Object namespace | Plan 11 onward (not needed for Wave 0 dry-runs, which run unauthenticated) |
 | Vercel project connected to this repo, Root Directory = `apps/web`, "Include files outside the Root Directory in the Build Step" enabled | Deploying `apps/web` | Plan 11 onward |
 
+## Live deployment (Plan 11)
+
+Recorded 2026-09-15.
+
+| Piece | Value |
+|---|---|
+| Worker | `games-worker` at `https://games-worker.rflores3113.workers.dev` (deployed with `npx wrangler deploy` from `apps/worker`) |
+| Vercel project | `games-web` (team "Roger Flores' projects", Hobby), Root Directory `apps/web` |
+| Production URL | `https://games.rogerflores.dev` |
+| Web → Worker link | Vercel env var `NEXT_PUBLIC_WORKER_HOST = games-worker.rflores3113.workers.dev` (bare host, no scheme), set for Production and Preview |
+
+`NEXT_PUBLIC_WORKER_HOST` is inlined at build time. Changing it does nothing
+until Vercel rebuilds, so redeploy after every change to it. It is public by
+construction (it is the host the browser dials), so it is not a secret.
+
+### Worker origin allowlist
+
+The Worker rejects WebSocket handshakes from origins it does not know
+(`apps/worker/src/origin.ts`). `https://games.rogerflores.dev` and any
+loopback origin are allowed in code. To allow another front-end origin (a
+`*.vercel.app` preview URL, say), set the comma-separated `ALLOWED_ORIGINS`
+Worker variable and **redeploy the Worker**. The allowlist is read at
+connect time from the deployed Worker's environment, so an unredeployed
+Worker keeps rejecting the new origin with close code 1008, and the page
+renders as a room that never loads.
+
+### Vercel monorepo build gotchas
+
+Vercel installs only the `apps/web` workspace's dependencies, not the
+monorepo root's devDependencies. Two consequences were hit on the first
+real deploy:
+
+- `typescript` must be declared in `apps/web/package.json`; the root copy
+  is not installed, and `next build` fails with "do not have the required
+  package(s) installed."
+- `next build` type-checks through `apps/web/tsconfig.build.json`, which
+  excludes test files. The normal `tsconfig.json` includes tests that
+  import `vitest`, which is a root devDependency and fails to resolve on
+  Vercel.
+
 ## Custom domain
 
-TODO(Plan 11)
+`games.rogerflores.dev` is added to the `games-web` Vercel project. DNS for
+`rogerflores.dev` is hosted on Cloudflare (nameservers
+`mona.ns.cloudflare.com`, `yoxall.ns.cloudflare.com`), with a `CNAME`
+record `games` → `2dd48b707c982d85.vercel-dns-017.com` set to **DNS only
+(grey cloud)**. Cloudflare's orange-cloud proxy would stop Vercel from
+issuing its certificate. Vercel serves TLS with a Let's Encrypt (YR2)
+certificate. The full record is in `docs/manual-checks/custom-domain.md`.
+
+## Running E2E against production
+
+```
+PLAYWRIGHT_BASE_URL=https://games.rogerflores.dev npx playwright test create-room join-room
+```
+
+With `PLAYWRIGHT_BASE_URL` set, Playwright skips its local `next dev` and
+`wrangler dev` servers. Only run specs that create their own rooms. Note that
+every run is traffic against the production Worker, which restarts the RT-02
+cold-start idle window (`docs/manual-checks/cold-start.md`).

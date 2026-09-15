@@ -15,6 +15,11 @@ import { defineConfig } from "@playwright/test";
 const WEB_PORT = 3100;
 const WORKER_PORT = 8787;
 
+// Set PLAYWRIGHT_BASE_URL (e.g. https://games.rogerflores.dev) to run specs
+// against a live deployment. Local dev servers are skipped in that mode: the
+// deployed web app already dials its deployed Worker.
+const REMOTE_BASE_URL = process.env.PLAYWRIGHT_BASE_URL;
+
 export default defineConfig({
   testDir: "./e2e",
   reporter: "list",
@@ -24,7 +29,7 @@ export default defineConfig({
     timeout: 10_000,
   },
   use: {
-    baseURL: `http://localhost:${WEB_PORT}`,
+    baseURL: REMOTE_BASE_URL ?? `http://localhost:${WEB_PORT}`,
   },
   projects: [
     {
@@ -32,17 +37,19 @@ export default defineConfig({
       use: { browserName: "chromium" },
     },
   ],
-  webServer: [
-    {
-      command: `npm run dev --workspace apps/web -- -p ${WEB_PORT}`,
-      port: WEB_PORT,
-      reuseExistingServer: !process.env.CI,
-    },
-    {
-      command: `npx wrangler dev --port ${WORKER_PORT}`,
-      cwd: "apps/worker",
-      port: WORKER_PORT,
-      reuseExistingServer: !process.env.CI,
-    },
-  ],
+  webServer: REMOTE_BASE_URL
+    ? undefined
+    : [
+        {
+          command: `npm run dev --workspace apps/web -- -p ${WEB_PORT}`,
+          port: WEB_PORT,
+          reuseExistingServer: !process.env.CI,
+        },
+        {
+          command: `npx wrangler dev --port ${WORKER_PORT}`,
+          cwd: "apps/worker",
+          port: WORKER_PORT,
+          reuseExistingServer: !process.env.CI,
+        },
+      ],
 });
