@@ -13,7 +13,7 @@ This milestone ships online multiplayer Hanabi (base, Rainbow, Black) as a link-
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Room & Transport Skeleton** - Prove the Cloudflare Durable Objects + partyserver + Vercel split on real infrastructure with a link-based, reconnect-safe room, before any game logic exists.
+- [x] **Phase 1: Room & Transport Skeleton** - Prove the Cloudflare Durable Objects + partyserver + Vercel split on real infrastructure with a link-based, reconnect-safe room, before any game logic exists. (completed 2026-09-15)
 - [ ] **Phase 2: Per-Seat Redaction Contract** - Prove the single whitelist-serialize per-seat projection chokepoint against a toy secret-holding game, with an automated leak test in place.
 - [ ] **Phase 3: Hanabi Rules Engine** - Build the full Hanabi rules engine as a pure, variant-parametrized, network-free package tested in isolation.
 - [ ] **Phase 4: Wire Engine Into Room Actor** - Replace the toy game with the real engine behind the game-adapter interface, delivering a live, correctly-filtered, correctly-ruled base-game table.
@@ -65,7 +65,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 01-11-PLAN.md — Deploy, custom domain, free-tier confirmation, RT-02 cold-start procedure (manual)
+- [x] 01-11-PLAN.md — Deploy, custom domain, free-tier confirmation, RT-02 cold-start procedure (manual)
 
 **Research note**: Cloudflare Durable Objects / `partyserver` API surface moves quickly — re-verify exact library version, hibernation lifecycle hooks, and free-tier limits against current docs immediately before planning this phase (research flagged MEDIUM confidence here).
 
@@ -161,7 +161,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Room & Transport Skeleton | 10/11 | In Progress|  |
+| 1. Room & Transport Skeleton | 11/11 | Complete   | 2026-09-15 |
 | 2. Per-Seat Redaction Contract | 0/TBD | Not started | - |
 | 3. Hanabi Rules Engine | 0/TBD | Not started | - |
 | 4. Wire Engine Into Room Actor | 0/TBD | Not started | - |
