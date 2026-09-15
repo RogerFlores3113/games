@@ -42,7 +42,7 @@ into evidence, on our own account, on our own domain.
 
 | Date | Days idle | Browser | Click→connected | Manual intervention needed? | Notes |
 |------|-----------|---------|------------------|------------------------------|-------|
-| 2026-09-03 | 0 | — | — | — | PENDING — 7-day window opens 2026-09-03, first check due 2026-09-10. Both targets had not yet completed a live deploy at the time this row was seeded (Plan 01-11 Task 1/2 are the human-action deploy steps); the window formally starts once both `apps/web` and `apps/worker` are confirmed live at their recorded hosts, per Step 1 above. If the live deploy date differs from 2026-09-03, update this row's due date to that deploy date + 7 days before running the check. |
+| 2026-09-15 | 0 | — | — | — | PENDING — 7-day window opens 2026-09-15, first check due 2026-09-22. Both targets confirmed live on 2026-09-15: Worker `games-worker.rflores3113.workers.dev`, web `https://games.rogerflores.dev` (Vercel project `games-web`). The originally seeded 2026-09-03 date predated any live deploy and is superseded. Production Playwright runs and redeploys on 2026-09-15 count as activity; if either target is redeployed or a room is opened after that, restart the window from that date and log the restart here. |
 
 ## When to re-run
 

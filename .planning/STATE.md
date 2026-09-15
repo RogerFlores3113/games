@@ -100,7 +100,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- RT-02 cold-start check (`docs/manual-checks/cold-start.md`) is PENDING — 7-day idle window opens once both `apps/web`/`apps/worker` are confirmed live (recorded as 2026-09-03 pending live-deploy confirmation), first check due 2026-09-10 or later if the live deploy date is later. Do not mark RT-02 complete until that log has a real (non-PENDING) row.
+- RT-02 cold-start check (`docs/manual-checks/cold-start.md`) is PENDING. Both targets went live 2026-09-15, so the 7-day idle window opens 2026-09-15 and the first check is due **2026-09-22** (later if either target is redeployed or a room is opened in between). Do not mark RT-02 complete until that log has a real (non-PENDING) row.
 
 ### Blockers/Concerns
 
