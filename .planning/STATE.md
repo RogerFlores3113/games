@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 2 UI-SPEC approved
-last_updated: "2026-09-15T19:14:49.314Z"
-last_activity: 2026-09-15 -- Phase 2 planning complete
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-09-15T19:24:11.993Z"
+last_activity: 2026-09-15
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 17
-  completed_plans: 11
+  completed_plans: 12
   percent: 14
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-01)
 
 **Core value:** A friend clicks a link and is playing Hanabi within seconds — and the game does not break, stall, or lose their seat for the next 25 minutes.
-**Current focus:** Phase 2 — per seat redaction contract
+**Current focus:** Phase 2 — Per-Seat Redaction Contract
 
 ## Current Position
 
-Phase: 2
-Plan: Not started
+Phase: 2 (Per-Seat Redaction Contract) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
-Last activity: 2026-09-15 -- Phase 2 planning complete
+Last activity: 2026-09-15
 
-Progress: [█████████░] 91%
+Progress: [███████░░░] 71%
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Progress: [█████████░] 91%
 | Phase 01 P07 | 25min | 3 tasks | 10 files |
 | Phase 01 P09 | 70min | 3 tasks | 11 files |
 | Phase 01 P10 | ~50min | 2 tasks | 13 files |
+| Phase 02 P01 | 20min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 01-09]: Tailwind v4 custom spacing tokens renamed --spacing-* to --space-* to avoid the reserved Tailwind namespace collision that collapsed every page's layout
 - [Phase 01]: Web dev server pinned to port 3100 (playwright.config.ts) to sidestep a real, observed port-3000 collision with an unrelated personal site on this machine
 - [Phase 01]: SeatRow gained an optional test-only seatId prop (data-seat-id attribute) for E2E observability, additive to the UI-SPEC's required prop shape
+- [Phase 02-01]: sfc32 seeded with all 4 cyrb128 words (128-bit state) for shuffle.ts, matching mintGameSeed's 128-bit secret — a 32-bit PRNG seed space is brute-forceable against visible cards; 128-bit state keeps deck order unguessable
+- [Phase 02-01]: checkSeatViewForLeaks/secretsForSeat live in packages/rules, designed for reuse by apps/worker's later D-11 layers 2/3 — avoids duplicating the checker; the file header documents the intended cross-layer reuse
 
 ### Pending Todos
 
@@ -116,6 +119,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-15T18:51:01.759Z
-Stopped at: Phase 2 UI-SPEC approved
-Resume file: .planning/phases/02-per-seat-redaction-contract/02-UI-SPEC.md
+Last session: 2026-09-15T19:24:11.986Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None
