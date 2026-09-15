@@ -12,6 +12,9 @@ export interface JoinFormProps {
   /** Called with the trimmed display name once the player submits. The
    * caller owns opening the socket connection. */
   onJoin: (displayName: string) => void;
+  /** Shown under the name field when the previous join attempt was rejected
+   * by the server (WR-05). */
+  error?: string;
 }
 
 /**
@@ -19,7 +22,7 @@ export interface JoinFormProps {
  * Display name only — no variant picker (locked to the host's choice) and
  * nothing else to fill out (ROOM-02).
  */
-export function JoinForm({ code, onJoin }: JoinFormProps) {
+export function JoinForm({ code, onJoin, error }: JoinFormProps) {
   const [displayName, setDisplayName] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -72,6 +75,14 @@ export function JoinForm({ code, onJoin }: JoinFormProps) {
               color: "var(--color-text)",
             }}
           />
+          {error && (
+            <p
+              className="text-[length:var(--text-label)]"
+              style={{ color: "var(--color-destructive)" }}
+            >
+              {error}
+            </p>
+          )}
         </div>
 
         <Button type="submit" variant="primary" disabled={submitting}>

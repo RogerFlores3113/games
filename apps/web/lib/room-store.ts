@@ -15,13 +15,19 @@ export type RoomConnectionStatus =
   | "superseded"
   /** WR-01: the server garbage-collected the room and closed the socket
    * with `ROOM_ABANDONED_CLOSE_CODE`. Terminal — no reconnect. */
-  | "abandoned";
+  | "abandoned"
+  /** WR-05: the server answered our `join` with an `error` frame (e.g. a
+   * stored name or token it rejects). Terminal for this attempt — the room
+   * flow falls back to the join form rather than retrying the same frame. */
+  | "join_failed";
 
 export interface RoomStoreState {
   view: RoomView | null;
   status: RoomConnectionStatus;
   refusalReason: RefusalReason | null;
   seatId: string | null;
+  /** WR-05: the error code that failed the last join, if any. */
+  joinError: RefusalReason | null;
 }
 
 export interface RoomStoreActions {
@@ -42,9 +48,10 @@ const initialState: RoomStoreState = {
   status: "connecting",
   refusalReason: null,
   seatId: null,
+  joinError: null,
 };
 
-export const useRoomStore = create<RoomStoreState & RoomStoreActions>((set) => ({
+export const useRoomStore = create<RoomStoreState & RoomStoreActions>((set, get) => ({
   ...initialState,
 
   applyServerMessage: (message) => {
@@ -55,6 +62,7 @@ export const useRoomStore = create<RoomStoreState & RoomStoreActions>((set) => (
           seatId: message.seatId,
           status: "seated",
           refusalReason: null,
+          joinError: null,
         });
         return;
       case "state":
@@ -68,9 +76,18 @@ export const useRoomStore = create<RoomStoreState & RoomStoreActions>((set) => (
         set({ status: "superseded" });
         return;
       case "error":
-        // Non-fatal protocol error (e.g. `not_host` from an unauthorized
-        // action attempt) — the server's own state broadcast is still the
-        // source of truth, so this deliberately does not mutate `view`.
+        // WR-05: while joining, the only frame we have sent is `join`, so an
+        // error here means the join itself was rejected. Dropping it left
+        // the page on "Connecting…" forever, replaying the same bad frame on
+        // every reconnect.
+        if (get().status === "joining") {
+          set({ view: null, status: "join_failed", joinError: message.code });
+          return;
+        }
+        // Otherwise a non-fatal protocol error (e.g. `not_host` from an
+        // unauthorized action attempt) — the server's own state broadcast is
+        // still the source of truth, so this deliberately does not mutate
+        // `view`.
         return;
       default:
         return;

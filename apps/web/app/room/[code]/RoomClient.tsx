@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import type { ClientMessage, Variant } from "@games/schema";
 import { useRoomSocket } from "../../../lib/room-socket";
 import { useRoomStore } from "../../../lib/room-store";
-import { readSeatToken, seatTokenKey } from "../../../lib/seat-token";
+import {
+  clearDisplayName,
+  readDisplayName,
+  readSeatToken,
+  seatTokenKey,
+  writeDisplayName,
+} from "../../../lib/seat-token";
 import { RefusalCard, type RefusalCardReason } from "../../../components/RefusalCard";
 import { JoinForm } from "../../../components/JoinForm";
 import { Lobby } from "../../../components/Lobby";
@@ -21,7 +27,10 @@ export interface RoomClientProps {
  * `joinRoom`: a matching `seatToken` is ALWAYS a reclaim). */
 const RECONNECT_PLACEHOLDER_NAME = "Player";
 
-function readStoredDisplayName(code: string): string | undefined {
+/** Legacy per-tab location of the host's name, written by builds before
+ * WR-06 moved it to localStorage (`readDisplayName`). Read-only fallback so
+ * a tab opened before the deploy still auto-joins under its real name. */
+function readLegacySessionDisplayName(code: string): string | undefined {
   if (typeof window === "undefined") {
     return undefined;
   }
@@ -41,9 +50,12 @@ function readStoredDisplayName(code: string): string | undefined {
 export function RoomClient({ code }: RoomClientProps) {
   const [displayName, setDisplayName] = useState<string | undefined>(undefined);
   const [checkedStorage, setCheckedStorage] = useState(false);
+  const [joinFailed, setJoinFailed] = useState(false);
 
   useEffect(() => {
-    const storedName = readStoredDisplayName(code);
+    // WR-06: the name lives in localStorage next to the seat token, so a new
+    // tab or a released lobby seat rejoins under the player's real name.
+    const storedName = readDisplayName(code) ?? readLegacySessionDisplayName(code);
     const hasSeatToken = Boolean(readSeatToken(code));
     if (storedName || hasSeatToken) {
       setDisplayName(storedName ?? RECONNECT_PLACEHOLDER_NAME);
@@ -57,17 +69,55 @@ export function RoomClient({ code }: RoomClientProps) {
   }
 
   if (displayName === undefined) {
-    return <JoinForm code={code} onJoin={setDisplayName} />;
+    return (
+      <JoinForm
+        code={code}
+        error={joinFailed ? "Couldn't join with that name — try another." : undefined}
+        onJoin={(name) => {
+          writeDisplayName(code, name);
+          setJoinFailed(false);
+          setDisplayName(name);
+        }}
+      />
+    );
   }
 
-  return <ConnectedRoom code={code} displayName={displayName} />;
+  return (
+    <ConnectedRoom
+      code={code}
+      displayName={displayName}
+      onJoinFailed={() => {
+        setJoinFailed(true);
+        setDisplayName(undefined);
+      }}
+    />
+  );
 }
 
-function ConnectedRoom({ code, displayName }: { code: string; displayName: string }) {
+function ConnectedRoom({
+  code,
+  displayName,
+  onJoinFailed,
+}: {
+  code: string;
+  displayName: string;
+  onJoinFailed: () => void;
+}) {
   const socket = useRoomSocket({ code, displayName });
   const status = useRoomStore((state) => state.status);
   const refusalReason = useRoomStore((state) => state.refusalReason);
   const view = useRoomStore((state) => state.view);
+
+  useEffect(() => {
+    if (status !== "join_failed") return;
+    // WR-05: the server rejected the join frame. The seat token was already
+    // validated before sending (`readJoinSeatToken`), so the stored name is
+    // what gets discarded — the token is kept, so re-entering a name still
+    // reclaims the seat. Unmounting this component closes the socket.
+    clearDisplayName(code);
+    useRoomStore.getState().reset();
+    onJoinFailed();
+  }, [status, code, onJoinFailed]);
 
   function send(message: ClientMessage) {
     socket.send(JSON.stringify(message));

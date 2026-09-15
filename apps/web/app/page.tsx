@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "../components/Button";
+import { writeDisplayName } from "../lib/seat-token";
 
 type VariantOption = "base" | "rainbow" | "black";
 
@@ -42,9 +43,10 @@ export default function HomePage() {
       }
       const json = (await res.json()) as { code: string; path: string };
       // Carry the entered display name into the lobby so the host does not
-      // retype it (D-03) — Plan 09's lobby reads this to send its `join`
-      // message automatically.
-      sessionStorage.setItem(`room:${json.code}:displayName`, displayName);
+      // retype it (D-03) — the room page reads this to send its `join`
+      // message automatically. localStorage, not sessionStorage (WR-06), so
+      // it survives into a new tab alongside the seat token.
+      writeDisplayName(json.code, displayName.trim());
       router.push(json.path);
     } catch {
       setError("Couldn't create a room — check your connection and try again.");

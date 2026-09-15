@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import usePartySocket from "partysocket/react";
 import type { PartySocket } from "partysocket";
 import { ROOM_ABANDONED_CLOSE_CODE, ServerMessageSchema, type DisplayName } from "@games/schema";
-import { clearSeatToken, readSeatToken, writeSeatToken } from "./seat-token";
+import { clearSeatToken, readJoinSeatToken, writeSeatToken } from "./seat-token";
 import { isTerminalCloseCode } from "./close-codes";
 import { useRoomStore } from "./room-store";
 
@@ -59,7 +59,9 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Part
         JSON.stringify({
           type: "join",
           displayName,
-          seatToken: readSeatToken(code),
+          // WR-05: a malformed stored token is dropped, not replayed into a
+          // join the server must reject.
+          seatToken: readJoinSeatToken(code),
         }),
       );
     },
@@ -83,6 +85,12 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Part
         writeSeatToken(code, message.seatToken);
       }
       if (message.type === "refused" || message.type === "superseded") {
+        stopReconnectingRef.current = true;
+      }
+      if (message.type === "error" && useRoomStore.getState().status === "joining") {
+        // WR-05: the server rejected our `join` itself. Replaying the same
+        // frame on every reconnect can never succeed — the room flow falls
+        // back to the join form instead (see RoomClient).
         stopReconnectingRef.current = true;
       }
 

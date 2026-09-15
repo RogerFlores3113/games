@@ -110,6 +110,24 @@ describe("room-store", () => {
     });
   });
 
+  describe("WR-05: a server error while joining is a failed join, not silence", () => {
+    it('"error" while joining sets status join_failed and records the code', () => {
+      useRoomStore.getState().setStatus("joining");
+      useRoomStore.getState().applyServerMessage({ type: "error", code: "bad_request" });
+      const state = useRoomStore.getState();
+      expect(state.status).toBe("join_failed");
+      expect(state.joinError).toBe("bad_request");
+      expect(state.view).toBeNull();
+    });
+
+    it('"error" after being seated still leaves status untouched', () => {
+      useRoomStore.getState().applyServerMessage({ type: "state", view: makeView() });
+      useRoomStore.getState().applyServerMessage({ type: "error", code: "not_host" });
+      expect(useRoomStore.getState().status).toBe("seated");
+      expect(useRoomStore.getState().joinError).toBeNull();
+    });
+  });
+
   it("reset returns the store to its initial shape", () => {
     useRoomStore.getState().applyServerMessage({ type: "state", view: makeView() });
     useRoomStore.getState().reset();

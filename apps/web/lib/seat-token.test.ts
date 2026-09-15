@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearSeatToken, readSeatToken, seatTokenKey, writeSeatToken } from "./seat-token";
+import {
+  clearSeatToken,
+  displayNameKey,
+  readDisplayName,
+  readJoinSeatToken,
+  readSeatToken,
+  seatTokenKey,
+  writeDisplayName,
+  writeSeatToken,
+} from "./seat-token";
 
 const originalWindow = globalThis.window;
 
@@ -107,6 +116,48 @@ describe("clearSeatToken", () => {
   it("does not throw when storage access fails", () => {
     installThrowingLocalStorage();
     expect(() => clearSeatToken("ABC123")).not.toThrow();
+  });
+});
+
+describe("WR-06: display name persists in localStorage next to the seat token", () => {
+  it('uses the "room:{code}:displayName" key', () => {
+    expect(displayNameKey("ABC123")).toBe("room:ABC123:displayName");
+  });
+
+  it("round-trips a name, scoped per room code, surviving a new tab (localStorage, not sessionStorage)", () => {
+    const storage = installFakeLocalStorage();
+    writeDisplayName("ABC123", "Bianca");
+    writeDisplayName("XYZ789", "Roger");
+    expect(storage.getItem("room:ABC123:displayName")).toBe("Bianca");
+    expect(readDisplayName("ABC123")).toBe("Bianca");
+    expect(readDisplayName("XYZ789")).toBe("Roger");
+  });
+
+  it("ignores a stored name that fails DisplayNameSchema", () => {
+    const storage = installFakeLocalStorage();
+    storage.setItem("room:ABC123:displayName", "   ");
+    expect(readDisplayName("ABC123")).toBeUndefined();
+  });
+
+  it("never throws during SSR or when storage access fails", () => {
+    installThrowingLocalStorage();
+    expect(() => writeDisplayName("ABC123", "Bianca")).not.toThrow();
+    expect(readDisplayName("ABC123")).toBeUndefined();
+  });
+});
+
+describe("WR-05: readJoinSeatToken only replays a well-formed token", () => {
+  it("returns a stored token that passes SeatTokenSchema", () => {
+    installFakeLocalStorage();
+    writeSeatToken("ABC123", "a".repeat(24));
+    expect(readJoinSeatToken("ABC123")).toBe("a".repeat(24));
+  });
+
+  it("drops (and clears) a malformed token instead of sending a join the server must reject", () => {
+    installFakeLocalStorage();
+    writeSeatToken("ABC123", "corrupted-value");
+    expect(readJoinSeatToken("ABC123")).toBeUndefined();
+    expect(readSeatToken("ABC123")).toBeUndefined();
   });
 });
 
