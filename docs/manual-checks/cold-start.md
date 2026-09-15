@@ -42,7 +42,7 @@ into evidence, on our own account, on our own domain.
 
 | Date | Days idle | Browser | Click→connected | Manual intervention needed? | Notes |
 |------|-----------|---------|------------------|------------------------------|-------|
-| 2026-09-15 | 0 | — | — | — | PENDING — 7-day window opens 2026-09-15, first check due 2026-09-22. Both targets confirmed live on 2026-09-15: Worker `games-worker.rflores3113.workers.dev`, web `https://games.rogerflores.dev` (Vercel project `games-web`). The originally seeded 2026-09-03 date predated any live deploy and is superseded. Production Playwright runs and redeploys on 2026-09-15 count as activity; if either target is redeployed or a room is opened after that, restart the window from that date and log the restart here. |
+| 2026-09-15 | 0 | — | — | — | WAIVED by project owner on 2026-09-15: the ≥7-day idle check is not required to close Phase 1. Basis: Durable Objects hibernate rather than pause (Cloudflare docs), room state persists to SQLite storage, and production rooms connected within seconds on 2026-09-15 (create-room/join-room E2E 6/6). This is a judgment call, not idle-window evidence. Run the procedure above if cold-start latency is ever suspect. |
 
 ## When to re-run
 
