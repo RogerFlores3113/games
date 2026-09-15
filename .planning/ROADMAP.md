@@ -14,7 +14,7 @@ This milestone ships online multiplayer Hanabi (base, Rainbow, Black) as a link-
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Room & Transport Skeleton** - Prove the Cloudflare Durable Objects + partyserver + Vercel split on real infrastructure with a link-based, reconnect-safe room, before any game logic exists. (completed 2026-09-15)
-- [ ] **Phase 2: Per-Seat Redaction Contract** - Prove the single whitelist-serialize per-seat projection chokepoint against a toy secret-holding game, with an automated leak test in place.
+- [x] **Phase 2: Per-Seat Redaction Contract** - Prove the single whitelist-serialize per-seat projection chokepoint against a toy secret-holding game, with an automated leak test in place. (completed 2026-09-15)
 - [ ] **Phase 3: Hanabi Rules Engine** - Build the full Hanabi rules engine as a pure, variant-parametrized, network-free package tested in isolation.
 - [ ] **Phase 4: Wire Engine Into Room Actor** - Replace the toy game with the real engine behind the game-adapter interface, delivering a live, correctly-filtered, correctly-ruled base-game table.
 - [ ] **Phase 5: Reconnect & Session Durability Hardening** - Exercise and harden the mobile-backgrounding and multi-tab failure modes that a manual refresh test does not surface.
@@ -98,7 +98,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 02-06-PLAN.md — Phase-wide automated gate + human DevTools WebSocket frame verification
+- [x] 02-06-PLAN.md — Phase-wide automated gate + human DevTools WebSocket frame verification
 
 ### Phase 3: Hanabi Rules Engine
 
@@ -180,7 +180,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Room & Transport Skeleton | 11/11 | Complete   | 2026-09-15 |
-| 2. Per-Seat Redaction Contract | 5/6 | In Progress|  |
+| 2. Per-Seat Redaction Contract | 6/6 | Complete   | 2026-09-15 |
 | 3. Hanabi Rules Engine | 0/TBD | Not started | - |
 | 4. Wire Engine Into Room Actor | 0/TBD | Not started | - |
 | 5. Reconnect & Session Durability Hardening | 0/TBD | Not started | - |
