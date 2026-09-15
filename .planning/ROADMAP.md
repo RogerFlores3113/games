@@ -89,7 +89,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-03-PLAN.md — Worker registration point + adapter swap, fail-closed `projectSeatView` gate, ROOM_SCHEMA_VERSION bump, D-11 layer-2 wire property test
+- [x] 02-03-PLAN.md — Worker registration point + adapter swap, fail-closed `projectSeatView` gate, ROOM_SCHEMA_VERSION bump, D-11 layer-2 wire property test
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -180,7 +180,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Room & Transport Skeleton | 11/11 | Complete   | 2026-09-15 |
-| 2. Per-Seat Redaction Contract | 2/6 | In Progress|  |
+| 2. Per-Seat Redaction Contract | 3/6 | In Progress|  |
 | 3. Hanabi Rules Engine | 0/TBD | Not started | - |
 | 4. Wire Engine Into Room Actor | 0/TBD | Not started | - |
 | 5. Reconnect & Session Durability Hardening | 0/TBD | Not started | - |
