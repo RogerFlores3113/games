@@ -70,9 +70,9 @@ created: 2026-09-15
 
 ## Manual-Only Verifications
 
-| Behavior | Requirement | Why Manual | Test Instructions |
-|----------|-------------|------------|-------------------|
-| Toy game renders own card face-down, others face-up (Plan 02-06 Task 2) | HIDE-01 (UX sanity) | Visual check of minimal toy UI | Open room in two browsers, start game, confirm each sees the other's card but not their own; DevTools WS frames show no own `value` |
+| Behavior | Requirement | Why Manual | Test Instructions | Result |
+|----------|-------------|------------|-------------------|--------|
+| Toy game renders own card face-down, others face-up (Plan 02-06 Task 2) | HIDE-01 (UX sanity) | Visual check of minimal toy UI | Open room in two browsers, start game, confirm each sees the other's card but not their own; DevTools WS frames show no own `value` | ✅ Approved by user 2026-09-15 — user confirmed the documented verification steps passed, no leaks reported |
 
 ---
 
@@ -85,7 +85,7 @@ created: 2026-09-15
 - [x] Feedback latency < 60s
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** automated gate green 2026-09-15; manual check pending Task 2
+**Approval:** automated gate green 2026-09-15; manual check approved by user 2026-09-15
 
 ---
 
