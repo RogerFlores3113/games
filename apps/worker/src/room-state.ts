@@ -277,9 +277,11 @@ export function startGame(
     seed,
   });
 
+  // WR-07: the seed is kept server-side for the life of the game. `seed`
+  // must be secret (`mintGameSeed`), never the public room code.
   return {
     ok: true,
-    state: { ...state, status: "in_progress", game, lastActivityAt: now },
+    state: { ...state, status: "in_progress", game, seed, lastActivityAt: now },
   };
 }
 

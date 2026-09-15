@@ -461,6 +461,25 @@ describe("HIDE-02 groundwork: toSeatView never leaks a seat token", () => {
   });
 });
 
+describe("WR-07: the game seed is persisted server-side and never projected", () => {
+  it("startGame stores the secret seed in RoomState, and no seat's view carries it", () => {
+    const minter = makeMinter();
+    const hostJoin = join(freshRoom(), "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+    const guestJoin = join(hostJoin.state, "Guest", 2, minter);
+    if (!guestJoin.ok) throw new Error("unreachable");
+    const secret = "0123456789abcdef0123456789abcdef";
+
+    const started = startGame(guestJoin.state, hostJoin.seatId, 3, secret);
+    if (!started.ok) throw new Error("unreachable");
+
+    expect(started.state.seed).toBe(secret);
+    for (const seat of started.state.seats) {
+      expect(JSON.stringify(toSeatView(started.state, seat.seatId)).includes(secret)).toBe(false);
+    }
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Purity: no function mutates its input
 // ---------------------------------------------------------------------------

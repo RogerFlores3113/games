@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 import { ROOM_CODE_ALPHABET, SEAT_TOKEN_LENGTH } from "@games/schema";
 import {
+  mintGameSeed,
   mintRoomCode,
   mintSeatToken,
   mintSeatId,
@@ -15,6 +16,18 @@ import {
 function makeSeat(seatId: string, seatToken: string): TokenBearingSeat {
   return { seatId, seatToken: seatToken as TokenBearingSeat["seatToken"] };
 }
+
+describe("mintGameSeed (WR-07)", () => {
+  it("mints a 128-bit hex secret, distinct every time, never derived from the public room code", () => {
+    const seeds = new Set<string>();
+    for (let i = 0; i < 1000; i++) {
+      const seed = mintGameSeed();
+      expect(seed).toMatch(/^[0-9a-f]{32}$/);
+      seeds.add(seed);
+    }
+    expect(seeds.size).toBe(1000);
+  });
+});
 
 describe("mintRoomCode / mintSeatToken / mintSeatId — entropy and shape", () => {
   it("mints 1000 distinct seat tokens, all length 24", () => {

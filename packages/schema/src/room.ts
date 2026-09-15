@@ -101,6 +101,12 @@ export const RoomStateSchema = z.object({
   adapterId: z.string(),
   /** Opaque to this package — the game adapter's state shape (FDN-01). */
   game: z.unknown(),
+  /** WR-07: the secret, server-minted seed the game was created from
+   * (RULES-19 deterministic shuffle). Set at game start. SERVER-ONLY — it
+   * has no field in `RoomViewSchema`, and must never gain one: anyone
+   * holding it could recompute the deck. Optional so rooms persisted before
+   * this field existed still parse. */
+  seed: z.string().optional(),
   createdAt: z.number(),
   lastActivityAt: z.number(),
 });

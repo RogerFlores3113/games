@@ -56,6 +56,17 @@ export function mintSeatId(): string {
   return nanoid(10);
 }
 
+/** WR-07: the secret seed a game's deterministic shuffle derives from
+ * (RULES-19). 128 bits from the platform CSPRNG, hex-encoded. Server-only:
+ * it lives in `RoomState` and has no representation in any view type.
+ * NEVER pass the room code (or anything else a player knows) as a seed —
+ * anyone at the table could recompute the whole deck, own hand included. */
+export function mintGameSeed(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 // ---------------------------------------------------------------------------
 // Token -> seat resolution (RT-07)
 // ---------------------------------------------------------------------------

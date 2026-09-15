@@ -38,6 +38,7 @@ import {
   toSeatView,
 } from "./room-state";
 import {
+  mintGameSeed,
   mintSeatId,
   mintSeatToken,
   rebindSeatConnection,
@@ -154,7 +155,8 @@ export class RoomDO extends Server<Env> {
     }
 
     if (msg.type === "start_game") {
-      const result = startGame(room, actorSeatId, now, this.name);
+      // WR-07: a secret seed, never the public room code (see mintGameSeed).
+      const result = startGame(room, actorSeatId, now, mintGameSeed());
       if (!result.ok) {
         connection.send(encodeServerMessage({ type: "error", code: result.reason }));
         return;
