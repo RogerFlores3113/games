@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import type { GameAdapter } from "./adapter";
 import { counterGame } from "./counter-game";
+import { foreheadCardGame } from "./forehead-card";
 
 /**
  * Reusable adapter-conformance suite. Phase 2 and Phase 4 call this same
@@ -83,6 +84,7 @@ export function describeAdapterConformance(
 }
 
 describeAdapterConformance("counter", counterGame, [{ type: "increment" }]);
+describeAdapterConformance("forehead-card", foreheadCardGame, [{ type: "guess", value: "Altair" }]);
 
 describe("packages/rules purity", () => {
   it("has no non-empty runtime dependencies", () => {
@@ -95,7 +97,7 @@ describe("packages/rules purity", () => {
   it("imports no Node/Worker-specific runtime modules from src", () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const forbidden = ["node:", "from \"fs\"", "from 'fs'", "partyserver", "cloudflare:"];
-    const files = ["adapter.ts", "counter-game.ts", "index.ts"];
+    const files = ["adapter.ts", "counter-game.ts", "index.ts", "shuffle.ts", "forehead-card.ts"];
     for (const file of files) {
       // Do not scan this test file itself — it legitimately uses node:fs/node:url
       // to read package.json for the purity check above.

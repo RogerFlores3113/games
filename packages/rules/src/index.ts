@@ -17,3 +17,14 @@ export type {
 
 export { counterGame } from "./counter-game";
 export type { CounterAction, CounterState, CounterView } from "./counter-game";
+
+export { FOREHEAD_CARD_VALUES, foreheadCardGame } from "./forehead-card";
+export type {
+  ForeheadCardAction,
+  ForeheadCardState,
+  ForeheadCardValue,
+  ForeheadCardView,
+  HiddenCardView,
+  RevealedCard,
+  VisibleCardView,
+} from "./forehead-card";
