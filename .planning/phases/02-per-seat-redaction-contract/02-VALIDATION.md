@@ -40,10 +40,17 @@ created: 2026-09-15
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | TBD | TBD | HIDE-01 | own-hand leak | No seat's view contains its own card identity (D-11 layers 1–3) | property + integration | `npx vitest run --project rules` / `npx vitest run --project worker` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | HIDE-02 | bypass serializer | Single `connection.send` site, single `toSeatView(` call site, zero `broadcast(` (comment-stripped) | structural source test | `npx vitest run --project worker source-structure` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | HIDE-03 | null-not-absent leak | Strict view schema rejects a hidden card carrying any `value` key, including `undefined` | unit | `npx vitest run --project schema` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | HIDE-04 | silent test | Leak checker flags a deliberately leaky projection (D-13 canary) | unit (canary) | `npx vitest run --project worker leak-check` | ❌ W0 | ⬜ pending |
+| 02-01-T3 | 02-01 | 1 | HIDE-01, HIDE-04 | own-hand leak (T-02-01) | No seat's toPlayerView carries own card identity, deck, or seed over random games (D-11 layer 1) | property | `npx vitest run --project rules forehead-card.property` | ❌ W0 | ⬜ pending |
+| 02-01-T3 | 02-01 | 1 | HIDE-04 | silent test (T-02-05) | Leak checker flags own value, value: null, value: undefined, own card in otherCards, deck, seed (D-13 canary) | unit (canary) | `npx vitest run --project rules forehead-card-leak-check` | ❌ W0 | ⬜ pending |
+| 02-01-T2 | 02-01 | 1 | HIDE-03 | spread/null projection (T-02-01) | Own card projected as { id, hidden: true } with exact key set; ids opaque (D-04, D-05) | unit + conformance | `npx vitest run --project rules forehead-card adapter` | ❌ W0 | ⬜ pending |
+| 02-02-T1 | 02-02 | 1 | HIDE-03 | null-not-absent leak (T-02-06) | Strict view schema rejects hidden card with any value key incl. undefined; unknown keys at every level | unit | `npx vitest run --project schema games/forehead-card` | ❌ W0 | ⬜ pending |
+| 02-02-T3 | 02-02 | 1 | HIDE-02 | error-frame side channel (T-02-07) | Error detail is a closed enum | unit | `npx vitest run --project schema messages` | ✅ | ⬜ pending |
+| 02-03-T2 | 02-03 | 2 | HIDE-02, HIDE-03 | fail-open validation (T-02-09) | projectSeatView returns null and logs no secrets on schema failure (D-07); counter rooms reset (ROOM_SCHEMA_VERSION 2) | unit | `npx vitest run --project worker seat-projection persistence` | ❌ W0 | ⬜ pending |
+| 02-03-T3 | 02-03 | 2 | HIDE-01, HIDE-04 | wire leak (T-02-13) | Encoded frames for every seat free of own value, deck, seed (D-11 layer 2) | property | `npx vitest run --project worker redaction-wire` | ❌ W0 | ⬜ pending |
+| 02-04-T1/T2 | 02-04 | 3 | HIDE-02 | bypass serializer (T-02-14) | One `.send(`, one `encodeServerMessage(`, one `toSeatView(` call, `toPlayerView(` only in toSeatView, zero `broadcast(` (comment-stripped, literal-aware) | structural source test | `npx vitest run --project worker source-structure` | ❌ W0 | ⬜ pending |
+| 02-04-T3 | 02-04 | 3 | HIDE-01, HIDE-04 | reconnect leak (T-02-17) | Real wrangler-dev frames on join, live update, seat-token reconnect carry no own value or undealt deck (D-11 layer 3) | integration | `npx vitest run --project worker room-do` | ✅ (extended) | ⬜ pending |
+| 02-05-T2 | 02-05 | 3 | HIDE-01 | UI own-card render (T-02-19) | Own-card tile blank; teammate-visible value absent from own tile; toy turn flow works | e2e | `npx playwright test e2e/start-game.spec.ts e2e/in-progress-arrival.spec.ts` | ✅ (updated) | ⬜ pending |
+| 02-06-T1 | 02-06 | 4 | HIDE-01..04 | integration regression | Full gate green | full suite | `npm test && npx playwright test` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -65,7 +72,7 @@ created: 2026-09-15
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| Toy game renders own card face-down, others face-up | HIDE-01 (UX sanity) | Visual check of minimal toy UI | Open room in two browsers, start game, confirm each sees the other's card but not their own; DevTools WS frames show no own `value` |
+| Toy game renders own card face-down, others face-up (Plan 02-06 Task 2) | HIDE-01 (UX sanity) | Visual check of minimal toy UI | Open room in two browsers, start game, confirm each sees the other's card but not their own; DevTools WS frames show no own `value` |
 
 ---
 
