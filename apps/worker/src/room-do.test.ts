@@ -985,4 +985,99 @@ describe("RoomDO integration (live wrangler dev)", () => {
     ws1.close();
     ws2.close();
   });
+
+  it("D-08: the persisted dedup key survives a genuine wrangler dev eviction — a retried actionId after a forced restart does not re-apply", async () => {
+    type GameCardVisible = { id: string; hidden: false; suit: string; rank: number };
+    type GameViewShape = {
+      otherHands: { seatId: string; cards: (GameCardVisible | { hidden: true })[] }[];
+      clueTokens: number;
+      history: unknown[];
+      isYourTurn: boolean;
+    };
+    type RoomViewShape = { status: string; game: GameViewShape | null };
+
+    const code = mintRoomCode();
+    const ws1 = await openSocket(code);
+    const c1 = collectMessages(ws1);
+    send(ws1, { type: "join", displayName: "Alice" });
+    const joined1 = (await c1.waitFor((m) => m.type === "joined")) as Parsed & {
+      seatId: string;
+      seatToken: string;
+    };
+
+    const ws2 = await openSocket(code);
+    const c2 = collectMessages(ws2);
+    send(ws2, { type: "join", displayName: "Bob" });
+    await c2.waitFor((m) => m.type === "joined");
+    await c1.waitFor((m) => m.type === "state" && (m.view as { seats: unknown[] }).seats.length === 2);
+
+    send(ws1, { type: "start_game" });
+    const startedView = (await c1.waitFor(
+      (m) => m.type === "state" && (m.view as RoomViewShape).status === "in_progress",
+      8000,
+    )) as Parsed & { view: RoomViewShape };
+    await c2.waitFor((m) => m.type === "state" && (m.view as RoomViewShape).status === "in_progress", 8000);
+
+    // Alice must be the active seat for this test's fixed clue frame to be
+    // legal; if she isn't, this room's deal made Bob active instead — retry
+    // with a fresh room is unnecessary in practice since start_game always
+    // makes seat 0 (the host, Alice) active, but assert it explicitly so a
+    // future engine change fails loudly here rather than via a confusing
+    // downstream refusal.
+    expect(startedView.view.game!.isYourTurn).toBe(true);
+    const bobHand = startedView.view.game!.otherHands[0]!;
+    const bobVisibleCard = bobHand.cards.find((c): c is GameCardVisible => !c.hidden)!;
+
+    const clueFrame = {
+      type: "game_action",
+      actionId: "test-action-d08-eviction-clue",
+      request: {
+        type: "clue",
+        targetSeatId: bobHand.seatId,
+        clue: { type: "rank", value: bobVisibleCard.rank },
+      },
+    };
+
+    send(ws1, clueFrame);
+    const applied = (await c1.waitFor(
+      (m) => m.type === "state" && (m.view as RoomViewShape).game?.history.length === 1,
+      8000,
+    )) as Parsed & { view: RoomViewShape };
+    const clueTokensAfterFirst = applied.view.game!.clueTokens;
+    const historyLengthAfterFirst = applied.view.game!.history.length;
+
+    ws1.close();
+    ws2.close();
+    // Give the DO a moment to persist the close-driven mutation before the
+    // process is killed out from under it.
+    await new Promise((r) => setTimeout(r, 500));
+
+    // Genuine eviction, not a socket reconnect: a client disconnect alone
+    // proves nothing, since the Durable Object can survive it entirely in
+    // memory with `lastAppliedActionId` intact regardless of whether it was
+    // ever persisted. Only killing the whole `wrangler dev` process tree
+    // guarantees no in-memory JS object is left anywhere to accidentally
+    // answer from — the retry below can only see the post-restart state if
+    // the dedup key was actually written to durable storage.
+    await killAndWait(child);
+    child = spawnWrangler();
+    await waitForReady();
+
+    const ws3 = await openSocket(code);
+    const c3 = collectMessages(ws3);
+    send(ws3, { type: "join", displayName: "Alice", seatToken: joined1.seatToken });
+    await c3.waitFor((m) => m.type === "joined" && (m.view as RoomViewShape).game !== null, 8000);
+
+    const beforeRetryCount = c3.parsed.length;
+    send(ws3, clueFrame);
+    const retried = (await c3.waitFor(
+      (m) => c3.parsed.indexOf(m) >= beforeRetryCount && m.type === "state",
+      8000,
+    )) as Parsed & { view: RoomViewShape };
+
+    expect(retried.view.game!.clueTokens).toBe(clueTokensAfterFirst);
+    expect(retried.view.game!.history.length).toBe(historyLengthAfterFirst);
+
+    ws3.close();
+  }, 40_000);
 });

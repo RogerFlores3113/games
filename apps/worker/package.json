@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "wrangler dev --port 8787",
     "build": "wrangler deploy --dry-run --outdir dist",
-    "test:integration": "vitest run --project worker room-do"
+    "test:integration": "cd ../.. && vitest run --project worker room-do"
   },
   "dependencies": {
     "@games/rules": "*",
