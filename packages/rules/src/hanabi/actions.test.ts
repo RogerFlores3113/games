@@ -287,4 +287,147 @@ describe("applyAction", () => {
       });
     });
   });
+
+  describe("clue", () => {
+    it("an accepted clue decrements clueTokens by exactly one and leaves everything else untouched", () => {
+      const state = baseState({ deck: [] });
+      const result = applyHanabiAction(state, "seat-a", {
+        type: "clue",
+        targetSeatId: "seat-b",
+        clue: { type: "color", value: "red" },
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      expect(result.state.clueTokens).toBe(state.clueTokens - 1);
+      expect(result.state.stacks).toEqual(state.stacks);
+      expect(result.state.discard).toEqual(state.discard);
+      expect(result.state.fuses).toBe(state.fuses);
+      expect(result.state.deck).toEqual(state.deck);
+      // Card identities in every hand are unchanged.
+      for (const hand of result.state.hands) {
+        const originalHand = state.hands.find((h) => h.seatId === hand.seatId)!;
+        expect(hand.slots.map((s) => s.card)).toEqual(originalHand.slots.map((s) => s.card));
+      }
+    });
+
+    it("every slot in the target's hand gains positive or negative clue facts, other hands are untouched", () => {
+      const state = baseState({ deck: [] });
+      const result = applyHanabiAction(state, "seat-a", {
+        type: "clue",
+        targetSeatId: "seat-b",
+        clue: { type: "color", value: "red" },
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      const targetHand = result.state.hands.find((h) => h.seatId === "seat-b")!;
+      const touchedSlot = targetHand.slots.find((s) => s.card.id === "seat-b-1")!; // red 1
+      expect(touchedSlot.facts.positiveClues).toHaveLength(1);
+      const untouchedSlot = targetHand.slots.find((s) => s.card.id === "seat-b-2")!; // blue 2
+      expect(untouchedSlot.facts.negativeClues).toHaveLength(1);
+
+      // Hands other than the target's, including the actor's own, are untouched.
+      const actorHand = result.state.hands.find((h) => h.seatId === "seat-a")!;
+      const originalActorHand = state.hands.find((h) => h.seatId === "seat-a")!;
+      expect(actorHand).toEqual(originalActorHand);
+      const bystanderHand = result.state.hands.find((h) => h.seatId === "seat-c")!;
+      const originalBystanderHand = state.hands.find((h) => h.seatId === "seat-c")!;
+      expect(bystanderHand).toEqual(originalBystanderHand);
+    });
+
+    it("a color clue in the rainbow variant touches the rainbow card as well as the named color's cards", () => {
+      const config = variantConfig("rainbow");
+      const state = baseState({
+        variant: "rainbow",
+        stacks: emptyStacks("rainbow"),
+        deck: [],
+        hands: [
+          { seatId: "seat-a", slots: [] },
+          {
+            seatId: "seat-b",
+            slots: [
+              { card: card("seat-b-1", "red", 1), facts: initialClueFacts(config) },
+              { card: card("seat-b-2", "rainbow", 3), facts: initialClueFacts(config) },
+              { card: card("seat-b-3", "blue", 2), facts: initialClueFacts(config) },
+            ],
+          },
+          { seatId: "seat-c", slots: [] },
+        ],
+      });
+      const result = applyHanabiAction(state, "seat-a", {
+        type: "clue",
+        targetSeatId: "seat-b",
+        clue: { type: "color", value: "red" },
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      expect(result.state.history[0]).toMatchObject({
+        touchedCardIds: expect.arrayContaining(["seat-b-1", "seat-b-2"]),
+      });
+      const targetHand = result.state.hands.find((h) => h.seatId === "seat-b")!;
+      const rainbowSlot = targetHand.slots.find((s) => s.card.id === "seat-b-2")!;
+      expect(rainbowSlot.facts.positiveClues).toHaveLength(1);
+    });
+
+    it("a clue touching zero cards is rejected with clue_touches_nothing and spends no token, for both clue types", () => {
+      const state = baseState({ deck: [] }); // seat-b has red-1, blue-2
+      const colorResult = applyHanabiAction(state, "seat-a", {
+        type: "clue",
+        targetSeatId: "seat-b",
+        clue: { type: "color", value: "green" },
+      });
+      expect(colorResult).toEqual({ ok: false, error: "clue_touches_nothing" });
+      const rankResult = applyHanabiAction(state, "seat-a", {
+        type: "clue",
+        targetSeatId: "seat-b",
+        clue: { type: "rank", value: 5 },
+      });
+      expect(rankResult).toEqual({ ok: false, error: "clue_touches_nothing" });
+      expect(state.clueTokens).toBe(5);
+    });
+
+    it("a clue at zero tokens is rejected with no_clue_tokens", () => {
+      const state = baseState({ clueTokens: 0, deck: [] });
+      const result = applyHanabiAction(state, "seat-a", {
+        type: "clue",
+        targetSeatId: "seat-b",
+        clue: { type: "color", value: "red" },
+      });
+      expect(result).toEqual({ ok: false, error: "no_clue_tokens" });
+    });
+
+    it("the clue appends a history entry carrying the clue and the touched card ids", () => {
+      const state = baseState({ deck: [] });
+      const result = applyHanabiAction(state, "seat-a", {
+        type: "clue",
+        targetSeatId: "seat-b",
+        clue: { type: "color", value: "red" },
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      expect(result.state.history).toHaveLength(1);
+      expect(result.state.history[0]).toMatchObject({
+        type: "clue",
+        seatId: "seat-a",
+        targetSeatId: "seat-b",
+        clue: { type: "color", value: "red" },
+        touchedCardIds: ["seat-b-1"],
+      });
+    });
+
+    it("the turn advances and the final-round counter decrements exactly as for play/discard, and a clue never draws", () => {
+      const state = baseState({ deck: [card("deck-1", "green", 3)], finalTurnsRemaining: 2 });
+      const result = applyHanabiAction(state, "seat-a", {
+        type: "clue",
+        targetSeatId: "seat-b",
+        clue: { type: "color", value: "red" },
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      expect(result.state.turnIndex).toBe(1);
+      expect(result.state.finalTurnsRemaining).toBe(1);
+      expect(result.state.deck).toEqual(state.deck);
+      const seatAHand = result.state.hands.find((h) => h.seatId === "seat-a")!;
+      expect(seatAHand.slots).toHaveLength(2); // unchanged, no draw
+    });
+  });
 });
