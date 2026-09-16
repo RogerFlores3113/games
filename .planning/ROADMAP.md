@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Per-Seat Redaction Contract** - Prove the single whitelist-serialize per-seat projection chokepoint against a toy secret-holding game, with an automated leak test in place. (completed 2026-09-15)
 - [x] **Phase 3: Hanabi Rules Engine** - Build the full Hanabi rules engine as a pure, variant-parametrized, network-free package tested in isolation. (completed 2026-09-16)
 - [x] **Phase 4: Wire Engine Into Room Actor** - Replace the toy game with the real engine behind the game-adapter interface, delivering a live, correctly-filtered, correctly-ruled base-game table. (completed 2026-09-16)
-- [ ] **Phase 5: Reconnect & Session Durability Hardening** - Exercise and harden the mobile-backgrounding and multi-tab failure modes that a manual refresh test does not surface.
+- [x] **Phase 5: Reconnect & Session Durability Hardening** - Exercise and harden the mobile-backgrounding and multi-tab failure modes that a manual refresh test does not surface. (completed 2026-09-16)
 - [ ] **Phase 6: Game Interface** - Build the board render, persistent per-card clue memory, colorblind-safe glyphs, and dark "fireworks night" luminosity theme against the now-stable wire contract.
 - [ ] **Phase 7: Variant Support (Rainbow, Black)** - Enable and test the Rainbow and Black configurations end to end, proving the variant-parametrized engine and UI built earlier need no special-casing.
 
@@ -217,7 +217,7 @@ Plans:
 
 **Wave 5**
 
-- [ ] 05-06-PLAN.md — Real-phone manual check doc, full gate, owner sign-off recorded verbatim (checkpoint)
+- [x] 05-06-PLAN.md — Real-phone manual check doc, full gate, owner sign-off recorded verbatim (checkpoint)
 
 ### Phase 6: Game Interface
 
@@ -260,6 +260,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Per-Seat Redaction Contract | 6/6 | Complete    | 2026-09-15 |
 | 3. Hanabi Rules Engine | 5/5 | Complete    | 2026-09-16 |
 | 4. Wire Engine Into Room Actor | 9/9 | Complete   | 2026-09-16 |
-| 5. Reconnect & Session Durability Hardening | 5/6 | In Progress|  |
+| 5. Reconnect & Session Durability Hardening | 6/6 | Complete   | 2026-09-16 |
 | 6. Game Interface | 0/TBD | Not started | - |
 | 7. Variant Support (Rainbow, Black) | 0/TBD | Not started | - |

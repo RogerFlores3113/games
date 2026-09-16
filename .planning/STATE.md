@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 05-05-PLAN.md
-last_updated: "2026-09-16T21:57:44.749Z"
+status: verifying
+stopped_at: Completed 05-06-PLAN.md (Phase 5 complete, ready for verification)
+last_updated: "2026-09-16T22:11:57.932Z"
 last_activity: 2026-09-16
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 37
-  completed_plans: 36
-  percent: 57
+  completed_plans: 37
+  percent: 71
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 
 Phase: 05 (reconnect-session-durability-hardening) — EXECUTING
 Plan: 6 of 6
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-16
 
-Progress: [██████████] 97%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -91,6 +91,7 @@ Progress: [██████████] 97%
 | Phase 05 P03 | 20min | 2 tasks | 7 files |
 | Phase 05 P04 | 3min | 3 tasks | 6 files |
 | Phase 05 P05 | 45min | 3 tasks | 4 files |
+| Phase 05 P06 | 15min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -171,6 +172,7 @@ Recent decisions affecting current work:
 - [Phase ?]: 05-04: RoomClient's send() also gates on status === reconnecting, keeping D-06 guaranteed at both component and dispatch-chokepoint layers since Lobby routes through send() without its own act()-style wrapper
 - [Phase 05-05]: playwright.config.ts WEB_PORT/WORKER_PORT made overridable via E2E_WEB_PORT/E2E_WORKER_PORT so a local run never collides with an operator's own already-running dev servers
 - [Phase 05-05]: RT-04's frozen-tab e2e test unconditionally pairs CDP freeze with a hard network drop, since a bare CDP freeze did not reliably stop the client heartbeat in the installed Chromium (confirmed live, matching RESEARCH.md Pitfall 4)
+- [Phase 05]: Owner explicitly waived the real-phone 10+ minute background check (RT-04) rather than performing it, deferring it until Phase 6/7 UI is finalized; recorded verbatim in docs/manual-checks/mobile-background.md
 
 ### Pending Todos
 
@@ -179,6 +181,7 @@ Recent decisions affecting current work:
 - Phase 1 needs a pre-planning research refresh: Cloudflare Durable Objects / `partyserver` API surface and free-tier limits were flagged MEDIUM confidence and move quickly — re-verify before planning.
 - Phase 6 needs original design work at plan time: no existing implementation combines luminosity-as-signal theming with colorblind-safe rendering.
 - Plan 01-09 checkpoint left D-08 (second-tab supersede) and ROOM-07/D-14 (in-progress refusal screen) without browser-level manual verification — flagged as must-cover Playwright scenarios for Plan 01-10
+- RT-04 real-phone 10+ minute background check is deferred (owner-waived 2026-09-16); re-run docs/manual-checks/mobile-background.md once Phase 6/7 UI is finalized
 
 ## Deferred Items
 
@@ -190,6 +193,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-16T21:57:44.742Z
-Stopped at: Completed 05-05-PLAN.md
+Last session: 2026-09-16T22:11:57.925Z
+Stopped at: Completed 05-06-PLAN.md (Phase 5 complete, ready for verification)
 Resume file: None
