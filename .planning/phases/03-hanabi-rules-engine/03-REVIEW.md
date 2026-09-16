@@ -91,6 +91,17 @@ illegitimate reveal of that identity elsewhere in the view. See CR-01.
 
 ### CR-01: Leak-checker's history-based allowance widening over-counts successful plays, creating an exploitable blind spot in the identity leak check
 
+> **RESOLVED 2026-09-16 in commit `65b6dd6`** (orchestrator, before Phase 3 was closed).
+> The redundant per-rank `stacks` loop was deleted from `secretsForHanabiSeat`; the
+> `history` loop alone now reproduces every legitimate occurrence exactly once.
+> A regression test — "Canary I" in `hanabi-leak-check.test.ts` — drives the real
+> projection to a successfully played card, asserts the clean view reports no leak,
+> then injects one duplicate of that already-public identity and asserts it IS
+> reported. Fault injection confirmed the canary is load-bearing: it fails when the
+> deleted loop is reinstated and passes with the fix. Full suite green afterwards
+> (425 tests). Independently found by the phase verifier as well — see
+> `03-VERIFICATION.md` Finding 1.
+
 **File:** `packages/rules/src/hanabi/hanabi-leak-check.ts:63-79`
 
 **Issue:**

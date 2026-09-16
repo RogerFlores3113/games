@@ -88,6 +88,15 @@ None. Grepped all 24 `packages/rules/src/hanabi/*.ts` files for `TODO|FIXME|TBD|
 
 ### Finding 1 (WARNING, non-blocking): leak-checker excess-count detection has a one-occurrence blind spot for successfully-played cards
 
+> **RESOLVED 2026-09-16 in commit `65b6dd6`** (orchestrator, before Phase 3 was closed).
+> The recommended fix in this finding was applied: the redundant per-rank `stacks`
+> bump was removed from `secretsForHanabiSeat`, leaving the `history` loop as the
+> single source of the allowance. "Canary I" in `hanabi-leak-check.test.ts` now
+> covers exactly the scenario reproduced below, and fault injection confirmed it
+> fails against the old behavior and passes against the fix. The code review reached
+> the same conclusion independently and rated it Critical — see `03-REVIEW.md` CR-01.
+> This finding is recorded as-written for the audit trail; no follow-up work remains.
+
 The orchestrator specifically asked this verification to check whether Plan 03-05's "fix" to the leak checker's identity-counting (closing a false positive around a played card's identity legitimately appearing in both the discard/stack and its history entry) weakened real leak detection. **It did, in one specific, reproducible case.**
 
 `secretsForHanabiSeat` (`hanabi-leak-check.ts`) bumps a played/discarded card's `{suit,rank}` allowed-count **twice** for every successfully completed stack rank: once from the `stacks` loop (`for (let rank = 1; rank <= stack.topRank; rank++) bump(stack.suit, rank)`) and once from the `history` loop (`if (entry.type === "play" ...) bump(entry.suit, entry.rank)`). But the real `toHanabiPlayerView` output only ever exposes that identity **once** for a successfully-played card — the `stacks` view field is `{ suit, topRank }` with no per-card `rank` key, so the only place a completed stack's played-card identity appears in the actual view is its `history` "play" entry.
