@@ -105,7 +105,7 @@ function ConnectedRoom({
   displayName: string;
   onJoinFailed: () => void;
 }) {
-  const socket = useRoomSocket({ code, displayName });
+  const { socket } = useRoomSocket({ code, displayName });
   const status = useRoomStore((state) => state.status);
   const refusalReason = useRoomStore((state) => state.refusalReason);
   const view = useRoomStore((state) => state.view);
