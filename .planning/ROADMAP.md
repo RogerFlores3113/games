@@ -150,7 +150,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 04-01-PLAN.md — Strict Hanabi view schema at `@games/schema/games/hanabi` + subpath wiring (D-05)
+- [x] 04-01-PLAN.md — Strict Hanabi view schema at `@games/schema/games/hanabi` + subpath wiring (D-05)
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -234,7 +234,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Room & Transport Skeleton | 11/11 | Complete   | 2026-09-15 |
 | 2. Per-Seat Redaction Contract | 6/6 | Complete    | 2026-09-15 |
 | 3. Hanabi Rules Engine | 5/5 | Complete    | 2026-09-16 |
-| 4. Wire Engine Into Room Actor | 0/8 | Planned     | - |
+| 4. Wire Engine Into Room Actor | 1/8 | In Progress|  |
 | 5. Reconnect & Session Durability Hardening | 0/TBD | Not started | - |
 | 6. Game Interface | 0/TBD | Not started | - |
 | 7. Variant Support (Rainbow, Black) | 0/TBD | Not started | - |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 4 UI-SPEC approved
-last_updated: "2026-09-16T02:47:18.260Z"
-last_activity: 2026-09-16 -- Phase 4 planning complete
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-09-16T02:54:06.810Z"
+last_activity: 2026-09-16
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 30
-  completed_plans: 22
+  completed_plans: 23
   percent: 43
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-01)
 
 **Core value:** A friend clicks a link and is playing Hanabi within seconds — and the game does not break, stall, or lose their seat for the next 25 minutes.
-**Current focus:** Phase 4 — wire engine into room actor
+**Current focus:** Phase 4 — Wire Engine Into Room Actor
 
 ## Current Position
 
-Phase: 4
-Plan: Not started
+Phase: 4 (Wire Engine Into Room Actor) — EXECUTING
+Plan: 2 of 8
 Status: Ready to execute
-Last activity: 2026-09-16 -- Phase 4 planning complete
+Last activity: 2026-09-16
 
-Progress: [██████████] 100%
+Progress: [████████░░] 77%
 
 ## Performance Metrics
 
@@ -75,6 +75,7 @@ Progress: [██████████] 100%
 | Phase 03 P03 | 45min | 3 tasks | 5 files |
 | Phase 03 P04 | 35min | 3 tasks | 8 files |
 | Phase 03 P05 | 50min | 3 tasks | 7 files |
+| Phase 04 P01 | 35min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -129,6 +130,8 @@ Recent decisions affecting current work:
 - [Phase 03]: Array.from(...) used instead of array-spread in projection.ts to keep the file's own forbidden-construct grep clean without weakening the no-object-spread discipline
 - [Phase 03]: Hanabi leak checker's typed identity-count check is a second, independent recursive walk (collectIdentityCounts), matching the plan's explicit separate-pass instruction
 - [Phase 03-05]: secretsForHanabiSeat bumps allowedIdentityCounts once per play/discard history entry, closing a false-positive leak where a played/discarded card's identity legitimately appears twice in a view (discard pile/stack plus history log)
+- [Phase ?]: 04-01: ClueValueSchema stays a single z.strictObject, not a z.discriminatedUnion("type", ...), because HanabiView's Clue-like wire fields are the loose { type; value: Suit|Rank } shape, which a narrower union cannot absorb without breaking game-registration.ts's compile-time assignability assertion
+- [Phase ?]: 04-01: hanabi.test.ts fixtures use named consts instead of array-indexing (baseValidView.yourHand[0]) because noUncheckedIndexedAccess makes indexed access possibly-undefined and fails tsc -b
 
 ### Pending Todos
 
@@ -148,6 +151,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-16T01:56:27.613Z
-Stopped at: Phase 4 UI-SPEC approved
-Resume file: .planning/phases/04-wire-engine-into-room-actor/04-UI-SPEC.md
+Last session: 2026-09-16T02:54:06.802Z
+Stopped at: Completed 04-01-PLAN.md
+Resume file: None
