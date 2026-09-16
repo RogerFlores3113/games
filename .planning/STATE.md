@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 04-06-PLAN.md
-last_updated: "2026-09-16T03:49:26.096Z"
+last_updated: "2026-09-16T03:59:59.495Z"
 last_activity: 2026-09-16
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 30
-  completed_plans: 28
+  completed_plans: 29
   percent: 43
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 4 (Wire Engine Into Room Actor) — EXECUTING
-Plan: 7 of 8
+Plan: 8 of 8
 Status: Ready to execute
 Last activity: 2026-09-16
 
-Progress: [█████████░] 93%
+Progress: [██████████] 97%
 
 ## Performance Metrics
 
@@ -81,6 +81,7 @@ Progress: [█████████░] 93%
 | Phase 04 P04 | 35min | 3 tasks | 4 files |
 | Phase 04-wire-engine-into-room-actor P05 | 9min | 2 tasks | 2 files |
 | Phase 04 P06 | 35min | 3 tasks | 4 files |
+| Phase 04 P07 | 55min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -146,6 +147,8 @@ Recent decisions affecting current work:
 - [Phase ?]: RT-09 duplicate-send proof records parsed.length before the second send and requires the matching frame's index at or beyond it, since the dedup branch resends a byte-identical view a naive waitFor would vacuously match
 - [Phase 04]: clueTouchCountForTarget only counts visible cards, delegating to variantConfig predicates rather than hand-rolled rules
 - [Phase 04]: Own-hand slots render position and raw positiveClues/negativeClues only, never possibleSuits/possibleRanks (Phase 6 UI-05 owns narrowed candidates)
+- [Phase ?]: start-game.spec.ts's table-action assertion uses play, not discard, since clue tokens start at 8/8 (max) and D-12 disables discard at max tokens
+- [Phase ?]: RT-03 proves same-seat reattachment via the OTHER page's other-hand-{seatId} testid, since the board never renders the viewer's own seatId
 
 ### Pending Todos
 
@@ -165,6 +168,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-16T03:49:26.087Z
+Last session: 2026-09-16T03:58:07.847Z
 Stopped at: Completed 04-06-PLAN.md
 Resume file: None
