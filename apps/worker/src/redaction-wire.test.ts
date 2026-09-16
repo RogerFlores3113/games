@@ -134,6 +134,7 @@ describe("D-11 layer 2: the encoded wire string never leaks own value, deck cont
             const result = applyGameAction(
               room,
               activeSeatId,
+              `action-${i}`,
               legalActionFor(game),
               room.lastActivityAt + 1,
             );
@@ -161,6 +162,7 @@ describe("D-11 layer 2: the encoded wire string never leaks own value, deck cont
       const result = applyGameAction(
         room,
         activeSeatId,
+        `action-${guard}`,
         legalActionFor(game),
         room.lastActivityAt + 1,
       );

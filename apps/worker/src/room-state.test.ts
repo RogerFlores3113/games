@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { RoomCode, RoomState, SeatToken } from "@games/schema";
-import { IDLE_GC_LOBBY_MS, MAX_PLAYERS } from "@games/schema";
+import { IDLE_GC_LOBBY_MS, MAX_PLAYERS, RoomStateSchema } from "@games/schema";
 import type { HanabiAction, HanabiView } from "@games/rules";
+import { RANKS } from "@games/rules";
 import { computeRoomTimers } from "./scheduler";
 import { activeGame } from "./game-registration";
 import type { ActiveGameState } from "./game-registration";
@@ -454,13 +455,13 @@ describe("D-02 / FDN-01: game actions are delegated to the registered adapter on
     const activeSeatId = game.seatIds[game.turnIndex]!;
     const action = legalActionFor(game);
 
-    const activeAttempt = applyGameAction(state, activeSeatId, action, 5);
+    const activeAttempt = applyGameAction(state, activeSeatId, "action-1", action, 5);
     expect(activeAttempt.ok).toBe(true);
     if (!activeAttempt.ok) throw new Error("unreachable");
     state = activeAttempt.state;
 
-    // The same seat going again (now off-turn) is refused.
-    const wrongTurn = applyGameAction(state, activeSeatId, action, 6);
+    // The same seat going again with a NEW actionId (now off-turn) is refused.
+    const wrongTurn = applyGameAction(state, activeSeatId, "action-2", action, 6);
     expect(wrongTurn.ok).toBe(false);
 
     // Exactly one seat's view reports isYourTurn === true.
@@ -491,6 +492,7 @@ describe("D-02 / FDN-01: game actions are delegated to the registered adapter on
       const result = applyGameAction(
         state,
         game.seatIds[game.turnIndex]!,
+        `action-${guard}`,
         legalActionFor(game),
         10 + guard,
       );
@@ -503,7 +505,7 @@ describe("D-02 / FDN-01: game actions are delegated to the registered adapter on
 
     const game = state.game as ActiveGameState;
     const stillActiveSeatId = game.seatIds[game.turnIndex]!;
-    const further = applyGameAction(state, stillActiveSeatId, legalActionFor(game), 9999);
+    const further = applyGameAction(state, stillActiveSeatId, "action-final", legalActionFor(game), 9999);
     expect(further.ok).toBe(false);
 
     for (const seat of state.seats) {
@@ -619,7 +621,237 @@ describe("purity: room-state functions never mutate their input", () => {
     const startedGame = started.state.game as ActiveGameState;
     const startedActiveSeatId = startedGame.seatIds[startedGame.turnIndex]!;
     const clone7 = structuredClone(started.state);
-    applyGameAction(clone7, startedActiveSeatId, legalActionFor(startedGame), 10);
+    applyGameAction(clone7, startedActiveSeatId, "action-purity", legalActionFor(startedGame), 10);
     expect(clone7).toEqual(structuredClone(started.state));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RT-09 / D-08 / D-09: duplicate actionId dedup, and D-10 typed error detail
+// ---------------------------------------------------------------------------
+
+function startedThreeSeatRoom(seed: string) {
+  const minter = makeMinter();
+  let state = freshRoom();
+  const hostJoin = join(state, "Host", 1, minter);
+  if (!hostJoin.ok) throw new Error("unreachable");
+  state = hostJoin.state;
+  const guestJoin = join(state, "Guest", 2, minter);
+  if (!guestJoin.ok) throw new Error("unreachable");
+  state = guestJoin.state;
+  const thirdJoin = join(state, "Third", 3, minter);
+  if (!thirdJoin.ok) throw new Error("unreachable");
+  state = thirdJoin.state;
+
+  const started = startGame(state, hostJoin.seatId, 4, seed);
+  if (!started.ok) throw new Error("unreachable");
+  return { state: started.state, hostJoin, guestJoin, thirdJoin };
+}
+
+describe("D-09: a repeated CLUE actionId is not re-applied", () => {
+  it("D-09: re-sending the same actionId for a CLUE does not spend a second clue token", () => {
+    const { state } = startedThreeSeatRoom("0123456789abcdef0123456789abcdef");
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const action = legalActionFor(game);
+
+    const first = applyGameAction(state, activeSeatId, "dupe-clue", action, 5);
+    expect(first.ok).toBe(true);
+    if (!first.ok) throw new Error("unreachable");
+
+    const firstGame = first.state.game as ActiveGameState;
+    const historyLenAfterFirst = firstGame.history.length;
+
+    const duplicate = applyGameAction(first.state, activeSeatId, "dupe-clue", action, 6);
+    expect(duplicate.ok).toBe(true);
+    if (!duplicate.ok) throw new Error("unreachable");
+
+    const dupeGame = duplicate.state.game as ActiveGameState;
+    expect(dupeGame.clueTokens).toBe(firstGame.clueTokens);
+    expect(dupeGame.history.length).toBe(historyLenAfterFirst);
+    expect(dupeGame.turnIndex).toBe(firstGame.turnIndex);
+    expect(duplicate.state.status).toBe("in_progress");
+    expect(duplicate.state).toEqual(first.state);
+  });
+
+  it("a DIFFERENT actionId presented after a deduped send is applied normally", () => {
+    const { state } = startedThreeSeatRoom("0123456789abcdef0123456789abcdef");
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const action = legalActionFor(game);
+
+    const first = applyGameAction(state, activeSeatId, "action-a", action, 5);
+    if (!first.ok) throw new Error("unreachable");
+    const duplicate = applyGameAction(first.state, activeSeatId, "action-a", action, 6);
+    if (!duplicate.ok) throw new Error("unreachable");
+
+    // The turn is still the same seat's (clue does not advance turn in the
+    // fixture's `legalActionFor` priority — but a discard/play would; either
+    // way the actor whose turn it now is can act with a fresh id.
+    const nextGame = duplicate.state.game as ActiveGameState;
+    const nextActorSeatId = nextGame.seatIds[nextGame.turnIndex]!;
+    const nextAction = legalActionFor(nextGame);
+
+    const fresh = applyGameAction(duplicate.state, nextActorSeatId, "action-b", nextAction, 7);
+    expect(fresh.ok).toBe(true);
+    if (!fresh.ok) throw new Error("unreachable");
+    expect(fresh.state).not.toEqual(duplicate.state);
+  });
+
+  it("the actor's seat carries lastAppliedActionId after success, and no other seat's is set", () => {
+    const { state } = startedThreeSeatRoom("0123456789abcdef0123456789abcdef");
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const action = legalActionFor(game);
+
+    const result = applyGameAction(state, activeSeatId, "action-seat-record", action, 5);
+    if (!result.ok) throw new Error("unreachable");
+
+    for (const seat of result.state.seats) {
+      if (seat.seatId === activeSeatId) {
+        expect(seat.lastAppliedActionId).toBe("action-seat-record");
+      } else {
+        expect(seat.lastAppliedActionId ?? null).toBeNull();
+      }
+    }
+  });
+
+  it("a duplicate actionId presented by a DIFFERENT seat is applied normally (key is per-seat)", () => {
+    const { state, hostJoin, guestJoin, thirdJoin } = startedThreeSeatRoom(
+      "0123456789abcdef0123456789abcdef",
+    );
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const action = legalActionFor(game);
+    const sharedActionId = "shared-id";
+
+    const first = applyGameAction(state, activeSeatId, sharedActionId, action, 5);
+    if (!first.ok) throw new Error("unreachable");
+
+    // Record the same id on the actor's seat; a DIFFERENT seat presenting the
+    // identical id string when it becomes their turn must not be deduped.
+    const otherSeatIds = [hostJoin.seatId, guestJoin.seatId, thirdJoin.seatId].filter(
+      (id) => id !== activeSeatId,
+    );
+    const nextGame = first.state.game as ActiveGameState;
+    const nextActorSeatId = nextGame.seatIds[nextGame.turnIndex]!;
+    expect(otherSeatIds).toContain(nextActorSeatId);
+
+    const nextAction = legalActionFor(nextGame);
+    const second = applyGameAction(first.state, nextActorSeatId, sharedActionId, nextAction, 6);
+    expect(second.ok).toBe(true);
+    if (!second.ok) throw new Error("unreachable");
+    expect(second.state).not.toEqual(first.state);
+  });
+
+  it("a duplicate actionId is still deduped after RoomStateSchema round-tripping (persisted-shape proof)", () => {
+    const { state } = startedThreeSeatRoom("0123456789abcdef0123456789abcdef");
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const action = legalActionFor(game);
+
+    const first = applyGameAction(state, activeSeatId, "action-persist", action, 5);
+    if (!first.ok) throw new Error("unreachable");
+
+    // SeatTokenSchema requires an exact length; the test fixture's minter
+    // uses short placeholder tokens, so pad them to a schema-valid length
+    // just for this round-trip proof — the dedup key under test is
+    // `lastAppliedActionId`, not the seat token's shape.
+    const serializable = {
+      ...first.state,
+      seats: first.state.seats.map((seat) => ({
+        ...seat,
+        seatToken: String(seat.seatToken).padEnd(24, "0"),
+      })),
+    };
+    const roundTripped = RoomStateSchema.parse(
+      JSON.parse(JSON.stringify(serializable)),
+    ) as RoomState;
+    const duplicate = applyGameAction(roundTripped, activeSeatId, "action-persist", action, 6);
+    expect(duplicate.ok).toBe(true);
+    if (!duplicate.ok) throw new Error("unreachable");
+    expect((duplicate.state.game as ActiveGameState).clueTokens).toBe(
+      (first.state.game as ActiveGameState).clueTokens,
+    );
+  });
+});
+
+describe("D-10: every adapter refusal maps 1:1 onto a closed ErrorDetail", () => {
+  it("an out-of-turn action returns bad_request with detail not_your_turn", () => {
+    const { state, hostJoin, guestJoin, thirdJoin } = startedThreeSeatRoom(
+      "0123456789abcdef0123456789abcdef",
+    );
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const offTurnSeatId = [hostJoin.seatId, guestJoin.seatId, thirdJoin.seatId].find(
+      (id) => id !== activeSeatId,
+    )!;
+    const action = legalActionFor(game);
+
+    const result = applyGameAction(state, offTurnSeatId, "action-x", action, 5);
+    expect(result).toMatchObject({ ok: false, reason: "bad_request", detail: "not_your_turn" });
+  });
+
+  it("a malformed payload with an extra asserted key returns detail invalid_action", () => {
+    const { state } = startedThreeSeatRoom("0123456789abcdef0123456789abcdef");
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const activeHand = game.hands.find((h) => h.seatId === activeSeatId)!;
+    const malformed = {
+      type: "play",
+      cardId: activeHand.slots[0]!.card.id,
+      resultingScore: 999,
+    };
+
+    const result = applyGameAction(state, activeSeatId, "action-y", malformed, 5);
+    expect(result).toMatchObject({ ok: false, reason: "bad_request", detail: "invalid_action" });
+  });
+
+  it("a discard at 8 clue tokens returns detail discard_at_max_clues", () => {
+    const { state } = startedThreeSeatRoom("0123456789abcdef0123456789abcdef");
+    const game = state.game as ActiveGameState;
+    expect(game.clueTokens).toBe(8);
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const activeHand = game.hands.find((h) => h.seatId === activeSeatId)!;
+
+    const result = applyGameAction(
+      state,
+      activeSeatId,
+      "action-z",
+      { type: "discard", cardId: activeHand.slots[0]!.card.id },
+      5,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      reason: "bad_request",
+      detail: "discard_at_max_clues",
+    });
+  });
+
+  it("a clue that touches zero cards returns detail clue_touches_nothing", () => {
+    const { state } = startedThreeSeatRoom("0123456789abcdef0123456789abcdef");
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const targetHand = game.hands.find((h) => h.seatId !== activeSeatId)!;
+    const presentRanks = new Set(targetHand.slots.map((slot) => slot.card.rank));
+    const absentRank = RANKS.find((rank) => !presentRanks.has(rank));
+    if (absentRank === undefined) throw new Error("fixture has no absent rank to clue");
+
+    const result = applyGameAction(
+      state,
+      activeSeatId,
+      "action-w",
+      {
+        type: "clue",
+        targetSeatId: targetHand.seatId,
+        clue: { type: "rank", value: absentRank },
+      },
+      5,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      reason: "bad_request",
+      detail: "clue_touches_nothing",
+    });
   });
 });
