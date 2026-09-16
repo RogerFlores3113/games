@@ -113,7 +113,27 @@ Plans:
   4. Two games created with the same seed produce identical shuffles and identical outcomes, and every game's state includes a full turn history from the first turn even though no interface displays it yet.
   5. The engine rejects any submitted action that asserts a resulting game state rather than requesting an action, and the entire package has zero networking or storage dependencies — it is built, run, and fully tested in isolation.
 
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — VariantConfig, shared engine types, deterministic variant-parametrized dealer
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-02-PLAN.md — Public-facts-only turn history, clue-fact narrowing, typed legality predicates
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 03-03-PLAN.md — Request guards, play/discard/clue branches, final round, end conditions and scoring
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 03-04-PLAN.md — Per-seat whitelist projection, generalized leak checker with canaries, composed hanabiGame adapter
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 03-05-PLAN.md — Conservation, redaction and termination properties, variant matrix, phase gate
 
 ### Phase 4: Wire Engine Into Room Actor
 
@@ -181,7 +201,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Room & Transport Skeleton | 11/11 | Complete   | 2026-09-15 |
 | 2. Per-Seat Redaction Contract | 6/6 | Complete    | 2026-09-15 |
-| 3. Hanabi Rules Engine | 0/TBD | Not started | - |
+| 3. Hanabi Rules Engine | 0/5 | Planned | - |
 | 4. Wire Engine Into Room Actor | 0/TBD | Not started | - |
 | 5. Reconnect & Session Durability Hardening | 0/TBD | Not started | - |
 | 6. Game Interface | 0/TBD | Not started | - |

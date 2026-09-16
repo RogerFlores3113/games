@@ -407,7 +407,21 @@ Multiple sources broadly agree on the base-game (25-max) band shape, though exac
 
 **For Rainbow/Black (30-max):** No source defines bands for a 30-point game. **[ASSUMED — see Assumptions Log A2]:** scale the 25-point band boundaries proportionally (e.g., ×1.2) or extend the top band. This needs explicit confirmation from the project owner during planning, not silent acceptance.
 
-## Open Questions
+## Open Questions — RESOLVED (2026-09-15, during phase planning)
+
+Both questions were decided at plan time and are locked into the phase plans. No open question remains.
+
+| # | Question | Resolution | Recorded in |
+|---|----------|------------|-------------|
+| 1 | Is Black a color-cluable suit, or colorless? | Black IS a normal, color-cluable suit: black is a nameable clue color like red or blue, matching the physical box product. Rainbow, by contrast, is touched by every color clue and is never itself a nameable clue color. Encoded in VariantConfig.cluableColors (includes black for the black variant, excludes rainbow for the rainbow variant) and in colorClueTouches. | Plan 03-01 Task 1 (header of hanabi/variant.ts plus variant.test.ts) |
+| 2 | Priority order of the three end conditions | Fixed order: fuses exhausted, then all stacks complete, then final round elapsed. All three are checked independently on every checkHanabiGameEnd call, never an else-if chain gated on whether a final round started, so a completed final stack ends the game immediately at the perfect score even mid-final-round. The order is fixed for determinism and readability; the conditions are mutually exclusive in practice. | Plan 03-03 Task 3 (ordering comment in hanabi/endgame.ts plus endgame.test.ts) |
+
+Two further flagged items were also decided at plan time:
+
+- Assumption A2 (score bands above 25): accepted. Bands are computed from the ratio score/maxScore so the 30-point variants scale proportionally from the published 25-point table, rather than hardcoding cutoffs. Recorded in plan 03-03 Task 3.
+- Assumption A1 and finding WR-01 (sfc32 state-recovery risk): accepted as a documented residual risk rather than re-engineered. shuffle.ts is reused unchanged; the header of hanabi/deck.ts records that shuffle security is scoped against seed brute-force only, that the residual risk is accepted for a cooperative game among trusted friends with no adversarial incentive, and that it must be revisited before any public-room expansion. Recorded in plan 03-01 Task 2.
+
+### Original question text (retained for context)
 
 1. **Is Black itself a "colored" suit for color-clue purposes, or colorless (rank-clue-only)?**
    - What we know: PROJECT.md and CONTEXT.md describe Black only via its rank-copy rule ("a suit with a single copy of each rank"), not its color-clue behavior. The physical Hanabi box's Black expansion suit is black-colored and **is** nameable/cluable by a "black" color clue like any other suit (it is not colorless) — this matches standard published box-variant rules.
