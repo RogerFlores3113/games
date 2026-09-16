@@ -126,6 +126,76 @@ describe("room-store", () => {
       expect(useRoomStore.getState().status).toBe("seated");
       expect(useRoomStore.getState().joinError).toBeNull();
     });
+
+    it('"error" while reconnecting also sets status join_failed (same as "joining")', () => {
+      useRoomStore.getState().applyServerMessage({ type: "state", view: makeView() });
+      useRoomStore.getState().setStatus("reconnecting");
+      useRoomStore.getState().applyServerMessage({ type: "error", code: "bad_request" });
+      const state = useRoomStore.getState();
+      expect(state.status).toBe("join_failed");
+      expect(state.joinError).toBe("bad_request");
+      expect(state.view).toBeNull();
+    });
+  });
+
+  describe("D-05: reconnecting keeps the last view", () => {
+    it("setStatus(\"reconnecting\") with a view present leaves view and seatId untouched", () => {
+      const view = makeView();
+      useRoomStore.getState().applyServerMessage({
+        type: "joined",
+        seatId: "seat-1",
+        seatToken: FAKE_SEAT_TOKEN,
+        view,
+      });
+      const before = useRoomStore.getState();
+
+      useRoomStore.getState().setStatus("reconnecting");
+
+      const after = useRoomStore.getState();
+      expect(after.status).toBe("reconnecting");
+      expect(after.view).toEqual(before.view);
+      expect(after.seatId).toBe(before.seatId);
+    });
+
+    it('from "reconnecting", a "state" frame sets status "seated" and replaces the view', () => {
+      useRoomStore.getState().applyServerMessage({ type: "state", view: makeView() });
+      useRoomStore.getState().setStatus("reconnecting");
+
+      const newView = makeView({
+        seats: [
+          { seatId: "seat-1", displayLabel: "Roger", connected: true, isHost: true },
+          { seatId: "seat-2", displayLabel: "Alex", connected: true, isHost: false },
+        ],
+      });
+      useRoomStore.getState().applyServerMessage({ type: "state", view: newView });
+
+      const state = useRoomStore.getState();
+      expect(state.status).toBe("seated");
+      expect(state.view).toEqual(newView);
+    });
+
+    it('from "reconnecting", a "joined" frame sets status "seated"', () => {
+      useRoomStore.getState().applyServerMessage({ type: "state", view: makeView() });
+      useRoomStore.getState().setStatus("reconnecting");
+
+      useRoomStore.getState().applyServerMessage({
+        type: "joined",
+        seatId: "seat-1",
+        seatToken: FAKE_SEAT_TOKEN,
+        view: makeView(),
+      });
+
+      expect(useRoomStore.getState().status).toBe("seated");
+    });
+
+    it('a "superseded" frame keeps the view (needed so "Use this tab" can show the banner over the last board)', () => {
+      const view = makeView();
+      useRoomStore.getState().applyServerMessage({ type: "state", view });
+      useRoomStore.getState().applyServerMessage({ type: "superseded" });
+      const state = useRoomStore.getState();
+      expect(state.status).toBe("superseded");
+      expect(state.view).toEqual(view);
+    });
   });
 
   it("reset returns the store to its initial shape", () => {

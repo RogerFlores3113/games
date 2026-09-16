@@ -13,6 +13,13 @@ export type RoomConnectionStatus =
   | "seated"
   | "refused"
   | "superseded"
+  /** D-05: a view has already been received and the socket dropped
+   * non-terminally (network blip, half-open pong timeout, zombie-sweep
+   * close). `view` is kept as-is for display only — it is never acted on —
+   * so the player sees the last known table with a "Reconnecting…" banner
+   * instead of dropping back to the full-screen "Connecting…" page.
+   * Cleared by the next `joined`/`state` frame, same as "joining". */
+  | "reconnecting"
   /** WR-01: the server garbage-collected the room and closed the socket
    * with `ROOM_ABANDONED_CLOSE_CODE`. Terminal — no reconnect. */
   | "abandoned"
@@ -76,11 +83,12 @@ export const useRoomStore = create<RoomStoreState & RoomStoreActions>((set, get)
         set({ status: "superseded" });
         return;
       case "error":
-        // WR-05: while joining, the only frame we have sent is `join`, so an
-        // error here means the join itself was rejected. Dropping it left
-        // the page on "Connecting…" forever, replaying the same bad frame on
-        // every reconnect.
-        if (get().status === "joining") {
+        // WR-05: while joining OR reconnecting, the only frame we have sent
+        // on this fresh socket is `join` — an error here means the join
+        // itself was rejected. Dropping it left the page on
+        // "Connecting…"/"Reconnecting…" forever, replaying the same bad
+        // frame on every reconnect.
+        if (get().status === "joining" || get().status === "reconnecting") {
           set({ view: null, status: "join_failed", joinError: message.code });
           return;
         }
