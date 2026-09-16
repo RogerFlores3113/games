@@ -12,8 +12,11 @@ import { defineConfig } from "@playwright/test";
 // `webServer.port` below always agree with what the server actually bound
 // to. `apps/worker/src/origin.ts` already allows any loopback origin/port,
 // so this choice needs no corresponding worker-side change.
-const WEB_PORT = 3100;
-const WORKER_PORT = 8787;
+// Overridable via env so a local run never collides with a wrangler/next dev
+// server the operator started independently and is not part of this test
+// run (e.g. a long-running manual `wrangler dev --port 8787` session).
+const WEB_PORT = Number(process.env.E2E_WEB_PORT) || 3100;
+const WORKER_PORT = Number(process.env.E2E_WORKER_PORT) || 8787;
 
 // Set PLAYWRIGHT_BASE_URL (e.g. https://games.rogerflores.dev) to run specs
 // against a live deployment. Local dev servers are skipped in that mode: the
@@ -63,6 +66,10 @@ export default defineConfig({
             ...process.env,
             NEXT_PUBLIC_HEARTBEAT_INTERVAL_MS: E2E_HEARTBEAT_INTERVAL_MS,
             NEXT_PUBLIC_HEARTBEAT_PONG_TIMEOUT_MS: E2E_HEARTBEAT_PONG_TIMEOUT_MS,
+            // Keep the web app's worker target in sync with the (possibly
+            // overridden) WORKER_PORT above — see origin.ts, which already
+            // allows any loopback origin/port.
+            NEXT_PUBLIC_WORKER_HOST: `localhost:${WORKER_PORT}`,
           },
         },
         {

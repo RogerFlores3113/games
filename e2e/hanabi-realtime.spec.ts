@@ -1,6 +1,15 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { createRoom, expectSeatCount, joinAs } from "./helpers";
+import {
+  createRoom,
+  emulateVisibility,
+  expectSeatCount,
+  freezePage,
+  joinAs,
+  resumePage,
+  seatIdOfOtherPlayer,
+  startTwoPlayerGame,
+} from "./helpers";
 
 /**
  * Selects a clue value on `page` (already targeting the sole other seat)
@@ -158,6 +167,125 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     // The other player's page was unaffected throughout.
     await expect(untouchedPage.getByTestId("turn-indicator")).toHaveText(untouchedTurnIndicatorBefore);
     await expect(untouchedPage.getByTestId("clue-tokens")).toHaveText(untouchedClueTokensBefore);
+
+    await contextB.close();
+  });
+});
+
+test.describe("Phase 5 reconnect hardening (RT-04 + RT-06 + D-14)", () => {
+  test.skip(!!process.env.PLAYWRIGHT_BASE_URL, "needs locally injected heartbeat timing (D-15)");
+
+  test("RT-04/RT-06: a network drop mid-game shows Reconnecting…, the table pauses in place for the other player, and the player returns to the same seat and turn", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    test.setTimeout(90_000);
+
+    const { contextB, pageB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
+
+    // Give one clue so this is genuinely mid-game, then wait for the turn to
+    // pass — the now-active page becomes the DROPPING page (so the other
+    // player's "Waiting for X" text applies to it), and the other page is
+    // the OBSERVER.
+    const otherSeatButton = activePage.locator('[data-testid^="clue-target-"]').first();
+    await otherSeatButton.click();
+    await selectAClueValueThatTouchesSomething(activePage);
+    await activePage.getByTestId("give-clue-button").click();
+    await expect(passivePage.getByTestId("turn-indicator")).toHaveText("Your turn");
+
+    const droppingPage = passivePage; // now active, per the assertion above
+    const observer = activePage; // now passive
+
+    const droppingContext = droppingPage === hostPage ? hostPage.context() : contextB;
+
+    const droppedSeatId = await seatIdOfOtherPlayer(observer);
+    const droppedNameText = ((await observer.getByTestId("turn-indicator").textContent()) ?? "").trim();
+    const droppedName = droppedNameText.replace(/^Waiting for /, "").trim();
+    const observerClueTokensBefore = ((await observer.getByTestId("clue-tokens").textContent()) ?? "").trim();
+    const observerDeckCountBefore = ((await observer.getByTestId("deck-count").textContent()) ?? "").trim();
+
+    const droppingClueTokensBefore = ((await droppingPage.getByTestId("clue-tokens").textContent()) ?? "").trim();
+    const droppingDeckCountBefore = ((await droppingPage.getByTestId("deck-count").textContent()) ?? "").trim();
+    const droppingOwnHandSlotCountBefore = await droppingPage.locator('[data-testid^="own-hand-slot-"]').count();
+
+    await droppingContext.setOffline(true);
+
+    await expect(droppingPage.getByTestId("reconnecting-banner")).toBeVisible({ timeout: 15_000 });
+    await expect(droppingPage.getByTestId("play-button")).toBeDisabled();
+    await expect(droppingPage.getByTestId("discard-button")).toBeDisabled();
+    await expect(droppingPage.getByTestId("give-clue-button")).toBeDisabled();
+    await expect(droppingPage.getByText(/Connecting to room/)).toHaveCount(0);
+    await expect(droppingPage.getByTestId("own-hand")).toBeVisible();
+
+    await expect(observer.getByTestId(`seat-status-${droppedSeatId}`)).toHaveAttribute("data-connected", "false", {
+      timeout: 20_000,
+    });
+    await expect(observer.getByTestId(`seat-status-${droppedSeatId}`)).toContainText("Disconnected");
+    await expect(observer.getByTestId("turn-indicator")).toHaveText(`Waiting for ${droppedName} — disconnected`);
+    await expect(observer.getByTestId("clue-tokens")).toHaveText(observerClueTokensBefore);
+    await expect(observer.getByTestId("deck-count")).toHaveText(observerDeckCountBefore);
+
+    await droppingContext.setOffline(false);
+
+    await expect(droppingPage.getByTestId("reconnecting-banner")).toHaveCount(0, { timeout: 15_000 });
+    await expect(droppingPage.getByTestId("turn-indicator")).toHaveText("Your turn");
+    await expect(droppingPage.getByTestId("clue-tokens")).toHaveText(droppingClueTokensBefore);
+    await expect(droppingPage.getByTestId("deck-count")).toHaveText(droppingDeckCountBefore);
+    await expect(droppingPage.locator('[data-testid^="own-hand-slot-"]')).toHaveCount(droppingOwnHandSlotCountBefore);
+
+    await expect(observer.getByTestId(`seat-status-${droppedSeatId}`)).toHaveAttribute("data-connected", "true");
+    await expect(observer.getByTestId(`seat-status-${droppedSeatId}`)).toContainText("Connected");
+    await expect(observer.getByTestId("turn-indicator")).toHaveText(`Waiting for ${droppedName}`);
+    expect(await seatIdOfOtherPlayer(observer)).toBe(droppedSeatId);
+
+    await contextB.close();
+  });
+
+  test("RT-04: a frozen, hidden tab is detected as disconnected and resumes its seat on return without a reload", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    test.setTimeout(90_000);
+
+    const { contextB, pageB } = await startTwoPlayerGame(hostPage, browser);
+    const sleeper = pageB;
+    const observer = hostPage;
+
+    const sleeperSeatId = await seatIdOfOtherPlayer(observer);
+    const observerTurnIndicatorBefore = ((await observer.getByTestId("turn-indicator").textContent()) ?? "").trim();
+    const sleeperTurnIndicatorBefore = ((await sleeper.getByTestId("turn-indicator").textContent()) ?? "").trim();
+
+    await emulateVisibility(sleeper, "hidden");
+    let cdpFroze = true;
+    let session: Awaited<ReturnType<typeof freezePage>> | undefined;
+    try {
+      session = await freezePage(sleeper);
+    } catch {
+      // Fallback per plan: if CDP freeze is unsupported, drop the network
+      // instead for the sleep window. A2 risk is backstopped by the 05-06
+      // manual phone check.
+      cdpFroze = false;
+      await contextB.setOffline(true);
+    }
+
+    await expect(observer.getByTestId(`seat-status-${sleeperSeatId}`)).toHaveAttribute("data-connected", "false", {
+      timeout: 25_000,
+    });
+
+    if (cdpFroze && session) {
+      await resumePage(session);
+    } else {
+      await contextB.setOffline(false);
+    }
+    await emulateVisibility(sleeper, "visible");
+
+    await expect(sleeper.getByTestId("reconnecting-banner")).toHaveCount(0, { timeout: 15_000 });
+    await expect(sleeper.getByTestId("own-hand")).toBeVisible();
+    await expect(sleeper.getByTestId("turn-indicator")).toHaveText(sleeperTurnIndicatorBefore);
+
+    await expect(observer.getByTestId(`seat-status-${sleeperSeatId}`)).toHaveAttribute("data-connected", "true");
+    expect(await seatIdOfOtherPlayer(observer)).toBe(sleeperSeatId);
+    await expect(observer.getByTestId("turn-indicator")).toHaveText(observerTurnIndicatorBefore);
 
     await contextB.close();
   });
