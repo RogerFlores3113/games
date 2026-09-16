@@ -14,7 +14,6 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@games/schema/games/forehead-card": ["packages/schema/src/games/forehead-card.ts"],
       "@games/schema/games/hanabi": ["packages/schema/src/games/hanabi.ts"],
       "@games/schema": ["packages/schema/src/index.ts"],
       "@games/rules": ["packages/rules/src/index.ts"]

@@ -3,16 +3,10 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 // Bare specifier resolved via the vitest alias / tsconfig paths entry added
 // in this task; proves the subpath resolves identically in both Vitest and tsc.
-import { FOREHEAD_CARD_GAME_ID, ForeheadCardViewSchema } from "@games/schema/games/forehead-card";
 import { HANABI_GAME_ID, HanabiViewSchema } from "@games/schema/games/hanabi";
 import { RoomViewSchema } from "../room";
 
 describe("subpath wiring (D-06, FDN-01)", () => {
-  it("resolves @games/schema/games/forehead-card as a bare specifier (proves alias ordering)", () => {
-    expect(FOREHEAD_CARD_GAME_ID).toBe("forehead-card");
-    expect(ForeheadCardViewSchema.safeParse({}).success).toBe(false);
-  });
-
   it("resolves @games/schema/games/hanabi as a bare specifier (proves alias ordering)", () => {
     expect(HANABI_GAME_ID).toBe("hanabi");
     expect(HanabiViewSchema.safeParse({}).success).toBe(false);
