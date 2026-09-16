@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 04-wire-engine-into-room-actor
 source: [04-01-SUMMARY.md, 04-02-SUMMARY.md, 04-03-SUMMARY.md, 04-04-SUMMARY.md, 04-05-SUMMARY.md, 04-06-SUMMARY.md, 04-07-SUMMARY.md, 04-08-SUMMARY.md]
 started: 2026-09-16T12:00:00Z
@@ -71,5 +71,14 @@ blocked: 0
   reason: "User reported: \"fuses left\" starts a 0 and counts up - at 3 it's game over. It should be reversed - start at 3, at 0 it's game over"
   severity: minor
   test: 10
-  artifacts: []  # Filled by diagnosis
-  missing: []    # Filled by diagnosis
+  root_cause: "Engine state `fuses` counts fuses USED (adapter.ts initializes 0, actions.ts increments on a misplay, endgame.ts ends at >= MAX_FUSES=3), but HanabiBoard.tsx:200 renders the raw value with the label 'fuses left', so the display counts up instead of down"
+  artifacts:
+    - path: "apps/web/components/HanabiBoard.tsx"
+      issue: "Line 200 renders `{game.fuses} fuses left` — raw used-count shown under a remaining-count label"
+    - path: "packages/rules/src/index.ts"
+      issue: "MAX_FUSES (legality.ts:23) is not exported, so the web app cannot derive remaining fuses without hardcoding 3"
+  missing:
+    - "Export MAX_FUSES from packages/rules/src/index.ts"
+    - "Render `MAX_FUSES - game.fuses` fuses left in HanabiBoard (engine/wire semantics unchanged)"
+    - "Add a test asserting a fresh game shows 3 fuses left and a misplay shows 2"
+  debug_session: ""
