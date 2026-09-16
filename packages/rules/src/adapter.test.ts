@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import type { GameAdapter } from "./adapter";
 import { hanabiGame } from "./hanabi/adapter";
+import type { HanabiAction, HanabiState } from "./hanabi/state";
 
 /**
  * Reusable adapter-conformance suite. Phase 2 and Phase 4 call this same
@@ -15,6 +16,9 @@ export function describeAdapterConformance(
   name: string,
   adapter: GameAdapter<any, any>,
   sampleActions: unknown[],
+  /** Returns one legal move for the current state; used to play a game to
+   * completion so `checkGameEnd`'s non-null branch is genuinely exercised. */
+  nextLegalMove: (state: any) => { actorSeatId: string; action: unknown },
 ) {
   describe(`${name} adapter conformance`, () => {
     const seatIds = ["seat-a", "seat-b", "seat-c"];
@@ -72,20 +76,63 @@ export function describeAdapterConformance(
       );
     });
 
-    it("checkGameEnd returns null or an object with a numeric score", () => {
+    it("checkGameEnd returns null for a fresh game", () => {
       const state = adapter.createInitialState(createInput);
-      const result = adapter.checkGameEnd(state);
-      if (result !== null) {
-        expect(typeof result.score).toBe("number");
+      expect(adapter.checkGameEnd(state)).toBeNull();
+    });
+
+    // WR-02: the non-null branch must actually execute — drive the game to
+    // its end with the caller-supplied legal-move driver, then assert shape.
+    it("checkGameEnd returns an object with a numeric score once the game ends", () => {
+      let state = adapter.createInitialState(createInput);
+      let ended = adapter.checkGameEnd(state);
+      let guard = 0;
+      while (ended === null && guard < 2000) {
+        guard++;
+        const { actorSeatId, action } = nextLegalMove(state);
+        const result = adapter.applyAction(state, actorSeatId, action);
+        expect(result.ok).toBe(true);
+        if (!result.ok) throw new Error("driver produced an illegal move");
+        state = result.state;
+        ended = adapter.checkGameEnd(state);
       }
+      expect(ended).not.toBeNull();
+      expect(typeof ended!.score).toBe("number");
     });
   });
 }
 
-describeAdapterConformance("hanabi", hanabiGame, [
-  { type: "discard", cardId: "zzzzzzzz" },
-  { type: "clue", targetSeatId: "seat-b", clue: { type: "rank", value: 1 } },
-]);
+/** One legal Hanabi move for the active seat: a rank clue on a card another
+ * seat holds when tokens remain; else a discard below the token cap; else a
+ * play of the actor's first card. */
+function nextLegalHanabiMove(state: HanabiState): { actorSeatId: string; action: HanabiAction } {
+  const actorSeatId = state.seatIds[state.turnIndex]!;
+  const activeHand = state.hands.find((h) => h.seatId === actorSeatId)!;
+  if (state.clueTokens > 0) {
+    const otherHand = state.hands.find((h) => h.seatId !== actorSeatId && h.slots.length > 0);
+    if (otherHand !== undefined) {
+      const card = otherHand.slots[0]!.card;
+      return {
+        actorSeatId,
+        action: { type: "clue", targetSeatId: otherHand.seatId, clue: { type: "rank", value: card.rank } },
+      };
+    }
+  }
+  if (state.clueTokens < 8) {
+    return { actorSeatId, action: { type: "discard", cardId: activeHand.slots[0]!.card.id } };
+  }
+  return { actorSeatId, action: { type: "play", cardId: activeHand.slots[0]!.card.id } };
+}
+
+describeAdapterConformance(
+  "hanabi",
+  hanabiGame,
+  [
+    { type: "discard", cardId: "zzzzzzzz" },
+    { type: "clue", targetSeatId: "seat-b", clue: { type: "rank", value: 1 } },
+  ],
+  nextLegalHanabiMove,
+);
 
 describe("packages/rules purity", () => {
   it("has no non-empty runtime dependencies", () => {
