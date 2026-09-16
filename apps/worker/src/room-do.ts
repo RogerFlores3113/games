@@ -39,6 +39,7 @@ import {
   HEARTBEAT_PONG,
   parseClientMessage,
   ROOM_ABANDONED_CLOSE_CODE,
+  STALE_SOCKET_CLOSE_CODE,
   SUPERSEDED_CLOSE_CODE,
   type RoomCode,
   type RoomState,
@@ -66,6 +67,7 @@ import { computeRoomTimers, dueTimers, nextDueAt, type TimerEvent } from "./sche
 import { loadRoom, loadTimers, saveRoom } from "./persistence";
 import { isOriginAllowed } from "./origin";
 import { projectSeatView, type OutboundFrame, type ProjectedRoomView } from "./seat-projection";
+import { resolveHeartbeatTiming, socketLastSeenAt, isSocketStale, type HeartbeatTiming } from "./heartbeat";
 
 /** The Durable Object namespace binding declared in wrangler.jsonc. */
 export interface Env {
@@ -74,6 +76,10 @@ export interface Env {
    * wrangler.jsonc `vars`. Used to allow a Vercel production/preview origin
    * without a code change. See `origin.ts`. */
   ALLOWED_ORIGINS?: string;
+  /** D-15: test-only overrides for the zombie-sweep timing, passed via
+   * wrangler dev `--var`; never set in production. */
+  SOCKET_STALE_MS?: string;
+  ZOMBIE_SWEEP_INTERVAL_MS?: string;
 }
 
 
@@ -81,6 +87,9 @@ export interface Env {
  * `partyserver`'s `setState` is backed by `serializeAttachment`. */
 interface SeatAttachment {
   readonly seatId?: string;
+  /** D-03: epoch ms when this connection claimed its seat. Lets the zombie
+   * sweep exempt a just-joined socket that has not pinged yet. */
+  readonly boundAt?: number;
 }
 
 /** A connection carrying `SeatAttachment`, for the derived `bindings` getter. */
@@ -132,7 +141,7 @@ export class RoomDO extends Server<Env> {
     this.room = room;
     this.#persisted = !wasReset;
     // An unpersisted room schedules nothing (and clears any stale alarm).
-    await this.#syncAlarm(this.#persisted ? computeRoomTimers(room, Date.now()) : []);
+    await this.#syncAlarm(this.#persisted ? this.#timers(room, Date.now()) : []);
   }
 
   async onConnect(connection: Connection, ctx: ConnectionContext): Promise<void> {
@@ -231,25 +240,11 @@ export class RoomDO extends Server<Env> {
     if (seatId === null) return;
     connection.setState(null);
 
-    // CR-01: a closing socket's attachment can be stale. A superseded tab
-    // (D-08), or a half-dead socket from before a wifi blip, can close AFTER
-    // a newer connection already reclaimed the same seat. `#handleJoin`
-    // detaches superseded sockets before closing them, but a stale close
-    // must still never mark a seat disconnected while another live
-    // connection holds it — in the lobby that would release a player who
-    // is sitting right there. `getConnections()` only yields OPEN sockets,
-    // so any binding found here belongs to a different, live connection.
-    const liveOwner = this.bindings[seatId];
-    if (liveOwner !== undefined && liveOwner !== connection.id) return;
-
     const room = await this.#ensureRoom();
-    // WR-01: nothing to mark when the seat is already gone — released, or
-    // the whole room garbage-collected. Committing here would resurrect a
-    // deleted room and re-arm its alarm.
-    if (!this.#persisted || !room.seats.some((seat) => seat.seatId === seatId)) return;
     const now = Date.now();
-    const nextState = markConnected(room, seatId, false, now);
-    await this.#commit(nextState, now);
+    const next = this.#disconnectSeat(room, seatId, connection.id, now);
+    if (next === room) return;
+    await this.#commit(next, now);
     // ROOM-04: pushes the live disconnected indicator to remaining seats;
     // also re-syncs the alarm — a disconnect is what arms D-07/D-12.
     await this.#pushState();
@@ -308,20 +303,52 @@ export class RoomDO extends Server<Env> {
           this.#persisted = false;
           await this.ctx.storage.deleteAll();
           return;
+        } else if (event.type === "zombie_sweep") {
+          // D-03: a seated socket can go half-open (mobile suspend, dead
+          // wifi) without ever delivering a close event. The runtime's
+          // auto-response timestamp is the only live signal for "did this
+          // socket answer recently". A stale one is detached FIRST (CR-01 —
+          // exactly the supersede/idle-GC discipline above), then closed
+          // with a NON-terminal code so the client reconnects on its own,
+          // and only then flipped through the SAME #disconnectSeat helper
+          // onClose uses — no second state-mutation call site. The detach
+          // guarantees a late-arriving onClose for this same socket finds
+          // no seat on its attachment and no-ops. This branch changes ONLY
+          // the `connected` flag (D-08): no transferHost/releaseSeat/
+          // applyGameAction call here, ever.
+          const { socketStaleMs } = this.#timing();
+          const connections = [...this.getConnections()];
+          for (const connection of connections) {
+            const seatId = this.#seatIdFor(connection as unknown as ConnectionWithSeat);
+            if (seatId === null) continue;
+            const lastSeen = socketLastSeenAt(
+              this.ctx.getWebSocketAutoResponseTimestamp(connection as unknown as WebSocket),
+              (connection.state as SeatAttachment | null)?.boundAt,
+            );
+            if (!isSocketStale(lastSeen, now, socketStaleMs)) continue;
+            connection.setState(null);
+            connection.close(STALE_SOCKET_CLOSE_CODE, "stale");
+            current = this.#disconnectSeat(current, seatId, connection.id, now);
+          }
         }
       }
 
-      this.room = current;
       const finalNow = Date.now();
-      await saveRoom(this.ctx.storage, current, computeRoomTimers(current, finalNow));
-      await this.#pushState();
-      await this.#syncAlarm(computeRoomTimers(current, finalNow));
+      // A no-op sweep (every socket healthy) must not write storage or push
+      // an identical state frame to everyone every interval — that would
+      // burn free-tier row writes and spam idle connections with noise.
+      if (current !== room) {
+        this.room = current;
+        await saveRoom(this.ctx.storage, current, this.#timers(current, finalNow));
+        await this.#pushState();
+      }
+      await this.#syncAlarm(this.#timers(current, finalNow));
     } catch (error) {
       console.error("RoomDO onAlarm failed:", error);
       // Re-sync even on failure so one bad event cannot permanently disarm
       // a room's GC.
       const room = await this.#ensureRoom();
-      await this.#syncAlarm(this.#persisted ? computeRoomTimers(room, Date.now()) : []);
+      await this.#syncAlarm(this.#persisted ? this.#timers(room, Date.now()) : []);
     }
   }
 
@@ -334,6 +361,37 @@ export class RoomDO extends Server<Env> {
       await this.onStart();
     }
     return this.room as RoomState;
+  }
+
+  /** D-15: resolves the live timing table from wrangler-injected env vars
+   * (test-only overrides), falling back to the packages/schema constants. */
+  #timing(): HeartbeatTiming {
+    return resolveHeartbeatTiming(this.env);
+  }
+
+  /** The ONLY call site of `computeRoomTimers` in this file — every other
+   * method routes through here so the zombie-sweep interval override (D-15)
+   * is applied consistently everywhere a timer table is derived. */
+  #timers(room: RoomState, now: number): TimerEvent[] {
+    return computeRoomTimers(room, now, { zombieSweepIntervalMs: this.#timing().zombieSweepIntervalMs });
+  }
+
+  /** Shared disconnect logic for both `onClose` and the zombie-sweep branch
+   * of `onAlarm` — the ONLY caller of `markConnected` in this file. Returns
+   * `room` UNCHANGED (same reference) when the disconnect should be a no-op,
+   * so callers can cheaply detect "nothing to commit" via `next === room`:
+   *
+   *   - CR-01: `closingConnectionId` is stale — a DIFFERENT, live connection
+   *     already holds this seat (`getConnections()` only yields OPEN
+   *     sockets, so any binding found here belongs to a live connection).
+   *   - WR-01: the room was never persisted, or the seat no longer exists
+   *     (released, or the whole room garbage-collected) — committing here
+   *     would resurrect a deleted room and re-arm its alarm. */
+  #disconnectSeat(room: RoomState, seatId: string, closingConnectionId: string, now: number): RoomState {
+    const liveOwner = this.bindings[seatId];
+    if (liveOwner !== undefined && liveOwner !== closingConnectionId) return room;
+    if (!this.#persisted || !room.seats.some((seat) => seat.seatId === seatId)) return room;
+    return markConnected(room, seatId, false, now);
   }
 
   /** Read the seat straight off the connection's own attachment.
@@ -381,8 +439,10 @@ export class RoomDO extends Server<Env> {
 
     const rebind = rebindSeatConnection(this.bindings, result.seatId, connection.id);
     // Ride the seat id on the connection attachment: survives hibernation,
-    // unlike an instance field (see the `bindings` getter).
-    connection.setState({ seatId: result.seatId });
+    // unlike an instance field (see the `bindings` getter). D-03: boundAt
+    // marks this moment so a just-joined socket that has not pinged yet is
+    // never mistaken for a zombie by the sweep.
+    connection.setState({ seatId: result.seatId, boundAt: now });
 
     if (rebind.supersededConnectionId !== null) {
       const superseded = this.getConnection(rebind.supersededConnectionId);
@@ -469,7 +529,7 @@ export class RoomDO extends Server<Env> {
    * method so no call site can forget one of the three. */
   async #commit(room: RoomState, now: number): Promise<void> {
     this.room = room;
-    const timers = computeRoomTimers(room, now);
+    const timers = this.#timers(room, now);
     await saveRoom(this.ctx.storage, room, timers);
     this.#persisted = true;
     await this.#syncAlarm(timers);

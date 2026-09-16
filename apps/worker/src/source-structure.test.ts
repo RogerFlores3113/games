@@ -418,4 +418,69 @@ describe("Phase 5 heartbeat / RT-05 structural audit (D-02, D-13)", () => {
       "expected zero resume/reconnect frame types in packages/schema/src/messages.ts",
     ).toBe(0);
   });
+
+  it("P5-4 (D-03): exactly one setAlarm( call site remains, and computeRoomTimers( appears exactly once in room-do.ts (inside #timers)", () => {
+    const roomDo = strippedByFile.get("room-do.ts") ?? "";
+    expect(countMatches(roomDo, /\bsetAlarm\(/g)).toBe(1);
+    expect(countMatches(roomDo, /\bcomputeRoomTimers\(/g)).toBe(1);
+
+    const timersDefIdx = roomDo.indexOf("#timers(room: RoomState, now: number)");
+    expect(timersDefIdx, "expected a `#timers(room: RoomState, now: number)` method definition").toBeGreaterThanOrEqual(0);
+    const callIdx = roomDo.indexOf("computeRoomTimers(");
+    expect(callIdx).toBeGreaterThanOrEqual(0);
+    // The single call site must live inside #timers, i.e. after its
+    // definition and before the next method definition.
+    const nextMethodIdx = roomDo.indexOf("\n  #disconnectSeat(", timersDefIdx + 1);
+    expect(nextMethodIdx, "expected #disconnectSeat to follow #timers").toBeGreaterThan(timersDefIdx);
+    expect(callIdx).toBeGreaterThan(timersDefIdx);
+    expect(callIdx).toBeLessThan(nextMethodIdx);
+  });
+
+  it('P5-5 (D-03/CR-01): markConnected( appears exactly once in room-do.ts, and both onClose and onAlarm call this.#disconnectSeat(', () => {
+    const roomDo = strippedByFile.get("room-do.ts") ?? "";
+    expect(countMatches(roomDo, /\bmarkConnected\(/g)).toBe(1);
+    expect(countMatches(roomDo, /this\.#disconnectSeat\(/g)).toBe(2);
+
+    const onCloseIdx = roomDo.indexOf("async onClose(");
+    const onAlarmIdx = roomDo.indexOf("async onAlarm(");
+    expect(onCloseIdx).toBeGreaterThanOrEqual(0);
+    expect(onAlarmIdx).toBeGreaterThan(onCloseIdx);
+    const onCloseBody = roomDo.slice(onCloseIdx, onAlarmIdx);
+    expect(countMatches(onCloseBody, /this\.#disconnectSeat\(/g)).toBe(1);
+
+    const onErrorIdx = roomDo.indexOf("onError(", onAlarmIdx > -1 ? 0 : onCloseIdx);
+    const privateHelpersIdx = roomDo.indexOf("// Private helpers");
+    const onAlarmBody = roomDo.slice(onAlarmIdx, privateHelpersIdx > -1 ? privateHelpersIdx : roomDo.length);
+    expect(countMatches(onAlarmBody, /this\.#disconnectSeat\(/g)).toBe(1);
+    void onErrorIdx;
+  });
+
+  it("P5-6 (D-03): getWebSocketAutoResponseTimestamp( appears exactly once across worker sources, in room-do.ts, between `async onAlarm(` and the private-helpers section", () => {
+    const hits = findFilesWithMatch(/getWebSocketAutoResponseTimestamp\(/g);
+    const total = hits.reduce((sum, h) => sum + h.count, 0);
+    expect(total, `expected exactly 1 getWebSocketAutoResponseTimestamp( call, found in: ${JSON.stringify(hits)}`).toBe(1);
+    expect(hits[0]?.file).toBe("room-do.ts");
+
+    const roomDo = strippedByFile.get("room-do.ts") ?? "";
+    const onAlarmIdx = roomDo.indexOf("async onAlarm(");
+    const privateHelpersIdx = roomDo.indexOf("async #ensureRoom(");
+    expect(onAlarmIdx).toBeGreaterThanOrEqual(0);
+    expect(privateHelpersIdx).toBeGreaterThan(onAlarmIdx);
+    const slice = roomDo.slice(onAlarmIdx, privateHelpersIdx);
+    expect(countMatches(slice, /getWebSocketAutoResponseTimestamp\(/g)).toBe(1);
+  });
+
+  it("P5-7 (D-08): the onAlarm zombie_sweep branch contains no transferHost(, releaseSeat(, or applyGameAction(", () => {
+    const roomDo = strippedByFile.get("room-do.ts") ?? "";
+    const branchStartIdx = roomDo.indexOf('event.type === "zombie_sweep"');
+    expect(branchStartIdx, 'expected an `event.type === "zombie_sweep"` branch in room-do.ts').toBeGreaterThanOrEqual(0);
+    const nextElseIfIdx = roomDo.indexOf("} else if", branchStartIdx);
+    const loopEndIdx = roomDo.indexOf("\n      }\n\n      const finalNow", branchStartIdx);
+    const branchEndIdx = nextElseIfIdx > -1 && (loopEndIdx === -1 || nextElseIfIdx < loopEndIdx) ? nextElseIfIdx : loopEndIdx;
+    expect(branchEndIdx, "expected the zombie_sweep branch to end before the next branch or loop end").toBeGreaterThan(branchStartIdx);
+    const branchBody = roomDo.slice(branchStartIdx, branchEndIdx);
+    expect(countMatches(branchBody, /\btransferHost\(/g)).toBe(0);
+    expect(countMatches(branchBody, /\breleaseSeat\(/g)).toBe(0);
+    expect(countMatches(branchBody, /\bapplyGameAction\(/g)).toBe(0);
+  });
 });
