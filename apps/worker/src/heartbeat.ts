@@ -57,3 +57,38 @@ export function socketLastSeenAt(autoResponseAt: Date | null, boundAt: number | 
 export function isSocketStale(lastSeenAt: number, now: number, staleMs: number): boolean {
   return now - lastSeenAt > staleMs;
 }
+
+/** What `#syncAlarm` should do with the Durable Object's single alarm slot. */
+export type AlarmWrite = { kind: "set"; at: number } | { kind: "delete" } | { kind: "keep" };
+
+/** CR-01/WR-01 (review): the pure decision behind `#syncAlarm`.
+ *
+ * - `next === null` deletes a pending alarm (nothing left to schedule).
+ * - Outside the alarm handler, a pending alarm that is already OVERDUE
+ *   (`currentAlarm <= now`) is authoritative and never replaced: the
+ *   runtime is about to deliver it (delivery is best-effort and may lag or
+ *   be retried), and overwriting it with a later target — e.g. a
+ *   hibernation wake recomputing the next grid boundary after the pending
+ *   one has passed — would defer the sweep by a whole interval, again and
+ *   again for a DO that hibernates between moves (RESEARCH.md Pitfall 3).
+ *   The handler that alarm triggers always re-arms on its way out.
+ * - Inside the alarm handler (`inAlarmHandler`), the firing alarm is being
+ *   consumed, so the next target is always written whenever it differs from
+ *   what `getAlarm()` reports — otherwise a runtime that still reports the
+ *   firing alarm would leave the room with no alarm at all.
+ * - Pitfall 2: an unchanged target is never re-written. */
+export function resolveAlarmWrite(
+  next: number | null,
+  currentAlarm: number | null,
+  now: number,
+  options: { inAlarmHandler: boolean },
+): AlarmWrite {
+  if (next === null) {
+    return currentAlarm === null ? { kind: "keep" } : { kind: "delete" };
+  }
+  if (!options.inAlarmHandler && currentAlarm !== null && currentAlarm <= now) {
+    return { kind: "keep" };
+  }
+  if (next === currentAlarm) return { kind: "keep" };
+  return { kind: "set", at: next };
+}

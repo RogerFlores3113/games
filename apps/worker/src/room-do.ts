@@ -63,11 +63,17 @@ import {
   bindingsFromConnections,
   type SeatBindings,
 } from "./seat-identity";
-import { computeRoomTimers, dueTimers, nextDueAt, upsertTimer, type TimerEvent } from "./scheduler";
+import { computeRoomTimers, dueTimers, nextDueAt, type TimerEvent } from "./scheduler";
 import { loadRoom, loadTimers, saveRoom } from "./persistence";
 import { isOriginAllowed } from "./origin";
 import { projectSeatView, type OutboundFrame, type ProjectedRoomView } from "./seat-projection";
-import { resolveHeartbeatTiming, socketLastSeenAt, isSocketStale, type HeartbeatTiming } from "./heartbeat";
+import {
+  resolveAlarmWrite,
+  resolveHeartbeatTiming,
+  socketLastSeenAt,
+  isSocketStale,
+  type HeartbeatTiming,
+} from "./heartbeat";
 
 /** The Durable Object namespace binding declared in wrangler.jsonc. */
 export interface Env {
@@ -110,26 +116,6 @@ export class RoomDO extends Server<Env> {
    * held in memory only, and must arm no alarm either — recomputed from
    * storage in `onStart` on every wake, set by `#commit`. */
   #persisted = false;
-
-  /** D-03/RESEARCH.md Pitfall 3: the currently-armed `zombie_sweep` target,
-   * held in memory only — a hibernation wake re-derives it fresh in
-   * `onStart`'s `#timers` call, matching this class's established
-   * re-arm-on-every-wake pattern (see the heartbeat auto-response comment
-   * above). `#timers` REUSES this exact value on every ordinary `#commit`;
-   * it is advanced ONLY by `onAlarm`'s own `zombie_sweep` branch, once the
-   * sweep has genuinely run.
-   *
-   * Grid-aligning `dueAt` inside `computeRoomTimers` alone is stable WITHIN
-   * a single interval window, but not across one: if a chatty room's own
-   * traffic calls `#commit` (and therefore `#timers`) again right at or
-   * after a window boundary — BEFORE the real Durable Object alarm has
-   * actually fired for that boundary — a fresh grid-aligned recompute would
-   * derive the NEXT window's (later) target and `#syncAlarm` would
-   * overwrite/cancel the still-pending alarm via `setAlarm`, deferring
-   * detection indefinitely. Reusing a memoized target until the sweep
-   * itself runs removes that race entirely: ordinary game actions can never
-   * push this schedule later, only the alarm firing can. */
-  #pendingZombieSweepAt: number | null = null;
 
   /** seatId -> connectionId, DERIVED from the live connections on every read
    * rather than cached in a field.
@@ -282,11 +268,24 @@ export class RoomDO extends Server<Env> {
       if (!this.#persisted) {
         // A stale alarm for a room with nothing in storage: never save
         // (that would resurrect it), just make sure nothing stays armed.
-        await this.#syncAlarm([]);
+        await this.#syncAlarm([], { inAlarmHandler: true });
         return;
       }
       const timers = await loadTimers(this.ctx.storage);
-      const { due } = dueTimers(timers, Date.now());
+      // CR-01 (review): the zombie sweep is decided from LIVE state, never
+      // from the persisted table. A stored `zombie_sweep` entry can be
+      // missing (a room saved before Phase 5) or stale (a no-op sweep does
+      // not save), and trusting it left the room either re-arming an alarm
+      // in the past or with no alarm at all. Every alarm firing runs the
+      // sweep instead: it is idempotent and cheap — staleness is judged
+      // against the live auto-response timestamps, and a sweep that changes
+      // nothing writes nothing. It runs FIRST so a due host transfer below
+      // never hands the host to a seat this sweep is about to flip.
+      const { due: storedDue } = dueTimers(timers, Date.now());
+      const due: TimerEvent[] = [
+        { type: "zombie_sweep", dueAt: Date.now() },
+        ...storedDue.filter((event) => event.type !== "zombie_sweep"),
+      ];
 
       let current = room;
       let now = Date.now();
@@ -350,12 +349,6 @@ export class RoomDO extends Server<Env> {
             connection.close(STALE_SOCKET_CLOSE_CODE, "stale");
             current = this.#disconnectSeat(current, seatId, connection.id, now);
           }
-          // Pitfall 3: only the sweep itself may advance the pending
-          // target (see `#pendingZombieSweepAt`'s doc comment) — clear it
-          // now so the post-loop `#timers()` call below adopts a fresh
-          // grid-aligned boundary for the NEXT check, rather than an
-          // ordinary #commit silently doing so first.
-          this.#pendingZombieSweepAt = null;
         }
       }
 
@@ -368,13 +361,14 @@ export class RoomDO extends Server<Env> {
         await saveRoom(this.ctx.storage, current, this.#timers(current, finalNow));
         await this.#pushState();
       }
-      await this.#syncAlarm(this.#timers(current, finalNow));
+      await this.#syncAlarm(this.#timers(current, finalNow), { inAlarmHandler: true });
     } catch (error) {
       console.error("RoomDO onAlarm failed:", error);
       // Re-sync even on failure so one bad event cannot permanently disarm
-      // a room's GC.
+      // a room's GC. `#timers` derives a fresh (future) sweep boundary, so a
+      // sweep that throws cannot re-arm an alarm in the past (CR-01).
       const room = await this.#ensureRoom();
-      await this.#syncAlarm(this.#persisted ? this.#timers(room, Date.now()) : []);
+      await this.#syncAlarm(this.#persisted ? this.#timers(room, Date.now()) : [], { inAlarmHandler: true });
     }
   }
 
@@ -399,27 +393,16 @@ export class RoomDO extends Server<Env> {
    * method routes through here so the zombie-sweep interval override (D-15)
    * is applied consistently everywhere a timer table is derived.
    *
-   * Adds one layer `computeRoomTimers` itself cannot provide (see
-   * `#pendingZombieSweepAt`'s doc comment): once a `zombie_sweep` target is
-   * armed, this wrapper keeps returning that SAME `dueAt` on every
-   * subsequent call, regardless of what a fresh grid-aligned derivation
-   * would compute for the current `now` — only `onAlarm`'s zombie_sweep
-   * branch clears `#pendingZombieSweepAt`, letting the next call adopt a
-   * new target. */
+   * A pure derivation with no in-memory memo (CR-01/WR-01, review): the
+   * grid-aligned `zombie_sweep.dueAt` is identical for every call inside one
+   * interval window and always lies in the future, so this never yields a
+   * past target. The cross-boundary race (RESEARCH.md Pitfall 3 — traffic
+   * or a hibernation wake recomputing the NEXT boundary before the pending
+   * alarm is delivered) is closed in `#syncAlarm` instead, which never
+   * replaces an overdue pending alarm outside the alarm handler. That guard
+   * survives hibernation; the old in-memory memo did not. */
   #timers(room: RoomState, now: number): TimerEvent[] {
-    const computed = computeRoomTimers(room, now, { zombieSweepIntervalMs: this.#timing().zombieSweepIntervalMs });
-    const freshSweep = computed.find((t) => t.type === "zombie_sweep");
-    if (freshSweep === undefined) {
-      this.#pendingZombieSweepAt = null;
-      return computed;
-    }
-    if (this.#pendingZombieSweepAt === null) {
-      this.#pendingZombieSweepAt = freshSweep.dueAt;
-    }
-    return upsertTimer(
-      computed.filter((t) => t.type !== "zombie_sweep"),
-      { type: "zombie_sweep", dueAt: this.#pendingZombieSweepAt },
-    );
+    return computeRoomTimers(room, now, { zombieSweepIntervalMs: this.#timing().zombieSweepIntervalMs });
   }
 
   /** Shared disconnect logic for both `onClose` and the zombie-sweep branch
@@ -589,20 +572,20 @@ export class RoomDO extends Server<Env> {
    * This guard is what prevents Pitfall 2: unconditionally re-arming the
    * alarm on every hibernation wake (including `onStart`, which reruns on
    * EVERY wake, not just true cold start) would perpetually defer the
-   * deadline so it never fires. Do not delete this comparison. */
-  async #syncAlarm(timers: TimerEvent[]): Promise<void> {
+   * deadline so it never fires. Do not delete this comparison.
+   *
+   * CR-01/WR-01 (review): outside the alarm handler, a pending alarm that is
+   * already overdue is left alone — it is about to be delivered, and its
+   * handler re-arms with `inAlarmHandler: true`. See `resolveAlarmWrite`. */
+  async #syncAlarm(timers: TimerEvent[], options: { inAlarmHandler: boolean } = { inAlarmHandler: false }): Promise<void> {
     const next = nextDueAt(timers);
     const currentAlarm = await this.ctx.storage.getAlarm();
+    const write = resolveAlarmWrite(next, currentAlarm, Date.now(), options);
 
-    if (next === null) {
-      if (currentAlarm !== null) {
-        await this.ctx.storage.deleteAlarm();
-      }
-      return;
-    }
-
-    if (next !== currentAlarm) {
-      await this.ctx.storage.setAlarm(next);
+    if (write.kind === "delete") {
+      await this.ctx.storage.deleteAlarm();
+    } else if (write.kind === "set") {
+      await this.ctx.storage.setAlarm(write.at);
     }
   }
 }

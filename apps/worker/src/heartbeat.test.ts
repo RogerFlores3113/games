@@ -1,6 +1,41 @@
 import { describe, expect, it } from "vitest";
 import { SOCKET_STALE_MS, ZOMBIE_SWEEP_INTERVAL_MS } from "@games/schema";
-import { isSocketStale, resolveHeartbeatTiming, socketLastSeenAt } from "./heartbeat";
+import {
+  isSocketStale,
+  resolveAlarmWrite,
+  resolveHeartbeatTiming,
+  socketLastSeenAt,
+} from "./heartbeat";
+
+describe("resolveAlarmWrite (CR-01/WR-01)", () => {
+  const now = 10_000;
+
+  it("deletes a pending alarm when nothing is scheduled, and keeps an empty slot empty", () => {
+    expect(resolveAlarmWrite(null, 12_000, now, { inAlarmHandler: false })).toEqual({ kind: "delete" });
+    expect(resolveAlarmWrite(null, null, now, { inAlarmHandler: false })).toEqual({ kind: "keep" });
+  });
+
+  it("Pitfall 2: never re-writes an unchanged future target", () => {
+    expect(resolveAlarmWrite(12_000, 12_000, now, { inAlarmHandler: false })).toEqual({ kind: "keep" });
+  });
+
+  it("arms an empty slot and moves a future alarm to a different target", () => {
+    expect(resolveAlarmWrite(12_000, null, now, { inAlarmHandler: false })).toEqual({ kind: "set", at: 12_000 });
+    expect(resolveAlarmWrite(11_000, 12_000, now, { inAlarmHandler: false })).toEqual({ kind: "set", at: 11_000 });
+  });
+
+  it("WR-01: outside the handler, an overdue pending alarm is never pushed later by a recomputed boundary", () => {
+    // A hibernation wake at now=10_000 recomputes the NEXT grid boundary
+    // (11_000) while the 9_000 alarm has not been delivered yet.
+    expect(resolveAlarmWrite(11_000, 9_000, now, { inAlarmHandler: false })).toEqual({ kind: "keep" });
+    expect(resolveAlarmWrite(11_000, now, now, { inAlarmHandler: false })).toEqual({ kind: "keep" });
+  });
+
+  it("CR-01: inside the handler, the next target is always armed even if getAlarm() still reports the firing alarm", () => {
+    expect(resolveAlarmWrite(11_000, 9_000, now, { inAlarmHandler: true })).toEqual({ kind: "set", at: 11_000 });
+    expect(resolveAlarmWrite(11_000, null, now, { inAlarmHandler: true })).toEqual({ kind: "set", at: 11_000 });
+  });
+});
 
 describe("resolveHeartbeatTiming", () => {
   it("falls back to the schema constants when env is empty", () => {
