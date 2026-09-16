@@ -9,6 +9,8 @@ import {
   isDiscardDisabled,
   isGiveClueDisabled,
   isPlayDisabled,
+  isSeatConnected,
+  turnIndicatorText,
 } from "./hanabi-board-logic";
 
 function baseView(overrides: Partial<HanabiView> = {}): HanabiView {
@@ -174,6 +176,42 @@ describe("fusesRemainingForView", () => {
 
   it("is 0 when fuses used equals MAX_FUSES imported from @games/rules", () => {
     expect(fusesRemainingForView(baseView({ fuses: MAX_FUSES }))).toBe(0);
+  });
+});
+
+describe("D-07: seat connection + turn text", () => {
+  it("isSeatConnected reads the seat's connected flag", () => {
+    expect(isSeatConnected([{ seatId: "a", connected: true }], "a")).toBe(true);
+    expect(isSeatConnected([{ seatId: "a", connected: false }], "a")).toBe(false);
+  });
+
+  it("isSeatConnected treats an unknown seat as connected (no false disconnected alarm)", () => {
+    expect(isSeatConnected([{ seatId: "a", connected: false }], "missing")).toBe(true);
+  });
+
+  it("turnIndicatorText returns 'Your turn' when it is the viewer's turn", () => {
+    const seats = [{ seatId: "a", connected: false }];
+    expect(
+      turnIndicatorText({ isYourTurn: true, activeSeatId: "a" }, seats, () => "Anyone"),
+    ).toBe("Your turn");
+  });
+
+  it("turnIndicatorText returns 'Waiting for {name}' when the active seat is connected", () => {
+    const seats = [{ seatId: "b", connected: true }];
+    expect(
+      turnIndicatorText({ isYourTurn: false, activeSeatId: "b" }, seats, (id) =>
+        id === "b" ? "Bianca" : "…",
+      ),
+    ).toBe("Waiting for Bianca");
+  });
+
+  it("turnIndicatorText appends the em-dash disconnected suffix when the active seat is disconnected", () => {
+    const seats = [{ seatId: "b", connected: false }];
+    expect(
+      turnIndicatorText({ isYourTurn: false, activeSeatId: "b" }, seats, (id) =>
+        id === "b" ? "Bianca" : "…",
+      ),
+    ).toBe("Waiting for Bianca — disconnected");
   });
 });
 
