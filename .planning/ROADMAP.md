@@ -213,7 +213,7 @@ Plans:
 
 **Wave 4**
 
-- [ ] 05-05-PLAN.md — Playwright proofs: network drop, frozen background tab, mid-game second tab + reclaim (injected timing)
+- [x] 05-05-PLAN.md — Playwright proofs: network drop, frozen background tab, mid-game second tab + reclaim (injected timing)
 
 **Wave 5**
 
@@ -260,6 +260,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Per-Seat Redaction Contract | 6/6 | Complete    | 2026-09-15 |
 | 3. Hanabi Rules Engine | 5/5 | Complete    | 2026-09-16 |
 | 4. Wire Engine Into Room Actor | 9/9 | Complete   | 2026-09-16 |
-| 5. Reconnect & Session Durability Hardening | 4/6 | In Progress|  |
+| 5. Reconnect & Session Durability Hardening | 5/6 | In Progress|  |
 | 6. Game Interface | 0/TBD | Not started | - |
 | 7. Variant Support (Rainbow, Black) | 0/TBD | Not started | - |
