@@ -118,6 +118,7 @@ describe("packages/rules purity", () => {
       "hanabi/projection.ts",
       "hanabi/hanabi-leak-check.ts",
       "hanabi/adapter.ts",
+      "hanabi/test-support.ts",
     ];
     for (const file of files) {
       // Do not scan this test file itself — it legitimately uses node:fs/node:url
