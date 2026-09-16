@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { createRoom, expectSeatCount, joinAs } from "./helpers";
 
-test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 forehead-card toy)", () => {
-  test("gating, variant lock, and the forehead-card toy prove turn order and HIDE-01 redaction end to end", async ({
+test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () => {
+  test("gating, variant lock, and the Hanabi board prove turn order and HIDE-01 redaction end to end", async ({
     page: hostPage,
     browser,
   }) => {
@@ -40,18 +40,17 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 forehead-card toy)"
     await expect(startButton).toBeEnabled();
     await startButton.click();
 
-    // Both contexts switch to the forehead-card toy screen.
-    await expect(hostPage.getByTestId("own-card")).toBeVisible();
-    await expect(pageB.getByTestId("own-card")).toBeVisible();
+    // Both contexts switch to the real Hanabi board.
+    await expect(hostPage.getByTestId("own-hand")).toBeVisible();
+    await expect(pageB.getByTestId("own-hand")).toBeVisible();
 
-    // Exactly one side reads "Your turn — guess your card"; the other reads
-    // "Waiting for".
+    // Exactly one side reads "Your turn"; the other reads "Waiting for".
     const hostIndicator = hostPage.getByTestId("turn-indicator");
     const joinerIndicator = pageB.getByTestId("turn-indicator");
     const hostText = (await hostIndicator.textContent()) ?? "";
     const joinerText = (await joinerIndicator.textContent()) ?? "";
-    const hostIsActive = hostText === "Your turn — guess your card";
-    const joinerIsActive = joinerText === "Your turn — guess your card";
+    const hostIsActive = hostText === "Your turn";
+    const joinerIsActive = joinerText === "Your turn";
     expect(hostIsActive).not.toBe(joinerIsActive);
     expect(hostIsActive || joinerIsActive).toBe(true);
     if (!hostIsActive) {
@@ -61,44 +60,67 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 forehead-card toy)"
       expect(joinerText).toContain("Waiting for");
     }
 
-    // HIDE-01 browser surface: each page's teammate's other-card tile shows
-    // the value that page's own-card tile must never reveal, and the
-    // converse for the other page.
-    const hostOtherCardValue = ((await hostPage.getByTestId("other-card").textContent()) ?? "").trim();
-    const joinerOtherCardValue = ((await pageB.getByTestId("other-card").textContent()) ?? "").trim();
-    expect(hostOtherCardValue.length).toBeGreaterThan(0);
-    expect(joinerOtherCardValue.length).toBeGreaterThan(0);
+    // HIDE-01 browser surface: what the OTHER page renders for a player's
+    // hand (their real card identities, seeded server-side and secret to
+    // this test) must never appear as text on that player's OWN own-hand
+    // region. Deriving the expected strings from what the other page
+    // actually shows avoids hardcoding a card identity.
+    const hostRealCardTexts = await pageB
+      .locator('[data-testid^="other-hand-card-"]')
+      .allTextContents();
+    const joinerRealCardTexts = await hostPage
+      .locator('[data-testid^="other-hand-card-"]')
+      .allTextContents();
+    expect(hostRealCardTexts.length).toBeGreaterThan(0);
+    expect(joinerRealCardTexts.length).toBeGreaterThan(0);
 
-    const hostOwnCardText = ((await hostPage.getByTestId("own-card").textContent()) ?? "").trim();
-    const joinerOwnCardText = ((await pageB.getByTestId("own-card").textContent()) ?? "").trim();
-    expect(joinerOwnCardText).toBe("");
-    expect(joinerOwnCardText).not.toContain(hostOtherCardValue);
-    expect(hostOwnCardText).toBe("");
-    expect(hostOwnCardText).not.toContain(joinerOtherCardValue);
+    const hostOwnHandText = ((await hostPage.getByTestId("own-hand").textContent()) ?? "").trim();
+    const joinerOwnHandText = ((await pageB.getByTestId("own-hand").textContent()) ?? "").trim();
+    for (const cardText of hostRealCardTexts) {
+      expect(hostOwnHandText).not.toContain(cardText.trim());
+    }
+    for (const cardText of joinerRealCardTexts) {
+      expect(joinerOwnHandText).not.toContain(cardText.trim());
+    }
 
-    // Guess controls: 16 guess buttons on both pages; enabled only for the
-    // active player.
-    const hostGuessButtons = hostPage.getByTestId(/^guess-button-/);
-    const joinerGuessButtons = pageB.getByTestId(/^guess-button-/);
-    await expect(hostGuessButtons).toHaveCount(16);
-    await expect(joinerGuessButtons).toHaveCount(16);
-
+    // Play/discard controls exist on both pages; disabled on the waiting
+    // player's page regardless of selection, since it is not their turn.
     const activePage = hostIsActive ? hostPage : pageB;
     const waitingPage = hostIsActive ? pageB : hostPage;
-    const activeButton = activePage.getByTestId(/^guess-button-/).first();
-    const waitingButton = waitingPage.getByTestId(/^guess-button-/).first();
-    await expect(activeButton).toBeEnabled();
-    await expect(waitingButton).toBeDisabled();
 
-    // The active player guesses: the deck count drops to 13, the revealed
-    // pile gains one entry on both pages, and the turn indicator swaps.
-    await activeButton.click();
-    await expect(hostPage.getByTestId("revealed-entry")).toHaveCount(1);
-    await expect(pageB.getByTestId("revealed-entry")).toHaveCount(1);
-    await expect(hostPage.getByTestId("deck-count")).toHaveText("13 left in deck");
-    await expect(pageB.getByTestId("deck-count")).toHaveText("13 left in deck");
+    await expect(waitingPage.getByTestId("play-button")).toBeDisabled();
+    await expect(waitingPage.getByTestId("discard-button")).toBeDisabled();
+
+    // Discard is disabled at the starting 8/8 clue tokens (D-12), so the
+    // active player plays their first own-hand slot instead: the deck count
+    // drops by one and EITHER the discard pile gains an entry (a misplay
+    // burns a fuse) OR a played stack advances — asserted structurally
+    // rather than assuming which outcome the seeded deck produces, on
+    // both pages — and the turn indicator swaps.
+    const activeInitialDeckCount = ((await activePage.getByTestId("deck-count").textContent()) ?? "").trim();
+    const initialDeckNumber = Number.parseInt(activeInitialDeckCount, 10);
+    expect(Number.isNaN(initialDeckNumber)).toBe(false);
+
+    const initialDiscardCount = await hostPage.locator('[data-testid="discard-pile"] li').count();
+    const initialStackTexts = (
+      await hostPage.locator('[data-testid^="played-stack-"]').allTextContents()
+    ).join("|");
+
+    await activePage.getByTestId("own-hand-slot-1").click();
+    await expect(activePage.getByTestId("play-button")).toBeEnabled();
+    await activePage.getByTestId("play-button").click();
+
+    await expect(hostPage.getByTestId("deck-count")).toHaveText(`${initialDeckNumber - 1} cards left in deck`);
+    await expect(pageB.getByTestId("deck-count")).toHaveText(`${initialDeckNumber - 1} cards left in deck`);
+
+    await expect(async () => {
+      const discardCount = await hostPage.locator('[data-testid="discard-pile"] li').count();
+      const stackTexts = (await hostPage.locator('[data-testid^="played-stack-"]').allTextContents()).join("|");
+      expect(discardCount > initialDiscardCount || stackTexts !== initialStackTexts).toBe(true);
+    }).toPass();
+
     await expect(activePage.getByTestId("turn-indicator")).toContainText("Waiting for");
-    await expect(waitingPage.getByTestId("turn-indicator")).toHaveText("Your turn — guess your card");
+    await expect(waitingPage.getByTestId("turn-indicator")).toHaveText("Your turn");
 
     // After the game starts, the host's variant control is gone (ROOM-05).
     await expect(hostPage.getByTestId("variant-picker")).toHaveCount(0);

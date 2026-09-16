@@ -20,7 +20,7 @@ test.describe("in-progress and full-room refusals (ROOM-07 + D-14 + D-06)", () =
     await expectSeatCount(hostPage, 2);
 
     await hostPage.getByTestId("start-game").click();
-    await expect(hostPage.getByTestId("own-card")).toBeVisible();
+    await expect(hostPage.getByTestId("own-hand")).toBeVisible();
 
     const contextC = await browser.newContext();
     const pageC = await attemptJoin(contextC, code, "Casey");
@@ -35,7 +35,7 @@ test.describe("in-progress and full-room refusals (ROOM-07 + D-14 + D-06)", () =
     // The important assertion: a refusal must not render a partial table
     // behind it. Absence, not just presence of the message.
     await expect(pageC.getByTestId("seat-list")).toHaveCount(0);
-    await expect(pageC.getByTestId("own-card")).toHaveCount(0);
+    await expect(pageC.getByTestId("own-hand")).toHaveCount(0);
     await expect(pageC.getByTestId("start-game")).toHaveCount(0);
 
     await contextB.close();
