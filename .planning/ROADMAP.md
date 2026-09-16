@@ -154,7 +154,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 04-02-PLAN.md — Wire protocol: `actionId`, widened closed `ErrorDetail`, persisted seat key, schema version bump (D-06/D-07/D-08/D-10)
+- [x] 04-02-PLAN.md — Wire protocol: `actionId`, widened closed `ErrorDetail`, persisted seat key, schema version bump (D-06/D-07/D-08/D-10)
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -234,7 +234,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Room & Transport Skeleton | 11/11 | Complete   | 2026-09-15 |
 | 2. Per-Seat Redaction Contract | 6/6 | Complete    | 2026-09-15 |
 | 3. Hanabi Rules Engine | 5/5 | Complete    | 2026-09-16 |
-| 4. Wire Engine Into Room Actor | 1/8 | In Progress|  |
+| 4. Wire Engine Into Room Actor | 2/8 | In Progress|  |
 | 5. Reconnect & Session Durability Hardening | 0/TBD | Not started | - |
 | 6. Game Interface | 0/TBD | Not started | - |
 | 7. Variant Support (Rainbow, Black) | 0/TBD | Not started | - |
