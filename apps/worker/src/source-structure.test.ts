@@ -343,3 +343,79 @@ describe("HIDE-02/HIDE-03/D-06 structural chokepoint audit (D-09)", () => {
     expect(existsSync(schemaToyPath), `expected ${schemaToyPath} to not exist`).toBe(false);
   });
 });
+
+describe("Phase 5 heartbeat / RT-05 structural audit (D-02, D-13)", () => {
+  const files = listSourceFiles();
+  const strippedByFile = new Map(files.map((f) => [f, readStripped(f)] as const));
+
+  function findFilesWithMatch(pattern: RegExp): { file: string; count: number }[] {
+    const hits: { file: string; count: number }[] = [];
+    for (const [file, text] of strippedByFile) {
+      const count = countMatches(text, pattern);
+      if (count > 0) hits.push({ file, count });
+    }
+    return hits;
+  }
+
+  it('P5-1 (D-02): setWebSocketAutoResponse( appears exactly once across worker non-test sources, in room-do.ts, inside onStart', () => {
+    const hits = findFilesWithMatch(/setWebSocketAutoResponse\(/g);
+    const total = hits.reduce((sum, h) => sum + h.count, 0);
+    expect(total, `expected exactly 1 setWebSocketAutoResponse( call, found in: ${JSON.stringify(hits)}`).toBe(1);
+    expect(hits[0]?.file).toBe("room-do.ts");
+
+    const roomDo = strippedByFile.get("room-do.ts") ?? "";
+    const startIdx = roomDo.indexOf("async onStart(");
+    expect(startIdx, "expected an `async onStart(` definition in room-do.ts").toBeGreaterThanOrEqual(0);
+    const nextIdx = roomDo.indexOf("async onConnect(", startIdx + 1);
+    expect(nextIdx, "expected an `async onConnect(` definition after onStart in room-do.ts").toBeGreaterThan(startIdx);
+    const onStartBody = roomDo.slice(startIdx, nextIdx);
+    expect(countMatches(onStartBody, /setWebSocketAutoResponse\(/g)).toBe(1);
+  });
+
+  it("P5-2 (D-02/D-13): the #send method body and onMessage body never mention HEARTBEAT_PING, HEARTBEAT_PONG, or the literal __ping__/__pong__", () => {
+    const roomDo = strippedByFile.get("room-do.ts") ?? "";
+    const heartbeatPattern = /HEARTBEAT_P(ING|ONG)|__p[io]ng__/g;
+
+    const sendDefIdx = roomDo.indexOf('#send(connection: Connection, frame: OutboundFrame)');
+    expect(sendDefIdx, "expected a `#send(connection: Connection, frame: OutboundFrame)` method definition").toBeGreaterThanOrEqual(0);
+    const pushStateIdx = roomDo.indexOf("async #pushState", sendDefIdx + 1);
+    expect(pushStateIdx, "expected an `async #pushState` definition after #send in room-do.ts").toBeGreaterThan(sendDefIdx);
+    const sendBody = roomDo.slice(sendDefIdx, pushStateIdx);
+    expect(countMatches(sendBody, heartbeatPattern)).toBe(0);
+
+    const onMessageIdx = roomDo.indexOf("async onMessage(");
+    expect(onMessageIdx, "expected an `async onMessage(` definition in room-do.ts").toBeGreaterThanOrEqual(0);
+    const onCloseIdx = roomDo.indexOf("async onClose(", onMessageIdx + 1);
+    expect(onCloseIdx, "expected an `async onClose(` definition after onMessage in room-do.ts").toBeGreaterThan(onMessageIdx);
+    const onMessageBody = roomDo.slice(onMessageIdx, onCloseIdx);
+    expect(countMatches(onMessageBody, heartbeatPattern)).toBe(0);
+  });
+
+  it("P5-3 (D-13): the single-writer counts are unchanged by Phase 5", () => {
+    const roomDo = strippedByFile.get("room-do.ts") ?? "";
+
+    const sendHits = findFilesWithMatch(/\.send\(/g);
+    const sendTotal = sendHits.reduce((sum, h) => sum + h.count, 0);
+    expect(sendTotal, `expected exactly 1 total .send( match, found in: ${JSON.stringify(sendHits)}`).toBe(1);
+
+    const encodeHits = findFilesWithMatch(/\bencodeServerMessage\(/g);
+    const encodeTotal = encodeHits.reduce((sum, h) => sum + h.count, 0);
+    expect(encodeTotal, `expected exactly 1 encodeServerMessage( call, found in: ${JSON.stringify(encodeHits)}`).toBe(1);
+
+    expect(countMatches(roomDo, /^\s*#send\(/gm)).toBe(1);
+    expect(countMatches(roomDo, /type:\s*"joined"/g)).toBe(1);
+    expect(countMatches(roomDo, /type:\s*"state"/g)).toBe(1);
+
+    const resumePattern = /type:\s*"(resume|resumed|reconnect|reconnected)"/g;
+    const resumeHits = findFilesWithMatch(resumePattern);
+    expect(resumeHits, `expected zero resume/reconnect frame types across worker sources, found in: ${JSON.stringify(resumeHits)}`).toEqual([]);
+
+    const messagesSchemaPath = join(REPO_ROOT, "packages", "schema", "src", "messages.ts");
+    const messagesSchemaSource = readFileSync(messagesSchemaPath, "utf-8");
+    const messagesSchemaStripped = stripComments(messagesSchemaSource);
+    expect(
+      countMatches(messagesSchemaStripped, resumePattern),
+      "expected zero resume/reconnect frame types in packages/schema/src/messages.ts",
+    ).toBe(0);
+  });
+});
