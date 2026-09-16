@@ -146,7 +146,7 @@ Plans:
   2. A player who refreshes mid-game rejoins their exact same seat with full game state and no lost turn.
   3. Submitting the same action twice (double-click, or retry after a dropped response) is applied exactly once, verified by deliberately double-sending a request.
 
-**Plans**: 8 plans
+**Plans**: 9 plans
 Plans:
 **Wave 1**
 
@@ -179,6 +179,10 @@ Plans:
 **Wave 8** *(blocked on Wave 7)*
 
 - [x] 04-08-PLAN.md — Forehead-card toy deletion sweep, zero-occurrence regression, phase gate (D-01/D-03/D-16)
+
+**Gap closure**
+
+- [ ] 04-09-PLAN.md — Fuse counter shows fuses remaining (MAX_FUSES - fuses), regression tests (UAT test 10)
 
 ### Phase 5: Reconnect & Session Durability Hardening
 
