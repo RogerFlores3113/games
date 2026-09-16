@@ -20,6 +20,21 @@ const WORKER_PORT = 8787;
 // deployed web app already dials its deployed Worker.
 const REMOTE_BASE_URL = process.env.PLAYWRIGHT_BASE_URL;
 
+// D-15: Phase 5 timing injection. These values are deliberately shortened
+// from production defaults (packages/schema's HEARTBEAT_INTERVAL_MS/
+// HEARTBEAT_PONG_TIMEOUT_MS/SOCKET_STALE_MS/ZOMBIE_SWEEP_INTERVAL_MS) so that
+// e2e/hanabi-realtime.spec.ts and e2e/seat-takeover.spec.ts's Phase 5 tests
+// never sleep for real minutes. NOTE: with `reuseExistingServer` (the local
+// default), an ALREADY-RUNNING `next dev`/`wrangler dev` process started
+// WITHOUT these values will silently be reused and the Phase 5 timing specs
+// will time out waiting for disconnected/reconnected indicators that never
+// arrive on the shortened schedule. Stop any stray servers on 3100/8787
+// before running `npx playwright test` locally.
+const E2E_HEARTBEAT_INTERVAL_MS = "1000";
+const E2E_HEARTBEAT_PONG_TIMEOUT_MS = "1000";
+const E2E_SOCKET_STALE_MS = 5000;
+const E2E_ZOMBIE_SWEEP_INTERVAL_MS = 1000;
+
 export default defineConfig({
   testDir: "./e2e",
   reporter: "list",
@@ -44,9 +59,14 @@ export default defineConfig({
           command: `npm run dev --workspace apps/web -- -p ${WEB_PORT}`,
           port: WEB_PORT,
           reuseExistingServer: !process.env.CI,
+          env: {
+            ...process.env,
+            NEXT_PUBLIC_HEARTBEAT_INTERVAL_MS: E2E_HEARTBEAT_INTERVAL_MS,
+            NEXT_PUBLIC_HEARTBEAT_PONG_TIMEOUT_MS: E2E_HEARTBEAT_PONG_TIMEOUT_MS,
+          },
         },
         {
-          command: `npx wrangler dev --port ${WORKER_PORT}`,
+          command: `npx wrangler dev --port ${WORKER_PORT} --var SOCKET_STALE_MS:${E2E_SOCKET_STALE_MS} --var ZOMBIE_SWEEP_INTERVAL_MS:${E2E_ZOMBIE_SWEEP_INTERVAL_MS}`,
           cwd: "apps/worker",
           port: WORKER_PORT,
           reuseExistingServer: !process.env.CI,
