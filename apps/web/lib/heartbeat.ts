@@ -1,4 +1,4 @@
-import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_PONG_TIMEOUT_MS } from "@games/schema";
+import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_PONG_TIMEOUT_MS, SOCKET_STALE_MS } from "@games/schema";
 
 /**
  * Pure client-side heartbeat/resume decisions (D-01/D-02/D-11). Framework-
@@ -16,6 +16,7 @@ export interface ClientHeartbeatTiming {
  * numbering) — imported as a plain literal here rather than from
  * `partysocket`, since this module must stay framework-free. */
 const OPEN_READY_STATE = 1;
+const CONNECTING_READY_STATE = 0;
 
 /** D-15: `NEXT_PUBLIC_HEARTBEAT_INTERVAL_MS`/`NEXT_PUBLIC_HEARTBEAT_PONG_TIMEOUT_MS`
  * let tests shorten the real constants (Next only inlines literal
@@ -54,11 +55,23 @@ export type ResumeAction = "none" | "ping" | "reconnect";
 /**
  * D-01: decides what a `visibilitychange`-to-visible or `online` event
  * should do to the socket. Never fires while latched (D-11 — a superseded
- * tab must never auto-reclaim). Otherwise: a socket that isn't OPEN, or
- * hasn't heard from the server in longer than one full heartbeat cycle
- * (interval + pong timeout), is force-reconnected immediately rather than
- * waiting on partysocket's own backoff; anything more recent than that just
- * gets an immediate ping.
+ * tab must never auto-reclaim). Otherwise:
+ *
+ * - CONNECTING: `"none"` (WR-05, review) — a handshake is already in
+ *   flight; bursts of `online`/`visibilitychange` on a flaky mobile network
+ *   must not abort it over and over. (partysocket reports the previous,
+ *   CLOSED socket while it waits out its backoff, so that wait still gets
+ *   an immediate reconnect below.)
+ * - CLOSING/CLOSED: force-reconnect immediately rather than waiting on
+ *   partysocket's own backoff.
+ * - OPEN: `"ping"` (WR-02, review), letting the pong-timeout path decide
+ *   within `pongTimeoutMs` whether the socket is really dead. A healthy
+ *   socket in a hidden tab can go ~60s between pongs under Chrome's timer
+ *   throttling, so "nothing heard for one heartbeat cycle" is not evidence
+ *   of death and must not tear down a working socket after an ordinary
+ *   alt-tab. Only a gap beyond `socketStaleMs` — after which the server's
+ *   zombie sweep has already closed the socket on its side — reconnects
+ *   immediately.
  */
 export function resumeAction(input: {
   latched: boolean;
@@ -66,15 +79,19 @@ export function resumeAction(input: {
   lastHeardAt: number;
   now: number;
   timing: ClientHeartbeatTiming;
+  socketStaleMs?: number;
 }): ResumeAction {
-  const { latched, readyState, lastHeardAt, now, timing } = input;
+  const { latched, readyState, lastHeardAt, now, socketStaleMs = SOCKET_STALE_MS } = input;
   if (latched) {
+    return "none";
+  }
+  if (readyState === CONNECTING_READY_STATE) {
     return "none";
   }
   if (readyState !== OPEN_READY_STATE) {
     return "reconnect";
   }
-  if (now - lastHeardAt > timing.intervalMs + timing.pongTimeoutMs) {
+  if (now - lastHeardAt > socketStaleMs) {
     return "reconnect";
   }
   return "ping";
