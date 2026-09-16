@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 3 Plan 1 complete (VariantConfig + deterministic dealer)
-last_updated: "2026-09-16T00:18:21.143Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-09-16T00:26:50.391Z"
 last_activity: 2026-09-16
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 22
-  completed_plans: 18
+  completed_plans: 19
   percent: 29
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 3 (Hanabi Rules Engine) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-09-16
 
-Progress: [████████░░] 82%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -70,6 +70,7 @@ Progress: [████████░░] 82%
 | Phase 02 P05 | 25min | 3 tasks | 10 files |
 | Phase 02 P06 | ~10min | 0 tasks | 1 files |
 | Phase 03 P01 | 5min | 2 tasks | 5 files |
+| Phase 03 P02 | 25min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -117,6 +118,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-05: isForeheadCardView narrows through explicit otherCards/revealed in-checks before array casts, avoiding a too-narrow TS intersection type from a single-property guard
 - [Phase 02-06]: Manual verification recorded as user's plain approval with no fabricated frame contents or observations - user replied 'approved' with no caveats
 - [Phase 03]: Round-robin card dealing (one card per seat per round) chosen for dealInitialHands, matching how a physical deck is dealt — Interfaces block only required per-seat hand sizes; round-robin is the more faithful/realistic dealing order
+- [Phase ?]: HistoryEntryView added to state.ts as the non-readonly plain-array mirror of HistoryEntry (03-02)
+- [Phase ?]: AdapterError widened to 8 members per D-03; GameAdapter interface's five members unchanged, apps/worker's mapAdapterError unaffected (03-02)
 
 ### Pending Todos
 
@@ -136,6 +139,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-16T00:18:21.136Z
-Stopped at: Phase 3 Plan 1 complete (VariantConfig + deterministic dealer)
-Resume file: .planning/phases/03-hanabi-rules-engine/03-02-PLAN.md
+Last session: 2026-09-16T00:26:50.383Z
+Stopped at: Completed 03-02-PLAN.md
+Resume file: None
