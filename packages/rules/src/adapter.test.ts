@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import type { GameAdapter } from "./adapter";
 import { foreheadCardGame } from "./forehead-card";
+import { hanabiGame } from "./hanabi/adapter";
 
 /**
  * Reusable adapter-conformance suite. Phase 2 and Phase 4 call this same
@@ -84,6 +85,11 @@ export function describeAdapterConformance(
 
 describeAdapterConformance("forehead-card", foreheadCardGame, [{ type: "guess", value: "Altair" }]);
 
+describeAdapterConformance("hanabi", hanabiGame, [
+  { type: "discard", cardId: "zzzzzzzz" },
+  { type: "clue", targetSeatId: "seat-b", clue: { type: "rank", value: 1 } },
+]);
+
 describe("packages/rules purity", () => {
   it("has no non-empty runtime dependencies", () => {
     const here = dirname(fileURLToPath(import.meta.url));
@@ -101,6 +107,17 @@ describe("packages/rules purity", () => {
       "shuffle.ts",
       "forehead-card.ts",
       "forehead-card-leak-check.ts",
+      "hanabi/variant.ts",
+      "hanabi/state.ts",
+      "hanabi/deck.ts",
+      "hanabi/history.ts",
+      "hanabi/clue-facts.ts",
+      "hanabi/legality.ts",
+      "hanabi/actions.ts",
+      "hanabi/endgame.ts",
+      "hanabi/projection.ts",
+      "hanabi/hanabi-leak-check.ts",
+      "hanabi/adapter.ts",
     ];
     for (const file of files) {
       // Do not scan this test file itself — it legitimately uses node:fs/node:url
