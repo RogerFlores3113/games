@@ -25,9 +25,9 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **RT-03**: A player who refreshes the page rejoins their same seat with full game state and no lost turn
 - [x] **RT-04**: A player who loses connection or whose mobile tab is suspended rejoins their same seat and resumes the game in progress
 - [x] **RT-05**: Reconnecting a player uses the same state-delivery path as initial join, not a separate resume path
-- [ ] **RT-06**: Remaining players see a clear disconnected indicator for an absent player, and the game pauses in place rather than freezing or erroring
+- [x] **RT-06**: Remaining players see a clear disconnected indicator for an absent player, and the game pauses in place rather than freezing or erroring
 - [x] **RT-07**: An occupied seat cannot be taken over by another person holding the room link
-- [ ] **RT-08**: A player opening the room in a second tab does not corrupt or duplicate their seat
+- [x] **RT-08**: A player opening the room in a second tab does not corrupt or duplicate their seat
 - [x] **RT-09**: Submitting the same action twice (double-click, retry after a dropped response) applies it once
 
 ### Hidden Information Integrity
@@ -139,9 +139,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RT-03 | Phase 4 | Complete |
 | RT-04 | Phase 5 | Complete |
 | RT-05 | Phase 5 | Complete |
-| RT-06 | Phase 5 | Pending |
+| RT-06 | Phase 5 | Complete |
 | RT-07 | Phase 1 | Complete |
-| RT-08 | Phase 5 | Pending |
+| RT-08 | Phase 5 | Complete |
 | RT-09 | Phase 4 | Complete |
 | HIDE-01 | Phase 2 | Complete |
 | HIDE-02 | Phase 2 | Complete |

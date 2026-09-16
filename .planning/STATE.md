@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-09-16T21:10:46.624Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-09-16T21:33:18.016Z"
 last_activity: 2026-09-16
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 37
-  completed_plans: 32
+  completed_plans: 33
   percent: 57
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 05 (reconnect-session-durability-hardening) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-09-16
 
-Progress: [█████████░] 86%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -87,6 +87,7 @@ Progress: [█████████░] 86%
 | Phase 04 P08 | unknown | 3 tasks | 8 files |
 | Phase 04 P09 | 12min | 2 tasks | 4 files |
 | Phase 05 P01 | 35min | 3 tasks | 6 files |
+| Phase 05 P02 | 19min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -158,6 +159,9 @@ Recent decisions affecting current work:
 - [Phase 04-09]: fusesRemainingForView added to hanabi-board-logic.ts alongside bandForView; MAX_FUSES re-exported from @games/rules barrel — Closes UAT test 10 fuse-counter-direction gap without touching engine/wire fuses semantics
 - [Phase 05]: 05-01: apps/worker/tsconfig.json types swapped to @cloudflare/workers-types/experimental to expose setWebSocketAutoResponse to the type checker — the base workers-types subpath does not declare the auto-response API; the experimental subpath is a strict superset
 - [Phase 05]: 05-01: RESEARCH.md Assumption A3 confirmed TRUE - wrangler dev's local workerd honors setWebSocketAutoResponse without invoking onMessage — proven via a live wrangler dev spike test before 05-02/05-03 build the zombie sweep and D-02 client heartbeat on top of it
+- [Phase 05-02]: computeRoomTimers gained an optional zombieSweepIntervalMs option (D-15) instead of a new exported constant-override mechanism
+- [Phase 05-02]: RoomDO#timers memoizes the armed zombie_sweep target in-memory (#pendingZombieSweepAt), advanced only by onAlarm's zombie_sweep branch once it has run, closing a chatty-room scheduling race grid alignment alone does not solve
+- [Phase 05-02]: SeatAttachment.boundAt (epoch ms at join) exempts a just-joined socket from the zombie sweep until its first heartbeat lands
 
 ### Pending Todos
 
@@ -177,6 +181,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-16T21:10:46.616Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-09-16T21:33:18.008Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
