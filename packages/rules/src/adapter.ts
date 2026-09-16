@@ -35,8 +35,11 @@ export type AdapterResult<TState> =
   | { ok: false; error: AdapterError };
 
 /** Result of a completed game. `checkGameEnd` returns `null` while the game
- * continues. */
-export type GameEndResult = { score: number; reason: string };
+ * continues. `band` is an additive, optional widening for Phase 3's Hanabi
+ * engine (D-17): the engine computes a descriptive band for the score, not
+ * the UI, so this is a new optional member, not a change to any existing
+ * caller's expected shape. */
+export type GameEndResult = { score: number; reason: string; band?: string };
 
 /**
  * The contract a game plugs into the room layer through. Exactly five
