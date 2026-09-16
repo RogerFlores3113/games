@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-stopped_at: Phase 4 complete (8/8) — ready to discuss Phase 5
-last_updated: 2026-09-16T16:51:52.486Z
+stopped_at: Phase 4 complete (9/9) — ready to discuss Phase 5
+last_updated: "2026-09-16T20:19:20.114Z"
 last_activity: 2026-09-16
 progress:
   total_phases: 7
   completed_phases: 4
-  total_plans: 30
-  completed_plans: 30
+  total_plans: 31
+  completed_plans: 31
   percent: 57
 ---
 
@@ -84,6 +84,7 @@ Progress: [██████████] 100%
 | Phase 04 P06 | 35min | 3 tasks | 4 files |
 | Phase 04 P07 | 55min | 3 tasks | 3 files |
 | Phase 04 P08 | unknown | 3 tasks | 8 files |
+| Phase 04 P09 | 12min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -152,6 +153,7 @@ Recent decisions affecting current work:
 - [Phase ?]: start-game.spec.ts's table-action assertion uses play, not discard, since clue tokens start at 8/8 (max) and D-12 disables discard at max tokens
 - [Phase ?]: RT-03 proves same-seat reattachment via the OTHER page's other-hand-{seatId} testid, since the board never renders the viewer's own seatId
 - [Phase ?]: [Phase 04-08]: Human phase-gate sign-off recorded as user's plain approval, quoting verbatim reply 'confirmed' - no fabricated frame contents or observations
+- [Phase 04-09]: fusesRemainingForView added to hanabi-board-logic.ts alongside bandForView; MAX_FUSES re-exported from @games/rules barrel — Closes UAT test 10 fuse-counter-direction gap without touching engine/wire fuses semantics
 
 ### Pending Todos
 
@@ -171,6 +173,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-16T16:44:06.944Z
-Stopped at: Completed 04-08-PLAN.md
+Last session: 2026-09-16T20:19:20.106Z
+Stopped at: Completed 04-09-PLAN.md
 Resume file: None
