@@ -196,7 +196,28 @@ Plans:
   3. Remaining players see a clear disconnected indicator for an absent player, and the game pauses in place rather than freezing or erroring.
   4. Opening the room in a second tab for an already-connected seat does not corrupt or duplicate that seat's state.
 
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — Experimental workers-types, D-04 heartbeat constants, auto-response registration + wrangler dev spike, heartbeat structural audit (Wave 0)
+
+**Wave 2**
+
+- [ ] 05-02-PLAN.md — Server zombie sweep in the single alarm, shared CR-01 disconnect helper, socket proofs of D-03/D-12/D-13/D-15
+- [ ] 05-03-PLAN.md — Client heartbeat, visibility/online fast resume, `reconnecting` status, no-queue sends, reclaimSeat
+
+**Wave 3**
+
+- [ ] 05-04-PLAN.md — Board per-seat status + "— disconnected" turn text, Reconnecting… banner with disabled controls, Use this tab button
+
+**Wave 4**
+
+- [ ] 05-05-PLAN.md — Playwright proofs: network drop, frozen background tab, mid-game second tab + reclaim (injected timing)
+
+**Wave 5**
+
+- [ ] 05-06-PLAN.md — Real-phone manual check doc, full gate, owner sign-off recorded verbatim (checkpoint)
 
 ### Phase 6: Game Interface
 
