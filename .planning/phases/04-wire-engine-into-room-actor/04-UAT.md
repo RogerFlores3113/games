@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: resolved
 phase: 04-wire-engine-into-room-actor
 source: [04-01-SUMMARY.md, 04-02-SUMMARY.md, 04-03-SUMMARY.md, 04-04-SUMMARY.md, 04-05-SUMMARY.md, 04-06-SUMMARY.md, 04-07-SUMMARY.md, 04-08-SUMMARY.md]
 started: 2026-09-16T12:00:00Z
-updated: 2026-09-16T12:50:00Z
+updated: 2026-09-16T13:40:00Z
 ---
 
 ## Current Test
@@ -67,7 +67,7 @@ blocked: 0
 ## Gaps
 
 - truth: "The fuse counter reads as fuses remaining — starts at 3, counts down, game over at 0"
-  status: failed
+  status: resolved
   reason: "User reported: \"fuses left\" starts a 0 and counts up - at 3 it's game over. It should be reversed - start at 3, at 0 it's game over"
   severity: minor
   test: 10
