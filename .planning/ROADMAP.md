@@ -125,7 +125,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 03-03-PLAN.md — Request guards, play/discard/clue branches, final round, end conditions and scoring
+- [x] 03-03-PLAN.md — Request guards, play/discard/clue branches, final round, end conditions and scoring
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -201,7 +201,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Room & Transport Skeleton | 11/11 | Complete   | 2026-09-15 |
 | 2. Per-Seat Redaction Contract | 6/6 | Complete    | 2026-09-15 |
-| 3. Hanabi Rules Engine | 2/5 | In Progress|  |
+| 3. Hanabi Rules Engine | 3/5 | In Progress|  |
 | 4. Wire Engine Into Room Actor | 0/TBD | Not started | - |
 | 5. Reconnect & Session Durability Hardening | 0/TBD | Not started | - |
 | 6. Game Interface | 0/TBD | Not started | - |
