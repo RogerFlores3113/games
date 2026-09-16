@@ -115,3 +115,11 @@ None - no external service configuration required.
 ---
 *Phase: 04-wire-engine-into-room-actor*
 *Completed: 2026-09-16*
+
+## Self-Check: PASSED
+
+- FOUND: `apps/worker/src/room-do.test.ts`
+- FOUND: `.planning/phases/04-wire-engine-into-room-actor/04-05-SUMMARY.md`
+- FOUND commit `b148b33` (Task 1)
+- FOUND commit `94b4a11` (Task 2 + script fix)
+- FOUND commit `41447e1` (this SUMMARY)
