@@ -1329,6 +1329,52 @@ describe("Phase 5 dead-socket detection and reconnect (D-03, D-12, D-13, D-15)",
   );
 
   it(
+    "CR-02: after a worker kill WITHOUT clean socket closes, a seat that never comes back flips to connected:false for the seat that did",
+    async () => {
+      const code = mintRoomCode();
+      const wsAlice = await openSocket(code);
+      const cAlice = collectMessages(wsAlice);
+      send(wsAlice, { type: "join", displayName: "Alice" });
+      const joinedAlice = (await cAlice.waitFor((m) => m.type === "joined")) as Parsed & {
+        seatId: string;
+        seatToken: string;
+      };
+
+      const wsBob = await openSocket(code);
+      const cBob = collectMessages(wsBob);
+      send(wsBob, { type: "join", displayName: "Bob" });
+      const joinedBob = (await cBob.waitFor((m) => m.type === "joined")) as Parsed & { seatId: string };
+      await cAlice.waitFor(
+        (m) => m.type === "state" && (m.view as SeatViewShape).seats.filter((s) => s.connected).length === 2,
+      );
+
+      // Deliberately NO wsAlice.close()/wsBob.close(): the worker dies with
+      // both seats persisted as connected:true and neither onClose ever runs
+      // — the deploy/eviction case the timestamp sweep alone cannot see.
+      await killAndWait(child);
+      child = spawnWrangler();
+      await waitForReady();
+
+      const wsAlice2 = await openSocket(code);
+      const cAlice2 = collectMessages(wsAlice2);
+      send(wsAlice2, { type: "join", displayName: "Alice", seatToken: joinedAlice.seatToken });
+      const reclaimed = (await cAlice2.waitFor((m) => m.type === "joined", 8000)) as Parsed & { seatId: string };
+      expect(reclaimed.seatId).toBe(joinedAlice.seatId);
+
+      const bobGone = await cAlice2.waitFor((m) => {
+        if (m.type !== "state") return false;
+        const bob = (m.view as SeatViewShape).seats.find((s) => s.seatId === joinedBob.seatId);
+        return bob !== undefined && bob.connected === false;
+      }, 10_000);
+      const aliceSeat = (bobGone.view as SeatViewShape).seats.find((s) => s.seatId === joinedAlice.seatId);
+      expect(aliceSeat?.connected).toBe(true);
+
+      wsAlice2.close();
+    },
+    60_000,
+  );
+
+  it(
     "D-08: sweeping the ACTIVE seat pauses the game in place — turn, tokens, deck and room status all unchanged",
     async () => {
       const code = mintRoomCode();

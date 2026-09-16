@@ -68,6 +68,7 @@ import { loadRoom, loadTimers, saveRoom } from "./persistence";
 import { isOriginAllowed } from "./origin";
 import { projectSeatView, type OutboundFrame, type ProjectedRoomView } from "./seat-projection";
 import {
+  orphanedConnectedSeatIds,
   resolveAlarmWrite,
   resolveHeartbeatTiming,
   socketLastSeenAt,
@@ -335,7 +336,17 @@ export class RoomDO extends Server<Env> {
           // no seat on its attachment and no-ops. This branch changes ONLY
           // the `connected` flag (D-08): no transferHost/releaseSeat/
           // applyGameAction call here, ever.
+          //
+          // CR-02 (review): a seat still `connected: true` in storage with NO
+          // socket bound at all (a deploy/eviction/restart dropped it and
+          // its close never arrived) is just as gone. It is collected from
+          // the bindings BEFORE any stale socket below is detached, so a
+          // stale socket's seat is never listed twice.
           const { socketStaleMs } = this.#timing();
+          const gone: { seatId: string; connectionId: string | null }[] = orphanedConnectedSeatIds(
+            current.seats,
+            this.bindings,
+          ).map((seatId) => ({ seatId, connectionId: null }));
           const connections = [...this.getConnections()];
           for (const connection of connections) {
             const seatId = this.#seatIdFor(connection as unknown as ConnectionWithSeat);
@@ -347,7 +358,10 @@ export class RoomDO extends Server<Env> {
             if (!isSocketStale(lastSeen, now, socketStaleMs)) continue;
             connection.setState(null);
             connection.close(STALE_SOCKET_CLOSE_CODE, "stale");
-            current = this.#disconnectSeat(current, seatId, connection.id, now);
+            gone.push({ seatId, connectionId: connection.id });
+          }
+          for (const { seatId, connectionId } of gone) {
+            current = this.#disconnectSeat(current, seatId, connectionId, now);
           }
         }
       }
@@ -415,8 +429,12 @@ export class RoomDO extends Server<Env> {
    *     sockets, so any binding found here belongs to a live connection).
    *   - WR-01: the room was never persisted, or the seat no longer exists
    *     (released, or the whole room garbage-collected) — committing here
-   *     would resurrect a deleted room and re-arm its alarm. */
-  #disconnectSeat(room: RoomState, seatId: string, closingConnectionId: string, now: number): RoomState {
+   *     would resurrect a deleted room and re-arm its alarm.
+   *
+   * `closingConnectionId` is `null` for a CR-02 orphaned seat that has no
+   * socket at all; the CR-01 guard then still refuses if a live connection
+   * has claimed the seat in the meantime. */
+  #disconnectSeat(room: RoomState, seatId: string, closingConnectionId: string | null, now: number): RoomState {
     const liveOwner = this.bindings[seatId];
     if (liveOwner !== undefined && liveOwner !== closingConnectionId) return room;
     if (!this.#persisted || !room.seats.some((seat) => seat.seatId === seatId)) return room;

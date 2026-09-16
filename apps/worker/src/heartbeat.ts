@@ -58,6 +58,21 @@ export function isSocketStale(lastSeenAt: number, now: number, staleMs: number):
   return now - lastSeenAt > staleMs;
 }
 
+/** CR-02 (review): seats persisted as `connected: true` that have NO live
+ * socket bound to them at all. This is exactly what a deploy, eviction, or
+ * DO restart leaves behind — every hibernated socket is dropped and its
+ * close event is not guaranteed to reach the new instance — so the
+ * timestamp-based check above (which only ever sees OPEN sockets) can never
+ * find them. `bindings` must be read in the same synchronous section as
+ * `seats`: a join binds its socket (`setState`) before it persists
+ * `connected: true`, so a seat mid-join is never reported here. */
+export function orphanedConnectedSeatIds(
+  seats: readonly { readonly seatId: string; readonly connected: boolean }[],
+  bindings: Readonly<Record<string, string>>,
+): string[] {
+  return seats.filter((seat) => seat.connected && bindings[seat.seatId] === undefined).map((seat) => seat.seatId);
+}
+
 /** What `#syncAlarm` should do with the Durable Object's single alarm slot. */
 export type AlarmWrite = { kind: "set"; at: number } | { kind: "delete" } | { kind: "keep" };
 

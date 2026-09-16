@@ -2,10 +2,37 @@ import { describe, expect, it } from "vitest";
 import { SOCKET_STALE_MS, ZOMBIE_SWEEP_INTERVAL_MS } from "@games/schema";
 import {
   isSocketStale,
+  orphanedConnectedSeatIds,
   resolveAlarmWrite,
   resolveHeartbeatTiming,
   socketLastSeenAt,
 } from "./heartbeat";
+
+describe("orphanedConnectedSeatIds (CR-02)", () => {
+  it("reports a connected seat with no bound socket (the post-eviction case)", () => {
+    const seats = [
+      { seatId: "a", connected: true },
+      { seatId: "b", connected: true },
+    ];
+    expect(orphanedConnectedSeatIds(seats, { a: "conn-a" })).toEqual(["b"]);
+  });
+
+  it("never reports a disconnected seat, or a connected seat that has a binding", () => {
+    const seats = [
+      { seatId: "a", connected: true },
+      { seatId: "b", connected: false },
+    ];
+    expect(orphanedConnectedSeatIds(seats, { a: "conn-a" })).toEqual([]);
+  });
+
+  it("reports every connected seat when no socket is bound at all", () => {
+    const seats = [
+      { seatId: "a", connected: true },
+      { seatId: "b", connected: true },
+    ];
+    expect(orphanedConnectedSeatIds(seats, {})).toEqual(["a", "b"]);
+  });
+});
 
 describe("resolveAlarmWrite (CR-01/WR-01)", () => {
   const now = 10_000;
