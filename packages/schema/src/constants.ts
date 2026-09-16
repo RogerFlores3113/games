@@ -10,8 +10,13 @@
  *
  * Bumped to 2 in Phase 2 when the D-15 counter adapter was replaced by the
  * forehead-card toy (RESEARCH.md Pitfall 1): persisted adapterId counter
- * rooms must reset, not deserialize into a different game. */
-export const ROOM_SCHEMA_VERSION = 2;
+ * rooms must reset, not deserialize into a different game.
+ *
+ * Bumped to 3 in Phase 4 when the forehead-card toy adapter was replaced by
+ * the real Hanabi engine (D-06): a persisted room carrying toy-shaped `game`
+ * state and `adapterId: "forehead-card"` resets to an empty lobby rather
+ * than being handed to the Hanabi adapter. */
+export const ROOM_SCHEMA_VERSION = 3;
 
 /** D-01: 32 uppercase-safe characters — no `I`, `O`, `0`, `1` — because the
  * room code is read aloud over a voice call. Do not add lowercase. */

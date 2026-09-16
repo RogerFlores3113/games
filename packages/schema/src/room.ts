@@ -84,6 +84,13 @@ export const SeatSchema = z.object({
    * derived from this and it must be persisted (not held only in memory)
    * so those deadlines survive a hibernation eviction. */
   disconnectedAt: z.number().nullable(),
+  /** RT-09/D-08: records the `actionId` of the most recently APPLIED
+   * `game_action` for this seat, so a retried send (same actionId) after a
+   * dropped response is not re-applied. Idempotency bookkeeping ONLY — never
+   * read by the adapter, never reaching the wire. Optional/nullable so rooms
+   * persisted before this field existed still parse (same precedent as
+   * `seed` on `RoomStateSchema` below). */
+  lastAppliedActionId: z.string().nullable().optional(),
 });
 export type Seat = z.infer<typeof SeatSchema>;
 
@@ -122,6 +129,10 @@ export type RoomState = z.infer<typeof RoomStateSchema>;
 // already follow it here.
 // ---------------------------------------------------------------------------
 
+// Deliberately absent: `lastAppliedActionId` (D-08) is server-only
+// idempotency bookkeeping and must never reach a client view — this is why
+// this schema is declared independently rather than derived from
+// `SeatSchema`.
 export const PublicSeatSchema = z.object({
   seatId: z.string(),
   displayLabel: z.string(),
