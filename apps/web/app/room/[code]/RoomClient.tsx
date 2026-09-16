@@ -16,7 +16,7 @@ import {
 import { RefusalCard, type RefusalCardReason } from "../../../components/RefusalCard";
 import { JoinForm } from "../../../components/JoinForm";
 import { Lobby } from "../../../components/Lobby";
-import { ForeheadCardGame } from "../../../components/ForeheadCardGame";
+import { HanabiBoard } from "../../../components/HanabiBoard";
 
 export interface RoomClientProps {
   code: string;
@@ -208,13 +208,13 @@ function ConnectedRoom({
   }
 
   return (
-    <ForeheadCardGame
+    <HanabiBoard
       view={view}
-      onGuess={(value) =>
+      onAction={(request) =>
         // D-07: actionId is minted once per user intent (one click). If a
         // retry path is ever added it MUST reuse the same id verbatim rather
         // than minting a new one, or server-side dedup is defeated.
-        send({ type: "game_action", actionId: nanoid(), request: { type: "guess", value } })
+        send({ type: "game_action", actionId: nanoid(), request })
       }
     />
   );
