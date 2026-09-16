@@ -8,6 +8,7 @@ import {
   HEARTBEAT_PONG,
   ROOM_ABANDONED_CLOSE_CODE,
   ServerMessageSchema,
+  SUPERSEDED_CLOSE_CODE,
   type DisplayName,
 } from "@games/schema";
 import { clearSeatToken, readJoinSeatToken, writeSeatToken } from "./seat-token";
@@ -88,6 +89,17 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Room
         stopReconnectingRef.current = true;
         clearSeatToken(code);
         setStatus("abandoned");
+        return;
+      }
+      if (event.code === SUPERSEDED_CLOSE_CODE) {
+        // WR-03 (review): latch from the close code itself, not only from
+        // the parsed `superseded` frame. If that frame is dropped (e.g. a
+        // schema skew across a deploy fails safeParse), this tab would
+        // otherwise sit "seated" on a CLOSED socket with no latch, and the
+        // next visibility/online event would auto-reclaim the seat — the
+        // automatic two-tab ping-pong D-11 forbids.
+        stopReconnectingRef.current = true;
+        setStatus("superseded");
         return;
       }
       // D-05: a non-terminal close (network blip, pong-timeout force
