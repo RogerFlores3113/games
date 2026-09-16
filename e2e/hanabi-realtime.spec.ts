@@ -255,6 +255,16 @@ test.describe("Phase 5 reconnect hardening (RT-04 + RT-06 + D-14)", () => {
     const observerTurnIndicatorBefore = ((await observer.getByTestId("turn-indicator").textContent()) ?? "").trim();
     const sleeperTurnIndicatorBefore = ((await sleeper.getByTestId("turn-indicator").textContent()) ?? "").trim();
 
+    // WR-06 (review): swallow the page's `online` event so restoring the
+    // network below cannot itself trigger the D-01 resume path — only the
+    // visibility change can. A capture listener on the target runs before
+    // the hook's own listener, and stopImmediatePropagation keeps it from
+    // ever firing. Installed BEFORE the freeze (evaluate on a frozen page is
+    // unreliable).
+    await sleeper.evaluate(() => {
+      window.addEventListener("online", (event) => event.stopImmediatePropagation(), { capture: true });
+    });
+
     await emulateVisibility(sleeper, "hidden");
     let session: Awaited<ReturnType<typeof freezePage>> | undefined;
     try {
@@ -278,13 +288,24 @@ test.describe("Phase 5 reconnect hardening (RT-04 + RT-06 + D-14)", () => {
       timeout: 25_000,
     });
 
+    // Stay offline long enough that partysocket's own backoff has grown well
+    // past the recovery window asserted below (1s x 1.5^n: its retries are
+    // ~11s+ apart by now), so a prompt return can only come from the
+    // visibility handler rather than a coincidental scheduled retry.
+    await sleeper.waitForTimeout(15_000);
+
     await contextB.setOffline(false);
     if (session) {
       await resumePage(session);
     }
+    // Network is back but (with `online` swallowed above) nothing has told
+    // the hook yet: the tab must still be showing the reconnecting banner.
+    await expect(sleeper.getByTestId("reconnecting-banner")).toBeVisible();
     await emulateVisibility(sleeper, "visible");
 
-    await expect(sleeper.getByTestId("reconnecting-banner")).toHaveCount(0, { timeout: 15_000 });
+    // D-01: the visibility change alone must reseat the tab promptly — well
+    // inside partysocket's current backoff interval.
+    await expect(sleeper.getByTestId("reconnecting-banner")).toHaveCount(0, { timeout: 4_000 });
     await expect(sleeper.getByTestId("own-hand")).toBeVisible();
     await expect(sleeper.getByTestId("turn-indicator")).toHaveText(sleeperTurnIndicatorBefore);
 
