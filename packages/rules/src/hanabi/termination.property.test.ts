@@ -12,7 +12,8 @@ import fc from "fast-check";
 import { hanabiGame } from "./adapter";
 import { checkHanabiGameEnd, type EndReason } from "./endgame";
 import { MAX_FUSES } from "./legality";
-import { maxScoreFor, variantConfig, type Variant as HanabiVariant } from "./variant";
+import { maxScoreFor, variantConfig } from "./variant";
+import type { Variant as HanabiVariant } from "../adapter";
 import { currentActorSeatId, enumerateLegalActions } from "./test-support";
 import type { HanabiState } from "./state";
 
