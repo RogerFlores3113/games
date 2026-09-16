@@ -65,6 +65,35 @@ export function fusesRemainingForView(view: HanabiView): number {
   return MAX_FUSES - view.fuses;
 }
 
+/** D-07: whether a seat is connected, per the server's already-redacted
+ * `view.seats[].connected` flag. An unknown seat (not found in `seats`) is
+ * treated as connected — the server view always includes every seat, so a
+ * missing entry is never a real signal and must never render a false
+ * "disconnected" alarm. */
+export function isSeatConnected(
+  seats: ReadonlyArray<{ seatId: string; connected: boolean }>,
+  seatId: string,
+): boolean {
+  const seat = seats.find((s) => s.seatId === seatId);
+  return seat === undefined ? true : seat.connected;
+}
+
+/** D-07/D-08: the turn indicator's exact copy. Display only — nothing here
+ * changes whose turn it is or what actions are legal; a disconnected active
+ * player still simply "waits," per D-08 (no skip, no auto-action). */
+export function turnIndicatorText(
+  game: Pick<HanabiView, "isYourTurn" | "activeSeatId">,
+  seats: ReadonlyArray<{ seatId: string; connected: boolean }>,
+  labelFor: (seatId: string) => string,
+): string {
+  if (game.isYourTurn) {
+    return "Your turn";
+  }
+  const name = labelFor(game.activeSeatId);
+  const connected = isSeatConnected(seats, game.activeSeatId);
+  return connected ? `Waiting for ${name}` : `Waiting for ${name} — disconnected`;
+}
+
 /** The variant's nameable colours — never includes "rainbow" in the
  * rainbow variant (rainbow is touched by every colour clue but is never
  * itself a nameable clue colour). */
