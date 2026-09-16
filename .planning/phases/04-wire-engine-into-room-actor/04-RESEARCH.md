@@ -513,7 +513,13 @@ it("RT-09: a double-sent clue actionId is applied exactly once", async () => {
 
 ## Open Questions
 
-1. **Does `mapAdapterError` need a full 1:1 mapping, or can several `AdapterError` members collapse onto one `ErrorDetail` member?**
+**ALL RESOLVED (2026-09-16, planner). This section is closed — no question below blocks planning or execution.**
+
+1. **RESOLVED — full 1:1 mapping. All 8 `AdapterError` members each get their own `ErrorDetail` member; nothing collapses.**
+   Settled by CONTEXT.md D-10, which states the mapping is 1:1 and names all 8 members verbatim after a direct read of `packages/rules/src/adapter.ts`. `invalid_action` and `clue_target_invalid` therefore DO get their own members. Implemented in plan `04-02` (enum widening) and plan `04-04` (`mapAdapterError(error: AdapterError): ErrorDetail`).
+   Planner-settled consequence: `mapAdapterError`'s return type changes from `RefusalReason` to `ErrorDetail`. The wire `code` stays `"bad_request"` and the specific reason rides in the error frame's `detail`, because D-10 widens `ErrorDetailSchema` — NOT the shared `RefusalReasonSchema`, which `refused` frames also use. `RoomResult`'s failure branch gains an optional `detail?: ErrorDetail`.
+   *Original question text retained below for the audit trail.*
+   ~~Does `mapAdapterError` need a full 1:1 mapping, or can several `AdapterError` members collapse onto one `ErrorDetail` member?~~
    - What we know: `AdapterError` has 8 members (`not_your_turn`, `invalid_action`, `game_over`, `card_not_in_hand`, `no_clue_tokens`, `clue_touches_nothing`, `clue_target_invalid`, `discard_at_max_clues`). D-10 names 6 player-facing reasons explicitly (clue tokens, clue touches nothing, discard at max, not your turn, card not in hand, game over) — `invalid_action` and `clue_target_invalid` are not named.
    - What's unclear: whether `invalid_action` (malformed/hostile payload) and `clue_target_invalid` (targeting self or a nonexistent seat — should be prevented by D-12 client disabling anyway) get their own enum members or collapse to a generic fallback.
    - Recommendation: give every `AdapterError` member a corresponding `ErrorDetail` member for a clean 1:1 map (simpler, no lossy collapsing, and `invalid_action`/`clue_target_invalid` are cheap to add) — matches D-10's spirit ("widened with a closed enum of rule-refusal reasons") without inventing an asymmetric partial mapping. Flag as a planning decision, not fully closed by research.
@@ -524,10 +530,21 @@ it("RT-09: a double-sent clue actionId is applied exactly once", async () => {
    - What's unclear: whether CONTEXT.md intended a DO-internal test assertion (bypassing the wire) or simply wrote D-15 loosely.
    - Recommendation: assert on wire-visible fields only (`clueTokens`, `activeSeatId`, `isYourTurn`, `deckCount`) — do not add a history-exposing debug path or reach into DO internals just to satisfy a literal reading of D-15's assertion list. Confirm this interpretation with the user/planner before execution if it matters to them.
 
-3. **Does the interim board need per-seat "your hand slot count" derived correctly when a player has fewer than 5 cards (4-5 player games use 4-card hands)?**
+3. **RESOLVED — the board renders hand slots by `.map()`ing the actual array; a hardcoded slot count is forbidden.**
+   Settled by `04-UI-SPEC.md` "Component Notes — Trap 1", an APPROVED contract: `HanabiView.yourHand` and each `otherHands[].cards` are already exactly as long as the real hand (4 cards for 4-5 players, 5 for 2-3), so the board must iterate the array and never render a fixed 5-slot grid. Enforced by an explicit acceptance criterion in plan `04-06`.
+   *Original question text retained below for the audit trail.*
+   ~~Does the interim board need per-seat "your hand slot count" derived correctly when a player has fewer than 5 cards?~~
    - What we know: `handSizeFor` in `packages/rules/src/hanabi/variant.ts` already parametrizes this; `HanabiView.yourHand`/`otherHands[].cards` arrays are simply as long as the actual hand.
    - What's unclear: nothing structurally — this is a non-issue as long as the board renders `.map()` over the actual array length rather than hardcoding "5 slots."
    - Recommendation: explicit reminder for the plan/executor, since a hardcoded 5-slot grid would silently misrender in a 4-5 player game (RULES-01 already correctly implemented server-side; don't let the UI reintroduce the bug visually).
+
+### Planner-resolved discrepancy (not an original open question — recorded here because it corrects Pattern 2 above)
+
+**`ClueValueSchema` must NOT be a `z.discriminatedUnion("type", ...)` in `packages/schema/src/games/hanabi.ts`.**
+
+Pattern 2 sketches it as a discriminated union of `{type:"color", value: Suit}` and `{type:"rank", value: Rank}`. That sketch would break `game-registration.ts`'s compile-time assertion. `ClueFactsView.positiveClues`/`negativeClues` are declared in `packages/rules/src/hanabi/state.ts:61-62` as `Array<{ type: "color" | "rank"; value: Suit | Rank }>` — a single loose object type, not a discriminated union — and the same loose shape appears on `HistoryEntryView`'s clue branch (`state.ts:93`). A value of that loose type is **not** assignable to the narrower discriminated union, so `[HanabiView] extends [HanabiViewWire]` would evaluate to `never` and fail to compile.
+
+The schema must therefore mirror the loose type exactly: one `z.strictObject` with `type: z.enum(["color","rank"])` and `value: z.union([SuitSchema, RankSchema])`. This is a deliberate, documented concession to the Phase 3 view type (which this phase does not reopen, per CONTEXT.md "No rules changes"). It is a view-shape nuance only and costs nothing in redaction terms: the own-hand boundary — the actual HIDE-01 line — is still carried by a strict `z.discriminatedUnion("hidden", ...)`. Plan `04-01` requires this rationale as an inline comment in the schema file.
 
 ## Environment Availability
 

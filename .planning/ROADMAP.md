@@ -146,7 +146,39 @@ Plans:
   2. A player who refreshes mid-game rejoins their exact same seat with full game state and no lost turn.
   3. Submitting the same action twice (double-click, or retry after a dropped response) is applied exactly once, verified by deliberately double-sending a request.
 
-**Plans**: TBD
+**Plans**: 8 plans
+Plans:
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — Strict Hanabi view schema at `@games/schema/games/hanabi` + subpath wiring (D-05)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 04-02-PLAN.md — Wire protocol: `actionId`, widened closed `ErrorDetail`, persisted seat key, schema version bump (D-06/D-07/D-08/D-10)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 04-03-PLAN.md — Registration-point swap to `hanabiGame`, leak-test repoint, structural confinement rewrite (D-02/D-03/D-04)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 04-04-PLAN.md — Exactly-once actions: per-seat `actionId` dedup before the adapter, 1:1 refusal mapping (D-08/D-09/D-10)
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 04-05-PLAN.md — Live-wire proofs: Hanabi frame capture, double-sent clue, dedup across a forced eviction (D-02/D-15)
+
+**Wave 6** *(blocked on Wave 4)*
+
+- [ ] 04-06-PLAN.md — Interim playable board, D-12 disabling predicates, `RoomClient` swap (D-11/D-12/D-13)
+
+**Wave 7** *(blocked on Wave 6)*
+
+- [ ] 04-07-PLAN.md — Playwright: RT-01 no-refresh propagation and RT-03 mid-game reload (D-14)
+
+**Wave 8** *(blocked on Wave 7)*
+
+- [ ] 04-08-PLAN.md — Forehead-card toy deletion sweep, zero-occurrence regression, phase gate (D-01/D-03/D-16)
 
 ### Phase 5: Reconnect & Session Durability Hardening
 
@@ -202,7 +234,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Room & Transport Skeleton | 11/11 | Complete   | 2026-09-15 |
 | 2. Per-Seat Redaction Contract | 6/6 | Complete    | 2026-09-15 |
 | 3. Hanabi Rules Engine | 5/5 | Complete    | 2026-09-16 |
-| 4. Wire Engine Into Room Actor | 0/TBD | Not started | - |
+| 4. Wire Engine Into Room Actor | 0/8 | Planned     | - |
 | 5. Reconnect & Session Durability Hardening | 0/TBD | Not started | - |
 | 6. Game Interface | 0/TBD | Not started | - |
 | 7. Variant Support (Rainbow, Black) | 0/TBD | Not started | - |
