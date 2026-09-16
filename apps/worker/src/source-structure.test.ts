@@ -23,7 +23,7 @@
 // dropped a path that used to exist (e.g. an error frame that stopped being
 // sent at all). Both directions are bugs this test must catch.
 
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -33,6 +33,8 @@ import { describe, expect, it } from "vitest";
 // `import.meta.url`'s `URL` object into `fileURLToPath` fails to type-check.
 // `.pathname` on a `file://` URL is a plain string and sidesteps that clash.
 const SRC_DIR = new URL("./", import.meta.url).pathname;
+// apps/worker/src -> repo root, to locate the deleted toy modules by path.
+const REPO_ROOT = join(SRC_DIR, "..", "..", "..");
 
 /**
  * Strips `//` line comments and `/* *\/` block comments from `source`,
@@ -322,5 +324,22 @@ describe("HIDE-02/HIDE-03/D-06 structural chokepoint audit (D-09)", () => {
   it("D-01/D-03: foreheadCardGame appears nowhere in the worker's non-test sources (the toy is gone, not merely unconfined)", () => {
     const hits = findFilesWithMatch(/foreheadCardGame/g);
     expect(hits, `expected zero foreheadCardGame occurrences, found in: ${JSON.stringify(hits)}`).toEqual([]);
+  });
+
+  // D-01/D-03 (04-08 T2): "the identifier is gone" (above) and "the files
+  // themselves are gone" are different claims — a future revert could
+  // resurrect forehead-card.ts as a file with all its `foreheadCardGame`
+  // references renamed away, which would satisfy the identifier check above
+  // while quietly reintroducing the toy. This check targets the FILES, by
+  // path, on disk. Deliberately scoped to the identifier/file, never the
+  // bare word "forehead": several packages/rules/src/hanabi/*.ts files and
+  // packages/schema/src/constants.ts legitimately cite forehead-card.ts in
+  // comment prose as the design template they were modelled on, and that
+  // historical rationale is deliberately retained, not swept.
+  it("D-01/D-03: the deleted toy modules no longer exist on disk", () => {
+    const rulesToyPath = join(REPO_ROOT, "packages", "rules", "src", "forehead-card.ts");
+    const schemaToyPath = join(REPO_ROOT, "packages", "schema", "src", "games", "forehead-card.ts");
+    expect(existsSync(rulesToyPath), `expected ${rulesToyPath} to not exist`).toBe(false);
+    expect(existsSync(schemaToyPath), `expected ${schemaToyPath} to not exist`).toBe(false);
   });
 });
