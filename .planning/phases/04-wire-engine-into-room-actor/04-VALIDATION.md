@@ -71,7 +71,7 @@ updated: 2026-09-16
 | 04-07 T3 | 04-07 | 7 | RT-03 (D-14) | T-04-31 | Mid-game reload returns the same seat, hand size, tokens, and turn | e2e, `page.reload()` | `npx playwright test e2e/hanabi-realtime.spec.ts` | ❌ new | ⬜ pending |
 | 04-08 T1 | 04-08 | 8 | RT-01 (D-01) | T-04-33 | Toy deleted with no dangling reference anywhere | typecheck + full suite | `npx tsc -b && npm test` | ✅ delete | ⬜ pending |
 | 04-08 T2 | 04-08 | 8 | RT-01 (D-03) | T-04-34 | Toy identifier and files provably absent | structural source test | `npx vitest run --project worker source-structure` | ✅ extend | ⬜ pending |
-| 04-08 T3 | 04-08 | 8 | RT-01, RT-03, RT-09 (D-16) | T-04-35/36 | Full gate green; a real two-player game played; clean WebSocket frame | gate + human | `npx tsc -b && npm test && npx playwright test` | ✅ gate | ⬜ pending |
+| 04-08 T3 | 04-08 | 8 | RT-01, RT-03, RT-09 (D-16) | T-04-35/36 | Full gate green; a real two-player game played; clean WebSocket frame | gate + human | `npx tsc -b && npm test && npx playwright test` | ✅ gate | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -120,9 +120,9 @@ No three consecutive tasks lack an automated verify: every task in all eight pla
 
 ## Manual-Only Verifications
 
-| Behavior | Requirement | Why Manual | Test Instructions |
-|----------|-------------|------------|-------------------|
-| A real two-player base game, plus raw WebSocket frame inspection | RT-01, RT-03, HIDE-01 | The automated layers prove redaction structurally; a human looking at an actual DevTools frame and playing a real game is the independent confirmation Phase 2 established as the closing ritual | See **04-08 T3**'s `<how-to-verify>` — 10 numbered steps |
+| Behavior | Requirement | Why Manual | Test Instructions | Result |
+|----------|-------------|------------|-------------------|--------|
+| A real two-player base game, plus raw WebSocket frame inspection | RT-01, RT-03, HIDE-01 | The automated layers prove redaction structurally; a human looking at an actual DevTools frame and playing a real game is the independent confirmation Phase 2 established as the closing ritual | See **04-08 T3**'s `<how-to-verify>` — 10 numbered steps | Approved by user on 2026-09-16, verbatim reply: "confirmed" |
 
 ---
 
@@ -139,3 +139,14 @@ No three consecutive tasks lack an automated verify: every task in all eight pla
 - [x] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** planner-filled 2026-09-16
+
+## Human Sign-Off — 04-08 Task 3 (Phase Gate)
+
+The automated D-16 gate (`npx tsc -b`, `npm test`, `npx playwright test`) was reported green by the executor before the checkpoint was raised. The user then ran the 10-step manual verification in `04-08-PLAN.md` Task 3 (`<how-to-verify>`) across two browser sessions and replied to the checkpoint with the single word **"confirmed"**, with no caveats and no further detail supplied.
+
+- **Approved by:** user (rflores3113@gmail.com)
+- **Date:** 2026-09-16
+- **Verbatim response:** "confirmed"
+- **Scope of approval:** all items in the Task 3 `<acceptance_criteria>` list — two-player base game playable end to end, live action propagation without refresh (RT-01), mid-game reload returning the same seat (RT-03), and own-hand entries in a raw WebSocket frame carrying no `suit`/`rank` keys.
+
+No specific frame contents, card identities, or screenshots were described by the user and none are recorded here beyond what the user stated.
