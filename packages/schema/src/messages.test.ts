@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import {
   ClientMessageSchema,
+  ErrorDetailSchema,
   ServerMessageSchema,
   encodeServerMessage,
   parseClientMessage,
@@ -56,12 +57,49 @@ describe("ClientMessageSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts a game_action with an arbitrary nested payload (the adapter, not this schema, judges it)", () => {
+  it("accepts a game_action with a valid actionId and an arbitrary nested payload (the adapter, not this schema, judges it)", () => {
     const result = ClientMessageSchema.safeParse({
       type: "game_action",
+      actionId: "abc123",
       request: { anything: { nested: [1, 2, 3] }, could: "be here" },
     });
     expect(result.success).toBe(true);
+  });
+
+  it("rejects a game_action without an actionId (D-07 required envelope field)", () => {
+    const result = ClientMessageSchema.safeParse({
+      type: "game_action",
+      request: { foo: "bar" },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a game_action with an empty-string actionId", () => {
+    const result = ClientMessageSchema.safeParse({
+      type: "game_action",
+      actionId: "",
+      request: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a game_action with a 65-character actionId (over the D-07 bound)", () => {
+    const result = ClientMessageSchema.safeParse({
+      type: "game_action",
+      actionId: "a".repeat(65),
+      request: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a game_action carrying an unknown extra envelope key (strict mode still holds)", () => {
+    const result = ClientMessageSchema.safeParse({
+      type: "game_action",
+      actionId: "abc123",
+      request: {},
+      extra: "nope",
+    });
+    expect(result.success).toBe(false);
   });
 
   it("accepts set_variant, start_game, and leave", () => {
@@ -158,6 +196,29 @@ describe("ErrorMessageSchema.detail (D-08 closed enum)", () => {
     const msg = { type: "error", code: "bad_request", detail: "anything else" };
     // @ts-expect-error — deliberately not a member of the closed ErrorDetailSchema enum
     expect(() => encodeServerMessage(msg)).toThrow();
+  });
+
+  it("D-08: rejects free-text detail such as 'you played the red 3' (error frames carry no state)", () => {
+    const result = ErrorDetailSchema.safeParse("you played the red 3");
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts every one of the 9 ErrorDetail members", () => {
+    const members = [
+      "view_unavailable",
+      "not_your_turn",
+      "invalid_action",
+      "game_over",
+      "card_not_in_hand",
+      "no_clue_tokens",
+      "clue_touches_nothing",
+      "clue_target_invalid",
+      "discard_at_max_clues",
+    ];
+    expect(members).toHaveLength(9);
+    for (const member of members) {
+      expect(ErrorDetailSchema.safeParse(member).success).toBe(true);
+    }
   });
 
   it("rejects an error frame carrying an extra key such as view or game", () => {

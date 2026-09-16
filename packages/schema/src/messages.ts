@@ -27,8 +27,22 @@ const StartGameMessageSchema = z.strictObject({
   type: z.literal("start_game"),
 });
 
+/** D-07: bounds for the client-minted idempotency key on `game_action`. */
+const ACTION_ID_MIN_LENGTH = 1;
+const ACTION_ID_MAX_LENGTH = 64;
+
 const GameActionMessageSchema = z.strictObject({
   type: z.literal("game_action"),
+  /** D-07: an opaque idempotency key minted by the client once per user
+   * intent (one click), reused verbatim on any retry. It deliberately lives
+   * at the ENVELOPE level and never inside `request`: the adapter's
+   * exact-own-key guards (`isPlayRequest`/`isDiscardRequest`/`isClueRequest`
+   * in `packages/rules/src/hanabi/actions.ts`) reject any request object
+   * carrying an extra key, so keeping `actionId` out of `request` is what
+   * lets both mechanisms hold at once. It is an idempotency key ONLY — it
+   * never reaches the adapter and never influences game logic (D-07,
+   * HIDE-05). */
+  actionId: z.string().min(ACTION_ID_MIN_LENGTH).max(ACTION_ID_MAX_LENGTH),
   /** Deliberately `unknown` here — validated by the game adapter, not by
    * this schema. The schema package must not know what a game action is
    * (FDN-01), and the adapter already treats `request` as hostile input. */
@@ -75,12 +89,25 @@ const SupersededMessageSchema = z.strictObject({
   type: z.literal("superseded"),
 });
 
-/** D-08: error frames must never carry state. `detail` is a CLOSED enum, not
- * a free string — the only current member, "view_unavailable", is sent when
- * a projected view fails its strict game schema (D-07 fail-closed). There is
- * deliberately no way to widen this into a free-text/state-bearing channel
- * without an explicit code change to this schema. */
-export const ErrorDetailSchema = z.enum(["view_unavailable"]);
+/** D-08/D-10: error frames must never carry state. `detail` is a CLOSED enum,
+ * never a free string. `"view_unavailable"` is sent when a projected view
+ * fails its strict game schema (D-07 fail-closed). The remaining 8 members
+ * mirror `AdapterError` (`packages/rules/src/adapter.ts`) 1:1 by name, so
+ * `mapAdapterError` (plan 04-04) can map without a lossy collapse. Widening
+ * this to a free-form string would reintroduce the state-bearing channel
+ * Phase 2 closed — there is deliberately no way to do that without an
+ * explicit code change to this schema. */
+export const ErrorDetailSchema = z.enum([
+  "view_unavailable",
+  "not_your_turn",
+  "invalid_action",
+  "game_over",
+  "card_not_in_hand",
+  "no_clue_tokens",
+  "clue_touches_nothing",
+  "clue_target_invalid",
+  "discard_at_max_clues",
+]);
 export type ErrorDetail = z.infer<typeof ErrorDetailSchema>;
 
 const ErrorMessageSchema = z.strictObject({
