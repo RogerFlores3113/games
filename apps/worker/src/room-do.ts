@@ -135,69 +135,77 @@ export class RoomDO extends Server<Env> {
       this.#send(connection, { type: "error", code: "bad_request" });
       return;
     }
-    const msg = parsed.message;
-    const now = Date.now();
-    const room = await this.#ensureRoom();
+    // WR-04: contain any exception escaping dispatch, mirroring `onAlarm`:
+    // an escaping throw must not tear down the room (T-1-10), and the
+    // requesting client still gets an answer instead of silence.
+    try {
+      const msg = parsed.message;
+      const now = Date.now();
+      const room = await this.#ensureRoom();
 
-    if (msg.type === "join") {
-      await this.#handleJoin(connection, room, msg.displayName, msg.seatToken, now);
-      return;
-    }
-
-    // Every other message type resolves the actor's seat from the
-    // connection-layer `bindings` map — NEVER from the message body, which
-    // has no `seatId` field to supply (T-1-04 boundary).
-    const actorSeatId = this.#seatIdFor(connection as unknown as ConnectionWithSeat);
-    if (actorSeatId === null) {
-      this.#send(connection, { type: "error", code: "not_seated" });
-      return;
-    }
-
-    if (msg.type === "set_variant") {
-      const result = setVariant(room, actorSeatId, msg.variant, now);
-      if (!result.ok) {
-        this.#send(connection, { type: "error", code: result.reason });
+      if (msg.type === "join") {
+        await this.#handleJoin(connection, room, msg.displayName, msg.seatToken, now);
         return;
       }
-      await this.#commit(result.state, now);
-      await this.#pushState();
-      return;
-    }
 
-    if (msg.type === "start_game") {
-      // WR-07: a secret seed, never the public room code (see mintGameSeed).
-      const result = startGame(room, actorSeatId, now, mintGameSeed());
-      if (!result.ok) {
-        this.#send(connection, { type: "error", code: result.reason });
+      // Every other message type resolves the actor's seat from the
+      // connection-layer `bindings` map — NEVER from the message body, which
+      // has no `seatId` field to supply (T-1-04 boundary).
+      const actorSeatId = this.#seatIdFor(connection as unknown as ConnectionWithSeat);
+      if (actorSeatId === null) {
+        this.#send(connection, { type: "error", code: "not_seated" });
         return;
       }
-      await this.#commit(result.state, now);
-      await this.#pushState();
-      return;
-    }
 
-    if (msg.type === "game_action") {
-      const result = applyGameAction(room, actorSeatId, msg.actionId, msg.request, now);
-      if (!result.ok) {
-        this.#send(connection, { type: "error", code: result.reason, detail: result.detail });
+      if (msg.type === "set_variant") {
+        const result = setVariant(room, actorSeatId, msg.variant, now);
+        if (!result.ok) {
+          this.#send(connection, { type: "error", code: result.reason });
+          return;
+        }
+        await this.#commit(result.state, now);
+        await this.#pushState();
         return;
       }
-      await this.#commit(result.state, now);
-      await this.#pushState();
-      return;
-    }
 
-    if (msg.type === "leave") {
-      // CR-03: `releaseSeat` refuses mid-game — the seat stays in turn order.
-      const result = releaseSeat(room, actorSeatId, now);
-      if (!result.ok) {
-        this.#send(connection, { type: "error", code: result.reason });
+      if (msg.type === "start_game") {
+        // WR-07: a secret seed, never the public room code (see mintGameSeed).
+        const result = startGame(room, actorSeatId, now, mintGameSeed());
+        if (!result.ok) {
+          this.#send(connection, { type: "error", code: result.reason });
+          return;
+        }
+        await this.#commit(result.state, now);
+        await this.#pushState();
         return;
       }
-      connection.setState(null);
-      await this.#commit(result.state, now);
-      await this.#pushState();
-      return;
+
+      if (msg.type === "game_action") {
+        const result = applyGameAction(room, actorSeatId, msg.actionId, msg.request, now);
+        if (!result.ok) {
+          this.#send(connection, { type: "error", code: result.reason, detail: result.detail });
+          return;
+        }
+        await this.#commit(result.state, now);
+        await this.#pushState();
+        return;
+      }
+
+      if (msg.type === "leave") {
+        // CR-03: `releaseSeat` refuses mid-game — the seat stays in turn order.
+        const result = releaseSeat(room, actorSeatId, now);
+        if (!result.ok) {
+          this.#send(connection, { type: "error", code: result.reason });
+          return;
+        }
+        connection.setState(null);
+        await this.#commit(result.state, now);
+        await this.#pushState();
+        return;
+      }
+    } catch (error) {
+      console.error(`RoomDO onMessage failed (${connection.id}):`, error);
+      this.#send(connection, { type: "error", code: "bad_request" });
     }
   }
 
