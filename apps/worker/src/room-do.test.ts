@@ -415,7 +415,7 @@ describe("RoomDO integration (live wrangler dev)", () => {
 
     // Alice takes her turn; the resulting state still has both seats, and it
     // is now Bob's turn — the game did not lose a seat it will need.
-    send(ws1, { type: "game_action", request: { type: "guess", value: "Altair" } });
+    send(ws1, { type: "game_action", actionId: "test-action-cr03", request: { type: "guess", value: "Altair" } });
     const afterTurn = await c2.waitFor(
       (m) => m.type === "state" && (m.view as { game: { revealed: unknown[] } | null }).game?.revealed.length === 1,
       5000,
@@ -570,7 +570,7 @@ describe("RoomDO integration (live wrangler dev)", () => {
       }
 
       const firstActive = findActiveSeat();
-      send(firstActive.ws, { type: "game_action", request: { type: "guess", value: FOREHEAD_CARD_VALUES[0] } });
+      send(firstActive.ws, { type: "game_action", actionId: "test-action-hide01-first", request: { type: "guess", value: FOREHEAD_CARD_VALUES[0] } });
       for (const seat of seats) {
         await seat.c.waitFor(
           (m) => m.type === "state" && (m.view as RoomViewShape).game?.revealed.length === 1,
@@ -579,7 +579,7 @@ describe("RoomDO integration (live wrangler dev)", () => {
       }
 
       const secondActive = findActiveSeat();
-      send(secondActive.ws, { type: "game_action", request: { type: "guess", value: FOREHEAD_CARD_VALUES[1] } });
+      send(secondActive.ws, { type: "game_action", actionId: "test-action-hide01-second", request: { type: "guess", value: FOREHEAD_CARD_VALUES[1] } });
       for (const seat of seats) {
         await seat.c.waitFor(
           (m) => m.type === "state" && (m.view as RoomViewShape).game?.revealed.length === 2,

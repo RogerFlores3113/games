@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { nanoid } from "nanoid";
 import type { ClientMessage, Variant } from "@games/schema";
 import { useRoomSocket } from "../../../lib/room-socket";
 import { useRoomStore } from "../../../lib/room-store";
@@ -209,7 +210,12 @@ function ConnectedRoom({
   return (
     <ForeheadCardGame
       view={view}
-      onGuess={(value) => send({ type: "game_action", request: { type: "guess", value } })}
+      onGuess={(value) =>
+        // D-07: actionId is minted once per user intent (one click). If a
+        // retry path is ever added it MUST reuse the same id verbatim rather
+        // than minting a new one, or server-side dedup is defeated.
+        send({ type: "game_action", actionId: nanoid(), request: { type: "guess", value } })
+      }
     />
   );
 }

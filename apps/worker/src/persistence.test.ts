@@ -146,6 +146,26 @@ describe("Phase 2 adapter swap (RESEARCH Pitfall 1): pre-swap counter rooms rese
   });
 });
 
+describe("Phase 4 adapter swap (D-06): pre-swap forehead-card rooms reset", () => {
+  it("a schemaVersion 2 room with adapterId forehead-card and a toy-shaped game resets without reading the room blob", async () => {
+    expect(ROOM_SCHEMA_VERSION).toBeGreaterThan(2);
+
+    const { storage, getCalls } = makeFakeStorage();
+    await storage.put(STORAGE_KEYS.schemaVersion, 2);
+    await storage.put(STORAGE_KEYS.room, {
+      ...fallbackRoom(),
+      adapterId: "forehead-card",
+      game: { yourCard: { id: "abc", hidden: true }, otherCards: [], revealed: [], deckCount: 10 },
+    });
+    getCalls.length = 0; // reset instrumentation after seeding
+
+    const result = await loadRoom(storage, fallbackRoom);
+
+    expect(result.wasReset).toBe(true);
+    expect(getCalls).not.toContain(STORAGE_KEYS.room);
+  });
+});
+
 describe("corrupt-but-versioned storage", () => {
   it("returns wasReset: true rather than throwing when the room blob fails RoomStateSchema", async () => {
     const { storage, map } = makeFakeStorage();
