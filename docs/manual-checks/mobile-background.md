@@ -82,6 +82,7 @@ instantly on a blip and not many minutes later.
 
 | Date | Device / browser | Minutes backgrounded | Seconds to seated after return | Same seat + turn? | Teammate saw Disconnected? | Use this tab OK? | Owner's verbatim reply |
 |------|-------------------|-----------------------|----------------------------------|---------------------|-------------------------------|----------------------|---------------------------|
+| 2026-09-16 | WAIVED | WAIVED | WAIVED | WAIVED | WAIVED | WAIVED | "just skip. we can do the phone check once the game is entirely finalized and polished and ui done." |
 
 ## When to re-run
 
