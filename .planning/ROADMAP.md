@@ -158,7 +158,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 04-03-PLAN.md — Registration-point swap to `hanabiGame`, leak-test repoint, structural confinement rewrite (D-02/D-03/D-04)
+- [x] 04-03-PLAN.md — Registration-point swap to `hanabiGame`, leak-test repoint, structural confinement rewrite (D-02/D-03/D-04)
 
 **Wave 4** *(blocked on Wave 3)*
 
@@ -234,7 +234,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Room & Transport Skeleton | 11/11 | Complete   | 2026-09-15 |
 | 2. Per-Seat Redaction Contract | 6/6 | Complete    | 2026-09-15 |
 | 3. Hanabi Rules Engine | 5/5 | Complete    | 2026-09-16 |
-| 4. Wire Engine Into Room Actor | 2/8 | In Progress|  |
+| 4. Wire Engine Into Room Actor | 3/8 | In Progress|  |
 | 5. Reconnect & Session Durability Hardening | 0/TBD | Not started | - |
 | 6. Game Interface | 0/TBD | Not started | - |
 | 7. Variant Support (Rainbow, Black) | 0/TBD | Not started | - |

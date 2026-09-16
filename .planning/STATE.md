@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-09-16T03:03:59.860Z"
+last_updated: "2026-09-16T03:20:08.952Z"
 last_activity: 2026-09-16
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 30
-  completed_plans: 24
+  completed_plans: 25
   percent: 43
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 4 (Wire Engine Into Room Actor) — EXECUTING
-Plan: 3 of 8
+Plan: 4 of 8
 Status: Ready to execute
 Last activity: 2026-09-16
 
-Progress: [████████░░] 80%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
@@ -77,6 +77,7 @@ Progress: [████████░░] 80%
 | Phase 03 P05 | 50min | 3 tasks | 7 files |
 | Phase 04 P01 | 35min | 2 tasks | 6 files |
 | Phase 04 P02 | 33min | 3 tasks | 7 files |
+| Phase 04 P03 | 55min | 4 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -134,6 +135,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 04-01: ClueValueSchema stays a single z.strictObject, not a z.discriminatedUnion("type", ...), because HanabiView's Clue-like wire fields are the loose { type; value: Suit|Rank } shape, which a narrower union cannot absorb without breaking game-registration.ts's compile-time assignability assertion
 - [Phase ?]: 04-01: hanabi.test.ts fixtures use named consts instead of array-indexing (baseValidView.yourHand[0]) because noUncheckedIndexedAccess makes indexed access possibly-undefined and fails tsc -b
 - [Phase 04]: actionId bounds 1-64 chars; ErrorDetail members named identically to AdapterError for lossless 1:1 mapping
+- [Phase ?]: legalActionFor priority order (clue > discard > play) implemented independently per test file, per plan's file-scoped task boundaries
+- [Phase ?]: Layer-3 leak test's allowedIdentityCounts computed as element-wise max across a seat's own captured frames
+- [Phase ?]: room-state.test.ts deck-exhaustion test rewritten to drive a Hanabi game to its natural end via legalActionFor
 
 ### Pending Todos
 
@@ -153,6 +157,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-16T03:03:45.700Z
+Last session: 2026-09-16T03:17:44.097Z
 Stopped at: Completed 04-01-PLAN.md
 Resume file: None
