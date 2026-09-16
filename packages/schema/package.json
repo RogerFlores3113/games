@@ -6,7 +6,8 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./games/forehead-card": "./src/games/forehead-card.ts"
+    "./games/forehead-card": "./src/games/forehead-card.ts",
+    "./games/hanabi": "./src/games/hanabi.ts"
   },
   "dependencies": {
     "zod": "4.5.4"
