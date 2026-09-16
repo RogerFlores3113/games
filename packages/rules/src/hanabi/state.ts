@@ -26,10 +26,8 @@ export type HandSlot = { readonly card: HanabiCard; readonly facts: ClueFacts };
 export type Hand = { readonly seatId: string; readonly slots: readonly HandSlot[] };
 export type StackEntry = { readonly suit: Suit; readonly topRank: number }; // 0 = empty stack
 
-// TODO(plan 02): replace this placeholder with `export type { HistoryEntry }
-// from "./history"` once history.ts exists. Kept local here so state.ts
-// compiles standalone for this plan.
-export type HistoryEntry = unknown;
+import type { HistoryEntry } from "./history";
+export type { HistoryEntry } from "./history";
 
 export type HanabiState = {
   readonly variant: Variant;
@@ -64,6 +62,44 @@ export type ClueFactsView = {
   negativeClues: Array<{ type: "color" | "rank"; value: Suit | Rank }>;
 };
 
+// Non-readonly, plain-Array view mirror of HistoryEntry (same split as every
+// other *View type in this file): a history entry never crosses the wire
+// with more identity than HistoryEntry itself carries (D-19) — this type
+// exists only to relax readonly/array-shape for Phase 4's z.infer
+// assignability, not to add or remove fields.
+export type HistoryEntryView =
+  | {
+      turn: number;
+      type: "play";
+      seatId: string;
+      cardId: string;
+      suit: Suit;
+      rank: Rank;
+      success: boolean;
+    }
+  | {
+      turn: number;
+      type: "discard";
+      seatId: string;
+      cardId: string;
+      suit: Suit;
+      rank: Rank;
+    }
+  | {
+      turn: number;
+      type: "clue";
+      seatId: string;
+      targetSeatId: string;
+      clue: { type: "color" | "rank"; value: Suit | Rank };
+      touchedCardIds: string[];
+    }
+  | {
+      turn: number;
+      type: "draw";
+      seatId: string;
+      cardId: string;
+    };
+
 export type HanabiView = {
   variant: Variant;
   yourSeatId: string | null;
@@ -78,5 +114,5 @@ export type HanabiView = {
   activeSeatId: string;
   isYourTurn: boolean;
   score: number;
-  history: unknown[]; // HistoryEntryView[], concretized in plan 02
+  history: HistoryEntryView[];
 };
