@@ -177,9 +177,9 @@ export class RoomDO extends Server<Env> {
     }
 
     if (msg.type === "game_action") {
-      const result = applyGameAction(room, actorSeatId, msg.request, now);
+      const result = applyGameAction(room, actorSeatId, msg.actionId, msg.request, now);
       if (!result.ok) {
-        this.#send(connection, { type: "error", code: result.reason });
+        this.#send(connection, { type: "error", code: result.reason, detail: result.detail });
         return;
       }
       await this.#commit(result.state, now);

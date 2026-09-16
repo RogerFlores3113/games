@@ -14,6 +14,7 @@ import { activeGame } from "./game-registration";
 import type { ActiveGameState } from "./game-registration";
 import { MAX_PLAYERS, MIN_PLAYERS } from "@games/schema";
 import type {
+  ErrorDetail,
   PublicSeat,
   RefusalReason,
   RoomState,
@@ -22,6 +23,7 @@ import type {
   SeatToken,
   Variant,
 } from "@games/schema";
+import type { AdapterError } from "@games/rules";
 import { deriveDisplayLabel } from "./seat-naming";
 
 // ---------------------------------------------------------------------------
@@ -39,7 +41,7 @@ const adapter = activeGame.adapter;
 
 export type RoomResult =
   | { ok: true; state: RoomState }
-  | { ok: false; reason: RefusalReason };
+  | { ok: false; reason: RefusalReason; detail?: ErrorDetail };
 
 export type JoinResult =
   | {
@@ -284,20 +286,60 @@ export function startGame(
   };
 }
 
-/** Every `AdapterError` collapses onto `bad_request` — the room layer does
- * not attempt to distinguish game-rule refusal reasons at the wire-protocol
- * level; Plan 09 can enrich the message shown to the player using the
- * adapter's own view, without widening this shared enum. */
-function mapAdapterError(): RefusalReason {
-  return "bad_request";
+/** D-10: the wire `code` on an `error` frame deliberately stays `bad_request`
+ * for every adapter refusal — `RefusalReasonSchema` is shared with `refused`
+ * frames (join-time refusals like `full`/`in_progress`) and must not be
+ * widened just to carry game-rule reasons. The SPECIFIC reason instead rides
+ * in the closed `ErrorDetail` vocabulary (`@games/schema`), which mirrors
+ * `AdapterError` 1:1 by name so this mapping is never lossy.
+ *
+ * This function must never return free text or interpolate any game value —
+ * that is the Phase 2 D-08 boundary (error frames carry no game state). The
+ * exhaustive `switch` with a `never`-typed default means a future widening of
+ * `AdapterError` (another typed refusal added to the adapter interface) is a
+ * compile error here, not a silent fallthrough onto some default detail. */
+function mapAdapterError(error: AdapterError): ErrorDetail {
+  switch (error) {
+    case "not_your_turn":
+      return "not_your_turn";
+    case "invalid_action":
+      return "invalid_action";
+    case "game_over":
+      return "game_over";
+    case "card_not_in_hand":
+      return "card_not_in_hand";
+    case "no_clue_tokens":
+      return "no_clue_tokens";
+    case "clue_touches_nothing":
+      return "clue_touches_nothing";
+    case "clue_target_invalid":
+      return "clue_target_invalid";
+    case "discard_at_max_clues":
+      return "discard_at_max_clues";
+    default: {
+      const exhaustiveCheck: never = error;
+      throw new Error(`Unrecognized AdapterError: ${String(exhaustiveCheck)}`);
+    }
+  }
 }
 
 /** Delegates to the adapter and never inspects the contents of `request` or
  * `state.game` itself — that delegation, and nothing else, is the FDN-01
- * line for in-game actions. */
+ * line for in-game actions.
+ *
+ * D-08/D-09/RT-09: `actionId` is checked against the actor's PERSISTED
+ * `lastAppliedActionId` unconditionally, for every action type, BEFORE
+ * `adapter.applyAction` is ever called. This placement is load-bearing: a
+ * repeated play or discard would be naturally rejected once the card has
+ * already left the hand, but a repeated CLUE is perfectly legal and would
+ * spend a second clue token — relying on the engine's accidental idempotence
+ * would silently miss exactly the action type that matters. A dedup hit is
+ * NOT an error: the caller commits and pushes this (unchanged) state, so a
+ * retry after a dropped response looks like success to the retrying client. */
 export function applyGameAction(
   state: RoomState,
   actorSeatId: string,
+  actionId: string,
   request: unknown,
   now: number,
 ): RoomResult {
@@ -305,13 +347,22 @@ export function applyGameAction(
     return { ok: false, reason: "bad_request" };
   }
 
+  const actorSeat = state.seats.find((seat) => seat.seatId === actorSeatId);
+  if (actorSeat !== undefined && actorSeat.lastAppliedActionId === actionId) {
+    return { ok: true, state };
+  }
+
   const gameState = state.game as ActiveGameState;
   const result = adapter.applyAction(gameState, actorSeatId, request);
   if (!result.ok) {
-    return { ok: false, reason: mapAdapterError() };
+    return { ok: false, reason: "bad_request", detail: mapAdapterError(result.error) };
   }
 
   const ended = adapter.checkGameEnd(result.state);
+
+  const seats = state.seats.map((seat) =>
+    seat.seatId === actorSeatId ? { ...seat, lastAppliedActionId: actionId } : seat,
+  );
 
   return {
     ok: true,
@@ -319,6 +370,7 @@ export function applyGameAction(
       ...state,
       status: ended !== null ? "ended" : state.status,
       game: result.state,
+      seats,
       lastActivityAt: now,
     },
   };
