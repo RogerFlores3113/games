@@ -23,8 +23,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **RT-01**: A player's action appears on every other player's screen without manual refresh
 - [x] **RT-02**: The backend serves a cold link click after a week of total inactivity with no manual intervention and no perceptible wake delay
 - [x] **RT-03**: A player who refreshes the page rejoins their same seat with full game state and no lost turn
-- [ ] **RT-04**: A player who loses connection or whose mobile tab is suspended rejoins their same seat and resumes the game in progress
-- [ ] **RT-05**: Reconnecting a player uses the same state-delivery path as initial join, not a separate resume path
+- [x] **RT-04**: A player who loses connection or whose mobile tab is suspended rejoins their same seat and resumes the game in progress
+- [x] **RT-05**: Reconnecting a player uses the same state-delivery path as initial join, not a separate resume path
 - [ ] **RT-06**: Remaining players see a clear disconnected indicator for an absent player, and the game pauses in place rather than freezing or erroring
 - [x] **RT-07**: An occupied seat cannot be taken over by another person holding the room link
 - [ ] **RT-08**: A player opening the room in a second tab does not corrupt or duplicate their seat
@@ -137,8 +137,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RT-01 | Phase 4 | Complete |
 | RT-02 | Phase 1 | Complete (waived 2026-09-15 by owner) |
 | RT-03 | Phase 4 | Complete |
-| RT-04 | Phase 5 | Pending |
-| RT-05 | Phase 5 | Pending |
+| RT-04 | Phase 5 | Complete |
+| RT-05 | Phase 5 | Complete |
 | RT-06 | Phase 5 | Pending |
 | RT-07 | Phase 1 | Complete |
 | RT-08 | Phase 5 | Pending |
