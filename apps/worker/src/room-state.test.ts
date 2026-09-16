@@ -486,22 +486,28 @@ describe("D-02 / FDN-01: game actions are delegated to the registered adapter on
     state = started.state;
 
     let guard = 0;
+    let lastActor = "";
+    let lastAction: HanabiAction | null = null;
     while (state.status === "in_progress" && guard < 2000) {
       guard++;
       const game = state.game as ActiveGameState;
-      const result = applyGameAction(
-        state,
-        game.seatIds[game.turnIndex]!,
-        `action-${guard}`,
-        legalActionFor(game),
-        10 + guard,
-      );
+      lastActor = game.seatIds[game.turnIndex]!;
+      lastAction = legalActionFor(game);
+      const result = applyGameAction(state, lastActor, `action-${guard}`, lastAction, 10 + guard);
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error("unreachable");
       state = result.state;
     }
 
     expect(state.status).toBe("ended");
+
+    // WR-01: retrying the game-ENDING action's own actionId is an idempotent
+    // success (dedup runs before the status gate), and changes nothing.
+    const endedState = state;
+    const retry = applyGameAction(endedState, lastActor, `action-${guard}`, lastAction, 9998);
+    expect(retry.ok).toBe(true);
+    if (!retry.ok) throw new Error("unreachable");
+    expect(retry.state).toBe(endedState);
 
     const game = state.game as ActiveGameState;
     const stillActiveSeatId = game.seatIds[game.turnIndex]!;

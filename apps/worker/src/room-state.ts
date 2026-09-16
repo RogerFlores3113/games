@@ -343,13 +343,16 @@ export function applyGameAction(
   request: unknown,
   now: number,
 ): RoomResult {
-  if (state.status !== "in_progress") {
-    return { ok: false, reason: "bad_request" };
-  }
-
+  // WR-01: the dedup check runs BEFORE the status gate. The action that ENDS
+  // the game flips `status` to "ended"; a retry of that same `actionId` after
+  // a dropped response must still see idempotent success, not `bad_request`.
   const actorSeat = state.seats.find((seat) => seat.seatId === actorSeatId);
   if (actorSeat !== undefined && actorSeat.lastAppliedActionId === actionId) {
     return { ok: true, state };
+  }
+
+  if (state.status !== "in_progress") {
+    return { ok: false, reason: "bad_request" };
   }
 
   const gameState = state.game as ActiveGameState;
