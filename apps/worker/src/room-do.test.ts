@@ -29,7 +29,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { HEARTBEAT_PING, HEARTBEAT_PONG, LOBBY_SEAT_RELEASE_GRACE_MS } from "@games/schema";
+import {
+  HEARTBEAT_PING,
+  HEARTBEAT_PONG,
+  LOBBY_SEAT_RELEASE_GRACE_MS,
+  ServerMessageSchema,
+  STALE_SOCKET_CLOSE_CODE,
+  SUPERSEDED_CLOSE_CODE,
+} from "@games/schema";
 import { checkHanabiViewForLeaks } from "@games/rules";
 import type { HanabiSeatSecrets } from "@games/rules";
 import { mintRoomCode } from "./seat-identity";
@@ -49,6 +56,11 @@ let child: ChildProcess;
  * exactly the false-positive this D-17 test exists to avoid. `detached:
  * true` puts the whole tree in its own process group; `killAndWait` below
  * signals the group (negative pid), not just the immediate child. */
+/** D-15: SOCKET_STALE_MS/ZOMBIE_SWEEP_INTERVAL_MS wrangler-var overrides so
+ * the zombie-sweep tests below never sleep for real minutes.
+ * `openSocket`'s 1s-interval default heartbeat keeps every OTHER (non-zombie)
+ * test's sockets well under this 4s threshold, so this does not perturb any
+ * pre-existing test in this file. */
 function spawnWrangler(): ChildProcess {
   return spawn(
     "npx",
@@ -61,6 +73,10 @@ function spawnWrangler(): ChildProcess {
       persistDir,
       "--log-level",
       "error",
+      "--var",
+      "SOCKET_STALE_MS:4000",
+      "--var",
+      "ZOMBIE_SWEEP_INTERVAL_MS:1000",
     ],
     {
       cwd: new URL("..", import.meta.url).pathname,
@@ -109,6 +125,13 @@ function roomUrl(code: string): string {
  * sockets. Tests that need to simulate a half-open peer (the heartbeat spike
  * itself, and later zombie-sweep tests) opt out with `{ heartbeat: false }`
  * so only their own explicit pings are sent. */
+/** D-03/D-08: sockets whose interval handle is tracked here, so a test can
+ * start a socket healthy (heartbeat on) and go half-open at a moment of its
+ * own choosing via `stopHeartbeat` below — needed for the D-08 pause-in-place
+ * case, where the sockets must not go stale in the LOBBY before the game
+ * starts. */
+const heartbeatIntervals = new WeakMap<WebSocket, ReturnType<typeof setInterval>>();
+
 function openSocket(code: string, options?: { heartbeat?: boolean }): Promise<WebSocket> {
   const heartbeat = options?.heartbeat ?? true;
   return new Promise((resolve, reject) => {
@@ -122,6 +145,7 @@ function openSocket(code: string, options?: { heartbeat?: boolean }): Promise<We
               ws.send(HEARTBEAT_PING);
             }
           }, 1000);
+          heartbeatIntervals.set(ws, interval);
           ws.addEventListener("close", () => clearInterval(interval), { once: true });
         }
         resolve(ws);
@@ -130,6 +154,14 @@ function openSocket(code: string, options?: { heartbeat?: boolean }): Promise<We
     );
     ws.addEventListener("error", (e) => reject(e), { once: true });
   });
+}
+
+/** Stops a socket's heartbeat interval (started by `openSocket`'s default
+ * `heartbeat: true`), simulating a half-open peer from this moment on
+ * without closing the socket itself. No-op if the socket had no heartbeat. */
+function stopHeartbeat(ws: WebSocket): void {
+  const interval = heartbeatIntervals.get(ws);
+  if (interval !== undefined) clearInterval(interval);
 }
 
 type Parsed = Record<string, unknown> & { type: string };
@@ -1181,4 +1213,375 @@ describe("Phase 5 heartbeat spike (D-02, RESEARCH Open Question 1)", () => {
 
     ws1.close();
   });
+});
+
+describe("Phase 5 dead-socket detection and reconnect (D-03, D-12, D-13, D-15)", () => {
+  type SeatViewShape = {
+    status: string;
+    hostSeatId: string | null;
+    seats: { seatId: string; connected: boolean }[];
+    game: { activeSeatId: string; clueTokens: number; deckCount: number } | null;
+  };
+
+  /** The most recent joined/state frame seen on `c`, so far. */
+  function latestState(
+    c: ReturnType<typeof collectMessages>,
+  ): (Parsed & { view: SeatViewShape }) | undefined {
+    return [...c.parsed].reverse().find((m) => m.type === "state" || m.type === "joined") as
+      | (Parsed & { view: SeatViewShape })
+      | undefined;
+  }
+
+  it(
+    "D-03: a seated socket that stops pinging is closed with STALE_SOCKET_CLOSE_CODE and its seat flips to connected:false for the other player",
+    async () => {
+      const code = mintRoomCode();
+      const wsAlice = await openSocket(code);
+      const cAlice = collectMessages(wsAlice);
+      send(wsAlice, { type: "join", displayName: "Alice" });
+      await cAlice.waitFor((m) => m.type === "joined");
+
+      const wsBob = await openSocket(code, { heartbeat: false });
+      const cBob = collectMessages(wsBob);
+      send(wsBob, { type: "join", displayName: "Bob" });
+      const joinedBob = (await cBob.waitFor((m) => m.type === "joined")) as Parsed & { seatId: string };
+
+      const afterSweep = await cAlice.waitFor((m) => {
+        if (m.type !== "state") return false;
+        const bob = (m.view as SeatViewShape).seats.find((s) => s.seatId === joinedBob.seatId);
+        return bob !== undefined && bob.connected === false;
+      }, 9000);
+      expect(afterSweep.type).toBe("state");
+
+      const bobClose = await cBob.waitForClose(9000);
+      expect(bobClose.code).toBe(STALE_SOCKET_CLOSE_CODE);
+
+      wsAlice.close();
+    },
+    30_000,
+  );
+
+  it(
+    "D-03: two healthy heartbeat sockets stay connected:true through 3x the stale window, with no state frame pushed by the no-op sweeps",
+    async () => {
+      const code = mintRoomCode();
+      const wsAlice = await openSocket(code);
+      const cAlice = collectMessages(wsAlice);
+      send(wsAlice, { type: "join", displayName: "Alice" });
+      await cAlice.waitFor((m) => m.type === "joined");
+
+      const wsBob = await openSocket(code);
+      const cBob = collectMessages(wsBob);
+      send(wsBob, { type: "join", displayName: "Bob" });
+      await cBob.waitFor((m) => m.type === "joined");
+      await cAlice.waitFor((m) => m.type === "state" && (m.view as SeatViewShape).seats.length === 2);
+
+      const countBefore = cAlice.parsed.length;
+      await new Promise((r) => setTimeout(r, 12_000));
+      const newStateFrames = cAlice.parsed.slice(countBefore).filter((m) => m.type === "state");
+      expect(newStateFrames).toHaveLength(0);
+
+      const latest = latestState(cAlice)!;
+      expect(latest.view.seats.every((s) => s.connected)).toBe(true);
+
+      wsAlice.close();
+      wsBob.close();
+    },
+    30_000,
+  );
+
+  it(
+    "Pitfall 3: a chatty host acting every 500ms does not defer detecting a genuinely stale seat",
+    async () => {
+      const code = mintRoomCode();
+      const wsAlice = await openSocket(code);
+      const cAlice = collectMessages(wsAlice);
+      send(wsAlice, { type: "join", displayName: "Alice" });
+      await cAlice.waitFor((m) => m.type === "joined");
+
+      const wsBob = await openSocket(code, { heartbeat: false });
+      const cBob = collectMessages(wsBob);
+      send(wsBob, { type: "join", displayName: "Bob" });
+      const joinedBob = (await cBob.waitFor((m) => m.type === "joined")) as Parsed & { seatId: string };
+
+      let toggled = false;
+      const chatInterval = setInterval(() => {
+        if (wsAlice.readyState === WebSocket.OPEN) {
+          send(wsAlice, { type: "set_variant", variant: toggled ? "rainbow" : "base" });
+          toggled = !toggled;
+        }
+      }, 500);
+
+      try {
+        const afterSweep = await cAlice.waitFor((m) => {
+          if (m.type !== "state") return false;
+          const bob = (m.view as SeatViewShape).seats.find((s) => s.seatId === joinedBob.seatId);
+          return bob !== undefined && bob.connected === false;
+        }, 9000);
+        expect(afterSweep.type).toBe("state");
+      } finally {
+        clearInterval(chatInterval);
+      }
+
+      wsAlice.close();
+    },
+    30_000,
+  );
+
+  it(
+    "D-08: sweeping the ACTIVE seat pauses the game in place — turn, tokens, deck and room status all unchanged",
+    async () => {
+      const code = mintRoomCode();
+      const wsAlice = await openSocket(code);
+      const cAlice = collectMessages(wsAlice);
+      send(wsAlice, { type: "join", displayName: "Alice" });
+      const joinedAlice = (await cAlice.waitFor((m) => m.type === "joined")) as Parsed & { seatId: string };
+
+      const wsBob = await openSocket(code);
+      const cBob = collectMessages(wsBob);
+      send(wsBob, { type: "join", displayName: "Bob" });
+      const joinedBob = (await cBob.waitFor((m) => m.type === "joined")) as Parsed & { seatId: string };
+      await cAlice.waitFor((m) => m.type === "state" && (m.view as SeatViewShape).seats.length === 2);
+
+      send(wsAlice, { type: "start_game" });
+      for (const c of [cAlice, cBob]) {
+        await c.waitFor((m) => m.type === "state" && (m.view as SeatViewShape).status === "in_progress", 8000);
+      }
+
+      const seats = [
+        { seatId: joinedAlice.seatId, ws: wsAlice, c: cAlice },
+        { seatId: joinedBob.seatId, ws: wsBob, c: cBob },
+      ];
+      const aliceLatest = latestState(cAlice)!;
+      const activeSeatId = aliceLatest.view.game!.activeSeatId;
+      const active = seats.find((s) => s.seatId === activeSeatId)!;
+      const observer = seats.find((s) => s.seatId !== activeSeatId)!;
+
+      const before = {
+        activeSeatId: aliceLatest.view.game!.activeSeatId,
+        clueTokens: aliceLatest.view.game!.clueTokens,
+        deckCount: aliceLatest.view.game!.deckCount,
+      };
+
+      // The sockets must not go stale in the LOBBY before the game starts —
+      // stopHeartbeat is called only now, after both are confirmed
+      // in_progress above.
+      stopHeartbeat(active.ws);
+
+      const afterSweep = await observer.c.waitFor((m) => {
+        if (m.type !== "state") return false;
+        const seat = (m.view as SeatViewShape).seats.find((s) => s.seatId === active.seatId);
+        return seat !== undefined && seat.connected === false;
+      }, 9000);
+
+      const view = afterSweep.view as SeatViewShape;
+      expect(view.game!.activeSeatId).toBe(before.activeSeatId);
+      expect(view.game!.clueTokens).toBe(before.clueTokens);
+      expect(view.game!.deckCount).toBe(before.deckCount);
+      expect(view.status).toBe("in_progress");
+      expect(view.seats.some((s) => s.seatId === active.seatId)).toBe(true);
+
+      wsAlice.close();
+      wsBob.close();
+    },
+    30_000,
+  );
+
+  it(
+    "D-12: a second socket claiming a half-open seat's token ends with exactly one bound socket, one seat, connected:true, same seatId",
+    async () => {
+      const code = mintRoomCode();
+      const ws1 = await openSocket(code, { heartbeat: false });
+      const c1 = collectMessages(ws1);
+      send(ws1, { type: "join", displayName: "Alice" });
+      const joined1 = (await c1.waitFor((m) => m.type === "joined")) as Parsed & {
+        seatId: string;
+        seatToken: string;
+      };
+
+      const ws2 = await openSocket(code);
+      const c2 = collectMessages(ws2);
+      send(ws2, { type: "join", displayName: "Alice", seatToken: joined1.seatToken });
+      const joined2 = (await c2.waitFor((m) => m.type === "joined")) as Parsed & { seatId: string };
+      expect(joined2.seatId).toBe(joined1.seatId);
+
+      await new Promise((r) => setTimeout(r, 6000));
+
+      const latest = latestState(c2)!;
+      expect(latest.view.seats).toHaveLength(1);
+      const seat = latest.view.seats.find((s) => s.seatId === joined1.seatId)!;
+      expect(seat.connected).toBe(true);
+
+      const ws1Close = await c1.waitForClose(8000);
+      expect(ws1Close.code).toBe(SUPERSEDED_CLOSE_CODE);
+      expect(ws1Close.code).not.toBe(STALE_SOCKET_CLOSE_CODE);
+
+      ws2.close();
+    },
+    30_000,
+  );
+
+  it(
+    "D-13: reconnecting after a zombie close gets a joined frame schema-identical to the original fresh join, and the seat flips back to connected:true",
+    async () => {
+      const code = mintRoomCode();
+      const wsAlice = await openSocket(code);
+      const cAlice = collectMessages(wsAlice);
+      send(wsAlice, { type: "join", displayName: "Alice" });
+      await cAlice.waitFor((m) => m.type === "joined");
+
+      const wsBob = await openSocket(code, { heartbeat: false });
+      const cBob = collectMessages(wsBob);
+      send(wsBob, { type: "join", displayName: "Bob" });
+      const joinedBob = (await cBob.waitFor((m) => m.type === "joined")) as Parsed & {
+        seatId: string;
+        seatToken: string;
+      };
+      expect(ServerMessageSchema.safeParse(joinedBob).success).toBe(true);
+
+      await cBob.waitForClose(9000);
+
+      const wsBob2 = await openSocket(code);
+      const cBob2 = collectMessages(wsBob2);
+      send(wsBob2, { type: "join", displayName: "Bob", seatToken: joinedBob.seatToken });
+      const reclaimed = (await cBob2.waitFor((m) => m.type === "joined")) as Parsed & { seatId: string };
+      expect(reclaimed.seatId).toBe(joinedBob.seatId);
+      expect(Object.keys(reclaimed).sort()).toEqual(Object.keys(joinedBob).sort());
+      expect(Object.keys(reclaimed.view as object).sort()).toEqual(Object.keys(joinedBob.view as object).sort());
+      expect(ServerMessageSchema.safeParse(reclaimed).success).toBe(true);
+
+      const afterReconnect = await cAlice.waitFor((m) => {
+        if (m.type !== "state") return false;
+        const seat = (m.view as SeatViewShape).seats.find((s) => s.seatId === joinedBob.seatId);
+        return seat !== undefined && seat.connected === true;
+      }, 8000);
+      expect(afterReconnect.type).toBe("state");
+
+      wsAlice.close();
+      wsBob2.close();
+    },
+    30_000,
+  );
+
+  it(
+    "D-15: reconnect after a forced wrangler eviction mid-game returns the same seatId and the same game state for both seats",
+    async () => {
+      type GameCardVisible = { id: string; hidden: false; suit: string; rank: number };
+      type GameCard = GameCardVisible | { id: string; hidden: true };
+      type GameViewShape = {
+        otherHands: { seatId: string; cards: GameCard[] }[];
+        clueTokens: number;
+        deckCount: number;
+        activeSeatId: string;
+        isYourTurn: boolean;
+      };
+      type RoomViewShape = { status: string; game: GameViewShape | null; seats: { seatId: string }[] };
+
+      const code = mintRoomCode();
+      const wsAlice = await openSocket(code);
+      const cAlice = collectMessages(wsAlice);
+      send(wsAlice, { type: "join", displayName: "Alice" });
+      const joinedAlice = (await cAlice.waitFor((m) => m.type === "joined")) as Parsed & {
+        seatId: string;
+        seatToken: string;
+      };
+
+      const wsBob = await openSocket(code);
+      const cBob = collectMessages(wsBob);
+      send(wsBob, { type: "join", displayName: "Bob" });
+      const joinedBob = (await cBob.waitFor((m) => m.type === "joined")) as Parsed & {
+        seatId: string;
+        seatToken: string;
+      };
+      await cAlice.waitFor((m) => m.type === "state" && (m.view as RoomViewShape).seats.length === 2);
+
+      send(wsAlice, { type: "start_game" });
+      for (const c of [cAlice, cBob]) {
+        await c.waitFor((m) => m.type === "state" && (m.view as RoomViewShape).status === "in_progress", 8000);
+      }
+
+      const seats = [
+        { seatId: joinedAlice.seatId, ws: wsAlice, c: cAlice },
+        { seatId: joinedBob.seatId, ws: wsBob, c: cBob },
+      ];
+
+      function findActiveSeat(): { seat: (typeof seats)[number]; game: GameViewShape } {
+        for (const seat of seats) {
+          const latestGameFrame = [...seat.c.parsed]
+            .reverse()
+            .find((m) => (m.type === "state" || m.type === "joined") && (m.view as RoomViewShape).game !== null);
+          const view = latestGameFrame?.view as RoomViewShape | undefined;
+          if (view?.game?.isYourTurn === true) return { seat, game: view.game };
+        }
+        throw new Error("no active seat found among the latest game-bearing frames");
+      }
+
+      function legalClueFrom(game: GameViewShape): { targetSeatId: string; rank: number } {
+        const target = game.otherHands.find((h) => h.cards.length > 0);
+        if (target === undefined) throw new Error("no other seat holds any cards to clue");
+        const card = target.cards.find((c): c is GameCardVisible => !c.hidden);
+        if (card === undefined) throw new Error("no visible card found to derive a legal clue from");
+        return { targetSeatId: target.seatId, rank: card.rank };
+      }
+
+      const active = findActiveSeat();
+      const clue = legalClueFrom(active.game);
+      send(active.seat.ws, {
+        type: "game_action",
+        actionId: "test-action-d15-eviction-clue",
+        request: {
+          type: "clue",
+          targetSeatId: clue.targetSeatId,
+          clue: { type: "rank", value: clue.rank },
+        },
+      });
+
+      const recorded = (await cAlice.waitFor((m) => {
+        if (m.type !== "state") return false;
+        const game = (m.view as RoomViewShape).game;
+        return game !== null && game.activeSeatId !== active.seat.seatId;
+      }, 8000)) as Parsed & { view: RoomViewShape };
+      const before = {
+        activeSeatId: recorded.view.game!.activeSeatId,
+        clueTokens: recorded.view.game!.clueTokens,
+        deckCount: recorded.view.game!.deckCount,
+      };
+
+      wsAlice.close();
+      wsBob.close();
+      await new Promise((r) => setTimeout(r, 500));
+
+      await killAndWait(child);
+      child = spawnWrangler();
+      await waitForReady();
+
+      const wsAlice2 = await openSocket(code);
+      const cAlice2 = collectMessages(wsAlice2);
+      send(wsAlice2, { type: "join", displayName: "Alice", seatToken: joinedAlice.seatToken });
+      const reclaimedAlice = (await cAlice2.waitFor((m) => m.type === "joined", 8000)) as Parsed & {
+        seatId: string;
+        view: RoomViewShape;
+      };
+      expect(reclaimedAlice.seatId).toBe(joinedAlice.seatId);
+      expect(reclaimedAlice.view.game!.activeSeatId).toBe(before.activeSeatId);
+      expect(reclaimedAlice.view.game!.clueTokens).toBe(before.clueTokens);
+      expect(reclaimedAlice.view.game!.deckCount).toBe(before.deckCount);
+
+      const wsBob2 = await openSocket(code);
+      const cBob2 = collectMessages(wsBob2);
+      send(wsBob2, { type: "join", displayName: "Bob", seatToken: joinedBob.seatToken });
+      const reclaimedBob = (await cBob2.waitFor((m) => m.type === "joined", 8000)) as Parsed & {
+        seatId: string;
+        view: RoomViewShape;
+      };
+      expect(reclaimedBob.seatId).toBe(joinedBob.seatId);
+      expect(reclaimedBob.view.game!.activeSeatId).toBe(before.activeSeatId);
+      expect(reclaimedBob.view.game!.clueTokens).toBe(before.clueTokens);
+      expect(reclaimedBob.view.game!.deckCount).toBe(before.deckCount);
+
+      wsAlice2.close();
+      wsBob2.close();
+    },
+    60_000,
+  );
 });
