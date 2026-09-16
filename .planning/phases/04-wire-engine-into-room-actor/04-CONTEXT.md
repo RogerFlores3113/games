@@ -45,7 +45,8 @@ This phase deletes the forehead-card toy and calls the **real Hanabi engine** th
 
 ### Proving it
 - **D-14:** RT-01 and RT-03 are proven by **Playwright against the real worker**: two browsers, a clue/play/discard appearing on the other screen without a refresh, and a mid-game refresh returning to the same seat with full state and the same turn. This extends the existing e2e specs rather than adding a parallel harness.
-- **D-15:** RT-09 is proven by **deliberately double-sending the same `actionId`** (the plan should exercise it at the socket level where the duplicate is unambiguous) and asserting the game state advanced exactly once — token count, history length and turn index all unchanged by the second send.
+- **D-15:** RT-09 is proven by **deliberately double-sending the same `actionId`** at the **socket level**, extending the existing `wrangler dev` + raw `ws` harness in `apps/worker/src/room-do.test.ts` (the same one that proves the D-17 eviction path). Playwright offers no reliable hook for forcing a byte-identical duplicate frame, so it is the wrong tool for this one.
+  **Corrected 2026-09-16:** an earlier draft of this decision named "history length" as an assertion target. That was wrong — turn history is server-only by Phase 3's D-19 and has no field in `HanabiView`, so it is not observable on the wire. Assert only on wire-visible evidence that the second send changed nothing: `clueTokens`, `activeSeatId`/`isYourTurn`, `deckCount`, and the target hand's clue facts. Do **not** add a debug hook to expose internal state for the sake of a test.
 - **D-16:** The phase gate is the full suite plus the e2e specs, matching Phases 2 and 3: `npm test` and `npx playwright test` green, and per-package `tsc --noEmit` clean.
 
 ### Claude's Discretion
