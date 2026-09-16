@@ -30,7 +30,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LOBBY_SEAT_RELEASE_GRACE_MS } from "@games/schema";
-import { FOREHEAD_CARD_VALUES, checkSeatViewForLeaks } from "@games/rules";
+import { checkHanabiViewForLeaks } from "@games/rules";
+import type { HanabiSeatSecrets } from "@games/rules";
 import { mintRoomCode } from "./seat-identity";
 
 const PORT = 18787;
@@ -523,16 +524,23 @@ describe("RoomDO integration (live wrangler dev)", () => {
   it(
     "HIDE-01 / HIDE-04 (D-11 layer 3): no seat's raw frames carry its own card, the undealt deck, across join, live update, and seat-token reconnect",
     async () => {
-      type GameCardHidden = { id: string; hidden: true };
-      type GameCardVisible = { id: string; hidden: false; value: string };
+      type GameCardHidden = { id: string; hidden: true; facts: unknown };
+      type GameCardVisible = { id: string; hidden: false; suit: string; rank: number; facts: unknown };
+      type GameCard = GameCardHidden | GameCardVisible;
+      type HistoryEntryShape = Record<string, unknown> & { type: string };
       type GameViewShape = {
-        yourCard: GameCardHidden;
-        otherCards: { seatId: string; card: GameCardHidden | GameCardVisible }[];
-        revealed: { id: string; seatId: string; value: string; correct: boolean }[];
+        yourHand: GameCard[];
+        otherHands: { seatId: string; cards: GameCard[] }[];
+        stacks: { suit: string; topRank: number }[];
+        discard: { id: string; suit: string; rank: number }[];
+        clueTokens: number;
+        fuses: number;
         deckCount: number;
+        finalTurnsRemaining: number | null;
         activeSeatId: string;
         isYourTurn: boolean;
         score: number;
+        history: HistoryEntryShape[];
       };
       type RoomViewShape = { status: string; game: GameViewShape | null };
 
@@ -584,31 +592,61 @@ describe("RoomDO integration (live wrangler dev)", () => {
         { seatId: joinedCara.seatId, ws: wsCara, c: cCara },
       ];
 
-      function findActiveSeat(): (typeof seats)[number] {
+      function findActiveSeat(): { seat: (typeof seats)[number]; game: GameViewShape } {
         for (const seat of seats) {
           const latestGameFrame = [...seat.c.parsed]
             .reverse()
             .find((m) => (m.type === "state" || m.type === "joined") && (m.view as RoomViewShape).game !== null);
           const view = latestGameFrame?.view as RoomViewShape | undefined;
-          if (view?.game?.isYourTurn === true) return seat;
+          if (view?.game?.isYourTurn === true) return { seat, game: view.game };
         }
         throw new Error("no active seat found among the latest game-bearing frames");
       }
 
-      const firstActive = findActiveSeat();
-      send(firstActive.ws, { type: "game_action", actionId: "test-action-hide01-first", request: { type: "guess", value: FOREHEAD_CARD_VALUES[0] } });
+      /** A rank clue naming a rank actually present on a card in some other
+       * seat's (visible) hand, from the ACTIVE seat's own captured view —
+       * this test only ever sees wire frames. Guaranteed legal: a rank
+       * actually present cannot be refused for touching nothing. */
+      function legalClueFrom(game: GameViewShape): { targetSeatId: string; rank: number } {
+        const target = game.otherHands.find((h) => h.cards.length > 0);
+        if (target === undefined) throw new Error("no other seat holds any cards to clue");
+        const card = target.cards.find((c): c is GameCardVisible => !c.hidden);
+        if (card === undefined) throw new Error("no visible card found to derive a legal clue from");
+        return { targetSeatId: target.seatId, rank: card.rank };
+      }
+
+      const first = findActiveSeat();
+      const firstClue = legalClueFrom(first.game);
+      send(first.seat.ws, {
+        type: "game_action",
+        actionId: "test-action-hide01-first",
+        request: {
+          type: "clue",
+          targetSeatId: firstClue.targetSeatId,
+          clue: { type: "rank", value: firstClue.rank },
+        },
+      });
       for (const seat of seats) {
         await seat.c.waitFor(
-          (m) => m.type === "state" && (m.view as RoomViewShape).game?.revealed.length === 1,
+          (m) => m.type === "state" && (m.view as RoomViewShape).game?.history.length === 1,
           8000,
         );
       }
 
-      const secondActive = findActiveSeat();
-      send(secondActive.ws, { type: "game_action", actionId: "test-action-hide01-second", request: { type: "guess", value: FOREHEAD_CARD_VALUES[1] } });
+      const second = findActiveSeat();
+      const secondClue = legalClueFrom(second.game);
+      send(second.seat.ws, {
+        type: "game_action",
+        actionId: "test-action-hide01-second",
+        request: {
+          type: "clue",
+          targetSeatId: secondClue.targetSeatId,
+          clue: { type: "rank", value: secondClue.rank },
+        },
+      });
       for (const seat of seats) {
         await seat.c.waitFor(
-          (m) => m.type === "state" && (m.view as RoomViewShape).game?.revealed.length === 2,
+          (m) => m.type === "state" && (m.view as RoomViewShape).game?.history.length === 2,
           8000,
         );
       }
@@ -637,27 +675,96 @@ describe("RoomDO integration (live wrangler dev)", () => {
       addFrames(joinedBob.seatId, cBobReconnect.raw, cBobReconnect.parsed);
       addFrames(joinedCara.seatId, cCara.raw, cCara.parsed);
 
-      // cardValueById: every value legitimately visible to SOME seat (another
-      // seat's live card, or a publicly revealed card) — never a seat's own
-      // yourCard (structurally hidden) or an undealt deck entry (never sent).
-      const cardValueById = new Map<string, string>();
+      // identityById: the true {suit, rank} of every card id legitimately
+      // observed with identity by SOME seat — another seat's visible hand
+      // card, or a discard-pile entry — never a seat's own yourHand entry
+      // (structurally hidden) or an undealt deck entry (never sent). This is
+      // the cross-frame correspondence the test uses to recover "the true
+      // identity of MY card" without touching server-side state: a seat's
+      // own hand card ids come from its own `yourHand[].id`; their true
+      // identities are observable in OTHER seats' frames under
+      // `otherHands[].cards[]` where the same card id appears with
+      // suit/rank.
+      const identityById = new Map<string, { suit: string; rank: number }>();
       for (const frame of frames) {
         const game = (frame.parsed as { view?: RoomViewShape }).view?.game;
         if (game === null || game === undefined) continue;
-        for (const other of game.otherCards) {
-          if (!other.card.hidden) cardValueById.set(other.card.id, other.card.value);
+        for (const hand of game.otherHands) {
+          for (const card of hand.cards) {
+            if (!card.hidden) identityById.set(card.id, { suit: card.suit, rank: card.rank });
+          }
         }
-        for (const entry of game.revealed) {
-          cardValueById.set(entry.id, entry.value);
+        for (const entry of game.discard) {
+          identityById.set(entry.id, { suit: entry.suit, rank: entry.rank });
         }
       }
 
-      const seenValues = new Set(cardValueById.values());
-      const forbiddenTokens = FOREHEAD_CARD_VALUES.filter((v) => !seenValues.has(v));
-      expect(
-        forbiddenTokens.length,
-        `expected at least 10 never-seen deck values (non-vacuous check); saw ${seenValues.size}: ${[...seenValues].join(", ")}`,
-      ).toBeGreaterThanOrEqual(10);
+      /** The {suit,rank} multiset legitimately visible in `game`'s own
+       * fields (other hands' visible cards, the discard pile, and any
+       * play/discard history entry) — the per-frame allowance a leak count
+       * must not exceed. */
+      function frameIdentityCounts(game: GameViewShape): Map<string, number> {
+        const counts = new Map<string, number>();
+        const bump = (suit: string, rank: number): void => {
+          const key = `${suit}:${rank}`;
+          counts.set(key, (counts.get(key) ?? 0) + 1);
+        };
+        for (const hand of game.otherHands) {
+          for (const card of hand.cards) {
+            if (!card.hidden) bump(card.suit, card.rank);
+          }
+        }
+        for (const entry of game.discard) bump(entry.suit, entry.rank);
+        for (const entry of game.history) {
+          if (entry.type === "play" || entry.type === "discard") {
+            bump(entry.suit as string, entry.rank as number);
+          }
+        }
+        return counts;
+      }
+
+      function ownCardsFor(seatId: string): HanabiSeatSecrets["ownCards"] {
+        const ids = new Set<string>();
+        for (const frame of frames) {
+          if (frame.seatId !== seatId) continue;
+          const game = (frame.parsed as { view?: RoomViewShape }).view?.game;
+          if (game === null || game === undefined) continue;
+          for (const card of game.yourHand) ids.add(card.id);
+        }
+        const result: HanabiSeatSecrets["ownCards"][number][] = [];
+        for (const id of ids) {
+          const identity = identityById.get(id);
+          if (identity !== undefined) {
+            result.push({ id, ...identity } as HanabiSeatSecrets["ownCards"][number]);
+          }
+        }
+        return result;
+      }
+
+      /** Element-wise max, per identity key, across every one of `seatId`'s
+       * own captured frames — the static allowance a per-frame observed
+       * count is checked against. */
+      function allowedIdentityCountsFor(seatId: string): Record<string, number> {
+        const maxCounts = new Map<string, number>();
+        for (const frame of frames) {
+          if (frame.seatId !== seatId) continue;
+          const game = (frame.parsed as { view?: RoomViewShape }).view?.game;
+          if (game === null || game === undefined) continue;
+          for (const [key, count] of frameIdentityCounts(game)) {
+            maxCounts.set(key, Math.max(maxCounts.get(key) ?? 0, count));
+          }
+        }
+        return Object.fromEntries(maxCounts);
+      }
+
+      const secretsBySeat = new Map<string, HanabiSeatSecrets>();
+      for (const seatId of [joinedAlice.seatId, joinedBob.seatId, joinedCara.seatId]) {
+        secretsBySeat.set(seatId, {
+          ownCards: ownCardsFor(seatId),
+          allowedIdentityCounts: allowedIdentityCountsFor(seatId),
+          forbiddenTokens: [],
+        });
+      }
 
       const gameFrameCountBySeat = new Map<string, number>();
       let reconnectFrameChecked = false;
@@ -665,24 +772,17 @@ describe("RoomDO integration (live wrangler dev)", () => {
       for (const frame of frames) {
         const view = (frame.parsed as { view?: RoomViewShape }).view;
         const game = view?.game ?? null;
-        let ownCard: { id: string; value: string } | null = null;
 
         if (game !== null) {
-          const ownId = game.yourCard.id;
-          const ownValue = cardValueById.get(ownId);
-          expect(
-            ownValue,
-            `seat ${frame.seatId}'s own card id ${ownId} was never observed as a visible/revealed value in any captured frame`,
-          ).toBeDefined();
-          ownCard = { id: ownId, value: ownValue as string };
           gameFrameCountBySeat.set(frame.seatId, (gameFrameCountBySeat.get(frame.seatId) ?? 0) + 1);
           if (frame.parsed === reconnectJoined) reconnectFrameChecked = true;
         }
 
-        const leaks = checkSeatViewForLeaks({
+        const secrets = secretsBySeat.get(frame.seatId)!;
+        const leaks = checkHanabiViewForLeaks({
           view: frame.parsed,
           serialized: frame.raw,
-          secrets: { ownCard, forbiddenTokens },
+          secrets,
         });
         expect(leaks, `seat ${frame.seatId} leaked in raw frame: ${frame.raw}`).toEqual([]);
       }
