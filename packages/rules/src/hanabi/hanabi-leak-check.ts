@@ -64,6 +64,19 @@ export function secretsForHanabiSeat(
   for (const stack of state.stacks) {
     for (let rank = 1; rank <= stack.topRank; rank++) bump(stack.suit, rank as Rank);
   }
+  // A "play" or "discard" history entry reveals the SAME already-public
+  // identity a view's stacks/discard-pile fields also carry (D-19's public
+  // facts, restated chronologically) — without this, a view containing both
+  // the current discard pile AND its history log legitimately mentions a
+  // discarded/misplayed card's identity twice, which the typed multiset
+  // below would otherwise flag as an excess-count leak. Bumping once per
+  // history entry (independent of the discard/stack bumps above) keeps the
+  // allowed count matching the view's actual, legitimate repetition.
+  for (const entry of state.history) {
+    if (entry.type === "play" || entry.type === "discard") {
+      bump(entry.suit, entry.rank);
+    }
+  }
 
   const forbiddenTokens = seed !== undefined ? [seed] : [];
 
