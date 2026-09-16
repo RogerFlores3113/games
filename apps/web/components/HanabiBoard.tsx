@@ -9,6 +9,7 @@ import { RANKS } from "@games/rules";
 import {
   bandForView,
   cluableColorsForView,
+  fusesRemainingForView,
   isDiscardDisabled,
   isGiveClueDisabled,
   isPlayDisabled,
@@ -197,7 +198,7 @@ export function HanabiBoard({ view, onAction }: HanabiBoardProps) {
             {game.clueTokens} clue tokens
           </p>
           <p data-testid="fuse-tokens" className="text-[length:var(--text-body)]" style={{ color: "var(--color-text)", lineHeight: "var(--text-body--line-height)" }}>
-            {game.fuses} fuses left
+            {fusesRemainingForView(game)} fuses left
           </p>
           <p data-testid="deck-count" className="text-[length:var(--text-body)]" style={{ color: "var(--color-text)", lineHeight: "var(--text-body--line-height)" }}>
             {game.deckCount} cards left in deck
