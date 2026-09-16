@@ -292,10 +292,14 @@ describe("HIDE-02/HIDE-03/D-06 structural chokepoint audit (D-09)", () => {
     expect(countMatches(roomDo, /type:\s*"state"/g)).toBe(1);
   });
 
-  it("A9 (D-06): foreheadCardGame and @games/schema/games/ appear only in game-registration.ts", () => {
-    const foreheadHits = findFilesWithMatch(/foreheadCardGame/g);
-    expect(foreheadHits, `expected foreheadCardGame only in game-registration.ts, found in: ${JSON.stringify(foreheadHits)}`).toEqual([
-      { file: "game-registration.ts", count: foreheadHits.find((h) => h.file === "game-registration.ts")?.count ?? 0 },
+  it("A9 (D-06): hanabiGame and @games/schema/games/ appear only in game-registration.ts", () => {
+    const hanabiHits = findFilesWithMatch(/hanabiGame/g);
+    const registrationCount = hanabiHits.find((h) => h.file === "game-registration.ts")?.count ?? 0;
+    // Non-vacuous: a future refactor that removes the identifier entirely
+    // must not make this confinement assertion pass with an empty array.
+    expect(registrationCount, "expected at least 1 hanabiGame occurrence in game-registration.ts").toBeGreaterThanOrEqual(1);
+    expect(hanabiHits, `expected hanabiGame only in game-registration.ts, found in: ${JSON.stringify(hanabiHits)}`).toEqual([
+      { file: "game-registration.ts", count: registrationCount },
     ]);
 
     const schemaGamesHits = findFilesWithMatch(/@games\/schema\/games\//g);
@@ -305,5 +309,18 @@ describe("HIDE-02/HIDE-03/D-06 structural chokepoint audit (D-09)", () => {
     ).toEqual([
       { file: "game-registration.ts", count: schemaGamesHits.find((h) => h.file === "game-registration.ts")?.count ?? 0 },
     ]);
+  });
+
+  // D-01/D-03: "confined to one file" (A9 above) and "appears nowhere" (this
+  // test) are different claims — silently relaxing A9 into this shape would
+  // leave a test that passes vacuously against a deleted name while proving
+  // nothing about the new one. Scoped to the IDENTIFIER `foreheadCardGame`,
+  // never the bare word "forehead": several Hanabi engine files and
+  // packages/schema/src/constants.ts legitimately cite `forehead-card.ts` in
+  // comment prose as the design template they were modelled on, and that
+  // historical rationale is deliberately retained.
+  it("D-01/D-03: foreheadCardGame appears nowhere in the worker's non-test sources (the toy is gone, not merely unconfined)", () => {
+    const hits = findFilesWithMatch(/foreheadCardGame/g);
+    expect(hits, `expected zero foreheadCardGame occurrences, found in: ${JSON.stringify(hits)}`).toEqual([]);
   });
 });
