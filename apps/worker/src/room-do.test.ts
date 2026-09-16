@@ -29,7 +29,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { LOBBY_SEAT_RELEASE_GRACE_MS } from "@games/schema";
+import { HEARTBEAT_PING, HEARTBEAT_PONG, LOBBY_SEAT_RELEASE_GRACE_MS } from "@games/schema";
 import { checkHanabiViewForLeaks } from "@games/rules";
 import type { HanabiSeatSecrets } from "@games/rules";
 import { mintRoomCode } from "./seat-identity";
@@ -101,11 +101,33 @@ function roomUrl(code: string): string {
   return `${WS_URL}/parties/room/${code}`;
 }
 
-/** Opens a WebSocket and resolves once the connection is open. */
-function openSocket(code: string): Promise<WebSocket> {
+/** Opens a WebSocket and resolves once the connection is open.
+ *
+ * D-02/D-15: by default, starts a 1s-interval heartbeat that sends the raw
+ * HEARTBEAT_PING literal while the socket is OPEN, mimicking a real client
+ * (`room-socket.ts`) so the 05-02 zombie sweep does not reap ordinary test
+ * sockets. Tests that need to simulate a half-open peer (the heartbeat spike
+ * itself, and later zombie-sweep tests) opt out with `{ heartbeat: false }`
+ * so only their own explicit pings are sent. */
+function openSocket(code: string, options?: { heartbeat?: boolean }): Promise<WebSocket> {
+  const heartbeat = options?.heartbeat ?? true;
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(roomUrl(code));
-    ws.addEventListener("open", () => resolve(ws), { once: true });
+    ws.addEventListener(
+      "open",
+      () => {
+        if (heartbeat) {
+          const interval = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(HEARTBEAT_PING);
+            }
+          }, 1000);
+          ws.addEventListener("close", () => clearInterval(interval), { once: true });
+        }
+        resolve(ws);
+      },
+      { once: true },
+    );
     ws.addEventListener("error", (e) => reject(e), { once: true });
   });
 }
@@ -117,19 +139,34 @@ type Parsed = Record<string, unknown> & { type: string };
  * bursts (e.g. `joined` immediately followed by a `state` push) well within
  * a single polling tick, so tests must search by PREDICATE (message type,
  * or a shape check) rather than assume "the Nth message" or "the most
- * recent message" is the one they're looking for. */
+ * recent message" is the one they're looking for.
+ *
+ * Pong-tolerant (D-02): a raw HEARTBEAT_PONG frame (the runtime's
+ * auto-response, never JSON) is counted separately via `pongs` and is never
+ * pushed to `raw`/`parsed`. Any other non-JSON frame is pushed to `raw` and
+ * skipped for `parsed` rather than throwing inside the listener. */
 function collectMessages(ws: WebSocket): {
   raw: string[];
   parsed: Parsed[];
+  pongs: { count: number };
   waitFor: (predicate: (msg: Parsed) => boolean, timeoutMs?: number) => Promise<Parsed>;
   waitForClose: (timeoutMs?: number) => Promise<{ code: number; reason: string }>;
 } {
   const raw: string[] = [];
   const parsed: Parsed[] = [];
+  const pongs = { count: 0 };
   ws.addEventListener("message", (event) => {
     const text = String(event.data);
+    if (text === HEARTBEAT_PONG) {
+      pongs.count += 1;
+      return;
+    }
     raw.push(text);
-    parsed.push(JSON.parse(text) as Parsed);
+    try {
+      parsed.push(JSON.parse(text) as Parsed);
+    } catch {
+      // Non-JSON, non-pong frame: recorded in `raw` only, never thrown.
+    }
   });
 
   let closeInfo: { code: number; reason: string } | null = null;
@@ -158,7 +195,7 @@ function collectMessages(ws: WebSocket): {
     return closeInfo;
   };
 
-  return { raw, parsed, waitFor, waitForClose };
+  return { raw, parsed, pongs, waitFor, waitForClose };
 }
 
 function send(ws: WebSocket, msg: unknown): void {
@@ -1080,4 +1117,68 @@ describe("RoomDO integration (live wrangler dev)", () => {
 
     ws3.close();
   }, 40_000);
+});
+
+describe("Phase 5 heartbeat spike (D-02, RESEARCH Open Question 1)", () => {
+  it("a joined socket that sends raw HEARTBEAT_PING receives a raw frame exactly equal to HEARTBEAT_PONG within 3s", async () => {
+    const code = mintRoomCode();
+    const ws1 = await openSocket(code, { heartbeat: false });
+    const c1 = collectMessages(ws1);
+    send(ws1, { type: "join", displayName: "Alice" });
+    await c1.waitFor((m) => m.type === "joined");
+
+    ws1.send(HEARTBEAT_PING);
+
+    const deadline = Date.now() + 3000;
+    while (c1.pongs.count < 1 && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    expect(c1.pongs.count).toBeGreaterThanOrEqual(1);
+
+    ws1.close();
+  });
+
+  it("in the 1500ms after sending the ping, the socket receives zero parsed error/state/joined frames (a ping reaching onMessage would produce an error/bad_request frame)", async () => {
+    const code = mintRoomCode();
+    const ws1 = await openSocket(code, { heartbeat: false });
+    const c1 = collectMessages(ws1);
+    send(ws1, { type: "join", displayName: "Alice" });
+    await c1.waitFor((m) => m.type === "joined");
+    const countBefore = c1.parsed.length;
+
+    ws1.send(HEARTBEAT_PING);
+    await new Promise((r) => setTimeout(r, 1500));
+
+    const newFrames = c1.parsed.slice(countBefore);
+    expect(newFrames.filter((m) => m.type === "error" || m.type === "state" || m.type === "joined")).toHaveLength(0);
+
+    ws1.close();
+  });
+
+  it("three pings in a row yield three pongs, and a subsequent legal set_variant still produces a state frame (socket still usable)", async () => {
+    const code = mintRoomCode();
+    const ws1 = await openSocket(code, { heartbeat: false });
+    const c1 = collectMessages(ws1);
+    send(ws1, { type: "join", displayName: "Alice" });
+    await c1.waitFor((m) => m.type === "joined");
+
+    ws1.send(HEARTBEAT_PING);
+    ws1.send(HEARTBEAT_PING);
+    ws1.send(HEARTBEAT_PING);
+
+    const deadline = Date.now() + 3000;
+    while (c1.pongs.count < 3 && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    expect(c1.pongs.count).toBeGreaterThanOrEqual(3);
+
+    send(ws1, { type: "set_variant", variant: "rainbow" });
+    const afterVariant = await c1.waitFor(
+      (m) => m.type === "state" && (m.view as { variant: string }).variant === "rainbow",
+      5000,
+    );
+    expect(afterVariant.type).toBe("state");
+
+    ws1.close();
+  });
 });

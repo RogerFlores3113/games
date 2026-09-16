@@ -25,10 +25,18 @@
 //      `projectSeatView` is itself the sole `toSeatView` call site in the
 //      whole worker. Join, live update, and reconnect all share this one
 //      path (D-10): there is no separate resume serializer anywhere.
+//   4. (D-02, Phase 5) Exactly one deliberate exception to invariant #2: the
+//      heartbeat pong is answered by the Cloudflare runtime's
+//      `setWebSocketAutoResponse`, registered once in `onStart`. It never
+//      routes through `#send`, never wakes the DO, and never invokes
+//      `onMessage` — a tested exception, not a second writer
+//      (source-structure.test.ts P5-1/P5-2/P5-3).
 
 import { Server, type Connection, type ConnectionContext } from "partyserver";
 import {
   encodeServerMessage,
+  HEARTBEAT_PING,
+  HEARTBEAT_PONG,
   parseClientMessage,
   ROOM_ABANDONED_CLOSE_CODE,
   SUPERSEDED_CLOSE_CODE,
@@ -109,6 +117,15 @@ export class RoomDO extends Server<Env> {
   }
 
   async onStart(): Promise<void> {
+    // D-02: registered once per DO instance (applies to every hibernatable
+    // socket the DO holds — not per-connection), re-armed on every wake
+    // because onStart reruns on EVERY hibernation wake (see the class-level
+    // comment above and `bindings`' own doc comment on this rerun
+    // behavior). Answered by the Cloudflare runtime without waking the DO
+    // or entering onMessage/#send — a deliberate, tested exception to the
+    // single-writer invariant (not a second writer).
+    this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(HEARTBEAT_PING, HEARTBEAT_PONG));
+
     const { room, wasReset } = await loadRoom(this.ctx.storage, () =>
       createEmptyRoom(this.name as RoomCode, "base", Date.now()),
     );
