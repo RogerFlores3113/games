@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Room & Transport Skeleton** - Prove the Cloudflare Durable Objects + partyserver + Vercel split on real infrastructure with a link-based, reconnect-safe room, before any game logic exists. (completed 2026-09-15)
 - [x] **Phase 2: Per-Seat Redaction Contract** - Prove the single whitelist-serialize per-seat projection chokepoint against a toy secret-holding game, with an automated leak test in place. (completed 2026-09-15)
 - [x] **Phase 3: Hanabi Rules Engine** - Build the full Hanabi rules engine as a pure, variant-parametrized, network-free package tested in isolation. (completed 2026-09-16)
-- [ ] **Phase 4: Wire Engine Into Room Actor** - Replace the toy game with the real engine behind the game-adapter interface, delivering a live, correctly-filtered, correctly-ruled base-game table.
+- [x] **Phase 4: Wire Engine Into Room Actor** - Replace the toy game with the real engine behind the game-adapter interface, delivering a live, correctly-filtered, correctly-ruled base-game table. (completed 2026-09-16)
 - [ ] **Phase 5: Reconnect & Session Durability Hardening** - Exercise and harden the mobile-backgrounding and multi-tab failure modes that a manual refresh test does not surface.
 - [ ] **Phase 6: Game Interface** - Build the board render, persistent per-card clue memory, colorblind-safe glyphs, and dark "fireworks night" luminosity theme against the now-stable wire contract.
 - [ ] **Phase 7: Variant Support (Rainbow, Black)** - Enable and test the Rainbow and Black configurations end to end, proving the variant-parametrized engine and UI built earlier need no special-casing.
@@ -178,7 +178,7 @@ Plans:
 
 **Wave 8** *(blocked on Wave 7)*
 
-- [ ] 04-08-PLAN.md — Forehead-card toy deletion sweep, zero-occurrence regression, phase gate (D-01/D-03/D-16)
+- [x] 04-08-PLAN.md — Forehead-card toy deletion sweep, zero-occurrence regression, phase gate (D-01/D-03/D-16)
 
 ### Phase 5: Reconnect & Session Durability Hardening
 
@@ -234,7 +234,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Room & Transport Skeleton | 11/11 | Complete   | 2026-09-15 |
 | 2. Per-Seat Redaction Contract | 6/6 | Complete    | 2026-09-15 |
 | 3. Hanabi Rules Engine | 5/5 | Complete    | 2026-09-16 |
-| 4. Wire Engine Into Room Actor | 7/8 | In Progress|  |
+| 4. Wire Engine Into Room Actor | 8/8 | Complete   | 2026-09-16 |
 | 5. Reconnect & Session Durability Hardening | 0/TBD | Not started | - |
 | 6. Game Interface | 0/TBD | Not started | - |
 | 7. Variant Support (Rainbow, Black) | 0/TBD | Not started | - |
