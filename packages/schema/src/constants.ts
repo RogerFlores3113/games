@@ -2,6 +2,10 @@
 // planning (D-02 idle GC, D-07 host-transfer grace, D-12 seat-release grace)
 // is fixed HERE as a single named export set. Later plans (04-09) import from
 // this file rather than re-deciding any of these values.
+//
+// Phase 5 D-04 heartbeat/zombie-sweep timing values are fixed HERE too (see
+// the "Phase 5 (D-02/D-03/D-04)" block below) — 05-02/05-03 import them
+// rather than re-deciding any of these values.
 
 /** D-17: persisted room state carries this version. On mismatch, reset to an
  * empty lobby rather than deserializing state written by an incompatible
@@ -62,3 +66,54 @@ export const ROOM_ABANDONED_CLOSE_CODE = 4002;
 
 export const MAX_DISPLAY_NAME_LENGTH = 24;
 export const MIN_DISPLAY_NAME_LENGTH = 1;
+
+// Phase 5 (D-02/D-03/D-04): hibernation-safe heartbeat and zombie-sweep
+// timing. These are raw, non-JSON text frames answered by the Durable
+// Object's setWebSocketAutoResponse — they sit outside ClientMessageSchema/
+// ServerMessageSchema, carry no state, and must match byte-for-byte (D-02,
+// RESEARCH.md Pitfall 2), so JSON.stringify must never be applied to them.
+
+/** D-02: raw ping literal the client sends on its heartbeat interval.
+ * Answered by the runtime's setWebSocketAutoResponse without waking the DO
+ * or invoking onMessage — never JSON.stringify'd, never routed through
+ * #send. Must byte-for-byte match the registered request literal. */
+export const HEARTBEAT_PING = "__ping__";
+
+/** D-02: raw pong literal the runtime answers HEARTBEAT_PING with. Never
+ * constructed by application code — the Cloudflare runtime emits this
+ * directly via setWebSocketAutoResponse. */
+export const HEARTBEAT_PONG = "__pong__";
+
+/** D-04: client ping cadence while the tab is visible. Chosen so a dead
+ * half-open socket is detected well within "about a minute" once combined
+ * with HEARTBEAT_PONG_TIMEOUT_MS and SOCKET_STALE_MS below. */
+export const HEARTBEAT_INTERVAL_MS = 20_000;
+
+/** D-04: if no pong (or any other frame) arrives within this long after a
+ * ping, the client force-reconnects rather than trusting a half-open
+ * socket. Deliberately shorter than HEARTBEAT_INTERVAL_MS so a single
+ * missed pong is caught before the next ping would even go out. */
+export const HEARTBEAT_PONG_TIMEOUT_MS = 10_000;
+
+/** D-04: server-side threshold against getWebSocketAutoResponseTimestamp — a
+ * seated socket with no auto-response/bind within this long is a zombie.
+ * Chrome's intensive throttling fires hidden-tab chained timers at most
+ * once per minute, so a threshold <= 60s would falsely disconnect a
+ * desktop player who alt-tabbed to the voice call; 75s is the smallest
+ * value with margin, giving teammates "disconnected" in 75-90s ("about a
+ * minute", D-04's intent). */
+export const SOCKET_STALE_MS = 75_000;
+
+/** D-03/D-04: grid step for the alarm-driven zombie_sweep timer (05-02).
+ * Re-derived on every computeRoomTimers call; the actual staleness
+ * decision happens at sweep time against the live auto-response
+ * timestamp, not against whether the alarm "fired on schedule"
+ * (RESEARCH.md Pitfall 3). */
+export const ZOMBIE_SWEEP_INTERVAL_MS = 15_000;
+
+/** D-03: WebSocket close code used when the zombie sweep closes a stale
+ * socket. Deliberately NON-terminal — unlike SUPERSEDED_CLOSE_CODE/
+ * ROOM_ABANDONED_CLOSE_CODE, a socket closed by a false-positive sweep must
+ * reconnect on its own, so this code must never be added to
+ * isTerminalCloseCode. */
+export const STALE_SOCKET_CLOSE_CODE = 4003;
