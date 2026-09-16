@@ -19,6 +19,7 @@ A friend clicks a link and is playing Hanabi within seconds — and the game doe
 - ✓ Players join by opening the link and picking a display name — no account, no email — *Validated in Phase 1: Room & Transport Skeleton (live at games.rogerflores.dev)*
 - ✓ Room and realtime layer are built game-agnostic so Innovation can be added without rewriting the foundation — *Validated in Phase 1: `GameAdapter` seam, counter game as the stand-in*
 - ✓ Server sends each player a per-seat filtered view — a player never receives the identity of cards in their own hand — *Validated in Phase 2: whitelist-serialize projection proven against a toy secret-holding game, with a hidden card structurally lacking its value field, one enforced send chokepoint, and three automated leak-test layers*
+- ✓ A correct, variant-parametrized Hanabi rules engine exists as a pure package — *Validated in Phase 3: deck/hand sizes, clue legality, token and fuse economy, the explicit final round and all three end conditions, deterministic seeded shuffles and public-only turn history, proven by unit tests plus conservation, redaction and termination property tests across base, Rainbow and Black. Not yet wired to the transport — that is Phase 4.*
 
 ### Active
 
@@ -115,4 +116,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-15 after Phase 2 (Per-Seat Redaction Contract)*
+*Last updated: 2026-09-15 after Phase 3 (Hanabi Rules Engine)*
