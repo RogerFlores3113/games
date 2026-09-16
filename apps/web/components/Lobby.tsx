@@ -2,6 +2,7 @@
 
 import { MAX_PLAYERS, MIN_PLAYERS, type RoomView, type Variant } from "@games/schema";
 import { Button } from "./Button";
+import { ReconnectingBanner } from "./ReconnectingBanner";
 import { RoomCode } from "./RoomCode";
 import { SeatRow } from "./SeatRow";
 
@@ -9,6 +10,10 @@ export interface LobbyProps {
   view: RoomView;
   onSetVariant: (variant: Variant) => void;
   onStartGame: () => void;
+  /** D-05: while true, the store's own socket is degraded and this last-
+   * known view is display-only — Start game and every host variant control
+   * are disabled, matching HanabiBoard's reconnecting treatment. */
+  reconnecting?: boolean;
 }
 
 const VARIANT_OPTIONS: { value: Variant; label: string }[] = [
@@ -23,7 +28,7 @@ const VARIANT_OPTIONS: { value: Variant; label: string }[] = [
  * player readiness anywhere in this component (D-10, D-11) — if you find
  * yourself adding one, stop, it was cut.
  */
-export function Lobby({ view, onSetVariant, onStartGame }: LobbyProps) {
+export function Lobby({ view, onSetVariant, onStartGame, reconnecting = false }: LobbyProps) {
   const isHost = view.youSeatId === view.hostSeatId;
   const seatCount = view.seats.length;
   const canStart = seatCount >= MIN_PLAYERS && seatCount <= MAX_PLAYERS;
@@ -35,6 +40,8 @@ export function Lobby({ view, onSetVariant, onStartGame }: LobbyProps) {
       className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-[length:var(--space-xl)] px-[length:var(--space-md)] py-[length:var(--space-2xl)] lg:max-w-3xl lg:justify-center lg:py-[length:var(--space-3xl)]"
       style={{ backgroundColor: "var(--color-bg)" }}
     >
+      {reconnecting && <ReconnectingBanner />}
+
       <RoomCode code={view.code} shareUrl={shareUrl} />
 
       <div
@@ -96,6 +103,7 @@ export function Lobby({ view, onSetVariant, onStartGame }: LobbyProps) {
                     name="variant"
                     value={value}
                     checked={view.variant === value}
+                    disabled={reconnecting}
                     onChange={() => onSetVariant(value)}
                   />
                   {label}
@@ -105,7 +113,12 @@ export function Lobby({ view, onSetVariant, onStartGame }: LobbyProps) {
           </fieldset>
 
           <div className="flex flex-col gap-[length:var(--space-xs)]">
-            <Button data-testid="start-game" variant="primary" onClick={onStartGame} disabled={!canStart}>
+            <Button
+              data-testid="start-game"
+              variant="primary"
+              onClick={onStartGame}
+              disabled={!canStart || reconnecting}
+            >
               Start game
             </Button>
             {!canStart && (

@@ -17,6 +17,7 @@ import { RefusalCard, type RefusalCardReason } from "../../../components/Refusal
 import { JoinForm } from "../../../components/JoinForm";
 import { Lobby } from "../../../components/Lobby";
 import { HanabiBoard } from "../../../components/HanabiBoard";
+import { Button } from "../../../components/Button";
 
 export interface RoomClientProps {
   code: string;
@@ -105,10 +106,20 @@ function ConnectedRoom({
   displayName: string;
   onJoinFailed: () => void;
 }) {
-  const { socket } = useRoomSocket({ code, displayName });
+  const { socket, reclaimSeat } = useRoomSocket({ code, displayName });
   const status = useRoomStore((state) => state.status);
   const refusalReason = useRoomStore((state) => state.refusalReason);
   const view = useRoomStore((state) => state.view);
+  // D-11: guards against double-firing reclaimSeat on a double-click — reset
+  // whenever we leave "superseded" so a tab superseded AGAIN later still has
+  // a live button, never a permanently-disabled one.
+  const [reclaiming, setReclaiming] = useState(false);
+
+  useEffect(() => {
+    if (status !== "superseded") {
+      setReclaiming(false);
+    }
+  }, [status]);
 
   useEffect(() => {
     if (status !== "join_failed") return;
@@ -123,6 +134,9 @@ function ConnectedRoom({
 
   useEffect(() => {
     if (!view) return;
+    // D-06: a reconnecting socket's last view is stale — never auto-send
+    // against it. The next fresh `joined`/`state` frame re-runs this effect.
+    if (status === "reconnecting") return;
     // WR-04: apply the variant picked on the create screen, once, through
     // the ordinary host-only `set_variant` message. Cleared on the first
     // seated view either way, so it can never fire later or for a joiner.
@@ -131,9 +145,13 @@ function ConnectedRoom({
     if (target !== null) {
       socket.send(JSON.stringify({ type: "set_variant", variant: target } satisfies ClientMessage));
     }
-  }, [view, code, socket]);
+  }, [view, code, socket, status]);
 
   function send(message: ClientMessage) {
+    // D-06: controls are already disabled while reconnecting, but this is
+    // the single dispatch chokepoint for both Lobby and HanabiBoard, so it
+    // guards here too rather than trusting every caller.
+    if (status === "reconnecting") return;
     socket.send(JSON.stringify(message));
   }
 
@@ -145,7 +163,7 @@ function ConnectedRoom({
   if (status === "superseded") {
     return (
       <main
-        className="flex min-h-screen items-center justify-center px-[length:var(--space-md)]"
+        className="flex min-h-screen flex-col items-center justify-center gap-[length:var(--space-md)] px-[length:var(--space-md)]"
         style={{ backgroundColor: "var(--color-bg)" }}
       >
         <p
@@ -154,6 +172,23 @@ function ConnectedRoom({
         >
           This room was opened in another tab.
         </p>
+        {/* D-11: user action only — this button is the ONLY way a superseded
+            tab reconnects. It never fires automatically, so two tabs can
+            never ping-pong each other into an auto-supersede loop. No
+            confirmation dialog: reclaiming ends the OTHER tab's session,
+            which is this player's own other device, not another player's
+            (UI-SPEC Destructive actions). */}
+        <Button
+          variant="primary"
+          data-testid="use-this-tab-button"
+          disabled={reclaiming}
+          onClick={() => {
+            setReclaiming(true);
+            reclaimSeat();
+          }}
+        >
+          Use this tab
+        </Button>
       </main>
     );
   }
@@ -203,6 +238,7 @@ function ConnectedRoom({
         view={view}
         onSetVariant={(variant: Variant) => send({ type: "set_variant", variant })}
         onStartGame={() => send({ type: "start_game" })}
+        reconnecting={status === "reconnecting"}
       />
     );
   }
@@ -216,6 +252,7 @@ function ConnectedRoom({
         // than minting a new one, or server-side dedup is defeated.
         send({ type: "game_action", actionId: nanoid(), request })
       }
+      reconnecting={status === "reconnecting"}
     />
   );
 }
