@@ -205,7 +205,7 @@ Plans:
 **Wave 2**
 
 - [x] 05-02-PLAN.md — Server zombie sweep in the single alarm, shared CR-01 disconnect helper, socket proofs of D-03/D-12/D-13/D-15
-- [ ] 05-03-PLAN.md — Client heartbeat, visibility/online fast resume, `reconnecting` status, no-queue sends, reclaimSeat
+- [x] 05-03-PLAN.md — Client heartbeat, visibility/online fast resume, `reconnecting` status, no-queue sends, reclaimSeat
 
 **Wave 3**
 
@@ -260,6 +260,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Per-Seat Redaction Contract | 6/6 | Complete    | 2026-09-15 |
 | 3. Hanabi Rules Engine | 5/5 | Complete    | 2026-09-16 |
 | 4. Wire Engine Into Room Actor | 9/9 | Complete   | 2026-09-16 |
-| 5. Reconnect & Session Durability Hardening | 2/6 | In Progress|  |
+| 5. Reconnect & Session Durability Hardening | 3/6 | In Progress|  |
 | 6. Game Interface | 0/TBD | Not started | - |
 | 7. Variant Support (Rainbow, Black) | 0/TBD | Not started | - |

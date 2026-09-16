@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-09-16T21:33:18.016Z"
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-09-16T21:39:01.633Z"
 last_activity: 2026-09-16
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 37
-  completed_plans: 33
+  completed_plans: 34
   percent: 57
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 05 (reconnect-session-durability-hardening) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Last activity: 2026-09-16
 
-Progress: [█████████░] 89%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
@@ -88,6 +88,7 @@ Progress: [█████████░] 89%
 | Phase 04 P09 | 12min | 2 tasks | 4 files |
 | Phase 05 P01 | 35min | 3 tasks | 6 files |
 | Phase 05 P02 | 19min | 3 tasks | 7 files |
+| Phase 05 P03 | 20min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -162,6 +163,8 @@ Recent decisions affecting current work:
 - [Phase 05-02]: computeRoomTimers gained an optional zombieSweepIntervalMs option (D-15) instead of a new exported constant-override mechanism
 - [Phase 05-02]: RoomDO#timers memoizes the armed zombie_sweep target in-memory (#pendingZombieSweepAt), advanced only by onAlarm's zombie_sweep branch once it has run, closing a chatty-room scheduling race grid alignment alone does not solve
 - [Phase 05-02]: SeatAttachment.boundAt (epoch ms at join) exempts a just-joined socket from the zombie sweep until its first heartbeat lands
+- [Phase 05]: 05-03: heartbeat.ts stays framework-free (no window/document, OPEN readyState as literal 1) so D-01/D-02 decision logic is unit-proven before any DOM wiring
+- [Phase 05]: 05-03: client heartbeat interval keeps running regardless of tab visibility so an alt-tabbed desktop player stays Connected for teammates; server SOCKET_STALE_MS absorbs Chrome's hidden-tab throttle
 
 ### Pending Todos
 
@@ -181,6 +184,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-16T21:33:18.008Z
-Stopped at: Completed 05-02-PLAN.md
+Last session: 2026-09-16T21:39:01.625Z
+Stopped at: Completed 05-03-PLAN.md
 Resume file: None
