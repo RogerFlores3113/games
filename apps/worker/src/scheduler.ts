@@ -25,10 +25,11 @@ import {
   IDLE_GC_IN_PROGRESS_MS,
   IDLE_GC_LOBBY_MS,
   LOBBY_SEAT_RELEASE_GRACE_MS,
+  ZOMBIE_SWEEP_INTERVAL_MS,
 } from "@games/schema";
 
 /** The closed set of timer kinds this phase schedules. */
-export type TimerType = "idle_gc" | "host_transfer" | "seat_release";
+export type TimerType = "idle_gc" | "host_transfer" | "seat_release" | "zombie_sweep";
 
 /**
  * A single pending timer event. Timers are keyed by `type` plus `seatId` —
@@ -111,9 +112,25 @@ export function dueTimers(
  * - one `seat_release` per disconnected seat at `seat.disconnectedAt + 30s`,
  *   ONLY when status is "lobby" (D-12 — in-progress seats are never
  *   auto-released in this phase)
+ * - one `zombie_sweep` (D-03) whenever at least one seat is `connected`,
+ *   grid-aligned to `(floor(now / interval) + 1) * interval` rather than
+ *   `now + interval`. This module is called on EVERY `#commit`, not just
+ *   alarm fires (Pitfall 1's own recompute-on-every-mutation shape); a
+ *   `now + interval` derivation would let a chatty room's own traffic push
+ *   the deadline forward forever and the sweep would never actually run
+ *   (RESEARCH.md Pitfall 3). Grid alignment makes `dueAt` identical for
+ *   every call inside the same interval window, so it cannot self-extend.
+ *   The staleness DECISION itself is made at sweep time in room-do.ts
+ *   against the live `getWebSocketAutoResponseTimestamp`, never by the mere
+ *   fact that this alarm fired — a "late" grid tick (because chatty traffic
+ *   kept recomputing the table) is still a correct check when it finally
+ *   runs, worst case detection = staleMs + intervalMs.
  */
-export function computeRoomTimers(state: RoomState, now: number): TimerEvent[] {
-  void now; // `now` is accepted for API symmetry/future use; not read directly here.
+export function computeRoomTimers(
+  state: RoomState,
+  now: number,
+  options: { zombieSweepIntervalMs?: number } = {},
+): TimerEvent[] {
   let timers: TimerEvent[] = [];
 
   const idleGcMs = state.status === "in_progress" ? IDLE_GC_IN_PROGRESS_MS : IDLE_GC_LOBBY_MS;
@@ -142,6 +159,14 @@ export function computeRoomTimers(state: RoomState, now: number): TimerEvent[] {
         });
       }
     }
+  }
+
+  if (state.seats.some((seat) => seat.connected)) {
+    const interval = options.zombieSweepIntervalMs ?? ZOMBIE_SWEEP_INTERVAL_MS;
+    timers = upsertTimer(timers, {
+      type: "zombie_sweep",
+      dueAt: (Math.floor(now / interval) + 1) * interval,
+    });
   }
 
   return timers;

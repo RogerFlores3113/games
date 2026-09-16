@@ -5,6 +5,7 @@ import {
   IDLE_GC_IN_PROGRESS_MS,
   IDLE_GC_LOBBY_MS,
   LOBBY_SEAT_RELEASE_GRACE_MS,
+  ZOMBIE_SWEEP_INTERVAL_MS,
 } from "@games/schema";
 import { computeRoomTimers, dueTimers, nextDueAt, upsertTimer, cancelTimer } from "./scheduler";
 import type { TimerEvent } from "./scheduler";
@@ -274,6 +275,67 @@ describe("D-12: lobby seat-release grace", () => {
 // Idempotency — Pitfall 2's failure mode: a hibernation wake must never
 // push a deadline forward.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// D-03: zombie_sweep timer — grid-aligned, only while a seat is connected,
+// immune to chatty-room self-extension (RESEARCH.md Pitfall 3).
+// ---------------------------------------------------------------------------
+
+describe("D-03: zombie_sweep timer", () => {
+  it("a room with >= 1 connected seat yields exactly one zombie_sweep timer, grid-aligned to the next interval boundary", () => {
+    const seat = makeSeat({ seatId: "s1", connected: true });
+    const state = makeRoom({ status: "lobby", seats: [seat] });
+    const now = 100_000;
+    const timers = computeRoomTimers(state, now);
+    const sweeps = timers.filter((t) => t.type === "zombie_sweep");
+    expect(sweeps).toHaveLength(1);
+    expect(sweeps[0]?.dueAt).toBe(
+      (Math.floor(now / ZOMBIE_SWEEP_INTERVAL_MS) + 1) * ZOMBIE_SWEEP_INTERVAL_MS,
+    );
+  });
+
+  it("a room with zero connected seats (all disconnected) yields no zombie_sweep timer", () => {
+    const seat = makeSeat({ seatId: "s1", connected: false, disconnectedAt: 1000 });
+    const state = makeRoom({ status: "lobby", seats: [seat] });
+    const timers = computeRoomTimers(state, 5000);
+    expect(timers.find((t) => t.type === "zombie_sweep")).toBeUndefined();
+  });
+
+  it("a room with no seats at all yields no zombie_sweep timer", () => {
+    const state = makeRoom({ status: "lobby", seats: [] });
+    const timers = computeRoomTimers(state, 5000);
+    expect(timers.find((t) => t.type === "zombie_sweep")).toBeUndefined();
+  });
+
+  it("Pitfall 3: two `now` values inside the same interval window yield an identical zombie_sweep dueAt", () => {
+    const seat = makeSeat({ seatId: "s1", connected: true });
+    const state = makeRoom({ status: "lobby", seats: [seat] });
+    const k = 7;
+    const now1 = ZOMBIE_SWEEP_INTERVAL_MS * k + 100;
+    const now2 = ZOMBIE_SWEEP_INTERVAL_MS * k + (ZOMBIE_SWEEP_INTERVAL_MS - 1000);
+    const dueAt1 = computeRoomTimers(state, now1).find((t) => t.type === "zombie_sweep")?.dueAt;
+    const dueAt2 = computeRoomTimers(state, now2).find((t) => t.type === "zombie_sweep")?.dueAt;
+    expect(dueAt1).toBe(dueAt2);
+  });
+
+  it("options override: a custom zombieSweepIntervalMs aligns dueAt to that grid instead of the constant", () => {
+    const seat = makeSeat({ seatId: "s1", connected: true });
+    const state = makeRoom({ status: "lobby", seats: [seat] });
+    const now = 3300;
+    const timers = computeRoomTimers(state, now, { zombieSweepIntervalMs: 1000 });
+    const sweep = timers.find((t) => t.type === "zombie_sweep");
+    expect(sweep?.dueAt).toBe(4000);
+  });
+
+  it("D-08: an in_progress room with a connected seat yields zombie_sweep AND still yields no seat_release/host_transfer", () => {
+    const seat = makeSeat({ seatId: "s1", connected: true });
+    const state = makeRoom({ status: "in_progress", seats: [seat], hostSeatId: "s1" });
+    const timers = computeRoomTimers(state, 10_000);
+    expect(timers.find((t) => t.type === "zombie_sweep")).toBeDefined();
+    expect(timers.find((t) => t.type === "seat_release")).toBeUndefined();
+    expect(timers.find((t) => t.type === "host_transfer")).toBeUndefined();
+  });
+});
 
 describe("idempotency across repeated hibernation wakes", () => {
   it("calling computeRoomTimers twice on the same state returns deep-equal arrays", () => {
