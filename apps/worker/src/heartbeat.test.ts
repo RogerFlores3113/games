@@ -1,12 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { SOCKET_STALE_MS, ZOMBIE_SWEEP_INTERVAL_MS } from "@games/schema";
+import { HEARTBEAT_PING } from "@games/schema";
 import {
+  isHeartbeatPing,
   isSocketStale,
   orphanedConnectedSeatIds,
   resolveAlarmWrite,
   resolveHeartbeatTiming,
   socketLastSeenAt,
 } from "./heartbeat";
+
+describe("isHeartbeatPing (WR-04)", () => {
+  it("matches only the exact raw ping literal", () => {
+    expect(isHeartbeatPing(HEARTBEAT_PING)).toBe(true);
+    expect(isHeartbeatPing(JSON.stringify(HEARTBEAT_PING))).toBe(false);
+    expect(isHeartbeatPing(`${HEARTBEAT_PING} `)).toBe(false);
+    expect(isHeartbeatPing('{"type":"join","displayName":"A"}')).toBe(false);
+    expect(isHeartbeatPing(new TextEncoder().encode(HEARTBEAT_PING))).toBe(false);
+  });
+});
 
 describe("orphanedConnectedSeatIds (CR-02)", () => {
   it("reports a connected seat with no bound socket (the post-eviction case)", () => {

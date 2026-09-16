@@ -66,6 +66,12 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Room
   // D-02: updated on EVERY inbound frame (including the raw pong) and on
   // every `open`, so a stale value alone proves the socket is dead.
   const lastHeardAtRef = useRef(0);
+  // WR-04 (review): true from the moment `onOpen` sends `join` on a socket
+  // until that join is answered (`joined`/`refused`/`error`). Error frames
+  // carry no request correlation, so only an error arriving in this window
+  // may be read as a rejected join; any later one is a non-fatal protocol
+  // error and must never bounce a reconnecting player back to the join form.
+  const joinReplyPendingRef = useRef(false);
   const pingSentAtRef = useRef<number | null>(null);
   const pongCheckTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
@@ -134,6 +140,7 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Room
       // seat token is re-read and replayed on every `open`, never only on
       // mount (D-05, RT-03 groundwork). Byte-identical to a fresh join
       // (D-13) — reconnect never gets a separate frame shape.
+      joinReplyPendingRef.current = true;
       socket.send(
         JSON.stringify({
           type: "join",
@@ -171,6 +178,16 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Room
       }
       const message = result.data;
 
+      if (message.type === "error" && !joinReplyPendingRef.current) {
+        // WR-04: not an answer to our `join` (see joinReplyPendingRef). The
+        // store would otherwise treat it as a failed join while the status
+        // is still "joining"/"reconnecting"; once seated it is a no-op there
+        // anyway, so dropping it here loses nothing.
+        return;
+      }
+      if (message.type === "joined" || message.type === "refused" || message.type === "error") {
+        joinReplyPendingRef.current = false;
+      }
       if (message.type === "joined") {
         writeSeatToken(code, message.seatToken);
       }

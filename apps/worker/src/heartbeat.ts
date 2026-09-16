@@ -5,7 +5,17 @@
 // this module is fully deterministic and offline-testable. room-do.ts is
 // the only place these are wired to the real Durable Object/runtime APIs.
 
-import { SOCKET_STALE_MS, ZOMBIE_SWEEP_INTERVAL_MS } from "@games/schema";
+import { HEARTBEAT_PING, SOCKET_STALE_MS, ZOMBIE_SWEEP_INTERVAL_MS } from "@games/schema";
+
+/** WR-04 (review): true for the raw heartbeat ping literal. The runtime's
+ * `setWebSocketAutoResponse` normally answers it before `onMessage` ever
+ * runs; this is defense in depth for a ping that slips through anyway (e.g.
+ * a race with auto-response registration on a fresh instance), which must
+ * be ignored silently — answering it with `bad_request` would read as a
+ * rejected join on a reconnecting client. */
+export function isHeartbeatPing(raw: string | ArrayBuffer | ArrayBufferView): boolean {
+  return typeof raw === "string" && raw === HEARTBEAT_PING;
+}
 
 /** D-15: wrangler `--var` overrides for socket-staleness timing, so socket
  * tests never sleep for real minutes. Production never sets these — see

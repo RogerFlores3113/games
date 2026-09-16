@@ -68,6 +68,7 @@ import { loadRoom, loadTimers, saveRoom } from "./persistence";
 import { isOriginAllowed } from "./origin";
 import { projectSeatView, type OutboundFrame, type ProjectedRoomView } from "./seat-projection";
 import {
+  isHeartbeatPing,
   orphanedConnectedSeatIds,
   resolveAlarmWrite,
   resolveHeartbeatTiming,
@@ -163,6 +164,10 @@ export class RoomDO extends Server<Env> {
   }
 
   async onMessage(connection: Connection, raw: string | ArrayBuffer | ArrayBufferView): Promise<void> {
+    // WR-04: a heartbeat that reaches here instead of the auto-response is
+    // dropped without a reply (see `isHeartbeatPing`). Still never routed
+    // through #send (P5-2).
+    if (isHeartbeatPing(raw)) return;
     const parsed = parseClientMessage(String(raw));
     if (!parsed.ok) {
       this.#send(connection, { type: "error", code: "bad_request" });
