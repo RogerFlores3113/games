@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createRoom, expectSeatCount, joinAs } from "./helpers";
+import { OTHER_HAND_SELECTOR, createRoom, expectSeatCount, joinAs, seatIdOfOtherPlayer, startTwoPlayerGame } from "./helpers";
 
 function selfSeatRow(page: import("@playwright/test").Page) {
   return page.getByTestId("seat-row").and(page.locator('[data-self="true"]'));
@@ -90,5 +90,61 @@ test.describe("seat takeover — the RT-07 adversary (RT-07 + D-05 + D-08)", () 
     await contextB.close();
     await contextC.close();
     await contextD.close();
+  });
+
+  test("RT-08 (D-10/D-11/D-12): mid-game, a second tab supersedes the first, Use this tab reclaims the seat, and the seat is never duplicated or ping-ponged", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    test.skip(!!process.env.PLAYWRIGHT_BASE_URL, "needs locally injected heartbeat timing (D-15)");
+    test.setTimeout(90_000);
+
+    const { code, contextB, pageB } = await startTwoPlayerGame(hostPage, browser);
+
+    // Observer = hostPage; the seat under test is pageB's.
+    const bSeatId = await seatIdOfOtherPlayer(hostPage);
+    const pageBOwnHandSlotCountBefore = await pageB.locator('[data-testid^="own-hand-slot-"]').count();
+    const pageBTurnIndicatorBefore = ((await pageB.getByTestId("turn-indicator").textContent()) ?? "").trim();
+    await expect(hostPage.locator(OTHER_HAND_SELECTOR)).toHaveCount(1);
+
+    const pageB2 = await contextB.newPage();
+    await pageB2.goto(`/room/${code}`);
+    await expect(pageB2.getByLabel("Your name")).toHaveCount(0);
+    await expect(pageB2.getByTestId("own-hand")).toBeVisible();
+    await expect(pageB2.getByTestId("turn-indicator")).toHaveText(pageBTurnIndicatorBefore);
+
+    await expect(pageB.getByText("This room was opened in another tab.")).toBeVisible();
+    await expect(pageB.getByTestId("use-this-tab-button")).toBeVisible();
+    await expect(pageB.getByTestId("use-this-tab-button")).toBeEnabled();
+
+    await expect(hostPage.locator(OTHER_HAND_SELECTOR)).toHaveCount(1);
+    expect(await seatIdOfOtherPlayer(hostPage)).toBe(bSeatId);
+    await expect(hostPage.getByTestId(`seat-status-${bSeatId}`)).toHaveAttribute("data-connected", "true");
+
+    await pageB.getByTestId("use-this-tab-button").click();
+
+    await expect(pageB.getByTestId("own-hand")).toBeVisible({ timeout: 15_000 });
+    await expect(pageB.getByText("This room was opened in another tab.")).toHaveCount(0);
+    await expect(pageB.locator('[data-testid^="own-hand-slot-"]')).toHaveCount(pageBOwnHandSlotCountBefore);
+
+    await expect(pageB2.getByText("This room was opened in another tab.")).toBeVisible();
+    await expect(pageB2.getByTestId("use-this-tab-button")).toBeVisible();
+
+    await expect(hostPage.locator(OTHER_HAND_SELECTOR)).toHaveCount(1);
+    expect(await seatIdOfOtherPlayer(hostPage)).toBe(bSeatId);
+    await expect(hostPage.getByTestId(`seat-status-${bSeatId}`)).toHaveAttribute("data-connected", "true");
+
+    // D-11: no ping-pong. Wait more than 4 injected heartbeat intervals
+    // (1000ms) and one full injected stale window (5000ms) — a deliberate
+    // negative-window wait proving the two tabs never auto-flip back.
+    await pageB.waitForTimeout(5_000);
+
+    await expect(pageB.getByTestId("own-hand")).toBeVisible();
+    await expect(pageB2.getByText("This room was opened in another tab.")).toBeVisible();
+    await expect(hostPage.locator(OTHER_HAND_SELECTOR)).toHaveCount(1);
+    expect(await seatIdOfOtherPlayer(hostPage)).toBe(bSeatId);
+    await expect(hostPage.getByTestId(`seat-status-${bSeatId}`)).toHaveAttribute("data-connected", "true");
+
+    await contextB.close();
   });
 });
