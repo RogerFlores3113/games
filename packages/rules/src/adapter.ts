@@ -16,8 +16,18 @@
  * with `@games/schema`'s canonical `Variant`. */
 export type Variant = "base" | "rainbow" | "black";
 
-/** Closed set of reasons `applyAction` can reject a request. */
-export type AdapterError = "not_your_turn" | "invalid_action" | "game_over";
+/** Closed set of reasons `applyAction` can reject a request. Phase 3 widened
+ * this union for Hanabi's typed refusals per D-03; the interface's five
+ * members below are unchanged. */
+export type AdapterError =
+  | "not_your_turn"
+  | "invalid_action"
+  | "game_over"
+  | "card_not_in_hand"
+  | "no_clue_tokens"
+  | "clue_touches_nothing"
+  | "clue_target_invalid"
+  | "discard_at_max_clues";
 
 /** Result of attempting to apply an action request to game state. */
 export type AdapterResult<TState> =
