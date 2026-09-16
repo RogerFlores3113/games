@@ -7,6 +7,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RoomView } from "@games/schema";
+import type { HanabiCardView } from "@games/rules";
 import { createEmptyRoom, joinRoom, startGame, toSeatView } from "./room-state";
 import type { JoinInput } from "./room-state";
 import { mintSeatToken } from "./seat-identity";
@@ -59,7 +60,7 @@ describe("projectSeatView: lobby room", () => {
 });
 
 describe("projectSeatView: started room", () => {
-  it("returns a non-null view for every seat, each yourCard sorted keys [\"hidden\",\"id\"]", () => {
+  it("returns a non-null view for every seat, each hidden yourHand entry sorted keys [\"facts\",\"hidden\",\"id\"]", () => {
     const minter = makeMinter();
     let state = createEmptyRoom(ROOM_CODE, "base", 0);
     const hostJoin = join(state, "Host", 1, minter);
@@ -76,15 +77,24 @@ describe("projectSeatView: started room", () => {
     for (const seatId of [hostJoin.seatId, guestJoin.seatId]) {
       const projected = projectSeatView(state, seatId);
       expect(projected).not.toBeNull();
-      const game = projected?.game as { yourCard: { id: string; hidden: true } };
-      expect(Object.keys(game.yourCard).sort()).toEqual(["hidden", "id"]);
+      const game = projected?.game as { yourHand: HanabiCardView[] };
+
+      // Non-vacuousness: a 2-seat base game deals 5 cards per seat.
+      expect(game.yourHand.length).toBeGreaterThan(0);
+
+      for (const card of game.yourHand) {
+        expect(card.hidden).toBe(true);
+        expect(Object.keys(card).sort()).toEqual(["facts", "hidden", "id"]);
+        expect("suit" in card).toBe(false);
+        expect("rank" in card).toBe(false);
+      }
     }
     expect(errorSpy).not.toHaveBeenCalled();
   });
 });
 
 describe("validateGameView: accepts a real clean projection", () => {
-  it("returns non-null for a rebuilt real view with yourCard { id, hidden: true }", () => {
+  it("returns non-null for a rebuilt real view with hidden yourHand entries { id, hidden: true, facts }", () => {
     const minter = makeMinter();
     let state = createEmptyRoom(ROOM_CODE, "base", 0);
     const hostJoin = join(state, "Host", 1, minter);
@@ -105,15 +115,43 @@ describe("validateGameView: accepts a real clean projection", () => {
 });
 
 describe("validateGameView: fails closed on every leak shape", () => {
+  const ownFacts = {
+    possibleSuits: ["red", "yellow"],
+    possibleRanks: [1, 2, 3, 4, 5],
+    positiveClues: [],
+    negativeClues: [],
+  };
+
+  const otherFacts = {
+    possibleSuits: ["blue"],
+    possibleRanks: [3],
+    positiveClues: [],
+    negativeClues: [],
+  };
+
+  /** A complete, valid Hanabi view — the shape's template is `baseValidView`
+   * from packages/schema/src/games/hanabi.test.ts. */
   function baseGame(): Record<string, unknown> {
     return {
-      yourCard: { id: "c1", hidden: true },
-      otherCards: [{ seatId: "s2", card: { id: "c2", hidden: false, value: "Sirius" } }],
-      revealed: [],
-      deckCount: 10,
+      variant: "base",
+      yourSeatId: "s1",
+      yourHand: [{ id: "c1", hidden: true, facts: ownFacts }],
+      otherHands: [
+        {
+          seatId: "s2",
+          cards: [{ id: "c2", hidden: false, suit: "blue", rank: 3, facts: otherFacts }],
+        },
+      ],
+      stacks: [{ suit: "red", topRank: 2 }],
+      discard: [{ id: "c3", suit: "white", rank: 1 }],
+      clueTokens: 7,
+      fuses: 0,
+      deckCount: 30,
+      finalTurnsRemaining: null,
       activeSeatId: "s1",
       isYourTurn: true,
-      score: 0,
+      score: 2,
+      history: [],
     };
   }
 
@@ -132,20 +170,40 @@ describe("validateGameView: fails closed on every leak shape", () => {
     };
   }
 
-  it("rejects yourCard with value: undefined present", () => {
-    const game = { ...baseGame(), yourCard: { id: "c1", hidden: true, value: undefined } };
+  // CRITICAL positive control (D-07/HIDE-03/T-04-38): without this, every
+  // rejection test below would pass for the WRONG reason post-swap — a
+  // toy-shaped fixture would fail HanabiViewSchema as a whole-shape
+  // mismatch, proving nothing about the specific leak each test injects.
+  // This asserts the unleaked fixture validates, so a rejection below can
+  // only be attributed to the specific mutation each test makes.
+  it("positive control: the unleaked baseGame() fixture validates non-null", () => {
+    const result = validateGameView(leakyView(baseGame()));
+    expect(result).not.toBeNull();
+  });
+
+  it("rejects a hidden own-hand card with suit: undefined present", () => {
+    const game = {
+      ...baseGame(),
+      yourHand: [{ id: "c1", hidden: true, suit: undefined, facts: ownFacts }],
+    };
     const result = validateGameView(leakyView(game));
     expect(result).toBeNull();
   });
 
-  it("rejects yourCard with value: null", () => {
-    const game = { ...baseGame(), yourCard: { id: "c1", hidden: true, value: null } };
+  it("rejects a hidden own-hand card with suit: null", () => {
+    const game = {
+      ...baseGame(),
+      yourHand: [{ id: "c1", hidden: true, suit: null, facts: ownFacts }],
+    };
     const result = validateGameView(leakyView(game));
     expect(result).toBeNull();
   });
 
-  it("rejects yourCard with the own value actually present", () => {
-    const game = { ...baseGame(), yourCard: { id: "c1", hidden: true, value: "Altair" } };
+  it("rejects a hidden own-hand card with the real suit and rank actually present", () => {
+    const game = {
+      ...baseGame(),
+      yourHand: [{ id: "c1", hidden: true, suit: "red", rank: 4, facts: ownFacts }],
+    };
     const result = validateGameView(leakyView(game));
     expect(result).toBeNull();
   });
@@ -156,17 +214,25 @@ describe("validateGameView: fails closed on every leak shape", () => {
     expect(result).toBeNull();
   });
 
-  it("rejects an otherCards card with hidden: true but a value key present", () => {
+  it("rejects an otherHands card with hidden: true but a suit key present", () => {
     const game = {
       ...baseGame(),
-      otherCards: [{ seatId: "s2", card: { id: "c2", hidden: true, value: "Sirius" } }],
+      otherHands: [
+        {
+          seatId: "s2",
+          cards: [{ id: "c2", hidden: true, suit: "blue", facts: otherFacts }],
+        },
+      ],
     };
     const result = validateGameView(leakyView(game));
     expect(result).toBeNull();
   });
 
   it("never returns the input object when it fails — result is strictly null", () => {
-    const game = { ...baseGame(), yourCard: { id: "c1", hidden: true, value: "Altair" } };
+    const game = {
+      ...baseGame(),
+      yourHand: [{ id: "c1", hidden: true, suit: "red", rank: 4, facts: ownFacts }],
+    };
     const input = leakyView(game);
     const result = validateGameView(input);
     expect(result).toBe(null);
@@ -175,17 +241,38 @@ describe("validateGameView: fails closed on every leak shape", () => {
 });
 
 describe("validateGameView: console.error on failure never leaks secrets", () => {
-  it("logs exactly once, first argument mentions HIDE-03, and no argument contains the leaked value or the room seed", () => {
-    const leakedValue = "Altair";
+  it("logs exactly once, first argument mentions HIDE-03, and no argument contains the leaked identity or the room seed", () => {
+    const leakedSuit = "red";
+    const leakedRank = 4;
     const seed = "0123456789abcdef0123456789abcdef";
     const game = {
-      yourCard: { id: "c1", hidden: true, value: leakedValue },
-      otherCards: [],
-      revealed: [],
-      deckCount: 10,
+      variant: "base",
+      yourSeatId: "s1",
+      yourHand: [
+        {
+          id: "c1",
+          hidden: true,
+          suit: leakedSuit,
+          rank: leakedRank,
+          facts: {
+            possibleSuits: ["red", "yellow"],
+            possibleRanks: [1, 2, 3, 4, 5],
+            positiveClues: [],
+            negativeClues: [],
+          },
+        },
+      ],
+      otherHands: [],
+      stacks: [],
+      discard: [],
+      clueTokens: 8,
+      fuses: 0,
+      deckCount: 30,
+      finalTurnsRemaining: null,
       activeSeatId: "s1",
       isYourTurn: true,
       score: 0,
+      history: [],
     };
     const view: RoomView = {
       code: ROOM_CODE,
@@ -205,7 +292,8 @@ describe("validateGameView: console.error on failure never leaks secrets", () =>
     expect(String(call[0])).toContain("HIDE-03");
 
     const serializedArgs = JSON.stringify(call);
-    expect(serializedArgs).not.toContain(leakedValue);
+    expect(serializedArgs).not.toContain(leakedSuit);
+    expect(serializedArgs).not.toContain(String(leakedRank));
     expect(serializedArgs).not.toContain(seed);
   });
 });

@@ -1,12 +1,13 @@
 // D-11 layer 2 / D-12 / D-14: this layer checks the ENCODED JSON STRING that
 // would actually be sent over the wire — not the in-memory view object — and
-// it reuses the SAME `checkSeatViewForLeaks` checker from `@games/rules`
-// that layer 1 (packages/rules/src/forehead-card.property.test.ts) uses, so
+// it reuses the SAME `checkHanabiViewForLeaks` checker from `@games/rules`
+// that layer 1 (packages/rules/src/hanabi/*.property.test.ts) uses, so
 // the canary evidence for the checker extends to this layer too.
 
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
-import { checkSeatViewForLeaks, FOREHEAD_CARD_VALUES, secretsForSeat } from "@games/rules";
+import { checkHanabiViewForLeaks, secretsForHanabiSeat } from "@games/rules";
+import type { HanabiAction, HanabiState } from "@games/rules";
 import type { RoomView } from "@games/schema";
 import { encodeServerMessage } from "@games/schema";
 import { createEmptyRoom, joinRoom, startGame, applyGameAction, toSeatView } from "./room-state";
@@ -41,8 +42,38 @@ function buildStartedRoom(seatCount: number, seed: string) {
   return { state: started.state, seatIds };
 }
 
+/** Derives ONE legal Hanabi action for the active seat, in priority order:
+ * a rank clue naming a card an other seat actually holds (cannot be refused
+ * for touching nothing) when clue tokens are available; else a discard of
+ * the actor's first card when below the token cap; else a play of the
+ * actor's first card. */
+function legalActionFor(game: ActiveGameState): HanabiAction {
+  const activeSeatId = game.seatIds[game.turnIndex]!;
+  const activeHand = game.hands.find((h) => h.seatId === activeSeatId)!;
+
+  if (game.clueTokens > 0) {
+    const otherHand = game.hands.find(
+      (h) => h.seatId !== activeSeatId && h.slots.length > 0,
+    );
+    if (otherHand !== undefined) {
+      const card = otherHand.slots[0]!.card;
+      return {
+        type: "clue",
+        targetSeatId: otherHand.seatId,
+        clue: { type: "rank", value: card.rank },
+      };
+    }
+  }
+
+  if (game.clueTokens < 8) {
+    return { type: "discard", cardId: activeHand.slots[0]!.card.id };
+  }
+
+  return { type: "play", cardId: activeHand.slots[0]!.card.id };
+}
+
 /** Asserts, for every seat, that BOTH a `state` frame and a `joined` frame
- * encode to a string with zero leak reasons, per `checkSeatViewForLeaks`
+ * encode to a string with zero leak reasons, per `checkHanabiViewForLeaks`
  * run on the parsed object AND on the raw string. */
 function assertNoWireLeaksForEveryState(
   room: ReturnType<typeof buildStartedRoom>["state"],
@@ -56,7 +87,7 @@ function assertNoWireLeaksForEveryState(
     expect(projected).not.toBeNull();
     const view = projected as unknown as RoomView;
 
-    const secrets = secretsForSeat(room.game as ActiveGameState, seatId, room.seed);
+    const secrets = secretsForHanabiSeat(room.game as ActiveGameState, seatId, room.seed);
 
     const stateFrame = encodeServerMessage({ type: "state", view });
     const joinedFrame = encodeServerMessage({
@@ -67,14 +98,14 @@ function assertNoWireLeaksForEveryState(
     });
 
     for (const frame of [stateFrame, joinedFrame]) {
-      const parsedReasons = checkSeatViewForLeaks({
+      const parsedReasons = checkHanabiViewForLeaks({
         view: JSON.parse(frame),
         serialized: frame,
         secrets,
       });
       expect(parsedReasons).toEqual([]);
 
-      const inMemoryReasons = checkSeatViewForLeaks({
+      const inMemoryReasons = checkHanabiViewForLeaks({
         view,
         serialized: frame,
         secrets,
@@ -85,25 +116,25 @@ function assertNoWireLeaksForEveryState(
 }
 
 describe("D-11 layer 2: the encoded wire string never leaks own value, deck contents, or seed", () => {
-  it("holds over 100 random games (2-5 seats, random seed, random guess sequence)", () => {
+  it("holds over 100 random games (2-5 seats, random seed, random legal-action sequence)", () => {
     fc.assert(
       fc.property(
         fc.integer({ min: 2, max: 5 }),
         fc.stringMatching(/^[0-9a-f]{32}$/),
-        fc.array(fc.nat({ max: 15 }), { maxLength: 16 }),
-        (seatCount, seed, guessIndexes) => {
+        fc.integer({ min: 0, max: 16 }),
+        (seatCount, seed, actionCount) => {
           const { state: initial, seatIds } = buildStartedRoom(seatCount, seed);
           let room = initial;
           assertNoWireLeaksForEveryState(room, seatIds);
 
-          for (const index of guessIndexes) {
+          for (let i = 0; i < actionCount; i++) {
             if (room.status !== "in_progress") break;
             const game = room.game as ActiveGameState;
             const activeSeatId = game.seatIds[game.turnIndex]!;
             const result = applyGameAction(
               room,
               activeSeatId,
-              { type: "guess", value: FOREHEAD_CARD_VALUES[index] },
+              legalActionFor(game),
               room.lastActivityAt + 1,
             );
             if (result.ok) room = result.state;
@@ -121,43 +152,50 @@ describe("D-11 layer 2: the encoded wire string never leaks own value, deck cont
     let room = initial;
     assertNoWireLeaksForEveryState(room, seatIds);
 
-    let guesses = 0;
-    while (room.status === "in_progress") {
+    let actionsApplied = 0;
+    let guard = 0;
+    while (room.status === "in_progress" && guard < 2000) {
+      guard++;
       const game = room.game as ActiveGameState;
       const activeSeatId = game.seatIds[game.turnIndex]!;
-      const hand = game.hands.find((h) => h.seatId === activeSeatId)!;
       const result = applyGameAction(
         room,
         activeSeatId,
-        { type: "guess", value: hand.card.value },
+        legalActionFor(game),
         room.lastActivityAt + 1,
       );
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error("unreachable");
       room = result.state;
-      guesses++;
+      actionsApplied++;
       assertNoWireLeaksForEveryState(room, seatIds);
     }
 
     expect(room.status).toBe("ended");
-    expect(guesses).toBe(11);
+    expect(actionsApplied).toBeGreaterThan(0);
     assertNoWireLeaksForEveryState(room, seatIds);
   });
 
-  it("wire canary: a leaky view (own value present) is rejected by validateGameView, but would encode successfully and be caught by checkSeatViewForLeaks — proving the strict game gate, not RoomViewSchema, is what blocks the leak", () => {
+  it("wire canary: a leaky view (own identity present) is rejected by validateGameView, but would encode successfully and be caught by checkHanabiViewForLeaks — proving the strict game gate, not RoomViewSchema, is what blocks the leak", () => {
     const seed = "0123456789abcdef0123456789abcdef";
     const { state: room, seatIds } = buildStartedRoom(2, seed);
     const seatId = seatIds[0]!;
     const cleanView = toSeatView(room, seatId);
-    const secretsBefore = secretsForSeat(room.game as ActiveGameState, seatId, room.seed);
-    if (secretsBefore.ownCard === null) throw new Error("unreachable: seated player has no own card");
+    const gameState = room.game as ActiveGameState;
+    const ownHand = gameState.hands.find((h) => h.seatId === seatId)!;
+    const ownFirstCard = ownHand.slots[0]!.card;
 
-    // Force a leak: the seat's own card is given its real value.
-    const cleanGame = cleanView.game as { yourCard: { id: string; hidden: true } };
-    const leakyGame = {
-      ...cleanGame,
-      yourCard: { ...cleanGame.yourCard, hidden: true, value: secretsBefore.ownCard.value },
+    // Force a leak: the seat's own first hidden hand card is given its real
+    // suit/rank while `hidden` stays true.
+    const cleanGame = cleanView.game as {
+      yourHand: Array<{ id: string; hidden: boolean }>;
     };
+    const leakyYourHand = cleanGame.yourHand.map((card) =>
+      card.id === ownFirstCard.id
+        ? { ...card, hidden: true, suit: ownFirstCard.suit, rank: ownFirstCard.rank }
+        : card,
+    );
+    const leakyGame = { ...cleanGame, yourHand: leakyYourHand };
     const leakyView: RoomView = { ...cleanView, game: leakyGame };
 
     // The strict game gate rejects it.
@@ -170,8 +208,8 @@ describe("D-11 layer 2: the encoded wire string never leaks own value, deck cont
     const frame = encodeServerMessage({ type: "state", view: leakyView });
     expect(typeof frame).toBe("string");
 
-    const secrets = secretsForSeat(room.game as ActiveGameState, seatId, room.seed);
-    const reasons = checkSeatViewForLeaks({ view: JSON.parse(frame), serialized: frame, secrets });
-    expect(reasons).toContain("string:own-value");
+    const secrets = secretsForHanabiSeat(gameState, seatId, room.seed);
+    const reasons = checkHanabiViewForLeaks({ view: JSON.parse(frame), serialized: frame, secrets });
+    expect(reasons).toContain("structural:hidden-card-has-identity");
   });
 });

@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RoomCode, RoomState, SeatToken } from "@games/schema";
 import { IDLE_GC_LOBBY_MS, MAX_PLAYERS } from "@games/schema";
-import { FOREHEAD_CARD_VALUES } from "@games/rules";
-import type { ForeheadCardView } from "@games/rules";
+import type { HanabiAction, HanabiView } from "@games/rules";
 import { computeRoomTimers } from "./scheduler";
 import { activeGame } from "./game-registration";
 import type { ActiveGameState } from "./game-registration";
@@ -54,6 +53,36 @@ function join(
 
 function freshRoom(now = 0): RoomState {
   return createEmptyRoom(ROOM_CODE, "base", now);
+}
+
+/** Derives ONE legal Hanabi action for the active seat, in priority order:
+ * a rank clue naming a card an other seat actually holds (cannot be refused
+ * for touching nothing) when clue tokens are available; else a discard of
+ * the actor's first card when below the token cap; else a play of the
+ * actor's first card. */
+function legalActionFor(game: ActiveGameState): HanabiAction {
+  const activeSeatId = game.seatIds[game.turnIndex]!;
+  const activeHand = game.hands.find((h) => h.seatId === activeSeatId)!;
+
+  if (game.clueTokens > 0) {
+    const otherHand = game.hands.find(
+      (h) => h.seatId !== activeSeatId && h.slots.length > 0,
+    );
+    if (otherHand !== undefined) {
+      const card = otherHand.slots[0]!.card;
+      return {
+        type: "clue",
+        targetSeatId: otherHand.seatId,
+        clue: { type: "rank", value: card.rank },
+      };
+    }
+  }
+
+  if (game.clueTokens < 8) {
+    return { type: "discard", cardId: activeHand.slots[0]!.card.id };
+  }
+
+  return { type: "play", cardId: activeHand.slots[0]!.card.id };
 }
 
 // ---------------------------------------------------------------------------
@@ -404,7 +433,7 @@ describe("WR-02: deferring idle GC while connections are live", () => {
 // ---------------------------------------------------------------------------
 
 describe("D-02 / FDN-01: game actions are delegated to the registered adapter only", () => {
-  it("D-02 / FDN-01: applyGameAction accepts the active seat's guess and refuses a repeat from the same seat", () => {
+  it("D-02 / FDN-01: applyGameAction accepts the active seat's clue and refuses a repeat from the same seat", () => {
     const minter = makeMinter();
     let state = freshRoom();
     const hostJoin = join(state, "Host", 1, minter);
@@ -423,24 +452,25 @@ describe("D-02 / FDN-01: game actions are delegated to the registered adapter on
 
     const game = state.game as ActiveGameState;
     const activeSeatId = game.seatIds[game.turnIndex]!;
+    const action = legalActionFor(game);
 
-    const activeAttempt = applyGameAction(state, activeSeatId, { type: "guess", value: "Altair" }, 5);
+    const activeAttempt = applyGameAction(state, activeSeatId, action, 5);
     expect(activeAttempt.ok).toBe(true);
     if (!activeAttempt.ok) throw new Error("unreachable");
     state = activeAttempt.state;
 
     // The same seat going again (now off-turn) is refused.
-    const wrongTurn = applyGameAction(state, activeSeatId, { type: "guess", value: "Sirius" }, 6);
+    const wrongTurn = applyGameAction(state, activeSeatId, action, 6);
     expect(wrongTurn.ok).toBe(false);
 
     // Exactly one seat's view reports isYourTurn === true.
     const yourTurnFlags = state.seats.map(
-      (seat) => (toSeatView(state, seat.seatId).game as ForeheadCardView).isYourTurn,
+      (seat) => (toSeatView(state, seat.seatId).game as HanabiView).isYourTurn,
     );
     expect(yourTurnFlags.filter(Boolean)).toHaveLength(1);
   });
 
-  it("D-02 / FDN-01: a 2-seat game played to deck exhaustion ends, refuses further actions, and every yourCard has sorted keys [\"hidden\",\"id\"]", () => {
+  it("D-02 / FDN-01: a 2-seat game played to the end refuses further actions, and every yourHand card has sorted keys [\"facts\",\"hidden\",\"id\"] when hidden", () => {
     const minter = makeMinter();
     let state = freshRoom();
     const hostJoin = join(state, "Host", 1, minter);
@@ -454,14 +484,15 @@ describe("D-02 / FDN-01: game actions are delegated to the registered adapter on
     if (!started.ok) throw new Error("unreachable");
     state = started.state;
 
-    for (let i = 0; i < 14; i++) {
+    let guard = 0;
+    while (state.status === "in_progress" && guard < 2000) {
+      guard++;
       const game = state.game as ActiveGameState;
-      const activeSeatId = game.seatIds[game.turnIndex]!;
       const result = applyGameAction(
         state,
-        activeSeatId,
-        { type: "guess", value: FOREHEAD_CARD_VALUES[i % FOREHEAD_CARD_VALUES.length] },
-        10 + i,
+        game.seatIds[game.turnIndex]!,
+        legalActionFor(game),
+        10 + guard,
       );
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error("unreachable");
@@ -472,17 +503,21 @@ describe("D-02 / FDN-01: game actions are delegated to the registered adapter on
 
     const game = state.game as ActiveGameState;
     const stillActiveSeatId = game.seatIds[game.turnIndex]!;
-    const fifteenth = applyGameAction(state, stillActiveSeatId, { type: "guess", value: "Altair" }, 30);
-    expect(fifteenth.ok).toBe(false);
+    const further = applyGameAction(state, stillActiveSeatId, legalActionFor(game), 9999);
+    expect(further.ok).toBe(false);
 
     for (const seat of state.seats) {
-      const view = toSeatView(state, seat.seatId).game as ForeheadCardView;
-      expect(Object.keys(view.yourCard).sort()).toEqual(["hidden", "id"]);
+      const view = toSeatView(state, seat.seatId).game as HanabiView;
+      for (const card of view.yourHand) {
+        if (card.hidden) {
+          expect(Object.keys(card).sort()).toEqual(["facts", "hidden", "id"]);
+        }
+      }
     }
   });
 
   it("D-02: createEmptyRoom registers the active adapter's id", () => {
-    expect(createEmptyRoom(ROOM_CODE, "base", 0).adapterId).toBe("forehead-card");
+    expect(createEmptyRoom(ROOM_CODE, "base", 0).adapterId).toBe("hanabi");
   });
 
   it("D-06: activeGame.adapter.id matches the registered game view schema's game id", () => {
@@ -584,7 +619,7 @@ describe("purity: room-state functions never mutate their input", () => {
     const startedGame = started.state.game as ActiveGameState;
     const startedActiveSeatId = startedGame.seatIds[startedGame.turnIndex]!;
     const clone7 = structuredClone(started.state);
-    applyGameAction(clone7, startedActiveSeatId, { type: "guess", value: "Altair" }, 10);
+    applyGameAction(clone7, startedActiveSeatId, legalActionFor(startedGame), 10);
     expect(clone7).toEqual(structuredClone(started.state));
   });
 });

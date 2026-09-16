@@ -413,11 +413,37 @@ describe("RoomDO integration (live wrangler dev)", () => {
     const refusal = (await c2.waitFor((m) => m.type === "error", 5000)) as Parsed & { code: string };
     expect(refusal.code).toBe("bad_request");
 
+    // Derive Alice's action from her own latest game-bearing frame — this
+    // test only ever sees wire frames, never server state. Take a rank that
+    // appears on one of Bob's visible cards: guaranteed legal (a rank
+    // actually present cannot be refused for touching nothing; clueTokens
+    // is at its maximum at game start so it cannot be refused for lack of
+    // tokens).
+    type AliceView = {
+      game: {
+        otherHands: Array<{ seatId: string; cards: Array<{ hidden: boolean; rank?: number }> }>;
+      } | null;
+    };
+    const aliceState = (await c1.waitFor(
+      (m) => m.type === "state" && (m.view as AliceView).game !== null,
+      5000,
+    )) as Parsed & { view: AliceView };
+    const bobHand = aliceState.view.game!.otherHands[0]!;
+    const bobVisibleCard = bobHand.cards.find((c) => !c.hidden && c.rank !== undefined)!;
+
     // Alice takes her turn; the resulting state still has both seats, and it
     // is now Bob's turn — the game did not lose a seat it will need.
-    send(ws1, { type: "game_action", actionId: "test-action-cr03", request: { type: "guess", value: "Altair" } });
+    send(ws1, {
+      type: "game_action",
+      actionId: "test-action-cr03",
+      request: {
+        type: "clue",
+        targetSeatId: bobHand.seatId,
+        clue: { type: "rank", value: bobVisibleCard.rank },
+      },
+    });
     const afterTurn = await c2.waitFor(
-      (m) => m.type === "state" && (m.view as { game: { revealed: unknown[] } | null }).game?.revealed.length === 1,
+      (m) => m.type === "state" && (m.view as { game: { history: unknown[] } | null }).game?.history.length === 1,
       5000,
     );
     const view = afterTurn.view as { seats: unknown[]; game: { isYourTurn: boolean } };
