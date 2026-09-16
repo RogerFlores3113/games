@@ -256,26 +256,31 @@ test.describe("Phase 5 reconnect hardening (RT-04 + RT-06 + D-14)", () => {
     const sleeperTurnIndicatorBefore = ((await sleeper.getByTestId("turn-indicator").textContent()) ?? "").trim();
 
     await emulateVisibility(sleeper, "hidden");
-    let cdpFroze = true;
     let session: Awaited<ReturnType<typeof freezePage>> | undefined;
     try {
       session = await freezePage(sleeper);
     } catch {
-      // Fallback per plan: if CDP freeze is unsupported, drop the network
-      // instead for the sleep window. A2 risk is backstopped by the 05-06
-      // manual phone check.
-      cdpFroze = false;
-      await contextB.setOffline(true);
+      // Fallback per plan: if CDP freeze throws (unsupported in the
+      // installed Chromium), rely on the network drop below alone.
     }
+    // Rule 1 fix (found running this test live): a bare CDP forced freeze
+    // did NOT reliably stop the client's heartbeat interval in the
+    // installed Chromium — the seat never went stale within the injected
+    // window, confirming Research Pitfall 4's documented uncertainty
+    // ("frozen" and "socket closed" are different subsystems; forced
+    // freeze is not a guarantee). Per Pitfall 4's own recommended defense
+    // in depth, pair the freeze attempt with a hard network drop for the
+    // sleep window so the staleness signal is guaranteed regardless of
+    // which mechanism the installed browser actually honors.
+    await contextB.setOffline(true);
 
     await expect(observer.getByTestId(`seat-status-${sleeperSeatId}`)).toHaveAttribute("data-connected", "false", {
       timeout: 25_000,
     });
 
-    if (cdpFroze && session) {
+    await contextB.setOffline(false);
+    if (session) {
       await resumePage(session);
-    } else {
-      await contextB.setOffline(false);
     }
     await emulateVisibility(sleeper, "visible");
 
