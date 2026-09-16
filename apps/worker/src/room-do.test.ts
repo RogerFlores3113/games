@@ -855,4 +855,134 @@ describe("RoomDO integration (live wrangler dev)", () => {
 
     ws3.close();
   }, 40_000);
+
+  it("RT-09 / D-15: a byte-identical duplicate game_action (a clue) applies exactly once on the live wire", async () => {
+    type GameCardHidden = { id: string; hidden: true; facts: unknown };
+    type GameCardVisible = { id: string; hidden: false; suit: string; rank: number; facts: unknown };
+    type GameCard = GameCardHidden | GameCardVisible;
+    type GameViewShape = {
+      otherHands: { seatId: string; cards: GameCard[] }[];
+      clueTokens: number;
+      deckCount: number;
+      activeSeatId: string;
+      isYourTurn: boolean;
+      history: unknown[];
+    };
+    type RoomViewShape = { status: string; game: GameViewShape | null };
+
+    const code = mintRoomCode();
+    const ws1 = await openSocket(code);
+    const c1 = collectMessages(ws1);
+    send(ws1, { type: "join", displayName: "Alice" });
+    const joined1 = (await c1.waitFor((m) => m.type === "joined")) as Parsed & { seatId: string };
+
+    const ws2 = await openSocket(code);
+    const c2 = collectMessages(ws2);
+    send(ws2, { type: "join", displayName: "Bob" });
+    await c2.waitFor((m) => m.type === "joined");
+    await c1.waitFor((m) => m.type === "state" && (m.view as { seats: unknown[] }).seats.length === 2);
+
+    send(ws1, { type: "start_game" });
+    for (const c of [c1, c2]) {
+      await c.waitFor((m) => m.type === "state" && (m.view as RoomViewShape).status === "in_progress", 8000);
+    }
+
+    const seats = [
+      { seatId: joined1.seatId, ws: ws1, c: c1 },
+      { seatId: (await c2.waitFor((m) => m.type === "joined")).seatId as string, ws: ws2, c: c2 },
+    ];
+
+    function findActiveSeat(): { seat: (typeof seats)[number]; game: GameViewShape } {
+      for (const seat of seats) {
+        const latestGameFrame = [...seat.c.parsed]
+          .reverse()
+          .find((m) => (m.type === "state" || m.type === "joined") && (m.view as RoomViewShape).game !== null);
+        const view = latestGameFrame?.view as RoomViewShape | undefined;
+        if (view?.game?.isYourTurn === true) return { seat, game: view.game };
+      }
+      throw new Error("no active seat found among the latest game-bearing frames");
+    }
+
+    /** A rank clue naming a rank actually present on a visible card in the
+     * other seat's hand — guaranteed legal (touches something, and
+     * clueTokens is at max at game start). */
+    function legalClueFrom(game: GameViewShape): { targetSeatId: string; rank: number } {
+      const target = game.otherHands.find((h) => h.cards.length > 0);
+      if (target === undefined) throw new Error("no other seat holds any cards to clue");
+      const card = target.cards.find((c): c is GameCardVisible => !c.hidden);
+      if (card === undefined) throw new Error("no visible card found to derive a legal clue from");
+      return { targetSeatId: target.seatId, rank: card.rank };
+    }
+
+    const active = findActiveSeat();
+    const clue = legalClueFrom(active.game);
+
+    // Built ONCE as a single object with a fixed literal actionId, so the
+    // second send below is byte-identical to the first.
+    const clueFrame = {
+      type: "game_action",
+      actionId: "test-action-rt09-dup-clue",
+      request: {
+        type: "clue",
+        targetSeatId: clue.targetSeatId,
+        clue: { type: "rank", value: clue.rank },
+      },
+    };
+
+    send(active.seat.ws, clueFrame);
+    const firstApplied = (await active.seat.c.waitFor(
+      (m) => m.type === "state" && (m.view as RoomViewShape).game?.history.length === 1,
+      8000,
+    )) as Parsed & { view: RoomViewShape };
+    const before = {
+      clueTokens: firstApplied.view.game!.clueTokens,
+      historyLength: firstApplied.view.game!.history.length,
+      activeSeatId: firstApplied.view.game!.activeSeatId,
+      isYourTurn: firstApplied.view.game!.isYourTurn,
+      deckCount: firstApplied.view.game!.deckCount,
+    };
+
+    // TRAP: the dedup branch re-sends the actor's CURRENT (unchanged) view,
+    // which is byte-identical to the view already captured above. A naive
+    // `waitFor` predicate matching "a state frame with history.length === 1"
+    // would therefore match the ALREADY-RECEIVED first frame and resolve
+    // immediately — proving nothing about whether a second response even
+    // arrived. Record the frame count now and require the matching frame to
+    // be at or beyond this index, exactly like the post-grace `set_variant`
+    // idiom above.
+    const parsedCountBeforeDup = active.seat.c.parsed.length;
+    send(active.seat.ws, clueFrame);
+    const dupApplied = (await active.seat.c.waitFor(
+      (m) => active.seat.c.parsed.indexOf(m) >= parsedCountBeforeDup && m.type === "state",
+      8000,
+    )) as Parsed & { view: RoomViewShape };
+
+    expect(dupApplied.view.game!.clueTokens).toBe(before.clueTokens);
+    expect(dupApplied.view.game!.history.length).toBe(before.historyLength);
+    expect(dupApplied.view.game!.activeSeatId).toBe(before.activeSeatId);
+    expect(dupApplied.view.game!.isYourTurn).toBe(before.isYourTurn);
+    expect(dupApplied.view.game!.deckCount).toBe(before.deckCount);
+
+    // Positive control: a DIFFERENT actionId carrying a legal action for the
+    // now-active seat still advances the game, proving the seat is not
+    // simply frozen.
+    const stillActive = findActiveSeat();
+    const secondClue = legalClueFrom(stillActive.game);
+    send(stillActive.seat.ws, {
+      type: "game_action",
+      actionId: "test-action-rt09-control",
+      request: {
+        type: "clue",
+        targetSeatId: secondClue.targetSeatId,
+        clue: { type: "rank", value: secondClue.rank },
+      },
+    });
+    await stillActive.seat.c.waitFor(
+      (m) => m.type === "state" && (m.view as RoomViewShape).game?.history.length === before.historyLength + 1,
+      8000,
+    );
+
+    ws1.close();
+    ws2.close();
+  });
 });
