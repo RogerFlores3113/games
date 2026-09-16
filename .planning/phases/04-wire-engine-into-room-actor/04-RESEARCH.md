@@ -477,7 +477,19 @@ it("RT-09: a double-sent clue actionId is applied exactly once", async () => {
   expect(viewAfterSecond.game.activeSeatId).toBe(/* seatB, unchanged from after first send */);
 });
 ```
-**Important correction to CONTEXT.md's stated assertion list:** D-15 says to assert on "token count, history length and turn index." `history` is **not present in `HanabiView`** (confirmed in `state.ts:103-118` — `HanabiView` has no `history` field at all; only `HanabiState`, the server-only internal type, carries history, per D-19 "no interface exposes history in v1"). The test must assert on `clueTokens`/`fuses`/`activeSeatId`/`isYourTurn`/`deckCount` — the fields actually present on the wire — not on history length, which is unobservable from the client's own received frames. **This is a discrepancy the planner must resolve**: either the test reaches into the DO's internal state directly (e.g. via a debug-only accessor, which the codebase does not currently have and D-11/D-13 CONTEXT.md gives no indication should be added), or the assertion is narrowed to the wire-visible fields. Recommend the latter — it is sufficient to prove RT-09 (a repeated clue must not decrement `clueTokens` twice) without requiring a new test-only backdoor into DO internals.
+**RETRACTED 2026-09-16 — this block was wrong; see the correction immediately below.**
+
+> **Correction (orchestrator, verified by reading the code):** `HanabiView` **does** declare
+> `history: HistoryEntryView[]` (`packages/rules/src/hanabi/state.ts`), and
+> `toHanabiPlayerView` **does** populate it (`projection.ts` maps `state.history` and returns
+> it in both the seated and unseated branches). History **is** wire-visible, so
+> `history.length` **is** a valid RT-09 assertion target and no debug backdoor is needed.
+> Phase 3's D-19 makes history *public-facts-only* — a draw entry carries just a card id —
+> which is precisely what makes it safe to send; it does not keep history off the wire.
+> CONTEXT.md D-15 is authoritative on this point. The original (incorrect) analysis is kept
+> below strikethrough-style for the audit trail — do not act on it.
+
+~~**Superseded analysis:** D-15 says to assert on "token count, history length and turn index." `history` is **not present in `HanabiView`**~~ (confirmed in `state.ts:103-118` — `HanabiView` has no `history` field at all; only `HanabiState`, the server-only internal type, carries history, per D-19 "no interface exposes history in v1"). The test must assert on `clueTokens`/`fuses`/`activeSeatId`/`isYourTurn`/`deckCount` — the fields actually present on the wire — not on history length, which is unobservable from the client's own received frames. **This is a discrepancy the planner must resolve**: either the test reaches into the DO's internal state directly (e.g. via a debug-only accessor, which the codebase does not currently have and D-11/D-13 CONTEXT.md gives no indication should be added), or the assertion is narrowed to the wire-visible fields. Recommend the latter — it is sufficient to prove RT-09 (a repeated clue must not decrement `clueTokens` twice) without requiring a new test-only backdoor into DO internals.
 
 ## State of the Art
 
@@ -506,7 +518,8 @@ it("RT-09: a double-sent clue actionId is applied exactly once", async () => {
    - What's unclear: whether `invalid_action` (malformed/hostile payload) and `clue_target_invalid` (targeting self or a nonexistent seat — should be prevented by D-12 client disabling anyway) get their own enum members or collapse to a generic fallback.
    - Recommendation: give every `AdapterError` member a corresponding `ErrorDetail` member for a clean 1:1 map (simpler, no lossy collapsing, and `invalid_action`/`clue_target_invalid` are cheap to add) — matches D-10's spirit ("widened with a closed enum of rule-refusal reasons") without inventing an asymmetric partial mapping. Flag as a planning decision, not fully closed by research.
 
-2. **Should `history` be added to `HanabiView` for the RT-09 test's benefit, or does the test work fine without it?**
+2. **RESOLVED (2026-09-16, orchestrator, verified in code) — no change needed: `history` is already on `HanabiView` and already populated by `toHanabiPlayerView`.** The premise of this question was false. Assert `history.length` alongside `clueTokens`, `activeSeatId`/`isYourTurn` and `deckCount`; add no debug path and reach into no DO internals. Original question text retained below for the audit trail.
+   ~~Should `history` be added to `HanabiView` for the RT-09 test's benefit, or does the test work fine without it?~~
    - What we know: D-19/D-13(Phase3) deliberately exclude history from any interface in v1; D-15(Phase4) asks the RT-09 test to assert on "history length," which isn't wire-visible.
    - What's unclear: whether CONTEXT.md intended a DO-internal test assertion (bypassing the wire) or simply wrote D-15 loosely.
    - Recommendation: assert on wire-visible fields only (`clueTokens`, `activeSeatId`, `isYourTurn`, `deckCount`) — do not add a history-exposing debug path or reach into DO internals just to satisfy a literal reading of D-15's assertion list. Confirm this interpretation with the user/planner before execution if it matters to them.
