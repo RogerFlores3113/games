@@ -170,7 +170,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 4)*
 
-- [ ] 04-06-PLAN.md — Interim playable board, D-12 disabling predicates, `RoomClient` swap (D-11/D-12/D-13)
+- [x] 04-06-PLAN.md — Interim playable board, D-12 disabling predicates, `RoomClient` swap (D-11/D-12/D-13)
 
 **Wave 7** *(blocked on Wave 6)*
 
@@ -234,7 +234,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Room & Transport Skeleton | 11/11 | Complete   | 2026-09-15 |
 | 2. Per-Seat Redaction Contract | 6/6 | Complete    | 2026-09-15 |
 | 3. Hanabi Rules Engine | 5/5 | Complete    | 2026-09-16 |
-| 4. Wire Engine Into Room Actor | 5/8 | In Progress|  |
+| 4. Wire Engine Into Room Actor | 6/8 | In Progress|  |
 | 5. Reconnect & Session Durability Hardening | 0/TBD | Not started | - |
 | 6. Game Interface | 0/TBD | Not started | - |
 | 7. Variant Support (Rainbow, Black) | 0/TBD | Not started | - |

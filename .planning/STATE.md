@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-09-16T03:41:18.312Z"
+stopped_at: Completed 04-06-PLAN.md
+last_updated: "2026-09-16T03:49:26.096Z"
 last_activity: 2026-09-16
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 30
-  completed_plans: 27
+  completed_plans: 28
   percent: 43
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 4 (Wire Engine Into Room Actor) — EXECUTING
-Plan: 6 of 8
+Plan: 7 of 8
 Status: Ready to execute
 Last activity: 2026-09-16
 
-Progress: [█████████░] 90%
+Progress: [█████████░] 93%
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Progress: [█████████░] 90%
 | Phase 04 P03 | 55min | 4 tasks | 6 files |
 | Phase 04 P04 | 35min | 3 tasks | 4 files |
 | Phase 04-wire-engine-into-room-actor P05 | 9min | 2 tasks | 2 files |
+| Phase 04 P06 | 35min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -143,6 +144,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Dedup check must run unconditionally before adapter.applyAction for every action type (D-09) because a repeated clue is legal and would otherwise spend a second token
 - [Phase ?]: mapAdapterError is an exhaustive switch over AdapterError with a never-typed default, mirroring variantConfig's exhaustiveness idiom
 - [Phase ?]: RT-09 duplicate-send proof records parsed.length before the second send and requires the matching frame's index at or beyond it, since the dedup branch resends a byte-identical view a naive waitFor would vacuously match
+- [Phase 04]: clueTouchCountForTarget only counts visible cards, delegating to variantConfig predicates rather than hand-rolled rules
+- [Phase 04]: Own-hand slots render position and raw positiveClues/negativeClues only, never possibleSuits/possibleRanks (Phase 6 UI-05 owns narrowed candidates)
 
 ### Pending Todos
 
@@ -162,6 +165,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-16T03:39:30.733Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-09-16T03:49:26.087Z
+Stopped at: Completed 04-06-PLAN.md
 Resume file: None
