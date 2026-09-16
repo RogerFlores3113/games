@@ -36,30 +36,30 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **HIDE-02**: Every outbound payload — initial join, live update, reconnect, and error responses — is produced by a single per-seat projection function, with no path that bypasses it
 - [x] **HIDE-03**: The wire format for a hidden card structurally lacks suit and rank fields rather than nulling or emptying them
 - [x] **HIDE-04**: An automated test fails if a serialized seat view contains the true identity of any card in that seat's own hand
-- [ ] **HIDE-05**: The server rejects any client-supplied action payload that asserts game state rather than requesting an action
+- [x] **HIDE-05**: The server rejects any client-supplied action payload that asserts game state rather than requesting an action
 
 ### Hanabi Rules Engine
 
-- [ ] **RULES-01**: Game deals correct hand sizes — 5 cards for 2-3 players, 4 cards for 4-5 players
-- [ ] **RULES-02**: Deck is constructed correctly for the selected variant, with three 1s, two each of 2/3/4, and one 5 per suit, and the Black suit instead holding a single copy of each rank
-- [ ] **RULES-03**: Suit count is derived from the variant configuration rather than hardcoded, so base (5 suits), Rainbow (6), and Black (6) all resolve correctly
-- [ ] **RULES-04**: Player can play a card from their hand on their turn
-- [ ] **RULES-05**: Player can discard a card from their hand on their turn, regaining a clue token
-- [ ] **RULES-06**: Player can give a clue naming exactly one color or one rank to exactly one other player, spending a clue token
-- [ ] **RULES-07**: A clue indicates every matching card in the target's hand, and no others
-- [ ] **RULES-08**: A clue that would touch zero cards is rejected
-- [ ] **RULES-09**: Giving a clue is unavailable when zero clue tokens remain
-- [ ] **RULES-10**: Discarding is unavailable when all 8 clue tokens are already available
+- [x] **RULES-01**: Game deals correct hand sizes — 5 cards for 2-3 players, 4 cards for 4-5 players
+- [x] **RULES-02**: Deck is constructed correctly for the selected variant, with three 1s, two each of 2/3/4, and one 5 per suit, and the Black suit instead holding a single copy of each rank
+- [x] **RULES-03**: Suit count is derived from the variant configuration rather than hardcoded, so base (5 suits), Rainbow (6), and Black (6) all resolve correctly
+- [x] **RULES-04**: Player can play a card from their hand on their turn
+- [x] **RULES-05**: Player can discard a card from their hand on their turn, regaining a clue token
+- [x] **RULES-06**: Player can give a clue naming exactly one color or one rank to exactly one other player, spending a clue token
+- [x] **RULES-07**: A clue indicates every matching card in the target's hand, and no others
+- [x] **RULES-08**: A clue that would touch zero cards is rejected
+- [x] **RULES-09**: Giving a clue is unavailable when zero clue tokens remain
+- [x] **RULES-10**: Discarding is unavailable when all 8 clue tokens are already available
 - [ ] **RULES-11**: Illegal actions are visibly unavailable in the interface rather than only rejected on submission
-- [ ] **RULES-12**: Playing a card that does not extend a stack loses a fuse and sends the card to the discard pile
-- [ ] **RULES-13**: Completing a stack with a 5 regains a clue token, unless the team is already at 8, in which case the bonus is forfeit
+- [x] **RULES-12**: Playing a card that does not extend a stack loses a fuse and sends the card to the discard pile
+- [x] **RULES-13**: Completing a stack with a 5 regains a clue token, unless the team is already at 8, in which case the bonus is forfeit
 - [ ] **RULES-14**: In the Rainbow variant, rainbow cards are indicated by clues of every color, and no clue names "rainbow" as a color
-- [ ] **RULES-15**: When the deck empties, a turns-remaining counter is set as explicit state, and every player including the one who drew the last card takes exactly one more turn
-- [ ] **RULES-16**: No cards are drawn during the final round
-- [ ] **RULES-17**: Game ends and is scored when the third fuse is lost, when all stacks are complete, or when the final round elapses
-- [ ] **RULES-18**: Final score is calculated and presented with its descriptive band
-- [ ] **RULES-19**: Shuffling is deterministic from a stored seed, so any game can be reproduced exactly for debugging
-- [ ] **RULES-20**: Turn history is recorded in game state from the first turn, with no interface exposing it in v1
+- [x] **RULES-15**: When the deck empties, a turns-remaining counter is set as explicit state, and every player including the one who drew the last card takes exactly one more turn
+- [x] **RULES-16**: No cards are drawn during the final round
+- [x] **RULES-17**: Game ends and is scored when the third fuse is lost, when all stacks are complete, or when the final round elapses
+- [x] **RULES-18**: Final score is calculated and presented with its descriptive band
+- [x] **RULES-19**: Shuffling is deterministic from a stored seed, so any game can be reproduced exactly for debugging
+- [x] **RULES-20**: Turn history is recorded in game state from the first turn, with no interface exposing it in v1
 
 ### Game Interface
 
@@ -78,7 +78,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Foundation
 
 - [x] **FDN-01**: Room, seating, connection, and reconnect machinery is separated from Hanabi-specific rules behind a game-adapter interface
-- [ ] **FDN-02**: The rules engine is a pure package with no networking or storage dependencies, testable in isolation
+- [x] **FDN-02**: The rules engine is a pure package with no networking or storage dependencies, testable in isolation
 - [x] **FDN-03**: The deployed system runs entirely within free tiers, with no service requiring a paid plan or stored payment method to remain reachable
 - [x] **FDN-04**: games.rogerflores.dev resolves to the deployed application
 
@@ -147,27 +147,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HIDE-02 | Phase 2 | Complete |
 | HIDE-03 | Phase 2 | Complete |
 | HIDE-04 | Phase 2 | Complete |
-| HIDE-05 | Phase 3 | Pending |
-| RULES-01 | Phase 3 | Pending |
-| RULES-02 | Phase 3 | Pending |
-| RULES-03 | Phase 3 | Pending |
-| RULES-04 | Phase 3 | Pending |
-| RULES-05 | Phase 3 | Pending |
-| RULES-06 | Phase 3 | Pending |
-| RULES-07 | Phase 3 | Pending |
-| RULES-08 | Phase 3 | Pending |
-| RULES-09 | Phase 3 | Pending |
-| RULES-10 | Phase 3 | Pending |
+| HIDE-05 | Phase 3 | Complete |
+| RULES-01 | Phase 3 | Complete |
+| RULES-02 | Phase 3 | Complete |
+| RULES-03 | Phase 3 | Complete |
+| RULES-04 | Phase 3 | Complete |
+| RULES-05 | Phase 3 | Complete |
+| RULES-06 | Phase 3 | Complete |
+| RULES-07 | Phase 3 | Complete |
+| RULES-08 | Phase 3 | Complete |
+| RULES-09 | Phase 3 | Complete |
+| RULES-10 | Phase 3 | Complete |
 | RULES-11 | Phase 6 | Pending |
-| RULES-12 | Phase 3 | Pending |
-| RULES-13 | Phase 3 | Pending |
+| RULES-12 | Phase 3 | Complete |
+| RULES-13 | Phase 3 | Complete |
 | RULES-14 | Phase 7 | Pending |
-| RULES-15 | Phase 3 | Pending |
-| RULES-16 | Phase 3 | Pending |
-| RULES-17 | Phase 3 | Pending |
-| RULES-18 | Phase 3 | Pending |
-| RULES-19 | Phase 3 | Pending |
-| RULES-20 | Phase 3 | Pending |
+| RULES-15 | Phase 3 | Complete |
+| RULES-16 | Phase 3 | Complete |
+| RULES-17 | Phase 3 | Complete |
+| RULES-18 | Phase 3 | Complete |
+| RULES-19 | Phase 3 | Complete |
+| RULES-20 | Phase 3 | Complete |
 | UI-01 | Phase 6 | Pending |
 | UI-02 | Phase 6 | Pending |
 | UI-03 | Phase 6 | Pending |
@@ -180,7 +180,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-10 | Phase 6 | Pending |
 | UI-11 | Phase 6 | Pending |
 | FDN-01 | Phase 1 | Complete |
-| FDN-02 | Phase 3 | Pending |
+| FDN-02 | Phase 3 | Complete |
 | FDN-03 | Phase 1 | Complete |
 | FDN-04 | Phase 1 | Complete |
 
