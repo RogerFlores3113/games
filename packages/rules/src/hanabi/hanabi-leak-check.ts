@@ -61,17 +61,24 @@ export function secretsForHanabiSeat(
     for (const slot of otherHand.slots) bump(slot.card.suit, slot.card.rank);
   }
   for (const card of state.discard) bump(card.suit, card.rank);
-  for (const stack of state.stacks) {
-    for (let rank = 1; rank <= stack.topRank; rank++) bump(stack.suit, rank as Rank);
-  }
+  // Deliberately NO per-rank bump for played stacks. A view's `stacks` entry
+  // is `{suit, topRank}` — it carries no `rank` key, so collectIdentityCounts
+  // never counts it, and a SUCCESSFULLY played card's identity appears in a
+  // view exactly once: in its own "play" history entry, bumped below.
+  // Bumping here as well raised the allowance to 2 against an observed 1,
+  // leaving one unit of slack per completed stack rank in which a genuine
+  // duplicate reveal of an already-played identity went undetected
+  // (03-REVIEW.md CR-01 / 03-VERIFICATION.md). Do not reintroduce it: the
+  // history loop below already reproduces every legitimate occurrence.
+  //
   // A "play" or "discard" history entry reveals the SAME already-public
-  // identity a view's stacks/discard-pile fields also carry (D-19's public
-  // facts, restated chronologically) — without this, a view containing both
-  // the current discard pile AND its history log legitimately mentions a
+  // identity a view's discard-pile field also carries (D-19's public facts,
+  // restated chronologically) — without this, a view containing both the
+  // current discard pile AND its history log legitimately mentions a
   // discarded/misplayed card's identity twice, which the typed multiset
   // below would otherwise flag as an excess-count leak. Bumping once per
-  // history entry (independent of the discard/stack bumps above) keeps the
-  // allowed count matching the view's actual, legitimate repetition.
+  // history entry (independent of the discard bump above) keeps the allowed
+  // count matching the view's actual, legitimate repetition.
   for (const entry of state.history) {
     if (entry.type === "play" || entry.type === "discard") {
       bump(entry.suit, entry.rank);

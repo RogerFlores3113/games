@@ -142,10 +142,50 @@ describe("leak: canary suite", () => {
     // an EXCESS check, not a presence check.
     expect(1).toBeGreaterThan(allowedCount === undefined ? -1 : allowedCount - 1);
   });
+
+  it("Canary I: one extra copy of an ALREADY-PLAYED card's identity on top of the real view (03-REVIEW.md CR-01 regression)", () => {
+    // Regression guard. `secretsForHanabiSeat` used to bump the allowance for
+    // a played card TWICE — once per completed stack rank and once for its
+    // "play" history entry — while a view exposes that identity only once
+    // (stacks are {suit, topRank} and carry no `rank` key). That left one
+    // unit of slack per completed rank, so a genuine duplicate reveal went
+    // undetected. This canary fails against that older behavior.
+    const played = buildState("base");
+    const suit = variantConfig("base").suits[0]!;
+    const playedState: HanabiState = {
+      ...played,
+      stacks: played.stacks.map((stack) => (stack.suit === suit ? { suit, topRank: 1 } : stack)),
+      history: [
+        { turn: 1, type: "play", seatId: "seat-b", cardId: "playedaa", suit, rank: 1, success: true },
+      ],
+    };
+    const viewer = "seat-a";
+    const playedSecrets = secretsForHanabiSeat(playedState, viewer, SEED);
+    const view = toHanabiPlayerView(playedState, viewer);
+
+    // Premise: the real view is clean — the played identity appears exactly
+    // once, in its own history entry.
+    expect(
+      checkHanabiViewForLeaks({
+        view,
+        serialized: JSON.stringify(view),
+        secrets: playedSecrets,
+      }),
+    ).toEqual([]);
+
+    // One extra copy of that same already-public identity must now be caught.
+    const leaky = { ...view, debugExtra: { suit, rank: 1 } };
+    const reasons = checkHanabiViewForLeaks({
+      view: leaky,
+      serialized: JSON.stringify(leaky),
+      secrets: playedSecrets,
+    });
+    expect(reasons).toContain(`typed:identity-count-exceeded:${suit}:1`);
+  });
 });
 
 describe("secretsForHanabiSeat", () => {
-  it("returns ownCards equal to the seat's hand cards and allowedIdentityCounts covering other hands, discard and stacks", () => {
+  it("returns ownCards equal to the seat's hand cards and allowedIdentityCounts covering other hands, discard and history", () => {
     const state = buildState("base");
     const secrets = secretsForHanabiSeat(state, "seat-a", SEED);
     const hand = state.hands.find((h) => h.seatId === "seat-a")!;
