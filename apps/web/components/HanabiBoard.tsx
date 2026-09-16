@@ -3,6 +3,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 import type { RoomView } from "@games/schema";
+import { HanabiViewSchema } from "@games/schema/games/hanabi";
 import type { Clue, HanabiView, Rank } from "@games/rules";
 import { RANKS } from "@games/rules";
 import {
@@ -24,19 +25,11 @@ export interface HanabiBoardProps {
   onAction: (request: HanabiActionRequest) => void;
 }
 
+/** WR-03: defers to the same strict wire schema the server's fail-closed gate
+ * uses, so there is exactly one definition of "a valid HanabiView" and the
+ * type predicate never claims more than was verified at runtime. */
 function isHanabiView(game: unknown): game is HanabiView {
-  return (
-    typeof game === "object" &&
-    game !== null &&
-    "yourHand" in game &&
-    Array.isArray((game as { yourHand: unknown }).yourHand) &&
-    "otherHands" in game &&
-    Array.isArray((game as { otherHands: unknown }).otherHands) &&
-    "stacks" in game &&
-    Array.isArray((game as { stacks: unknown }).stacks) &&
-    "discard" in game &&
-    Array.isArray((game as { discard: unknown }).discard)
-  );
+  return HanabiViewSchema.safeParse(game).success;
 }
 
 /**
