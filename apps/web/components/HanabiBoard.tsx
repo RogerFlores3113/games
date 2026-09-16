@@ -13,8 +13,11 @@ import {
   isDiscardDisabled,
   isGiveClueDisabled,
   isPlayDisabled,
+  isSeatConnected,
+  turnIndicatorText,
 } from "../lib/hanabi-board-logic";
 import { Button } from "./Button";
+import { ReconnectingBanner } from "./ReconnectingBanner";
 
 export type HanabiActionRequest =
   | { type: "play"; cardId: string }
@@ -24,6 +27,10 @@ export type HanabiActionRequest =
 export interface HanabiBoardProps {
   view: RoomView;
   onAction: (request: HanabiActionRequest) => void;
+  /** D-05: while true, the store's own socket is degraded and this last-
+   * known view is display-only — every action control is disabled and the
+   * `act()` wrapper below no-ops, so nothing is sent against a stale view. */
+  reconnecting?: boolean;
 }
 
 /** WR-03: defers to the same strict wire schema the server's fail-closed gate
@@ -47,7 +54,7 @@ function isHanabiView(game: unknown): game is HanabiView {
  * from a hidden `HanabiCardView`; this component must not visually
  * reintroduce a signal the data doesn't carry.
  */
-export function HanabiBoard({ view, onAction }: HanabiBoardProps) {
+export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoardProps) {
   const game = isHanabiView(view.game) ? view.game : null;
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [clueTarget, setClueTarget] = useState<string | null>(null);
@@ -55,6 +62,39 @@ export function HanabiBoard({ view, onAction }: HanabiBoardProps) {
 
   function labelFor(seatId: string): string {
     return view.seats.find((seat) => seat.seatId === seatId)?.displayLabel ?? "…";
+  }
+
+  // D-06: defense in depth — a click that slips past a disabled control
+  // (e.g. a queued event handler from just before reconnecting flipped
+  // true) still never reaches onAction while the view is stale.
+  function act(request: HanabiActionRequest): void {
+    if (reconnecting) return;
+    onAction(request);
+  }
+
+  function seatStatus(seatId: string) {
+    const connected = isSeatConnected(view.seats, seatId);
+    return (
+      <div
+        data-testid={`seat-status-${seatId}`}
+        data-connected={String(connected)}
+        className="flex items-center gap-[length:var(--space-xs)]"
+      >
+        <span
+          aria-hidden="true"
+          className="inline-block h-2 w-2 rounded-full"
+          style={{
+            backgroundColor: connected ? "var(--color-status-connected)" : "var(--color-status-disconnected)",
+          }}
+        />
+        <span
+          className="text-[length:var(--text-label)]"
+          style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
+        >
+          {connected ? "Connected" : "Disconnected"}
+        </span>
+      </div>
+    );
   }
 
   const isEnded = view.status === "ended";
@@ -88,6 +128,8 @@ export function HanabiBoard({ view, onAction }: HanabiBoardProps) {
       className="flex min-h-screen flex-col items-center gap-[length:var(--space-xl)] px-[length:var(--space-md)] py-[length:var(--space-3xl)]"
       style={{ backgroundColor: "var(--color-bg)" }}
     >
+      {reconnecting && <ReconnectingBanner />}
+
       {!isEnded && (
         <p
           data-testid="turn-indicator"
@@ -97,7 +139,7 @@ export function HanabiBoard({ view, onAction }: HanabiBoardProps) {
             lineHeight: "var(--text-body--line-height)",
           }}
         >
-          {game.isYourTurn ? "Your turn" : `Waiting for ${labelFor(game.activeSeatId)}`}
+          {turnIndicatorText(game, view.seats, labelFor)}
         </p>
       )}
 
@@ -114,6 +156,7 @@ export function HanabiBoard({ view, onAction }: HanabiBoardProps) {
             >
               {labelFor(hand.seatId)}&apos;s hand
             </span>
+            {seatStatus(hand.seatId)}
             <div className="flex flex-wrap justify-center gap-[length:var(--space-sm)]">
               {hand.cards.map((card) => (
                 <div
@@ -213,6 +256,7 @@ export function HanabiBoard({ view, onAction }: HanabiBoardProps) {
         >
           Your hand
         </span>
+        {view.youSeatId !== null && seatStatus(view.youSeatId)}
         <div data-testid="own-hand" className="flex flex-wrap justify-center gap-[length:var(--space-sm)]">
           {game.yourHand.map((card, index) => {
             const slotNumber = index + 1;
@@ -222,6 +266,7 @@ export function HanabiBoard({ view, onAction }: HanabiBoardProps) {
                 key={card.id}
                 type="button"
                 data-testid={`own-hand-slot-${slotNumber}`}
+                disabled={reconnecting}
                 onClick={() => setSelectedCardId(card.id)}
                 className={clsx(
                   "flex min-h-[64px] min-w-[64px] flex-col items-center justify-center gap-[length:var(--space-xs)] rounded-md border px-[length:var(--space-sm)]",
@@ -269,15 +314,15 @@ export function HanabiBoard({ view, onAction }: HanabiBoardProps) {
             <div className="flex gap-[length:var(--space-sm)]">
               <Button
                 data-testid="play-button"
-                disabled={isPlayDisabled(game) || !selectedCardId}
-                onClick={() => selectedCardId && onAction({ type: "play", cardId: selectedCardId })}
+                disabled={isPlayDisabled(game) || !selectedCardId || reconnecting}
+                onClick={() => selectedCardId && act({ type: "play", cardId: selectedCardId })}
               >
                 Play
               </Button>
               <Button
                 data-testid="discard-button"
-                disabled={isDiscardDisabled(game) || !selectedCardId}
-                onClick={() => selectedCardId && onAction({ type: "discard", cardId: selectedCardId })}
+                disabled={isDiscardDisabled(game) || !selectedCardId || reconnecting}
+                onClick={() => selectedCardId && act({ type: "discard", cardId: selectedCardId })}
               >
                 Discard
               </Button>
@@ -305,6 +350,7 @@ export function HanabiBoard({ view, onAction }: HanabiBoardProps) {
                   key={hand.seatId}
                   variant={clueTarget === hand.seatId ? "primary" : "ghost"}
                   data-testid={`clue-target-${hand.seatId}`}
+                  disabled={reconnecting}
                   onClick={() => setClueTarget(hand.seatId)}
                 >
                   {labelFor(hand.seatId)}
@@ -324,6 +370,7 @@ export function HanabiBoard({ view, onAction }: HanabiBoardProps) {
                   key={color}
                   variant={clueValue?.type === "color" && clueValue.value === color ? "primary" : "ghost"}
                   data-testid={`clue-value-${color}`}
+                  disabled={reconnecting}
                   onClick={() => setClueValue({ type: "color", value: color })}
                 >
                   {color}
@@ -334,6 +381,7 @@ export function HanabiBoard({ view, onAction }: HanabiBoardProps) {
                   key={rank}
                   variant={clueValue?.type === "rank" && clueValue.value === rank ? "primary" : "ghost"}
                   data-testid={`clue-value-${rank}`}
+                  disabled={reconnecting}
                   onClick={() => setClueValue({ type: "rank", value: rank })}
                 >
                   {rank}
@@ -343,8 +391,8 @@ export function HanabiBoard({ view, onAction }: HanabiBoardProps) {
 
             <Button
               data-testid="give-clue-button"
-              disabled={!clueTarget || !clueValue || giveClueDisabled}
-              onClick={() => clueTarget && clueValue && onAction({ type: "clue", targetSeatId: clueTarget, clue: clueValue })}
+              disabled={!clueTarget || !clueValue || giveClueDisabled || reconnecting}
+              onClick={() => clueTarget && clueValue && act({ type: "clue", targetSeatId: clueTarget, clue: clueValue })}
             >
               Give clue
             </Button>
