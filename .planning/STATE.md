@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-09-16T21:39:01.633Z"
+last_updated: "2026-09-16T21:45:21.074Z"
 last_activity: 2026-09-16
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 37
-  completed_plans: 34
+  completed_plans: 35
   percent: 57
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 05 (reconnect-session-durability-hardening) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
 Last activity: 2026-09-16
 
-Progress: [█████████░] 92%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -89,6 +89,7 @@ Progress: [█████████░] 92%
 | Phase 05 P01 | 35min | 3 tasks | 6 files |
 | Phase 05 P02 | 19min | 3 tasks | 7 files |
 | Phase 05 P03 | 20min | 2 tasks | 7 files |
+| Phase 05 P04 | 3min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -165,6 +166,8 @@ Recent decisions affecting current work:
 - [Phase 05-02]: SeatAttachment.boundAt (epoch ms at join) exempts a just-joined socket from the zombie sweep until its first heartbeat lands
 - [Phase 05]: 05-03: heartbeat.ts stays framework-free (no window/document, OPEN readyState as literal 1) so D-01/D-02 decision logic is unit-proven before any DOM wiring
 - [Phase 05]: 05-03: client heartbeat interval keeps running regardless of tab visibility so an alt-tabbed desktop player stays Connected for teammates; server SOCKET_STALE_MS absorbs Chrome's hidden-tab throttle
+- [Phase ?]: 05-04: act() wrapper inside HanabiBoard is deliberate defense-in-depth (D-06) on top of every control's own disabled prop
+- [Phase ?]: 05-04: RoomClient's send() also gates on status === reconnecting, keeping D-06 guaranteed at both component and dispatch-chokepoint layers since Lobby routes through send() without its own act()-style wrapper
 
 ### Pending Todos
 
@@ -184,6 +187,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-16T21:39:01.625Z
+Last session: 2026-09-16T21:45:17.249Z
 Stopped at: Completed 05-03-PLAN.md
 Resume file: None
