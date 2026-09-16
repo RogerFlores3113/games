@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { HanabiView } from "@games/rules";
+import { MAX_FUSES } from "@games/rules";
 import {
   bandForView,
   clueTouchCountForTarget,
   cluableColorsForView,
+  fusesRemainingForView,
   isDiscardDisabled,
   isGiveClueDisabled,
   isPlayDisabled,
@@ -154,6 +156,24 @@ describe("bandForView", () => {
   it("returns Legendary for a perfect base-game score", () => {
     const view = baseView({ score: 25 });
     expect(bandForView(view)).toBe("Legendary");
+  });
+});
+
+describe("fusesRemainingForView", () => {
+  it("is 3 for a fresh game (fuses used 0)", () => {
+    expect(fusesRemainingForView(baseView({ fuses: 0 }))).toBe(3);
+  });
+
+  it("is 2 after one misplay", () => {
+    expect(fusesRemainingForView(baseView({ fuses: 1 }))).toBe(2);
+  });
+
+  it("is 0 at game over from fuses", () => {
+    expect(fusesRemainingForView(baseView({ fuses: 3 }))).toBe(0);
+  });
+
+  it("is 0 when fuses used equals MAX_FUSES imported from @games/rules", () => {
+    expect(fusesRemainingForView(baseView({ fuses: MAX_FUSES }))).toBe(0);
   });
 });
 

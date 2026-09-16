@@ -15,7 +15,7 @@ export type {
 
 export { hanabiGame } from "./hanabi/adapter";
 export { variantConfig, handSizeFor, maxScoreFor, ALL_SUITS, RANKS } from "./hanabi/variant";
-export { canPlay, canDiscard, canClue, cardsTouchedByClue } from "./hanabi/legality";
+export { canPlay, canDiscard, canClue, cardsTouchedByClue, MAX_FUSES } from "./hanabi/legality";
 export { currentScore, scoreBand } from "./hanabi/endgame";
 export { checkHanabiViewForLeaks, secretsForHanabiSeat } from "./hanabi/hanabi-leak-check";
 export type { HanabiAction, HanabiState, HanabiView, HanabiCardView, ClueFacts, Clue } from "./hanabi/state";

@@ -1,5 +1,5 @@
 import type { HanabiView, Clue, Suit } from "@games/rules";
-import { variantConfig, maxScoreFor, scoreBand } from "@games/rules";
+import { variantConfig, maxScoreFor, scoreBand, MAX_FUSES } from "@games/rules";
 
 /**
  * D-12 boundary: these four predicates are the ONLY client-side disabling
@@ -56,6 +56,13 @@ export function isGiveClueDisabled(view: HanabiView, targetSeatId: string, clue:
  * maximum achievable score — never re-derived client-side. */
 export function bandForView(view: HanabiView): string {
   return scoreBand(view.score, maxScoreFor(variantConfig(view.variant)));
+}
+
+/** `view.fuses` counts fuses USED on the wire (engine/schema semantics are
+ * unchanged by this helper). This converts it to fuses remaining for
+ * display only, the same kind of view-derived value as `bandForView`. */
+export function fusesRemainingForView(view: HanabiView): number {
+  return MAX_FUSES - view.fuses;
 }
 
 /** The variant's nameable colours — never includes "rainbow" in the
