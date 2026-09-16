@@ -166,7 +166,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4)*
 
-- [ ] 04-05-PLAN.md — Live-wire proofs: Hanabi frame capture, double-sent clue, dedup across a forced eviction (D-02/D-15)
+- [x] 04-05-PLAN.md — Live-wire proofs: Hanabi frame capture, double-sent clue, dedup across a forced eviction (D-02/D-15)
 
 **Wave 6** *(blocked on Wave 4)*
 
@@ -234,7 +234,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Room & Transport Skeleton | 11/11 | Complete   | 2026-09-15 |
 | 2. Per-Seat Redaction Contract | 6/6 | Complete    | 2026-09-15 |
 | 3. Hanabi Rules Engine | 5/5 | Complete    | 2026-09-16 |
-| 4. Wire Engine Into Room Actor | 4/8 | In Progress|  |
+| 4. Wire Engine Into Room Actor | 5/8 | In Progress|  |
 | 5. Reconnect & Session Durability Hardening | 0/TBD | Not started | - |
 | 6. Game Interface | 0/TBD | Not started | - |
 | 7. Variant Support (Rainbow, Black) | 0/TBD | Not started | - |

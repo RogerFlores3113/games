@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-09-16T03:28:46.173Z"
+last_updated: "2026-09-16T03:41:18.312Z"
 last_activity: 2026-09-16
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 30
-  completed_plans: 26
+  completed_plans: 27
   percent: 43
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 4 (Wire Engine Into Room Actor) — EXECUTING
-Plan: 5 of 8
+Plan: 6 of 8
 Status: Ready to execute
 Last activity: 2026-09-16
 
-Progress: [█████████░] 87%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
@@ -79,6 +79,7 @@ Progress: [█████████░] 87%
 | Phase 04 P02 | 33min | 3 tasks | 7 files |
 | Phase 04 P03 | 55min | 4 tasks | 6 files |
 | Phase 04 P04 | 35min | 3 tasks | 4 files |
+| Phase 04-wire-engine-into-room-actor P05 | 9min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -141,6 +142,7 @@ Recent decisions affecting current work:
 - [Phase ?]: room-state.test.ts deck-exhaustion test rewritten to drive a Hanabi game to its natural end via legalActionFor
 - [Phase ?]: Dedup check must run unconditionally before adapter.applyAction for every action type (D-09) because a repeated clue is legal and would otherwise spend a second token
 - [Phase ?]: mapAdapterError is an exhaustive switch over AdapterError with a never-typed default, mirroring variantConfig's exhaustiveness idiom
+- [Phase ?]: RT-09 duplicate-send proof records parsed.length before the second send and requires the matching frame's index at or beyond it, since the dedup branch resends a byte-identical view a naive waitFor would vacuously match
 
 ### Pending Todos
 
@@ -160,6 +162,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-16T03:28:41.287Z
+Last session: 2026-09-16T03:39:30.733Z
 Stopped at: Completed 04-01-PLAN.md
 Resume file: None
