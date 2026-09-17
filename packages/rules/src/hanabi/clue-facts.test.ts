@@ -95,6 +95,42 @@ describe("clue facts", () => {
     expect(afterSecond.possibleSuits).toEqual(afterFirst.possibleSuits);
   });
 
+  // Phase 06.2's hint display relies on this: hints are a pure function of
+  // current facts only because positiveClues never shrinks — the previous
+  // array is always a prefix of the next, across any sequence of clues.
+  it("positiveClues only ever grows: previous entries remain, in order, as a prefix of the next array, across alternating colour/rank clues and both wasTouched values", () => {
+    const config = variantConfig("base");
+    let facts = initialClueFacts(config);
+    const previousLengths: number[] = [facts.positiveClues.length];
+    const clueSequence: Array<{ clue: { type: "color" | "rank"; value: unknown }; wasTouched: boolean }> = [
+      { clue: { type: "color", value: "red" }, wasTouched: true },
+      { clue: { type: "rank", value: 1 }, wasTouched: false },
+      { clue: { type: "rank", value: 3 }, wasTouched: true },
+      { clue: { type: "color", value: "blue" }, wasTouched: false },
+      { clue: { type: "color", value: "red" }, wasTouched: true },
+    ];
+
+    for (const { clue, wasTouched } of clueSequence) {
+      const before = facts.positiveClues;
+      const next = applyClueToSlotFacts(
+        config,
+        facts,
+        clue as { type: "color" | "rank"; value: never },
+        wasTouched,
+      );
+      // Every entry from before is still present, in the same order, as a
+      // prefix of next.
+      expect(next.positiveClues.slice(0, before.length)).toEqual(before);
+      expect(next.positiveClues.length).toBeGreaterThanOrEqual(before.length);
+      previousLengths.push(next.positiveClues.length);
+      facts = next;
+    }
+
+    // Non-vacuousness: at least one clue in the sequence was a positive
+    // (wasTouched: true) clue, so positiveClues actually grew at least once.
+    expect(Math.max(...previousLengths)).toBeGreaterThan(0);
+  });
+
   it("applyClueToSlotFacts never mutates the facts argument", () => {
     const config = variantConfig("base");
     const facts = initialClueFacts(config);
