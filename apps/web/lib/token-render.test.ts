@@ -14,7 +14,7 @@ const FUSE_TOKEN_ART_PATH = fileURLToPath(new URL("../components/hanabi/FuseToke
 const clueTokenArtSource = readFileSync(CLUE_TOKEN_ART_PATH, "utf-8");
 const fuseTokenArtSource = readFileSync(FUSE_TOKEN_ART_PATH, "utf-8");
 
-function noHexLiterals(source: string): RegExpMatchArray[] | null {
+function noHexLiterals(source: string): RegExpMatchArray | null {
   const withoutComments = source
     .split("\n")
     .filter((line) => !line.trim().startsWith("//"))
