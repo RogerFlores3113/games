@@ -111,11 +111,11 @@ describe("own-hand render guard (D-15, WR-06)", () => {
     expect(render(narrowed)).toContain('data-testid="hint-numeral"');
   });
 
-  it("renders a note chip in the first own-hand slot's note row (D-03/D-05, NOTE-02)", () => {
-    expect(render(VISIBLE_HAND)).toContain("note-chip-slot-1");
+  it("renders a note box in the first own-hand slot's note row (D-09/D-10, NOTE-03)", () => {
+    expect(render(VISIBLE_HAND)).toContain("note-box-slot-1");
   });
 
-  it("TeammateHand renders no note chip (D-03: notes are own-hand only)", () => {
+  it("TeammateHand renders no note surface (D-03: notes are own-hand only)", () => {
     const markup = renderToStaticMarkup(
       createElement(TeammateHand, {
         hand: { seatId: "seat-2", cards: VISIBLE_HAND },
@@ -130,7 +130,7 @@ describe("own-hand render guard (D-15, WR-06)", () => {
         onSelectTarget: () => {},
       }),
     );
-    expect(markup).not.toContain("note-chip");
+    expect(markup).not.toContain("note-box");
   });
 
   it("every own-hand card-back segment is byte-identical across slots (D-10)", () => {

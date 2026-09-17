@@ -1,7 +1,7 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { HanabiCardView, Variant } from "@games/rules";
 import { NOTE_ROW_PX } from "../../lib/layout-budget";
-import { NoteChip } from "./NoteChip";
+import { NoteBox } from "./NoteBox";
 import { OwnHandCard } from "./OwnHandCard";
 import { TeammateCard } from "./TeammateCard";
 
@@ -177,9 +177,9 @@ export interface OwnHandProps {
  * `card.facts` — never the card itself — structurally preserving the D-15
  * identity boundary at this call site too. Each slot keeps a fixed
  * `NOTE_ROW_PX`-tall note row above the card holding the existing
- * `NoteChip` (HINT-04 removes the marks-zone band that used to sit there
- * instead; 06.2-05 replaces the chip itself with the always-visible box —
- * this plan does not touch the chip). */
+ * `NoteBox` (HINT-04 removes the marks-zone band that used to sit there
+ * instead; 06.2-06 replaced the click-to-reveal chip with this
+ * always-visible, autosaving box). */
 export function OwnHand({
   cards,
   variant,
@@ -253,7 +253,7 @@ export function OwnHand({
               style={{ height: NOTE_ROW_PX }}
             >
               {youSeatId !== null && (
-                <NoteChip key={card.id} roomCode={roomCode} seatId={youSeatId} cardId={card.id} slotNumber={i + 1} />
+                <NoteBox key={card.id} roomCode={roomCode} seatId={youSeatId} cardId={card.id} slotNumber={i + 1} />
               )}
             </div>
             <OwnHandCard
