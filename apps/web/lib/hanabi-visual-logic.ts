@@ -1,5 +1,6 @@
-import type { HanabiCardView, HanabiView, Rank, Suit, Variant } from "@games/rules";
-import { RANKS, variantConfig } from "@games/rules";
+import type { Clue, HanabiCardView, HanabiView, Rank, Suit, Variant } from "@games/rules";
+import { MAX_FUSES, RANKS, maxScoreFor, variantConfig } from "@games/rules";
+import { clueTouchCountForTarget, isDiscardDisabled } from "./hanabi-board-logic";
 
 /**
  * D-23 / D-15 boundary: every derivation below is a pure function over the
@@ -116,3 +117,108 @@ export function newlyCompletedStacks(
 /** UI-SPEC durations (D-14 transient clue-touch highlight, D-11 stack-complete flash). */
 export const CLUE_HIGHLIGHT_MS = 2000;
 export const STACK_FLASH_MS = 600;
+
+// ---------------------------------------------------------------------------
+// D-18 / D-20 / D-04 / D-01: action, end-reason, deck-text and turn-order
+// derivations. These never call the engine's full-legality checks (they need
+// the complete HanabiState, which the client never has) — they dispatch
+// through the same
+// two client-safe predicates hanabi-board-logic.ts already exposes
+// (isDiscardDisabled, clueTouchCountForTarget), keeping one touch/disable
+// rule shared across both files (RULES-11, T-06-02).
+// ---------------------------------------------------------------------------
+
+export type ActionIntent =
+  | { kind: "play"; selectedCardId: string | null }
+  | { kind: "discard"; selectedCardId: string | null }
+  | { kind: "clue"; targetSeatId: string | null; clue: Clue | null };
+
+export interface ActionContext {
+  reconnecting: boolean;
+  ended: boolean;
+  labelFor?: (seatId: string) => string;
+}
+
+/** D-18: a short reason string for every disabled play/discard/clue state,
+ * or null when the action is allowed. Check order (fixed, matches
+ * behavior spec): ended, then reconnecting, then not-your-turn, then
+ * per-kind reasons. */
+export function disabledReasonFor(view: HanabiView, intent: ActionIntent, ctx: ActionContext): string | null {
+  if (ctx.ended) return "The game has ended";
+  if (ctx.reconnecting) return "Reconnecting — actions paused";
+  if (!view.isYourTurn) return "Not your turn";
+
+  if (intent.kind === "play") {
+    if (!intent.selectedCardId) return "Select a card in your hand first";
+    return null;
+  }
+
+  if (intent.kind === "discard") {
+    if (isDiscardDisabled(view)) return "Clue tokens are full — you can't discard";
+    if (!intent.selectedCardId) return "Select a card in your hand first";
+    return null;
+  }
+
+  // intent.kind === "clue"
+  if (view.clueTokens <= 0) return "No clue tokens left";
+  if (!intent.targetSeatId) return "Choose a teammate to clue";
+  if (!intent.clue) return "Choose a color or rank";
+  if (clueTouchCountForTarget(view, intent.targetSeatId, intent.clue) === 0) {
+    const labelFor = ctx.labelFor ?? (() => "…");
+    return `That clue wouldn't touch any of ${labelFor(intent.targetSeatId)}'s cards`;
+  }
+  return null;
+}
+
+export type EndReason = "fuses_exhausted" | "all_stacks_complete" | "final_round_elapsed";
+
+/** D-20: mirrors checkHanabiGameEnd's fixed order over the redacted view —
+ * fuses_exhausted, then all_stacks_complete, then final_round_elapsed, else
+ * null. Uses the engine's own MAX_FUSES/maxScoreFor/variantConfig, never a
+ * client-side re-derivation of the thresholds. */
+export function endReasonForView(view: HanabiView): EndReason | null {
+  if (view.fuses >= MAX_FUSES) return "fuses_exhausted";
+  if (view.score === maxScoreFor(variantConfig(view.variant))) return "all_stacks_complete";
+  if (view.finalTurnsRemaining === 0) return "final_round_elapsed";
+  return null;
+}
+
+export const END_REASON_COPY: Record<EndReason, string> = {
+  fuses_exhausted: "Three fuses were lost.",
+  all_stacks_complete: "Every stack was completed!",
+  final_round_elapsed: "The deck ran out and the final round elapsed.",
+};
+
+/** D-04: the deck-count caption, full-swap to the final-round message once
+ * the deck has run out (see UI-SPEC — "0 cards left in deck" during the
+ * final round is exactly the confusing state this exists to fix). */
+export function deckCountText(view: Pick<HanabiView, "deckCount" | "finalTurnsRemaining">): string {
+  if (view.finalTurnsRemaining !== null) {
+    return `Final round — ${view.finalTurnsRemaining} turns left`;
+  }
+  return `${view.deckCount} cards left in deck`;
+}
+
+/** D-01: orders `otherHands` starting with the seat immediately after the
+ * viewer in room seat order, wrapping around. Falls back to the original
+ * order when `yourSeatId` is null or not present in `seatOrder`. A hand
+ * whose seatId is missing from `seatOrder` is appended at the end, in its
+ * original relative order. */
+export function teammatesInTurnOrder<T extends { seatId: string }>(
+  otherHands: T[],
+  seatOrder: readonly string[],
+  yourSeatId: string | null,
+): T[] {
+  if (yourSeatId === null) return otherHands;
+  const yourIndex = seatOrder.indexOf(yourSeatId);
+  if (yourIndex === -1) return otherHands;
+
+  const orderIndexOf = (seatId: string): number => {
+    const idx = seatOrder.indexOf(seatId);
+    if (idx === -1) return Number.POSITIVE_INFINITY;
+    // Rotate so the seat right after yourIndex sorts first.
+    return (idx - yourIndex - 1 + seatOrder.length) % seatOrder.length;
+  };
+
+  return [...otherHands].sort((a, b) => orderIndexOf(a.seatId) - orderIndexOf(b.seatId));
+}

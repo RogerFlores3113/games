@@ -14,28 +14,40 @@ import { variantConfig, maxScoreFor, scoreBand, MAX_FUSES } from "@games/rules";
  * `bandForView` is NOT a client-side re-derivation of the band table: the
  * thresholds live in the engine (D-13) and this module only calls the
  * engine's own `scoreBand`/`maxScoreFor`/`variantConfig` functions.
+ *
+ * D-17 (Phase 6): `clueTouchIdsForTarget` adds the ids form of the existing
+ * `clueTouchCountForTarget`; it is still no new disabling rule in this file —
+ * `clueTouchCountForTarget` is now defined in terms of it so there is one
+ * touch rule, not two independently-maintained ones.
  */
 
 const MAX_CLUE_TOKENS = 8;
 
-/** Counts how many of a target seat's VISIBLE cards a given clue touches,
- * dispatching through the variant config's own predicates rather than
- * hand-rolling a touch rule in the client. */
-export function clueTouchCountForTarget(view: HanabiView, targetSeatId: string, clue: Clue): number {
+/** Returns exactly the ids of a target seat's VISIBLE cards a given clue
+ * would touch, dispatching through the variant config's own predicates
+ * rather than hand-rolling a touch rule in the client. Hidden cards are
+ * never included (we cannot know their identity to judge them), and an
+ * unknown target seat returns []. */
+export function clueTouchIdsForTarget(view: HanabiView, targetSeatId: string, clue: Clue): string[] {
   const target = view.otherHands.find((hand) => hand.seatId === targetSeatId);
-  if (!target) return 0;
+  if (!target) return [];
 
   const config = variantConfig(view.variant);
-  let count = 0;
+  const ids: string[] = [];
   for (const card of target.cards) {
-    if (card.hidden) continue; // not visible to us — cannot count it
+    if (card.hidden) continue; // not visible to us — cannot judge it
     if (clue.type === "color") {
-      if (config.colorClueTouches(card.suit, clue.value)) count += 1;
+      if (config.colorClueTouches(card.suit, clue.value)) ids.push(card.id);
     } else {
-      if (config.rankClueTouches(card.rank, clue.value)) count += 1;
+      if (config.rankClueTouches(card.rank, clue.value)) ids.push(card.id);
     }
   }
-  return count;
+  return ids;
+}
+
+/** Counts how many of a target seat's VISIBLE cards a given clue touches. */
+export function clueTouchCountForTarget(view: HanabiView, targetSeatId: string, clue: Clue): number {
+  return clueTouchIdsForTarget(view, targetSeatId, clue).length;
 }
 
 export function isPlayDisabled(view: HanabiView): boolean {
