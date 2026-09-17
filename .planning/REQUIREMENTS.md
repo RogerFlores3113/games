@@ -50,7 +50,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **RULES-08**: A clue that would touch zero cards is rejected
 - [x] **RULES-09**: Giving a clue is unavailable when zero clue tokens remain
 - [x] **RULES-10**: Discarding is unavailable when all 8 clue tokens are already available
-- [ ] **RULES-11**: Illegal actions are visibly unavailable in the interface rather than only rejected on submission
+- [x] **RULES-11**: Illegal actions are visibly unavailable in the interface rather than only rejected on submission
 - [x] **RULES-12**: Playing a card that does not extend a stack loses a fuse and sends the card to the discard pile
 - [x] **RULES-13**: Completing a stack with a 5 regains a clue token, unless the team is already at 8, in which case the bonus is forfeit
 - [ ] **RULES-14**: In the Rainbow variant, rainbow cards are indicated by clues of every color, and no clue names "rainbow" as a color
@@ -63,16 +63,16 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Game Interface
 
-- [ ] **UI-01**: Clue tokens, fuse tokens, deck count, discard pile contents, and all played stacks are visible at all times without opening a menu or drawer
+- [x] **UI-01**: Clue tokens, fuse tokens, deck count, discard pile contents, and all played stacks are visible at all times without opening a menu or drawer
 - [ ] **UI-02**: The active player is unmistakably indicated
 - [ ] **UI-03**: A player sees every other player's hand face-up, and their own hand face-down
-- [ ] **UI-04**: Cards touched by a clue are marked immediately and the marking persists until the card leaves the hand or gains further information
-- [ ] **UI-05**: Each card in a player's own hand accumulates and displays both positive and negative clue information, narrowing the candidate suits and ranks as clues land
+- [x] **UI-04**: Cards touched by a clue are marked immediately and the marking persists until the card leaves the hand or gains further information
+- [x] **UI-05**: Each card in a player's own hand accumulates and displays both positive and negative clue information, narrowing the candidate suits and ranks as clues land
 - [ ] **UI-06**: Every card carries a non-color suit identifier by default, with no accessibility mode to enable
 - [ ] **UI-07**: Suit identification remains unambiguous in the Rainbow variant, where color alone cannot distinguish a rainbow card
-- [ ] **UI-08**: Card luminosity conveys accumulated clue information as a channel independent of hue
+- [x] **UI-08**: Card luminosity conveys accumulated clue information as a channel independent of hue
 - [ ] **UI-09**: The interface presents a dark fireworks-night visual treatment
-- [ ] **UI-10**: The end-of-game screen shows the final score, its band, and the completed stacks
+- [x] **UI-10**: The end-of-game screen shows the final score, its band, and the completed stacks
 - [ ] **UI-11**: The interface is usable on a desktop browser at common window sizes
 
 ### Foundation
@@ -158,7 +158,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RULES-08 | Phase 3 | Complete |
 | RULES-09 | Phase 3 | Complete |
 | RULES-10 | Phase 3 | Complete |
-| RULES-11 | Phase 6 | Pending |
+| RULES-11 | Phase 6 | Complete |
 | RULES-12 | Phase 3 | Complete |
 | RULES-13 | Phase 3 | Complete |
 | RULES-14 | Phase 7 | Pending |
@@ -168,16 +168,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RULES-18 | Phase 3 | Complete |
 | RULES-19 | Phase 3 | Complete |
 | RULES-20 | Phase 3 | Complete |
-| UI-01 | Phase 6 | Pending |
+| UI-01 | Phase 6 | Complete |
 | UI-02 | Phase 6 | Pending |
 | UI-03 | Phase 6 | Pending |
-| UI-04 | Phase 6 | Pending |
-| UI-05 | Phase 6 | Pending |
+| UI-04 | Phase 6 | Complete |
+| UI-05 | Phase 6 | Complete |
 | UI-06 | Phase 6 | Pending |
 | UI-07 | Phase 7 | Pending |
-| UI-08 | Phase 6 | Pending |
+| UI-08 | Phase 6 | Complete |
 | UI-09 | Phase 6 | Pending |
-| UI-10 | Phase 6 | Pending |
+| UI-10 | Phase 6 | Complete |
 | UI-11 | Phase 6 | Pending |
 | FDN-01 | Phase 1 | Complete |
 | FDN-02 | Phase 3 | Complete |

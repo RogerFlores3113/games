@@ -236,7 +236,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 06-01-PLAN.md — Pure visual derivations (luminosity, candidates, clue ids, disabled reasons, end reason, deck text, turn order) with D-15 identity tripwire (TDD)
+- [x] 06-01-PLAN.md — Pure visual derivations (luminosity, candidates, clue ids, disabled reasons, end reason, deck text, turn order) with D-15 identity tripwire (TDD)
 - [ ] 06-02-PLAN.md — Suit identity system: 7 glyphs + AA-verified hue tokens, card-glow token, CSS keyframes with reduced motion
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -283,5 +283,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 3. Hanabi Rules Engine | 5/5 | Complete    | 2026-09-16 |
 | 4. Wire Engine Into Room Actor | 9/9 | Complete   | 2026-09-16 |
 | 5. Reconnect & Session Durability Hardening | 6/6 | Complete    | 2026-09-17 |
-| 6. Game Interface | 0/TBD | Not started | - |
+| 6. Game Interface | 1/7 | In Progress|  |
 | 7. Variant Support (Rainbow, Black) | 0/TBD | Not started | - |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-09-17T01:29:02.119Z"
-last_activity: 2026-09-17 -- Phase 6 planning complete
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-09-17T01:37:54.943Z"
+last_activity: 2026-09-17
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 44
-  completed_plans: 37
+  completed_plans: 38
   percent: 71
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-01)
 
 **Core value:** A friend clicks a link and is playing Hanabi within seconds — and the game does not break, stall, or lose their seat for the next 25 minutes.
-**Current focus:** Phase 6 — game interface
+**Current focus:** Phase 6 — Game Interface
 
 ## Current Position
 
-Phase: 6
-Plan: Not started
+Phase: 6 (Game Interface) — EXECUTING
+Plan: 2 of 7
 Status: Ready to execute
-Last activity: 2026-09-17 -- Phase 6 planning complete
+Last activity: 2026-09-17
 
-Progress: [██████████] 100%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -93,6 +93,7 @@ Progress: [██████████] 100%
 | Phase 05 P04 | 3min | 3 tasks | 6 files |
 | Phase 05 P05 | 45min | 3 tasks | 4 files |
 | Phase 05 P06 | 15min | 3 tasks | 2 files |
+| Phase 06 P01 | 20min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -174,6 +175,8 @@ Recent decisions affecting current work:
 - [Phase 05-05]: playwright.config.ts WEB_PORT/WORKER_PORT made overridable via E2E_WEB_PORT/E2E_WORKER_PORT so a local run never collides with an operator's own already-running dev servers
 - [Phase 05-05]: RT-04's frozen-tab e2e test unconditionally pairs CDP freeze with a hard network drop, since a bare CDP freeze did not reliably stop the client heartbeat in the installed Chromium (confirmed live, matching RESEARCH.md Pitfall 4)
 - [Phase 05]: Owner explicitly waived the real-phone 10+ minute background check (RT-04) rather than performing it, deferring it until Phase 6/7 UI is finalized; recorded verbatim in docs/manual-checks/mobile-background.md
+- [Phase 06-01]: clueTouchCountForTarget reimplemented as clueTouchIdsForTarget(...).length (D-17), single source of truth for the touch rule
+- [Phase 06-01]: CardFacts/HistoryEntry derived via indexed-access types inside hanabi-visual-logic.ts rather than exported from packages/rules, keeping the frozen wire contract untouched
 
 ### Pending Todos
 
@@ -194,6 +197,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T01:09:10.338Z
-Stopped at: Phase 6 UI-SPEC approved
-Resume file: .planning/phases/06-game-interface/06-UI-SPEC.md
+Last session: 2026-09-17T01:37:54.932Z
+Stopped at: Completed 06-01-PLAN.md
+Resume file: None
