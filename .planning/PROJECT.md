@@ -21,6 +21,7 @@ A friend clicks a link and is playing Hanabi within seconds — and the game doe
 - ✓ Server sends each player a per-seat filtered view — a player never receives the identity of cards in their own hand — *Validated in Phase 2: whitelist-serialize projection proven against a toy secret-holding game, with a hidden card structurally lacking its value field, one enforced send chokepoint, and three automated leak-test layers*
 - ✓ A correct, variant-parametrized Hanabi rules engine exists as a pure package — *Validated in Phase 3: deck/hand sizes, clue legality, token and fuse economy, the explicit final round and all three end conditions, deterministic seeded shuffles and public-only turn history, proven by unit tests plus conservation, redaction and termination property tests across base, Rainbow and Black. Not yet wired to the transport — that is Phase 4.*
 - ✓ A live base-game Hanabi table is playable end to end — *Validated in Phase 4: the engine runs behind the game-adapter seam (only `game-registration.ts` names the game), actions appear on every screen without a refresh, a mid-game reload rejoins the same seat, and a double-sent action applies exactly once even across a forced worker eviction. The forehead-card toy is deleted. The board is a deliberately plain interim screen; Phase 6 replaces it.*
+- ✓ A player who drops connection, sleeps their tab, or opens a second tab keeps their seat, and teammates see a clear disconnected indicator while the game pauses in place — *Validated in Phase 5: hibernation-safe heartbeat auto-response, server zombie sweep (including orphaned connected seats), client resume-on-visible/online, "Reconnecting…" banner, per-seat status and "Use this tab" reclaim, proven by socket-level and Playwright tests. The real-phone 10+ minute check is owner-waived until the UI is finalized.*
 
 ### Active
 
@@ -36,8 +37,6 @@ A friend clicks a link and is playing Hanabi within seconds — and the game doe
 - [ ] Game correctly detects all three endings: three fuses lost, all five stacks complete, and the final round after the deck empties
 - [ ] Final score is calculated and shown at game end
 - [ ] Players see each other's moves in near real time without manual refresh
-- [ ] A player who refreshes, drops connection, or sleeps their tab can rejoin the same seat and resume the game in progress
-- [ ] Remaining players see a clear disconnected indicator for an absent player rather than a frozen or broken table
 - [ ] Interface uses a dark "fireworks night" visual direction where card luminosity carries real signal about what has been clued
 
 ### Out of Scope
@@ -91,7 +90,7 @@ A friend clicks a link and is playing Hanabi within seconds — and the game doe
 | Box variants only (base, Rainbow, Black) | Hanab Live's catalogue would make the rules engine the entire project | — Pending |
 | No in-app chat | Players are already on a voice call; chat adds scope and message volume for no gain | — Pending |
 | Server-authoritative with per-seat filtered views | Forced by Hanabi's hidden-information design — you cannot see your own hand | ✓ Good — shipped in Phase 2: one projection chokepoint, strict fail-closed view schema, structural no-bypass test, three leak-test layers |
-| Reconnect-and-resume required; ephemeral games rejected | Losing a 25-minute co-op game to a wifi blip is unacceptable | — Pending |
+| Reconnect-and-resume required; ephemeral games rejected | Losing a 25-minute co-op game to a wifi blip is unacceptable | ✓ Good — shipped in Phase 5 (real-phone check deferred) |
 | Supabase free tier rejected as primary backend | Projects pause after ~1 week idle; a paused backend breaks the core "click a link and play" promise | ✓ Good — Cloudflare Workers Free + Durable Objects live; no payment method, no pause notice (FDN-03) |
 | Invocation efficiency as a principle, not a hard budget | At one-table scale the free tier ceiling is ~100x away from binding; availability is the real constraint | — Pending |
 | Dark "fireworks night" visual direction | Fits the theme, and card luminosity can carry genuine signal about clue state rather than being decoration | — Pending |
@@ -117,4 +116,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-16 after Phase 4 (Wire Engine Into Room Actor)*
+*Last updated: 2026-09-17 after Phase 5 (Reconnect & Session Durability Hardening)*
