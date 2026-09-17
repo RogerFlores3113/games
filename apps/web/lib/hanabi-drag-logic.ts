@@ -94,6 +94,38 @@ export function reorderedCardIds(
   return result;
 }
 
+/** DRAG-01/D-08: per-slot pixel shift (along the hand's axis) for the
+ * drop-gap preview during a hand reorder drag. Reuses `reorderedCardIds`'s
+ * exact clamp/move semantics internally, so the gap the player sees is
+ * always consistent with the reorder that would actually be submitted on
+ * drop — this function decides no new legality and introduces no timer,
+ * it is purely a function of the current hand order and drag state. The
+ * dragged tile's own offset is always 0 (it tracks the pointer elsewhere,
+ * not the gap). `draggedId === null` (no drag in progress) or an unknown
+ * `draggedId` both yield all-zero offsets. */
+export function shiftOffsetsForDrag(
+  handIds: readonly string[],
+  draggedId: string | null,
+  targetIndex: number,
+  slotPitchPx: number,
+): Record<string, number> {
+  const offsets: Record<string, number> = {};
+  for (const id of handIds) {
+    offsets[id] = 0;
+  }
+  if (draggedId === null || handIds.indexOf(draggedId) === -1) {
+    return offsets;
+  }
+  const reordered = reorderedCardIds(handIds, draggedId, targetIndex);
+  for (const id of handIds) {
+    if (id === draggedId) continue;
+    const finalIndex = reordered.indexOf(id);
+    const originalIndex = handIds.indexOf(id);
+    offsets[id] = (finalIndex - originalIndex) * slotPitchPx;
+  }
+  return offsets;
+}
+
 export type DropZoneStatus = { enabled: boolean; reason: string | null };
 
 /** Wraps `disabledReasonFor` for a drag zone — adds no rule of its own. */
