@@ -72,6 +72,22 @@ describe("firework-card-render", () => {
     expect(first).not.toContain("card-identity");
   });
 
+  it("FireworkCardBack renders a flat tile fill plus a picture-frame double outline (outer edge + inset), no card-like emblem/glow", () => {
+    // Owner override (06.1-07 Task 3): first "make it the outline of a
+    // rectangle - this is too cardlike, it should be tilelike", then "the
+    // cards have the outline, then the back has another outline inside it.
+    // like a picture frame" — replaces the old unlit-shell-emblem + glow-arc
+    // card back with a tile fill plus TWO concentric outlines and an empty
+    // interior.
+    const markup = renderToStaticMarkup(createElement(FireworkCardBack, { width: 88, height: 112 }));
+    expect(countOccurrences(markup, "<path")).toBe(3);
+    expect(countOccurrences(markup, 'fill-rule="evenodd"')).toBe(2);
+    expect(markup).toContain("var(--color-bg)");
+    expect(countOccurrences(markup, "var(--color-border)")).toBe(2);
+    expect(markup).not.toContain("var(--color-card-glow)");
+    expect(markup).not.toContain("var(--color-text-muted)");
+  });
+
   it("FireworkCard.tsx source contains no hex colour literal", () => {
     const withoutComments = source
       .split("\n")

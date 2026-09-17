@@ -95,11 +95,11 @@ export function FireworkCardBack({ width, height }: FireworkCardBackProps) {
   return (
     <span
       className="relative inline-block overflow-hidden rounded-md"
-      style={{ width, height, backgroundColor: "var(--color-surface)" }}
+      style={{ width, height, backgroundColor: "transparent" }}
     >
       <svg viewBox={CARD_BACK_ART.viewBox} width={width} height={height} focusable="false" aria-hidden="true">
         {CARD_BACK_ART.layers.map((layer, index) => (
-          <path key={index} d={layer.d} fill={layer.fillVar} opacity={layer.opacity} />
+          <path key={index} d={layer.d} fill={layer.fillVar} opacity={layer.opacity} fillRule={layer.fillRule} />
         ))}
       </svg>
     </span>

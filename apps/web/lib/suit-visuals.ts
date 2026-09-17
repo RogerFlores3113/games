@@ -59,6 +59,8 @@ export interface CardBackLayer {
   d: string;
   fillVar: string;
   opacity: number;
+  /** Defaults to "nonzero" when omitted, matching SVG's own default. */
+  fillRule?: "nonzero" | "evenodd";
 }
 
 export interface CardBackArt {
@@ -236,18 +238,44 @@ export function burstLayoutForRank(rank: 1 | 2 | 3 | 4 | 5): readonly BurstPlace
 }
 
 /**
- * D-10: single neutral card-back motif (unlit shell / night silhouette),
- * identical for every own-hand card regardless of true identity — zero
- * suit/rank signal. Coloured exclusively via existing @theme tokens.
+ * D-10: single neutral card-back motif, identical for every own-hand card
+ * regardless of true identity — zero suit/rank signal. Coloured exclusively
+ * via existing @theme tokens.
+ *
+ * Owner override (06.1-07 Task 3): the original unlit-shell emblem plus soft
+ * glow arc read as too "card-like" to the owner ("make it the outline of a
+ * rectangle - this is too cardlike, it should be tilelike"), so a first pass
+ * replaced it with a single rectangular outline. The owner then asked for a
+ * second, inset outline as well ("the cards have the outline, then the back
+ * has another outline inside it. like a picture frame") — so the final back
+ * is a flat near-background tile fill plus TWO concentric rectangular
+ * outlines (the outer edge outline, and an evenly-inset inner outline,
+ * picture-frame-mat style), with an empty interior — no inner emblem, no
+ * glow garnish, nothing else. Each outline is expressed as its own evenodd
+ * "ring" layer (an outer rect minus a slightly smaller inner rect) since
+ * this module's art is fill-only path data with no separate stroke
+ * primitive; square corners (not rounded) read more "tile" than "card".
+ * Still identical for every card and structurally incapable of leaking
+ * identity (CARD_BACK_ART takes no suit/rank input).
  */
 export const CARD_BACK_ART: CardBackArt = {
   viewBox: "0 0 24 32",
   layers: [
-    { d: "M0 0H24V32H0Z", fillVar: "var(--color-border)", opacity: 1 },
-    { d: "M1 1H23V31H1Z", fillVar: "var(--color-surface)", opacity: 1 },
-    // Faint unlit-shell emblem (a diamond) — pure decoration, no identity.
-    { d: "M12 10 L17 16 L12 22 L7 16 Z", fillVar: "var(--color-text-muted)", opacity: 0.35 },
-    // Soft top glow arc — night-motif garnish only.
-    { d: "M4 7 A9 6 0 0 1 20 7 L18 8 A7 4.5 0 0 0 6 8 Z", fillVar: "var(--color-card-glow)", opacity: 0.15 },
+    { d: "M0 0H24V32H0Z", fillVar: "var(--color-bg)", opacity: 1 },
+    // Outer edge outline (the card's own outline).
+    {
+      d: "M0 0H24V32H0Z M1.5 1.5H22.5V30.5H1.5Z",
+      fillVar: "var(--color-border)",
+      opacity: 1,
+      fillRule: "evenodd",
+    },
+    // Inset inner outline, evenly inset from the outer edge on all sides —
+    // the "picture frame" mat line, with nothing drawn inside it.
+    {
+      d: "M4 5H20V27H4Z M5.5 6.5H18.5V25.5H5.5Z",
+      fillVar: "var(--color-border)",
+      opacity: 1,
+      fillRule: "evenodd",
+    },
   ],
 };

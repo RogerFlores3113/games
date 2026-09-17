@@ -80,7 +80,7 @@ function BurstGrid() {
       ))}
 
       <section className="flex flex-col gap-[length:var(--space-sm)]">
-        <Heading>Card back</Heading>
+        <Heading>Card back (tile with picture-frame double outline, owner review round 3)</Heading>
         <div className="flex items-end gap-[length:var(--space-md)]">
           <FireworkCardBack width={88} height={112} />
           <FireworkCardBack width={64} height={84} />
