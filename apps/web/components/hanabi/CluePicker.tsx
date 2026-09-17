@@ -63,14 +63,21 @@ export function CluePicker({
       RANKS.some((rank) => clueTouchCountForTarget(game, clueTarget, { type: "rank", value: rank }) === 0));
 
   return (
+    // fix(06.2): the "Clue" / "Color or rank" captions used to sit on their
+    // own rows above each button group (four stacked rows before the reason
+    // text), which alone cost ~210px at 5 players and forced the whole
+    // bottom controls row onto a third wrapped line (UI-11). Both captions
+    // now sit inline, at the start of their own button row, and "Give clue"
+    // joins the value row instead of sitting on a row by itself — same
+    // controls, same disabled-reason captions, two rows instead of four.
     <div className="flex flex-col items-center gap-[3px]">
-      <span
-        className="text-[length:var(--text-label)] font-semibold"
-        style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
-      >
-        Clue
-      </span>
-      <div className="flex flex-wrap justify-center gap-[length:var(--space-sm)]">
+      <div className="flex flex-wrap items-center justify-center gap-[length:var(--space-sm)]">
+        <span
+          className="text-[length:var(--text-label)] font-semibold"
+          style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
+        >
+          Clue
+        </span>
         {targets.map((target) => (
           <Button
             key={target.seatId}
@@ -86,13 +93,18 @@ export function CluePicker({
         ))}
       </div>
 
-      <span
-        className="text-[length:var(--text-label)] font-semibold"
-        style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
-      >
-        Color or rank
-      </span>
-      <div className="flex flex-wrap justify-center gap-[length:var(--space-sm)]">
+      {/* fix(06.2): tightened to gap-xs (from gap-sm) — with the label plus
+          5 colors, 5 ranks, and the give-clue button all sharing this one
+          row (13 items, 12 gaps), the 4px saved per gap is what lets this
+          row fit beside AudioControls/toggles instead of wrapping to its
+          own third line (UI-11). */}
+      <div className="flex flex-wrap items-center justify-center gap-[length:var(--space-xs)]">
+        <span
+          className="text-[length:var(--text-label)] font-semibold"
+          style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
+        >
+          Color or rank
+        </span>
         {cluableColors.map((color) => {
           const clue: Clue = { type: "color", value: color };
           return (
@@ -132,6 +144,16 @@ export function CluePicker({
             </Button>
           );
         })}
+
+        <Button
+          variant="ghost"
+          data-testid="give-clue-button"
+          disabled={clueReason !== null}
+          aria-describedby={clueReason !== null ? "action-reason-clue" : undefined}
+          onClick={onGive}
+        >
+          Give clue
+        </Button>
       </div>
 
       {hasZeroTouchOption && zeroTouchTarget && (
@@ -143,16 +165,6 @@ export function CluePicker({
           {`Dimmed options wouldn't touch any of ${zeroTouchTarget.label}'s cards`}
         </p>
       )}
-
-      <Button
-        variant="ghost"
-        data-testid="give-clue-button"
-        disabled={clueReason !== null}
-        aria-describedby={clueReason !== null ? "action-reason-clue" : undefined}
-        onClick={onGive}
-      >
-        Give clue
-      </Button>
       {clueReason !== null && (
         <p
           id="action-reason-clue"

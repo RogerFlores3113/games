@@ -40,7 +40,13 @@ export interface OwnHandCardProps {
 // stay local render constants, not re-imported, since layout-budget.ts's
 // own comment defers that consolidation to whichever later plan first needs
 // to import the value rather than just assert it.
-const CARD_WIDTH = 88;
+// fix(06.2): exported so Hand.tsx can size the note-row above each card to
+// match (UI-11) — an unconstrained `w-full` note input was inheriting the
+// browser's ~200px default text-input width instead of the card's own 88px,
+// which silently widened every own-hand slot and starved the controls row of
+// the horizontal space it needed to sit beside the hand instead of wrapping
+// under it.
+export const CARD_WIDTH = 88;
 const CARD_HEIGHT = 100;
 
 const DEFAULT_TILE_COLOR = TILE_COLOR_PRESETS.find((preset) => preset.id === "slate")!.cssValue;

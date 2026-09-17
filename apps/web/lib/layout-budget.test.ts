@@ -33,7 +33,10 @@ describe("layout-budget", () => {
 
   it("OWN_BAND_PX has no marks-band constant (HINT-04 removes the pip band)", () => {
     expect((layoutBudget as Record<string, unknown>).MARKS_BAND_PX).toBeUndefined();
-    expect(OWN_BAND_PX).toBe(180);
+    // fix(06.2): corrected from the fictional 180 to the measured ~285px
+    // real footprint (+ margin) of the whole bottom controls row — see
+    // OWN_BAND_PX's own doc comment in layout-budget.ts.
+    expect(OWN_BAND_PX).toBe(300);
   });
 
   it("PLAY_AREA_PX + DECK_COUNTER_PX + DISCARD_AREA_PX equals LEFT_COLUMN_PX", () => {

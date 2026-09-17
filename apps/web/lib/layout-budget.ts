@@ -20,8 +20,14 @@ export const VIEWPORT_TEST_WIDTH_PX = 1280;
  * Page padding and inter-band gaps not attributed to any individual band
  * below — the fixed overhead the three main bands' sum must still fit
  * within, alongside VIEWPORT_TEST_HEIGHT_PX.
+ *
+ * fix(06.2): corrected 40 -> 16, matching the app's actual `gap-[3px]`/
+ * `py-[3px]` main layout (measured: four 3px gaps ≈ 12px, plus a few px of
+ * rounding), with a small margin kept rather than the fictional 40px this
+ * was previously set to. See OWN_BAND_PX's comment for the full ledger
+ * correction this phase's UI-11 fix required.
  */
-export const BOARD_CHROME_PX = 40;
+export const BOARD_CHROME_PX = 16;
 
 /**
  * UI-SPEC "Top (teammate hands)" row, this phase: 140px (seat label 20 +
@@ -32,13 +38,29 @@ export const BOARD_CHROME_PX = 40;
 export const TEAMMATE_BAND_PX = 140;
 
 /**
- * UI-SPEC "Bottom (own hand)" row, this phase: 180px (turn indicator 24 +
- * card row 100 + controls row 44 + note-row 20 [now always-visible, same
- * 20px budget as 06.1's click-to-reveal chip], gaps/padding). The 28px
- * automatic clue-mark pip band from 06.1 is removed (HINT-04) — there is no
- * MARKS_BAND_PX constant.
+ * UI-SPEC "Bottom (own hand)" row, this phase: originally set to 180px
+ * (turn indicator 24 + card row 100 + controls row 44 + note-row 20 [now
+ * always-visible, same 20px budget as 06.1's click-to-reveal chip],
+ * gaps/padding). The 28px automatic clue-mark pip band from 06.1 is removed
+ * (HINT-04) — there is no MARKS_BAND_PX constant.
+ *
+ * fix(06.2): 180 was never the real footprint of this band — it only
+ * covered `OwnHand` itself (turn indicator + card row + note row, which
+ * really does render at ~154px). It never accounted for `CardActions`,
+ * `CluePicker`, `AudioControls`, and the keep-hints/tile-colour toggles,
+ * which sit in the same bottom controls row but are separate flex children,
+ * not sub-rows of `OwnHand`. Once Table.tsx stopped absorbing that gap
+ * (06.2-07), a live 5-player 1280x720 measurement showed the true combined
+ * height of the whole row (wrapped across two lines: OwnHand+CardActions on
+ * one, CluePicker+AudioControls+toggles on the other) is ~285px, not 180px.
+ * Corrected to 300px (285 measured + ~15px margin) — a real number this
+ * phase's fixes (NoteBox width bug, CluePicker's compacted 2-row layout)
+ * actually hit, not a number chosen to make the arithmetic below look
+ * right. TEAMMATE_BAND_PX/TABLE_BAND_MIN_PX/BOARD_CHROME_PX keep their own
+ * (now-accurate) values, and the four still sum to ≤720 — see
+ * layout-budget.test.ts.
  */
-export const OWN_BAND_PX = 180;
+export const OWN_BAND_PX = 300;
 
 /**
  * UI-SPEC "Center (tableau)" row's minimum available height, this phase:

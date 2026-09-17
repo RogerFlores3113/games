@@ -2,7 +2,7 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import type { HanabiCardView, Variant } from "@games/rules";
 import { NOTE_ROW_PX } from "../../lib/layout-budget";
 import { NoteBox } from "./NoteBox";
-import { OwnHandCard } from "./OwnHandCard";
+import { CARD_WIDTH, OwnHandCard } from "./OwnHandCard";
 import { TeammateCard } from "./TeammateCard";
 
 export interface SeatStatusProps {
@@ -249,10 +249,17 @@ export function OwnHand({
             data-card-id={card.id}
             ref={(el) => registerSlot(card.id, el)}
             className="flex flex-col items-center"
+            style={{ width: CARD_WIDTH }}
           >
+            {/* fix(06.2): explicit width matching the card below — an
+                unconstrained `w-full` note input previously inherited the
+                browser's ~200px default text-input width instead of
+                CARD_WIDTH, silently doubling every own-hand slot's footprint
+                and starving the controls row of the space it needed to sit
+                beside the hand rather than wrap under it (UI-11). */}
             <div
-              className="flex w-full items-center justify-end"
-              style={{ height: NOTE_ROW_PX }}
+              className="flex items-center justify-end"
+              style={{ height: NOTE_ROW_PX, width: CARD_WIDTH }}
             >
               {youSeatId !== null && (
                 <NoteBox key={card.id} roomCode={roomCode} seatId={youSeatId} cardId={card.id} slotNumber={i + 1} />
