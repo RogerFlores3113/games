@@ -274,7 +274,7 @@ Plans:
   5. Distinct short sounds play for a clue, a play, a discard, a lost fuse, and a completed stack, over a static city-at-night background that leaves cards legible.
 
 **Notes:** Owner feedback recorded verbatim in `.planning/phases/06-game-interface/06-HUMAN-UAT.md`. HAND-01/HAND-03 change hand ordering in the engine and wire contract, so the per-seat redaction chokepoint and leak tests must stay intact. The owner asked for the box game's per-color burst designs; the art must be original work in that spirit, not copied publisher artwork — show the owner the burst shapes before building them into cards.
-**Plans:** 11/15 plans executed
+**Plans:** 12/15 plans executed
 
 Plans:
 
@@ -289,7 +289,7 @@ Plans:
 - [x] 06.1-09-PLAN.md — Clue marks above every card; firework faces and neutral card backs (NOTE-01, ART-01)
 - [x] 06.1-10-PLAN.md — Stack/discard art, compact discard + full-art overlay (ART-01)
 - [x] 06.1-11-PLAN.md — Private per-card notes on own hand (NOTE-02)
-- [ ] 06.1-12-PLAN.md — Drag to reorder/play/discard with drop zones (HAND-01, HAND-02)
+- [x] 06.1-12-PLAN.md — Drag to reorder/play/discard with drop zones (HAND-01, HAND-02)
 - [ ] 06.1-13-PLAN.md — Fly-to animation for departing cards (HAND-02, HAND-03)
 - [ ] 06.1-14-PLAN.md — Playwright proofs for the phase (all behavioural requirements)
 - [ ] 06.1-15-PLAN.md — Phase gate + owner visual/audio sign-off (D-31)

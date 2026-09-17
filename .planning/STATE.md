@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06.1-11-PLAN.md
-last_updated: "2026-09-17T15:52:17.170Z"
+stopped_at: Completed 06.1-12-PLAN.md
+last_updated: "2026-09-17T16:01:31.506Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 59
-  completed_plans: 55
+  completed_plans: 56
   percent: 75
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 06.1 (table-polish-firework-art-notes-drag-audio) — EXECUTING
-Plan: 11 of 15
+Plan: 12 of 15
 Status: Ready to execute
 Last activity: 2026-09-17
 
-Progress: [█████████░] 93%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -112,6 +112,7 @@ Progress: [█████████░] 93%
 | Phase 06.1 P09 | 40min | 2 tasks | 8 files |
 | Phase 06.1 P10 | 50min | 2 tasks | 4 files |
 | Phase 06.1 P11 | ~20min | 2 tasks | 6 files |
+| Phase 06.1 P12 | 35min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -228,6 +229,9 @@ Recent decisions affecting current work:
 - [Phase 06.1-10]: discard-toggle's 44px touch target is provided by an out-of-flow inset span rather than a literal min-height, since a full 44px header row regressed the UI-11 1280x720 no-scroll fit
 - [Phase 06.1-11]: NoteChip loads readNote in a mount effect (not the state initializer) so SSR and first client render both show the empty state, keeping own-hand-render.test.ts's byte-identical guard valid
 - [Phase 06.1-11]: Note-row touch target expanded via an absolutely-positioned inset span (Table.tsx discard-toggle pattern), reusing the 20px MarksZone note-row budget from 06.1-09 without exceeding it
+- [Phase ?]: 06.1-12: useHandDrag subscribes window pointer listeners once and reads game/ctx/onDropRequest via refs, avoiding listener churn on every server frame while resolving each drop against the latest view
+- [Phase ?]: 06.1-12: applyPendingOrder (D-22) returns the input array unchanged for any non-permutation of pendingIds, guarding a stale reorder against concurrent draw/play/discard
+- [Phase ?]: 06.1-12: own-hand-render.test.ts fixture updated with no-op drag props (Rule 3 fix) after OwnHandProps gained five required drag fields
 
 ### Pending Todos
 
@@ -248,6 +252,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T15:52:17.161Z
-Stopped at: Completed 06.1-11-PLAN.md
+Last session: 2026-09-17T16:01:31.497Z
+Stopped at: Completed 06.1-12-PLAN.md
 Resume file: None
