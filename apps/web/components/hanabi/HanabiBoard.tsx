@@ -186,8 +186,7 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
 
   return (
     <main
-      className="flex min-h-screen flex-col gap-[3px] overflow-y-auto px-[length:var(--space-md)] py-[3px]"
-      style={{ backgroundColor: "var(--color-bg)" }}
+      className="table-backdrop flex min-h-screen flex-col gap-[3px] overflow-y-auto px-[length:var(--space-md)] py-[3px]"
     >
       {reconnecting && <ReconnectingBanner />}
 
