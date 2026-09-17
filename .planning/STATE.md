@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 current_plan: 8
 status: executing
-stopped_at: Completed 06.2-07-PLAN.md (UI-11 overflow still open, see blockers)
+stopped_at: Completed 06.2-07-PLAN.md; UI-11 overflow fix landed as a scoped fix task before 06.2-08
 last_updated: "2026-09-17T22:16:40.063Z"
 last_activity: 2026-09-17
 progress:
@@ -269,6 +269,7 @@ Recent decisions affecting current work:
 - [Phase ?]: keep-hints toggle + TileColorPicker grouped with AudioControls in one tight-gap wrapper to limit controls-row width growth
 - [Phase 06.2-07]: Table.tsx rebuilt to BOARD-01..05 spec (labelled Play/Deck/Discard, TokenColumn, PlayedStack fan, discardOrder rendering) — its own layout now correctly matches its layout-budget for the first time
 - [Phase 06.2-07]: UI-11 1280x720 overflow root-caused to HanabiBoard.tsx's bottom controls row (440px measured vs 180px OWN_BAND_PX budget), not Table.tsx — fix deferred to 06.2-08 or 06.2-10 per this plan's own escape hatch, see deferred-items.md
+- [Scoped fix, pre-06.2-08]: UI-11 resolved — NoteBox's unconstrained `w-full` note input was inheriting the browser's ~200px default input width instead of the 88px card width, doubling every own-hand slot's footprint; CluePicker's four stacked rows (two label rows + a standalone give-clue row) compacted to two inline rows. Bottom row: 440px -> 285px; page total: 847px -> 720px exactly. layout-budget.ts's OWN_BAND_PX (180 -> 300) and BOARD_CHROME_PX (40 -> 16) corrected to the measured reality. See deferred-items.md for the full before/after table.
 
 ### Pending Todos
 
@@ -278,8 +279,8 @@ Recent decisions affecting current work:
 - Phase 6 needs original design work at plan time: no existing implementation combines luminosity-as-signal theming with colorblind-safe rendering.
 - Plan 01-09 checkpoint left D-08 (second-tab supersede) and ROOM-07/D-14 (in-progress refusal screen) without browser-level manual verification — flagged as must-cover Playwright scenarios for Plan 01-10
 - RT-04 real-phone 10+ minute background check is deferred (owner-waived 2026-09-16); re-run docs/manual-checks/mobile-background.md once Phase 6/7 UI is finalized
-- e2e/start-game.spec.ts UI-11 pre-existing 5px viewport overflow, unrelated to 06.2-06 (see .planning/phases/06.2-board-redesign-hint-display-tile-styling-board-layout-tokens/deferred-items.md); needs 06.2-07 attention
-- UI-11 1280x720 overflow (STILL OPEN, worse than previously known): confirmed by 06.2-07's live-browser measurement to be 100% caused by HanabiBoard.tsx's bottom controls row (440px vs its own 180px OWN_BAND_PX budget) — not Table.tsx, which now correctly matches its layout budget. See .planning/phases/06.2-board-redesign-hint-display-tile-styling-board-layout-tokens/deferred-items.md for the full measurement table. Recommend fixing before/during 06.2-08 (already touches HanabiBoard.tsx) rather than deferring to 06.2-10.
+- ~~e2e/start-game.spec.ts UI-11 pre-existing 5px viewport overflow~~ — RESOLVED, see below.
+- ~~UI-11 1280x720 overflow (STILL OPEN, worse than previously known)~~ — RESOLVED by a scoped fix task before 06.2-08: root cause was an unconstrained NoteBox input width plus CluePicker's four stacked rows. Bottom controls row 440px -> 285px, page total 847px -> 720px exactly, all four e2e/vitest/tsc gates green. See .planning/phases/06.2-board-redesign-hint-display-tile-styling-board-layout-tokens/deferred-items.md for the full before/after table.
 
 ## Deferred Items
 
@@ -292,5 +293,5 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-09-17T22:16:40.054Z
-Stopped at: Completed 06.2-07-PLAN.md (UI-11 overflow still open, see blockers)
+Stopped at: Completed 06.2-07-PLAN.md; UI-11 overflow fix landed as a scoped fix task before 06.2-08
 Resume file: None

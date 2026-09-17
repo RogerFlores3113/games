@@ -2,7 +2,63 @@
 
 ## UI-11 vertical overflow — root cause confirmed by 06.2-07: HanabiBoard.tsx's bottom controls row, NOT Table.tsx
 
-**Status: NOT resolved. Escalated, not fixed, by plan 06.2-07 per that plan's
+**Status: RESOLVED** by a scoped fix task run before 06.2-08 (not a plan — no
+PLAN.md/SUMMARY.md, one atomic commit: `fix(06.2): restore the 1280x720
+no-scroll fit in the bottom controls row`).
+
+**Root causes found by live-browser measurement at 1280x720, 5 players:**
+
+1. **`NoteBox`'s note input had no explicit width.** Its container div used
+   `w-full` with no width constraint of its own, so the `<input>` fell back
+   to the browser's intrinsic default text-input width (~200px) instead of
+   the 88px `OwnHandCard` beneath it. Every own-hand slot's rendered width
+   was therefore ~201px instead of 88px, and the whole `own-band` measured
+   862px wide instead of ~410px — wide enough to monopolize its own wrapped
+   row and push `CardActions`/`CluePicker`/`AudioControls` onto separate
+   lines below it purely by width-driven `flex-wrap` accident, not by any
+   real height requirement of those components. Fixed by giving the
+   note-row container and the per-card slot wrapper (`Hand.tsx`) an
+   explicit `width: CARD_WIDTH` (88px, now exported from `OwnHandCard.tsx`)
+   instead of `w-full`.
+2. **`CluePicker` stacked four rows where two would do.** "Clue" and "Color
+   or rank" each sat on their own label row above their button group, and
+   "Give clue" sat on a fifth row by itself — 210px tall before any
+   conditional disabled-reason text. Compacted to two rows: each label now
+   sits inline at the start of its own button row, and "Give clue" joins
+   the value-button row. The value row's gap was tightened from
+   `--space-sm` (8px) to `--space-xs` (4px) so the now-wider row (13 items:
+   label + 5 colors + 5 ranks + give-clue) still fits under 1248px and can
+   sit beside `AudioControls`/the keep-hints toggle/tile-colour picker on
+   the same wrapped line instead of forcing a third.
+
+**Measured before -> after (1280x720, 5 players, live browser):**
+
+| Element | Before | After |
+|---|---|---|
+| `own-band` width | 862px | 410px |
+| `CluePicker` height | 210px | 115px |
+| Bottom controls row (2 wrapped lines instead of 3) | 440px | 285px |
+| `tableau` height (flex-1 absorbs the freed space) | 278px | 306px |
+| Page total (`document.documentElement.scrollHeight`) | 847px | **720px** (exactly `window.innerHeight`) |
+
+No feature was removed: Play/Discard/CardActions, the full clue target +
+color/rank grid, Give-clue, the always-visible note box, the keep-hints
+toggle, the tile-colour picker, and audio controls are all still present,
+reachable, and functional — verified by `e2e/start-game.spec.ts`'s UI-11
+and 06.2-07 fit-check tests, and by `e2e/hanabi-table-polish.spec.ts`'s
+full 9-test suite, all green.
+
+`apps/web/lib/layout-budget.ts`'s `OWN_BAND_PX` (180 -> 300) and
+`BOARD_CHROME_PX` (40 -> 16) were corrected to these measured numbers
+rather than left as the fictional values that made the arithmetic-only
+`layout-budget.test.ts` sum check pass without ever reflecting the real
+render — the four bands still sum to ≤720px (140 + 260 + 16 + 300 = 716).
+
+---
+
+### Original diagnosis (06.2-07, kept for history)
+
+**Status (at the time): NOT resolved. Escalated, not fixed, by plan 06.2-07 per that plan's
 own explicit escape hatch** ("if the overflow needs a change outside this
 plan's files, stop and report rather than silently widen scope").
 
