@@ -1,5 +1,6 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { HanabiCardView, Variant } from "@games/rules";
+import { shiftOffsetsForDrag } from "../../lib/hanabi-drag-logic";
 import { NOTE_ROW_PX } from "../../lib/layout-budget";
 import { NoteBox } from "./NoteBox";
 import { CARD_WIDTH, OwnHandCard } from "./OwnHandCard";
@@ -163,6 +164,13 @@ export interface OwnHandProps {
    * through unchanged — `OwnHand` never re-derives drag geometry itself. */
   draggingCardId: string | null;
   dragOffset: { x: number; y: number } | null;
+  /** DRAG-01/D-08: the current reorder drop index and the measured slot
+   * pitch, threaded straight from `useHandDrag`'s `dragState` — `OwnHand`
+   * feeds both into `shiftOffsetsForDrag` to compute the drop-gap preview.
+   * `null`/`undefined` (no drag, or hovering a non-reorder zone) yields an
+   * all-zero shift via that same pure function. */
+  dropIndex?: number | null;
+  slotPitchPx?: number | null;
   onCardPointerDown: (cardId: string, event: ReactPointerEvent) => void;
   registerSlot: (cardId: string, el: HTMLElement | null) => void;
   consumeClickSuppression: () => boolean;
@@ -196,12 +204,28 @@ export function OwnHand({
   onSelectCard,
   draggingCardId,
   dragOffset,
+  dropIndex,
+  slotPitchPx,
   onCardPointerDown,
   registerSlot,
   consumeClickSuppression,
   hintsVisible,
   tileColor,
 }: OwnHandProps) {
+  // DRAG-01/D-08: the drop-gap preview — a pure function of the current
+  // hand order and drag state (see shiftOffsetsForDrag's own header), never
+  // cached or timer-driven. When no drag is in flight, draggingCardId is
+  // null and every offset resolves to 0 regardless of the other inputs.
+  const handIds = cards.map((card) => card.id);
+  const currentDragIndex = draggingCardId !== null ? handIds.indexOf(draggingCardId) : -1;
+  const effectiveTargetIndex = dropIndex ?? (currentDragIndex === -1 ? 0 : currentDragIndex);
+  const shiftOffsets = shiftOffsetsForDrag(
+    handIds,
+    draggingCardId,
+    effectiveTargetIndex,
+    slotPitchPx ?? CARD_WIDTH,
+  );
+
   return (
     <section
       data-testid="own-band"
@@ -280,6 +304,7 @@ export function OwnHand({
               }}
               hintsVisible={hintsVisible ? hintsVisible.has(card.id) : true}
               tileColor={tileColor}
+              shiftOffsetPx={shiftOffsets[card.id] ?? 0}
             />
           </div>
         ))}

@@ -335,6 +335,8 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
           onSelectCard={(cardId) => setSelectedCardId(cardId)}
           draggingCardId={drag.dragState?.cardId ?? null}
           dragOffset={drag.dragState?.offset ?? null}
+          dropIndex={drag.dragState?.dropIndex ?? null}
+          slotPitchPx={drag.dragState?.slotPitchPx ?? null}
           onCardPointerDown={drag.onCardPointerDown}
           registerSlot={drag.registerSlot}
           consumeClickSuppression={drag.consumeClickSuppression}

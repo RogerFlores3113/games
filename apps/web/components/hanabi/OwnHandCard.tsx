@@ -26,6 +26,11 @@ export interface OwnHandCardProps {
    * Defaults to the slate preset so callers not yet wired to the picker
    * still compile and render the unchanged look. */
   tileColor?: string;
+  /** DRAG-01/D-08: the drop-gap shift-aside offset (pixels, from
+   * `shiftOffsetsForDrag`) applied to the slot wrapper — composed with, not
+   * replacing, the drag-follow transform on the card itself below. Defaults
+   * to 0 (no-op) for callers not mid-drag. */
+  shiftOffsetPx?: number;
 }
 
 // UI-SPEC targets 72x100 for a 5-suit hand; widened here to 88x112 (06.1-03
@@ -77,6 +82,7 @@ export function OwnHandCard({
   onPointerDown,
   hintsVisible,
   tileColor = DEFAULT_TILE_COLOR,
+  shiftOffsetPx = 0,
 }: OwnHandCardProps) {
   const step = luminosityStepFor(facts);
   const frame = LUMINOSITY_FRAME[step];
@@ -99,7 +105,18 @@ export function OwnHandCard({
       ? `translate(${dragOffset.x}px, ${dragOffset.y}px) scale(1.05)`
       : undefined;
 
+  // DRAG-01/D-08: the shift-aside preview lives on a separate wrapper layer
+  // from the drag-follow transform above — `.tile-shift` (globals.css) gives
+  // it the same 150ms ease-out timing (and prefers-reduced-motion static
+  // pairing) as the rest of this file's motion, composed with rather than
+  // replacing the button's own dragTransform. A shift-in-flight wrapper adds
+  // no flow height/width of its own (inline-block, sized to its button
+  // child) — UI-11's zero-slack 1280x720 fit depends on that.
   return (
+    <div
+      className="tile-shift inline-block"
+      style={{ transform: shiftOffsetPx !== 0 ? `translateX(${shiftOffsetPx}px)` : undefined }}
+    >
     <button
       type="button"
       data-testid={`own-hand-slot-${slotNumber}`}
@@ -170,5 +187,6 @@ export function OwnHandCard({
         <span aria-hidden="true" className="anim-clue-touch pointer-events-none absolute inset-0 rounded-md" />
       )}
     </button>
+    </div>
   );
 }

@@ -16,6 +16,16 @@ export interface DragState {
   cardId: string;
   offset: Point;
   target: DropTarget;
+  /** DRAG-01/D-08: the current reorder drop index (from `target` when its
+   * kind is "reorder"), surfaced directly on the drag state so callers don't
+   * need to re-derive it from `target` themselves. `null` while hovering a
+   * non-reorder zone or nothing at all. */
+  dropIndex: number | null;
+  /** DRAG-01/D-08: the measured on-screen slot pitch (in pixels, along the
+   * hand's axis) derived from the already-registered slot rects — no new
+   * measurement mechanism, no new listener. `null` when fewer than two
+   * slots are registered (nothing to measure a pitch between). */
+  slotPitchPx: number | null;
 }
 
 export interface UseHandDragOptions {
@@ -109,6 +119,17 @@ export function useHandDrag({ game, ctx, onDropRequest }: UseHandDragOptions): U
     return { slots, play, discard };
   }
 
+  /** DRAG-01/D-08: derives the slot pitch from the already-registered slot
+   * rects (sorted by their actual on-screen left edge, not registration
+   * order, so a mid-drag Map insertion order never skews the measurement).
+   * No new measurement mechanism, no new listener — reuses the rects
+   * `buildZones` already collects for drop resolution. */
+  function slotPitchFromZones(zones: DropZones): number | null {
+    if (zones.slots.length < 2) return null;
+    const lefts = zones.slots.map((slot) => slot.rect.left).sort((a, b) => a - b);
+    return lefts[1]! - lefts[0]!;
+  }
+
   function endDrag(): void {
     startRef.current = null;
     draggingCardIdRef.current = null;
@@ -126,8 +147,15 @@ export function useHandDrag({ game, ctx, onDropRequest }: UseHandDragOptions): U
         if (!exceedsDragThreshold(start, point)) return;
         draggingActiveRef.current = true;
       }
-      const target = resolveDropTarget(point, buildZones());
-      setDragState({ cardId, offset: { x: point.x - start.x, y: point.y - start.y }, target });
+      const zones = buildZones();
+      const target = resolveDropTarget(point, zones);
+      setDragState({
+        cardId,
+        offset: { x: point.x - start.x, y: point.y - start.y },
+        target,
+        dropIndex: target.kind === "reorder" ? target.targetIndex : null,
+        slotPitchPx: slotPitchFromZones(zones),
+      });
     }
 
     function handlePointerUp(event: PointerEvent): void {

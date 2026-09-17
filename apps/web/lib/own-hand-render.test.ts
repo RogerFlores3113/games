@@ -60,6 +60,10 @@ function render(cards: HanabiCardView[]): string {
     onSelectCard: () => {},
     draggingCardId: null,
     dragOffset: null,
+    // DRAG-01/D-08: no-op shift-aside inputs — no drag in flight, so
+    // shiftOffsetsForDrag resolves every slot's offset to 0 regardless.
+    dropIndex: null,
+    slotPitchPx: null,
     onCardPointerDown: () => {},
     registerSlot: () => {},
     consumeClickSuppression: () => false,
