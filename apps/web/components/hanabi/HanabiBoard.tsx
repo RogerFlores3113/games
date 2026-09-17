@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { RoomView } from "@games/schema";
 import { HanabiViewSchema } from "@games/schema/games/hanabi";
 import type { Clue, HanabiView } from "@games/rules";
@@ -36,12 +36,6 @@ export interface HanabiBoardProps {
   reconnecting?: boolean;
 }
 
-/** WR-03: defers to the same strict wire schema the server's fail-closed gate
- * uses, so there is exactly one definition of "a valid HanabiView" and the
- * type predicate never claims more than was verified at runtime. */
-function isHanabiView(game: unknown): game is HanabiView {
-  return HanabiViewSchema.safeParse(game).success;
-}
 
 /**
  * D-01/D-02/D-14/D-16/D-17/D-20: the designed board orchestrator — a thin
@@ -57,7 +51,22 @@ function isHanabiView(game: unknown): game is HanabiView {
  * rank for its own seat even by accident.
  */
 export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoardProps) {
-  const game = isHanabiView(view.game) ? view.game : null;
+  // Parsed against the same strict wire schema the server's fail-closed gate
+  // uses, so there is exactly one definition of "a valid HanabiView".
+  // WR-04: a present-but-invalid game (e.g. worker/web deploy drift) is
+  // surfaced — logged and shown as an error — never silently rendered as an
+  // endless "Loading game…".
+  const parsed = useMemo(
+    () => (view.game == null ? null : HanabiViewSchema.safeParse(view.game)),
+    [view.game],
+  );
+  const game: HanabiView | null = parsed?.success ? (view.game as HanabiView) : null;
+  const schemaMismatch = parsed !== null && !parsed.success;
+  useEffect(() => {
+    if (parsed && !parsed.success) {
+      console.error("HanabiView schema mismatch", parsed.error.issues);
+    }
+  }, [parsed]);
 
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [clueTarget, setClueTarget] = useState<string | null>(null);
@@ -124,13 +133,24 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
         className="flex min-h-screen items-center justify-center px-[length:var(--space-md)]"
         style={{ backgroundColor: "var(--color-bg)" }}
       >
-        <p
-          role="status"
-          className="text-[length:var(--text-body)]"
-          style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-body--line-height)" }}
-        >
-          Loading game…
-        </p>
+        {schemaMismatch ? (
+          <p
+            role="alert"
+            data-testid="game-view-error"
+            className="text-[length:var(--text-body)]"
+            style={{ color: "var(--color-text)", lineHeight: "var(--text-body--line-height)" }}
+          >
+            This game couldn&apos;t be displayed — try refreshing.
+          </p>
+        ) : (
+          <p
+            role="status"
+            className="text-[length:var(--text-body)]"
+            style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-body--line-height)" }}
+          >
+            Loading game…
+          </p>
+        )}
       </main>
     );
   }
