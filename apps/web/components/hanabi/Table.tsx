@@ -4,17 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 import { Layers } from "lucide-react";
 import type { HanabiView, Suit } from "@games/rules";
-import { RANKS } from "@games/rules";
 import { fusesRemainingForView } from "../../lib/hanabi-board-logic";
 import { deckCountText, newlyCompletedStacks, STACK_FLASH_MS } from "../../lib/hanabi-visual-logic";
-import { groupDiscardsBySuit, readDiscardViewPref, writeDiscardViewPref, type DiscardView } from "../../lib/hanabi-discard-logic";
+import { readDiscardViewPref, writeDiscardViewPref, type DiscardView } from "../../lib/hanabi-discard-logic";
 import type { DropTarget, DropZoneStatus } from "../../lib/hanabi-drag-logic";
 import { DECK_COUNTER_PX, DISCARD_AREA_PX, LEFT_COLUMN_PX, PLAY_AREA_PX } from "../../lib/layout-budget";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
 import { DiscardOverlay } from "./DiscardOverlay";
-import { FireworkCardBack } from "./FireworkCard";
+import { FireworkCardBack, FireworkCardFace } from "./FireworkCard";
 import { PlayedStack } from "./PlayedStack";
-import { SuitGlyph } from "./SuitGlyph";
 import { TokenColumn } from "./TokenColumn";
 
 export interface TableDropStatus {
@@ -41,6 +39,30 @@ function dropZoneHighlightStyle(status: DropZoneStatus | undefined, hovered: boo
   };
 }
 
+/** BOARD-01/DISC-01/T-06.2-15: resolves the board's discard tile sequence
+ * from the server-authoritative `discardOrder`, defensively. An id in
+ * `discardOrder` with no matching `discard` entry is skipped (never thrown);
+ * a `discard` entry missing from `discardOrder` (a malformed/stale frame) is
+ * appended at the end so a real discarded tile can never be hidden. */
+function resolveDiscardOrder(
+  discardOrder: readonly string[],
+  discard: HanabiView["discard"],
+): HanabiView["discard"] {
+  const byId = new Map(discard.map((card) => [card.id, card]));
+  const seen = new Set<string>();
+  const ordered: HanabiView["discard"] = [];
+  for (const id of discardOrder) {
+    const card = byId.get(id);
+    if (!card) continue;
+    ordered.push(card);
+    seen.add(id);
+  }
+  for (const card of discard) {
+    if (!seen.has(card.id)) ordered.push(card);
+  }
+  return ordered;
+}
+
 /** Shared caption treatment for the Play/Discard area labels — reuses the
  * existing disabled-reason-caption typographic role (Label, muted, inset at
  * the outline's top-left corner) rather than a heading, per UI-SPEC. */
@@ -61,12 +83,14 @@ function AreaLabel({ children }: { children: string }) {
  * reaches rank 5 gets a single 600ms flash, never a continuously-running
  * animation.
  *
- * BOARD-01/BOARD-04/TILE-02 (Task 1 of 06.2-07's rework): a wooden
- * `.board-surface` panel laid out as a single `items-stretch` flex row with
- * two children — the left column (Play above Deck-counter above Discard,
- * each a fixed layout-budget height) and the right column (token totals,
- * swapped for the real `TokenColumn` in Task 2). Stack/discard art is
- * swapped for `PlayedStack`/`discardOrder` rendering in Tasks 2 and 3.
+ * BOARD-01..05/TILE-02/DISC-01: a wooden `.board-surface` panel laid out as a
+ * single `items-stretch` flex row with two children — the left column (Play
+ * above Deck-counter above Discard, each a fixed layout-budget height) and
+ * the right column (`TokenColumn`, stretched to the left column's exact
+ * height so it can never force the board taller — RESEARCH.md Pitfall 1).
+ * The Discard area renders every tile in the server's shared `discardOrder`
+ * (resolved defensively via `resolveDiscardOrder`), and every played stack
+ * shows every card via `PlayedStack`'s horizontal fan.
  */
 export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: TableProps) {
   const prevStacksRef = useRef<HanabiView["stacks"] | null>(null);
@@ -121,7 +145,7 @@ export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: 
   }, [game.stacks]);
 
   const fusesRemaining = fusesRemainingForView(game);
-  const discardGroups = groupDiscardsBySuit(game.discard, game.variant).filter((group) => group.total > 0);
+  const orderedDiscard = resolveDiscardOrder(game.discardOrder, game.discard);
 
   const playHighlight = dropZoneHighlightStyle(dropStatus?.play, dropStatus?.hovered === "play");
   const discardHighlight = dropZoneHighlightStyle(dropStatus?.discard, dropStatus?.hovered === "discard");
@@ -225,7 +249,7 @@ export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: 
             data-discard-count={game.discard.length}
             data-view={view}
             data-drop-state={discardDropState}
-            className="relative flex flex-1 flex-col gap-[length:var(--space-xs)] overflow-hidden rounded-md"
+            className="relative flex flex-1 flex-wrap items-center gap-[length:var(--space-xs)] overflow-hidden rounded-md"
             style={discardHighlight}
           >
             {dropStatus && !dropStatus.discard.enabled && dropStatus.discard.reason && (
@@ -247,22 +271,17 @@ export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: 
                 {dropStatus.discard.reason}
               </span>
             )}
-            {discardGroups.length > 0 ? (
-              <div className="flex flex-col gap-[length:var(--space-xs)]">
-                {discardGroups.map((group) => (
-                  <div key={group.suit} className="flex items-center gap-[length:var(--space-xs)]">
-                    <SuitGlyph suit={group.suit} size={14} title={SUIT_VISUALS[group.suit].label} />
-                    <span
-                      className="text-[length:var(--text-label)]"
-                      style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
-                    >
-                      {RANKS.filter((rank) => (group.countsByRank[rank - 1] ?? 0) > 0)
-                        .map((rank) => `${rank}×${group.countsByRank[rank - 1] ?? 0}`)
-                        .join(" ")}
-                    </span>
-                  </div>
-                ))}
-              </div>
+            {orderedDiscard.length > 0 ? (
+              orderedDiscard.map((card) => (
+                <span
+                  key={card.id}
+                  data-testid={`discard-tile-${card.id}`}
+                  className="inline-flex flex-col items-center"
+                >
+                  <FireworkCardFace suit={card.suit} rank={card.rank} width={40} height={54} />
+                  <span className="sr-only">{`${SUIT_VISUALS[card.suit].label} ${card.rank}`}</span>
+                </span>
+              ))
             ) : (
               <p
                 className="text-[length:var(--text-body)]"

@@ -126,3 +126,45 @@ describe("table-render: TokenColumn, PlayedStack and deck counter (Task 2)", () 
     expect(markup).not.toContain("h-2 w-2 rounded-full");
   });
 });
+
+describe("table-render: discard order and empty state (Task 3)", () => {
+  it("renders discard tiles in discardOrder's exact sequence, not discard's insertion order", () => {
+    const game: HanabiView = {
+      ...BASE_GAME,
+      discard: [
+        { id: "d1", suit: "red", rank: 1 },
+        { id: "d2", suit: "blue", rank: 2 },
+        { id: "d3", suit: "green", rank: 3 },
+      ],
+      discardOrder: ["d3", "d1", "d2"],
+    };
+    const markup = render(game);
+    const i3 = markup.indexOf('data-testid="discard-tile-d3"');
+    const i1 = markup.indexOf('data-testid="discard-tile-d1"');
+    const i2 = markup.indexOf('data-testid="discard-tile-d2"');
+    expect(i3).toBeGreaterThan(-1);
+    expect(i1).toBeGreaterThan(i3);
+    expect(i2).toBeGreaterThan(i1);
+  });
+
+  it("skips a discardOrder id with no matching discard entry, and appends a discard entry missing from discardOrder", () => {
+    const game: HanabiView = {
+      ...BASE_GAME,
+      discard: [
+        { id: "d1", suit: "red", rank: 1 },
+        { id: "d2", suit: "blue", rank: 2 },
+      ],
+      discardOrder: ["d1", "unknown-id"],
+    };
+    const markup = render(game);
+    expect(markup).toContain('data-testid="discard-tile-d1"');
+    expect(markup).toContain('data-testid="discard-tile-d2"');
+    expect(markup).not.toContain("discard-tile-unknown-id");
+  });
+
+  it("renders the empty-state copy when discard is empty", () => {
+    const game: HanabiView = { ...BASE_GAME, discard: [], discardOrder: [] };
+    const markup = render(game);
+    expect(markup).toContain("No tiles discarded yet");
+  });
+});

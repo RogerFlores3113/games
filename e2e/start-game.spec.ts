@@ -427,4 +427,25 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       await context.close();
     }
   });
+
+  test("06.2-07 early fit check: the reworked board fits 1280x720 with no vertical scrollbar at 5 players", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    test.setTimeout(120_000);
+
+    const { contexts } = await startGameWithPlayers(hostPage, browser, ["Roger", "Bianca", "Chen", "Dara", "Eli"]);
+
+    // Default viewport is 1280x720 (playwright.config.ts sets none).
+    await expect(hostPage.locator('[data-testid^="other-hand-card-"]')).toHaveCount(16);
+
+    const fitsNoScroll = await hostPage.evaluate(
+      () => document.scrollingElement !== null && document.scrollingElement.scrollHeight <= window.innerHeight + 1,
+    );
+    expect(fitsNoScroll).toBe(true);
+
+    for (const context of contexts) {
+      await context.close();
+    }
+  });
 });
