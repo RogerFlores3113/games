@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { createRoom, expectSeatCount, joinAs, startGameWithPlayers, startTwoPlayerGame } from "./helpers";
 
 type WireCard = Record<string, unknown> & { id?: unknown; hidden?: unknown };
@@ -246,9 +246,26 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     const { contextB, pageB } = await startTwoPlayerGame(hostPage, browser);
     const otherPage = pageB;
 
+    // WR-09: the game can end at any point inside an iteration. Once it does,
+    // the full-screen overlay covers (and the board disables) every control,
+    // so a plain `.click()` would retry until the 240s test timeout. Every
+    // click below uses a short timeout and, on failure, re-checks the overlay
+    // before moving on.
+    const endOverlayVisible = async () =>
+      (await hostPage.getByTestId("end-overlay").isVisible()) ||
+      (await otherPage.getByTestId("end-overlay").isVisible());
+    const tryClick = async (locator: Locator): Promise<boolean> => {
+      try {
+        await locator.click({ timeout: 2000 });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
     let sawEndOverlay = false;
     for (let i = 0; i < 80; i++) {
-      if (await hostPage.getByTestId("end-overlay").isVisible()) {
+      if (await endOverlayVisible()) {
         sawEndOverlay = true;
         break;
       }
@@ -258,19 +275,41 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       const hostText = ((await hostPage.getByTestId("turn-indicator").textContent()) ?? "").trim();
       const activePlayer = hostText === "Your turn" ? hostPage : otherPage;
 
-      await activePlayer.getByTestId("own-hand-slot-1").click();
-      const playEnabled = await activePlayer.getByTestId("play-button").isEnabled();
-      if (!playEnabled) {
-        // Selection may have been dropped (card left the hand) or the game
-        // ended between the poll above and this click; re-check the overlay
-        // before treating this as a failure.
-        if (await hostPage.getByTestId("end-overlay").isVisible()) {
+      if (await endOverlayVisible()) {
+        sawEndOverlay = true;
+        break;
+      }
+      if (!(await tryClick(activePlayer.getByTestId("own-hand-slot-1")))) {
+        if (await endOverlayVisible()) {
           sawEndOverlay = true;
           break;
         }
         continue;
       }
-      await activePlayer.getByTestId("play-button").click();
+
+      // Retrying wait for the play button (the selection re-render may not
+      // have landed yet), rather than a one-shot `isEnabled()` read.
+      const playEnabled = await expect(activePlayer.getByTestId("play-button"))
+        .toBeEnabled({ timeout: 2000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!playEnabled) {
+        // Selection may have been dropped (card left the hand), it is not
+        // this page's turn after all, or the game ended; re-check the overlay
+        // before treating this as a failure.
+        if (await endOverlayVisible()) {
+          sawEndOverlay = true;
+          break;
+        }
+        continue;
+      }
+      if (!(await tryClick(activePlayer.getByTestId("play-button")))) {
+        if (await endOverlayVisible()) {
+          sawEndOverlay = true;
+          break;
+        }
+        continue;
+      }
 
       await expect
         .poll(async () => {
