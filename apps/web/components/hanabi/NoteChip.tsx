@@ -126,10 +126,10 @@ export function NoteChip({ roomCode, seatId, cardId, slotNumber }: NoteChipProps
         <Pencil aria-hidden="true" size={12} color="var(--color-text-muted)" />
       )}
       {/* Out-of-flow touch target: the row's own flow height stays 20px
-          (the MarksZone note-row budget), but the effective hit area is
-          expanded to >= 44px via this absolutely-positioned inset span, so
-          the layout never grows (mirrors Table.tsx's discard-toggle
-          pattern). */}
+          (the own-hand note-row budget, NOTE_ROW_PX in layout-budget.ts),
+          but the effective hit area is expanded to >= 44px via this
+          absolutely-positioned inset span, so the layout never grows
+          (mirrors Table.tsx's discard-toggle pattern). */}
       <span aria-hidden="true" className="absolute" style={{ inset: "-12px 0" }} />
     </button>
   );

@@ -25,8 +25,9 @@ export const BOARD_CHROME_PX = 40;
 
 /**
  * UI-SPEC "Top (teammate hands)" row, this phase: 140px (seat label 20 +
- * card row 78 + status row 20 + gaps/padding). The 28px MarksZone pip band
- * from 06.1 is removed (HINT-04) — there is no MARKS_BAND_PX constant.
+ * card row 78 + status row 20 + gaps/padding). The 28px automatic clue-mark
+ * pip band from 06.1 is removed (HINT-04) — there is no MARKS_BAND_PX
+ * constant.
  */
 export const TEAMMATE_BAND_PX = 140;
 
@@ -34,7 +35,7 @@ export const TEAMMATE_BAND_PX = 140;
  * UI-SPEC "Bottom (own hand)" row, this phase: 180px (turn indicator 24 +
  * card row 100 + controls row 44 + note-row 20 [now always-visible, same
  * 20px budget as 06.1's click-to-reveal chip], gaps/padding). The 28px
- * MarksZone pip band from 06.1 is removed (HINT-04) — there is no
+ * automatic clue-mark pip band from 06.1 is removed (HINT-04) — there is no
  * MARKS_BAND_PX constant.
  */
 export const OWN_BAND_PX = 180;

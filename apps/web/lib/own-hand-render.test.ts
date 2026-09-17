@@ -12,7 +12,6 @@ import { describe, expect, it } from "vitest";
 import type { HanabiCardView } from "@games/rules";
 import { OwnHand, TeammateHand, type OwnHandProps } from "../components/hanabi/Hand";
 import type { OwnHandCardProps } from "../components/hanabi/OwnHandCard";
-import type { CandidateStripProps } from "../components/hanabi/CandidateStrip";
 import type { CardFacts } from "./hanabi-visual-logic";
 
 type Facts = HanabiCardView["facts"];
@@ -64,6 +63,8 @@ function render(cards: HanabiCardView[]): string {
     onCardPointerDown: () => {},
     registerSlot: () => {},
     consumeClickSuppression: () => false,
+    hintsVisible: true,
+    tileColor: undefined,
   };
   return renderToStaticMarkup(createElement(OwnHand, props));
 }
@@ -77,7 +78,6 @@ type PropsCarryingIdentity<T> = {
 }[keyof T];
 type AssertNever<T extends never> = T;
 export type _OwnHandCardPropsHaveNoIdentity = AssertNever<PropsCarryingIdentity<OwnHandCardProps>>;
-export type _CandidateStripPropsHaveNoIdentity = AssertNever<PropsCarryingIdentity<CandidateStripProps>>;
 type AssertFalse<T extends false> = T;
 export type _CardFactsHasNoIdentity = AssertFalse<HasIdentityKey<CardFacts>>;
 export type _OwnHandCardHasNoCardProp = AssertFalse<"card" extends keyof OwnHandCardProps ? true : false>;
@@ -104,11 +104,11 @@ describe("own-hand render guard (D-15, WR-06)", () => {
       i === 0 ? { ...card, facts: { ...card.facts, possibleRanks: [3], positiveClues: [{ type: "rank", value: 3 }] } } : card,
     );
     expect(render(narrowed)).not.toBe(render(VISIBLE_HAND));
-    expect(render(narrowed)).toContain('data-testid="confirmed-rank"');
-  });
-
-  it("renders a marks zone above the first own-hand slot (D-07 relocation)", () => {
-    expect(render(VISIBLE_HAND)).toContain("marks-zone-slot-1");
+    // HINT-01/02/04 relocation: a positive clue now renders a hint overlay
+    // on the tile itself (HintIndicator's numeral chip), not the deleted
+    // automatic clue-mark pip row's confirmed-rank pip.
+    expect(render(narrowed)).toContain("own-hand-slot-1-hints");
+    expect(render(narrowed)).toContain('data-testid="hint-numeral"');
   });
 
   it("renders a note chip in the first own-hand slot's note row (D-03/D-05, NOTE-02)", () => {

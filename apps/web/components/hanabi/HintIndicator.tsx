@@ -12,7 +12,8 @@ export interface HintIndicatorProps {
 }
 
 /**
- * D-01..D-07 (HINT-01..04): replaces MarksZone/CandidateStrip's pip rows.
+ * D-01..D-07 (HINT-01..04): replaces the deleted automatic clue-mark pip
+ * rows.
  * A colour clue tints the whole tile face and shows a faint, non-colour
  * suit-glyph marker (D-04 grayscale survival); a number clue stamps a
  * numeral chip on the tile back. The two channels are independent and never
@@ -25,13 +26,14 @@ export interface HintIndicatorProps {
  * only — never a card object, never a bare `suit`/`rank` prop — so both
  * exported components can safely render into the viewer's own hidden hand.
  * Passing the CLUED suit into `SuitGlyph` is safe even on the own-hand path
- * (the clue itself already revealed that suit to the viewer), but
- * `exposeSuit` must never be set to true anywhere in this file — a `true`
- * value would put a suit-identity `data-glyph` marker into the DOM, which is
- * a stronger signal than the clue actually grants. `OwnHintIndicator` and
- * `TeammateHintIndicator` are two thin named exports over the same overlay so
- * a source-scan-style guard can still address the own-hand path directly
- * (own-hand-source.test.ts's HINT_INDICATOR_PATH scan).
+ * (the clue itself already revealed that suit to the viewer), but the
+ * glyph-identity opt-in flag `SuitGlyph` accepts must never be turned on
+ * anywhere in this file — turning it on would put a suit-identity DOM
+ * marker into the markup, which is a stronger signal than the clue actually
+ * grants. `OwnHintIndicator` and `TeammateHintIndicator` are two thin named
+ * exports over the same overlay so a source-scan-style guard can still
+ * address the own-hand path directly (own-hand-source.test.ts's
+ * HINT_INDICATOR_PATH scan).
  */
 function HintOverlay({ facts, visible, width, height, testId }: HintIndicatorProps) {
   if (!visible) return null;

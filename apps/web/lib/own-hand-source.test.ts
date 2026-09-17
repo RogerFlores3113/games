@@ -1,6 +1,6 @@
 // D-15 own-hand source scan. This test enforces the "no identity signal in
 // an own-hand card" rule at the source-code level, not just by convention:
-// OwnHandCard.tsx and CandidateStrip.tsx (which OwnHandCard renders into)
+// OwnHandCard.tsx and HintIndicator.tsx (which OwnHandCard renders into)
 // must never read a card's suit/rank property, never opt a SuitGlyph into
 // `exposeSuit`, and never emit a `data-suit`/`card-identity`/`data-glyph`
 // attribute — any of those would put own-hand identity into the DOM for a
@@ -16,14 +16,13 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const OWN_HAND_CARD_PATH = fileURLToPath(new URL("../components/hanabi/OwnHandCard.tsx", import.meta.url));
-const CANDIDATE_STRIP_PATH = fileURLToPath(new URL("../components/hanabi/CandidateStrip.tsx", import.meta.url));
-// 06.1-09 / RESEARCH.md Pitfall 3: clue marks relocated into MarksZone.tsx —
-// the D-15 source scan must cover this new file too, or a suit/rank leak
-// introduced here would go uncaught.
-const MARKS_ZONE_PATH = fileURLToPath(new URL("../components/hanabi/MarksZone.tsx", import.meta.url));
-// 06.1-11 / T-06.1-34: the note chip fills MarksZone's own-hand note-row
-// slot and receives only ids (never a card object) — the D-15 source scan
-// must cover this file too.
+// 06.2-04 / HINT-04: the two automatic clue-mark pip-row components are
+// deleted (the pip rows they rendered are gone); HintIndicator.tsx is their
+// replacement and the D-15 source scan must cover it instead.
+const HINT_INDICATOR_PATH = fileURLToPath(new URL("../components/hanabi/HintIndicator.tsx", import.meta.url));
+// 06.1-11 / T-06.1-34: the note chip fills the own-hand note row and
+// receives only ids (never a card object) — the D-15 source scan must cover
+// this file too.
 const NOTE_CHIP_PATH = fileURLToPath(new URL("../components/hanabi/NoteChip.tsx", import.meta.url));
 // 06.1-12 / T-06.1-37: the drag hook tracks own-hand cards by id only (drop
 // resolution and pending reorder never touch a card's suit/rank) — the D-15
@@ -31,8 +30,7 @@ const NOTE_CHIP_PATH = fileURLToPath(new URL("../components/hanabi/NoteChip.tsx"
 const USE_HAND_DRAG_PATH = fileURLToPath(new URL("../components/hanabi/useHandDrag.ts", import.meta.url));
 
 const ownHandCardSource = readFileSync(OWN_HAND_CARD_PATH, "utf-8");
-const candidateStripSource = readFileSync(CANDIDATE_STRIP_PATH, "utf-8");
-const marksZoneSource = readFileSync(MARKS_ZONE_PATH, "utf-8");
+const hintIndicatorSource = readFileSync(HINT_INDICATOR_PATH, "utf-8");
 const noteChipSource = readFileSync(NOTE_CHIP_PATH, "utf-8");
 const useHandDragSource = readFileSync(USE_HAND_DRAG_PATH, "utf-8");
 
@@ -151,18 +149,10 @@ describe("own-hand source scan (D-15)", () => {
     expect(code).not.toMatch(DESTRUCTURING);
   });
 
-  it("CandidateStrip.tsx code (comments stripped) never reads a suit or rank property", () => {
-    // Destructuring is not banned here: CandidateStrip legitimately
-    // destructures `suit`/`rank` out of its facts-derived CandidateDisplay
-    // (positive marks and candidate pips). Its props type (asserted in
-    // own-hand-render.test.ts) is what keeps a card from ever reaching it.
-    expect(stripComments(candidateStripSource)).not.toMatch(PROPERTY_ACCESS);
-  });
-
   it("neither file mentions exposeSuit or a suit-identity DOM marker anywhere, comments included", () => {
     for (const token of FORBIDDEN_TOKENS) {
       expect(ownHandCardSource).not.toContain(token);
-      expect(candidateStripSource).not.toContain(token);
+      expect(hintIndicatorSource).not.toContain(token);
     }
   });
 
@@ -184,21 +174,26 @@ describe("own-hand source scan (D-15)", () => {
     expect(ownHandCardSource).toContain("renders NO identity signal");
   });
 
-  it("MarksZone.tsx code (comments stripped) never reads or destructures a suit or rank property", () => {
-    const code = stripComments(marksZoneSource);
-    expect(code).not.toMatch(PROPERTY_ACCESS);
-    expect(code).not.toMatch(DESTRUCTURING);
+  it("HintIndicator.tsx code (comments stripped) never reads a suit or rank property", () => {
+    // Destructuring is not banned here, mirroring the former pip-strip
+    // component's exception: HintIndicator legitimately passes the already-CLUED suit
+    // into `SuitGlyph suit={suit}` as the non-colour marker (D-04) — that
+    // JSX attribute assignment trips the DESTRUCTURING regex's "{suit}"
+    // shape even though it is not an object-destructure of a card. The
+    // props type (asserted below) is what keeps a real card from ever
+    // reaching this file.
+    expect(stripComments(hintIndicatorSource)).not.toMatch(PROPERTY_ACCESS);
   });
 
-  it("MarksZone.tsx never mentions exposeSuit or a suit-identity DOM marker anywhere, comments included", () => {
+  it("HintIndicator.tsx never mentions exposeSuit or a suit-identity DOM marker anywhere, comments included", () => {
     for (const token of FORBIDDEN_TOKENS) {
-      expect(marksZoneSource).not.toContain(token);
+      expect(hintIndicatorSource).not.toContain(token);
     }
   });
 
-  it("MarksZone's props type has no card member — it takes facts/variant only, never a card object", () => {
-    expect(marksZoneSource).not.toMatch(/\bcard\s*:/);
-    expect(marksZoneSource).not.toContain("HanabiCardView");
+  it("HintIndicator's props type has no card member — it takes facts only, never a card object", () => {
+    expect(hintIndicatorSource).not.toMatch(/\bcard\s*:/);
+    expect(hintIndicatorSource).not.toContain("HanabiCardView");
   });
 
   it("NoteChip.tsx code (comments stripped) never reads or destructures a suit or rank property", () => {

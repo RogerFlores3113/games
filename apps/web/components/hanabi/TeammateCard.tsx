@@ -1,23 +1,32 @@
 import type { HanabiCardView } from "@games/rules";
 import { luminosityStepFor } from "../../lib/hanabi-visual-logic";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
+import { TILE_COLOR_PRESETS } from "../../lib/tile-color-pref";
 import { FireworkCardBack, FireworkCardFace } from "./FireworkCard";
+import { TeammateHintIndicator } from "./HintIndicator";
 import { LUMINOSITY_FRAME } from "./luminosity-frame";
 
 export interface TeammateCardProps {
   card: HanabiCardView;
   preview: boolean;
   justClued: boolean;
+  /** HINT-03/D-05: whether this card's hint overlay should currently render. */
+  hintsVisible: boolean;
+  /** TILE-03/D-13: the viewer's personal tile-colour preference. Defaults to
+   * the slate preset so callers not yet wired to the picker still compile. */
+  tileColor?: string;
 }
 
 // UI-SPEC targets 56x78 for a 5-suit hand; widened to 64x84 here (06.1-03
 // deviation, carried forward) so the marks zone above still fits Rainbow/
 // Black's 6-suit candidate strip without wrapping.
 // 06.1-09 deviation: further reduced 84 -> 78 (UI-11 fit regression once the
-// 28px marks-zone band was added above every teammate card) — see this
+// 28px marks-zone band was added above every teammate card) — see that
 // plan's SUMMARY.
 const CARD_WIDTH = 64;
 const CARD_HEIGHT = 78;
+
+const DEFAULT_TILE_COLOR = TILE_COLOR_PRESETS.find((preset) => preset.id === "slate")!.cssValue;
 
 /**
  * D-08/D-09/D-12/D-13: a teammate's face-up card renders the owner-approved
@@ -26,13 +35,17 @@ const CARD_HEIGHT = 78;
  * luminosity frame is derived from the SAME `facts` the card's own holder
  * would see about it (D-09), and the burst art's hue stays fully solid at
  * every luminosity step (D-10) — only the frame below (border/box-shadow/
- * background layer) ever carries the luminosity signal. Clue marks (told
- * suits/ranks, candidate pips) moved to MarksZone (D-07) — this card body
- * renders only the face/back art.
+ * background layer) ever carries the luminosity signal. The automatic
+ * clue-mark pip band is gone (HINT-04) — hints now render on the tile
+ * itself via `TeammateHintIndicator`, and the tile gets its own raised,
+ * opaque surface (TILE-01) distinct from the board beneath it.
  */
-export function TeammateCard({ card, preview, justClued }: TeammateCardProps) {
+export function TeammateCard({ card, preview, justClued, hintsVisible, tileColor = DEFAULT_TILE_COLOR }: TeammateCardProps) {
   const step = luminosityStepFor(card.facts);
   const frame = LUMINOSITY_FRAME[step];
+
+  const tileShadow = "0 2px 4px var(--color-tile-shadow)";
+  const composedBoxShadow = frame.boxShadow === "none" ? tileShadow : `${frame.boxShadow}, ${tileShadow}`;
 
   return (
     <span
@@ -44,9 +57,9 @@ export function TeammateCard({ card, preview, justClued }: TeammateCardProps) {
       style={{
         width: CARD_WIDTH,
         height: CARD_HEIGHT,
-        backgroundColor: "var(--color-surface)",
+        backgroundColor: tileColor,
         border: frame.border,
-        boxShadow: frame.boxShadow,
+        boxShadow: composedBoxShadow,
       }}
     >
       {frame.backgroundFilter && (
@@ -73,6 +86,14 @@ export function TeammateCard({ card, preview, justClued }: TeammateCardProps) {
           <FireworkCardBack width={CARD_WIDTH} height={CARD_HEIGHT} />
         </span>
       )}
+
+      <TeammateHintIndicator
+        facts={card.facts}
+        visible={hintsVisible}
+        width={CARD_WIDTH}
+        height={CARD_HEIGHT}
+        testId={`other-hand-card-${card.id}-hints`}
+      />
 
       {preview && (
         <span

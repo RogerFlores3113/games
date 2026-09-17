@@ -1,6 +1,6 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { HanabiCardView, Variant } from "@games/rules";
-import { MarksZone } from "./MarksZone";
+import { NOTE_ROW_PX } from "../../lib/layout-budget";
 import { NoteChip } from "./NoteChip";
 import { OwnHandCard } from "./OwnHandCard";
 import { TeammateCard } from "./TeammateCard";
@@ -48,24 +48,36 @@ export interface TeammateHandProps {
   justCluedIds: ReadonlySet<string>;
   disabled: boolean;
   onSelectTarget: () => void;
+  /** HINT-03/D-05: whether every teammate card's hint overlay currently
+   * renders. Defaults to true so callers not yet wired to the keep-hints
+   * toggle still compile and render hints unconditionally. */
+  hintsVisible?: boolean;
+  /** TILE-03/D-13: the viewer's personal tile-colour preference, applied to
+   * every teammate tile too (D-13 — affects only that player's own view). */
+  tileColor?: string;
 }
 
 /** D-02/D-16/D-19: one teammate's hand — the active-player ring, restyled
  * seat status, and a select-then-act "give this teammate a clue" button
  * wrapping their card row. Preserves `other-hand-{seatId}` /
  * `other-hand-card-{id}` testids (D-24) — no other testid in this component
- * may start with "other-hand-". */
+ * may start with "other-hand-". The `variant` prop is unused now that the
+ * deleted automatic clue-mark pip band (HINT-04) no longer reads a card's
+ * candidate suits per variant, but stays on the props type — HanabiBoard.tsx
+ * still threads it through, and TeammateCard's own luminosity/hint
+ * derivation is variant-independent (facts alone). */
 export function TeammateHand({
   hand,
   label,
   connected,
-  variant,
   isActive,
   isTarget,
   previewIds,
   justCluedIds,
   disabled,
   onSelectTarget,
+  hintsVisible = true,
+  tileColor,
 }: TeammateHandProps) {
   return (
     <div
@@ -120,10 +132,14 @@ export function TeammateHand({
         }}
       >
         {hand.cards.map((card) => (
-          <div key={card.id} className="flex flex-col items-center">
-            <MarksZone facts={card.facts} variant={variant} scale="teammate" testId={`marks-zone-${card.id}`} />
-            <TeammateCard card={card} preview={previewIds.has(card.id)} justClued={justCluedIds.has(card.id)} />
-          </div>
+          <TeammateCard
+            key={card.id}
+            card={card}
+            preview={previewIds.has(card.id)}
+            justClued={justCluedIds.has(card.id)}
+            hintsVisible={hintsVisible}
+            tileColor={tileColor}
+          />
         ))}
       </div>
     </div>
@@ -149,11 +165,21 @@ export interface OwnHandProps {
   onCardPointerDown: (cardId: string, event: ReactPointerEvent) => void;
   registerSlot: (cardId: string, el: HTMLElement | null) => void;
   consumeClickSuppression: () => boolean;
+  /** HINT-03/D-05: whether every own-hand card's hint overlay currently
+   * renders. Defaults to true so callers not yet wired to the keep-hints
+   * toggle still compile and render hints unconditionally. */
+  hintsVisible?: boolean;
+  /** TILE-03/D-13: the viewer's personal tile-colour preference. */
+  tileColor?: string;
 }
 
 /** D-02/D-15/D-19: the viewer's own hand. Every `OwnHandCard` receives only
  * `card.facts` — never the card itself — structurally preserving the D-15
- * identity boundary at this call site too. */
+ * identity boundary at this call site too. Each slot keeps a fixed
+ * `NOTE_ROW_PX`-tall note row above the card holding the existing
+ * `NoteChip` (HINT-04 removes the marks-zone band that used to sit there
+ * instead; 06.2-05 replaces the chip itself with the always-visible box —
+ * this plan does not touch the chip). */
 export function OwnHand({
   cards,
   variant,
@@ -171,6 +197,8 @@ export function OwnHand({
   onCardPointerDown,
   registerSlot,
   consumeClickSuppression,
+  hintsVisible = true,
+  tileColor,
 }: OwnHandProps) {
   return (
     <section
@@ -220,17 +248,14 @@ export function OwnHand({
             ref={(el) => registerSlot(card.id, el)}
             className="flex flex-col items-center"
           >
-            <MarksZone
-              facts={card.facts}
-              variant={variant}
-              scale="own"
-              testId={`marks-zone-slot-${i + 1}`}
-              noteSlot={
-                youSeatId !== null ? (
-                  <NoteChip key={card.id} roomCode={roomCode} seatId={youSeatId} cardId={card.id} slotNumber={i + 1} />
-                ) : null
-              }
-            />
+            <div
+              className="flex w-full items-center justify-end"
+              style={{ height: NOTE_ROW_PX }}
+            >
+              {youSeatId !== null && (
+                <NoteChip key={card.id} roomCode={roomCode} seatId={youSeatId} cardId={card.id} slotNumber={i + 1} />
+              )}
+            </div>
             <OwnHandCard
               facts={card.facts}
               slotNumber={i + 1}
@@ -244,6 +269,8 @@ export function OwnHand({
                 if (consumeClickSuppression()) return;
                 onSelectCard(card.id);
               }}
+              hintsVisible={hintsVisible}
+              tileColor={tileColor}
             />
           </div>
         ))}

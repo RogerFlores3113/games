@@ -1,7 +1,10 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { CardFacts } from "../../lib/hanabi-visual-logic";
 import { luminosityStepFor } from "../../lib/hanabi-visual-logic";
+import { hintDisplayFor } from "../../lib/hanabi-hint-logic";
+import { TILE_COLOR_PRESETS } from "../../lib/tile-color-pref";
 import { FireworkCardBack } from "./FireworkCard";
+import { OwnHintIndicator } from "./HintIndicator";
 import { LUMINOSITY_FRAME } from "./luminosity-frame";
 
 export interface OwnHandCardProps {
@@ -15,6 +18,14 @@ export interface OwnHandCardProps {
   dragging: boolean;
   dragOffset: { x: number; y: number } | null;
   onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  /** HINT-03/D-05: whether this card's hint overlay should currently render
+   * (the "keep hints visible" toggle's derived per-card visibility). */
+  hintsVisible: boolean;
+  /** TILE-03/D-13: the viewer's personal tile-colour preference — a
+   * `var(--color-*)`/`color-mix(...)` CSS value, never a raw hex literal.
+   * Defaults to the slate preset so callers not yet wired to the picker
+   * still compile and render the unchanged look. */
+  tileColor?: string;
 }
 
 // UI-SPEC targets 72x100 for a 5-suit hand; widened here to 88x112 (06.1-03
@@ -22,21 +33,31 @@ export interface OwnHandCardProps {
 // Black's 6-suit candidate strip without wrapping.
 // 06.1-09 deviation: further reduced 112 -> 100 (UI-11 fit regression once
 // the 28px/20px marks-zone band was added above every own-hand card) — see
-// this plan's SUMMARY.
+// that plan's SUMMARY.
+// 06.2-02 deviation ledger: these two constants are now duplicated in
+// apps/web/lib/layout-budget.ts (OWN_CARD_HEIGHT_PX) as the single named
+// height source for later plans; this file's own CARD_WIDTH/CARD_HEIGHT
+// stay local render constants, not re-imported, since layout-budget.ts's
+// own comment defers that consolidation to whichever later plan first needs
+// to import the value rather than just assert it.
 const CARD_WIDTH = 88;
 const CARD_HEIGHT = 100;
+
+const DEFAULT_TILE_COLOR = TILE_COLOR_PRESETS.find((preset) => preset.id === "slate")!.cssValue;
 
 /**
  * The one load-bearing rule this file must never violate: a card in the
  * viewer's own hand renders NO identity signal — no suit, no rank, no
  * colour derived from either, no placeholder glyph hinting at either. Its
  * only permitted content is the identical neutral card back (D-10, owner-
- * approved picture-frame art) and its slot position. The server already
- * guarantees the identity fields are absent from a hidden card view; this
- * component structurally cannot reintroduce that signal, because it accepts
- * only `facts: CardFacts` — a type with no suit/rank fields — never the card
- * object itself (D-15). Clue marks (told suits/ranks, candidate pips) moved
- * to MarksZone (D-07) — this card body renders only the neutral back.
+ * approved picture-frame art), its slot position, and its own hint overlay
+ * (HINT-01/02, derived only from `facts.positiveClues` — never from a real,
+ * still-hidden suit/rank). The server already guarantees the identity
+ * fields are absent from a hidden card view; this component structurally
+ * cannot reintroduce that signal, because it accepts only
+ * `facts: CardFacts` — a type with no suit/rank fields — never the card
+ * object itself (D-15). The automatic clue-mark pip band is gone (HINT-04)
+ * — hints now render on the tile itself via `OwnHintIndicator`.
  */
 export function OwnHandCard({
   facts,
@@ -48,9 +69,19 @@ export function OwnHandCard({
   dragging,
   dragOffset,
   onPointerDown,
+  hintsVisible,
+  tileColor = DEFAULT_TILE_COLOR,
 }: OwnHandCardProps) {
   const step = luminosityStepFor(facts);
   const frame = LUMINOSITY_FRAME[step];
+  const hints = hintDisplayFor(facts);
+  const hasHints = hintsVisible && (hints.colorHints.length > 0 || hints.numberHints.length > 0);
+
+  // TILE-01/D-12: a tile is a raised, opaque object distinct from the board
+  // beneath it — a downward drop-shadow composed WITH (not replacing) the
+  // existing luminosity glow, which stays the frame's border/box-shadow.
+  const tileShadow = "0 2px 4px var(--color-tile-shadow)";
+  const composedBoxShadow = frame.boxShadow === "none" ? tileShadow : `${frame.boxShadow}, ${tileShadow}`;
 
   // D-20: while dragging, the card lifts (elevated shadow + slight scale)
   // and tracks the pointer via a translate transform; releasing outside a
@@ -70,6 +101,7 @@ export function OwnHandCard({
       data-selected={String(selected)}
       data-just-clued={String(justClued)}
       data-dragging={String(dragging)}
+      data-hints={String(hasHints)}
       aria-pressed={selected}
       disabled={disabled}
       onClick={onSelect}
@@ -84,11 +116,11 @@ export function OwnHandCard({
         height: CARD_HEIGHT,
         minHeight: "var(--size-touch-min)",
         minWidth: "var(--size-touch-min)",
-        backgroundColor: "var(--color-surface)",
+        backgroundColor: tileColor,
         border: frame.border,
         boxShadow: dragging
-          ? "0 8px 24px 0 rgba(0, 0, 0, 0.5), " + frame.boxShadow
-          : frame.boxShadow,
+          ? "0 8px 24px 0 rgba(0, 0, 0, 0.5), " + composedBoxShadow
+          : composedBoxShadow,
         outline: selected ? "2px solid var(--color-text)" : undefined,
         outlineOffset: selected ? "2px" : undefined,
         touchAction: "none",
@@ -108,6 +140,14 @@ export function OwnHandCard({
           style={{ filter: frame.backgroundFilter, backgroundColor: "var(--color-surface)" }}
         />
       )}
+
+      <OwnHintIndicator
+        facts={facts}
+        visible={hintsVisible}
+        width={CARD_WIDTH}
+        height={CARD_HEIGHT}
+        testId={`own-hand-slot-${slotNumber}-hints`}
+      />
 
       <span
         className="relative z-10 rounded px-[length:var(--space-xs)] text-[length:var(--text-label)] font-semibold"

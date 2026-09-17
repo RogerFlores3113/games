@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { HanabiView } from "@games/rules";
 import {
   luminosityStepFor,
-  candidateDisplayFor,
   touchedCardIdsFromLatestClue,
   newlyCompletedStacks,
   disabledReasonFor,
@@ -94,80 +93,6 @@ describe("luminosityStepFor", () => {
   });
 });
 
-describe("candidateDisplayFor", () => {
-  it("has 5 suit entries in variantConfig('base').suits order for base variant", () => {
-    const facts = factsFor({ possibleSuits: [...FIVE_SUITS], possibleRanks: [...FIVE_RANKS] });
-    const display = candidateDisplayFor(facts, "base");
-    expect(display.suits.map((s) => s.suit)).toEqual(["red", "yellow", "green", "blue", "white"]);
-  });
-
-  it("includes rainbow for the rainbow variant", () => {
-    const facts = factsFor({ possibleSuits: ["rainbow"], possibleRanks: [...FIVE_RANKS] });
-    const display = candidateDisplayFor(facts, "rainbow");
-    expect(display.suits.map((s) => s.suit)).toContain("rainbow");
-  });
-
-  it("includes black for the black variant", () => {
-    const facts = factsFor({ possibleSuits: ["black"], possibleRanks: [...FIVE_RANKS] });
-    const display = candidateDisplayFor(facts, "black");
-    expect(display.suits.map((s) => s.suit)).toContain("black");
-  });
-
-  it("flags a suit absent from possibleSuits as not possible", () => {
-    const facts = factsFor({ possibleSuits: ["red"], possibleRanks: [...FIVE_RANKS] });
-    const display = candidateDisplayFor(facts, "base");
-    const blue = display.suits.find((s) => s.suit === "blue");
-    expect(blue?.possible).toBe(false);
-    const red = display.suits.find((s) => s.suit === "red");
-    expect(red?.possible).toBe(true);
-  });
-
-  it("always lists ranks 1..5 in order with possible flags", () => {
-    const facts = factsFor({ possibleSuits: [...FIVE_SUITS], possibleRanks: [1, 3] });
-    const display = candidateDisplayFor(facts, "base");
-    expect(display.ranks.map((r) => r.rank)).toEqual([1, 2, 3, 4, 5]);
-    expect(display.ranks.find((r) => r.rank === 1)?.possible).toBe(true);
-    expect(display.ranks.find((r) => r.rank === 2)?.possible).toBe(false);
-  });
-
-  it("confirmedSuit is the suit only when possibleSuits.length === 1, else null", () => {
-    const narrowed = candidateDisplayFor(factsFor({ possibleSuits: ["red"], possibleRanks: [...FIVE_RANKS] }), "base");
-    expect(narrowed.confirmedSuit).toBe("red");
-    const notNarrowed = candidateDisplayFor(
-      factsFor({ possibleSuits: ["red", "blue"], possibleRanks: [...FIVE_RANKS] }),
-      "base",
-    );
-    expect(notNarrowed.confirmedSuit).toBeNull();
-  });
-
-  it("confirmedRank is the rank only when possibleRanks.length === 1, else null", () => {
-    const narrowed = candidateDisplayFor(factsFor({ possibleSuits: [...FIVE_SUITS], possibleRanks: [3] }), "base");
-    expect(narrowed.confirmedRank).toBe(3);
-    const notNarrowed = candidateDisplayFor(
-      factsFor({ possibleSuits: [...FIVE_SUITS], possibleRanks: [3, 4] }),
-      "base",
-    );
-    expect(notNarrowed.confirmedRank).toBeNull();
-  });
-
-  it("positiveMarks maps each positive clue to a mark, deduplicated, in first-seen order", () => {
-    const facts = factsFor({
-      possibleSuits: ["red"],
-      possibleRanks: [...FIVE_RANKS],
-      positiveClues: [
-        { type: "color", value: "red" },
-        { type: "rank", value: 3 },
-        { type: "color", value: "red" },
-      ],
-    });
-    const display = candidateDisplayFor(facts, "base");
-    expect(display.positiveMarks).toEqual([
-      { type: "color", suit: "red" },
-      { type: "rank", rank: 3 },
-    ]);
-  });
-});
-
 describe("touchedCardIdsFromLatestClue", () => {
   const clueEntry: HistoryEntry = {
     turn: 0,
@@ -246,12 +171,6 @@ describe("identity tripwire (D-15)", () => {
     const realFacts: CardFacts = factsFor({ possibleSuits: ["red"], possibleRanks: [3] });
     const proxied = tripwireFacts(realFacts);
     expect(() => luminosityStepFor(proxied)).not.toThrow();
-  });
-
-  it("candidateDisplayFor never reads a key outside the four allowed CardFacts keys", () => {
-    const realFacts: CardFacts = factsFor({ possibleSuits: ["red"], possibleRanks: [...FIVE_RANKS] });
-    const proxied = tripwireFacts(realFacts);
-    expect(() => candidateDisplayFor(proxied, "base")).not.toThrow();
   });
 });
 

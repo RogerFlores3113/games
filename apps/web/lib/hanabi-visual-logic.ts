@@ -1,18 +1,26 @@
-import type { Clue, HanabiCardView, HanabiView, Rank, Suit, Variant } from "@games/rules";
+import type { Clue, HanabiCardView, HanabiView, Suit } from "@games/rules";
 import { MAX_FUSES, RANKS, maxScoreFor, variantConfig } from "@games/rules";
 import { clueTouchCountForTarget, isDiscardDisabled } from "./hanabi-board-logic";
 
 /**
  * D-23 / D-15 boundary: every derivation below is a pure function over the
  * redacted `HanabiView` (or a piece of it) — no DOM types, no React imports,
- * no network/storage access. The own-hand helpers (`luminosityStepFor`,
- * `candidateDisplayFor`) accept ONLY `CardFacts` — a type with no
- * `suit`/`rank` fields — because that is the entire own-hand identity
- * boundary (D-15, carried from Phase 4): if a helper ever needs a card's
- * actual suit/rank to render an own-hand slot, stop, because that is exactly
- * the leak this file exists to make structurally impossible. Teammates'
- * face-up cards may pass a discriminated `HanabiCardView` to callers that
- * need full identity, but these two functions never do.
+ * no network/storage access. The own-hand helper (`luminosityStepFor`)
+ * accepts ONLY `CardFacts` — a type with no `suit`/`rank` fields — because
+ * that is the entire own-hand identity boundary (D-15, carried from Phase
+ * 4): if a helper ever needs a card's actual suit/rank to render an
+ * own-hand slot, stop, because that is exactly the leak this file exists to
+ * make structurally impossible. Teammates' face-up cards may pass a
+ * discriminated `HanabiCardView` to callers that need full identity, but
+ * this function never does.
+ *
+ * HINT-04 (D-07): the automatic clue-mark pip rows' data-derivation
+ * function and its display type were removed from this file in 06.2-04
+ * once their only consumers — the pip-row components — were deleted.
+ * `hanabi-hint-logic.ts`'s `hintDisplayFor` is their replacement (positive
+ * clues only, no ruled-out/negative information, per the owner's "Let it
+ * go" decision) — do not reintroduce a candidate/ruled-out display here or
+ * anywhere else.
  */
 
 export type CardFacts = HanabiCardView["facts"];
@@ -35,49 +43,6 @@ export function luminosityStepFor(facts: CardFacts): LuminosityStep {
     return "touched";
   }
   return "unclued";
-}
-
-export interface CandidateDisplay {
-  suits: Array<{ suit: Suit; possible: boolean }>;
-  ranks: Array<{ rank: Rank; possible: boolean }>;
-  confirmedSuit: Suit | null;
-  confirmedRank: Rank | null;
-  positiveMarks: Array<{ type: "color"; suit: Suit } | { type: "rank"; rank: Rank }>;
-}
-
-/** D-12: lists exactly the variant's suits (so Rainbow shows rainbow, Black
- * shows black) and ranks 1-5, each flagged possible/ruled-out, plus the
- * confirmed suit/rank only once narrowed to exactly one candidate. */
-export function candidateDisplayFor(facts: CardFacts, variant: Variant): CandidateDisplay {
-  const config = variantConfig(variant);
-
-  const suits = config.suits.map((suit) => ({
-    suit,
-    possible: facts.possibleSuits.includes(suit),
-  }));
-
-  const ranks = RANKS.map((rank) => ({
-    rank,
-    possible: facts.possibleRanks.includes(rank),
-  }));
-
-  const confirmedSuit = facts.possibleSuits.length === 1 ? (facts.possibleSuits[0] ?? null) : null;
-  const confirmedRank = facts.possibleRanks.length === 1 ? (facts.possibleRanks[0] ?? null) : null;
-
-  const positiveMarks: CandidateDisplay["positiveMarks"] = [];
-  const seen = new Set<string>();
-  for (const clue of facts.positiveClues) {
-    const mark =
-      clue.type === "color"
-        ? ({ type: "color", suit: clue.value as Suit } as const)
-        : ({ type: "rank", rank: clue.value as Rank } as const);
-    const key = `${mark.type}:${mark.type === "color" ? mark.suit : mark.rank}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    positiveMarks.push(mark);
-  }
-
-  return { suits, ranks, confirmedSuit, confirmedRank, positiveMarks };
 }
 
 /** D-14: the touched-card ids of the last clue entry at or after `sinceIndex`
