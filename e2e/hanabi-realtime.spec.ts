@@ -7,6 +7,7 @@ import {
   freezePage,
   joinAs,
   OTHER_HAND_SELECTOR,
+  OWN_HAND_SLOT_SELECTOR,
   resumePage,
   seatIdOfOtherPlayer,
   startTwoPlayerGame,
@@ -144,7 +145,7 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     const otherHandTestIdBefore = await untouchedPage.locator(OTHER_HAND_SELECTOR).first().getAttribute("data-testid");
     expect(otherHandTestIdBefore).toMatch(/^other-hand-/);
     const reloadingSeatId = otherHandTestIdBefore!.replace(/^other-hand-/, "");
-    const ownHandSlotCountBefore = await reloadingPage.locator('[data-testid^="own-hand-slot-"]').count();
+    const ownHandSlotCountBefore = await reloadingPage.locator(OWN_HAND_SLOT_SELECTOR).count();
     const ownHandTextBefore = ((await reloadingPage.getByTestId("own-hand").textContent()) ?? "").trim();
     const clueTokensBefore = ((await reloadingPage.getByTestId("clue-tokens").textContent()) ?? "").trim();
     const deckCountBefore = ((await reloadingPage.getByTestId("deck-count").textContent()) ?? "").trim();
@@ -177,7 +178,7 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     );
     await expect(untouchedPage.locator(OTHER_HAND_SELECTOR)).toHaveCount(1);
     await expect(untouchedPage.locator(OTHER_HAND_SELECTOR)).toHaveAttribute("data-testid", otherHandTestIdBefore!);
-    await expect(reloadingPage.locator('[data-testid^="own-hand-slot-"]')).toHaveCount(ownHandSlotCountBefore);
+    await expect(reloadingPage.locator(OWN_HAND_SLOT_SELECTOR)).toHaveCount(ownHandSlotCountBefore);
     await expect(reloadingPage.getByTestId("own-hand")).toHaveText(ownHandTextBefore);
     await expect(reloadingPage.getByTestId("clue-tokens")).toHaveText(clueTokensBefore);
     await expect(reloadingPage.getByTestId("deck-count")).toHaveText(deckCountBefore);
@@ -248,14 +249,14 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
       activePage.locator(`[data-testid="other-hand-${targetSeat}"] [data-luminosity]:not([data-luminosity="unclued"])`),
     ).toHaveCount(touchedCount);
     await expect(
-      passivePage.locator('[data-testid^="own-hand-slot-"]:not([data-luminosity="unclued"])'),
+      passivePage.locator(`${OWN_HAND_SLOT_SELECTOR}:not([data-luminosity="unclued"])`),
     ).toHaveCount(touchedCount);
 
     // The transient highlight clears after CLUE_HIGHLIGHT_MS while the
     // persistent marks remain.
     await expect(passivePage.locator('[data-just-clued="true"]')).toHaveCount(0, { timeout: 5000 });
     await expect(
-      passivePage.locator('[data-testid^="own-hand-slot-"]:not([data-luminosity="unclued"])'),
+      passivePage.locator(`${OWN_HAND_SLOT_SELECTOR}:not([data-luminosity="unclued"])`),
     ).toHaveCount(touchedCount);
 
     // UI-02 after: the active marker has moved to the target.
@@ -267,7 +268,7 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     // Refresh persistence (D-14): the target's own-hand luminosity survives
     // a reload with no transient replay.
     const before = await passivePage
-      .locator('[data-testid^="own-hand-slot-"]')
+      .locator(OWN_HAND_SLOT_SELECTOR)
       .evaluateAll((els) => els.map((el) => el.getAttribute("data-luminosity")));
 
     await passivePage.reload();
@@ -278,12 +279,12 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     await expect
       .poll(() =>
         passivePage
-          .locator('[data-testid^="own-hand-slot-"]')
+          .locator(OWN_HAND_SLOT_SELECTOR)
           .evaluateAll((els) => els.map((el) => el.getAttribute("data-luminosity"))),
       )
       .toEqual(before);
     await expect(
-      passivePage.locator('[data-testid^="own-hand-slot-"]:not([data-luminosity="unclued"])'),
+      passivePage.locator(`${OWN_HAND_SLOT_SELECTOR}:not([data-luminosity="unclued"])`),
     ).toHaveCount(touchedCount);
     await expect(passivePage.locator('[data-just-clued="true"]')).toHaveCount(0);
 
@@ -310,7 +311,7 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     // highlight on them must still clear. Before the CR-01 fix, this second
     // frame cancelled the clear timer and the highlight stuck until the next
     // clue. If every card was clued, discarding one still leaves the others.
-    const unclued = passivePage.locator('[data-testid^="own-hand-slot-"][data-just-clued="false"]');
+    const unclued = passivePage.locator(`${OWN_HAND_SLOT_SELECTOR}[data-just-clued="false"]`);
     const slot = (await unclued.count()) > 0 ? unclued.first() : passivePage.getByTestId("own-hand-slot-1");
     await slot.click();
     await expect(slot).toHaveAttribute("data-selected", "true");
@@ -365,7 +366,7 @@ test.describe("Phase 5 reconnect hardening (RT-04 + RT-06 + D-14)", () => {
 
     const droppingClueTokensBefore = ((await droppingPage.getByTestId("clue-tokens").textContent()) ?? "").trim();
     const droppingDeckCountBefore = ((await droppingPage.getByTestId("deck-count").textContent()) ?? "").trim();
-    const droppingOwnHandSlotCountBefore = await droppingPage.locator('[data-testid^="own-hand-slot-"]').count();
+    const droppingOwnHandSlotCountBefore = await droppingPage.locator(OWN_HAND_SLOT_SELECTOR).count();
 
     await droppingContext.setOffline(true);
 
@@ -391,7 +392,7 @@ test.describe("Phase 5 reconnect hardening (RT-04 + RT-06 + D-14)", () => {
     await expect(droppingPage.getByTestId("turn-indicator")).toHaveText("Your turn");
     await expect(droppingPage.getByTestId("clue-tokens")).toHaveText(droppingClueTokensBefore);
     await expect(droppingPage.getByTestId("deck-count")).toHaveText(droppingDeckCountBefore);
-    await expect(droppingPage.locator('[data-testid^="own-hand-slot-"]')).toHaveCount(droppingOwnHandSlotCountBefore);
+    await expect(droppingPage.locator(OWN_HAND_SLOT_SELECTOR)).toHaveCount(droppingOwnHandSlotCountBefore);
 
     await expect(observer.getByTestId(`seat-status-${droppedSeatId}`)).toHaveAttribute("data-connected", "true");
     await expect(observer.getByTestId(`seat-status-${droppedSeatId}`)).toContainText("Connected");

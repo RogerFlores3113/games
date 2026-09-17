@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { OTHER_HAND_SELECTOR, createRoom, expectSeatCount, joinAs, seatIdOfOtherPlayer, startTwoPlayerGame } from "./helpers";
+import {
+  OTHER_HAND_SELECTOR,
+  OWN_HAND_SLOT_SELECTOR,
+  createRoom,
+  expectSeatCount,
+  joinAs,
+  seatIdOfOtherPlayer,
+  startTwoPlayerGame,
+} from "./helpers";
 
 function selfSeatRow(page: import("@playwright/test").Page) {
   return page.getByTestId("seat-row").and(page.locator('[data-self="true"]'));
@@ -103,7 +111,7 @@ test.describe("seat takeover — the RT-07 adversary (RT-07 + D-05 + D-08)", () 
 
     // Observer = hostPage; the seat under test is pageB's.
     const bSeatId = await seatIdOfOtherPlayer(hostPage);
-    const pageBOwnHandSlotCountBefore = await pageB.locator('[data-testid^="own-hand-slot-"]').count();
+    const pageBOwnHandSlotCountBefore = await pageB.locator(OWN_HAND_SLOT_SELECTOR).count();
     const pageBTurnIndicatorBefore = ((await pageB.getByTestId("turn-indicator").textContent()) ?? "").trim();
     await expect(hostPage.locator(OTHER_HAND_SELECTOR)).toHaveCount(1);
 
@@ -125,7 +133,7 @@ test.describe("seat takeover — the RT-07 adversary (RT-07 + D-05 + D-08)", () 
 
     await expect(pageB.getByTestId("own-hand")).toBeVisible({ timeout: 15_000 });
     await expect(pageB.getByText("This room was opened in another tab.")).toHaveCount(0);
-    await expect(pageB.locator('[data-testid^="own-hand-slot-"]')).toHaveCount(pageBOwnHandSlotCountBefore);
+    await expect(pageB.locator(OWN_HAND_SLOT_SELECTOR)).toHaveCount(pageBOwnHandSlotCountBefore);
 
     await expect(pageB2.getByText("This room was opened in another tab.")).toBeVisible();
     await expect(pageB2.getByTestId("use-this-tab-button")).toBeVisible();

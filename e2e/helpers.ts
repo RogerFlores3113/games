@@ -68,6 +68,20 @@ export async function expectSeatCount(page: Page, n: number): Promise<void> {
 export const OTHER_HAND_SELECTOR = '[data-testid^="other-hand-"]:not([data-testid^="other-hand-card-"])';
 
 /**
+ * Matches a rendered own-hand card slot (`own-hand-slot-{n}`) but NOT the
+ * hint overlay nested inside it (`own-hand-slot-{n}-hints`, added in
+ * 06.2-04 when hints moved onto the tile), which also starts with the bare
+ * `own-hand-slot-` prefix. The overlay carries no `data-luminosity`, so a
+ * bare-prefix `:not([data-luminosity="unclued"])` locator silently counts
+ * it as a marked slot; it is also conditionally rendered (it disappears
+ * when the card has no positive clues, or when "keep hints visible" is off
+ * and the next player has acted), so a bare-prefix slot COUNT drifts with
+ * hint visibility rather than with the hand. Same shape as
+ * `OTHER_HAND_SELECTOR` above, for the same reason.
+ */
+export const OWN_HAND_SLOT_SELECTOR = '[data-testid^="own-hand-slot-"]:not([data-testid$="-hints"])';
+
+/**
  * Reads the seatId of the sole other player rendered on `observer`'s board,
  * by stripping the `other-hand-` prefix off the first matching container's
  * testid. The board never renders the viewer's own seatId (D-14/RT-03
