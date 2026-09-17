@@ -81,9 +81,9 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **ART-02**: The table sits on a static city-at-night background image that does not reduce card legibility
 - [ ] **NOTE-01**: Clue marks a card has received are shown above the card rather than on its face
 - [ ] **NOTE-02**: A player can type free-text notes on each card in their own hand; the automatic positive/negative clue tracking (UI-05) remains
-- [ ] **HAND-01**: A player can reorder their own hand by clicking and dragging, and every player sees the new order (server-authoritative, survives refresh)
+- [x] **HAND-01**: A player can reorder their own hand by clicking and dragging, and every player sees the new order (server-authoritative, survives refresh)
 - [ ] **HAND-02**: Dragging an own card to the center plays it and dragging it to a discard zone discards it, with the existing buttons kept as a keyboard fallback
-- [ ] **HAND-03**: A newly drawn card takes the hand slot of the card that was played or discarded, rather than joining the end of the hand
+- [x] **HAND-03**: A newly drawn card takes the hand slot of the card that was played or discarded, rather than joining the end of the hand
 - [ ] **AUD-01**: Simple audio cues play for a clue, a play, a discard, a lost fuse, and a completed stack of five
 
 ### Foundation
@@ -197,9 +197,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ART-02 | Phase 6.1 | Pending |
 | NOTE-01 | Phase 6.1 | Pending |
 | NOTE-02 | Phase 6.1 | Pending |
-| HAND-01 | Phase 6.1 | Pending |
+| HAND-01 | Phase 6.1 | Complete |
 | HAND-02 | Phase 6.1 | Pending |
-| HAND-03 | Phase 6.1 | Pending |
+| HAND-03 | Phase 6.1 | Complete |
 | AUD-01 | Phase 6.1 | Pending |
 
 **Coverage:**

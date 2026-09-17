@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 6.1 UI-SPEC approved
-last_updated: "2026-09-17T07:40:52.721Z"
-last_activity: 2026-09-17 -- Phase 06.1 planning complete
+stopped_at: Completed 06.1-01-PLAN.md
+last_updated: "2026-09-17T07:48:34.743Z"
+last_activity: 2026-09-17
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 59
-  completed_plans: 44
+  completed_plans: 45
   percent: 75
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-01)
 
 **Core value:** A friend clicks a link and is playing Hanabi within seconds — and the game does not break, stall, or lose their seat for the next 25 minutes.
-**Current focus:** Phase 6.1 — table polish (firework art, notes, drag, audio)
+**Current focus:** Phase 06.1 — table-polish-firework-art-notes-drag-audio
 
 ## Current Position
 
-Phase: 6.1
-Plan: Not started
+Phase: 06.1 (table-polish-firework-art-notes-drag-audio) — EXECUTING
+Plan: 2 of 15
 Status: Ready to execute
-Last activity: 2026-09-17 -- Phase 06.1 planning complete
+Last activity: 2026-09-17
 
-Progress: [██████████] 100%
+Progress: [████████░░] 76%
 
 ## Performance Metrics
 
@@ -101,6 +101,7 @@ Progress: [██████████] 100%
 | Phase 06 P05 | 65min | 2 tasks | 6 files |
 | Phase 06 P06 | 70min | 2 tasks | 8 files |
 | Phase 06 P07 | 10min | 3 tasks | 2 files |
+| Phase 06.1 P01 | 40min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -200,6 +201,7 @@ Recent decisions affecting current work:
 - [Phase ?]: 06-06: HanabiBoard/Table/Hand/CardActions/CluePicker spacing tightened (space-md/lg -> space-xs/sm/3px) to fit a 5-player board in 1280x720 with no scroll; button touch-target minimums untouched
 - [Phase 06-07]: Phase 6 owner sign-off approved as a working first pass; requested changes (fireworks tile art, notes-above-card plus player note box, drag rearrange/play/discard, discard-slot replenishment, audio cues, city-at-night background) scoped to a new inserted Phase 6.1, not a Phase 6 gap
 - [Phase 06-07]: RT-04 real-phone check remains deferred; owner's Phase 6 sign-off reply did not address it, recorded as 'owner did not state' rather than run or waived
+- [Phase ?]: 06.1-01: reorder is not logged to history (D-18); canReorder gates only on game_over, deliberately skipping isActorsTurn (D-17: reorder legal anytime, including off-turn)
 
 ### Pending Todos
 
@@ -220,6 +222,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T07:08:21.353Z
-Stopped at: Phase 6.1 UI-SPEC approved
-Resume file: .planning/phases/06.1-table-polish-firework-art-notes-drag-audio/06.1-UI-SPEC.md
+Last session: 2026-09-17T07:48:34.735Z
+Stopped at: Completed 06.1-01-PLAN.md
+Resume file: None
