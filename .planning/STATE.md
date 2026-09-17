@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 5
+current_plan: 6
 status: executing
-stopped_at: Completed 06.2-04-PLAN.md
-last_updated: "2026-09-17T21:46:40.782Z"
+stopped_at: Completed 06.2-06-PLAN.md
+last_updated: "2026-09-17T22:00:49.523Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 70
-  completed_plans: 64
+  completed_plans: 65
   percent: 78
 ---
 
@@ -27,13 +27,13 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 06.2
-Plan: 5 of 11
-Current Plan: 5
+Plan: 6 of 11
+Current Plan: 6
 Total Plans in Phase: 11
 Status: Ready to execute
 Last activity: 2026-09-17
 
-Progress: [█████████░] 91%
+Progress: [█████████░] 93%
 
 ## Performance Metrics
 
@@ -125,6 +125,7 @@ Progress: [█████████░] 91%
 | Phase 06.2 P03 | 3min | 2 tasks | 5 files |
 | Phase 06.2 P04 | 40min | 3 tasks | 13 files |
 | Phase 06.2 P05 | 25min | 3 tasks | 6 files |
+| Phase 06.2 P06 | 30min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -262,6 +263,9 @@ Recent decisions affecting current work:
 - [Phase 06.2-04]: Tile box-shadow composes the existing luminosity frame boxShadow with a fixed color-tile-shadow drop-shadow via comma join, rather than replacing it
 - [Phase 06.2-04]: hintsVisible/tileColor are optional props defaulting to true/slate so HanabiBoard.tsx compiles before 06.2-05 wires the real toggle and picker
 - [Phase ?]: 06.2-05: TokenColumn disc-size clamp is one-sided (Math.min against a max) so tokenPitchPx's exact budget-fill invariant can never be broken by the clamp
+- [Phase ?]: NOTE_MAX_LENGTH raised 20 -> 40 (D-10), note box always visible
+- [Phase ?]: hintsVisible widened from boolean to ReadonlySet<string> on OwnHand/TeammateHand props for genuine per-card D-05 turn-based lifetime
+- [Phase ?]: keep-hints toggle + TileColorPicker grouped with AudioControls in one tight-gap wrapper to limit controls-row width growth
 
 ### Pending Todos
 
@@ -271,6 +275,7 @@ Recent decisions affecting current work:
 - Phase 6 needs original design work at plan time: no existing implementation combines luminosity-as-signal theming with colorblind-safe rendering.
 - Plan 01-09 checkpoint left D-08 (second-tab supersede) and ROOM-07/D-14 (in-progress refusal screen) without browser-level manual verification — flagged as must-cover Playwright scenarios for Plan 01-10
 - RT-04 real-phone 10+ minute background check is deferred (owner-waived 2026-09-16); re-run docs/manual-checks/mobile-background.md once Phase 6/7 UI is finalized
+- e2e/start-game.spec.ts UI-11 pre-existing 5px viewport overflow, unrelated to 06.2-06 (see .planning/phases/06.2-board-redesign-hint-display-tile-styling-board-layout-tokens/deferred-items.md); needs 06.2-07 attention
 
 ## Deferred Items
 
@@ -282,6 +287,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T21:43:42.472Z
-Stopped at: Completed 06.2-04-PLAN.md
+Last session: 2026-09-17T22:00:49.515Z
+Stopped at: Completed 06.2-06-PLAN.md
 Resume file: None
