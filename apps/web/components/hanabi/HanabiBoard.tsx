@@ -16,6 +16,7 @@ import {
   touchedCardIdsFromLatestClue,
   type ActionContext,
 } from "../../lib/hanabi-visual-logic";
+import { applyPendingOrder, dropZoneStatus } from "../../lib/hanabi-drag-logic";
 import { OwnHand, TeammateHand } from "./Hand";
 import { Table } from "./Table";
 import { CardActions } from "./CardActions";
@@ -24,11 +25,13 @@ import { EndOverlay } from "./EndOverlay";
 import { ReconnectingBanner } from "../ReconnectingBanner";
 import { AudioControls } from "./AudioControls";
 import { useHanabiAudio } from "./useHanabiAudio";
+import { useHandDrag } from "./useHandDrag";
 
 export type HanabiActionRequest =
   | { type: "play"; cardId: string }
   | { type: "discard"; cardId: string }
-  | { type: "clue"; targetSeatId: string; clue: Clue };
+  | { type: "clue"; targetSeatId: string; clue: Clue }
+  | { type: "reorder"; cardIds: string[] };
 
 export interface HanabiBoardProps {
   view: RoomView;
@@ -156,6 +159,12 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
     onAction(request);
   }
 
+  // Constructed above the early return (and `useHandDrag` called
+  // unconditionally right after it) so the hook order never changes between
+  // a null and a present `game` render.
+  const ctx: ActionContext = { reconnecting, ended, labelFor };
+  const drag = useHandDrag({ game, ctx, onDropRequest: act });
+
   if (!game) {
     return (
       <main
@@ -184,7 +193,6 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
     );
   }
 
-  const ctx: ActionContext = { reconnecting, ended, labelFor };
   const controlsDisabled = reconnecting || ended;
   const teammates = teammatesInTurnOrder(
     game.otherHands,
@@ -195,6 +203,17 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
   const previewIds = new Set<string>(
     clueTarget && activeClueValue ? clueTouchIdsForTarget(game, clueTarget, activeClueValue) : [],
   );
+
+  // D-16: only computed while a drag is in flight, so Table never carries
+  // drop-zone highlight/reason styling outside an active drag.
+  const dropStatus =
+    drag.dragState !== null
+      ? {
+          play: dropZoneStatus(game, "play", drag.dragState.cardId, ctx),
+          discard: dropZoneStatus(game, "discard", drag.dragState.cardId, ctx),
+          hovered: drag.dragState.target.kind,
+        }
+      : null;
 
   function handleGiveClue() {
     if (!clueTarget || !clueValue) return;
@@ -228,12 +247,17 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
       </div>
 
       <div className="flex min-h-0 flex-1 justify-center">
-        <Table game={game} />
+        <Table
+          game={game}
+          playZoneRef={drag.playZoneRef}
+          discardZoneRef={drag.discardZoneRef}
+          dropStatus={dropStatus}
+        />
       </div>
 
       <div className="flex flex-none flex-wrap items-start justify-center gap-[length:var(--space-md)]">
         <OwnHand
-          cards={game.yourHand}
+          cards={applyPendingOrder(game.yourHand, drag.pendingOrder)}
           variant={game.variant}
           roomCode={view.code}
           youSeatId={view.youSeatId}
@@ -244,6 +268,11 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
           justCluedIds={justCluedIds}
           disabled={controlsDisabled}
           onSelectCard={(cardId) => setSelectedCardId(cardId)}
+          draggingCardId={drag.dragState?.cardId ?? null}
+          dragOffset={drag.dragState?.offset ?? null}
+          onCardPointerDown={drag.onCardPointerDown}
+          registerSlot={drag.registerSlot}
+          consumeClickSuppression={drag.consumeClickSuppression}
         />
 
         <CardActions

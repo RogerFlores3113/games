@@ -108,6 +108,34 @@ export function dropZoneStatus(
   return { enabled: reason === null, reason };
 }
 
+/** D-22: applies a pending optimistic order to `cards` without waiting for
+ * the server's confirmed order. `pendingIds` must be an exact permutation of
+ * `cards`' own ids (same length, every id present) — any mismatch (a stale
+ * pending order from a card that has since been played/discarded/drawn, or
+ * an id typo) returns `cards` unchanged rather than dropping/duplicating a
+ * card. A `null` pendingIds also returns `cards` unchanged. */
+export function applyPendingOrder<T extends { id: string }>(
+  cards: T[],
+  pendingIds: readonly string[] | null,
+): T[] {
+  if (pendingIds === null) {
+    return cards;
+  }
+  if (pendingIds.length !== cards.length) {
+    return cards;
+  }
+  const byId = new Map(cards.map((card) => [card.id, card]));
+  const result: T[] = [];
+  for (const id of pendingIds) {
+    const card = byId.get(id);
+    if (card === undefined) {
+      return cards;
+    }
+    result.push(card);
+  }
+  return result;
+}
+
 /** Resolves a completed drop into the request to send, or `null` when the
  * drop should be a no-op (unchanged reorder, disabled zone, "none" target,
  * or reconnecting/ended for a reorder). */

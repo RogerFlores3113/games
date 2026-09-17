@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { HanabiView } from "@games/rules";
 import {
   DRAG_THRESHOLD_PX,
+  applyPendingOrder,
   dropZoneStatus,
   exceedsDragThreshold,
   reorderedCardIds,
@@ -140,6 +141,30 @@ describe("dropZoneStatus", () => {
     const view = baseView({ isYourTurn: true, clueTokens: 4 });
     const status = dropZoneStatus(view, "discard", "a1", ctxFor());
     expect(status).toEqual({ enabled: true, reason: null });
+  });
+});
+
+describe("applyPendingOrder", () => {
+  const cards = [{ id: "a" }, { id: "b" }, { id: "c" }];
+
+  it("reorders cards into the pending id order, returning the same objects", () => {
+    const result = applyPendingOrder(cards, ["c", "a", "b"]);
+    expect(result.map((c) => c.id)).toEqual(["c", "a", "b"]);
+    expect(result[0]).toBe(cards[2]);
+    expect(result[1]).toBe(cards[0]);
+    expect(result[2]).toBe(cards[1]);
+  });
+
+  it("returns cards unchanged when pendingIds is null", () => {
+    expect(applyPendingOrder(cards, null)).toBe(cards);
+  });
+
+  it("returns cards unchanged when pendingIds has a different length", () => {
+    expect(applyPendingOrder(cards, ["a", "b"])).toBe(cards);
+  });
+
+  it("returns cards unchanged when pendingIds contains an unknown id", () => {
+    expect(applyPendingOrder(cards, ["a", "b", "z"])).toBe(cards);
   });
 });
 

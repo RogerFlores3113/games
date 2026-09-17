@@ -1,19 +1,41 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties, RefObject } from "react";
 import { Layers } from "lucide-react";
 import type { HanabiView, Suit } from "@games/rules";
 import { MAX_FUSES, RANKS } from "@games/rules";
 import { fusesRemainingForView } from "../../lib/hanabi-board-logic";
 import { deckCountText, newlyCompletedStacks, STACK_FLASH_MS } from "../../lib/hanabi-visual-logic";
 import { groupDiscardsBySuit, readDiscardViewPref, writeDiscardViewPref, type DiscardView } from "../../lib/hanabi-discard-logic";
+import type { DropTarget, DropZoneStatus } from "../../lib/hanabi-drag-logic";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
 import { DiscardOverlay } from "./DiscardOverlay";
 import { FireworkCardFace } from "./FireworkCard";
 import { SuitGlyph } from "./SuitGlyph";
 
+export interface TableDropStatus {
+  play: DropZoneStatus;
+  discard: DropZoneStatus;
+  hovered: DropTarget["kind"];
+}
+
 export interface TableProps {
   game: HanabiView;
+  playZoneRef?: RefObject<HTMLDivElement | null>;
+  discardZoneRef?: RefObject<HTMLDivElement | null>;
+  dropStatus?: TableDropStatus | null;
+}
+
+/** D-16: a drop-zone's box-shadow highlight (enabled zones only — a
+ * disabled zone gets its reason label instead, never a glow implying it
+ * will accept the drop). Stronger while the pointer is over this exact
+ * zone. Adds no flow height — box-shadow paints outside layout. */
+function dropZoneHighlightStyle(status: DropZoneStatus | undefined, hovered: boolean): CSSProperties {
+  if (!status || !status.enabled) return {};
+  return {
+    boxShadow: hovered ? "0 0 0 4px var(--color-card-glow)" : "0 0 0 2px var(--color-card-glow)",
+  };
 }
 
 /**
@@ -22,7 +44,7 @@ export interface TableProps {
  * reaches rank 5 gets a single 600ms flash, never a continuously-running
  * animation.
  */
-export function Table({ game }: TableProps) {
+export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: TableProps) {
   const prevStacksRef = useRef<HanabiView["stacks"] | null>(null);
   const [flashingSuits, setFlashingSuits] = useState<ReadonlySet<Suit>>(new Set());
   const flashClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -78,6 +100,11 @@ export function Table({ game }: TableProps) {
   const fusesUsed = MAX_FUSES - fusesRemaining;
   const discardGroups = groupDiscardsBySuit(game.discard, game.variant).filter((group) => group.total > 0);
 
+  const playHighlight = dropZoneHighlightStyle(dropStatus?.play, dropStatus?.hovered === "play");
+  const discardHighlight = dropZoneHighlightStyle(dropStatus?.discard, dropStatus?.hovered === "discard");
+  const playDropState = dropStatus ? (dropStatus.play.enabled ? "enabled" : "disabled") : undefined;
+  const discardDropState = dropStatus ? (dropStatus.discard.enabled ? "enabled" : "disabled") : undefined;
+
   return (
     <section
       data-testid="tableau"
@@ -93,7 +120,32 @@ export function Table({ game }: TableProps) {
           >
             Fireworks
           </span>
-          <div className="flex flex-wrap gap-[length:var(--space-sm)]">
+          <div
+            ref={playZoneRef}
+            data-testid="play-zone"
+            data-drop-state={playDropState}
+            className="relative flex flex-wrap gap-[length:var(--space-sm)] rounded-md"
+            style={playHighlight}
+          >
+            {dropStatus && !dropStatus.play.enabled && dropStatus.play.reason && (
+              <span
+                data-testid="drop-reason-play"
+                role="status"
+                className="pointer-events-none absolute z-10 whitespace-nowrap rounded px-[length:var(--space-xs)] text-[length:var(--text-label)]"
+                style={{
+                  bottom: "100%",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  marginBottom: 4,
+                  color: "var(--color-text-muted)",
+                  backgroundColor: "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
+                  lineHeight: "var(--text-label--line-height)",
+                }}
+              >
+                {dropStatus.play.reason}
+              </span>
+            )}
             {game.stacks.map((stack) => {
               const complete = stack.topRank === 5;
               const flashing = flashingSuits.has(stack.suit);
@@ -203,11 +255,33 @@ export function Table({ game }: TableProps) {
         </p>
 
         <div
+          ref={discardZoneRef}
           data-testid="discard-pile"
           data-discard-count={game.discard.length}
           data-view={view}
-          className="flex flex-col gap-[length:var(--space-xs)]"
+          data-drop-state={discardDropState}
+          className="relative flex flex-col gap-[length:var(--space-xs)] rounded-md"
+          style={discardHighlight}
         >
+          {dropStatus && !dropStatus.discard.enabled && dropStatus.discard.reason && (
+            <span
+              data-testid="drop-reason-discard"
+              role="status"
+              className="pointer-events-none absolute z-10 whitespace-nowrap rounded px-[length:var(--space-xs)] text-[length:var(--text-label)]"
+              style={{
+                bottom: "100%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                marginBottom: 4,
+                color: "var(--color-text-muted)",
+                backgroundColor: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                lineHeight: "var(--text-label--line-height)",
+              }}
+            >
+              {dropStatus.discard.reason}
+            </span>
+          )}
           <div className="flex items-center gap-[length:var(--space-xs)]">
             <span
               className="text-[length:var(--text-label)] font-semibold"
