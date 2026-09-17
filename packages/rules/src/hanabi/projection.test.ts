@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Variant } from "../adapter";
+import { hanabiGame } from "./adapter";
 import { dealInitialHands } from "./deck";
 import { toHanabiPlayerView } from "./projection";
 import { variantConfig } from "./variant";
@@ -139,6 +140,96 @@ describe("toHanabiPlayerView", () => {
     }
     expect(handsChecked).toBe(state.seatIds.length);
     expect(cardsChecked).toBeGreaterThan(0);
+  });
+
+  describe("reorder projection", () => {
+    it("a NON-active seat's reversed reorder is reflected in the actor's own view and every other seat's view, in submitted order", () => {
+      const state = buildState("base");
+      const actorSeatId = state.seatIds[0]!; // active seat (turnIndex 0)
+      const reorderSeatId = state.seatIds[1]!; // deliberately NOT the active seat
+      expect(reorderSeatId).not.toBe(actorSeatId);
+
+      const reorderHand = state.hands.find((h) => h.seatId === reorderSeatId)!;
+      const originalIds = reorderHand.slots.map((s) => s.card.id);
+      const reversedIds = [...originalIds].reverse();
+      const originalCardsById = new Map(reorderHand.slots.map((s) => [s.card.id, s.card]));
+
+      const result = hanabiGame.applyAction(state, reorderSeatId, {
+        type: "reorder",
+        cardIds: reversedIds,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      // The reordering seat's own view: yourHand lists the reversed ids, all
+      // hidden, with structurally no suit/rank key (D-07/D-15 still hold).
+      const ownView = toHanabiPlayerView(result.state, reorderSeatId);
+      expect(ownView.yourHand.map((c) => c.id)).toEqual(reversedIds);
+      for (const card of ownView.yourHand) {
+        expect(card.hidden).toBe(true);
+        expect("suit" in card).toBe(false);
+        expect("rank" in card).toBe(false);
+      }
+
+      // Every OTHER seat's view carries the same submitted order, with full
+      // identity matching the pre-reorder cards (D-22: order is information,
+      // identity is unchanged by a reorder).
+      for (const observerSeatId of result.state.seatIds) {
+        if (observerSeatId === reorderSeatId) continue;
+        const observerView = toHanabiPlayerView(result.state, observerSeatId);
+        const reorderedEntry = observerView.otherHands.find((h) => h.seatId === reorderSeatId)!;
+        expect(reorderedEntry.cards.map((c) => c.id)).toEqual(reversedIds);
+        for (const card of reorderedEntry.cards) {
+          expect(card.hidden).toBe(false);
+          const originalCard = originalCardsById.get(card.id)!;
+          if (!card.hidden) {
+            expect(card.suit).toBe(originalCard.suit);
+            expect(card.rank).toBe(originalCard.rank);
+          }
+        }
+      }
+    });
+
+    it("a slot-preserving discard by the active seat shows the drawn card at the vacated index in every observer's view", () => {
+      const state = buildState("base");
+      const actorSeatId = state.seatIds[0]!;
+      // clueTokens starts at MAX (8) in buildState, so spend one via a clue
+      // first to make discard legal.
+      const targetSeatId = state.seatIds[1]!;
+      const targetCard = state.hands.find((h) => h.seatId === targetSeatId)!.slots[0]!.card;
+      const afterClue = hanabiGame.applyAction(state, actorSeatId, {
+        type: "clue",
+        targetSeatId,
+        clue: { type: "rank", value: targetCard.rank },
+      });
+      expect(afterClue.ok).toBe(true);
+      if (!afterClue.ok) return;
+
+      const nextActorSeatId = afterClue.state.seatIds[afterClue.state.turnIndex]!;
+      const preDiscardHand = afterClue.state.hands.find((h) => h.seatId === nextActorSeatId)!;
+      const discardedCardId = preDiscardHand.slots[0]!.card.id;
+      const vacatedIndex = 0;
+
+      const afterDiscard = hanabiGame.applyAction(afterClue.state, nextActorSeatId, {
+        type: "discard",
+        cardId: discardedCardId,
+      });
+      expect(afterDiscard.ok).toBe(true);
+      if (!afterDiscard.ok) return;
+
+      const drawEntry = afterDiscard.state.history[afterDiscard.state.history.length - 1]!;
+      expect(drawEntry.type).toBe("draw");
+      if (drawEntry.type !== "draw") return;
+
+      for (const observerSeatId of afterDiscard.state.seatIds) {
+        const observerView = toHanabiPlayerView(afterDiscard.state, observerSeatId);
+        const cards =
+          observerSeatId === nextActorSeatId
+            ? observerView.yourHand
+            : observerView.otherHands.find((h) => h.seatId === nextActorSeatId)!.cards;
+        expect(cards[vacatedIndex]!.id).toBe(drawEntry.cardId);
+      }
+    });
   });
 
   it("an unseated viewer never sees more than the least-privileged seated seat", () => {

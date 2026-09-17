@@ -861,3 +861,175 @@ describe("D-10: every adapter refusal maps 1:1 onto a closed ErrorDetail", () =>
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// D-22: reorder through the room layer — actionId idempotency and the
+// status gate, proven at the room actor (not just the engine).
+// ---------------------------------------------------------------------------
+
+describe("D-22: reorder through the room layer", () => {
+  it("an off-turn seat's reorder is accepted, leaves the turn unchanged, and records lastAppliedActionId", () => {
+    const { state, hostJoin, guestJoin, thirdJoin } = startedThreeSeatRoom(
+      "0123456789abcdef0123456789abcdef",
+    );
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const offTurnSeatId = [hostJoin.seatId, guestJoin.seatId, thirdJoin.seatId].find(
+      (id) => id !== activeSeatId,
+    )!;
+    const offTurnHand = game.hands.find((h) => h.seatId === offTurnSeatId)!;
+    const reversedIds = offTurnHand.slots.map((s) => s.card.id).reverse();
+
+    const result = applyGameAction(
+      state,
+      offTurnSeatId,
+      "reorder-1",
+      { type: "reorder", cardIds: reversedIds },
+      5,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const resultGame = result.state.game as ActiveGameState;
+    expect(resultGame.turnIndex).toBe(game.turnIndex);
+    expect(resultGame.seatIds[resultGame.turnIndex]).toBe(activeSeatId);
+
+    const offTurnSeat = result.state.seats.find((s) => s.seatId === offTurnSeatId)!;
+    expect(offTurnSeat.lastAppliedActionId).toBe("reorder-1");
+
+    const reorderedHand = resultGame.hands.find((h) => h.seatId === offTurnSeatId)!;
+    expect(reorderedHand.slots.map((s) => s.card.id)).toEqual(reversedIds);
+  });
+
+  it("repeating the same actionId with a different order is deduped — not re-applied", () => {
+    const { state, hostJoin, guestJoin, thirdJoin } = startedThreeSeatRoom(
+      "0123456789abcdef0123456789abcdef",
+    );
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const offTurnSeatId = [hostJoin.seatId, guestJoin.seatId, thirdJoin.seatId].find(
+      (id) => id !== activeSeatId,
+    )!;
+    const offTurnHand = game.hands.find((h) => h.seatId === offTurnSeatId)!;
+    const originalIds = offTurnHand.slots.map((s) => s.card.id);
+    const reversedIds = [...originalIds].reverse();
+    const rotatedIds = [...originalIds.slice(1), originalIds[0]!];
+
+    const first = applyGameAction(
+      state,
+      offTurnSeatId,
+      "reorder-1",
+      { type: "reorder", cardIds: reversedIds },
+      5,
+    );
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+
+    const duplicate = applyGameAction(
+      first.state,
+      offTurnSeatId,
+      "reorder-1",
+      { type: "reorder", cardIds: rotatedIds },
+      6,
+    );
+    expect(duplicate.ok).toBe(true);
+    if (!duplicate.ok) return;
+
+    // Dedup returns the FIRST result's state unchanged — the second
+    // (different) order must never have been applied.
+    expect(duplicate.state).toEqual(first.state);
+    const dupeGame = duplicate.state.game as ActiveGameState;
+    const dupeHand = dupeGame.hands.find((h) => h.seatId === offTurnSeatId)!;
+    expect(dupeHand.slots.map((s) => s.card.id)).toEqual(reversedIds);
+  });
+
+  it("a cardIds array with a duplicate id is refused with detail card_not_in_hand", () => {
+    const { state } = startedThreeSeatRoom("0123456789abcdef0123456789abcdef");
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const offTurnSeatId = game.seatIds.find((id) => id !== activeSeatId)!;
+    const offTurnHand = game.hands.find((h) => h.seatId === offTurnSeatId)!;
+    const duplicated = [
+      offTurnHand.slots[0]!.card.id,
+      offTurnHand.slots[0]!.card.id,
+      ...offTurnHand.slots.slice(2).map((s) => s.card.id),
+    ];
+
+    const result = applyGameAction(
+      state,
+      offTurnSeatId,
+      "reorder-dup",
+      { type: "reorder", cardIds: duplicated },
+      5,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      reason: "bad_request",
+      detail: "card_not_in_hand",
+    });
+  });
+
+  it("a reorder payload with an extra key is refused with detail invalid_action", () => {
+    const { state } = startedThreeSeatRoom("0123456789abcdef0123456789abcdef");
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const offTurnSeatId = game.seatIds.find((id) => id !== activeSeatId)!;
+    const offTurnHand = game.hands.find((h) => h.seatId === offTurnSeatId)!;
+    const cardIds = offTurnHand.slots.map((s) => s.card.id);
+
+    const result = applyGameAction(
+      state,
+      offTurnSeatId,
+      "reorder-extra",
+      { type: "reorder", cardIds, extra: true },
+      5,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      reason: "bad_request",
+      detail: "invalid_action",
+    });
+  });
+
+  it("a room with status ended refuses a fresh reorder with reason bad_request", () => {
+    const minter = makeMinter();
+    let state = freshRoom();
+    const hostJoin = join(state, "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+    state = hostJoin.state;
+    const guestJoin = join(state, "Guest", 2, minter);
+    if (!guestJoin.ok) throw new Error("unreachable");
+    state = guestJoin.state;
+
+    const started = startGame(state, hostJoin.seatId, 3, "fedcba9876543210fedcba9876543210");
+    if (!started.ok) throw new Error("unreachable");
+    state = started.state;
+
+    let guard = 0;
+    while (state.status === "in_progress" && guard < 2000) {
+      guard++;
+      const game = state.game as ActiveGameState;
+      const actorSeatId = game.seatIds[game.turnIndex]!;
+      const action = legalActionFor(game);
+      const result = applyGameAction(state, actorSeatId, `action-${guard}`, action, 10 + guard);
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("unreachable");
+      state = result.state;
+    }
+    expect(state.status).toBe("ended");
+
+    const endedGame = state.game as ActiveGameState;
+    const seatId = endedGame.seatIds[0]!;
+    const hand = endedGame.hands.find((h) => h.seatId === seatId)!;
+    const cardIds = hand.slots.map((s) => s.card.id);
+
+    const result = applyGameAction(
+      state,
+      seatId,
+      "reorder-after-end",
+      { type: "reorder", cardIds },
+      guard + 100,
+    );
+    expect(result).toMatchObject({ ok: false, reason: "bad_request" });
+  });
+});
