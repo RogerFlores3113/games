@@ -242,7 +242,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 06-03-PLAN.md — Card and hand components: luminosity frame, candidate strip, teammate/own cards (facts-only own card + source scan), hand containers
-- [ ] 06-04-PLAN.md — Tableau, Play/Discard + clue picker with visible disabled reasons and hover/focus preview, end-of-game overlay
+- [x] 06-04-PLAN.md — Tableau, Play/Discard + clue picker with visible disabled reasons and hover/focus preview, end-of-game overlay
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -283,5 +283,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 3. Hanabi Rules Engine | 5/5 | Complete    | 2026-09-16 |
 | 4. Wire Engine Into Room Actor | 9/9 | Complete   | 2026-09-16 |
 | 5. Reconnect & Session Durability Hardening | 6/6 | Complete    | 2026-09-17 |
-| 6. Game Interface | 3/7 | In Progress|  |
+| 6. Game Interface | 4/7 | In Progress|  |
 | 7. Variant Support (Rainbow, Black) | 0/TBD | Not started | - |

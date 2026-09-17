@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-03-PLAN.md
-last_updated: "2026-09-17T01:59:00.463Z"
+stopped_at: Completed 06-04-PLAN.md
+last_updated: "2026-09-17T02:06:54.798Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 44
-  completed_plans: 40
+  completed_plans: 41
   percent: 71
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 6 (Game Interface) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 Last activity: 2026-09-17
 
-Progress: [█████████░] 91%
+Progress: [█████████░] 93%
 
 ## Performance Metrics
 
@@ -96,6 +96,7 @@ Progress: [█████████░] 91%
 | Phase 06 P01 | 20min | 2 tasks | 4 files |
 | Phase 06 P02 | 15min | 2 tasks tasks | 4 files files |
 | Phase 06 P03 | 25min | 3 tasks | 6 files |
+| Phase 06 P04 | 20min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -183,6 +184,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 06-02: Rainbow starburst uses 16 vertices (outer r=11/inner r=3) vs red star's 10 vertices (outer r=10/inner r=4.5) so the two glyphs are structurally distinct
 - [Phase ?]: 06-03: TeammateCard widened to 64x84 and OwnHandCard to 88x112 (within the plan's own stated ceilings) so 6-suit Rainbow/Black candidate strips fit on one line
 - [Phase ?]: 06-03: CandidateStrip destructures every suit/rank pair at each call site (never a bare .suit/.rank property access, even in comments) so the D-15 source-scan regex can never false-positive on prose
+- [Phase 06]: Table.tsx inlines luminosity-frame.ts's 'known' border/box-shadow literals for stack-complete glow rather than importing a card-frame lookup into a stack-head context
+- [Phase 06]: CluePicker's selected-target outline uses a Tailwind outline-* className, never an inline style prop, since Button.tsx spreads ...rest (including any style) after its own minHeight/minWidth style
+- [Phase 06]: EndOverlay's score line extends the preserved final-score string to include / {max} per D-20, additive to bandForView's existing contract
 
 ### Pending Todos
 
@@ -203,6 +207,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T01:59:00.451Z
-Stopped at: Completed 06-03-PLAN.md
+Last session: 2026-09-17T02:06:54.790Z
+Stopped at: Completed 06-04-PLAN.md
 Resume file: None
