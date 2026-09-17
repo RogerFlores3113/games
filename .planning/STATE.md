@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 06.1-13-PLAN.md
-last_updated: "2026-09-17T18:41:58.552Z"
+last_updated: "2026-09-17T18:45:58.986Z"
 last_activity: 2026-09-17
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 7
   total_plans: 59
   completed_plans: 59
-  percent: 88
+  percent: 78
 ---
 
 # Project State
@@ -122,6 +122,7 @@ Progress: [██████████] 100%
 ### Roadmap Evolution
 
 - Phase 6.1 inserted after Phase 6: Owner-requested table polish after Phase 6 first-pass sign-off: per-suit firework burst card art, clue marks above cards plus player-typed notes, drag reorder/play/discard with slot-preserving draws, audio cues, city-at-night background
+- Phase 06.2 inserted after Phase 6: Board redesign: 17 follow-on requests from the 06.1 owner sign-off (hints, tokens, board layout, tile styling, shared discard order) (URGENT)
 
 ### Decisions
 

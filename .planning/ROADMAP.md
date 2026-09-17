@@ -20,6 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Reconnect & Session Durability Hardening** - Exercise and harden the mobile-backgrounding and multi-tab failure modes that a manual refresh test does not surface. (completed 2026-09-16)
 - [x] **Phase 6: Game Interface** - Build the board render, persistent per-card clue memory, colorblind-safe glyphs, and dark "fireworks night" luminosity theme against the now-stable wire contract. (completed 2026-09-17)
 - [x] **Phase 6.1: Table Polish (INSERTED)** - Firework-burst card art per suit, clue marks above cards plus player notes, drag reorder/play/discard with slot-preserving draws, audio cues, and a city-at-night background. (completed 2026-09-17)
+- [ ] **Phase 06.2: Board Redesign (INSERTED)** - Hint display (clue-coloured highlight, number on the tile back, keep-hints toggle), tile styling and player colour picker, wooden board texture, labelled Play/Discard areas with token art and deck counter, drag-reorder gap preview, always-visible private note box, and a shared rearrangeable discard order. Follow-on requests from the Phase 6.1 owner sign-off.
 - [ ] **Phase 7: Variant Support (Rainbow, Black)** - Enable and test the Rainbow and Black configurations end to end, proving the variant-parametrized engine and UI built earlier need no special-casing.
 
 ## Phase Details
@@ -297,6 +298,28 @@ Plans:
 **Cross-cutting constraints:**
 
 - Phase 6 D-01: five players still fit 1280x720 without scrolling
+
+### Phase 06.2: Board Redesign: hint display, tile styling, board layout, tokens, and shared discard order (INSERTED)
+
+**Goal:** Rework the table's visual language and hint feedback so the board reads like a physical tile game, and give the discard pile a shared, player-arrangeable order.
+**Requirements**: TBD (17 owner requests recorded under "## Gaps" in .planning/phases/06.1-table-polish-firework-art-notes-drag-audio/06.1-HUMAN-UAT.md)
+**Depends on:** Phase 06.1
+**Plans:** 0 plans
+
+Scope (owner requests, 06.1 sign-off):
+- Hint display: a clue highlights the tile in that clue's colour (not a generic yellow); a number clue shows the number on the tile back; a "keep hints visible" toggle (on = hints persist past the next player's move, off = they clear).
+- Hand interaction: other tiles shift aside during a drag reorder so the drop position is clear; an always-visible faint note box above each tile that is click-to-type, autosaving, and private to its own player (replaces the current note chip).
+- Tile and board styling: tile background visually distinct from the board; wooden (or similar) board texture; player-settable tile colour via a colour picker.
+- Board layout: Play area at the top and Discard at the bottom, each with a subtle labelled outline; clue tokens (black, blue question mark) in a vertical line with fuse tokens (black, yellow explosion with orange-red rim) beside them, both on the right; spent tokens removed from the board rather than only decremented; deck counter rendered as "48 x [card back]" between Play and Discard.
+- Played stack: every firework in a stack is clearly visible, not just the top card.
+- Shared discard order: the discard shows every discarded tile, rearrangeable by any player, with the arrangement visible to everyone — the only server-side item (new action + ordering/conflict rules); everything else is client-side.
+
+Open before planning:
+- The owner still owes the new format for the remade automatic tile notes (gap item 2 is blocked on it).
+- Shared discard ordering rules need discussion: who may reorder, conflict resolution, and persistence across reconnects.
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 06.2 to break down)
 
 ### Phase 7: Variant Support (Rainbow, Black)
 
