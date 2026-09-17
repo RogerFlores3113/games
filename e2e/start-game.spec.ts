@@ -33,6 +33,29 @@ function recordGameFrames(page: Page, sink: GameFrame[]): void {
   });
 }
 
+/** Returns whichever of `hostPage`/`otherPage` currently has the active turn. */
+async function currentActivePage(hostPage: Page, otherPage: Page): Promise<Page> {
+  const hostText = ((await hostPage.getByTestId("turn-indicator").textContent()) ?? "").trim();
+  return hostText === "Your turn" ? hostPage : otherPage;
+}
+
+/** Walks up to 5 ancestors from `locator` looking for a computed solid
+ * border — a generic way to prove "this area is outlined" without coupling
+ * to which exact ancestor div carries the border style (BOARD-01). */
+async function hasBorderedAncestor(locator: Locator): Promise<boolean> {
+  return locator.evaluate((el) => {
+    let node: HTMLElement | null = el as HTMLElement;
+    for (let i = 0; i < 5 && node; i += 1) {
+      const style = getComputedStyle(node);
+      if (style.borderStyle.split(" ").some((s) => s === "solid") && parseFloat(style.borderWidth) > 0) {
+        return true;
+      }
+      node = node.parentElement;
+    }
+    return false;
+  });
+}
+
 test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () => {
   test("gating, variant lock, and the Hanabi board prove turn order and HIDE-01 redaction end to end", async ({
     page: hostPage,
@@ -447,5 +470,114 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     for (const context of contexts) {
       await context.close();
     }
+  });
+
+  test("BOARD-01..05: Play/Discard order and outline, deck placement, token column position, token counts track actions, and every played card renders", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    test.setTimeout(60_000);
+    const { contextB, pageB } = await startTwoPlayerGame(hostPage, browser);
+
+    // BOARD-01: Play above Discard, each labelled and outlined.
+    const tableau = hostPage.getByTestId("tableau");
+    await expect(tableau.getByText("Play", { exact: true })).toBeVisible();
+    await expect(tableau.getByText("Discard", { exact: true })).toBeVisible();
+    expect(await hasBorderedAncestor(hostPage.getByTestId("play-zone"))).toBe(true);
+    expect(await hasBorderedAncestor(hostPage.getByTestId("discard-pile"))).toBe(true);
+
+    const playBox = await hostPage.getByTestId("play-zone").boundingBox();
+    const deckBox = await hostPage.getByTestId("deck-count").boundingBox();
+    const discardBox = await hostPage.getByTestId("discard-pile").boundingBox();
+    if (!playBox || !deckBox || !discardBox) throw new Error("missing bounding box");
+
+    // BOARD-04: the deck counter sits between Play and Discard in document
+    // order (proven here by vertical position, since the left column is a
+    // flex-col of exactly Play/Deck/Discard) and shows the remaining count
+    // beside the tile back.
+    expect(playBox.y).toBeLessThan(deckBox.y);
+    expect(deckBox.y).toBeLessThan(discardBox.y);
+    await expect(hostPage.getByTestId("deck-count")).toHaveText(/^\d+ cards left in deck$/);
+
+    // BOARD-02: the token column sits to the right of the left (Play/Deck/
+    // Discard) column.
+    const clueTokensBox = await hostPage.getByTestId("clue-tokens").boundingBox();
+    if (!clueTokensBox) throw new Error("missing bounding box");
+    expect(clueTokensBox.x).toBeGreaterThan(playBox.x + playBox.width);
+
+    // BOARD-02/03: the clue-token element count and text track the
+    // remaining clue count, and drop by one after a clue is given.
+    const clueTokensBefore = Number(await hostPage.getByTestId("clue-tokens").getAttribute("data-count"));
+    await expect(hostPage.locator('[data-testid="clue-token"]')).toHaveCount(clueTokensBefore);
+    await expect(hostPage.getByTestId("clue-tokens")).toHaveText(`${clueTokensBefore} clues left`);
+
+    const clueGiver = await currentActivePage(hostPage, pageB);
+    await clueGiver.locator('[data-testid^="clue-target-"]').first().click();
+    const valueButtons = clueGiver.locator('[data-testid^="clue-value-"]');
+    const valueCount = await valueButtons.count();
+    let gaveClue = false;
+    for (let i = 0; i < valueCount; i += 1) {
+      const button = valueButtons.nth(i);
+      if (!(await button.isEnabled())) continue;
+      await button.click();
+      if (await clueGiver.getByTestId("give-clue-button").isEnabled()) {
+        await clueGiver.getByTestId("give-clue-button").click();
+        gaveClue = true;
+        break;
+      }
+    }
+    expect(gaveClue).toBe(true);
+
+    await expect(hostPage.getByTestId("clue-tokens")).toHaveAttribute("data-count", String(clueTokensBefore - 1));
+    await expect(hostPage.getByTestId("clue-tokens")).toHaveText(`${clueTokensBefore - 1} clues left`);
+    await expect(hostPage.locator('[data-testid="clue-token"]')).toHaveCount(clueTokensBefore - 1);
+
+    // BOARD-03/BOARD-05: playing a card always either advances a stack or
+    // misplays (burns a fuse) — a bounded number of turns reliably produces
+    // a fuse drop, and whichever stack (if any) has advanced renders every
+    // one of its cards (fanned, per PlayedStack).
+    let fuseDroppedOnce = false;
+    for (let i = 0; i < 15 && !fuseDroppedOnce; i += 1) {
+      if (await hostPage.getByTestId("end-overlay").isVisible()) break;
+      const active = await currentActivePage(hostPage, pageB);
+      const fuseBefore = Number(await hostPage.getByTestId("fuse-tokens").getAttribute("data-count"));
+
+      await active.getByTestId("own-hand-slot-1").click();
+      const playEnabled = await expect(active.getByTestId("play-button"))
+        .toBeEnabled({ timeout: 2000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!playEnabled) continue;
+      await active.getByTestId("play-button").click();
+
+      await expect
+        .poll(async () => {
+          const fuseNow = Number(await hostPage.getByTestId("fuse-tokens").getAttribute("data-count"));
+          const stillSameActive = (await currentActivePage(hostPage, pageB)) === active;
+          return fuseNow !== fuseBefore || !stillSameActive;
+        })
+        .toBe(true);
+
+      const fuseAfter = Number(await hostPage.getByTestId("fuse-tokens").getAttribute("data-count"));
+      if (fuseAfter < fuseBefore) fuseDroppedOnce = true;
+    }
+    expect(fuseDroppedOnce).toBe(true);
+
+    const stacks = await hostPage
+      .locator('[data-testid^="played-stack-"]:not([data-testid*="-card-"])')
+      .evaluateAll((els) =>
+        els.map((el) => ({
+          suit: (el.getAttribute("data-testid") ?? "").replace("played-stack-", ""),
+          rank: Number(el.getAttribute("data-top-rank") ?? "0"),
+        })),
+      );
+    const advanced = stacks.find((s) => s.rank > 0);
+    if (advanced) {
+      await expect(hostPage.locator(`[data-testid^="played-stack-${advanced.suit}-card-"]`)).toHaveCount(
+        advanced.rank,
+      );
+    }
+
+    await contextB.close();
   });
 });
