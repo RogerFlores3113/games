@@ -148,12 +148,12 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
 
   return (
     <main
-      className="flex min-h-screen flex-col gap-[length:var(--space-md)] overflow-y-auto px-[length:var(--space-md)] py-[length:var(--space-sm)]"
+      className="flex min-h-screen flex-col gap-[3px] overflow-y-auto px-[length:var(--space-md)] py-[3px]"
       style={{ backgroundColor: "var(--color-bg)" }}
     >
       {reconnecting && <ReconnectingBanner />}
 
-      <div data-testid="teammates-band" className="flex flex-none flex-wrap justify-center gap-[length:var(--space-md)]">
+      <div data-testid="teammates-band" className="flex flex-none flex-wrap justify-center gap-[length:var(--space-xs)]">
         {teammates.map((hand) => (
           <TeammateHand
             key={hand.seatId}
@@ -175,7 +175,7 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
         <Table game={game} />
       </div>
 
-      <div className="flex flex-none flex-wrap items-start justify-center gap-[length:var(--space-lg)]">
+      <div className="flex flex-none flex-wrap items-start justify-center gap-[length:var(--space-md)]">
         <OwnHand
           cards={game.yourHand}
           variant={game.variant}

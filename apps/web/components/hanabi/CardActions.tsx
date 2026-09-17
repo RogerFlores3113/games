@@ -22,8 +22,8 @@ export function CardActions({ game, selectedCardId, ctx, onPlay, onDiscard }: Ca
   const discardReason = disabledReasonFor(game, { kind: "discard", selectedCardId }, ctx);
 
   return (
-    <div className="flex flex-col items-center gap-[length:var(--space-xs)]">
-      <div className="flex gap-[length:var(--space-sm)]">
+    <div className="flex flex-col items-center gap-[3px]">
+      <div className="flex gap-[length:var(--space-xs)]">
         <div className="flex flex-col items-center gap-[length:var(--space-xs)]">
           <Button
             variant="ghost"

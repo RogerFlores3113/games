@@ -63,7 +63,7 @@ export function CluePicker({
       RANKS.some((rank) => clueTouchCountForTarget(game, clueTarget, { type: "rank", value: rank }) === 0));
 
   return (
-    <div className="flex flex-col items-center gap-[length:var(--space-sm)]">
+    <div className="flex flex-col items-center gap-[3px]">
       <span
         className="text-[length:var(--text-label)] font-semibold"
         style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}

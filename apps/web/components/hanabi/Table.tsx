@@ -45,10 +45,10 @@ export function Table({ game }: TableProps) {
     <section
       data-testid="tableau"
       aria-label="Table"
-      className="flex flex-wrap gap-[length:var(--space-md)] rounded-md border p-[length:var(--space-md)]"
+      className="flex flex-wrap gap-[length:var(--space-sm)] rounded-md border p-[length:var(--space-xs)]"
       style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
     >
-      <div className="flex flex-wrap items-center gap-[length:var(--space-lg)]">
+      <div className="flex flex-wrap items-center gap-[length:var(--space-md)]">
         <div className="flex flex-col gap-[length:var(--space-xs)]">
           <span
             className="text-[length:var(--text-label)] font-semibold"
@@ -138,7 +138,7 @@ export function Table({ game }: TableProps) {
         </div>
       </div>
 
-      <div className="flex w-full flex-wrap items-start gap-[length:var(--space-lg)]">
+      <div className="flex w-full flex-wrap items-start gap-[length:var(--space-md)]">
         <p
           data-testid="deck-count"
           data-final-round={String(game.finalTurnsRemaining !== null)}

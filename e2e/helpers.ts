@@ -117,6 +117,45 @@ export async function startTwoPlayerGame(
 }
 
 /**
+ * D-24 / UI-11: creates a room as `names[0]` (the host) and joins every
+ * further name in `names` in its own new browser context, then starts the
+ * game and waits for `own-hand` to render on every page. Generalizes
+ * `startTwoPlayerGame` to N players (2-5) for multi-player layout/viewport
+ * proofs. `pages[0]` is always `hostPage`; `contexts` holds only the joiner
+ * contexts (never the host's own context) so the caller can close them.
+ */
+export async function startGameWithPlayers(
+  hostPage: Page,
+  browser: Browser,
+  names: string[],
+  options: { variant?: Variant } = {},
+): Promise<{ code: string; pages: Page[]; contexts: BrowserContext[] }> {
+  if (names.length < 2) {
+    throw new Error("startGameWithPlayers: needs at least 2 names");
+  }
+  const [hostName, ...guestNames] = names as [string, ...string[]];
+  const code = await createRoom(hostPage, { name: hostName, variant: options.variant });
+
+  const contexts: BrowserContext[] = [];
+  const pages: Page[] = [hostPage];
+  for (const guestName of guestNames) {
+    const context = await browser.newContext();
+    contexts.push(context);
+    const page = await joinAs(context, code, guestName);
+    pages.push(page);
+  }
+
+  await expectSeatCount(hostPage, names.length);
+  await hostPage.getByTestId("start-game").click();
+
+  for (const page of pages) {
+    await expect(page.getByTestId("own-hand")).toBeVisible();
+  }
+
+  return { code, pages, contexts };
+}
+
+/**
  * D-14: redefines `document.visibilityState`/`document.hidden` and fires a
  * `visibilitychange` event, simulating a tab going to or returning from the
  * background without relying on Chromium's own (unreliable-to-drive)

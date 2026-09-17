@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createRoom, expectSeatCount, joinAs } from "./helpers";
+import { createRoom, expectSeatCount, joinAs, startGameWithPlayers, startTwoPlayerGame } from "./helpers";
 
 test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () => {
   test("gating, variant lock, and the Hanabi board prove turn order and HIDE-01 redaction end to end", async ({
@@ -43,6 +43,36 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     // Both contexts switch to the real Hanabi board.
     await expect(hostPage.getByTestId("own-hand")).toBeVisible();
     await expect(pageB.getByTestId("own-hand")).toBeVisible();
+
+    // UI-01 (D-01/D-24): the tableau and every one of its elements are in
+    // the viewport with NO interaction — checked before any click below.
+    await expect(hostPage.getByTestId("tableau")).toBeInViewport();
+    await expect(hostPage.getByTestId("clue-tokens")).toBeInViewport();
+    await expect(hostPage.getByTestId("fuse-tokens")).toBeInViewport();
+    await expect(hostPage.getByTestId("deck-count")).toBeInViewport();
+    await expect(hostPage.getByTestId("discard-pile")).toBeInViewport();
+
+    // Black variant has 6 suits (base 5 + Black) — every played stack is
+    // present, in the viewport, and carries exactly one suit glyph (UI-03/
+    // UI-06).
+    const playedStacks = hostPage.locator('[data-testid^="played-stack-"]');
+    await expect(playedStacks).toHaveCount(6);
+    const playedStackCount = await playedStacks.count();
+    for (let i = 0; i < playedStackCount; i++) {
+      const stack = playedStacks.nth(i);
+      await expect(stack).toBeInViewport();
+      await expect(stack.locator("[data-glyph]")).toHaveCount(1);
+    }
+
+    // Every teammate card carries a suit glyph via card-identity (UI-03/
+    // UI-06) — face-up by design, unlike the viewer's own hand.
+    const otherHandCards = hostPage.locator('[data-testid^="other-hand-card-"]');
+    const otherHandCardCount = await otherHandCards.count();
+    expect(otherHandCardCount).toBeGreaterThan(0);
+    for (let i = 0; i < otherHandCardCount; i++) {
+      const card = otherHandCards.nth(i);
+      await expect(card.locator('[data-testid="card-identity"] [data-glyph]')).toHaveCount(1);
+    }
 
     // Exactly one side reads "Your turn"; the other reads "Waiting for".
     const hostIndicator = hostPage.getByTestId("turn-indicator");
@@ -106,6 +136,13 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     await expect(waitingPage.getByTestId("play-button")).toBeDisabled();
     await expect(waitingPage.getByTestId("discard-button")).toBeDisabled();
 
+    // RULES-11: every disabled control shows a visible reason.
+    await expect(waitingPage.getByTestId("action-reason-play")).toHaveText("Not your turn");
+    await expect(activePage.getByTestId("action-reason-discard")).toHaveText(
+      "Clue tokens are full — you can't discard",
+    );
+    await expect(activePage.getByTestId("action-reason-play")).toHaveText("Select a card in your hand first");
+
     // Discard is disabled at the starting 8/8 clue tokens (D-12), so the
     // active player plays their first own-hand slot instead: the deck count
     // drops by one and EITHER the discard pile gains an entry (a misplay
@@ -122,6 +159,8 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     ).join("|");
 
     await activePage.getByTestId("own-hand-slot-1").click();
+    await expect(activePage.getByTestId("action-reason-play")).toHaveCount(0);
+    await expect(activePage.getByTestId("own-hand-slot-1")).toHaveAttribute("data-selected", "true");
     await expect(activePage.getByTestId("play-button")).toBeEnabled();
     await activePage.getByTestId("play-button").click();
 
@@ -141,5 +180,140 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     await expect(hostPage.getByTestId("variant-picker")).toHaveCount(0);
 
     await contextB.close();
+  });
+
+  test("UI-10: a game played to its end shows the designed end overlay (D-20/D-21)", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    test.setTimeout(240_000);
+
+    const { contextB, pageB } = await startTwoPlayerGame(hostPage, browser);
+    const otherPage = pageB;
+
+    let sawEndOverlay = false;
+    for (let i = 0; i < 80; i++) {
+      if (await hostPage.getByTestId("end-overlay").isVisible()) {
+        sawEndOverlay = true;
+        break;
+      }
+
+      // Re-derive which page is active each iteration — the active seat
+      // alternates as the game progresses.
+      const hostText = ((await hostPage.getByTestId("turn-indicator").textContent()) ?? "").trim();
+      const activePlayer = hostText === "Your turn" ? hostPage : otherPage;
+
+      await activePlayer.getByTestId("own-hand-slot-1").click();
+      const playEnabled = await activePlayer.getByTestId("play-button").isEnabled();
+      if (!playEnabled) {
+        // Selection may have been dropped (card left the hand) or the game
+        // ended between the poll above and this click; re-check the overlay
+        // before treating this as a failure.
+        if (await hostPage.getByTestId("end-overlay").isVisible()) {
+          sawEndOverlay = true;
+          break;
+        }
+        continue;
+      }
+      await activePlayer.getByTestId("play-button").click();
+
+      await expect
+        .poll(async () => {
+          if (await hostPage.getByTestId("end-overlay").isVisible()) return true;
+          const stillYourTurn = ((await activePlayer.getByTestId("turn-indicator").textContent()) ?? "") === "Your turn";
+          return !stillYourTurn;
+        })
+        .toBe(true);
+    }
+
+    if (!sawEndOverlay) {
+      sawEndOverlay = await hostPage.getByTestId("end-overlay").isVisible();
+    }
+    if (!sawEndOverlay) {
+      throw new Error("UI-10: game did not reach an end state within 80 play iterations");
+    }
+
+    for (const page of [hostPage, otherPage]) {
+      await expect(page.getByTestId("end-overlay")).toBeVisible();
+      await expect(page.getByTestId("game-over-heading")).toHaveText("Game over");
+      await expect(page.getByTestId("final-score")).toHaveText(/^Final score: \d+ \/ 25 — .+$/);
+      await expect(page.getByTestId("end-reason")).toHaveText(
+        /^(Three fuses were lost\.|Every stack was completed!|The deck ran out and the final round elapsed\.)$/,
+      );
+      await expect(page.locator('[data-testid="end-stack"]')).toHaveCount(5);
+      await expect(page.getByTestId("new-game-link")).toHaveAttribute("href", "/");
+      await expect(page.getByTestId("play-button")).toBeDisabled();
+      await expect(page.getByTestId("discard-button")).toBeDisabled();
+      await expect(page.getByTestId("give-clue-button")).toBeDisabled();
+      await expect(page.getByTestId("tableau")).toBeVisible();
+    }
+
+    await contextB.close();
+  });
+
+  test("UI-11: five players fit a 1280x720 desktop without scrolling and stay usable at 1024 wide (D-01)", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    test.setTimeout(120_000);
+
+    const { contexts } = await startGameWithPlayers(hostPage, browser, ["Roger", "Bianca", "Chen", "Dara", "Eli"]);
+
+    // Default viewport is 1280x720 (playwright.config.ts sets none).
+    await expect(hostPage.locator('[data-testid^="other-hand-card-"]')).toHaveCount(16);
+
+    const fitsNoScroll = await hostPage.evaluate(
+      () =>
+        document.documentElement.scrollHeight <= window.innerHeight + 1 &&
+        document.documentElement.scrollWidth <= window.innerWidth + 1,
+    );
+    expect(fitsNoScroll).toBe(true);
+
+    const elementsToCheck = [
+      hostPage.getByTestId("tableau"),
+      hostPage.getByTestId("clue-tokens"),
+      hostPage.getByTestId("fuse-tokens"),
+      hostPage.getByTestId("deck-count"),
+      hostPage.getByTestId("discard-pile"),
+      hostPage.getByTestId("own-hand"),
+      hostPage.getByTestId("turn-indicator"),
+    ];
+    for (const locator of elementsToCheck) {
+      await expect(locator).toBeInViewport();
+    }
+    const playedStacksAt1280 = hostPage.locator('[data-testid^="played-stack-"]');
+    const playedStacksAt1280Count = await playedStacksAt1280.count();
+    for (let i = 0; i < playedStacksAt1280Count; i++) {
+      await expect(playedStacksAt1280.nth(i)).toBeInViewport();
+    }
+
+    // Narrower desktop viewport: no horizontal overflow, and every tableau
+    // element remains reachable and visible.
+    await hostPage.setViewportSize({ width: 1024, height: 768 });
+
+    const noHorizontalOverflow = await hostPage.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+    );
+    expect(noHorizontalOverflow).toBe(true);
+
+    for (const locator of elementsToCheck) {
+      await locator.scrollIntoViewIfNeeded();
+      await expect(locator).toBeVisible();
+    }
+    const playedStacksAt1024 = hostPage.locator('[data-testid^="played-stack-"]');
+    const playedStacksAt1024Count = await playedStacksAt1024.count();
+    for (let i = 0; i < playedStacksAt1024Count; i++) {
+      const stack = playedStacksAt1024.nth(i);
+      await stack.scrollIntoViewIfNeeded();
+      await expect(stack).toBeVisible();
+    }
+
+    await hostPage.getByTestId("own-hand-slot-1").scrollIntoViewIfNeeded();
+    await hostPage.getByTestId("own-hand-slot-1").click();
+    await expect(hostPage.getByTestId("own-hand-slot-1")).toHaveAttribute("data-selected", "true");
+
+    for (const context of contexts) {
+      await context.close();
+    }
   });
 });

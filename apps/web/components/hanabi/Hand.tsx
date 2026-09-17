@@ -69,7 +69,7 @@ export function TeammateHand({
       data-testid={"other-hand-" + hand.seatId}
       data-active={String(isActive)}
       data-target={String(isTarget)}
-      className="flex flex-col items-center gap-[length:var(--space-xs)] rounded-md p-[length:var(--space-sm)]"
+      className="flex flex-col items-center gap-[length:var(--space-xs)] rounded-md p-[length:var(--space-xs)]"
       style={{
         border: isActive ? "2px solid var(--color-accent)" : "2px solid transparent",
         boxShadow: isActive ? "0 0 12px 0 rgba(245, 185, 66, 0.4)" : "none",
@@ -143,7 +143,7 @@ export function OwnHand({
     <section
       data-testid="own-band"
       data-active={String(isYourTurn)}
-      className="flex flex-col items-center gap-[length:var(--space-sm)] rounded-md p-[length:var(--space-sm)]"
+      className="flex flex-col items-center gap-[3px] rounded-md p-[3px]"
       style={{
         border: isYourTurn ? "2px solid var(--color-accent)" : "2px solid transparent",
         boxShadow: isYourTurn ? "0 0 12px 0 rgba(245, 185, 66, 0.4)" : "none",
