@@ -1,11 +1,49 @@
 import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { createRoom, expectSeatCount, joinAs, startGameWithPlayers, startTwoPlayerGame } from "./helpers";
+
+type WireCard = Record<string, unknown> & { id?: unknown; hidden?: unknown };
+interface GameFrame {
+  yourHand: WireCard[] | undefined;
+  otherHandCards: WireCard[];
+}
+
+/** WR-07: collects the Hanabi game view out of every JSON frame the page's
+ * WebSockets receive (non-JSON frames such as heartbeats are ignored). */
+function recordGameFrames(page: Page, sink: GameFrame[]): void {
+  page.on("websocket", (ws) => {
+    ws.on("framereceived", ({ payload }) => {
+      if (typeof payload !== "string") return;
+      let message: unknown;
+      try {
+        message = JSON.parse(payload);
+      } catch {
+        return;
+      }
+      const game = (message as { view?: { game?: unknown } } | null)?.view?.game as
+        | { yourHand?: WireCard[]; otherHands?: Array<{ cards?: WireCard[] }> }
+        | null
+        | undefined;
+      if (!game || typeof game !== "object") return;
+      sink.push({
+        yourHand: game.yourHand,
+        otherHandCards: (game.otherHands ?? []).flatMap((hand) => hand.cards ?? []),
+      });
+    });
+  });
+}
 
 test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () => {
   test("gating, variant lock, and the Hanabi board prove turn order and HIDE-01 redaction end to end", async ({
     page: hostPage,
     browser,
   }) => {
+    // WR-07: record every game frame each page receives, registered before
+    // either page opens its socket.
+    const hostFrames: GameFrame[] = [];
+    const joinerFrames: GameFrame[] = [];
+    recordGameFrames(hostPage, hostFrames);
+
     const code = await createRoom(hostPage, { name: "Roger" });
 
     // With only the host seated: "Start game" present but disabled, with the
@@ -30,6 +68,7 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     await expect(hostPage.getByRole("radio", { name: "Black" })).toBeChecked();
 
     const contextB = await browser.newContext();
+    contextB.on("page", (page) => recordGameFrames(page, joinerFrames));
     const pageB = await joinAs(contextB, code, "Bianca");
     await expectSeatCount(hostPage, 2);
 
@@ -90,32 +129,48 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       expect(joinerText).toContain("Waiting for");
     }
 
-    // HIDE-01 browser surface: what the OTHER page renders for a player's
-    // hand (their real card identities, seeded server-side and secret to
-    // this test) must never appear as text on that player's OWN own-hand
-    // region. The Phase 6 board renders identity text ONLY inside
-    // `card-identity` (see TeammateCard) — scoping the read to that testid
-    // keeps this comparison exact (suit/rank text only) rather than vacuous
-    // (which a bare `other-hand-card-*` read would risk once those cards
-    // also render a candidate-strip glyph row). Deriving the expected
-    // strings from what the other page actually shows avoids hardcoding a
-    // card identity.
-    const hostRealCardTexts = await pageB
-      .locator('[data-testid^="other-hand-card-"] [data-testid="card-identity"]')
-      .allTextContents();
-    const joinerRealCardTexts = await hostPage
-      .locator('[data-testid^="other-hand-card-"] [data-testid="card-identity"]')
-      .allTextContents();
-    expect(hostRealCardTexts.length).toBeGreaterThan(0);
-    expect(joinerRealCardTexts.length).toBeGreaterThan(0);
-
-    const hostOwnHandText = ((await hostPage.getByTestId("own-hand").textContent()) ?? "").trim();
-    const joinerOwnHandText = ((await pageB.getByTestId("own-hand").textContent()) ?? "").trim();
-    for (const cardText of hostRealCardTexts) {
-      expect(hostOwnHandText).not.toContain(cardText.trim());
+    // HIDE-01 wire surface (WR-07): every server frame either page received
+    // must redact that page's own hand — `hidden: true` and no suit/rank key
+    // on any `yourHand` card. The teammate-hand sanity check proves the
+    // detector really sees identity keys when they are present, so a pass
+    // here is not vacuous.
+    for (const [who, frames] of [
+      ["host", hostFrames],
+      ["joiner", joinerFrames],
+    ] as const) {
+      const gameFrames = frames.filter((f) => f.yourHand !== undefined);
+      expect(gameFrames.length, `${who} received at least one game frame`).toBeGreaterThan(0);
+      for (const frame of gameFrames) {
+        for (const card of frame.yourHand ?? []) {
+          expect(card.hidden, `${who} own card ${String(card.id)} is hidden`).toBe(true);
+          expect(card, `${who} own card ${String(card.id)} has no suit key`).not.toHaveProperty("suit");
+          expect(card, `${who} own card ${String(card.id)} has no rank key`).not.toHaveProperty("rank");
+        }
+      }
+      const teammateCards = gameFrames.flatMap((f) => f.otherHandCards);
+      expect(teammateCards.some((card) => "suit" in card && "rank" in card)).toBe(true);
     }
-    for (const cardText of joinerRealCardTexts) {
-      expect(joinerOwnHandText).not.toContain(cardText.trim());
+
+    // HIDE-01 browser surface (WR-07): with no clue given yet, every own-hand
+    // slot must show zero knowledge — no confirmed suit/rank, every rank and
+    // suit pip still fully possible, and the unclued luminosity. A rendering
+    // leak of any identity signal changes at least one of these.
+    for (const page of [hostPage, pageB]) {
+      const slots = page.locator('[data-testid^="own-hand-slot-"]');
+      const slotCount = await slots.count();
+      expect(slotCount).toBeGreaterThan(0);
+      for (let i = 0; i < slotCount; i++) {
+        const slot = slots.nth(i);
+        await expect(slot).toHaveAttribute("data-luminosity", "unclued");
+        await expect(slot.locator('[data-testid="confirmed-rank"]')).toHaveCount(0);
+        await expect(slot.locator('[data-testid="confirmed-suit"]')).toHaveCount(0);
+        await expect(slot.locator('[data-testid="positive-marks"]')).toHaveCount(0);
+        const pipOpacities = await slot
+          .locator('[data-testid="rank-pips"] > *, [data-testid="suit-pips"] > *')
+          .evaluateAll((els) => els.map((el) => getComputedStyle(el).opacity));
+        expect(pipOpacities.length).toBeGreaterThan(0);
+        expect(pipOpacities.every((opacity) => opacity === "1")).toBe(true);
+      }
     }
 
     // No clues have been given yet at this point in the test, so no own-hand
