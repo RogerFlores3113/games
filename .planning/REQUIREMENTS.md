@@ -75,6 +75,17 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **UI-10**: The end-of-game screen shows the final score, its band, and the completed stacks
 - [x] **UI-11**: The interface is usable on a desktop browser at common window sizes
 
+### Table Polish (added 2026-09-17 at owner sign-off of Phase 6)
+
+- [ ] **ART-01**: Every face-up card shows firework-burst art whose burst silhouette is distinct per suit, so suits stay distinguishable with color ignored; the art is original (inspired by the box game's per-color burst shapes, not copied from the publisher's artwork)
+- [ ] **ART-02**: The table sits on a static city-at-night background image that does not reduce card legibility
+- [ ] **NOTE-01**: Clue marks a card has received are shown above the card rather than on its face
+- [ ] **NOTE-02**: A player can type free-text notes on each card in their own hand; the automatic positive/negative clue tracking (UI-05) remains
+- [ ] **HAND-01**: A player can reorder their own hand by clicking and dragging, and every player sees the new order (server-authoritative, survives refresh)
+- [ ] **HAND-02**: Dragging an own card to the center plays it and dragging it to a discard zone discards it, with the existing buttons kept as a keyboard fallback
+- [ ] **HAND-03**: A newly drawn card takes the hand slot of the card that was played or discarded, rather than joining the end of the hand
+- [ ] **AUD-01**: Simple audio cues play for a clue, a play, a discard, a lost fuse, and a completed stack of five
+
 ### Foundation
 
 - [x] **FDN-01**: Room, seating, connection, and reconnect machinery is separated from Hanabi-specific rules behind a game-adapter interface
@@ -94,7 +105,7 @@ Deferred to future release. Tracked but not in current roadmap.
 ### Quality of Life
 
 - **QOL-01**: Chronological clue log panel, built on the turn history already recorded in v1
-- **QOL-02**: Sound or haptic cue when a player's turn begins or when they are clued
+- **QOL-02**: Sound or haptic cue when a player's turn begins or when they are clued (action sound cues pulled into v1 as AUD-01; turn-start cue and haptics remain v2)
 
 ### Second Game
 
@@ -106,7 +117,6 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Player-authored card notes | Explicitly rejected. The automatic per-card positive and negative clue tracking (UI-05) is the memory aid, and with notes excluded it carries the full load — it must be correspondingly strong. |
 | User accounts, sign-in, persistent profiles | Known friend group sharing a link; auth is friction with no payoff, and it converts an ephemeral app into an identity-management product |
 | Public lobby, matchmaking, game browser | No engagement goal beyond one small group; a discovery surface reintroduces the abuse and moderation problems accounts were rejected to avoid |
 | In-app chat | Players are on a voice call. Worse, a text channel is an attractive nuisance for typing out card identities, which violates Hanabi's core rule |
@@ -183,12 +193,20 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FDN-02 | Phase 3 | Complete |
 | FDN-03 | Phase 1 | Complete |
 | FDN-04 | Phase 1 | Complete |
+| ART-01 | Phase 6.1 | Pending |
+| ART-02 | Phase 6.1 | Pending |
+| NOTE-01 | Phase 6.1 | Pending |
+| NOTE-02 | Phase 6.1 | Pending |
+| HAND-01 | Phase 6.1 | Pending |
+| HAND-02 | Phase 6.1 | Pending |
+| HAND-03 | Phase 6.1 | Pending |
+| AUD-01 | Phase 6.1 | Pending |
 
 **Coverage:**
-- v1 requirements: 57 total
-- Mapped to phases: 57
+- v1 requirements: 65 total
+- Mapped to phases: 65
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-01*
-*Last updated: 2026-09-01 after initialization*
+*Last updated: 2026-09-17 — Phase 6.1 table-polish requirements added at owner sign-off; player notes moved from Out of Scope to v1 (NOTE-02)*

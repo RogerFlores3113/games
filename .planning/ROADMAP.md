@@ -19,6 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Wire Engine Into Room Actor** - Replace the toy game with the real engine behind the game-adapter interface, delivering a live, correctly-filtered, correctly-ruled base-game table. (completed 2026-09-16)
 - [x] **Phase 5: Reconnect & Session Durability Hardening** - Exercise and harden the mobile-backgrounding and multi-tab failure modes that a manual refresh test does not surface. (completed 2026-09-16)
 - [x] **Phase 6: Game Interface** - Build the board render, persistent per-card clue memory, colorblind-safe glyphs, and dark "fireworks night" luminosity theme against the now-stable wire contract. (completed 2026-09-17)
+- [ ] **Phase 6.1: Table Polish (INSERTED)** - Firework-burst card art per suit, clue marks above cards plus player notes, drag reorder/play/discard with slot-preserving draws, audio cues, and a city-at-night background.
 - [ ] **Phase 7: Variant Support (Rainbow, Black)** - Enable and test the Rainbow and Black configurations end to end, proving the variant-parametrized engine and UI built earlier need no special-casing.
 
 ## Phase Details
@@ -257,6 +258,25 @@ Plans:
 - [x] 06-07-PLAN.md — Phase gate + owner visual sign-off recorded verbatim (D-25), RT-04 phone check offered
 **UI hint**: yes
 **Research note**: No existing implementation combines a luminosity-as-signal theme with colorblind-safe rendering — this needs original design work at plan time, not an adapted reference; design the colorblind glyph system and the luminosity/lightness steps jointly since they compete for the same visual channel.
+
+### Phase 06.1: Table Polish (Firework Art, Notes, Drag, Audio) (INSERTED)
+
+**Goal:** Turn the signed-off first-pass board into the table the owner wants to play on: firework-burst card art with a distinct burst shape per suit, clue marks above cards plus player-typed notes, drag-to-reorder/play/discard with slot-preserving draws that every player sees, simple audio cues, and a city-at-night backdrop.
+**Requirements**: ART-01, ART-02, NOTE-01, NOTE-02, HAND-01, HAND-02, HAND-03, AUD-01
+**Depends on:** Phase 6
+**Success Criteria** (what must be TRUE):
+
+  1. Every face-up card shows original firework-burst art, and with color ignored each suit's burst silhouette is still distinguishable from every other suit's.
+  2. Clue marks appear above each card, and a player can type and keep notes on each of their own cards.
+  3. A player can drag their own cards to reorder them, and every other player sees the same order, including after a refresh; dragging to the center plays and to the discard zone discards, with buttons still available.
+  4. A drawn card lands in the slot the played or discarded card left, on every screen.
+  5. Distinct short sounds play for a clue, a play, a discard, a lost fuse, and a completed stack, over a static city-at-night background that leaves cards legible.
+
+**Notes:** Owner feedback recorded verbatim in `.planning/phases/06-game-interface/06-HUMAN-UAT.md`. HAND-01/HAND-03 change hand ordering in the engine and wire contract, so the per-seat redaction chokepoint and leak tests must stay intact. The owner asked for the box game's per-color burst designs; the art must be original work in that spirit, not copied publisher artwork — show the owner the burst shapes before building them into cards.
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 06.1 to break down)
 
 ### Phase 7: Variant Support (Rainbow, Black)
 

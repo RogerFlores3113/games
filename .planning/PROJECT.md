@@ -22,6 +22,7 @@ A friend clicks a link and is playing Hanabi within seconds — and the game doe
 - ✓ A correct, variant-parametrized Hanabi rules engine exists as a pure package — *Validated in Phase 3: deck/hand sizes, clue legality, token and fuse economy, the explicit final round and all three end conditions, deterministic seeded shuffles and public-only turn history, proven by unit tests plus conservation, redaction and termination property tests across base, Rainbow and Black. Not yet wired to the transport — that is Phase 4.*
 - ✓ A live base-game Hanabi table is playable end to end — *Validated in Phase 4: the engine runs behind the game-adapter seam (only `game-registration.ts` names the game), actions appear on every screen without a refresh, a mid-game reload rejoins the same seat, and a double-sent action applies exactly once even across a forced worker eviction. The forehead-card toy is deleted. The board is a deliberately plain interim screen; Phase 6 replaces it.*
 - ✓ A player who drops connection, sleeps their tab, or opens a second tab keeps their seat, and teammates see a clear disconnected indicator while the game pauses in place — *Validated in Phase 5: hibernation-safe heartbeat auto-response, server zombie sweep (including orphaned connected seats), client resume-on-visible/online, "Reconnecting…" banner, per-seat status and "Use this tab" reclaim, proven by socket-level and Playwright tests. The real-phone 10+ minute check is owner-waived until the UI is finalized.*
+- ✓ The table is a designed dark "fireworks night" board — always-visible tableau, unmistakable active player, face-down own hand with accumulating clue memory, always-on suit glyphs, card luminosity as a hue-independent clue signal, visibly disabled illegal actions, and a designed end screen — *Validated in Phase 6: Game Interface, owner-approved as a first pass (verbatim sign-off in 06-HUMAN-UAT.md); follow-up polish scoped into Phase 6.1*
 
 ### Active
 
@@ -38,6 +39,10 @@ A friend clicks a link and is playing Hanabi within seconds — and the game doe
 - [ ] Final score is calculated and shown at game end
 - [ ] Players see each other's moves in near real time without manual refresh
 - [ ] Interface uses a dark "fireworks night" visual direction where card luminosity carries real signal about what has been clued
+- [ ] Face-up cards show original firework-burst art with a distinct burst shape per suit, over a city-at-night background
+- [ ] Clue marks sit above each card, and players can type their own per-card notes
+- [ ] Players drag their own cards to reorder (seen by everyone), play, or discard; a drawn card fills the vacated slot
+- [ ] Simple audio cues for clues, plays, discards, lost fuses, and completed stacks
 
 ### Out of Scope
 
@@ -96,6 +101,8 @@ A friend clicks a link and is playing Hanabi within seconds — and the game doe
 | Dark "fireworks night" visual direction | Fits the theme, and card luminosity can carry genuine signal about clue state rather than being decoration | — Pending |
 | Room and realtime layer built game-agnostic from the start | Innovation is a known future milestone; retrofitting a second game onto a Hanabi-shaped foundation would be costly | ✓ Good — `GameAdapter` seam held through Phase 1 |
 | RT-02 7-day idle cold-start check waived at Phase 1 close | DO hibernation + SQLite persistence and within-seconds production connects judged sufficient; re-run `docs/manual-checks/cold-start.md` if cold starts ever feel slow | ✓ Accepted (owner, 2026-09-15) |
+| Player-authored per-card notes brought into v1 (reverses earlier exclusion) | Owner asked for them at Phase 6 sign-off; they sit alongside, not instead of, automatic clue tracking | — Pending (Phase 6.1) |
+| Hand order is player-controlled and server-authoritative; draws fill the vacated slot | Voice-call references like "your third card" must mean the same card on every screen | — Pending (Phase 6.1) |
 | Vercel installs only `apps/web`'s own dependencies | Workspace build tools must be declared in `apps/web`; production type-check excludes tests via `tsconfig.build.json` | ✓ Adopted in Phase 1 |
 
 ## Evolution
@@ -116,4 +123,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-17 after Phase 5 (Reconnect & Session Durability Hardening)*
+*Last updated: 2026-09-17 after Phase 6 (Game Interface); Phase 6.1 inserted*

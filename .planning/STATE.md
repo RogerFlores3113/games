@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Phase 6 complete (7/7) — ready to discuss Phase 7
-last_updated: 2026-09-17T04:42:26.651Z
+status: planning
+stopped_at: "Completed 06-07-PLAN.md; Phase 6 ready for /gsd:verify-work"
+last_updated: "2026-09-17T04:43:33.142Z"
 last_activity: 2026-09-17
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 6
   total_plans: 44
   completed_plans: 44
-  percent: 86
+  percent: 75
 ---
 
 # Project State
@@ -103,6 +103,10 @@ Progress: [██████████] 100%
 | Phase 06 P07 | 10min | 3 tasks | 2 files |
 
 ## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 6.1 inserted after Phase 6: Owner-requested table polish after Phase 6 first-pass sign-off: per-suit firework burst card art, clue marks above cards plus player-typed notes, drag reorder/play/discard with slot-preserving draws, audio cues, city-at-night background
 
 ### Decisions
 
