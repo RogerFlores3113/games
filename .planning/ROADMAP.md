@@ -232,7 +232,29 @@ Plans:
   4. Every card shows a non-color suit identifier by default with no accessibility toggle required, and card luminosity visibly conveys accumulated clue information as a signal independent of hue, within a dark "fireworks night" visual treatment.
   5. The end-of-game screen shows the final score, its descriptive band, and the completed stacks, and the whole interface is usable on a desktop browser at common window sizes.
 
-**Plans**: TBD
+**Plans**: 7 plans
+Plans:
+**Wave 1**
+
+- [ ] 06-01-PLAN.md — Pure visual derivations (luminosity, candidates, clue ids, disabled reasons, end reason, deck text, turn order) with D-15 identity tripwire (TDD)
+- [ ] 06-02-PLAN.md — Suit identity system: 7 glyphs + AA-verified hue tokens, card-glow token, CSS keyframes with reduced motion
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 06-03-PLAN.md — Card and hand components: luminosity frame, candidate strip, teammate/own cards (facts-only own card + source scan), hand containers
+- [ ] 06-04-PLAN.md — Tableau, Play/Discard + clue picker with visible disabled reasons and hover/focus preview, end-of-game overlay
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 06-05-PLAN.md — Wire the board orchestrator into RoomClient, delete interim board, restyle banner, same-change e2e compatibility
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 06-06-PLAN.md — Playwright proofs for D-24: tableau visibility, active marker, clue marks + refresh persistence, reasons, end screen, 5-player viewport
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 06-07-PLAN.md — Phase gate + owner visual sign-off recorded verbatim (D-25), RT-04 phone check offered
 **UI hint**: yes
 **Research note**: No existing implementation combines a luminosity-as-signal theme with colorblind-safe rendering — this needs original design work at plan time, not an adapted reference; design the colorblind glyph system and the luminosity/lightness steps jointly since they compete for the same visual channel.
 

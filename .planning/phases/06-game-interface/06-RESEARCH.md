@@ -423,7 +423,7 @@ describe("own-hand rendering helpers never read identity fields", () => {
 
 **If this table is empty:** N/A — see above.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **What exact glyph shapes does Hanab Live's colorblind mode use per suit?**
    - What we know: Hanab Live (the reference open-source Hanabi implementation) has a colorblind-mode toggle and documents suit "pips" somewhere in its repo/wiki (per WebSearch); this project's WebSearch access did not fetch the actual pips reference page content this session.
