@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 06.2 UI-SPEC approved
-last_updated: "2026-09-17T20:22:44.121Z"
+stopped_at: Completed 06.2-01-PLAN.md
+last_updated: "2026-09-17T21:00:00.000Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 9
   completed_phases: 7
-  total_plans: 59
-  completed_plans: 59
-  percent: 78
+  total_plans: 70
+  completed_plans: 60
+  percent: 86
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 06.2
-Plan: Not started
-Status: Ready to plan
+Plan: 01 complete
+Status: In progress
 Last activity: 2026-09-17
 
-Progress: [██████████] 100%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -117,6 +117,7 @@ Progress: [██████████] 100%
 | Phase 06.1 P13 | 25min | 2 tasks | 5 files |
 | Phase 06.1 P14 | 40min | 2 tasks | 3 files |
 | Phase 06.1 P15 | 25min | 3 tasks | 1 files |
+| Phase 06.2 P01 | 25min | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -243,6 +244,8 @@ Recent decisions affecting current work:
 - [Phase 06.1-14]: e2e gesture-unlock clicks must use page.mouse.click(x,y) at a fixed coordinate, not locator('body').click(), on the table-backdrop min-h-screen overflow-y-auto layout
 - [Phase ?]: Owner approved all 06.1 table-polish work; recorded 17 follow-on requests as Gaps for a future plan, not defects
 - [Phase ?]: RT-04 reconnect flake was a real pre-existing bug (partysocket ignoring reconnect() mid-backoff), fixed in 9acc73d and verified green under this plan's fresh gate
+- [Phase 06.2-01]: discardOrder (D-23/D-28) added to HanabiState/HanabiView/HanabiViewSchema in the same commit as the reorderDiscard action; canReorderDiscard reuses card_not_in_hand/invalid_action rather than widening AdapterError; applyHanabiAction's dispatch rewritten as explicit per-type checks so Task 1 alone type-checks before Task 2 adds the reorderDiscard handler
+- [Phase 06.2-01]: discard-order.property.test.ts proves the permutation invariant and cross-seat identity over 200 random games; clue-facts.test.ts proves positiveClues is append-only, the premise phase 06.2's hint display depends on
 
 ### Pending Todos
 
@@ -263,6 +266,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T20:22:44.113Z
-Stopped at: Phase 06.2 UI-SPEC approved
-Resume file: .planning/phases/06.2-board-redesign-hint-display-tile-styling-board-layout-tokens/06.2-UI-SPEC.md
+Last session: 2026-09-17T21:00:00.000Z
+Stopped at: Completed 06.2-01-PLAN.md
+Resume file: None

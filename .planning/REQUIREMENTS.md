@@ -102,7 +102,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **BOARD-03**: Spent clue and fuse tokens are removed from the board rather than dimmed, with a text count retained for accessibility
 - [ ] **BOARD-04**: A deck counter showing the remaining tile count beside a tile back sits between the Play and Discard areas
 - [ ] **BOARD-05**: Each played fireworks stack shows every card it contains, not only the top card
-- [ ] **DISC-01**: The discard area shows every discarded tile, any seated player can rearrange it at any time, and every player sees the same arrangement (server-authoritative, survives refresh)
+- [x] **DISC-01**: The discard area shows every discarded tile, any seated player can rearrange it at any time, and every player sees the same arrangement (server-authoritative, survives refresh)
 
 ### Foundation
 
@@ -233,7 +233,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BOARD-03 | Phase 6.2 | Pending |
 | BOARD-04 | Phase 6.2 | Pending |
 | BOARD-05 | Phase 6.2 | Pending |
-| DISC-01 | Phase 6.2 | Pending |
+| DISC-01 | Phase 6.2 | Complete |
 
 **Coverage:**
 - v1 requirements: 80 total
