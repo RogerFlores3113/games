@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 05-06-PLAN.md (Phase 5 complete, ready for verification)
-last_updated: "2026-09-16T22:11:57.932Z"
+status: ready_to_plan
+stopped_at: Phase 5 complete (6/6) — ready to discuss Phase 6
+last_updated: 2026-09-17T00:30:14.134Z
 last_activity: 2026-09-16
 progress:
   total_phases: 7
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-01)
 
 **Core value:** A friend clicks a link and is playing Hanabi within seconds — and the game does not break, stall, or lose their seat for the next 25 minutes.
-**Current focus:** Phase 05 — reconnect-session-durability-hardening
+**Current focus:** Phase 6 — game interface
 
 ## Current Position
 
-Phase: 05 (reconnect-session-durability-hardening) — EXECUTING
-Plan: 6 of 6
-Status: Phase complete — ready for verification
-Last activity: 2026-09-16
+Phase: 6
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-09-17
 
 Progress: [██████████] 100%
 
@@ -36,7 +36,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 39
+- Total plans completed: 45
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -49,6 +49,7 @@ Progress: [██████████] 100%
 | 3 | 5 | - | - |
 | 4 | 8 | - | - |
 | 04 | 9 | - | - |
+| 5 | 6 | - | - |
 
 **Recent Trend:**
 
