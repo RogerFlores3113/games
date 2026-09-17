@@ -22,6 +22,7 @@ import { Table } from "./Table";
 import { CardActions } from "./CardActions";
 import { CluePicker } from "./CluePicker";
 import { EndOverlay } from "./EndOverlay";
+import { FlyToLayer } from "./FlyToLayer";
 import { ReconnectingBanner } from "../ReconnectingBanner";
 import { AudioControls } from "./AudioControls";
 import { useHanabiAudio } from "./useHanabiAudio";
@@ -302,6 +303,8 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
           onVolumeChange={audio.setVolume}
         />
       </div>
+
+      <FlyToLayer game={game} reconnecting={reconnecting} suppressedCardIds={drag.droppedCardIdsRef} />
 
       {ended && <EndOverlay game={game} />}
     </main>

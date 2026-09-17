@@ -172,6 +172,24 @@ body {
 }
 
 /*
+ * D-21: fly-to ghost motion (FlyToLayer). Under prefers-reduced-motion the
+ * ghost is never shown at all (FlyToLayer skips spawning any ghost when the
+ * media query matches) — this rule is a second, structural line of defense
+ * so the transition itself is inert and the element is hidden even if a
+ * ghost somehow mounted anyway.
+ */
+.fly-to-ghost {
+  transition: transform 450ms ease-in-out, opacity 450ms ease-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fly-to-ghost {
+    transition: none;
+    display: none;
+  }
+}
+
+/*
  * ART-02/D-14: static city-at-night backdrop behind the in-game table. The
  * 0.75 scrim below is --color-bg at 75% opacity (rgba(11, 15, 26, 0.75),
  * matching --color-bg's value) — written as a literal rgba() rather than a
