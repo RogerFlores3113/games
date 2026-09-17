@@ -389,7 +389,7 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
               aria-label={keepHints ? "Clear hints after each move" : "Keep hints visible"}
               aria-pressed={keepHints}
               onClick={handleToggleKeepHints}
-              className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+              className="relative inline-flex items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
               style={{ width: 28, height: 28 }}
             >
               {keepHints ? (
@@ -397,8 +397,16 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
               ) : (
                 <EyeOff size={16} aria-hidden="true" color="var(--color-text-muted)" />
               )}
+              {/* fix(06.2-10): the enlarged touch-target span must be a
+                  DESCENDANT of the button, not a sibling — a sibling span
+                  painted after the button in DOM order sits on top of it
+                  (same stacking context, no z-index), silently swallowing
+                  every pointer click at the button's own visual location in
+                  both a real browser and Playwright. Moved inside, matching
+                  Table.tsx's discard-toggle (the one button of this shape
+                  that was already click-safe). */}
+              <span aria-hidden="true" className="absolute" style={{ inset: "-8px" }} />
             </button>
-            <span aria-hidden="true" className="absolute" style={{ inset: "-8px" }} />
           </span>
 
           <TileColorPicker value={tileColorId} onChange={handleTileColorChange} />

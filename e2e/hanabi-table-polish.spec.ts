@@ -52,6 +52,56 @@ async function readDeckCount(page: Page): Promise<number> {
   return Number(match[1]);
 }
 
+/**
+ * Selects an enabled clue value (colour when `wantColor` is true, rank
+ * otherwise) that currently touches at least one of the already-selected
+ * target's cards. Assumes a clue target has already been clicked. Returns
+ * the clicked value's testid, or null if no value of that kind currently
+ * touches anything.
+ */
+async function selectClueValueOfKind(page: Page, wantColor: boolean): Promise<string | null> {
+  const valueButtons = page.locator('[data-testid^="clue-value-"]');
+  const count = await valueButtons.count();
+  for (let i = 0; i < count; i++) {
+    const button = valueButtons.nth(i);
+    const testId = await button.getAttribute("data-testid");
+    if (!testId) continue;
+    const isRankValue = /^clue-value-\d+$/.test(testId);
+    if (isRankValue === wantColor) continue;
+    if (!(await button.isEnabled())) continue;
+    await button.click();
+    if (await page.getByTestId("give-clue-button").isEnabled()) {
+      return testId;
+    }
+  }
+  return null;
+}
+
+/** Reads which own-hand slot testids currently carry a rendered hint
+ * overlay (`data-hints="true"`), in DOM order. Excludes the `-hints`
+ * overlay spans themselves (they carry no `data-hints` attribute). */
+async function ownHandHintedSlots(page: Page): Promise<string[]> {
+  return page.locator('[data-testid^="own-hand-slot-"][data-hints="true"]').evaluateAll((els) =>
+    els.map((el) => el.getAttribute("data-testid") ?? "").filter((id) => /^own-hand-slot-\d+$/.test(id)),
+  );
+}
+
+/** Returns whichever of `hostPage`/`otherPage` currently has the active turn. */
+async function activeOf(hostPage: Page, otherPage: Page): Promise<Page> {
+  const hostText = ((await hostPage.getByTestId("turn-indicator").textContent()) ?? "").trim();
+  return hostText === "Your turn" ? hostPage : otherPage;
+}
+
+/** Reads the discard pile's tile order (card ids, in DOM order) — the
+ * DISC-01-safe way to observe the server's shared `discardOrder`, since
+ * discarded cards' identities are public (unlike own-hand cards). */
+async function discardTileOrder(page: Page): Promise<string[]> {
+  const testIds = await page
+    .locator('[data-testid="discard-pile"] [data-testid^="discard-tile-"]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute("data-testid") ?? ""));
+  return testIds.map((id) => id.replace(/^discard-tile-/, ""));
+}
+
 test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
   test("HAND-01: an off-turn drag reorder is seen by the teammate and survives refresh", async ({
     page: hostPage,
@@ -227,7 +277,7 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     page: hostPage,
     browser,
   }) => {
-    const { contextB, activePage } = await startTwoPlayerGame(hostPage, browser);
+    const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
 
     const sentFrames: string[] = [];
     activePage.on("websocket", (ws) => {
@@ -250,6 +300,12 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
 
     expect(sentFrames.some((frame) => frame.includes("r5? save"))).toBe(false);
 
+    // T-06.2-22: the other player's page shows no trace of the note text —
+    // NoteBox only ever renders for the viewer's own hand, and notes are
+    // never sent over the wire (asserted above), so there is no surface on
+    // which it could leak.
+    await expect(passivePage.getByText("r5? save")).toHaveCount(0);
+
     // On the actor's turn, playing slot 1 draws a fresh card into that
     // slot — its note box resets to the empty state.
     await activePage.getByTestId("own-hand-slot-1").click();
@@ -257,6 +313,252 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await activePage.getByTestId("play-button").click();
 
     await expect(activePage.getByTestId("note-box-slot-1")).toHaveValue("");
+
+    await contextB.close();
+  });
+
+  test("HINT-01/HINT-02: a colour clue tints the touched tile and a number clue stamps its numeral", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, pageB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
+
+    // HINT-01: a colour clue from the active player touches at least one of
+    // the passive player's own-hand cards.
+    await activePage.locator('[data-testid^="clue-target-"]').first().click();
+    const colorTestId = await selectClueValueOfKind(activePage, true);
+    expect(colorTestId).not.toBeNull();
+    await activePage.getByTestId("give-clue-button").click();
+
+    const touchedAfterColor = await ownHandHintedSlots(passivePage);
+    expect(touchedAfterColor.length).toBeGreaterThan(0);
+    const colorSlot = touchedAfterColor[0]!;
+    await expect(passivePage.getByTestId(colorSlot)).toHaveAttribute("data-hints", "true");
+    const colorHintSpan = passivePage.getByTestId(`${colorSlot}-hints`);
+    await expect(colorHintSpan).toHaveCount(1);
+    const tintBg = await colorHintSpan
+      .locator("> span")
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(tintBg).not.toBe("rgba(0, 0, 0, 0)");
+
+    // HINT-02: turn has passed to the formerly-passive player; it clues the
+    // (now passive) other seat with a rank value, which stamps a numeral.
+    const newActive = await activeOf(hostPage, pageB);
+    const newPassive = newActive === hostPage ? pageB : hostPage;
+    await newActive.locator('[data-testid^="clue-target-"]').first().click();
+    const rankTestId = await selectClueValueOfKind(newActive, false);
+    expect(rankTestId).not.toBeNull();
+    const rankValue = rankTestId!.replace(/^clue-value-/, "");
+    await newActive.getByTestId("give-clue-button").click();
+
+    const touchedAfterRank = await ownHandHintedSlots(newPassive);
+    expect(touchedAfterRank.length).toBeGreaterThan(0);
+    const rankSlot = touchedAfterRank[0]!;
+    await expect(newPassive.getByTestId(`${rankSlot}-hints`).getByTestId("hint-numeral")).toHaveText(rankValue);
+
+    await contextB.close();
+  });
+
+  test("HINT-03: keep-hints OFF clears after the next move; ON persists and survives a refresh", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, pageB } = await startTwoPlayerGame(hostPage, browser);
+    const slotNumbers = [1, 2, 3, 4, 5];
+
+    function otherSlotNumber(touchedIds: string[]): number {
+      const touchedNumbers = new Set(touchedIds.map((id) => Number(id.replace("own-hand-slot-", ""))));
+      const found = slotNumbers.find((n) => !touchedNumbers.has(n));
+      if (found === undefined) throw new Error("otherSlotNumber: every slot was touched by the clue");
+      return found;
+    }
+
+    const active1 = await activeOf(hostPage, pageB);
+    const passive1 = active1 === hostPage ? pageB : hostPage;
+
+    // Default (OFF): clue passive1's hand, then have passive1 act on a
+    // DIFFERENT slot — the touched card's hint should clear.
+    await active1.locator('[data-testid^="clue-target-"]').first().click();
+    expect(await selectClueValueOfKind(active1, true)).not.toBeNull();
+    await active1.getByTestId("give-clue-button").click();
+
+    const touched1 = await ownHandHintedSlots(passive1);
+    expect(touched1.length).toBeGreaterThan(0);
+    const touchedSlot1 = touched1[0]!;
+    await expect(passive1.getByTestId(touchedSlot1)).toHaveAttribute("data-hints", "true");
+
+    await passive1.getByTestId(`own-hand-slot-${otherSlotNumber(touched1)}`).click();
+    await expect(passive1.getByTestId("play-button")).toBeEnabled();
+    await passive1.getByTestId("play-button").click();
+
+    await expect(passive1.getByTestId(touchedSlot1)).toHaveAttribute("data-hints", "false");
+
+    // Turn keep-hints ON for passive1, repeat, and this time the hint
+    // should survive the next move.
+    await passive1.getByTestId("keep-hints-toggle").click();
+    await expect(passive1.getByTestId("keep-hints-toggle")).toHaveAttribute("aria-pressed", "true");
+
+    const active2 = await activeOf(hostPage, pageB);
+    await active2.locator('[data-testid^="clue-target-"]').first().click();
+    expect(await selectClueValueOfKind(active2, true)).not.toBeNull();
+    await active2.getByTestId("give-clue-button").click();
+
+    const touched2 = await ownHandHintedSlots(passive1);
+    expect(touched2.length).toBeGreaterThan(0);
+    const touchedSlot2 = touched2[0]!;
+    await expect(passive1.getByTestId(touchedSlot2)).toHaveAttribute("data-hints", "true");
+
+    await passive1.getByTestId(`own-hand-slot-${otherSlotNumber(touched2)}`).click();
+    await expect(passive1.getByTestId("play-button")).toBeEnabled();
+    await passive1.getByTestId("play-button").click();
+
+    await expect(passive1.getByTestId(touchedSlot2)).toHaveAttribute("data-hints", "true");
+
+    // The keep-hints preference survives a refresh.
+    await passive1.reload();
+    await expect(passive1.getByTestId("own-hand")).toBeVisible();
+    await expect(passive1.getByTestId("keep-hints-toggle")).toHaveAttribute("aria-pressed", "true");
+
+    await contextB.close();
+  });
+
+  test("HINT-04: no legacy pip-row markup exists anywhere on the board", async ({ page: hostPage, browser }) => {
+    const { contextB } = await startTwoPlayerGame(hostPage, browser);
+
+    await expect(hostPage.locator('[data-testid*="pip"]')).toHaveCount(0);
+    await expect(hostPage.locator('[data-testid*="marks-band"]')).toHaveCount(0);
+
+    await contextB.close();
+  });
+
+  test("TILE-03: the tile-colour preference persists locally and does not leak to the other player", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, pageB } = await startTwoPlayerGame(hostPage, browser);
+
+    const slot = hostPage.getByTestId("own-hand-slot-1");
+    const before = await slot.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    await hostPage.getByTestId("tile-color-picker-toggle").click();
+    await hostPage.getByTestId("tile-color-swatch-plum").click();
+
+    await expect.poll(() => slot.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(before);
+    const after = await slot.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    // Persists across a refresh.
+    await hostPage.reload();
+    await expect(hostPage.getByTestId("own-hand")).toBeVisible();
+    await hostPage.getByTestId("tile-color-picker-toggle").click();
+    await expect(hostPage.getByTestId("tile-color-swatch-plum")).toHaveAttribute("aria-pressed", "true");
+    await expect(hostPage.getByTestId("own-hand-slot-1")).toHaveCSS("background-color", after);
+
+    // The other player's own tiles are unaffected — a purely personal,
+    // local preference (TILE-03).
+    const otherBg = await pageB.getByTestId("own-hand-slot-1").evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(otherBg).toBe(before);
+
+    await contextB.close();
+  });
+
+  test("DRAG-01: mid-drag, non-dragged own-hand slots shift aside and return to zero after the drop", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB } = await startTwoPlayerGame(hostPage, browser);
+
+    const source = hostPage.getByTestId("own-hand-slot-1");
+    const target = hostPage.getByTestId("own-hand-slot-3");
+    const sourceBox = await source.boundingBox();
+    const targetBox = await target.boundingBox();
+    if (!sourceBox || !targetBox) throw new Error("missing bounding box");
+    const sourceCenter = { x: sourceBox.x + sourceBox.width / 2, y: sourceBox.y + sourceBox.height / 2 };
+    const targetCenter = { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height / 2 };
+
+    await hostPage.mouse.move(sourceCenter.x, sourceCenter.y);
+    await hostPage.mouse.down();
+    await hostPage.mouse.move(sourceCenter.x + 10, sourceCenter.y + 10, { steps: 2 });
+    await hostPage.mouse.move(targetCenter.x, targetCenter.y, { steps: 12 });
+
+    // A non-dragged slot between source and target carries a non-zero
+    // shift-aside transform on its wrapper while the drag is in flight.
+    const midDragTransform = await hostPage
+      .getByTestId("own-hand-slot-2")
+      .evaluate((el) => getComputedStyle(el.parentElement!).transform);
+    expect(midDragTransform).not.toBe("none");
+
+    await hostPage.mouse.up();
+
+    await expect
+      .poll(() =>
+        hostPage.getByTestId("own-hand-slot-2").evaluate((el) => getComputedStyle(el.parentElement!).transform),
+      )
+      .toBe("none");
+
+    await contextB.close();
+  });
+
+  test("DISC-01: a discard-pile reorder by one player is seen by the other and survives a refresh", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    test.setTimeout(60_000);
+    const { contextB, pageB } = await startTwoPlayerGame(hostPage, browser);
+
+    async function currentActive(): Promise<Page> {
+      const hostText = ((await hostPage.getByTestId("turn-indicator").textContent()) ?? "").trim();
+      return hostText === "Your turn" ? hostPage : pageB;
+    }
+
+    // Builds up 3 discarded tiles by alternating "give a clue" (the only
+    // way to drop clue tokens below 8 — the max at which discarding is
+    // illegal) with a discard, across whichever player is active.
+    for (let i = 0; i < 3; i++) {
+      const active = await currentActive();
+      const other = active === hostPage ? pageB : hostPage;
+      const clueTokens = Number(await hostPage.getByTestId("clue-tokens").getAttribute("data-count"));
+
+      let discardActive = active;
+      if (clueTokens >= 8) {
+        await active.locator('[data-testid^="clue-target-"]').first().click();
+        await selectAClueValueThatTouchesSomething(active);
+        await active.getByTestId("give-clue-button").click();
+        // Wait for the turn to actually flip before deriving who discards
+        // next — a bare re-read races the socket round-trip.
+        await expect(other.getByTestId("turn-indicator")).toHaveText("Your turn");
+        discardActive = other;
+      }
+
+      await discardActive.getByTestId("own-hand-slot-1").click();
+      await expect(discardActive.getByTestId("discard-button")).toBeEnabled();
+      await discardActive.getByTestId("discard-button").click();
+
+      await expect
+        .poll(() => hostPage.getByTestId("discard-pile").getAttribute("data-discard-count"))
+        .toBe(String(i + 1));
+    }
+
+    const orderBefore = await discardTileOrder(hostPage);
+    expect(orderBefore.length).toBeGreaterThanOrEqual(3);
+
+    const draggedId = orderBefore[0]!;
+    const lastId = orderBefore[orderBefore.length - 1]!;
+    const expected = expectedReorder(orderBefore, draggedId, orderBefore.length - 1);
+
+    await dragLocatorTo(
+      hostPage,
+      hostPage.getByTestId(`discard-tile-${draggedId}`),
+      hostPage.getByTestId(`discard-tile-${lastId}`),
+    );
+
+    await expect.poll(() => discardTileOrder(hostPage)).toEqual(expected);
+    // The other player sees the identical order with no manual refresh.
+    await expect.poll(() => discardTileOrder(pageB)).toEqual(expected);
+
+    await pageB.reload();
+    await expect(pageB.getByTestId("own-hand")).toBeVisible();
+    await expect.poll(() => discardTileOrder(pageB)).toEqual(expected);
 
     await contextB.close();
   });

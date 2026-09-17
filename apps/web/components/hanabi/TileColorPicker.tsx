@@ -44,14 +44,18 @@ export function TileColorPicker({ value, onChange }: TileColorPickerProps) {
           aria-label="Choose tile colour"
           aria-expanded={open}
           onClick={() => setOpen((prev) => !prev)}
-          className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+          className="relative inline-flex items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
           style={{ width: 28, height: 28 }}
         >
           <Palette size={16} aria-hidden="true" color="var(--color-text-muted)" />
+          {/* fix(06.2-10): out-of-flow touch target — visible glyph stays
+              small, invisible hit area reaches the CONTROLS_ROW_PX/44px
+              minimum. Must be a DESCENDANT of the button, not a sibling — a
+              sibling span painted after the button sits on top of it (same
+              stacking context, no z-index) and silently swallows every
+              click at the button's own visual location. */}
+          <span aria-hidden="true" className="absolute" style={{ inset: "-8px" }} />
         </button>
-        {/* Out-of-flow touch target — visible glyph stays small, invisible
-            hit area reaches the CONTROLS_ROW_PX/44px minimum. */}
-        <span aria-hidden="true" className="absolute" style={{ inset: "-8px" }} />
       </span>
 
       {open && (
@@ -80,7 +84,7 @@ export function TileColorPicker({ value, onChange }: TileColorPickerProps) {
                   onChange(preset.id);
                   setOpen(false);
                 }}
-                className="inline-flex items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+                className="relative inline-flex items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
                 style={{
                   width: 24,
                   height: 24,
@@ -90,8 +94,12 @@ export function TileColorPicker({ value, onChange }: TileColorPickerProps) {
                       ? "2px solid var(--color-text)"
                       : "1px solid var(--color-border)",
                 }}
-              />
-              <span aria-hidden="true" className="absolute" style={{ inset: "-10px" }} />
+              >
+                {/* fix(06.2-10): moved inside the button — see the toggle
+                    button's own comment above for why a sibling overlay
+                    silently swallows every click. */}
+                <span aria-hidden="true" className="absolute" style={{ inset: "-10px" }} />
+              </button>
             </span>
           ))}
         </div>
