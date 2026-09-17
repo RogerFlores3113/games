@@ -16,7 +16,7 @@ import {
 import { RefusalCard, type RefusalCardReason } from "../../../components/RefusalCard";
 import { JoinForm } from "../../../components/JoinForm";
 import { Lobby } from "../../../components/Lobby";
-import { HanabiBoard } from "../../../components/HanabiBoard";
+import { HanabiBoard } from "../../../components/hanabi/HanabiBoard";
 import { Button } from "../../../components/Button";
 
 export interface RoomClientProps {

@@ -63,13 +63,18 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     // HIDE-01 browser surface: what the OTHER page renders for a player's
     // hand (their real card identities, seeded server-side and secret to
     // this test) must never appear as text on that player's OWN own-hand
-    // region. Deriving the expected strings from what the other page
-    // actually shows avoids hardcoding a card identity.
+    // region. The Phase 6 board renders identity text ONLY inside
+    // `card-identity` (see TeammateCard) — scoping the read to that testid
+    // keeps this comparison exact (suit/rank text only) rather than vacuous
+    // (which a bare `other-hand-card-*` read would risk once those cards
+    // also render a candidate-strip glyph row). Deriving the expected
+    // strings from what the other page actually shows avoids hardcoding a
+    // card identity.
     const hostRealCardTexts = await pageB
-      .locator('[data-testid^="other-hand-card-"]')
+      .locator('[data-testid^="other-hand-card-"] [data-testid="card-identity"]')
       .allTextContents();
     const joinerRealCardTexts = await hostPage
-      .locator('[data-testid^="other-hand-card-"]')
+      .locator('[data-testid^="other-hand-card-"] [data-testid="card-identity"]')
       .allTextContents();
     expect(hostRealCardTexts.length).toBeGreaterThan(0);
     expect(joinerRealCardTexts.length).toBeGreaterThan(0);
@@ -82,6 +87,16 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     for (const cardText of joinerRealCardTexts) {
       expect(joinerOwnHandText).not.toContain(cardText.trim());
     }
+
+    // No clues have been given yet at this point in the test, so no own-hand
+    // card may carry any suit-exposing marker either — neither a
+    // colorblind-safe glyph (`data-glyph`) nor identity text.
+    await expect(
+      hostPage.getByTestId("own-hand").locator('[data-glyph], [data-testid="card-identity"]'),
+    ).toHaveCount(0);
+    await expect(
+      pageB.getByTestId("own-hand").locator('[data-glyph], [data-testid="card-identity"]'),
+    ).toHaveCount(0);
 
     // Play/discard controls exist on both pages; disabled on the waiting
     // player's page regardless of selection, since it is not their turn.

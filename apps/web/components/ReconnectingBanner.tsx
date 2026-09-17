@@ -10,14 +10,15 @@
  * THIS named player currently reachable by the server?" They are different
  * signals rendered in different places; never merge them into one.
  *
- * No accent, no destructive color, no animation (Phase 6 restyles).
+ * No accent, no destructive color, no animation (Phase 6 restyled this to a
+ * fixed top overlay so it never pushes the three bands down).
  */
 export function ReconnectingBanner() {
   return (
     <div
       role="status"
       data-testid="reconnecting-banner"
-      className="flex w-full max-w-md items-center gap-[length:var(--space-xs)] rounded-md border p-[length:var(--space-md)]"
+      className="fixed left-1/2 top-[length:var(--space-sm)] z-40 flex w-full max-w-md -translate-x-1/2 items-center gap-[length:var(--space-xs)] rounded-md border p-[length:var(--space-md)] shadow-lg"
       style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
     >
       <span

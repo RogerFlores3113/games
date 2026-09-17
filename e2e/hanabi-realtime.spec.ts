@@ -17,12 +17,21 @@ import {
  * trying each rendered `clue-value-*` button in turn until the submit
  * button (`give-clue-button`) becomes enabled. Never guesses at card
  * identities — the deck is server-seeded and secret to this test.
+ *
+ * D-17: zero-touch clue-value options are now rendered disabled, so a
+ * `.click()` on one would hang until Playwright's actionability timeout
+ * (disabled elements never become clickable). Skip any button whose
+ * `isEnabled()` is false before attempting to click it.
  */
 async function selectAClueValueThatTouchesSomething(page: Page): Promise<void> {
   const valueButtons = page.locator('[data-testid^="clue-value-"]');
   const count = await valueButtons.count();
   for (let i = 0; i < count; i++) {
-    await valueButtons.nth(i).click();
+    const button = valueButtons.nth(i);
+    if (!(await button.isEnabled())) {
+      continue;
+    }
+    await button.click();
     const enabled = await page.getByTestId("give-clue-button").isEnabled();
     if (enabled) {
       return;
