@@ -179,6 +179,106 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
 
     await contextB.close();
   });
+
+  test("UI-02 + UI-04: the active marker moves and a clue marks the same cards on the giver's and target's screens, persisting across the target's refresh (D-02/D-14/D-24)", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
+    const giverSeat = await seatIdOfOtherPlayer(passivePage);
+    const targetSeat = await seatIdOfOtherPlayer(activePage);
+
+    // UI-02 before: the active marker is on the giver's own-band/turn-
+    // indicator, and on the passive page's rendering of the giver's hand.
+    await expect(activePage.getByTestId("own-band")).toHaveAttribute("data-active", "true");
+    await expect(activePage.getByTestId("turn-indicator")).toHaveAttribute("data-your-turn", "true");
+    await expect(passivePage.getByTestId("own-band")).toHaveAttribute("data-active", "false");
+    await expect(passivePage.getByTestId(`other-hand-${giverSeat}`)).toHaveAttribute("data-active", "true");
+    await expect(activePage.getByTestId(`other-hand-${targetSeat}`)).toHaveAttribute("data-active", "false");
+
+    // Giver targets the sole other seat and selects a clue value that
+    // touches at least one visible card, keeping focus on that value button
+    // (its preview stays active via onFocus/onBlur) — collect the preview
+    // ids before giving the clue.
+    await activePage.getByTestId(`clue-target-${targetSeat}`).click();
+    await selectAClueValueThatTouchesSomething(activePage);
+
+    const previewLocator = activePage.locator(`[data-testid="other-hand-${targetSeat}"] [data-preview="true"]`);
+    await expect(previewLocator.first()).toBeVisible();
+    const previewTestIds = await previewLocator.evaluateAll((els) =>
+      els.map((el) => el.getAttribute("data-testid")),
+    );
+    expect(previewTestIds.length).toBeGreaterThan(0);
+    const touchedCount = previewTestIds.length;
+
+    await activePage.getByTestId("give-clue-button").click();
+
+    // Transient (D-14): the just-clued highlight appears on BOTH the
+    // target's own-hand (passivePage) and the giver's rendering of the
+    // target's hand (activePage), matching the touched count.
+    await expect(passivePage.locator('[data-testid="own-hand"] [data-just-clued="true"]')).toHaveCount(
+      touchedCount,
+    );
+    await expect(
+      activePage.locator(`[data-testid="other-hand-${targetSeat}"] [data-just-clued="true"]`),
+    ).toHaveCount(touchedCount);
+
+    // Persistent marks: on the giver's page, every previously-previewed card
+    // now carries a non-"unclued" luminosity, and the touched count matches
+    // exactly. On the target's own page, the same number of own-hand slots
+    // are non-"unclued".
+    for (const testId of previewTestIds) {
+      if (!testId) continue;
+      await expect(activePage.locator(`[data-testid="${testId}"]`)).toHaveAttribute(
+        "data-luminosity",
+        /^(touched|known)$/,
+      );
+    }
+    await expect(
+      activePage.locator(`[data-testid="other-hand-${targetSeat}"] [data-luminosity]:not([data-luminosity="unclued"])`),
+    ).toHaveCount(touchedCount);
+    await expect(
+      passivePage.locator('[data-testid^="own-hand-slot-"]:not([data-luminosity="unclued"])'),
+    ).toHaveCount(touchedCount);
+
+    // The transient highlight clears after CLUE_HIGHLIGHT_MS while the
+    // persistent marks remain.
+    await expect(passivePage.locator('[data-just-clued="true"]')).toHaveCount(0, { timeout: 5000 });
+    await expect(
+      passivePage.locator('[data-testid^="own-hand-slot-"]:not([data-luminosity="unclued"])'),
+    ).toHaveCount(touchedCount);
+
+    // UI-02 after: the active marker has moved to the target.
+    await expect(passivePage.getByTestId("own-band")).toHaveAttribute("data-active", "true");
+    await expect(passivePage.getByTestId("turn-indicator")).toHaveText("Your turn");
+    await expect(activePage.getByTestId(`other-hand-${targetSeat}`)).toHaveAttribute("data-active", "true");
+    await expect(activePage.getByTestId("own-band")).toHaveAttribute("data-active", "false");
+
+    // Refresh persistence (D-14): the target's own-hand luminosity survives
+    // a reload with no transient replay.
+    const before = await passivePage
+      .locator('[data-testid^="own-hand-slot-"]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute("data-luminosity")));
+
+    await passivePage.reload();
+
+    await expect(passivePage.getByTestId("refusal-card")).toHaveCount(0);
+    await expect(passivePage.getByTestId("own-hand")).toBeVisible();
+
+    await expect
+      .poll(() =>
+        passivePage
+          .locator('[data-testid^="own-hand-slot-"]')
+          .evaluateAll((els) => els.map((el) => el.getAttribute("data-luminosity"))),
+      )
+      .toEqual(before);
+    await expect(
+      passivePage.locator('[data-testid^="own-hand-slot-"]:not([data-luminosity="unclued"])'),
+    ).toHaveCount(touchedCount);
+    await expect(passivePage.locator('[data-just-clued="true"]')).toHaveCount(0);
+
+    await contextB.close();
+  });
 });
 
 test.describe("Phase 5 reconnect hardening (RT-04 + RT-06 + D-14)", () => {
@@ -223,6 +323,7 @@ test.describe("Phase 5 reconnect hardening (RT-04 + RT-06 + D-14)", () => {
     await expect(droppingPage.getByTestId("play-button")).toBeDisabled();
     await expect(droppingPage.getByTestId("discard-button")).toBeDisabled();
     await expect(droppingPage.getByTestId("give-clue-button")).toBeDisabled();
+    await expect(droppingPage.getByTestId("action-reason-play")).toHaveText("Reconnecting — actions paused");
     await expect(droppingPage.getByText(/Connecting to room/)).toHaveCount(0);
     await expect(droppingPage.getByTestId("own-hand")).toBeVisible();
 
