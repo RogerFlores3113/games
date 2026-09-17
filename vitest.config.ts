@@ -78,6 +78,11 @@ export default defineConfig({
           include: ["**/*.test.ts", "**/*.test.tsx"],
           exclude: ["**/node_modules/**", "**/.next/**"],
         },
+        // apps/web's tsconfig sets `jsx: "preserve"` for Next; tests that
+        // import components (own-hand-render.test.ts) need JSX compiled.
+        oxc: {
+          jsx: { runtime: "automatic" },
+        },
         resolve: {
           alias: {
             "@games/schema/games/hanabi": alias("./packages/schema/src/games/hanabi.ts"),

@@ -108,26 +108,61 @@ function stripComments(source: string): string {
 
 const FORBIDDEN_TOKENS = ["exposeSuit", "data-suit", "card-identity", "data-glyph"];
 
+// WR-06: property access in any spelling — `.suit`, `?.suit`, `. suit`, and
+// bracket access `["suit"]` / `['rank']` / `` [`suit`] ``.
+const PROPERTY_ACCESS = /\??\.\s*(suit|rank)\b|\[\s*["'`](suit|rank)["'`]\s*\]/;
+// WR-06: destructuring suit/rank out of anything, e.g. `const { suit } = card`
+// or a `({ rank }) =>` parameter.
+// The prefix admits only a comma-separated binding list (`a`, `a: b`), so a
+// JSX `suit={...}` attribute inside a `{cond && (...)}` block never matches.
+const DESTRUCTURING = /\{\s*(?:[\w$]+\s*(?::\s*[\w$]+)?\s*,\s*)*(suit|rank)\b\s*(?:[,}:]|=(?!\{))/;
+
+/** The source text of `export function OwnHand(` up to the end of the file
+ * or the next top-level `export`, whichever comes first. */
+function ownHandFunctionBody(source: string): string {
+  const start = source.indexOf("export function OwnHand(");
+  if (start === -1) throw new Error("OwnHand function not found in Hand.tsx");
+  const nextExport = source.indexOf("\nexport ", start + 1);
+  return source.slice(start, nextExport === -1 ? source.length : nextExport);
+}
+
+const HAND_PATH = fileURLToPath(new URL("../components/hanabi/Hand.tsx", import.meta.url));
+const ownHandBody = stripComments(ownHandFunctionBody(readFileSync(HAND_PATH, "utf-8")));
+
 describe("own-hand source scan (D-15)", () => {
-  it("OwnHandCard.tsx never reads a card's suit or rank property, even in comments", () => {
-    expect(stripComments(ownHandCardSource)).not.toMatch(/\.(suit|rank)\b/);
+  it("OwnHandCard.tsx code (comments stripped) never reads or destructures a suit or rank property", () => {
+    const code = stripComments(ownHandCardSource);
+    expect(code).not.toMatch(PROPERTY_ACCESS);
+    expect(code).not.toMatch(DESTRUCTURING);
   });
 
-  it("CandidateStrip.tsx never reads a card's suit or rank property, even in comments", () => {
-    expect(stripComments(candidateStripSource)).not.toMatch(/\.(suit|rank)\b/);
+  it("CandidateStrip.tsx code (comments stripped) never reads a suit or rank property", () => {
+    // Destructuring is not banned here: CandidateStrip legitimately
+    // destructures `suit`/`rank` out of its facts-derived CandidateDisplay
+    // (positive marks and candidate pips). Its props type (asserted in
+    // own-hand-render.test.ts) is what keeps a card from ever reaching it.
+    expect(stripComments(candidateStripSource)).not.toMatch(PROPERTY_ACCESS);
   });
 
-  it("neither file opts into exposeSuit or emits a suit-identity DOM marker", () => {
+  it("neither file mentions exposeSuit or a suit-identity DOM marker anywhere, comments included", () => {
     for (const token of FORBIDDEN_TOKENS) {
       expect(ownHandCardSource).not.toContain(token);
       expect(candidateStripSource).not.toContain(token);
     }
   });
 
-  it("OwnHandCard's props type structurally cannot accept a visible card", () => {
-    const hasExtractGuard = ownHandCardSource.includes("Extract<HanabiCardView, { hidden: true }>");
-    const hasFactsOnlyGuard = ownHandCardSource.includes("facts: CardFacts");
-    expect(hasExtractGuard || hasFactsOnlyGuard).toBe(true);
+  it("OwnHand (Hand.tsx) touches only card.id and card.facts — never identity, spreads, or bracket access", () => {
+    expect(ownHandBody).not.toMatch(PROPERTY_ACCESS);
+    expect(ownHandBody).not.toMatch(DESTRUCTURING);
+    expect(ownHandBody).not.toMatch(/\.\.\.\s*card\b/);
+    expect(ownHandBody).not.toMatch(/\bcard\s*\[/);
+    for (const token of FORBIDDEN_TOKENS) {
+      expect(ownHandBody).not.toContain(token);
+    }
+    const cardMembers = new Set([...ownHandBody.matchAll(/\bcard\s*\??\.\s*(\w+)/g)].map((m) => m[1]));
+    expect([...cardMembers].sort()).toEqual(["facts", "id"]);
+    // facts pass through untouched, not rebuilt from a spread/object literal.
+    expect(ownHandBody).toMatch(/facts=\{card\.facts\}/);
   });
 
   it("carries forward the Phase 4 load-bearing no-identity comment", () => {
