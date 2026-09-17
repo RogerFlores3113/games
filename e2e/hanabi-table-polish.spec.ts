@@ -1,0 +1,403 @@
+import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import {
+  createRoom,
+  dragLocatorTo,
+  expectSeatCount,
+  joinAs,
+  ownHandCardIds,
+  seatIdOfOtherPlayer,
+  startTwoPlayerGame,
+  teammateHandCardIds,
+} from "./helpers";
+
+/**
+ * Selects a clue value on `page` (already targeting the sole other seat)
+ * that the board itself shows as touching at least one visible card —
+ * copied locally from hanabi-realtime.spec.ts (that file's own docblock
+ * notes this pattern is not exported for reuse).
+ */
+async function selectAClueValueThatTouchesSomething(page: Page): Promise<void> {
+  const valueButtons = page.locator('[data-testid^="clue-value-"]');
+  const count = await valueButtons.count();
+  for (let i = 0; i < count; i++) {
+    const button = valueButtons.nth(i);
+    if (!(await button.isEnabled())) {
+      continue;
+    }
+    await button.click();
+    const enabled = await page.getByTestId("give-clue-button").isEnabled();
+    if (enabled) {
+      return;
+    }
+  }
+  throw new Error("selectAClueValueThatTouchesSomething: no clue value touched any visible card");
+}
+
+/** Mirrors hanabi-drag-logic.ts's `reorderedCardIds` exactly, so this test
+ * can compute the expected order from a captured `targetIndex` without
+ * importing app source into the e2e project. */
+function expectedReorder(handIds: readonly string[], draggedId: string, targetIndex: number): string[] {
+  const without = handIds.filter((id) => id !== draggedId);
+  const clamped = Math.max(0, Math.min(targetIndex, without.length));
+  const result = without.slice();
+  result.splice(clamped, 0, draggedId);
+  return result;
+}
+
+async function readDeckCount(page: Page): Promise<number> {
+  const text = (await page.getByTestId("deck-count").textContent()) ?? "";
+  const match = text.match(/(\d+)/);
+  if (!match) throw new Error(`readDeckCount: could not parse "${text}"`);
+  return Number(match[1]);
+}
+
+test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
+  test("HAND-01: an off-turn drag reorder is seen by the teammate and survives refresh", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
+    // The passive player's seat id, as observed from the active page — the
+    // teammate whose hand is about to be reordered.
+    const passiveSeatId = await seatIdOfOtherPlayer(activePage);
+
+    const originalOrder = await ownHandCardIds(passivePage);
+    const draggedId = originalOrder[0]!;
+    // Slot 3's zero-based index among the registered slots (slot1=0,
+    // slot2=1, slot3=2) — matches the passive player's own hand, which has
+    // not been reordered yet.
+    const expected = expectedReorder(originalOrder, draggedId, 2);
+
+    // Passive drags its own slot 1 column onto slot 3 — legal off-turn
+    // (D-17) — using raw pointer events, never HTML5 dragTo.
+    await dragLocatorTo(passivePage, passivePage.getByTestId("own-hand-slot-1"), passivePage.getByTestId("own-hand-slot-3"));
+
+    await expect.poll(() => ownHandCardIds(passivePage)).toEqual(expected);
+    await expect.poll(() => teammateHandCardIds(activePage, passiveSeatId)).toEqual(expected);
+
+    // The active turn indicator is unaffected by an off-turn reorder.
+    await expect(activePage.getByTestId("turn-indicator")).toHaveText("Your turn");
+
+    await hostPage.reload();
+    await passivePage.reload();
+    await expect(hostPage.getByTestId("own-hand")).toBeVisible();
+    await expect(passivePage.getByTestId("own-hand")).toBeVisible();
+
+    await expect.poll(() => ownHandCardIds(passivePage)).toEqual(expected);
+    await expect.poll(() => teammateHandCardIds(activePage, passiveSeatId)).toEqual(expected);
+
+    await contextB.close();
+  });
+
+  test("HAND-02: dragging onto the stacks plays on your turn, and an off-turn drop does nothing", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
+
+    const orderBefore = await ownHandCardIds(passivePage);
+    const deckBeforeOffTurn = await readDeckCount(passivePage);
+
+    // Off-turn drag onto the play zone: the reason label appears while
+    // hovering, and releasing changes nothing on either screen.
+    const sourceBox = await passivePage.getByTestId("own-hand-slot-1").boundingBox();
+    const targetBox = await passivePage.getByTestId("play-zone").boundingBox();
+    if (!sourceBox || !targetBox) throw new Error("missing bounding box");
+    const sourceCenter = { x: sourceBox.x + sourceBox.width / 2, y: sourceBox.y + sourceBox.height / 2 };
+    const targetCenter = { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height / 2 };
+
+    await passivePage.mouse.move(sourceCenter.x, sourceCenter.y);
+    await passivePage.mouse.down();
+    await passivePage.mouse.move(sourceCenter.x + 10, sourceCenter.y + 10, { steps: 2 });
+    await passivePage.mouse.move(targetCenter.x, targetCenter.y, { steps: 12 });
+    await expect(passivePage.getByTestId("drop-reason-play")).toBeVisible();
+    await passivePage.mouse.up();
+
+    await expect(passivePage.getByTestId("deck-count")).toHaveText(`${deckBeforeOffTurn} cards left in deck`);
+    await expect(hostPage.getByTestId("deck-count")).toHaveText(`${deckBeforeOffTurn} cards left in deck`);
+    expect(await ownHandCardIds(passivePage)).toEqual(orderBefore);
+
+    // The active player drags slot 1 onto the play zone: a real play.
+    const deckBeforeOnTurn = await readDeckCount(passivePage);
+    await dragLocatorTo(activePage, activePage.getByTestId("own-hand-slot-1"), activePage.getByTestId("play-zone"));
+
+    await expect.poll(() => readDeckCount(passivePage)).toBe(deckBeforeOnTurn - 1);
+
+    await contextB.close();
+  });
+
+  test("HAND-02: dragging onto the discard pile discards", async ({ page: hostPage, browser }) => {
+    const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
+
+    // The active player gives a clue, dropping clue tokens below 8 so the
+    // NEW active player (the current passive player) can discard.
+    const otherSeatButton = activePage.locator('[data-testid^="clue-target-"]').first();
+    await otherSeatButton.click();
+    await selectAClueValueThatTouchesSomething(activePage);
+    await activePage.getByTestId("give-clue-button").click();
+
+    await expect(passivePage.getByTestId("turn-indicator")).toHaveText("Your turn");
+
+    const discardCountBefore = Number(
+      await passivePage.getByTestId("discard-pile").getAttribute("data-discard-count"),
+    );
+
+    await dragLocatorTo(passivePage, passivePage.getByTestId("own-hand-slot-2"), passivePage.getByTestId("discard-pile"));
+
+    await expect
+      .poll(async () => Number(await passivePage.getByTestId("discard-pile").getAttribute("data-discard-count")))
+      .toBe(discardCountBefore + 1);
+    await expect
+      .poll(async () => Number(await activePage.getByTestId("discard-pile").getAttribute("data-discard-count")))
+      .toBe(discardCountBefore + 1);
+
+    await contextB.close();
+  });
+
+  test("HAND-02: Play and Discard buttons still work", async ({ page: hostPage, browser }) => {
+    const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
+
+    const deckBefore = await readDeckCount(passivePage);
+
+    await activePage.getByTestId("own-hand-slot-1").click();
+    await expect(activePage.getByTestId("play-button")).toBeEnabled();
+    await activePage.getByTestId("play-button").click();
+
+    await expect.poll(() => readDeckCount(passivePage)).toBe(deckBefore - 1);
+
+    await contextB.close();
+  });
+
+  test("HAND-03: the drawn card takes the vacated slot on both screens", async ({ page: hostPage, browser }) => {
+    const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
+    const activeSeatId = await seatIdOfOtherPlayer(passivePage);
+
+    const actorIdsBefore = await ownHandCardIds(activePage);
+    const teammateIdsBefore = await teammateHandCardIds(passivePage, activeSeatId);
+    expect(actorIdsBefore).toEqual(teammateIdsBefore);
+
+    await activePage.getByTestId("own-hand-slot-2").click();
+    await expect(activePage.getByTestId("play-button")).toBeEnabled();
+    await activePage.getByTestId("play-button").click();
+
+    await expect
+      .poll(async () => {
+        const ids = await ownHandCardIds(activePage);
+        return ids.length === actorIdsBefore.length && ids[1] !== actorIdsBefore[1];
+      })
+      .toBe(true);
+
+    const actorIdsAfter = await ownHandCardIds(activePage);
+    await expect.poll(() => teammateHandCardIds(passivePage, activeSeatId)).toEqual(actorIdsAfter);
+
+    // Only index 1 (slot 2) changed; every other index is untouched — the
+    // drawn card occupies exactly the vacated slot, on both screens.
+    for (let i = 0; i < actorIdsBefore.length; i++) {
+      if (i === 1) {
+        expect(actorIdsAfter[i]).not.toBe(actorIdsBefore[i]);
+      } else {
+        expect(actorIdsAfter[i]).toBe(actorIdsBefore[i]);
+      }
+    }
+
+    await contextB.close();
+  });
+
+  test("NOTE-01: clue marks sit above every card", async ({ page: hostPage, browser }) => {
+    const { contextB } = await startTwoPlayerGame(hostPage, browser);
+
+    const ownMarks = hostPage.getByTestId("marks-zone-slot-1");
+    const ownCard = hostPage.getByTestId("own-hand-slot-1");
+    const ownMarksBox = await ownMarks.boundingBox();
+    const ownCardBox = await ownCard.boundingBox();
+    if (!ownMarksBox || !ownCardBox) throw new Error("missing bounding box");
+    expect(ownMarksBox.y + ownMarksBox.height).toBeLessThanOrEqual(ownCardBox.y + 1);
+
+    const teammateCard = hostPage.locator('[data-testid^="other-hand-card-"]').first();
+    const teammateTestId = await teammateCard.getAttribute("data-testid");
+    if (!teammateTestId) throw new Error("no teammate card found");
+    const teammateCardId = teammateTestId.replace(/^other-hand-card-/, "");
+    const teammateMarks = hostPage.getByTestId(`marks-zone-${teammateCardId}`);
+    const teammateMarksBox = await teammateMarks.boundingBox();
+    const teammateCardBox = await teammateCard.boundingBox();
+    if (!teammateMarksBox || !teammateCardBox) throw new Error("missing bounding box");
+    expect(teammateMarksBox.y + teammateMarksBox.height).toBeLessThanOrEqual(teammateCardBox.y + 1);
+
+    await contextB.close();
+  });
+
+  test("NOTE-02: a note survives refresh, is never sent, and clears when its card leaves", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, activePage } = await startTwoPlayerGame(hostPage, browser);
+
+    const sentFrames: string[] = [];
+    activePage.on("websocket", (ws) => {
+      ws.on("framesent", ({ payload }) => {
+        if (typeof payload === "string") sentFrames.push(payload);
+      });
+    });
+
+    await activePage.getByTestId("note-chip-slot-1").click();
+    await activePage.getByTestId("note-input-slot-1").fill("r5? save");
+    await activePage.getByTestId("note-input-slot-1").press("Enter");
+    await expect(activePage.getByTestId("note-chip-slot-1")).toHaveText("r5? save");
+
+    await activePage.reload();
+    await expect(activePage.getByTestId("own-hand")).toBeVisible();
+    await expect(activePage.getByTestId("note-chip-slot-1")).toHaveText("r5? save");
+
+    expect(sentFrames.some((frame) => frame.includes("r5? save"))).toBe(false);
+
+    // On the actor's turn, playing slot 1 draws a fresh card into that
+    // slot — its note chip resets to the empty "Add note" state.
+    await activePage.getByTestId("own-hand-slot-1").click();
+    await expect(activePage.getByTestId("play-button")).toBeEnabled();
+    await activePage.getByTestId("play-button").click();
+
+    await expect(activePage.getByTestId("note-chip-slot-1")).toHaveAttribute("aria-label", "Add note");
+
+    await contextB.close();
+  });
+
+  test("D-13: discard overlay opens, closes on Esc, and is remembered", async ({ page: hostPage, browser }) => {
+    const { contextB } = await startTwoPlayerGame(hostPage, browser);
+
+    await hostPage.getByTestId("discard-toggle").click();
+    await expect(hostPage.getByTestId("discard-overlay")).toBeVisible();
+
+    await hostPage.reload();
+    await expect(hostPage.getByTestId("own-hand")).toBeVisible();
+    await expect(hostPage.getByTestId("discard-overlay")).toBeVisible();
+
+    await hostPage.keyboard.press("Escape");
+    await expect(hostPage.getByTestId("discard-overlay")).toBeHidden();
+
+    await hostPage.reload();
+    await expect(hostPage.getByTestId("own-hand")).toBeVisible();
+    await expect(hostPage.getByTestId("discard-overlay")).toBeHidden();
+
+    await contextB.close();
+  });
+
+  test("AUD-01: refresh plays no catch-up sound and a live action does", async ({ page: hostPage, browser }) => {
+    function installFakeAudioContext() {
+      (window as unknown as { __soundStarts: number }).__soundStarts = 0;
+
+      class FakeParam {
+        value = 0;
+        setValueAtTime() {
+          return this;
+        }
+        linearRampToValueAtTime() {
+          return this;
+        }
+        exponentialRampToValueAtTime() {
+          return this;
+        }
+      }
+      class FakeGain {
+        gain = new FakeParam();
+        connect() {
+          return this;
+        }
+      }
+      class FakeFilter {
+        type = "bandpass";
+        frequency = new FakeParam();
+        Q = new FakeParam();
+        connect() {
+          return this;
+        }
+      }
+      class FakeOscillator {
+        type = "sine";
+        frequency = new FakeParam();
+        connect() {
+          return this;
+        }
+        start() {
+          (window as unknown as { __soundStarts: number }).__soundStarts += 1;
+        }
+        stop() {}
+      }
+      class FakeBufferSource {
+        buffer: unknown = null;
+        connect() {
+          return this;
+        }
+        start() {
+          (window as unknown as { __soundStarts: number }).__soundStarts += 1;
+        }
+        stop() {}
+      }
+      class FakeAudioContext {
+        currentTime = 0;
+        state = "running";
+        sampleRate = 44100;
+        destination = {};
+        resume() {
+          return Promise.resolve();
+        }
+        createOscillator() {
+          return new FakeOscillator();
+        }
+        createGain() {
+          return new FakeGain();
+        }
+        createBiquadFilter() {
+          return new FakeFilter();
+        }
+        createBuffer() {
+          return { getChannelData: () => new Float32Array(1) };
+        }
+        createBufferSource() {
+          return new FakeBufferSource();
+        }
+      }
+
+      (window as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    }
+
+    await hostPage.context().addInitScript(installFakeAudioContext);
+    const contextB = await browser.newContext();
+    await contextB.addInitScript(installFakeAudioContext);
+
+    const code = await createRoom(hostPage, { name: "Roger" });
+    const pageB = await joinAs(contextB, code, "Bianca");
+    await expectSeatCount(hostPage, 2);
+
+    await hostPage.getByTestId("start-game").click();
+    await expect(hostPage.getByTestId("own-hand")).toBeVisible();
+    await expect(pageB.getByTestId("own-hand")).toBeVisible();
+
+    const hostText = (await hostPage.getByTestId("turn-indicator").textContent()) ?? "";
+    const hostIsActive = hostText === "Your turn";
+    const activePage = hostIsActive ? hostPage : pageB;
+    const observer = hostIsActive ? pageB : hostPage;
+
+    async function soundStarts(page: Page): Promise<number> {
+      return page.evaluate(() => (window as unknown as { __soundStarts: number }).__soundStarts);
+    }
+
+    // Gesture-unlock the observer.
+    await observer.locator("body").click();
+
+    const otherSeatButton = activePage.locator('[data-testid^="clue-target-"]').first();
+    await otherSeatButton.click();
+    await selectAClueValueThatTouchesSomething(activePage);
+    await activePage.getByTestId("give-clue-button").click();
+
+    await expect.poll(() => soundStarts(observer)).toBeGreaterThan(0);
+
+    await observer.reload();
+    await expect(observer.getByTestId("own-hand")).toBeVisible();
+    await observer.locator("body").click();
+    await observer.waitForTimeout(1500);
+    expect(await soundStarts(observer)).toBe(0);
+
+    await contextB.close();
+  });
+});

@@ -1,4 +1,4 @@
-import type { Browser, BrowserContext, Page } from "@playwright/test";
+import type { Browser, BrowserContext, Locator, Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
 export type Variant = "base" | "rainbow" | "black";
@@ -187,4 +187,54 @@ export async function freezePage(page: Page): Promise<import("@playwright/test")
 /** D-14: reverses `freezePage`, reusing the same CDP session. */
 export async function resumePage(session: import("@playwright/test").CDPSession): Promise<void> {
   await session.send("Page.setWebLifecycleState", { state: "active" });
+}
+
+/**
+ * D-20/D-30: drags `source` onto `target` using raw mouse events (never
+ * HTML5 `dragTo`, which does not exercise the app's Pointer Event
+ * listeners with `setPointerCapture`). Moves to the source center, presses
+ * down, moves a few px to clear the app's own drag threshold, then glides
+ * to the target center over several steps before releasing — giving the
+ * app's `pointermove` handler enough intermediate points to resolve the
+ * hovered drop zone before the final `pointerup`.
+ */
+export async function dragLocatorTo(page: Page, source: Locator, target: Locator): Promise<void> {
+  const sourceBox = await source.boundingBox();
+  const targetBox = await target.boundingBox();
+  if (!sourceBox || !targetBox) {
+    throw new Error("dragLocatorTo: source or target has no bounding box");
+  }
+  const sourceCenter = { x: sourceBox.x + sourceBox.width / 2, y: sourceBox.y + sourceBox.height / 2 };
+  const targetCenter = { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height / 2 };
+
+  await page.mouse.move(sourceCenter.x, sourceCenter.y);
+  await page.mouse.down();
+  // Clear the app's DRAG_THRESHOLD_PX before resolving any drop target.
+  await page.mouse.move(sourceCenter.x + 10, sourceCenter.y + 10, { steps: 2 });
+  await page.mouse.move(targetCenter.x, targetCenter.y, { steps: 12 });
+  await page.mouse.up();
+}
+
+/**
+ * Reads `[data-card-id]` from the viewer's own hand, in DOM order — the
+ * D-15-safe way to observe reorder/slot-replacement effects without ever
+ * touching a card's suit/rank identity (own-hand cards carry no identity
+ * fields to read).
+ */
+export async function ownHandCardIds(page: Page): Promise<string[]> {
+  const ids = await page.locator('[data-testid="own-hand"] [data-card-id]').evaluateAll((els) =>
+    els.map((el) => el.getAttribute("data-card-id") ?? ""),
+  );
+  return ids;
+}
+
+/**
+ * Reads the ids off a teammate's rendered cards (`other-hand-card-{id}`
+ * testids) inside `other-hand-{seatId}`, in DOM order.
+ */
+export async function teammateHandCardIds(page: Page, seatId: string): Promise<string[]> {
+  const testIds = await page
+    .locator(`[data-testid="other-hand-${seatId}"] [data-testid^="other-hand-card-"]`)
+    .evaluateAll((els) => els.map((el) => el.getAttribute("data-testid") ?? ""));
+  return testIds.map((testId) => testId.replace(/^other-hand-card-/, ""));
 }
