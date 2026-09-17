@@ -152,27 +152,21 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     }
 
     // HIDE-01 browser surface (WR-07): with no clue given yet, every own-hand
-    // slot must show zero knowledge — no confirmed suit/rank, every rank and
-    // suit pip still fully possible, and the unclued luminosity. A rendering
-    // leak of any identity signal changes at least one of these.
+    // slot must show zero knowledge — no hint overlay rendered at all, and
+    // the unclued luminosity. A rendering leak of any identity signal
+    // changes at least one of these.
     for (const page of [hostPage, pageB]) {
       const slots = page.locator('[data-testid^="own-hand-slot-"]');
       const slotCount = await slots.count();
       expect(slotCount).toBeGreaterThan(0);
       for (let i = 0; i < slotCount; i++) {
         const slot = slots.nth(i);
-        // D-07: clue marks now render in a fixed marks-zone-slot-N above the
-        // card, not inside own-hand-slot-N itself.
-        const marksZone = page.getByTestId(`marks-zone-slot-${i + 1}`);
+        // HINT-01/02/04: clue hints now render on the tile itself via a
+        // `own-hand-slot-N-hints` overlay (HintIndicator), not an automatic
+        // clue-mark pip row above the card — that pip band is deleted.
         await expect(slot).toHaveAttribute("data-luminosity", "unclued");
-        await expect(marksZone.locator('[data-testid="confirmed-rank"]')).toHaveCount(0);
-        await expect(marksZone.locator('[data-testid="confirmed-suit"]')).toHaveCount(0);
-        await expect(marksZone.locator('[data-told="true"]')).toHaveCount(0);
-        const pipOpacities = await marksZone
-          .locator('[data-testid="rank-pips"] > *, [data-testid="suit-pips"] > *')
-          .evaluateAll((els) => els.map((el) => getComputedStyle(el).opacity));
-        expect(pipOpacities.length).toBeGreaterThan(0);
-        expect(pipOpacities.every((opacity) => opacity === "1")).toBe(true);
+        await expect(slot).toHaveAttribute("data-hints", "false");
+        await expect(page.getByTestId(`own-hand-slot-${i + 1}-hints`)).toHaveCount(0);
       }
     }
 
@@ -385,14 +379,17 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       await expect(locator).toBeInViewport();
     }
 
-    // Phase 6.1 D-01: the marks/note/audio/discard-overlay additions still
-    // fit at 1280x720 alongside the rest of the tableau.
-    await expect(hostPage.getByTestId("marks-zone-slot-1")).toBeInViewport();
-    await expect(hostPage.getByTestId("marks-zone-slot-1-note-row")).toBeInViewport();
+    // Phase 6.1/6.2 D-01: the note/audio/discard-overlay additions and the
+    // tile-borne hint surfaces still fit at 1280x720 alongside the rest of
+    // the tableau. HINT-04 deletes the automatic clue-mark pip band —
+    // own-hand-slot-1 and note-chip-slot-1 (both present unconditionally)
+    // are the fit checks that replace the deleted pip-band assertions.
+    await expect(hostPage.getByTestId("own-hand-slot-1")).toBeInViewport();
+    await expect(hostPage.getByTestId("note-chip-slot-1")).toBeInViewport();
     await expect(hostPage.getByTestId("audio-mute-toggle")).toBeInViewport();
     await expect(hostPage.getByTestId("discard-toggle")).toBeInViewport();
     await expect(
-      hostPage.locator('[data-testid="teammates-band"] [data-testid^="marks-zone-"]').first(),
+      hostPage.locator('[data-testid="teammates-band"] [data-testid^="other-hand-card-"]').first(),
     ).toBeInViewport();
     const playedStacksAt1280 = hostPage.locator('[data-testid^="played-stack-"]');
     const playedStacksAt1280Count = await playedStacksAt1280.count();

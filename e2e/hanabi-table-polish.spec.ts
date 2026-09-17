@@ -204,25 +204,21 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await contextB.close();
   });
 
-  test("NOTE-01: clue marks sit above every card", async ({ page: hostPage, browser }) => {
+  test("HINT-04: no automatic clue-mark overlay renders on an unclued card", async ({ page: hostPage, browser }) => {
+    // HINT-01/02/04: the pip band that used to sit above every card is
+    // deleted. Hints now render as an overlay ON the tile itself
+    // (HintIndicator), and only once a clue has actually touched the card —
+    // with no clue given yet, no own-hand or teammate card carries one.
     const { contextB } = await startTwoPlayerGame(hostPage, browser);
 
-    const ownMarks = hostPage.getByTestId("marks-zone-slot-1");
     const ownCard = hostPage.getByTestId("own-hand-slot-1");
-    const ownMarksBox = await ownMarks.boundingBox();
-    const ownCardBox = await ownCard.boundingBox();
-    if (!ownMarksBox || !ownCardBox) throw new Error("missing bounding box");
-    expect(ownMarksBox.y + ownMarksBox.height).toBeLessThanOrEqual(ownCardBox.y + 1);
+    await expect(ownCard).toHaveAttribute("data-hints", "false");
+    await expect(hostPage.getByTestId("own-hand-slot-1-hints")).toHaveCount(0);
 
     const teammateCard = hostPage.locator('[data-testid^="other-hand-card-"]').first();
     const teammateTestId = await teammateCard.getAttribute("data-testid");
     if (!teammateTestId) throw new Error("no teammate card found");
-    const teammateCardId = teammateTestId.replace(/^other-hand-card-/, "");
-    const teammateMarks = hostPage.getByTestId(`marks-zone-${teammateCardId}`);
-    const teammateMarksBox = await teammateMarks.boundingBox();
-    const teammateCardBox = await teammateCard.boundingBox();
-    if (!teammateMarksBox || !teammateCardBox) throw new Error("missing bounding box");
-    expect(teammateMarksBox.y + teammateMarksBox.height).toBeLessThanOrEqual(teammateCardBox.y + 1);
+    await expect(hostPage.getByTestId(`${teammateTestId}-hints`)).toHaveCount(0);
 
     await contextB.close();
   });
