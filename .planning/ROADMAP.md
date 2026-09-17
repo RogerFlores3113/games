@@ -304,7 +304,7 @@ Plans:
 **Goal:** Rework the table's visual language and hint feedback so the board reads like a physical tile game, and give the discard pile a shared, player-arrangeable order.
 **Requirements**: HINT-01, HINT-02, HINT-03, HINT-04, NOTE-03, DRAG-01, TILE-01, TILE-02, TILE-03, BOARD-01, BOARD-02, BOARD-03, BOARD-04, BOARD-05, DISC-01 (from the 17 owner requests under "## Gaps" in .planning/phases/06.1-table-polish-firework-art-notes-drag-audio/06.1-HUMAN-UAT.md)
 **Depends on:** Phase 06.1
-**Plans:** 1/11 plans executed
+**Plans:** 2/11 plans executed
 
 Scope (owner requests, 06.1 sign-off):
 - Hint display: a clue highlights the tile in that clue's colour (not a generic yellow); a number clue shows the number on the tile back; a "keep hints visible" toggle (on = hints persist past the next player's move, off = they clear).
@@ -323,7 +323,7 @@ Plans:
 **Wave 1**
 
 - [x] 06.2-01-PLAN.md — Engine + wire: shared discardOrder state, reorderDiscard action, permutation property test (DISC-01)
-- [ ] 06.2-02-PLAN.md — Seven @theme tokens, wooden board surface, shift-aside motion, 1280x720 height ledger
+- [x] 06.2-02-PLAN.md — Seven @theme tokens, wooden board surface, shift-aside motion, 1280x720 height ledger
 - [ ] 06.2-03-PLAN.md — Pure hint derivation and lifetime, keep-hints and tile-colour preferences
 
 **Wave 2** *(blocked on Wave 1)*
