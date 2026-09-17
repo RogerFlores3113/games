@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Wire Engine Into Room Actor** - Replace the toy game with the real engine behind the game-adapter interface, delivering a live, correctly-filtered, correctly-ruled base-game table. (completed 2026-09-16)
 - [x] **Phase 5: Reconnect & Session Durability Hardening** - Exercise and harden the mobile-backgrounding and multi-tab failure modes that a manual refresh test does not surface. (completed 2026-09-16)
 - [x] **Phase 6: Game Interface** - Build the board render, persistent per-card clue memory, colorblind-safe glyphs, and dark "fireworks night" luminosity theme against the now-stable wire contract. (completed 2026-09-17)
-- [ ] **Phase 6.1: Table Polish (INSERTED)** - Firework-burst card art per suit, clue marks above cards plus player notes, drag reorder/play/discard with slot-preserving draws, audio cues, and a city-at-night background.
+- [x] **Phase 6.1: Table Polish (INSERTED)** - Firework-burst card art per suit, clue marks above cards plus player notes, drag reorder/play/discard with slot-preserving draws, audio cues, and a city-at-night background. (completed 2026-09-17)
 - [ ] **Phase 7: Variant Support (Rainbow, Black)** - Enable and test the Rainbow and Black configurations end to end, proving the variant-parametrized engine and UI built earlier need no special-casing.
 
 ## Phase Details
@@ -274,7 +274,7 @@ Plans:
   5. Distinct short sounds play for a clue, a play, a discard, a lost fuse, and a completed stack, over a static city-at-night background that leaves cards legible.
 
 **Notes:** Owner feedback recorded verbatim in `.planning/phases/06-game-interface/06-HUMAN-UAT.md`. HAND-01/HAND-03 change hand ordering in the engine and wire contract, so the per-seat redaction chokepoint and leak tests must stay intact. The owner asked for the box game's per-color burst designs; the art must be original work in that spirit, not copied publisher artwork — show the owner the burst shapes before building them into cards.
-**Plans:** 14/15 plans executed
+**Plans:** 15/15 plans complete
 
 Plans:
 
@@ -292,7 +292,7 @@ Plans:
 - [x] 06.1-12-PLAN.md — Drag to reorder/play/discard with drop zones (HAND-01, HAND-02)
 - [x] 06.1-13-PLAN.md — Fly-to animation for departing cards (HAND-02, HAND-03)
 - [x] 06.1-14-PLAN.md — Playwright proofs for the phase (all behavioural requirements)
-- [ ] 06.1-15-PLAN.md — Phase gate + owner visual/audio sign-off (D-31)
+- [x] 06.1-15-PLAN.md — Phase gate + owner visual/audio sign-off (D-31)
 
 **Cross-cutting constraints:**
 

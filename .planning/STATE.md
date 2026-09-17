@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 06.1-13-PLAN.md
-last_updated: "2026-09-17T16:20:43.633Z"
+last_updated: "2026-09-17T18:41:58.552Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 8
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 59
-  completed_plans: 58
-  percent: 75
+  completed_plans: 59
+  percent: 88
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 06.1 (table-polish-firework-art-notes-drag-audio) — EXECUTING
-Plan: 14 of 15
+Plan: 15 of 15
 Status: Ready to execute
 Last activity: 2026-09-17
 
-Progress: [██████████] 98%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -115,6 +115,7 @@ Progress: [██████████] 98%
 | Phase 06.1 P12 | 35min | 2 tasks | 10 files |
 | Phase 06.1 P13 | 25min | 2 tasks | 5 files |
 | Phase 06.1 P14 | 40min | 2 tasks | 3 files |
+| Phase 06.1 P15 | 25min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -238,6 +239,8 @@ Recent decisions affecting current work:
 - [Phase 06.1-13]: suppressedCardIds entries deleted from the ref's Set immediately once consumed, so a later reused card id is never wrongly suppressed
 - [Phase 06.1-13]: prefers-reduced-motion checked twice (FlyToLayer behavioral skip + globals.css structural override) as defense in depth
 - [Phase 06.1-14]: e2e gesture-unlock clicks must use page.mouse.click(x,y) at a fixed coordinate, not locator('body').click(), on the table-backdrop min-h-screen overflow-y-auto layout
+- [Phase ?]: Owner approved all 06.1 table-polish work; recorded 17 follow-on requests as Gaps for a future plan, not defects
+- [Phase ?]: RT-04 reconnect flake was a real pre-existing bug (partysocket ignoring reconnect() mid-backoff), fixed in 9acc73d and verified green under this plan's fresh gate
 
 ### Pending Todos
 
@@ -258,6 +261,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T16:18:39.793Z
+Last session: 2026-09-17T18:41:58.540Z
 Stopped at: Completed 06.1-13-PLAN.md
 Resume file: None
