@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { CSSProperties, RefObject } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { Layers } from "lucide-react";
 import type { HanabiView, Suit } from "@games/rules";
 import { fusesRemainingForView } from "../../lib/hanabi-board-logic";
 import { deckCountText, newlyCompletedStacks, STACK_FLASH_MS } from "../../lib/hanabi-visual-logic";
 import { readDiscardViewPref, writeDiscardViewPref, type DiscardView } from "../../lib/hanabi-discard-logic";
 import type { DropTarget, DropZoneStatus } from "../../lib/hanabi-drag-logic";
+import { applyPendingOrder } from "../../lib/hanabi-discard-drag-logic";
+import type { DiscardDragState } from "./useDiscardDrag";
 import { DECK_COUNTER_PX, DISCARD_AREA_PX, LEFT_COLUMN_PX, PLAY_AREA_PX } from "../../lib/layout-budget";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
 import { DiscardOverlay } from "./DiscardOverlay";
@@ -26,6 +28,13 @@ export interface TableProps {
   playZoneRef?: RefObject<HTMLDivElement | null>;
   discardZoneRef?: RefObject<HTMLDivElement | null>;
   dropStatus?: TableDropStatus | null;
+  /** DISC-01: discard-pile drag wiring, threaded through from
+   * `useDiscardDrag` via `HanabiBoard`. Optional so `table-render.test.ts`'s
+   * existing render calls (which predate this plan) keep working unchanged. */
+  discardDragState?: DiscardDragState | null;
+  discardPendingOrder?: string[] | null;
+  registerDiscardTile?: (cardId: string, el: HTMLElement | null) => void;
+  onDiscardTilePointerDown?: (cardId: string, event: ReactPointerEvent) => void;
 }
 
 /** D-16: a drop-zone's box-shadow highlight (enabled zones only — a
@@ -92,7 +101,16 @@ function AreaLabel({ children }: { children: string }) {
  * (resolved defensively via `resolveDiscardOrder`), and every played stack
  * shows every card via `PlayedStack`'s horizontal fan.
  */
-export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: TableProps) {
+export function Table({
+  game,
+  playZoneRef,
+  discardZoneRef,
+  dropStatus = null,
+  discardDragState = null,
+  discardPendingOrder = null,
+  registerDiscardTile,
+  onDiscardTilePointerDown,
+}: TableProps) {
   const prevStacksRef = useRef<HanabiView["stacks"] | null>(null);
   const [flashingSuits, setFlashingSuits] = useState<ReadonlySet<Suit>>(new Set());
   const flashClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -145,7 +163,12 @@ export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: 
   }, [game.stacks]);
 
   const fusesRemaining = fusesRemainingForView(game);
-  const orderedDiscard = resolveDiscardOrder(game.discardOrder, game.discard);
+  const serverOrderedDiscard = resolveDiscardOrder(game.discardOrder, game.discard);
+  // DISC-01/D-27: while a discard-pile drag is pending confirmation, the
+  // dragging player's own view shows the pending order immediately;
+  // `applyPendingOrder` falls back to `serverOrderedDiscard` unchanged if
+  // the pending ids no longer match the current pile (stale, per D-27).
+  const orderedDiscard = applyPendingOrder(serverOrderedDiscard, discardPendingOrder);
 
   const playHighlight = dropZoneHighlightStyle(dropStatus?.play, dropStatus?.hovered === "play");
   const discardHighlight = dropZoneHighlightStyle(dropStatus?.discard, dropStatus?.hovered === "discard");
@@ -272,16 +295,38 @@ export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: 
               </span>
             )}
             {orderedDiscard.length > 0 ? (
-              orderedDiscard.map((card) => (
-                <span
-                  key={card.id}
-                  data-testid={`discard-tile-${card.id}`}
-                  className="inline-flex flex-col items-center"
-                >
-                  <FireworkCardFace suit={card.suit} rank={card.rank} width={40} height={54} />
-                  <span className="sr-only">{`${SUIT_VISUALS[card.suit].label} ${card.rank}`}</span>
-                </span>
-              ))
+              orderedDiscard.map((card) => {
+                const dragging = discardDragState?.cardId === card.id;
+                // D-20: mirrors OwnHandCard's drag-lift transform — tracks
+                // the pointer via translate while dragging, no continuous
+                // animation otherwise (drag-snap handles the release).
+                const dragTransform =
+                  dragging && discardDragState
+                    ? `translate(${discardDragState.offset.x}px, ${discardDragState.offset.y}px) scale(1.05)`
+                    : undefined;
+                return (
+                  <span
+                    key={card.id}
+                    ref={(el) => registerDiscardTile?.(card.id, el)}
+                    data-testid={`discard-tile-${card.id}`}
+                    data-dragging={String(dragging)}
+                    onPointerDown={(event) => onDiscardTilePointerDown?.(card.id, event)}
+                    className={
+                      "relative inline-flex flex-col items-center" +
+                      (dragging ? " cursor-grabbing" : " cursor-grab") +
+                      (dragging ? "" : " drag-snap")
+                    }
+                    style={{
+                      transform: dragTransform,
+                      zIndex: dragging ? 10 : undefined,
+                      touchAction: "none",
+                    }}
+                  >
+                    <FireworkCardFace suit={card.suit} rank={card.rank} width={40} height={54} />
+                    <span className="sr-only">{`${SUIT_VISUALS[card.suit].label} ${card.rank}`}</span>
+                  </span>
+                );
+              })
             ) : (
               <p
                 className="text-[length:var(--text-body)]"

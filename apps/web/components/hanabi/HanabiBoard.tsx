@@ -38,12 +38,14 @@ import { AudioControls } from "./AudioControls";
 import { TileColorPicker } from "./TileColorPicker";
 import { useHanabiAudio } from "./useHanabiAudio";
 import { useHandDrag } from "./useHandDrag";
+import { useDiscardDrag } from "./useDiscardDrag";
 
 export type HanabiActionRequest =
   | { type: "play"; cardId: string }
   | { type: "discard"; cardId: string }
   | { type: "clue"; targetSeatId: string; clue: Clue }
-  | { type: "reorder"; cardIds: string[] };
+  | { type: "reorder"; cardIds: string[] }
+  | { type: "reorderDiscard"; cardIds: string[] };
 
 export interface HanabiBoardProps {
   view: RoomView;
@@ -201,6 +203,7 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
   // a null and a present `game` render.
   const ctx: ActionContext = { reconnecting, ended, labelFor };
   const drag = useHandDrag({ game, ctx, onDropRequest: act });
+  const discardDrag = useDiscardDrag({ game, ctx, onDropRequest: act });
 
   if (!game) {
     return (
@@ -310,6 +313,10 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
           playZoneRef={drag.playZoneRef}
           discardZoneRef={drag.discardZoneRef}
           dropStatus={dropStatus}
+          discardDragState={discardDrag.dragState}
+          discardPendingOrder={discardDrag.pendingOrder}
+          registerDiscardTile={discardDrag.registerTile}
+          onDiscardTilePointerDown={discardDrag.onTilePointerDown}
         />
       </div>
 
