@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 import { Layers } from "lucide-react";
 import type { HanabiView, Suit } from "@games/rules";
-import { MAX_FUSES, RANKS } from "@games/rules";
+import { RANKS } from "@games/rules";
 import { fusesRemainingForView } from "../../lib/hanabi-board-logic";
 import { deckCountText, newlyCompletedStacks, STACK_FLASH_MS } from "../../lib/hanabi-visual-logic";
 import { groupDiscardsBySuit, readDiscardViewPref, writeDiscardViewPref, type DiscardView } from "../../lib/hanabi-discard-logic";
 import type { DropTarget, DropZoneStatus } from "../../lib/hanabi-drag-logic";
+import { DECK_COUNTER_PX, DISCARD_AREA_PX, LEFT_COLUMN_PX, PLAY_AREA_PX } from "../../lib/layout-budget";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
 import { DiscardOverlay } from "./DiscardOverlay";
 import { FireworkCardFace } from "./FireworkCard";
@@ -38,11 +39,32 @@ function dropZoneHighlightStyle(status: DropZoneStatus | undefined, hovered: boo
   };
 }
 
+/** Shared caption treatment for the Play/Discard area labels — reuses the
+ * existing disabled-reason-caption typographic role (Label, muted, inset at
+ * the outline's top-left corner) rather than a heading, per UI-SPEC. */
+function AreaLabel({ children }: { children: string }) {
+  return (
+    <span
+      className="text-[length:var(--text-label)] font-semibold"
+      style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
+    >
+      {children}
+    </span>
+  );
+}
+
 /**
  * D-01: the tableau — stacks, tokens, deck/final-round count, and discard
  * pile — always rendered, no menu/drawer/tab/hover gate. D-11: a stack that
  * reaches rank 5 gets a single 600ms flash, never a continuously-running
  * animation.
+ *
+ * BOARD-01/BOARD-04/TILE-02 (Task 1 of 06.2-07's rework): a wooden
+ * `.board-surface` panel laid out as a single `items-stretch` flex row with
+ * two children — the left column (Play above Deck-counter above Discard,
+ * each a fixed layout-budget height) and the right column (token totals,
+ * swapped for the real `TokenColumn` in Task 2). Stack/discard art is
+ * swapped for `PlayedStack`/`discardOrder` rendering in Tasks 2 and 3.
  */
 export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: TableProps) {
   const prevStacksRef = useRef<HanabiView["stacks"] | null>(null);
@@ -97,7 +119,6 @@ export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: 
   }, [game.stacks]);
 
   const fusesRemaining = fusesRemainingForView(game);
-  const fusesUsed = MAX_FUSES - fusesRemaining;
   const discardGroups = groupDiscardsBySuit(game.discard, game.variant).filter((group) => group.total > 0);
 
   const playHighlight = dropZoneHighlightStyle(dropStatus?.play, dropStatus?.hovered === "play");
@@ -109,22 +130,20 @@ export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: 
     <section
       data-testid="tableau"
       aria-label="Table"
-      className="flex flex-wrap gap-[length:var(--space-sm)] rounded-md border p-[length:var(--space-xs)]"
-      style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+      className="board-surface flex items-stretch gap-[length:var(--space-md)] p-[length:var(--space-sm)]"
     >
-      <div className="flex flex-wrap items-center gap-[length:var(--space-md)]">
-        <div className="flex flex-col gap-[length:var(--space-xs)]">
-          <span
-            className="text-[length:var(--text-label)] font-semibold"
-            style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
-          >
-            Fireworks
-          </span>
+      <div className="flex flex-col gap-[length:var(--space-xs)]" style={{ height: LEFT_COLUMN_PX }}>
+        {/* Play area (BOARD-01) */}
+        <div
+          className="relative flex flex-col gap-[length:var(--space-xs)] overflow-hidden rounded-md border p-[length:var(--space-xs)]"
+          style={{ height: PLAY_AREA_PX, borderColor: "var(--color-border)" }}
+        >
+          <AreaLabel>Play</AreaLabel>
           <div
             ref={playZoneRef}
             data-testid="play-zone"
             data-drop-state={playDropState}
-            className="relative flex flex-wrap gap-[length:var(--space-sm)] rounded-md"
+            className="relative flex flex-1 flex-wrap items-center gap-[length:var(--space-sm)] rounded-md"
             style={playHighlight}
           >
             {dropStatus && !dropStatus.play.enabled && dropStatus.play.reason && (
@@ -160,9 +179,6 @@ export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: 
                     width: "48px",
                     height: "64px",
                     backgroundColor: "var(--color-surface)",
-                    // Completed-stack static glow: same LUMINOSITY_FRAME "known" values as
-                    // luminosity-frame.ts — inlined here since that module lives in 06-03's
-                    // scope and this component consumes stack completion, not card facts.
                     border: complete ? "2px solid var(--color-card-glow)" : "1px solid var(--color-border)",
                     boxShadow: complete
                       ? "0 0 16px 0 rgba(255, 217, 138, 0.65), 0 0 4px 0 rgba(255, 217, 138, 0.9)"
@@ -170,8 +186,6 @@ export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: 
                   }}
                 >
                   {stack.topRank > 0 ? (
-                    // Owner override (06.1-07): FireworkCardFace has no
-                    // numeralSize prop — rank reads from burst count only.
                     <FireworkCardFace
                       suit={stack.suit}
                       rank={stack.topRank as 1 | 2 | 3 | 4 | 5}
@@ -200,95 +214,23 @@ export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: 
           </div>
         </div>
 
-        <div className="flex flex-col gap-[length:var(--space-xs)]">
-          <p
-            data-testid="clue-tokens"
-            className="text-[length:var(--text-body)]"
-            style={{ color: "var(--color-text)", lineHeight: "var(--text-body--line-height)" }}
-          >
-            {game.clueTokens} clue tokens
-          </p>
-          <div aria-hidden="true" className="flex gap-[length:var(--space-xs)]">
-            {Array.from({ length: 8 }, (_, i) => (
-              <span
-                key={i}
-                className="inline-block h-2 w-2 rounded-full"
-                style={{
-                  backgroundColor: i < game.clueTokens ? "var(--color-text)" : "transparent",
-                  border: i < game.clueTokens ? "none" : "1px solid var(--color-border)",
-                }}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-[length:var(--space-xs)]">
-          <p
-            data-testid="fuse-tokens"
-            className="text-[length:var(--text-body)]"
-            style={{ color: "var(--color-text)", lineHeight: "var(--text-body--line-height)" }}
-          >
-            {fusesRemaining} fuses left
-          </p>
-          <div aria-hidden="true" className="flex gap-[length:var(--space-xs)]">
-            {Array.from({ length: MAX_FUSES }, (_, i) => (
-              <span
-                key={i}
-                className="inline-block h-2 w-2 rounded-full"
-                style={{
-                  backgroundColor: i < fusesUsed ? "var(--color-destructive)" : "var(--color-text)",
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex w-full flex-wrap items-start gap-[length:var(--space-md)]">
+        {/* Deck counter (BOARD-04), between Play and Discard */}
         <p
           data-testid="deck-count"
           data-final-round={String(game.finalTurnsRemaining !== null)}
-          className="text-[length:var(--text-body)]"
-          style={{ color: "var(--color-text)", lineHeight: "var(--text-body--line-height)" }}
+          className="flex items-center justify-center text-[length:var(--text-label)] font-semibold"
+          style={{ height: DECK_COUNTER_PX, color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
         >
           {deckCountText(game)}
         </p>
 
+        {/* Discard area (BOARD-01) */}
         <div
-          ref={discardZoneRef}
-          data-testid="discard-pile"
-          data-discard-count={game.discard.length}
-          data-view={view}
-          data-drop-state={discardDropState}
-          className="relative flex flex-col gap-[length:var(--space-xs)] rounded-md"
-          style={discardHighlight}
+          className="relative flex flex-col gap-[length:var(--space-xs)] overflow-hidden rounded-md border p-[length:var(--space-xs)]"
+          style={{ height: DISCARD_AREA_PX, borderColor: "var(--color-border)" }}
         >
-          {dropStatus && !dropStatus.discard.enabled && dropStatus.discard.reason && (
-            <span
-              data-testid="drop-reason-discard"
-              role="status"
-              className="pointer-events-none absolute z-10 whitespace-nowrap rounded px-[length:var(--space-xs)] text-[length:var(--text-label)]"
-              style={{
-                bottom: "100%",
-                left: "50%",
-                transform: "translateX(-50%)",
-                marginBottom: 4,
-                color: "var(--color-text-muted)",
-                backgroundColor: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
-                lineHeight: "var(--text-label--line-height)",
-              }}
-            >
-              {dropStatus.discard.reason}
-            </span>
-          )}
           <div className="flex items-center gap-[length:var(--space-xs)]">
-            <span
-              className="text-[length:var(--text-label)] font-semibold"
-              style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
-            >
-              Discard
-            </span>
+            <AreaLabel>Discard</AreaLabel>
             <button
               type="button"
               data-testid="discard-toggle"
@@ -308,38 +250,87 @@ export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: 
               }}
             >
               <Layers aria-hidden="true" size={16} />
-              <span
-                aria-hidden="true"
-                className="absolute"
-                style={{ inset: "var(--touch-inset)" }}
-              />
+              <span aria-hidden="true" className="absolute" style={{ inset: "var(--touch-inset)" }} />
             </button>
           </div>
 
-          {discardGroups.length > 0 ? (
-            <div className="flex flex-col gap-[length:var(--space-xs)]">
-              {discardGroups.map((group) => (
-                <div key={group.suit} className="flex items-center gap-[length:var(--space-xs)]">
-                  <SuitGlyph suit={group.suit} size={14} title={SUIT_VISUALS[group.suit].label} />
-                  <span
-                    className="text-[length:var(--text-label)]"
-                    style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
-                  >
-                    {RANKS.filter((rank) => (group.countsByRank[rank - 1] ?? 0) > 0)
-                      .map((rank) => `${rank}×${group.countsByRank[rank - 1] ?? 0}`)
-                      .join(" ")}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p
-              className="text-[length:var(--text-body)]"
-              style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-body--line-height)" }}
-            >
-              No cards discarded yet
-            </p>
-          )}
+          <div
+            ref={discardZoneRef}
+            data-testid="discard-pile"
+            data-discard-count={game.discard.length}
+            data-view={view}
+            data-drop-state={discardDropState}
+            className="relative flex flex-1 flex-col gap-[length:var(--space-xs)] overflow-hidden rounded-md"
+            style={discardHighlight}
+          >
+            {dropStatus && !dropStatus.discard.enabled && dropStatus.discard.reason && (
+              <span
+                data-testid="drop-reason-discard"
+                role="status"
+                className="pointer-events-none absolute z-10 whitespace-nowrap rounded px-[length:var(--space-xs)] text-[length:var(--text-label)]"
+                style={{
+                  bottom: "100%",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  marginBottom: 4,
+                  color: "var(--color-text-muted)",
+                  backgroundColor: "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
+                  lineHeight: "var(--text-label--line-height)",
+                }}
+              >
+                {dropStatus.discard.reason}
+              </span>
+            )}
+            {discardGroups.length > 0 ? (
+              <div className="flex flex-col gap-[length:var(--space-xs)]">
+                {discardGroups.map((group) => (
+                  <div key={group.suit} className="flex items-center gap-[length:var(--space-xs)]">
+                    <SuitGlyph suit={group.suit} size={14} title={SUIT_VISUALS[group.suit].label} />
+                    <span
+                      className="text-[length:var(--text-label)]"
+                      style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
+                    >
+                      {RANKS.filter((rank) => (group.countsByRank[rank - 1] ?? 0) > 0)
+                        .map((rank) => `${rank}×${group.countsByRank[rank - 1] ?? 0}`)
+                        .join(" ")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p
+                className="text-[length:var(--text-body)]"
+                style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-body--line-height)" }}
+              >
+                No tiles discarded yet
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="flex flex-col items-center justify-center gap-[length:var(--space-md)]"
+        style={{ height: LEFT_COLUMN_PX }}
+      >
+        <div className="flex flex-col items-center gap-[length:var(--space-xs)]">
+          <p
+            data-testid="clue-tokens"
+            className="text-[length:var(--text-body)]"
+            style={{ color: "var(--color-text)", lineHeight: "var(--text-body--line-height)" }}
+          >
+            {game.clueTokens} clues left
+          </p>
+        </div>
+        <div className="flex flex-col items-center gap-[length:var(--space-xs)]">
+          <p
+            data-testid="fuse-tokens"
+            className="text-[length:var(--text-body)]"
+            style={{ color: "var(--color-text)", lineHeight: "var(--text-body--line-height)" }}
+          >
+            {fusesRemaining} fuses left
+          </p>
         </div>
       </div>
 
