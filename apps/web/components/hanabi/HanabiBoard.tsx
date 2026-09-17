@@ -105,6 +105,16 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
     }, CLUE_HIGHLIGHT_MS);
   }, [game]);
 
+  // WR-05: a value button can become disabled under the pointer/focus
+  // without firing mouseleave/blur, which would leave a stale preview
+  // overriding the selected clue. Drop the preview whenever the conditions
+  // that disable value buttons change.
+  const isYourTurn = game?.isYourTurn ?? false;
+  const previewControlsDisabled = reconnecting || view.status === "ended";
+  useEffect(() => {
+    setPreviewClue(null);
+  }, [clueTarget, previewControlsDisabled, isYourTurn]);
+
   // Selection hygiene: drop a stale selection once the card leaves the hand
   // (played/discarded), so a disabled action never fires against a dead id.
   useEffect(() => {
