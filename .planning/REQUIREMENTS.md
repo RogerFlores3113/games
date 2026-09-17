@@ -78,7 +78,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Table Polish (added 2026-09-17 at owner sign-off of Phase 6)
 
 - [x] **ART-01**: Every face-up card shows firework-burst art whose burst silhouette is distinct per suit, so suits stay distinguishable with color ignored; the art is original (inspired by the box game's per-color burst shapes, not copied from the publisher's artwork)
-- [ ] **ART-02**: The table sits on a static city-at-night background image that does not reduce card legibility
+- [x] **ART-02**: The table sits on a static city-at-night background image that does not reduce card legibility
 - [ ] **NOTE-01**: Clue marks a card has received are shown above the card rather than on its face
 - [x] **NOTE-02**: A player can type free-text notes on each card in their own hand; the automatic positive/negative clue tracking (UI-05) remains
 - [x] **HAND-01**: A player can reorder their own hand by clicking and dragging, and every player sees the new order (server-authoritative, survives refresh)
@@ -194,7 +194,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FDN-03 | Phase 1 | Complete |
 | FDN-04 | Phase 1 | Complete |
 | ART-01 | Phase 6.1 | Complete |
-| ART-02 | Phase 6.1 | Pending |
+| ART-02 | Phase 6.1 | Complete |
 | NOTE-01 | Phase 6.1 | Pending |
 | NOTE-02 | Phase 6.1 | Complete |
 | HAND-01 | Phase 6.1 | Complete |

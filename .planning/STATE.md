@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 06.1-03-PLAN.md
-last_updated: "2026-09-17T08:02:36.292Z"
+last_updated: "2026-09-17T08:08:57.960Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 59
-  completed_plans: 47
+  completed_plans: 48
   percent: 75
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 06.1 (table-polish-firework-art-notes-drag-audio) — EXECUTING
-Plan: 4 of 15
+Plan: 5 of 15
 Status: Ready to execute
 Last activity: 2026-09-17
 
-Progress: [████████░░] 80%
+Progress: [████████░░] 81%
 
 ## Performance Metrics
 
@@ -104,6 +104,7 @@ Progress: [████████░░] 80%
 | Phase 06.1 P01 | 40min | 2 tasks | 7 files |
 | Phase 06.1 P02 | 35min | 2 tasks | 6 files |
 | Phase 06.1 P03 | 25min | 2 tasks | 8 files |
+| Phase 06.1 P05 | 25min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -208,6 +209,7 @@ Recent decisions affecting current work:
 - [Phase ?]: 06.1-02: FireworkCardFace never forwards exposeSuit to inner SuitGlyph instances -- only the wrapper span carries data-glyph -- so multi-burst ranks still yield exactly one data-glyph match
 - [Phase ?]: 06.1-03: hanabi-notes.ts docblock avoids literal strings that would false-positive its own D-01 structural-import scan / the plan's acceptance-criteria greps
 - [Phase ?]: 06.1-03: requestForDrop's reorder branch checks only ctx.reconnecting/ctx.ended (never view.isYourTurn), mirroring D-17's off-turn-allowed rule and HanabiBoard's act() guard
+- [Phase 06.1]: 06.1-05: background sourced from Wikimedia Commons (CC BY-SA 4.0) instead of Unsplash/Pexels — both sites blocked scripted license verification with bot challenges; Commons API gave directly-verifiable license/author metadata
 
 ### Pending Todos
 
@@ -228,6 +230,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T08:02:36.285Z
+Last session: 2026-09-17T08:07:13.446Z
 Stopped at: Completed 06.1-03-PLAN.md
 Resume file: None
