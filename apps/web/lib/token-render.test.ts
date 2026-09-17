@@ -8,11 +8,19 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ClueTokenArt } from "../components/hanabi/ClueTokenArt";
 import { FuseTokenArt } from "../components/hanabi/FuseTokenArt";
+import { TokenColumn } from "../components/hanabi/TokenColumn";
+import { MAX_TOKEN_COUNT, TABLE_BAND_MIN_PX } from "./layout-budget";
 
 const CLUE_TOKEN_ART_PATH = fileURLToPath(new URL("../components/hanabi/ClueTokenArt.tsx", import.meta.url));
 const FUSE_TOKEN_ART_PATH = fileURLToPath(new URL("../components/hanabi/FuseTokenArt.tsx", import.meta.url));
+const TOKEN_COLUMN_PATH = fileURLToPath(new URL("../components/hanabi/TokenColumn.tsx", import.meta.url));
 const clueTokenArtSource = readFileSync(CLUE_TOKEN_ART_PATH, "utf-8");
 const fuseTokenArtSource = readFileSync(FUSE_TOKEN_ART_PATH, "utf-8");
+const tokenColumnSource = readFileSync(TOKEN_COLUMN_PATH, "utf-8");
+
+function countOccurrences(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1;
+}
 
 function noHexLiterals(source: string): RegExpMatchArray | null {
   const withoutComments = source
@@ -79,6 +87,82 @@ describe("token-render: FuseTokenArt", () => {
     // uses a 9-spike / 3-value-radius-cycle silhouette that cannot collide
     // with any SUIT_VISUALS entry.
     expect(fuseTokenArtSource).not.toMatch(/spikeCount\s*=\s*(6|8|10|12|16|20)\b/);
+  });
+});
+
+describe("token-render: TokenColumn", () => {
+  it("with 5 clue tokens remaining, exactly 5 clue-token artworks are in the markup", () => {
+    const markup = renderToStaticMarkup(
+      createElement(TokenColumn, { clueTokens: 5, fusesRemaining: 3, columnHeightPx: 260 }),
+    );
+    expect(countOccurrences(markup, 'data-testid="clue-token"')).toBe(5);
+  });
+
+  it("with 2 fuses remaining, exactly 2 fuse-token artworks are in the markup", () => {
+    const markup = renderToStaticMarkup(
+      createElement(TokenColumn, { clueTokens: 8, fusesRemaining: 2, columnHeightPx: 260 }),
+    );
+    expect(countOccurrences(markup, 'data-testid="fuse-token"')).toBe(2);
+  });
+
+  it("with 0 clues and 0 fuses remaining, no token artworks render but both counts still render as text", () => {
+    const markup = renderToStaticMarkup(
+      createElement(TokenColumn, { clueTokens: 0, fusesRemaining: 0, columnHeightPx: 260 }),
+    );
+    expect(countOccurrences(markup, 'data-testid="clue-token"')).toBe(0);
+    expect(countOccurrences(markup, 'data-testid="fuse-token"')).toBe(0);
+    expect(markup).toContain("0 clues left");
+    expect(markup).toContain("0 fuses left");
+  });
+
+  it("the text counts are always present, including at zero tokens and at max tokens", () => {
+    const markup = renderToStaticMarkup(
+      createElement(TokenColumn, { clueTokens: 8, fusesRemaining: 3, columnHeightPx: 260 }),
+    );
+    expect(markup).toContain("8 clues left");
+    expect(markup).toContain("3 fuses left");
+  });
+
+  it("the clue-tokens element exposes data-count equal to the remaining clue count, and same for fuse-tokens", () => {
+    const markup = renderToStaticMarkup(
+      createElement(TokenColumn, { clueTokens: 4, fusesRemaining: 1, columnHeightPx: 260 }),
+    );
+    expect(markup).toContain('data-testid="clue-tokens" data-count="4"');
+    expect(markup).toContain('data-testid="fuse-tokens" data-count="1"');
+  });
+
+  it("spent tokens are absent from the markup, not dimmed or transparent (no opacity/dim styling path)", () => {
+    const withoutComments = tokenColumnSource
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
+      .join("\n");
+    expect(withoutComments).not.toMatch(/opacity|dim/i);
+  });
+
+  it("token disc size never exceeds the column height budget even at the max supported token count", () => {
+    const markup = renderToStaticMarkup(
+      createElement(TokenColumn, {
+        clueTokens: 8,
+        fusesRemaining: 3,
+        columnHeightPx: TABLE_BAND_MIN_PX,
+      }),
+    );
+    expect(MAX_TOKEN_COUNT).toBe(11);
+    const widths = [...markup.matchAll(/<svg viewBox="0 0 24 24" width="([0-9.]+)"/g)].map((m) => Number(m[1]));
+    expect(widths.length).toBe(11);
+    for (const w of widths) {
+      expect(w * 11 + 10 * 4).toBeLessThanOrEqual(TABLE_BAND_MIN_PX + 1);
+    }
+  });
+
+  it("renders clue tokens and fuse tokens as two vertical runs within one right-hand column", () => {
+    const markup = renderToStaticMarkup(
+      createElement(TokenColumn, { clueTokens: 2, fusesRemaining: 1, columnHeightPx: 260 }),
+    );
+    const clueIndex = markup.indexOf('data-testid="clue-tokens"');
+    const fuseIndex = markup.indexOf('data-testid="fuse-tokens"');
+    expect(clueIndex).toBeGreaterThan(-1);
+    expect(fuseIndex).toBeGreaterThan(clueIndex);
   });
 });
 
