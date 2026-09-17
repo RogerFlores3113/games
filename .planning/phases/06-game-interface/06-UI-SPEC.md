@@ -59,7 +59,7 @@ Inherited verbatim from Phase 1 — do not redefine, do not introduce a third we
 | Heading | 24px | 600 (semibold) | 1.2 |
 | Display (room code only — not used in-game) | 40px | 600 (semibold) | 1.2 |
 
-**New this phase — Rank numeral role** (on cards, stack heads, candidate strips): uses the **Label** role's weight (600) at a card-scoped size (declared under Card Anatomy below, not a new global `@theme` text role — it is a component-scoped size, matching the existing pattern of `--text-body`/`--text-label` being applied via inline `fontSize` overrides in `HanabiBoard.tsx` today, not literal new theme tokens per card size).
+**New this phase — Rank numeral role** (on cards, stack heads, candidate strips): rank numerals reuse the **existing 4-size scale verbatim — no new sizes are introduced.** Two of the four existing sizes are used: **Body (16px, weight 600 for this numeral use)** for the teammate face-up card's main rank numeral and the own-hand confirmed-info zone's rank numeral, and **Label (14px, weight 600)** for the stack-head/discard-entry rank numeral and every candidate-pip numeral (own-hand candidate strip and the teammate face-up card's own candidate strip). No 22px or 12px numeral size exists anywhere in this spec — glyph (non-text, SVG shape) sizes are declared separately under Card Anatomy and are not typography-scale values.
 
 ---
 
@@ -105,6 +105,8 @@ All seven verified via the WCAG relative-luminance formula this session (`node` 
 ---
 
 ## Layout
+
+**Primary visual anchor:** the active player's hand container — its accent-colored ring/glow (`--color-accent`, see Active-Player Indication below) is the single brightest, highest-contrast piece of chrome on screen and is designed to be the first thing the eye lands on, immediately answering "whose turn is it." **Secondary visual anchor:** luminosity-lit cards (the gold `--color-card-glow` frame at the "Touched" and especially "Known" steps, see Luminosity System below) — these draw the eye second, toward cards currently holding confirmed information, reinforcing the "fireworks night" reading of the board as points of light against the dark `--color-bg` field.
 
 **Fixed three-band desktop layout (D-01).** No scrolling required at ≥1280×720 for 5 players; usable with vertical scroll permitted down to ~1024px wide.
 
@@ -192,17 +194,19 @@ Applies identically to **teammates' face-up cards** using their own `facts` (D-0
 
 ### Sizing (by context)
 
-| Context | Size (≥1280px) | Size (1024px) | Glyph size | Rank numeral size |
+| Context | Size (≥1280px) | Size (1024px) | Glyph size (visual shape, not typography scale) | Rank numeral size (typography scale) |
 |---------|------------------|-----------------|------------|---------------------|
-| Teammate face-up card | 56×78px | 48×68px | 20px | 16px (Label weight 600) |
-| Own-hand face-down card | 72×100px | 60×84px | 28px (confirmed) / 12px (candidate pips) | 22px (confirmed) / 12px (candidate pips) |
-| Stack head / discard entry | 48×64px | 48×64px (unchanged — legibility floor) | 18px | 14px |
+| Teammate face-up card | 56×78px | 48×68px | 20px | 16px (Body role, weight 600 for this use) |
+| Own-hand face-down card | 72×100px | 60×84px | 28px (confirmed) / 12px (candidate pips) | 16px confirmed (Body role, weight 600) / 14px candidate pips (Label role, weight 600) |
+| Stack head / discard entry | 48×64px | 48×64px (unchanged — legibility floor) | 18px | 14px (Label role, weight 600) |
+
+**Consolidation note (Dimension 4 fix):** rank numerals previously specified at 22px and 12px are removed. The own-hand confirmed-info zone's rank numeral now renders at 16px (Body) — the same size already used by the teammate card's numeral — which remains legible at the 72×100px (or 60×84px) own-hand card size without any card-dimension change. Candidate-pip numerals (own-hand and teammate) now render at 14px (Label) rather than 12px; pip glyph size stays at 12px (or 10px for the teammate strip) since glyphs are SVG shapes, not typography-scale text.
 
 ### Teammate face-up card (visible identity)
 
 - Frame: luminosity-step border/glow (above) around a `--color-surface` card body, `border-radius` matching existing `Button`/`SeatRow` radius convention (read from existing components; do not introduce a new radius token).
-- Content: `SuitGlyph` (hue-filled) centered top, rank numeral (Label weight, `--color-text`) centered below it.
-- Candidate/clue marks (D-13): a compact strip below the rank numeral, same visual language as the own-hand candidate strip but at a smaller scale (10px pips) — shows what the *holder* knows about their own card, not new information for the viewer (the face-up identity is dominant; the strip is secondary).
+- Content: `SuitGlyph` (hue-filled) centered top, rank numeral (16px, Body role, weight 600, `--color-text`) centered below it.
+- Candidate/clue marks (D-13): a compact strip below the rank numeral, same visual language as the own-hand candidate strip but at a smaller glyph scale (10px pip glyphs); pip **numerals** in this strip render at 14px (Label role, weight 600) — the same typography-scale size used by every other candidate-pip numeral in this spec, never a bespoke size — shows what the *holder* knows about their own card, not new information for the viewer (the face-up identity is dominant; the strip is secondary).
 
 ### Own-hand card (face-down, no identity beyond narrowed facts — D-15 hard rule)
 
@@ -212,7 +216,7 @@ Two-zone anatomy, top 60% / bottom 40% of the card body:
 2. **Candidate strip (bottom):** two compact rows —
    - **Suit pips row:** one small glyph per variant suit (in `ALL_SUITS`/`cluableColors` order), each rendered at `opacity: 1` if still in `possibleSuits`, or `opacity: 0.25` + a diagonal strike-through overlay if ruled out.
    - **Rank pips row:** numerals 1–5, same present/struck treatment driven by `possibleRanks`.
-   - Pip sizing: 12px glyphs/numerals, `--space-xs` (4px) gaps.
+   - Pip sizing: 12px glyphs, 14px numerals (Label role, weight 600 — typography-scale size, not a bespoke 12px numeral), `--space-xs` (4px) gaps.
 - Frame: same luminosity-step system as teammate cards, computed from the same `facts`.
 - **Hard rule (D-15, carried from Phase 4):** the derivation functions that produce this anatomy (`candidateDisplayFor`, the confirmed-glyph/numeral logic) accept only `ClueFactsView` — a type with no `suit`/`rank` fields — making an identity leak a compile-time impossibility, not just a runtime discipline. Unit-tested per D-23.
 
