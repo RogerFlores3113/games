@@ -6,6 +6,7 @@ import {
   expectSeatCount,
   freezePage,
   joinAs,
+  OTHER_HAND_SELECTOR,
   resumePage,
   seatIdOfOtherPlayer,
   startTwoPlayerGame,
@@ -140,10 +141,9 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     // perspective instead: the `other-hand-{seatId}` testid it renders for
     // the reloading player names that player's seat, and reattaching to a
     // NEW seat (rather than reclaiming the same one) would change it.
-    const otherHandTestIdBefore = await untouchedPage
-      .locator('[data-testid^="other-hand-"]')
-      .first()
-      .getAttribute("data-testid");
+    const otherHandTestIdBefore = await untouchedPage.locator(OTHER_HAND_SELECTOR).first().getAttribute("data-testid");
+    expect(otherHandTestIdBefore).toMatch(/^other-hand-/);
+    const reloadingSeatId = otherHandTestIdBefore!.replace(/^other-hand-/, "");
     const ownHandSlotCountBefore = await reloadingPage.locator('[data-testid^="own-hand-slot-"]').count();
     const ownHandTextBefore = ((await reloadingPage.getByTestId("own-hand").textContent()) ?? "").trim();
     const clueTokensBefore = ((await reloadingPage.getByTestId("clue-tokens").textContent()) ?? "").trim();
@@ -162,11 +162,21 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     await expect(reloadingPage.getByTestId("refusal-card")).toHaveCount(0);
     await expect(reloadingPage.getByTestId("own-hand")).toBeVisible();
 
-    const otherHandTestIdAfter = await untouchedPage
-      .locator('[data-testid^="other-hand-"]')
-      .first()
-      .getAttribute("data-testid");
-    expect(otherHandTestIdAfter).toBe(otherHandTestIdBefore);
+    // WR-08: only judge seat identity once the reload has actually rejoined
+    // and the untouched page has seen it — the reloaded page's own seat
+    // status is connected, and the untouched page shows that same seat
+    // connected again. Then retrying assertions confirm the untouched page
+    // still renders exactly one other hand, for the SAME seat.
+    await expect(reloadingPage.getByTestId(`seat-status-${reloadingSeatId}`)).toHaveAttribute(
+      "data-connected",
+      "true",
+    );
+    await expect(untouchedPage.getByTestId(`seat-status-${reloadingSeatId}`)).toHaveAttribute(
+      "data-connected",
+      "true",
+    );
+    await expect(untouchedPage.locator(OTHER_HAND_SELECTOR)).toHaveCount(1);
+    await expect(untouchedPage.locator(OTHER_HAND_SELECTOR)).toHaveAttribute("data-testid", otherHandTestIdBefore!);
     await expect(reloadingPage.locator('[data-testid^="own-hand-slot-"]')).toHaveCount(ownHandSlotCountBefore);
     await expect(reloadingPage.getByTestId("own-hand")).toHaveText(ownHandTextBefore);
     await expect(reloadingPage.getByTestId("clue-tokens")).toHaveText(clueTokensBefore);
