@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06.1-06-PLAN.md
-last_updated: "2026-09-17T15:23:17.384Z"
+stopped_at: Completed 06.1-09-PLAN.md
+last_updated: "2026-09-17T15:33:05.120Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 59
-  completed_plans: 52
+  completed_plans: 53
   percent: 75
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 06.1 (table-polish-firework-art-notes-drag-audio) — EXECUTING
-Plan: 8 of 15
+Plan: 9 of 15
 Status: Ready to execute
 Last activity: 2026-09-17
 
-Progress: [█████████░] 88%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
@@ -108,6 +108,8 @@ Progress: [█████████░] 88%
 | Phase 06.1 P04 | 20min | 2 tasks | 6 files |
 | Phase 06.1 P06 | 35min | 2 tasks | 6 files |
 | Phase 06.1 P08 | 15min | 2 tasks tasks | 4 files files |
+| Phase 06.1 P09 | 40min | 2 tasks | 8 files |
+| Phase 06.1 P09 | 40min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -217,6 +219,9 @@ Recent decisions affecting current work:
 - [Phase 06.1]: 06.1-06: reorder driven every third property-suite step by index-selected seat (frequently off-turn), never gated on enumerateLegalActions
 - [Phase 06.1]: 06.1-06: redaction property test imports typed toHanabiPlayerView directly rather than the adapter's unknown-typed toPlayerView
 - [Phase ?]: Reworded a docblock comment in useHanabiAudio.ts (backticked AudioContext -> Web Audio context) because the plan's own acceptance grep for direct AudioContext usage matched the comment prose, not just code
+- [Phase ?]: 06.1-09: told marks folded onto candidate pips via data-told (replacing a separate positive-marks row) so the fixed 28px MarksZone has room
+- [Phase ?]: 06.1-09: MarksZone note-row stacked below the 28px marks band (own-hand only), not beside it, since an 88px card cannot fit pips and a readable note side by side; recorded for D-31 owner review
+- [Phase ?]: 06.1-09: OwnHandCard/TeammateCard heights further reduced (100/78) to restore UI-11 1280x720 fit once the marks-zone band was added above every card
 
 ### Pending Todos
 
@@ -237,6 +242,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T15:21:05.673Z
-Stopped at: Completed 06.1-06-PLAN.md
+Last session: 2026-09-17T15:33:05.112Z
+Stopped at: Completed 06.1-09-PLAN.md
 Resume file: None
