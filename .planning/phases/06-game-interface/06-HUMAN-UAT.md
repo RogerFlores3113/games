@@ -1,9 +1,9 @@
 ---
-status: pending
+status: complete
 phase: 06-game-interface
 source: [06-CONTEXT.md D-25]
 started: 2026-09-17T19:51:00Z
-updated: 2026-09-17T19:51:00Z
+updated: 2026-09-16T00:00:00Z
 ---
 
 ## Current Test
@@ -20,15 +20,25 @@ expected:
 - Playing a game to the end (or misplaying three times) shows the designed end overlay: score / max, band, reason, stacks, and New game.
 - The now-runnable deferred RT-04 real-phone check (docs/manual-checks/mobile-background.md) is offered; owner states whether to run it now, later, or keep it waived.
 
-result: pending
+result: pass
 
 ## Owner's verbatim reply
 
-(awaiting owner reply)
+> looks great for a first pass. But: i'd like you to try and use hanabi's firework design for each of the tiles if possible. To show to other players. I'd also like for the notes feature - each tile's marked notes - the hints happen above the card (is the meaning of this clear to you?). Players have to write them down themselves. Furthermore, your own tiles should be rearrangable by clicking and dragging. If you drag a tile to the center, you play it. If you drag it to a discard zone, you discard it. When a tile is replenished to hand, it should take the slot of whatever was previously discarded - so it's not a queue. There should be simple audio queues for hints, plays, discards, and fuses used. When a set of 5 is completed, also have a simple audio effect. And the background - make it a starry night sky, static image. Or maybe make it a city at night background. Firework time. Does this make sense?
+
+Owner's follow-up answers to clarifying questions:
+
+> Notes: Clue marks above, plus notes (clue marks shown above each card, not on it; each own card also gets a player-typed note box; automatic ruled-out tracking stays)
+>
+> Card order: Yes, everyone sees it (server-synced hand order)
+>
+> Background: City at night
+>
+> Scope: Close Phase 6, new Phase 6.1
 
 ## Deferred check offered
 
-The deferred real-phone RT-04 check (docs/manual-checks/mobile-background.md) is now runnable per D-25 (UI work complete) and was offered to the owner at this checkpoint. Owner's choice: (awaiting owner reply)
+The deferred real-phone RT-04 check (docs/manual-checks/mobile-background.md) is now runnable per D-25 (UI work complete) and was offered to the owner at this checkpoint. Owner's choice: owner did not state — the reply did not address the RT-04 real-phone check; it remains deferred, not run or waived by this reply.
 
 ## Deviations from UI-SPEC for owner review
 
@@ -42,10 +52,12 @@ The deferred real-phone RT-04 check (docs/manual-checks/mobile-background.md) is
 ## Summary
 
 total: 1
-passed: 0
+passed: 1
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
 ## Gaps
+
+None — Phase 6 is approved as a working first pass. The owner requested additional design/feature work (per-tile firework art, notes-above-card display plus a player-typed note box, drag-to-rearrange/play/discard for own hand, discard-slot replenishment (no queue), audio cues for hints/plays/discards/fuses/set-completion, and a city-at-night static background) which the owner explicitly scoped as a new inserted Phase 6.1, not a Phase 6 gap. The deferred RT-04 real-phone check (docs/manual-checks/mobile-background.md) was not addressed by the owner in this reply and remains deferred.
