@@ -176,15 +176,132 @@ describe("applyAction", () => {
     });
   });
 
+  describe("slot-preserving draw", () => {
+    function fiveCardState(overrides: Partial<HanabiState> = {}): HanabiState {
+      const config = variantConfig("base");
+      const seatIds = ["seat-a", "seat-b"];
+      const seatASlots = ["1", "2", "3", "4", "5"].map((n) =>
+        ({ card: card(`seat-a-${n}`, "red", 1), facts: initialClueFacts(config) }),
+      );
+      const hands = [
+        { seatId: "seat-a", slots: seatASlots },
+        { seatId: "seat-b", slots: [{ card: card("seat-b-1", "blue", 2), facts: initialClueFacts(config) }] },
+      ];
+      const deck: HanabiCard[] = [card("deck-1", "green", 3), card("deck-2", "white", 4)];
+      return {
+        variant: "base",
+        seatIds,
+        turnIndex: 0,
+        hands,
+        deck,
+        stacks: emptyStacks(),
+        discard: [],
+        clueTokens: 5,
+        fuses: 0,
+        finalTurnsRemaining: null,
+        history: [],
+        ...overrides,
+      };
+    }
+
+    it("discarding index 0 of a 5-card hand: the new card lands at index 0, indexes 1-4 keep their ids", () => {
+      const state = fiveCardState();
+      const result = applyHanabiAction(state, "seat-a", { type: "discard", cardId: "seat-a-1" });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      const seatAHand = result.state.hands.find((h) => h.seatId === "seat-a")!;
+      expect(seatAHand.slots.map((s) => s.card.id)).toEqual([
+        "deck-1",
+        "seat-a-2",
+        "seat-a-3",
+        "seat-a-4",
+        "seat-a-5",
+      ]);
+    });
+
+    it("a successful play of the middle card (index 2): the drawn card lands at index 2, others unchanged", () => {
+      const stacks = emptyStacks().map((s) => (s.suit === "red" ? { suit: s.suit, topRank: 0 } : s));
+      const state = fiveCardState({ stacks });
+      const result = applyHanabiAction(state, "seat-a", { type: "play", cardId: "seat-a-3" }); // red rank 1, extends stack
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      const seatAHand = result.state.hands.find((h) => h.seatId === "seat-a")!;
+      expect(seatAHand.slots.map((s) => s.card.id)).toEqual([
+        "seat-a-1",
+        "seat-a-2",
+        "deck-1",
+        "seat-a-4",
+        "seat-a-5",
+      ]);
+    });
+
+    it("a misplay of the last card (index 4): the drawn card lands at index 4", () => {
+      // Red stack already at 1, so red rank 1 misplays.
+      const stacks = emptyStacks().map((s) => (s.suit === "red" ? { suit: s.suit, topRank: 1 } : s));
+      const state = fiveCardState({ stacks });
+      const result = applyHanabiAction(state, "seat-a", { type: "play", cardId: "seat-a-5" });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      expect(result.state.fuses).toBe(1);
+      const seatAHand = result.state.hands.find((h) => h.seatId === "seat-a")!;
+      expect(seatAHand.slots.map((s) => s.card.id)).toEqual([
+        "seat-a-1",
+        "seat-a-2",
+        "seat-a-3",
+        "seat-a-4",
+        "deck-1",
+      ]);
+    });
+
+    it("the drawn slot's facts equal initialClueFacts; untouched slots keep their existing facts values", () => {
+      const state = fiveCardState();
+      const result = applyHanabiAction(state, "seat-a", { type: "discard", cardId: "seat-a-1" });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      const seatAHand = result.state.hands.find((h) => h.seatId === "seat-a")!;
+      expect(seatAHand.slots[0]!.facts).toEqual(initialClueFacts(variantConfig("base")));
+      const originalHand = state.hands.find((h) => h.seatId === "seat-a")!;
+      for (let i = 1; i < 5; i++) {
+        expect(seatAHand.slots[i]!.facts).toEqual(originalHand.slots[i]!.facts);
+      }
+    });
+
+    it("deck empty: no draw, hand length drops by one, remaining ids keep relative order", () => {
+      const state = fiveCardState({ deck: [] });
+      const result = applyHanabiAction(state, "seat-a", { type: "discard", cardId: "seat-a-3" });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      const seatAHand = result.state.hands.find((h) => h.seatId === "seat-a")!;
+      expect(seatAHand.slots.map((s) => s.card.id)).toEqual([
+        "seat-a-1",
+        "seat-a-2",
+        "seat-a-4",
+        "seat-a-5",
+      ]);
+    });
+
+    it("only the actor's hand changes; every other seat's hand is deep-equal to before", () => {
+      const state = fiveCardState();
+      const result = applyHanabiAction(state, "seat-a", { type: "discard", cardId: "seat-a-1" });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      const seatBHand = result.state.hands.find((h) => h.seatId === "seat-b")!;
+      const originalSeatBHand = state.hands.find((h) => h.seatId === "seat-b")!;
+      expect(seatBHand).toEqual(originalSeatBHand);
+    });
+  });
+
   describe("draw and final-round bookkeeping", () => {
-    it("after an accepted play/discard the actor draws the deck's next card appended to the end, keeping surviving slots' order", () => {
+    it("after an accepted play/discard the actor draws the deck's next card into the vacated index, keeping surviving slots' order", () => {
       const state = baseState();
       const result = applyHanabiAction(state, "seat-a", { type: "discard", cardId: "seat-a-1" });
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error("expected success");
       const seatAHand = result.state.hands.find((h) => h.seatId === "seat-a")!;
-      expect(seatAHand.slots.map((s) => s.card.id)).toEqual(["seat-a-2", "deck-1"]);
-      const drawnSlot = seatAHand.slots[1]!;
+      // seat-a-1 was at index 0, so the drawn card takes index 0, and the
+      // surviving seat-a-2 shifts to index 1.
+      expect(seatAHand.slots.map((s) => s.card.id)).toEqual(["deck-1", "seat-a-2"]);
+      const drawnSlot = seatAHand.slots[0]!;
       expect(drawnSlot.facts).toEqual(initialClueFacts(variantConfig("base")));
     });
 

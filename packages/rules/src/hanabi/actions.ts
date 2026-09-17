@@ -135,19 +135,31 @@ function advanceTurn(
   return { turnIndex, finalTurnsRemaining };
 }
 
-/** Draws one card for `seatId` from `deck`'s next slot, appended to the end
- * of their hand with all-possibilities initial clue facts (D-05), UNLESS the
- * final round has already started or the deck is empty (RULES-16). Returns
- * the drawn card's id (for the history entry) or `null` when no draw
- * occurred. */
+/** Finds the index of `cardId` inside `seatId`'s hand within `hands`, or -1
+ * if that seat/card is not found. Must be called against the PRE-removal
+ * hands (i.e. `state.hands`, before `removeFromHand` runs) — `removeFromHand`
+ * uses `.filter`, which loses positional information, so computing this
+ * index after removal would silently shift it (RESEARCH.md Pitfall 1). */
+function findHandIndex(hands: readonly Hand[], seatId: string, cardId: string): number {
+  const hand = hands.find((h) => h.seatId === seatId);
+  if (hand === undefined) return -1;
+  return hand.slots.findIndex((s) => s.card.id === cardId);
+}
+
+/** Draws one card for `seatId` from `deck`'s next slot, inserted at the
+ * vacated index (D-23) with all-possibilities initial clue facts (D-05),
+ * UNLESS the final round has already started or the deck is empty
+ * (RULES-16). Returns the drawn card's id (for the history entry) or `null`
+ * when no draw occurred. */
 function drawCard(input: {
   config: ReturnType<typeof variantConfig>;
   seatId: string;
   hands: readonly Hand[];
   deck: readonly HanabiCard[];
   finalTurnsRemainingBeforeThisTurn: number | null;
+  insertAtIndex: number;
 }): { hands: Hand[]; deck: readonly HanabiCard[]; drawnCardId: string | null } {
-  const { config, seatId, hands, deck, finalTurnsRemainingBeforeThisTurn } = input;
+  const { config, seatId, hands, deck, finalTurnsRemainingBeforeThisTurn, insertAtIndex } = input;
   if (finalTurnsRemainingBeforeThisTurn !== null || deck.length === 0) {
     return { hands: hands.map((h) => h), deck, drawnCardId: null };
   }
@@ -156,7 +168,9 @@ function drawCard(input: {
   const nextHands = hands.map((hand) => {
     if (hand.seatId !== seatId) return hand;
     const newSlot: HandSlot = { card: drawnCard, facts: initialClueFacts(config) };
-    return { seatId: hand.seatId, slots: [...hand.slots, newSlot] };
+    const slots = hand.slots.slice();
+    slots.splice(insertAtIndex, 0, newSlot);
+    return { seatId: hand.seatId, slots };
   });
   return { hands: nextHands, deck: nextDeck, drawnCardId: drawnCard.id };
 }
@@ -187,6 +201,9 @@ function applyPlay(
   const stack = state.stacks[stackIndex]!;
   const success = card.rank === stack.topRank + 1;
 
+  // Captured from state.hands (PRE-removal) so the drawn card lands in the
+  // exact slot the played card vacated (D-23, RESEARCH.md Pitfall 1).
+  const vacatedIndex = findHandIndex(state.hands, actorSeatId, cardId);
   const handsAfterRemoval = removeFromHand(state.hands, actorSeatId, cardId);
 
   let stacks: readonly StackEntry[] = state.stacks;
@@ -216,6 +233,7 @@ function applyPlay(
     hands: handsAfterRemoval,
     deck: state.deck,
     finalTurnsRemainingBeforeThisTurn: state.finalTurnsRemaining,
+    insertAtIndex: vacatedIndex,
   });
   const { turnIndex, finalTurnsRemaining } = advanceTurn(state, drawResult.deck);
 
@@ -268,6 +286,9 @@ function applyDiscard(
   const slot = findOwnSlot(state, actorSeatId, cardId)!;
   const card = slot.card;
 
+  // Captured from state.hands (PRE-removal) so the drawn card lands in the
+  // exact slot the discarded card vacated (D-23, RESEARCH.md Pitfall 1).
+  const vacatedIndex = findHandIndex(state.hands, actorSeatId, cardId);
   const handsAfterRemoval = removeFromHand(state.hands, actorSeatId, cardId);
   const discard = [...state.discard, card];
   const clueTokens = Math.min(state.clueTokens + 1, MAX_CLUE_TOKENS);
@@ -278,6 +299,7 @@ function applyDiscard(
     hands: handsAfterRemoval,
     deck: state.deck,
     finalTurnsRemainingBeforeThisTurn: state.finalTurnsRemaining,
+    insertAtIndex: vacatedIndex,
   });
   const { turnIndex, finalTurnsRemaining } = advanceTurn(state, drawResult.deck);
 
