@@ -12,8 +12,10 @@ import type { DropTarget, DropZoneStatus } from "../../lib/hanabi-drag-logic";
 import { DECK_COUNTER_PX, DISCARD_AREA_PX, LEFT_COLUMN_PX, PLAY_AREA_PX } from "../../lib/layout-budget";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
 import { DiscardOverlay } from "./DiscardOverlay";
-import { FireworkCardFace } from "./FireworkCard";
+import { FireworkCardBack } from "./FireworkCard";
+import { PlayedStack } from "./PlayedStack";
 import { SuitGlyph } from "./SuitGlyph";
+import { TokenColumn } from "./TokenColumn";
 
 export interface TableDropStatus {
   play: DropZoneStatus;
@@ -165,64 +167,27 @@ export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: 
                 {dropStatus.play.reason}
               </span>
             )}
-            {game.stacks.map((stack) => {
-              const complete = stack.topRank === 5;
-              const flashing = flashingSuits.has(stack.suit);
-              return (
-                <div
-                  key={stack.suit}
-                  data-testid={"played-stack-" + stack.suit}
-                  data-top-rank={stack.topRank}
-                  data-complete={String(complete)}
-                  className={"flex flex-col items-center justify-center gap-[length:var(--space-xs)] rounded-md" + (flashing ? " anim-stack-flash" : "")}
-                  style={{
-                    width: "48px",
-                    height: "64px",
-                    backgroundColor: "var(--color-surface)",
-                    border: complete ? "2px solid var(--color-card-glow)" : "1px solid var(--color-border)",
-                    boxShadow: complete
-                      ? "0 0 16px 0 rgba(255, 217, 138, 0.65), 0 0 4px 0 rgba(255, 217, 138, 0.9)"
-                      : "none",
-                  }}
-                >
-                  {stack.topRank > 0 ? (
-                    <FireworkCardFace
-                      suit={stack.suit}
-                      rank={stack.topRank as 1 | 2 | 3 | 4 | 5}
-                      width={48}
-                      height={64}
-                      exposeSuit
-                      showBurstCount
-                    />
-                  ) : (
-                    <>
-                      <span style={{ opacity: 0.35 }}>
-                        <SuitGlyph suit={stack.suit} size={18} exposeSuit />
-                      </span>
-                      <span
-                        className="text-[length:var(--text-label)] font-semibold"
-                        style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
-                      >
-                        —
-                      </span>
-                    </>
-                  )}
-                  <span className="sr-only">{stack.suit}</span>
-                </div>
-              );
-            })}
+            {game.stacks.map((stack) => (
+              <PlayedStack key={stack.suit} stack={stack} flashing={flashingSuits.has(stack.suit)} />
+            ))}
           </div>
         </div>
 
         {/* Deck counter (BOARD-04), between Play and Discard */}
-        <p
-          data-testid="deck-count"
-          data-final-round={String(game.finalTurnsRemaining !== null)}
-          className="flex items-center justify-center text-[length:var(--text-label)] font-semibold"
-          style={{ height: DECK_COUNTER_PX, color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
+        <div
+          className="flex items-center justify-center gap-[length:var(--space-xs)]"
+          style={{ height: DECK_COUNTER_PX }}
         >
-          {deckCountText(game)}
-        </p>
+          <FireworkCardBack width={32} height={44} />
+          <p
+            data-testid="deck-count"
+            data-final-round={String(game.finalTurnsRemaining !== null)}
+            className="text-[length:var(--text-label)] font-semibold"
+            style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
+          >
+            {deckCountText(game)}
+          </p>
+        </div>
 
         {/* Discard area (BOARD-01) */}
         <div
@@ -310,29 +275,7 @@ export function Table({ game, playZoneRef, discardZoneRef, dropStatus = null }: 
         </div>
       </div>
 
-      <div
-        className="flex flex-col items-center justify-center gap-[length:var(--space-md)]"
-        style={{ height: LEFT_COLUMN_PX }}
-      >
-        <div className="flex flex-col items-center gap-[length:var(--space-xs)]">
-          <p
-            data-testid="clue-tokens"
-            className="text-[length:var(--text-body)]"
-            style={{ color: "var(--color-text)", lineHeight: "var(--text-body--line-height)" }}
-          >
-            {game.clueTokens} clues left
-          </p>
-        </div>
-        <div className="flex flex-col items-center gap-[length:var(--space-xs)]">
-          <p
-            data-testid="fuse-tokens"
-            className="text-[length:var(--text-body)]"
-            style={{ color: "var(--color-text)", lineHeight: "var(--text-body--line-height)" }}
-          >
-            {fusesRemaining} fuses left
-          </p>
-        </div>
-      </div>
+      <TokenColumn clueTokens={game.clueTokens} fusesRemaining={fusesRemaining} columnHeightPx={LEFT_COLUMN_PX} />
 
       {view === "expanded" && (
         <DiscardOverlay discard={game.discard} variant={game.variant} onClose={closeExpandedView} />

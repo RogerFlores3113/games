@@ -88,3 +88,41 @@ describe("table-render: board skeleton (Task 1)", () => {
     expect(markup).toContain('data-final-round="true"');
   });
 });
+
+function countOccurrences(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1;
+}
+
+describe("table-render: TokenColumn, PlayedStack and deck counter (Task 2)", () => {
+  it("renders exactly the given clue and fuse token counts, plus both text counts", () => {
+    const game: HanabiView = { ...BASE_GAME, clueTokens: 5, fuses: 1 };
+    const markup = render(game);
+    expect(countOccurrences(markup, 'data-testid="clue-token"')).toBe(5);
+    // fuses: 1 used of 3 max => 2 remaining
+    expect(countOccurrences(markup, 'data-testid="fuse-token"')).toBe(2);
+    expect(markup).toContain("5 clues left");
+    expect(markup).toContain("2 fuses left");
+  });
+
+  it("renders the deck counter between the Play and Discard areas in document order", () => {
+    const markup = render(BASE_GAME);
+    const playIndex = markup.indexOf('data-testid="play-zone"');
+    const deckIndex = markup.indexOf('data-testid="deck-count"');
+    const discardIndex = markup.indexOf('data-testid="discard-pile"');
+    expect(playIndex).toBeGreaterThan(-1);
+    expect(deckIndex).toBeGreaterThan(playIndex);
+    expect(discardIndex).toBeGreaterThan(deckIndex);
+  });
+
+  it("a stack at rank 3 renders three card faces via PlayedStack", () => {
+    const markup = render(BASE_GAME);
+    expect(markup).toContain('data-testid="played-stack-red-card-1"');
+    expect(markup).toContain('data-testid="played-stack-red-card-2"');
+    expect(markup).toContain('data-testid="played-stack-red-card-3"');
+  });
+
+  it("no longer renders the old dot-token rows", () => {
+    const markup = render(BASE_GAME);
+    expect(markup).not.toContain("h-2 w-2 rounded-full");
+  });
+});
