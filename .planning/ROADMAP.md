@@ -283,5 +283,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 3. Hanabi Rules Engine | 5/5 | Complete    | 2026-09-16 |
 | 4. Wire Engine Into Room Actor | 9/9 | Complete   | 2026-09-16 |
 | 5. Reconnect & Session Durability Hardening | 6/6 | Complete    | 2026-09-17 |
-| 6. Game Interface | 7/7 | Complete   | 2026-09-17 |
+| 6. Game Interface | 7/7 | Complete    | 2026-09-17 |
 | 7. Variant Support (Rainbow, Black) | 0/TBD | Not started | - |
