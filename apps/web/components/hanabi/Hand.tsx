@@ -83,15 +83,34 @@ export function TeammateHand({
           {label}
         </span>
         <SeatStatus seatId={hand.seatId} connected={connected} />
+        {/* WR-03: the keyboard/screen-reader clue-target control is a separate
+            button — wrapping the card row in a labelled button made every
+            card's identity text presentational (never announced). */}
+        <button
+          type="button"
+          aria-label={`Give ${label} a clue`}
+          aria-pressed={isTarget}
+          disabled={disabled}
+          onClick={onSelectTarget}
+          className="rounded px-[length:var(--space-xs)] text-[length:var(--text-label)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed"
+          style={{
+            color: "var(--color-text-muted)",
+            lineHeight: "var(--text-label--line-height)",
+            border: "1px solid var(--color-border)",
+          }}
+        >
+          Clue
+        </button>
       </div>
 
-      <button
-        type="button"
-        aria-label={`Give ${label} a clue`}
-        aria-pressed={isTarget}
-        disabled={disabled}
-        onClick={onSelectTarget}
-        className="flex gap-[length:var(--space-xs)] rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed"
+      {/* Pointer shortcut: clicking the row also targets this teammate. The
+          row is a labelled group (not a button) so each card stays readable
+          by assistive tech; the button above is the accessible equivalent. */}
+      <div
+        role="group"
+        aria-label={`${label}'s cards`}
+        onClick={disabled ? undefined : onSelectTarget}
+        className={"flex gap-[length:var(--space-xs)] rounded-md" + (disabled ? " cursor-not-allowed" : " cursor-pointer")}
         style={{
           outline: isTarget ? "2px solid var(--color-text)" : undefined,
           outlineOffset: isTarget ? "2px" : undefined,
@@ -106,7 +125,7 @@ export function TeammateHand({
             justClued={justCluedIds.has(card.id)}
           />
         ))}
-      </button>
+      </div>
     </div>
   );
 }

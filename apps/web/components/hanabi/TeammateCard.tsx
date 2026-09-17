@@ -60,8 +60,8 @@ export function TeammateCard({ card, variant, preview, justClued }: TeammateCard
         <span data-testid="card-identity" className="relative z-10 flex flex-col items-center">
           <SuitGlyph suit={card.suit} size={IDENTITY_GLYPH_SIZE} exposeSuit />
           <span className="sr-only">{`${SUIT_VISUALS[card.suit].label} `}</span>
+          {/* WR-03: the rank is part of the accessible name ("Red 3"). */}
           <span
-            aria-hidden="true"
             className="text-[length:var(--text-body)] font-semibold"
             style={{ color: "var(--color-text)", lineHeight: "var(--text-body--line-height)" }}
           >
