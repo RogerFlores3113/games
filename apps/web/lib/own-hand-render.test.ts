@@ -10,7 +10,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { HanabiCardView } from "@games/rules";
-import { OwnHand, type OwnHandProps } from "../components/hanabi/Hand";
+import { OwnHand, TeammateHand, type OwnHandProps } from "../components/hanabi/Hand";
 import type { OwnHandCardProps } from "../components/hanabi/OwnHandCard";
 import type { CandidateStripProps } from "../components/hanabi/CandidateStrip";
 import type { CardFacts } from "./hanabi-visual-logic";
@@ -50,6 +50,7 @@ function render(cards: HanabiCardView[]): string {
   const props: OwnHandProps = {
     cards,
     variant: "base",
+    roomCode: "ABCD",
     youSeatId: "seat-me",
     connected: true,
     isYourTurn: true,
@@ -103,6 +104,28 @@ describe("own-hand render guard (D-15, WR-06)", () => {
 
   it("renders a marks zone above the first own-hand slot (D-07 relocation)", () => {
     expect(render(VISIBLE_HAND)).toContain("marks-zone-slot-1");
+  });
+
+  it("renders a note chip in the first own-hand slot's note row (D-03/D-05, NOTE-02)", () => {
+    expect(render(VISIBLE_HAND)).toContain("note-chip-slot-1");
+  });
+
+  it("TeammateHand renders no note chip (D-03: notes are own-hand only)", () => {
+    const markup = renderToStaticMarkup(
+      createElement(TeammateHand, {
+        hand: { seatId: "seat-2", cards: VISIBLE_HAND },
+        label: "Alex",
+        connected: true,
+        variant: "base",
+        isActive: false,
+        isTarget: false,
+        previewIds: new Set<string>(),
+        justCluedIds: new Set<string>(),
+        disabled: false,
+        onSelectTarget: () => {},
+      }),
+    );
+    expect(markup).not.toContain("note-chip");
   });
 
   it("every own-hand card-back segment is byte-identical across slots (D-10)", () => {

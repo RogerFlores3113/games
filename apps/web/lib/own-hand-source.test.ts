@@ -21,10 +21,15 @@ const CANDIDATE_STRIP_PATH = fileURLToPath(new URL("../components/hanabi/Candida
 // the D-15 source scan must cover this new file too, or a suit/rank leak
 // introduced here would go uncaught.
 const MARKS_ZONE_PATH = fileURLToPath(new URL("../components/hanabi/MarksZone.tsx", import.meta.url));
+// 06.1-11 / T-06.1-34: the note chip fills MarksZone's own-hand note-row
+// slot and receives only ids (never a card object) — the D-15 source scan
+// must cover this file too.
+const NOTE_CHIP_PATH = fileURLToPath(new URL("../components/hanabi/NoteChip.tsx", import.meta.url));
 
 const ownHandCardSource = readFileSync(OWN_HAND_CARD_PATH, "utf-8");
 const candidateStripSource = readFileSync(CANDIDATE_STRIP_PATH, "utf-8");
 const marksZoneSource = readFileSync(MARKS_ZONE_PATH, "utf-8");
+const noteChipSource = readFileSync(NOTE_CHIP_PATH, "utf-8");
 
 /**
  * Strips `//` line comments and `/* *\/` block comments from `source`,
@@ -189,5 +194,22 @@ describe("own-hand source scan (D-15)", () => {
   it("MarksZone's props type has no card member — it takes facts/variant only, never a card object", () => {
     expect(marksZoneSource).not.toMatch(/\bcard\s*:/);
     expect(marksZoneSource).not.toContain("HanabiCardView");
+  });
+
+  it("NoteChip.tsx code (comments stripped) never reads or destructures a suit or rank property", () => {
+    const code = stripComments(noteChipSource);
+    expect(code).not.toMatch(PROPERTY_ACCESS);
+    expect(code).not.toMatch(DESTRUCTURING);
+  });
+
+  it("NoteChip.tsx never mentions exposeSuit or a suit-identity DOM marker anywhere, comments included", () => {
+    for (const token of FORBIDDEN_TOKENS) {
+      expect(noteChipSource).not.toContain(token);
+    }
+  });
+
+  it("NoteChip's props type has no card member — it takes ids only, never a card object", () => {
+    expect(noteChipSource).not.toMatch(/\bcard\s*:/);
+    expect(noteChipSource).not.toContain("HanabiCardView");
   });
 });

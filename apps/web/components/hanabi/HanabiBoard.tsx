@@ -9,6 +9,7 @@ import {
   isSeatConnected,
   turnIndicatorText,
 } from "../../lib/hanabi-board-logic";
+import { clearNotesForRoom, pruneNotesForSeat } from "../../lib/hanabi-notes";
 import {
   CLUE_HIGHLIGHT_MS,
   teammatesInTurnOrder,
@@ -127,6 +128,21 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
     }
   }, [game, selectedCardId]);
 
+  // D-04: private note lifecycle. An ended game clears every note for the
+  // room; otherwise, prune notes for own-hand cards that have left the hand
+  // (played/discarded) so a stale note never silently reappears on a
+  // different card that later lands in the same slot — this also runs on
+  // reconnect after a tab was closed mid-game, not just live transitions.
+  const ownHandIds = game?.yourHand.map((card) => card.id).join(",") ?? "";
+  useEffect(() => {
+    if (view.status === "ended") {
+      clearNotesForRoom(view.code);
+      return;
+    }
+    if (view.youSeatId === null || ownHandIds === "") return;
+    pruneNotesForSeat(view.code, view.youSeatId, ownHandIds.split(","));
+  }, [ownHandIds, view.youSeatId, view.status, view.code]);
+
   function labelFor(seatId: string): string {
     return view.seats.find((seat) => seat.seatId === seatId)?.displayLabel ?? "…";
   }
@@ -219,6 +235,7 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
         <OwnHand
           cards={game.yourHand}
           variant={game.variant}
+          roomCode={view.code}
           youSeatId={view.youSeatId}
           connected={view.youSeatId !== null ? isSeatConnected(view.seats, view.youSeatId) : true}
           isYourTurn={game.isYourTurn && !ended}

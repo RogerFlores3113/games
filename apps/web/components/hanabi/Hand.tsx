@@ -1,5 +1,6 @@
 import type { HanabiCardView, Variant } from "@games/rules";
 import { MarksZone } from "./MarksZone";
+import { NoteChip } from "./NoteChip";
 import { OwnHandCard } from "./OwnHandCard";
 import { TeammateCard } from "./TeammateCard";
 
@@ -131,6 +132,7 @@ export function TeammateHand({
 export interface OwnHandProps {
   cards: HanabiCardView[];
   variant: Variant;
+  roomCode: string;
   youSeatId: string | null;
   connected: boolean;
   isYourTurn: boolean;
@@ -147,6 +149,7 @@ export interface OwnHandProps {
 export function OwnHand({
   cards,
   variant,
+  roomCode,
   youSeatId,
   connected,
   isYourTurn,
@@ -199,7 +202,17 @@ export function OwnHand({
       <div data-testid="own-hand" className="flex gap-[length:var(--space-md)]">
         {cards.map((card, i) => (
           <div key={card.id} className="flex flex-col items-center">
-            <MarksZone facts={card.facts} variant={variant} scale="own" testId={`marks-zone-slot-${i + 1}`} />
+            <MarksZone
+              facts={card.facts}
+              variant={variant}
+              scale="own"
+              testId={`marks-zone-slot-${i + 1}`}
+              noteSlot={
+                youSeatId !== null ? (
+                  <NoteChip key={card.id} roomCode={roomCode} seatId={youSeatId} cardId={card.id} slotNumber={i + 1} />
+                ) : null
+              }
+            />
             <OwnHandCard
               facts={card.facts}
               slotNumber={i + 1}
