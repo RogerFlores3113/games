@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-02-PLAN.md
-last_updated: "2026-09-17T01:47:25.920Z"
+stopped_at: Completed 06-03-PLAN.md
+last_updated: "2026-09-17T01:59:00.463Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 44
-  completed_plans: 39
+  completed_plans: 40
   percent: 71
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 6 (Game Interface) — EXECUTING
-Plan: 3 of 7
+Plan: 4 of 7
 Status: Ready to execute
 Last activity: 2026-09-17
 
-Progress: [█████████░] 89%
+Progress: [█████████░] 91%
 
 ## Performance Metrics
 
@@ -95,6 +95,7 @@ Progress: [█████████░] 89%
 | Phase 05 P06 | 15min | 3 tasks | 2 files |
 | Phase 06 P01 | 20min | 2 tasks | 4 files |
 | Phase 06 P02 | 15min | 2 tasks tasks | 4 files files |
+| Phase 06 P03 | 25min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -180,6 +181,8 @@ Recent decisions affecting current work:
 - [Phase 06-01]: CardFacts/HistoryEntry derived via indexed-access types inside hanabi-visual-logic.ts rather than exported from packages/rules, keeping the frozen wire contract untouched
 - [Phase ?]: 06-02: Widened --color-accent reserved-uses comment from five to seven documented uses to cover the two new D-02 in-game accent uses
 - [Phase ?]: 06-02: Rainbow starburst uses 16 vertices (outer r=11/inner r=3) vs red star's 10 vertices (outer r=10/inner r=4.5) so the two glyphs are structurally distinct
+- [Phase ?]: 06-03: TeammateCard widened to 64x84 and OwnHandCard to 88x112 (within the plan's own stated ceilings) so 6-suit Rainbow/Black candidate strips fit on one line
+- [Phase ?]: 06-03: CandidateStrip destructures every suit/rank pair at each call site (never a bare .suit/.rank property access, even in comments) so the D-15 source-scan regex can never false-positive on prose
 
 ### Pending Todos
 
@@ -200,6 +203,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T01:47:25.910Z
-Stopped at: Completed 06-02-PLAN.md
+Last session: 2026-09-17T01:59:00.451Z
+Stopped at: Completed 06-03-PLAN.md
 Resume file: None

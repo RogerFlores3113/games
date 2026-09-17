@@ -64,8 +64,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Game Interface
 
 - [x] **UI-01**: Clue tokens, fuse tokens, deck count, discard pile contents, and all played stacks are visible at all times without opening a menu or drawer
-- [ ] **UI-02**: The active player is unmistakably indicated
-- [ ] **UI-03**: A player sees every other player's hand face-up, and their own hand face-down
+- [x] **UI-02**: The active player is unmistakably indicated
+- [x] **UI-03**: A player sees every other player's hand face-up, and their own hand face-down
 - [x] **UI-04**: Cards touched by a clue are marked immediately and the marking persists until the card leaves the hand or gains further information
 - [x] **UI-05**: Each card in a player's own hand accumulates and displays both positive and negative clue information, narrowing the candidate suits and ranks as clues land
 - [x] **UI-06**: Every card carries a non-color suit identifier by default, with no accessibility mode to enable
@@ -169,8 +169,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RULES-19 | Phase 3 | Complete |
 | RULES-20 | Phase 3 | Complete |
 | UI-01 | Phase 6 | Complete |
-| UI-02 | Phase 6 | Pending |
-| UI-03 | Phase 6 | Pending |
+| UI-02 | Phase 6 | Complete |
+| UI-03 | Phase 6 | Complete |
 | UI-04 | Phase 6 | Complete |
 | UI-05 | Phase 6 | Complete |
 | UI-06 | Phase 6 | Complete |
