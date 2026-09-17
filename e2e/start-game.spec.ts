@@ -384,6 +384,16 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     for (const locator of elementsToCheck) {
       await expect(locator).toBeInViewport();
     }
+
+    // Phase 6.1 D-01: the marks/note/audio/discard-overlay additions still
+    // fit at 1280x720 alongside the rest of the tableau.
+    await expect(hostPage.getByTestId("marks-zone-slot-1")).toBeInViewport();
+    await expect(hostPage.getByTestId("marks-zone-slot-1-note-row")).toBeInViewport();
+    await expect(hostPage.getByTestId("audio-mute-toggle")).toBeInViewport();
+    await expect(hostPage.getByTestId("discard-toggle")).toBeInViewport();
+    await expect(
+      hostPage.locator('[data-testid="teammates-band"] [data-testid^="marks-zone-"]').first(),
+    ).toBeInViewport();
     const playedStacksAt1280 = hostPage.locator('[data-testid^="played-stack-"]');
     const playedStacksAt1280Count = await playedStacksAt1280.count();
     for (let i = 0; i < playedStacksAt1280Count; i++) {

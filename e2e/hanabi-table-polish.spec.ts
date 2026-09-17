@@ -383,7 +383,7 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     }
 
     // Gesture-unlock the observer.
-    await observer.locator("body").click();
+    await observer.mouse.click(5, 5);
 
     const otherSeatButton = activePage.locator('[data-testid^="clue-target-"]').first();
     await otherSeatButton.click();
@@ -394,7 +394,7 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
 
     await observer.reload();
     await expect(observer.getByTestId("own-hand")).toBeVisible();
-    await observer.locator("body").click();
+    await observer.mouse.click(5, 5);
     await observer.waitForTimeout(1500);
     expect(await soundStarts(observer)).toBe(0);
 
