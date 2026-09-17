@@ -1,3 +1,4 @@
+import type { PointerEvent as ReactPointerEvent } from "react";
 import type { HanabiCardView, Variant } from "@games/rules";
 import { MarksZone } from "./MarksZone";
 import { NoteChip } from "./NoteChip";
@@ -141,6 +142,13 @@ export interface OwnHandProps {
   justCluedIds: ReadonlySet<string>;
   disabled: boolean;
   onSelectCard: (cardId: string) => void;
+  /** D-15/D-16/D-20: drag state and callbacks from `useHandDrag`, threaded
+   * through unchanged — `OwnHand` never re-derives drag geometry itself. */
+  draggingCardId: string | null;
+  dragOffset: { x: number; y: number } | null;
+  onCardPointerDown: (cardId: string, event: ReactPointerEvent) => void;
+  registerSlot: (cardId: string, el: HTMLElement | null) => void;
+  consumeClickSuppression: () => boolean;
 }
 
 /** D-02/D-15/D-19: the viewer's own hand. Every `OwnHandCard` receives only
@@ -158,6 +166,11 @@ export function OwnHand({
   justCluedIds,
   disabled,
   onSelectCard,
+  draggingCardId,
+  dragOffset,
+  onCardPointerDown,
+  registerSlot,
+  consumeClickSuppression,
 }: OwnHandProps) {
   return (
     <section
@@ -201,7 +214,12 @@ export function OwnHand({
 
       <div data-testid="own-hand" className="flex gap-[length:var(--space-md)]">
         {cards.map((card, i) => (
-          <div key={card.id} className="flex flex-col items-center">
+          <div
+            key={card.id}
+            data-card-id={card.id}
+            ref={(el) => registerSlot(card.id, el)}
+            className="flex flex-col items-center"
+          >
             <MarksZone
               facts={card.facts}
               variant={variant}
@@ -219,7 +237,13 @@ export function OwnHand({
               selected={selectedCardId === card.id}
               justClued={justCluedIds.has(card.id)}
               disabled={disabled}
-              onSelect={() => onSelectCard(card.id)}
+              dragging={draggingCardId === card.id}
+              dragOffset={draggingCardId === card.id ? dragOffset : null}
+              onPointerDown={(event) => onCardPointerDown(card.id, event)}
+              onSelect={() => {
+                if (consumeClickSuppression()) return;
+                onSelectCard(card.id);
+              }}
             />
           </div>
         ))}

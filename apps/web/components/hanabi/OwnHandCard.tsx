@@ -1,3 +1,4 @@
+import type { PointerEvent as ReactPointerEvent } from "react";
 import type { CardFacts } from "../../lib/hanabi-visual-logic";
 import { luminosityStepFor } from "../../lib/hanabi-visual-logic";
 import { FireworkCardBack } from "./FireworkCard";
@@ -10,6 +11,10 @@ export interface OwnHandCardProps {
   justClued: boolean;
   disabled: boolean;
   onSelect: () => void;
+  /** D-15/D-20: pointer-drag visuals only — no card identity involved. */
+  dragging: boolean;
+  dragOffset: { x: number; y: number } | null;
+  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
 }
 
 // UI-SPEC targets 72x100 for a 5-suit hand; widened here to 88x112 (06.1-03
@@ -40,9 +45,22 @@ export function OwnHandCard({
   justClued,
   disabled,
   onSelect,
+  dragging,
+  dragOffset,
+  onPointerDown,
 }: OwnHandCardProps) {
   const step = luminosityStepFor(facts);
   const frame = LUMINOSITY_FRAME[step];
+
+  // D-20: while dragging, the card lifts (elevated shadow + slight scale)
+  // and tracks the pointer via a translate transform; releasing outside a
+  // drop zone animates back to the slot through the `drag-snap` transition
+  // (D-15) rather than an instant jump. `pointer-events: none` on the
+  // moving layer keeps hit-testing on the zones beneath it during the drag.
+  const dragTransform =
+    dragging && dragOffset
+      ? `translate(${dragOffset.x}px, ${dragOffset.y}px) scale(1.05)`
+      : undefined;
 
   return (
     <button
@@ -51,10 +69,16 @@ export function OwnHandCard({
       data-luminosity={step}
       data-selected={String(selected)}
       data-just-clued={String(justClued)}
+      data-dragging={String(dragging)}
       aria-pressed={selected}
       disabled={disabled}
       onClick={onSelect}
-      className="relative inline-flex flex-col items-center justify-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed"
+      onPointerDown={onPointerDown}
+      className={
+        "relative inline-flex flex-col items-center justify-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed" +
+        (dragging ? " cursor-grabbing" : " cursor-grab") +
+        (dragging ? "" : " drag-snap")
+      }
       style={{
         width: CARD_WIDTH,
         height: CARD_HEIGHT,
@@ -62,9 +86,15 @@ export function OwnHandCard({
         minWidth: "var(--size-touch-min)",
         backgroundColor: "var(--color-surface)",
         border: frame.border,
-        boxShadow: frame.boxShadow,
+        boxShadow: dragging
+          ? "0 8px 24px 0 rgba(0, 0, 0, 0.5), " + frame.boxShadow
+          : frame.boxShadow,
         outline: selected ? "2px solid var(--color-text)" : undefined,
         outlineOffset: selected ? "2px" : undefined,
+        touchAction: "none",
+        transform: dragTransform,
+        zIndex: dragging ? 50 : undefined,
+        pointerEvents: dragging ? "none" : undefined,
       }}
     >
       <span className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-md">

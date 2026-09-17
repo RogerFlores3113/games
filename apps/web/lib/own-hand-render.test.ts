@@ -59,6 +59,11 @@ function render(cards: HanabiCardView[]): string {
     justCluedIds: new Set(["c3"]),
     disabled: false,
     onSelectCard: () => {},
+    draggingCardId: null,
+    dragOffset: null,
+    onCardPointerDown: () => {},
+    registerSlot: () => {},
+    consumeClickSuppression: () => false,
   };
   return renderToStaticMarkup(createElement(OwnHand, props));
 }

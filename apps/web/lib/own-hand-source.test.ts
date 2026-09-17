@@ -25,11 +25,16 @@ const MARKS_ZONE_PATH = fileURLToPath(new URL("../components/hanabi/MarksZone.ts
 // slot and receives only ids (never a card object) — the D-15 source scan
 // must cover this file too.
 const NOTE_CHIP_PATH = fileURLToPath(new URL("../components/hanabi/NoteChip.tsx", import.meta.url));
+// 06.1-12 / T-06.1-37: the drag hook tracks own-hand cards by id only (drop
+// resolution and pending reorder never touch a card's suit/rank) — the D-15
+// source scan must cover this file too.
+const USE_HAND_DRAG_PATH = fileURLToPath(new URL("../components/hanabi/useHandDrag.ts", import.meta.url));
 
 const ownHandCardSource = readFileSync(OWN_HAND_CARD_PATH, "utf-8");
 const candidateStripSource = readFileSync(CANDIDATE_STRIP_PATH, "utf-8");
 const marksZoneSource = readFileSync(MARKS_ZONE_PATH, "utf-8");
 const noteChipSource = readFileSync(NOTE_CHIP_PATH, "utf-8");
+const useHandDragSource = readFileSync(USE_HAND_DRAG_PATH, "utf-8");
 
 /**
  * Strips `//` line comments and `/* *\/` block comments from `source`,
@@ -211,5 +216,21 @@ describe("own-hand source scan (D-15)", () => {
   it("NoteChip's props type has no card member — it takes ids only, never a card object", () => {
     expect(noteChipSource).not.toMatch(/\bcard\s*:/);
     expect(noteChipSource).not.toContain("HanabiCardView");
+  });
+
+  it("useHandDrag.ts code (comments stripped) never reads or destructures a suit or rank property", () => {
+    const code = stripComments(useHandDragSource);
+    expect(code).not.toMatch(PROPERTY_ACCESS);
+    expect(code).not.toMatch(DESTRUCTURING);
+  });
+
+  it("useHandDrag.ts never mentions exposeSuit or a suit-identity DOM marker anywhere, comments included", () => {
+    for (const token of FORBIDDEN_TOKENS) {
+      expect(useHandDragSource).not.toContain(token);
+    }
+  });
+
+  it("useHandDrag.ts never imports HanabiCardView — it reads card ids only", () => {
+    expect(useHandDragSource).not.toContain("HanabiCardView");
   });
 });
