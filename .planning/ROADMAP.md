@@ -304,7 +304,7 @@ Plans:
 **Goal:** Rework the table's visual language and hint feedback so the board reads like a physical tile game, and give the discard pile a shared, player-arrangeable order.
 **Requirements**: HINT-01, HINT-02, HINT-03, HINT-04, NOTE-03, DRAG-01, TILE-01, TILE-02, TILE-03, BOARD-01, BOARD-02, BOARD-03, BOARD-04, BOARD-05, DISC-01 (from the 17 owner requests under "## Gaps" in .planning/phases/06.1-table-polish-firework-art-notes-drag-audio/06.1-HUMAN-UAT.md)
 **Depends on:** Phase 06.1
-**Plans:** 0 plans
+**Plans:** 11 plans
 
 Scope (owner requests, 06.1 sign-off):
 - Hint display: a clue highlights the tile in that clue's colour (not a generic yellow); a number clue shows the number on the tile back; a "keep hints visible" toggle (on = hints persist past the next player's move, off = they clear).
@@ -314,12 +314,43 @@ Scope (owner requests, 06.1 sign-off):
 - Played stack: every firework in a stack is clearly visible, not just the top card.
 - Shared discard order: the discard shows every discarded tile, rearrangeable by any player, with the arrangement visible to everyone — the only server-side item (new action + ordering/conflict rules); everything else is client-side.
 
-Open before planning:
-- The owner still owes the new format for the remade automatic tile notes (gap item 2 is blocked on it).
-- Shared discard ordering rules need discussion: who may reorder, conflict resolution, and persistence across reconnects.
+Resolved during discussion (06.2-CONTEXT.md):
+- The new automatic-tile-note format IS the hint indicators themselves, with the keep-hints toggle making them persistent (D-01, owner verbatim). The pip rows are removed and ruled-out information is dropped with no replacement (D-07, owner-confirmed "Let it go").
+- Shared discard ordering: any seated player may reorder at any time, validation mirrors canReorder's exact-permutation check, last write wins, and the order is server state projected identically to every seat (D-23..D-29).
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 06.2 to break down)
+
+**Wave 1**
+
+- [ ] 06.2-01-PLAN.md — Engine + wire: shared discardOrder state, reorderDiscard action, permutation property test (DISC-01)
+- [ ] 06.2-02-PLAN.md — Seven @theme tokens, wooden board surface, shift-aside motion, 1280x720 height ledger
+- [ ] 06.2-03-PLAN.md — Pure hint derivation and lifetime, keep-hints and tile-colour preferences
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 06.2-04-PLAN.md — Hint indicators on tiles, pip band deleted, raised tile surface (HINT-01/02/04, TILE-01)
+- [ ] 06.2-05-PLAN.md — Clue/fuse token art, shrinking token column, fanned played stacks (BOARD-02/03/05)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 06.2-06-PLAN.md — Always-visible note box, keep-hints toggle, tile-colour picker (NOTE-03, HINT-03, TILE-03)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 06.2-07-PLAN.md — Table layout rework: wooden board, labelled Play/Discard, deck counter, token column (BOARD-01..05, TILE-02)
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 06.2-08-PLAN.md — Discard drag: pure drop logic, useDiscardDrag, reorderDiscard dispatch (DISC-01)
+- [ ] 06.2-09-PLAN.md — Drag shift-aside gap preview in the hand (DRAG-01)
+
+**Wave 6** *(blocked on Wave 5)*
+
+- [ ] 06.2-10-PLAN.md — Playwright proofs for every behavioural requirement + measured 1280x720 worst-case fit
+
+**Wave 7** *(blocked on Wave 6)*
+
+- [ ] 06.2-11-PLAN.md — Phase gate + owner visual sign-off recorded verbatim (checkpoint)
 
 ### Phase 7: Variant Support (Rainbow, Black)
 
