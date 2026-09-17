@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 06.1-09-PLAN.md
-last_updated: "2026-09-17T15:33:05.120Z"
+last_updated: "2026-09-17T15:43:47.796Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 59
-  completed_plans: 53
+  completed_plans: 54
   percent: 75
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 06.1 (table-polish-firework-art-notes-drag-audio) — EXECUTING
-Plan: 9 of 15
+Plan: 10 of 15
 Status: Ready to execute
 Last activity: 2026-09-17
 
-Progress: [█████████░] 90%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
@@ -110,6 +110,7 @@ Progress: [█████████░] 90%
 | Phase 06.1 P08 | 15min | 2 tasks tasks | 4 files files |
 | Phase 06.1 P09 | 40min | 2 tasks | 8 files |
 | Phase 06.1 P09 | 40min | 2 tasks | 8 files |
+| Phase 06.1 P10 | 50min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -222,6 +223,8 @@ Recent decisions affecting current work:
 - [Phase ?]: 06.1-09: told marks folded onto candidate pips via data-told (replacing a separate positive-marks row) so the fixed 28px MarksZone has room
 - [Phase ?]: 06.1-09: MarksZone note-row stacked below the 28px marks band (own-hand only), not beside it, since an 88px card cannot fit pips and a readable note side by side; recorded for D-31 owner review
 - [Phase ?]: 06.1-09: OwnHandCard/TeammateCard heights further reduced (100/78) to restore UI-11 1280x720 fit once the marks-zone band was added above every card
+- [Phase 06.1-10]: FireworkCardFace's numeralSize prop removed entirely per 06.1-07 owner override; stack heads render burst-count-only rank with no numeral
+- [Phase 06.1-10]: discard-toggle's 44px touch target is provided by an out-of-flow inset span rather than a literal min-height, since a full 44px header row regressed the UI-11 1280x720 no-scroll fit
 
 ### Pending Todos
 
@@ -242,6 +245,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T15:33:05.112Z
+Last session: 2026-09-17T15:43:47.789Z
 Stopped at: Completed 06.1-09-PLAN.md
 Resume file: None
