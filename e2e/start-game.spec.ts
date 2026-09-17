@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
 import { createRoom, expectSeatCount, joinAs, startGameWithPlayers, startTwoPlayerGame } from "./helpers";
+import {
+  BOARD_CHROME_PX,
+  OWN_BAND_PX,
+  TABLE_BAND_MIN_PX,
+  TEAMMATE_BAND_PX,
+} from "../apps/web/lib/layout-budget";
 
 type WireCard = Record<string, unknown> & { id?: unknown; hidden?: unknown };
 interface GameFrame {
@@ -579,5 +585,166 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     }
 
     await contextB.close();
+  });
+
+  test("UI-11 worst case: 5 seats, Black variant, a deep discard pile and advanced stacks measured against the layout-budget ledger", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    test.setTimeout(180_000);
+
+    const { pages, contexts } = await startGameWithPlayers(
+      hostPage,
+      browser,
+      ["Roger", "Bianca", "Chen", "Dara", "Eli"],
+      { variant: "black" },
+    );
+
+    async function activePageAmong(): Promise<Page> {
+      for (const page of pages) {
+        const text = ((await page.getByTestId("turn-indicator").textContent()) ?? "").trim();
+        if (text === "Your turn") return page;
+      }
+      throw new Error("activePageAmong: no page currently has the active turn");
+    }
+
+    async function giveAnyLegalClue(page: Page): Promise<boolean> {
+      const targets = page.locator('[data-testid^="clue-target-"]');
+      const targetCount = await targets.count();
+      for (let t = 0; t < targetCount; t += 1) {
+        await targets.nth(t).click();
+        const valueButtons = page.locator('[data-testid^="clue-value-"]');
+        const valueCount = await valueButtons.count();
+        for (let v = 0; v < valueCount; v += 1) {
+          const button = valueButtons.nth(v);
+          if (!(await button.isEnabled())) continue;
+          await button.click();
+          if (await page.getByTestId("give-clue-button").isEnabled()) {
+            await page.getByTestId("give-clue-button").click();
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    async function maxStackRank(): Promise<number> {
+      const ranks = await hostPage
+        .locator('[data-testid^="played-stack-"]:not([data-testid*="-card-"])')
+        .evaluateAll((els) => els.map((el) => Number(el.getAttribute("data-top-rank") ?? "0")));
+      return ranks.length ? Math.max(...ranks) : 0;
+    }
+
+    // Drives the game toward the worst case this build supports for the fit
+    // check below: a deep discard pile and at least one advanced stack.
+    // Never forces an exact target — see the SUMMARY for the actual state
+    // reached when the bounded loop below runs out of attempts first.
+    const TARGET_DISCARD_COUNT = 8;
+    const TARGET_STACK_RANK = 3;
+    for (let i = 0; i < 60; i += 1) {
+      if (await hostPage.getByTestId("end-overlay").isVisible()) break;
+      const discardCount = Number(await hostPage.getByTestId("discard-pile").getAttribute("data-discard-count"));
+      const rank = await maxStackRank();
+      if (discardCount >= TARGET_DISCARD_COUNT && rank >= TARGET_STACK_RANK) break;
+
+      const active = await activePageAmong();
+      const clueTokens = Number(await hostPage.getByTestId("clue-tokens").getAttribute("data-count"));
+      const fusesRemaining = Number(await hostPage.getByTestId("fuse-tokens").getAttribute("data-count"));
+
+      if (clueTokens >= 8) {
+        const gave = await giveAnyLegalClue(active);
+        if (!gave) {
+          await active.getByTestId("own-hand-slot-1").click();
+          await expect(active.getByTestId("play-button")).toBeEnabled({ timeout: 2000 });
+          await active.getByTestId("play-button").click();
+        }
+      } else if (fusesRemaining <= 1) {
+        // Preserve the game (only 3 fuses total) — discard only from here.
+        await active.getByTestId("own-hand-slot-1").click();
+        await expect(active.getByTestId("discard-button")).toBeEnabled({ timeout: 2000 });
+        await active.getByTestId("discard-button").click();
+      } else if (i % 2 === 0) {
+        await active.getByTestId("own-hand-slot-1").click();
+        await expect(active.getByTestId("play-button")).toBeEnabled({ timeout: 2000 });
+        await active.getByTestId("play-button").click();
+      } else {
+        await active.getByTestId("own-hand-slot-1").click();
+        await expect(active.getByTestId("discard-button")).toBeEnabled({ timeout: 2000 });
+        await active.getByTestId("discard-button").click();
+      }
+
+      await expect
+        .poll(async () => {
+          if (await hostPage.getByTestId("end-overlay").isVisible()) return true;
+          try {
+            return (await activePageAmong()) !== active;
+          } catch {
+            // Transient: mid-broadcast, no page has yet rendered the new
+            // active turn — treat as "not yet flipped" and keep polling.
+            return false;
+          }
+        })
+        .toBe(true);
+    }
+
+    const finalDiscardCount = Number(await hostPage.getByTestId("discard-pile").getAttribute("data-discard-count"));
+    const finalMaxRank = await maxStackRank();
+    // eslint-disable-next-line no-console -- worst-case state is recorded in the SUMMARY by hand from this log
+    console.log(`UI-11 worst case reached: discardCount=${finalDiscardCount}, maxStackRank=${finalMaxRank}`);
+
+    // Default viewport is 1280x720 (playwright.config.ts sets none).
+    const fitsNoScroll = await hostPage.evaluate(() => {
+      const el = document.scrollingElement;
+      return el !== null && el.scrollHeight <= el.clientHeight;
+    });
+    expect(fitsNoScroll).toBe(true);
+
+    const elementsToCheck = [
+      hostPage.getByTestId("tableau"),
+      hostPage.getByTestId("play-zone"),
+      hostPage.getByTestId("discard-pile"),
+      hostPage.getByTestId("deck-count"),
+      hostPage.getByTestId("clue-tokens"),
+      hostPage.getByTestId("fuse-tokens"),
+    ];
+    for (const locator of elementsToCheck) {
+      await expect(locator).toBeInViewport();
+    }
+
+    const otherHands = hostPage.locator('[data-testid^="other-hand-"]:not([data-testid^="other-hand-card-"])');
+    const otherHandCount = await otherHands.count();
+    expect(otherHandCount).toBeGreaterThan(0);
+    for (let i = 0; i < otherHandCount; i += 1) {
+      await expect(otherHands.nth(i)).toBeInViewport();
+    }
+
+    const ownSlots = hostPage.locator('[data-testid^="own-hand-slot-"]:not([data-testid$="-hints"])');
+    const ownSlotCount = await ownSlots.count();
+    expect(ownSlotCount).toBeGreaterThan(0);
+    for (let i = 0; i < ownSlotCount; i += 1) {
+      await expect(ownSlots.nth(i)).toBeInViewport();
+    }
+
+    // Measure the real band heights and reconcile against layout-budget.ts
+    // (RESEARCH.md Pitfall 1) — the ledger must match the rendered board,
+    // not the reverse.
+    const teammatesBandBox = await hostPage.getByTestId("teammates-band").boundingBox();
+    const tableauBox = await hostPage.getByTestId("tableau").boundingBox();
+    const bottomRowBox = await hostPage.getByTestId("bottom-controls-row").boundingBox();
+    if (!teammatesBandBox || !tableauBox || !bottomRowBox) throw new Error("missing band bounding box");
+
+    // eslint-disable-next-line no-console -- measured values recorded in the SUMMARY by hand from this log
+    console.log(
+      `Measured bands: teammates=${teammatesBandBox.height}, tableau=${tableauBox.height}, bottomRow=${bottomRowBox.height}`,
+    );
+
+    const TOLERANCE_PX = 40;
+    expect(Math.abs(teammatesBandBox.height - TEAMMATE_BAND_PX)).toBeLessThanOrEqual(TOLERANCE_PX);
+    expect(Math.abs(tableauBox.height - (TABLE_BAND_MIN_PX + BOARD_CHROME_PX))).toBeLessThanOrEqual(TOLERANCE_PX);
+    expect(Math.abs(bottomRowBox.height - OWN_BAND_PX)).toBeLessThanOrEqual(TOLERANCE_PX);
+
+    for (const context of contexts) {
+      await context.close();
+    }
   });
 });

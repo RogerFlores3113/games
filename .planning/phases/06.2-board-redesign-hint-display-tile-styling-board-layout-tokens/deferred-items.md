@@ -1,5 +1,33 @@
 # Deferred items
 
+## Pre-existing flake: `e2e/hanabi-realtime.spec.ts`'s "UI-02 + UI-04" test (found by 06.2-10's full-suite run)
+
+**Status: deferred, out of scope for 06.2-10.** `e2e/hanabi-realtime.spec.ts`
+is not in 06.2-10's `files_modified`, and the mismatch is in clue-touch/
+luminosity computation, which none of 06.2-10's edits (e2e board-layout
+specs, `layout-budget.ts`, and a JSX reorder + click-target fix in
+`HanabiBoard.tsx`/`TileColorPicker.tsx`) come anywhere near.
+
+Confirmed unrelated to 06.2-10's changes by reverting
+`HanabiBoard.tsx` to its pre-06.2-10 (06.2-09) committed state and
+re-running the same test in isolation: it still fails, with a different
+mismatched count (3 expected vs 6 received, vs. 1 expected vs 2 received on
+the 06.2-10 tree) — confirming this is inherent test/game-logic
+flakiness, not something introduced by this plan's JSX reordering or
+button-overlay fix.
+
+The test (`UI-02 + UI-04: the active marker moves and a clue marks the same
+cards on the giver's and target's screens...`) captures a clue's preview
+count via `[data-preview="true"]` elements before clicking "Give clue", then
+asserts the post-clue `data-luminosity` touched-count on both pages equals
+that preview count. The mismatch (fewer preview elements than actually-
+touched cards after the real clue lands) suggests a timing race in how the
+test captures the preview state relative to `CluePicker`'s
+onFocus/onMouseEnter-driven preview, not a redaction/security bug — join per
+its own file's likely candidate for a future debug session (add to the
+"pre-existing flakes to note, not chase" list alongside RT-04 frozen-tab and
+the network-drop test, for phases after 06.2).
+
 ## UI-11 vertical overflow — root cause confirmed by 06.2-07: HanabiBoard.tsx's bottom controls row, NOT Table.tsx
 
 **Status: RESOLVED** by a scoped fix task run before 06.2-08 (not a plan — no

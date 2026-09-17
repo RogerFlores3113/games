@@ -320,7 +320,17 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
         />
       </div>
 
-      <div className="flex flex-none flex-wrap items-start justify-center gap-[length:var(--space-md)]">
+      {/* fix(06.2-10): testid added purely as a measurement hook — the
+          OWN_BAND_PX layout-budget constant covers this ENTIRE row (OwnHand
+          + CardActions + CluePicker + AudioControls + toggles, per that
+          constant's own doc comment), but the only pre-existing testid
+          scoped to any part of it ("own-band") wraps just OwnHand's own
+          section. Task 3's ledger-vs-render reconciliation needs to measure
+          the row this budget actually describes. */}
+      <div
+        data-testid="bottom-controls-row"
+        className="flex flex-none flex-wrap items-start justify-center gap-[length:var(--space-md)]"
+      >
         <OwnHand
           cards={applyPendingOrder(game.yourHand, drag.pendingOrder)}
           variant={game.variant}
@@ -352,22 +362,22 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
           onDiscard={() => selectedCardId && act({ type: "discard", cardId: selectedCardId })}
         />
 
-        <CluePicker
-          game={game}
-          targets={teammates.map((hand) => ({ seatId: hand.seatId, label: labelFor(hand.seatId) }))}
-          clueTarget={clueTarget}
-          clueValue={clueValue}
-          ctx={ctx}
-          onSelectTarget={(seatId) => setClueTarget(seatId)}
-          onSelectValue={(clue) => setClueValue(clue)}
-          onPreview={(clue) => setPreviewClue(clue)}
-          onGive={handleGiveClue}
-        />
-
-        {/* HINT-03/D-05/TILE-03: grouped with AudioControls in a single
-            tight-gap wrapper (space-xs, not the row's own space-md) so the
-            two new personal-preference controls don't push the already
-            wrap-prone controls row past the UI-11 1280x720 fit. */}
+        {/* fix(06.2-10): moved BEFORE CluePicker (was after it). CluePicker
+            is the widest, most wrap-prone element in this row — its value
+            row grows by one button per extra cluable colour (Rainbow/
+            Black add a 6th), and at 5 players/1280px width that growth was
+            enough to push THIS group off the same wrapped line as
+            CluePicker, adding an entire extra line (~108px) to the whole
+            bottom-controls-row and breaking the UI-11 1280x720 fit for the
+            Black-variant worst case (measured: 369px vs the 300px
+            OWN_BAND_PX budget). Reordered so OwnHand+CardActions+this group
+            greedily fill the first wrapped line (they are comfortably
+            narrower, using slack CardActions/AudioControls always had),
+            leaving CluePicker to wrap onto its own line alone regardless of
+            how many colour buttons it renders — the same 2-row internal
+            shape either way, just never fighting a sibling for width.
+            HINT-03/D-05/TILE-03: grouped with AudioControls in a single
+            tight-gap wrapper (space-xs, not the row's own space-md). */}
         <div className="flex items-center gap-[length:var(--space-xs)]">
           <AudioControls
             muted={audio.muted}
@@ -411,6 +421,18 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
 
           <TileColorPicker value={tileColorId} onChange={handleTileColorChange} />
         </div>
+
+        <CluePicker
+          game={game}
+          targets={teammates.map((hand) => ({ seatId: hand.seatId, label: labelFor(hand.seatId) }))}
+          clueTarget={clueTarget}
+          clueValue={clueValue}
+          ctx={ctx}
+          onSelectTarget={(seatId) => setClueTarget(seatId)}
+          onSelectValue={(clue) => setClueValue(clue)}
+          onPreview={(clue) => setPreviewClue(clue)}
+          onGive={handleGiveClue}
+        />
       </div>
 
       <FlyToLayer game={game} reconnecting={reconnecting} suppressedCardIds={drag.droppedCardIdsRef} />
