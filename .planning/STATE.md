@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to discuss
-stopped_at: Phase 6.1 context gathered
-last_updated: "2026-09-17T06:55:55.779Z"
+stopped_at: Phase 6.1 UI-SPEC approved
+last_updated: "2026-09-17T07:08:21.361Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 8
@@ -220,6 +220,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T06:55:55.769Z
-Stopped at: Phase 6.1 context gathered
-Resume file: .planning/phases/06.1-table-polish-firework-art-notes-drag-audio/06.1-CONTEXT.md
+Last session: 2026-09-17T07:08:21.353Z
+Stopped at: Phase 6.1 UI-SPEC approved
+Resume file: .planning/phases/06.1-table-polish-firework-art-notes-drag-audio/06.1-UI-SPEC.md
