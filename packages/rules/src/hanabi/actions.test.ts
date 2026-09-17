@@ -4,6 +4,7 @@ import {
   isClueRequest,
   isDiscardRequest,
   isPlayRequest,
+  isReorderDiscardRequest,
   isReorderRequest,
   parseHanabiRequest,
 } from "./actions";
@@ -75,6 +76,17 @@ describe("applyAction", () => {
       expect(isReorderRequest({ type: "reorder", cardIds: "a,b" })).toBe(false);
       expect(isReorderRequest({ type: "reorder", cardIds: ["a", 5] })).toBe(false);
       expect(isReorderRequest(null)).toBe(false);
+    });
+
+    it("isReorderDiscardRequest accepts exactly {type, cardIds} and rejects extra key, missing key, non-array, an array with a number, and null", () => {
+      expect(isReorderDiscardRequest({ type: "reorderDiscard", cardIds: ["a", "b"] })).toBe(true);
+      expect(
+        isReorderDiscardRequest({ type: "reorderDiscard", cardIds: ["a"], extra: true }),
+      ).toBe(false);
+      expect(isReorderDiscardRequest({ type: "reorderDiscard" })).toBe(false);
+      expect(isReorderDiscardRequest({ type: "reorderDiscard", cardIds: "a,b" })).toBe(false);
+      expect(isReorderDiscardRequest({ type: "reorderDiscard", cardIds: ["a", 5] })).toBe(false);
+      expect(isReorderDiscardRequest(null)).toBe(false);
     });
 
     it("isClueRequest rejects a clue sub-object with an extra key", () => {
@@ -474,6 +486,64 @@ describe("applyAction", () => {
         cardIds: [seatAIds[0]!, seatAIds[0]!],
       });
       expect(result).toEqual({ ok: false, error: "card_not_in_hand" });
+    });
+  });
+
+  describe("reorderDiscard", () => {
+    it("applies an off-turn reorderDiscard, setting discardOrder to the submitted ids and changing nothing else", () => {
+      const state = baseState({
+        discard: [
+          { id: "d1", suit: "red", rank: 1 },
+          { id: "d2", suit: "blue", rank: 2 },
+        ],
+        discardOrder: ["d1", "d2"],
+      }); // seat-a's turn; reorderDiscard by seat-b (off-turn)
+      const reversed = ["d2", "d1"];
+      const result = applyHanabiAction(state, "seat-b", {
+        type: "reorderDiscard",
+        cardIds: reversed,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      expect(result.state.discardOrder).toEqual(reversed);
+      expect(result.state.turnIndex).toBe(state.turnIndex);
+      expect(result.state.clueTokens).toBe(state.clueTokens);
+      expect(result.state.fuses).toBe(state.fuses);
+      expect(result.state.deck).toEqual(state.deck);
+      expect(result.state.stacks).toEqual(state.stacks);
+      expect(result.state.discard).toEqual(state.discard);
+      expect(result.state.finalTurnsRemaining).toBe(state.finalTurnsRemaining);
+      expect(result.state.history).toHaveLength(state.history.length);
+      expect(result.state.hands).toEqual(state.hands);
+    });
+
+    it("a malformed reorderDiscard payload returns invalid_action and does not mutate state", () => {
+      const state = baseState({ discard: [{ id: "d1", suit: "red", rank: 1 }] });
+      const snapshot = structuredClone(state);
+      const result = applyHanabiAction(state, "seat-a", {
+        type: "reorderDiscard",
+        cardIds: "not-an-array",
+      });
+      expect(result).toEqual({ ok: false, error: "invalid_action" });
+      expect(state).toEqual(snapshot);
+    });
+
+    it("rejects a reorderDiscard that is not an exact permutation with card_not_in_hand", () => {
+      const state = baseState({ discard: [{ id: "d1", suit: "red", rank: 1 }] });
+      const result = applyHanabiAction(state, "seat-a", {
+        type: "reorderDiscard",
+        cardIds: ["d1", "d1"],
+      });
+      expect(result).toEqual({ ok: false, error: "card_not_in_hand" });
+    });
+
+    it("rejects a reorderDiscard from an unseated actor with invalid_action", () => {
+      const state = baseState({ discard: [{ id: "d1", suit: "red", rank: 1 }] });
+      const result = applyHanabiAction(state, "not-a-seat", {
+        type: "reorderDiscard",
+        cardIds: ["d1"],
+      });
+      expect(result).toEqual({ ok: false, error: "invalid_action" });
     });
   });
 

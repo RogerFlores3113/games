@@ -26,7 +26,15 @@
 import type { AdapterResult } from "../adapter";
 import { appendHistory } from "./history";
 import { applyClueToSlotFacts, initialClueFacts } from "./clue-facts";
-import { canPlay, canDiscard, canClue, canReorder, findOwnSlot, MAX_CLUE_TOKENS } from "./legality";
+import {
+  canPlay,
+  canDiscard,
+  canClue,
+  canReorder,
+  canReorderDiscard,
+  findOwnSlot,
+  MAX_CLUE_TOKENS,
+} from "./legality";
 // Imported under a namespace on purpose: the clue-touch resolver must be
 // resolved exactly once in this file and reused for both the clue-fact
 // update and the history entry, never resolved twice (RESEARCH.md Pitfall 2).
@@ -124,12 +132,28 @@ export function isReorderRequest(
   return r.cardIds.every((id) => typeof id === "string");
 }
 
-/** Dispatches across the four request guards; `null` for every payload none
+/** Same exact-own-key discipline as `isReorderRequest`, for reorderDiscard:
+ * own keys exactly "type" and "cardIds", with "cardIds" an array of strings
+ * (D-29: hand-rolled guard, no zod schema, matching the `reorder` precedent
+ * so the two reorder actions stay consistent). */
+export function isReorderDiscardRequest(
+  request: unknown,
+): request is { type: "reorderDiscard"; cardIds: string[] } {
+  if (typeof request !== "object" || request === null) return false;
+  const keys = Object.keys(request);
+  if (keys.length !== 2 || !keys.includes("type") || !keys.includes("cardIds")) return false;
+  const r = request as { type: unknown; cardIds: unknown };
+  if (r.type !== "reorderDiscard" || !Array.isArray(r.cardIds)) return false;
+  return r.cardIds.every((id) => typeof id === "string");
+}
+
+/** Dispatches across the five request guards; `null` for every payload none
  * of them accept. */
 export function parseHanabiRequest(request: unknown): HanabiAction | null {
   if (isPlayRequest(request)) return request;
   if (isDiscardRequest(request)) return request;
   if (isReorderRequest(request)) return request;
+  if (isReorderDiscardRequest(request)) return request;
   if (isClueRequest(request)) return request;
   return null;
 }
@@ -463,6 +487,40 @@ function applyReorder(
   };
 }
 
+/** D-24/D-25/D-26/D-29: sets the shared discard arrangement to exactly
+ * `cardIds` (validated by `canReorderDiscard` as an exact permutation of the
+ * current discard pile). No turn advance, no token/fuse change, no draw, and
+ * no history entry — mirrors `applyReorder`'s quiet-action shape exactly,
+ * because this is a shared workspace edit, not a scored move. Returns the
+ * FULL field-by-field state literal (no spread), carrying every other field
+ * from `state` unchanged. */
+function applyReorderDiscard(
+  state: HanabiState,
+  actorSeatId: string,
+  cardIds: readonly string[],
+): AdapterResult<HanabiState> {
+  const legality = canReorderDiscard(state, actorSeatId, cardIds);
+  if (!legality.legal) return { ok: false, error: legality.reason };
+
+  return {
+    ok: true,
+    state: {
+      variant: state.variant,
+      seatIds: state.seatIds,
+      turnIndex: state.turnIndex,
+      hands: state.hands,
+      deck: state.deck,
+      stacks: state.stacks,
+      discard: state.discard,
+      discardOrder: [...cardIds],
+      clueTokens: state.clueTokens,
+      fuses: state.fuses,
+      finalTurnsRemaining: state.finalTurnsRemaining,
+      history: state.history,
+    },
+  };
+}
+
 /** Parses `request` first (any payload no guard accepts is rejected with
  * `invalid_action`, never thrown), then dispatches to the matching branch.
  * Every legality refusal comes from `legality.ts`'s exported predicates —
@@ -479,7 +537,5 @@ export function applyHanabiAction(
   if (action.type === "discard") return applyDiscard(state, actorSeatId, action.cardId);
   if (action.type === "reorder") return applyReorder(state, actorSeatId, action.cardIds);
   if (action.type === "clue") return applyClue(state, actorSeatId, action.targetSeatId, action.clue);
-  // action.type === "reorderDiscard": dispatch wired in Task 2 (canReorderDiscard/
-  // applyReorderDiscard do not exist yet at this point in the plan).
-  return { ok: false, error: "invalid_action" };
+  return applyReorderDiscard(state, actorSeatId, action.cardIds);
 }

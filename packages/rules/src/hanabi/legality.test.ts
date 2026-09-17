@@ -7,6 +7,7 @@ import {
   canDiscard,
   canPlay,
   canReorder,
+  canReorderDiscard,
   cardsTouchedByClue,
   findOwnSlot,
   isActorsTurn,
@@ -230,6 +231,69 @@ describe("legality", () => {
       const stateFinal = buildState("base", ["a", "b"], "seed-13", { finalTurnsRemaining: 0 });
       const aIds2 = stateFinal.hands.find((h) => h.seatId === "a")!.slots.map((s) => s.card.id);
       expect(canReorder(stateFinal, "a", aIds2)).toEqual({ legal: false, reason: "game_over" });
+    });
+  });
+
+  describe("canReorderDiscard", () => {
+    it("rejects with game_over when the game is over", () => {
+      const stateFuses = buildState("base", ["a", "b"], "seed-20", {
+        fuses: MAX_FUSES,
+        discard: [],
+      });
+      expect(canReorderDiscard(stateFuses, "a", [])).toEqual({
+        legal: false,
+        reason: "game_over",
+      });
+
+      const stateFinal = buildState("base", ["a", "b"], "seed-21", {
+        finalTurnsRemaining: 0,
+        discard: [],
+      });
+      expect(canReorderDiscard(stateFinal, "a", [])).toEqual({
+        legal: false,
+        reason: "game_over",
+      });
+    });
+
+    it("rejects with invalid_action when actorSeatId is not seated", () => {
+      const state = buildState("base", ["a", "b"], "seed-22", { discard: [] });
+      expect(canReorderDiscard(state, "not-a-seat", [])).toEqual({
+        legal: false,
+        reason: "invalid_action",
+      });
+    });
+
+    it("rejects a wrong length, a duplicate id, or an id not currently in the discard with card_not_in_hand", () => {
+      const discard = [
+        { id: "d1", suit: "red" as const, rank: 1 as const },
+        { id: "d2", suit: "blue" as const, rank: 2 as const },
+      ];
+      const state = buildState("base", ["a", "b"], "seed-23", { discard });
+
+      expect(canReorderDiscard(state, "a", ["d1"])).toEqual({
+        legal: false,
+        reason: "card_not_in_hand",
+      });
+      expect(canReorderDiscard(state, "a", ["d1", "d1"])).toEqual({
+        legal: false,
+        reason: "card_not_in_hand",
+      });
+      expect(canReorderDiscard(state, "a", ["d1", "not-a-real-id"])).toEqual({
+        legal: false,
+        reason: "card_not_in_hand",
+      });
+    });
+
+    it("allows a seated non-active player to reorder (off-turn is legal, D-25), including the identity permutation", () => {
+      const discard = [
+        { id: "d1", suit: "red" as const, rank: 1 as const },
+        { id: "d2", suit: "blue" as const, rank: 2 as const },
+      ];
+      // turnIndex 0 -> "a" is active; "b" is off-turn.
+      const state = buildState("base", ["a", "b"], "seed-24", { discard });
+
+      expect(canReorderDiscard(state, "b", ["d1", "d2"])).toEqual({ legal: true });
+      expect(canReorderDiscard(state, "b", ["d2", "d1"])).toEqual({ legal: true });
     });
   });
 

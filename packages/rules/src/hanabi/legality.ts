@@ -127,6 +127,42 @@ export function canReorder(
   return { legal: true };
 }
 
+/** D-24/D-25/D-26: any seated player may reorder the shared discard pile at
+ * any time, off-turn included — deliberately NO `isActorsTurn` check and NO
+ * per-seat hand lookup at all, since the discard pile belongs to no single
+ * seat. Validates `cardIds` is an EXACT permutation of `state.discard`'s
+ * current ids: same length, no duplicates, every id present in the current
+ * pile. `card_not_in_hand` is the reused literal for a discard-set mismatch
+ * (the wire's `AdapterError` enum is closed and deliberately not widened for
+ * this reversible, shared-workspace action — see actions.ts's
+ * applyReorderDiscard doc and RESEARCH.md). An actor not seated in the game
+ * at all is rejected with `invalid_action`, since there is no hand to fall
+ * back on the way `canReorder` falls back to `card_not_in_hand`. */
+export function canReorderDiscard(
+  state: HanabiState,
+  actorSeatId: string,
+  cardIds: readonly string[],
+): Legality {
+  if (isGameOver(state)) return { legal: false, reason: "game_over" };
+  if (!state.seatIds.includes(actorSeatId)) {
+    return { legal: false, reason: "invalid_action" };
+  }
+  const currentIds = state.discard.map((c) => c.id);
+  if (cardIds.length !== currentIds.length) {
+    return { legal: false, reason: "card_not_in_hand" };
+  }
+  const currentSet = new Set(currentIds);
+  const suppliedSet = new Set(cardIds);
+  if (currentSet.size !== suppliedSet.size) {
+    // Duplicate id supplied (length matched, but the set collapsed).
+    return { legal: false, reason: "card_not_in_hand" };
+  }
+  for (const id of cardIds) {
+    if (!currentSet.has(id)) return { legal: false, reason: "card_not_in_hand" };
+  }
+  return { legal: true };
+}
+
 export function canClue(
   state: HanabiState,
   actorSeatId: string,
