@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 8
+current_plan: 9
 status: executing
-stopped_at: Completed 06.2-07-PLAN.md; UI-11 overflow fix landed as a scoped fix task before 06.2-08
-last_updated: "2026-09-17T22:16:40.063Z"
+stopped_at: Completed 06.2-08-PLAN.md
+last_updated: "2026-09-17T22:36:48.946Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 70
-  completed_plans: 66
+  completed_plans: 67
   percent: 78
 ---
 
@@ -27,13 +27,13 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 06.2
-Plan: 8 of 11
-Current Plan: 8
+Plan: 9 of 11
+Current Plan: 9
 Total Plans in Phase: 11
 Status: Ready to execute
 Last activity: 2026-09-17
 
-Progress: [█████████░] 94%
+Progress: [██████████] 96%
 
 ## Performance Metrics
 
@@ -127,6 +127,7 @@ Progress: [█████████░] 94%
 | Phase 06.2 P05 | 25min | 3 tasks | 6 files |
 | Phase 06.2 P06 | 30min | 3 tasks | 10 files |
 | Phase 06.2 P07 | 55min | 3 tasks | 3 files |
+| Phase 06.2 P08 | 35min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -270,6 +271,7 @@ Recent decisions affecting current work:
 - [Phase 06.2-07]: Table.tsx rebuilt to BOARD-01..05 spec (labelled Play/Deck/Discard, TokenColumn, PlayedStack fan, discardOrder rendering) — its own layout now correctly matches its layout-budget for the first time
 - [Phase 06.2-07]: UI-11 1280x720 overflow root-caused to HanabiBoard.tsx's bottom controls row (440px measured vs 180px OWN_BAND_PX budget), not Table.tsx — fix deferred to 06.2-08 or 06.2-10 per this plan's own escape hatch, see deferred-items.md
 - [Scoped fix, pre-06.2-08]: UI-11 resolved — NoteBox's unconstrained `w-full` note input was inheriting the browser's ~200px default input width instead of the 88px card width, doubling every own-hand slot's footprint; CluePicker's four stacked rows (two label rows + a standalone give-clue row) compacted to two inline rows. Bottom row: 440px -> 285px; page total: 847px -> 720px exactly. layout-budget.ts's OWN_BAND_PX (180 -> 300) and BOARD_CHROME_PX (40 -> 16) corrected to the measured reality. See deferred-items.md for the full before/after table.
+- [Phase 06.2]: DiscardOverlay's suit-grouped rendering was replaced with the same discardOrder-sequenced flat rendering Table.tsx uses — a single shared position-based draggable order can't coexist with a second, different suit-grouping presentation of order in the same feature (06.2-08)
 
 ### Pending Todos
 
@@ -292,6 +294,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T22:16:40.054Z
-Stopped at: Completed 06.2-07-PLAN.md; UI-11 overflow fix landed as a scoped fix task before 06.2-08
+Last session: 2026-09-17T22:36:48.937Z
+Stopped at: Completed 06.2-08-PLAN.md
 Resume file: None
