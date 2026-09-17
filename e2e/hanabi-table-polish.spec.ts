@@ -77,11 +77,18 @@ async function selectClueValueOfKind(page: Page, wantColor: boolean): Promise<st
   return null;
 }
 
-/** Reads which own-hand slot testids currently carry a rendered hint
- * overlay (`data-hints="true"`), in DOM order. Excludes the `-hints`
- * overlay spans themselves (they carry no `data-hints` attribute). */
+/** Waits for at least one own-hand slot to carry a rendered hint overlay
+ * (`data-hints="true"`) and then reads which slot testids they are, in DOM
+ * order. Excludes the `-hints` overlay spans themselves (they carry no
+ * `data-hints` attribute). Callers always invoke this immediately after an
+ * action (giving a clue) that is expected to touch at least one slot, so
+ * this waits for that slot to actually render rather than taking a
+ * one-shot snapshot that races the clue's websocket round trip and the
+ * resulting re-render. */
 async function ownHandHintedSlots(page: Page): Promise<string[]> {
-  return page.locator('[data-testid^="own-hand-slot-"][data-hints="true"]').evaluateAll((els) =>
+  const hinted = page.locator('[data-testid^="own-hand-slot-"][data-hints="true"]');
+  await expect(hinted.first()).toBeVisible();
+  return hinted.evaluateAll((els) =>
     els.map((el) => el.getAttribute("data-testid") ?? "").filter((id) => /^own-hand-slot-\d+$/.test(id)),
   );
 }
