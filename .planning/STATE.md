@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: "Completed 06-07-PLAN.md; Phase 6 ready for /gsd:verify-work"
-last_updated: "2026-09-17T04:43:33.142Z"
+status: Ready to discuss
+stopped_at: "Phase 6 complete; Phase 6.1 inserted — next /gsd:discuss-phase 6.1"
+last_updated: "2026-09-17T04:43:48.946Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 8
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-01)
 
 **Core value:** A friend clicks a link and is playing Hanabi within seconds — and the game does not break, stall, or lose their seat for the next 25 minutes.
-**Current focus:** Phase 7 — variant support (rainbow, black)
+**Current focus:** Phase 6.1 — table polish (firework art, notes, drag, audio)
 
 ## Current Position
 
-Phase: 7
+Phase: 6.1
 Plan: Not started
-Status: Ready to plan
+Status: Ready to discuss
 Last activity: 2026-09-17
 
 Progress: [██████████] 100%
@@ -220,6 +220,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T04:14:00.674Z
-Stopped at: Completed 06-07-PLAN.md; Phase 6 ready for /gsd:verify-work
+Last session: 2026-09-17T04:43:48.937Z
+Stopped at: Phase 6 complete; Phase 6.1 inserted — next /gsd:discuss-phase 6.1
 Resume file: None
