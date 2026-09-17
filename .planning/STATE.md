@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 9
+current_plan: 10
 status: executing
 stopped_at: Completed 06.2-08-PLAN.md
-last_updated: "2026-09-17T22:36:48.946Z"
+last_updated: "2026-09-17T22:45:23.210Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 70
-  completed_plans: 67
+  completed_plans: 68
   percent: 78
 ---
 
@@ -27,13 +27,13 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 06.2
-Plan: 9 of 11
-Current Plan: 9
+Plan: 10 of 11
+Current Plan: 10
 Total Plans in Phase: 11
 Status: Ready to execute
 Last activity: 2026-09-17
 
-Progress: [██████████] 96%
+Progress: [██████████] 97%
 
 ## Performance Metrics
 
@@ -128,6 +128,7 @@ Progress: [██████████] 96%
 | Phase 06.2 P06 | 30min | 3 tasks | 10 files |
 | Phase 06.2 P07 | 55min | 3 tasks | 3 files |
 | Phase 06.2 P08 | 35min | 3 tasks | 7 files |
+| Phase 06.2 P09 | 25min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -272,6 +273,9 @@ Recent decisions affecting current work:
 - [Phase 06.2-07]: UI-11 1280x720 overflow root-caused to HanabiBoard.tsx's bottom controls row (440px measured vs 180px OWN_BAND_PX budget), not Table.tsx — fix deferred to 06.2-08 or 06.2-10 per this plan's own escape hatch, see deferred-items.md
 - [Scoped fix, pre-06.2-08]: UI-11 resolved — NoteBox's unconstrained `w-full` note input was inheriting the browser's ~200px default input width instead of the 88px card width, doubling every own-hand slot's footprint; CluePicker's four stacked rows (two label rows + a standalone give-clue row) compacted to two inline rows. Bottom row: 440px -> 285px; page total: 847px -> 720px exactly. layout-budget.ts's OWN_BAND_PX (180 -> 300) and BOARD_CHROME_PX (40 -> 16) corrected to the measured reality. See deferred-items.md for the full before/after table.
 - [Phase 06.2]: DiscardOverlay's suit-grouped rendering was replaced with the same discardOrder-sequenced flat rendering Table.tsx uses — a single shared position-based draggable order can't coexist with a second, different suit-grouping presentation of order in the same feature (06.2-08)
+- [Phase ?]: 06.2-09: shiftOffsetsForDrag accepts draggedId: string | null so 'no drag' is a first-class input, not a caller-side special case
+- [Phase ?]: 06.2-09: shift-aside transform lives on a new wrapper div around OwnHandCard's button, composed with (not replacing) the button's own drag-follow transform
+- [Phase ?]: 06.2-09: slot pitch measured from registered rects sorted by physical left position, not Map insertion order, to stay correct across a mid-drag optimistic reorder
 
 ### Pending Todos
 
@@ -294,6 +298,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T22:36:48.937Z
+Last session: 2026-09-17T22:45:23.201Z
 Stopped at: Completed 06.2-08-PLAN.md
 Resume file: None
