@@ -21,6 +21,8 @@ import { CardActions } from "./CardActions";
 import { CluePicker } from "./CluePicker";
 import { EndOverlay } from "./EndOverlay";
 import { ReconnectingBanner } from "../ReconnectingBanner";
+import { AudioControls } from "./AudioControls";
+import { useHanabiAudio } from "./useHanabiAudio";
 
 export type HanabiActionRequest =
   | { type: "play"; cardId: string }
@@ -68,6 +70,7 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
     }
   }, [parsed]);
 
+  const audio = useHanabiAudio(game, reconnecting);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [clueTarget, setClueTarget] = useState<string | null>(null);
   const [clueValue, setClueValue] = useState<Clue | null>(null);
@@ -244,6 +247,13 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
           onSelectValue={(clue) => setClueValue(clue)}
           onPreview={(clue) => setPreviewClue(clue)}
           onGive={handleGiveClue}
+        />
+
+        <AudioControls
+          muted={audio.muted}
+          volume={audio.volume}
+          onToggleMute={() => audio.setMuted(!audio.muted)}
+          onVolumeChange={audio.setVolume}
         />
       </div>
 
