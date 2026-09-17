@@ -274,7 +274,7 @@ Plans:
   5. Distinct short sounds play for a clue, a play, a discard, a lost fuse, and a completed stack, over a static city-at-night background that leaves cards legible.
 
 **Notes:** Owner feedback recorded verbatim in `.planning/phases/06-game-interface/06-HUMAN-UAT.md`. HAND-01/HAND-03 change hand ordering in the engine and wire contract, so the per-seat redaction chokepoint and leak tests must stay intact. The owner asked for the box game's per-color burst designs; the art must be original work in that spirit, not copied publisher artwork — show the owner the burst shapes before building them into cards.
-**Plans:** 6/15 plans executed
+**Plans:** 7/15 plans executed
 
 Plans:
 
@@ -284,7 +284,7 @@ Plans:
 - [x] 06.1-04-PLAN.md — Audio logic: live-history diff, cue selection, Web Audio engine + prefs (AUD-01)
 - [x] 06.1-05-PLAN.md — City-at-night background image, license record, scrim (ART-02)
 - [x] 06.1-06-PLAN.md — Property/projection/room-layer tests for reorder and slot-preserving draw (HAND-01, HAND-03)
-- [ ] 06.1-07-PLAN.md — Owner gate: burst shapes approved before building into cards (ART-01)
+- [x] 06.1-07-PLAN.md — Owner gate: burst shapes approved before building into cards (ART-01)
 - [ ] 06.1-08-PLAN.md — Audio wired into the board with mute/volume controls (AUD-01)
 - [ ] 06.1-09-PLAN.md — Clue marks above every card; firework faces and neutral card backs (NOTE-01, ART-01)
 - [ ] 06.1-10-PLAN.md — Stack/discard art, compact discard + full-art overlay (ART-01)
