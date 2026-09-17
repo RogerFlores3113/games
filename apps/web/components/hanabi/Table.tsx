@@ -342,7 +342,16 @@ export function Table({
       <TokenColumn clueTokens={game.clueTokens} fusesRemaining={fusesRemaining} columnHeightPx={LEFT_COLUMN_PX} />
 
       {view === "expanded" && (
-        <DiscardOverlay discard={game.discard} variant={game.variant} onClose={closeExpandedView} />
+        <DiscardOverlay
+          discard={game.discard}
+          discardOrder={game.discardOrder}
+          variant={game.variant}
+          onClose={closeExpandedView}
+          discardDragState={discardDragState}
+          discardPendingOrder={discardPendingOrder}
+          registerDiscardTile={registerDiscardTile}
+          onDiscardTilePointerDown={onDiscardTilePointerDown}
+        />
       )}
     </section>
   );

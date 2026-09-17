@@ -1,19 +1,61 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { X } from "lucide-react";
 import type { HanabiView, Variant } from "@games/rules";
-import { groupDiscardsBySuit } from "../../lib/hanabi-discard-logic";
+import { applyPendingOrder } from "../../lib/hanabi-discard-drag-logic";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
 import { FireworkCardFace } from "./FireworkCard";
+import type { DiscardDragState } from "./useDiscardDrag";
 
 export interface DiscardOverlayProps {
   discard: HanabiView["discard"];
+  /** DISC-01: the shared, server-authoritative discard arrangement.
+   * Defaults to `discard`'s own array order when omitted (pre-DISC-01
+   * callers, and the render-test fixtures that predate this prop) so the
+   * overlay still renders a sensible sequence without it. */
+  discardOrder?: readonly string[];
   variant: Variant;
   onClose: () => void;
   /** D-09 (owner-revised 06.1-07): rank shown as burst count. Defaults true
    * to match the owner-approved compact/expanded card rendering elsewhere. */
   showBurstCount?: boolean;
+  /** DISC-01: the same discard-pile drag wiring `Table.tsx`'s compact view
+   * uses (from `useDiscardDrag`, threaded through `HanabiBoard`), so a tile
+   * can be rearranged from this expanded view too — both views read and
+   * edit the one shared `discardOrder`. Omitted entirely, the overlay is
+   * still fully readable, just not draggable. */
+  discardDragState?: DiscardDragState | null;
+  discardPendingOrder?: string[] | null;
+  registerDiscardTile?: (cardId: string, el: HTMLElement | null) => void;
+  onDiscardTilePointerDown?: (cardId: string, event: ReactPointerEvent) => void;
+}
+
+/** DISC-01/T-06.2-15: mirrors `Table.tsx`'s `resolveDiscardOrder` exactly —
+ * an id in `discardOrder` with no matching `discard` entry is skipped
+ * (never thrown), and a `discard` entry missing from `discardOrder` (a
+ * malformed/stale frame) is appended at the end so a real discarded tile
+ * can never be hidden. Kept as a sibling copy rather than a shared import
+ * to stay within this task's own file list; both copies must stay in sync
+ * if the defensive rule ever changes. */
+function resolveDiscardOrder(
+  discardOrder: readonly string[],
+  discard: HanabiView["discard"],
+): HanabiView["discard"] {
+  const byId = new Map(discard.map((card) => [card.id, card]));
+  const seen = new Set<string>();
+  const ordered: HanabiView["discard"] = [];
+  for (const id of discardOrder) {
+    const card = byId.get(id);
+    if (!card) continue;
+    ordered.push(card);
+    seen.add(id);
+  }
+  for (const card of discard) {
+    if (!seen.has(card.id)) ordered.push(card);
+  }
+  return ordered;
 }
 
 /**
@@ -21,12 +63,26 @@ export interface DiscardOverlayProps {
  * scrim + dialog panel over the still-visible table (layout underneath is
  * never shifted). Closes on the close button, a click on the scrim (not the
  * panel), or Escape. Every discarded card renders its owner-approved
- * `FireworkCardFace` (never `exposeSuit` — discards are already public via
- * `groupDiscardsBySuit`'s suit grouping and the sr-only label below, so the
- * card itself does not need the identity-leak-gated `data-glyph`/aria-label
- * path Task 2's compact stack heads use).
+ * `FireworkCardFace` (never `exposeSuit` — discards are already public, so
+ * the card itself does not need the identity-leak-gated `data-glyph`/
+ * aria-label path Task 2's compact stack heads use).
+ *
+ * DISC-01: tiles render in the shared `discardOrder` sequence (not grouped
+ * by suit) — a linear sequence is what dragging rearranges, and grouping by
+ * suit would conflict with a single shared position-based order that must
+ * render identically here and on the board.
  */
-export function DiscardOverlay({ discard, variant, onClose, showBurstCount = true }: DiscardOverlayProps) {
+export function DiscardOverlay({
+  discard,
+  discardOrder,
+  variant: _variant,
+  onClose,
+  showBurstCount = true,
+  discardDragState = null,
+  discardPendingOrder = null,
+  registerDiscardTile,
+  onDiscardTilePointerDown,
+}: DiscardOverlayProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -41,7 +97,8 @@ export function DiscardOverlay({ discard, variant, onClose, showBurstCount = tru
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const groups = groupDiscardsBySuit(discard, variant).filter((group) => group.total > 0);
+  const serverOrdered = resolveDiscardOrder(discardOrder ?? discard.map((card) => card.id), discard);
+  const orderedDiscard = applyPendingOrder(serverOrdered, discardPendingOrder ?? null);
 
   return (
     <div
@@ -87,32 +144,43 @@ export function DiscardOverlay({ discard, variant, onClose, showBurstCount = tru
           </button>
         </div>
 
-        {groups.length > 0 ? (
-          <div className="flex flex-col gap-[length:var(--space-sm)]">
-            {groups.map((group) => {
-              const cards = discard
-                .filter((card) => card.suit === group.suit)
-                .slice()
-                .sort((a, b) => a.rank - b.rank);
+        {orderedDiscard.length > 0 ? (
+          <div className="flex flex-wrap gap-[length:var(--space-sm)]">
+            {orderedDiscard.map((card) => {
+              const dragging = discardDragState?.cardId === card.id;
+              // D-20: mirrors the board's compact tiles and OwnHandCard's
+              // own drag-lift transform.
+              const dragTransform =
+                dragging && discardDragState
+                  ? `translate(${discardDragState.offset.x}px, ${discardDragState.offset.y}px) scale(1.05)`
+                  : undefined;
               return (
-                <div key={group.suit} className="flex flex-wrap gap-[length:var(--space-xs)]">
-                  {cards.map((card) => (
-                    <span
-                      key={card.id}
-                      data-testid="discard-overlay-card"
-                      className="inline-flex flex-col items-center gap-[length:var(--space-xs)]"
-                    >
-                      <FireworkCardFace
-                        suit={card.suit}
-                        rank={card.rank}
-                        width={48}
-                        height={64}
-                        showBurstCount={showBurstCount}
-                      />
-                      <span className="sr-only">{`${SUIT_VISUALS[card.suit].label} ${card.rank}`}</span>
-                    </span>
-                  ))}
-                </div>
+                <span
+                  key={card.id}
+                  ref={(el) => registerDiscardTile?.(card.id, el)}
+                  data-testid="discard-overlay-card"
+                  data-dragging={String(dragging)}
+                  onPointerDown={(event) => onDiscardTilePointerDown?.(card.id, event)}
+                  className={
+                    "relative inline-flex flex-col items-center gap-[length:var(--space-xs)]" +
+                    (dragging ? " cursor-grabbing" : " cursor-grab") +
+                    (dragging ? "" : " drag-snap")
+                  }
+                  style={{
+                    transform: dragTransform,
+                    zIndex: dragging ? 10 : undefined,
+                    touchAction: "none",
+                  }}
+                >
+                  <FireworkCardFace
+                    suit={card.suit}
+                    rank={card.rank}
+                    width={48}
+                    height={64}
+                    showBurstCount={showBurstCount}
+                  />
+                  <span className="sr-only">{`${SUIT_VISUALS[card.suit].label} ${card.rank}`}</span>
+                </span>
               );
             })}
           </div>

@@ -27,7 +27,7 @@ describe("discard-overlay-render", () => {
     expect(markup).toContain("No cards discarded yet");
   });
 
-  it("groups discarded cards by suit (red before blue) with one discard-overlay-card per card", () => {
+  it("renders one discard-overlay-card per card, in discard's array order when discardOrder is omitted", () => {
     const discard: HanabiView["discard"] = [
       { id: "a", suit: "red", rank: 1 },
       { id: "b", suit: "red", rank: 1 },
@@ -40,6 +40,47 @@ describe("discard-overlay-render", () => {
 
     expect(countOccurrences(markup, 'data-testid="discard-overlay-card"')).toBe(3);
     expect(markup.indexOf("Red")).toBeLessThan(markup.indexOf("Blue"));
+  });
+
+  it("DISC-01: with a discardOrder differing from discard's array order, the rendered tile sequence follows discardOrder", () => {
+    const discard: HanabiView["discard"] = [
+      { id: "a", suit: "red", rank: 1 },
+      { id: "b", suit: "red", rank: 1 },
+      { id: "c", suit: "blue", rank: 5 },
+    ] as HanabiView["discard"];
+
+    const markup = renderToStaticMarkup(
+      createElement(DiscardOverlay, {
+        discard,
+        discardOrder: ["c", "a", "b"],
+        variant: "base",
+        onClose: () => {},
+      }),
+    );
+
+    const iC = markup.indexOf("Blue");
+    const iA = markup.indexOf("Red 1");
+    expect(iC).toBeLessThan(iA);
+    expect(countOccurrences(markup, 'data-testid="discard-overlay-card"')).toBe(3);
+  });
+
+  it("DISC-01: skips a discardOrder id with no matching discard entry, and appends a discard entry missing from discardOrder", () => {
+    const discard: HanabiView["discard"] = [
+      { id: "a", suit: "red", rank: 1 },
+      { id: "b", suit: "blue", rank: 2 },
+    ] as HanabiView["discard"];
+
+    const markup = renderToStaticMarkup(
+      createElement(DiscardOverlay, {
+        discard,
+        discardOrder: ["a", "unknown-id"],
+        variant: "base",
+        onClose: () => {},
+      }),
+    );
+
+    expect(countOccurrences(markup, 'data-testid="discard-overlay-card"')).toBe(2);
+    expect(markup).not.toContain("unknown-id");
   });
 
   it("close button carries the compact-view label and testid", () => {
