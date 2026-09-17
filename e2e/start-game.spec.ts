@@ -211,7 +211,9 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     const initialDeckNumber = Number.parseInt(activeInitialDeckCount, 10);
     expect(Number.isNaN(initialDeckNumber)).toBe(false);
 
-    const initialDiscardCount = await hostPage.locator('[data-testid="discard-pile"] li').count();
+    const initialDiscardCount = Number(
+      await hostPage.getByTestId("discard-pile").getAttribute("data-discard-count"),
+    );
     const initialStackTexts = (
       await hostPage.locator('[data-testid^="played-stack-"]').allTextContents()
     ).join("|");
@@ -226,7 +228,9 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     await expect(pageB.getByTestId("deck-count")).toHaveText(`${initialDeckNumber - 1} cards left in deck`);
 
     await expect(async () => {
-      const discardCount = await hostPage.locator('[data-testid="discard-pile"] li').count();
+      const discardCount = Number(
+        await hostPage.getByTestId("discard-pile").getAttribute("data-discard-count"),
+      );
       const stackTexts = (await hostPage.locator('[data-testid^="played-stack-"]').allTextContents()).join("|");
       expect(discardCount > initialDiscardCount || stackTexts !== initialStackTexts).toBe(true);
     }).toPass();

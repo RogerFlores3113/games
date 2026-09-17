@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Layers } from "lucide-react";
 import type { HanabiView, Suit } from "@games/rules";
-import { MAX_FUSES } from "@games/rules";
+import { MAX_FUSES, RANKS } from "@games/rules";
 import { fusesRemainingForView } from "../../lib/hanabi-board-logic";
 import { deckCountText, newlyCompletedStacks, STACK_FLASH_MS } from "../../lib/hanabi-visual-logic";
+import { groupDiscardsBySuit, readDiscardViewPref, writeDiscardViewPref, type DiscardView } from "../../lib/hanabi-discard-logic";
+import { SUIT_VISUALS } from "../../lib/suit-visuals";
+import { DiscardOverlay } from "./DiscardOverlay";
+import { FireworkCardFace } from "./FireworkCard";
 import { SuitGlyph } from "./SuitGlyph";
 
 export interface TableProps {
@@ -21,6 +26,24 @@ export function Table({ game }: TableProps) {
   const prevStacksRef = useRef<HanabiView["stacks"] | null>(null);
   const [flashingSuits, setFlashingSuits] = useState<ReadonlySet<Suit>>(new Set());
   const flashClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // D-13: initial state is "compact" for SSR safety — the real (possibly
+  // "expanded") preference is only readable client-side, so it is applied in
+  // a mount effect rather than as the initializer.
+  const [view, setView] = useState<DiscardView>("compact");
+
+  useEffect(() => {
+    setView(readDiscardViewPref());
+  }, []);
+
+  function closeExpandedView() {
+    setView("compact");
+    writeDiscardViewPref("compact");
+  }
+
+  function openExpandedView() {
+    setView("expanded");
+    writeDiscardViewPref("expanded");
+  }
 
   // Unmount-only cleanup for the flash-clear timer.
   useEffect(
@@ -53,6 +76,7 @@ export function Table({ game }: TableProps) {
 
   const fusesRemaining = fusesRemainingForView(game);
   const fusesUsed = MAX_FUSES - fusesRemaining;
+  const discardGroups = groupDiscardsBySuit(game.discard, game.variant).filter((group) => group.total > 0);
 
   return (
     <section
@@ -93,14 +117,31 @@ export function Table({ game }: TableProps) {
                       : "none",
                   }}
                 >
-                  <SuitGlyph suit={stack.suit} size={18} exposeSuit />
+                  {stack.topRank > 0 ? (
+                    // Owner override (06.1-07): FireworkCardFace has no
+                    // numeralSize prop — rank reads from burst count only.
+                    <FireworkCardFace
+                      suit={stack.suit}
+                      rank={stack.topRank as 1 | 2 | 3 | 4 | 5}
+                      width={48}
+                      height={64}
+                      exposeSuit
+                      showBurstCount
+                    />
+                  ) : (
+                    <>
+                      <span style={{ opacity: 0.35 }}>
+                        <SuitGlyph suit={stack.suit} size={18} exposeSuit />
+                      </span>
+                      <span
+                        className="text-[length:var(--text-label)] font-semibold"
+                        style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
+                      >
+                        —
+                      </span>
+                    </>
+                  )}
                   <span className="sr-only">{stack.suit}</span>
-                  <span
-                    className="text-[length:var(--text-label)] font-semibold"
-                    style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
-                  >
-                    {stack.topRank > 0 ? stack.topRank : "—"}
-                  </span>
                 </div>
               );
             })}
@@ -161,37 +202,62 @@ export function Table({ game }: TableProps) {
           {deckCountText(game)}
         </p>
 
-        <div data-testid="discard-pile" className="flex flex-col gap-[length:var(--space-xs)]">
-          <span
-            className="text-[length:var(--text-label)] font-semibold"
-            style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
-          >
-            Discard
-          </span>
-          {game.discard.length > 0 ? (
-            <ul className="flex max-w-full flex-wrap gap-[length:var(--space-xs)]">
-              {game.discard.map((card) => (
-                <li
-                  key={card.id}
-                  className="flex flex-col items-center justify-center gap-[length:var(--space-xs)] rounded-md border"
-                  style={{
-                    width: "48px",
-                    height: "64px",
-                    backgroundColor: "var(--color-surface)",
-                    borderColor: "var(--color-border)",
-                  }}
-                >
-                  <SuitGlyph suit={card.suit} size={18} exposeSuit />
-                  <span className="sr-only">{card.suit}</span>
+        <div
+          data-testid="discard-pile"
+          data-discard-count={game.discard.length}
+          data-view={view}
+          className="flex flex-col gap-[length:var(--space-xs)]"
+        >
+          <div className="flex items-center gap-[length:var(--space-xs)]">
+            <span
+              className="text-[length:var(--text-label)] font-semibold"
+              style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
+            >
+              Discard
+            </span>
+            <button
+              type="button"
+              data-testid="discard-toggle"
+              aria-label="Show full discard pile"
+              onClick={openExpandedView}
+              // The visible/flow box stays icon-sized so this header row does
+              // not grow past the "Discard" label's own height (needed for
+              // the UI-11 1280x720 no-scroll fit) — the 44px touch target is
+              // provided by an absolutely-positioned (out-of-flow) pseudo
+              // element instead, per --size-touch-min.
+              className="relative inline-flex items-center justify-center rounded-md before:absolute before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+              style={{
+                width: 16,
+                height: 16,
+                color: "var(--color-text-muted)",
+                ["--touch-inset" as string]: "calc((var(--size-touch-min) - 16px) / -2)",
+              }}
+            >
+              <Layers aria-hidden="true" size={16} />
+              <span
+                aria-hidden="true"
+                className="absolute"
+                style={{ inset: "var(--touch-inset)" }}
+              />
+            </button>
+          </div>
+
+          {discardGroups.length > 0 ? (
+            <div className="flex flex-col gap-[length:var(--space-xs)]">
+              {discardGroups.map((group) => (
+                <div key={group.suit} className="flex items-center gap-[length:var(--space-xs)]">
+                  <SuitGlyph suit={group.suit} size={14} title={SUIT_VISUALS[group.suit].label} />
                   <span
-                    className="text-[length:var(--text-label)] font-semibold"
+                    className="text-[length:var(--text-label)]"
                     style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
                   >
-                    {card.rank}
+                    {RANKS.filter((rank) => (group.countsByRank[rank - 1] ?? 0) > 0)
+                      .map((rank) => `${rank}×${group.countsByRank[rank - 1] ?? 0}`)
+                      .join(" ")}
                   </span>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           ) : (
             <p
               className="text-[length:var(--text-body)]"
@@ -202,6 +268,10 @@ export function Table({ game }: TableProps) {
           )}
         </div>
       </div>
+
+      {view === "expanded" && (
+        <DiscardOverlay discard={game.discard} variant={game.variant} onClose={closeExpandedView} />
+      )}
     </section>
   );
 }
