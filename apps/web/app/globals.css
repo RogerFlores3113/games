@@ -6,11 +6,14 @@
  * board on TOP of these tokens and must NOT redefine them here or hardcode
  * a hex value anywhere outside this block.
  *
- * `--color-accent` is reserved for EXACTLY five uses, per the
+ * `--color-accent` is reserved for EXACTLY seven uses, per the
  * approved UI-SPEC: primary CTA fill ("Create room" / "Join room" /
  * "Start game"), the room-code Display text, the own-seat "you are here"
- * ring, the active-turn indicator (placeholder counter game), and focus
- * rings. Nothing else may use it.
+ * ring, the active-turn indicator (placeholder counter game), focus
+ * rings, the active-player hand-container ring/glow (D-02, in-game), and
+ * the own-hand "Your turn" state accent (D-02, in-game). Nothing else may
+ * use it. `--color-card-glow` is a separate, non-accent luminosity signal
+ * (D-06/D-11/D-22) — it is never a substitute for --color-accent.
  *
  * Contrast rule (load-bearing, verified): anything sitting ON an
  * --color-accent fill MUST use --color-bg as its label color (~10.9:1,
@@ -27,6 +30,25 @@
   --color-border: #232B45;
   --color-status-connected: #34D399;
   --color-status-disconnected: #6B7280;
+
+  /*
+   * Phase 6 suit hues (D-05..D-07, D-10) — hue is constant across
+   * luminosity steps. Each suit's identity is carried jointly by its
+   * glyph silhouette (SuitGlyph.tsx) and its hue below; hue is never the
+   * only carrier of suit identity. All seven pass WCAG AA (>=4.5:1)
+   * against both --color-bg and --color-surface, verified by
+   * lib/suit-visuals.test.ts. --color-card-glow is the shared
+   * luminosity/clue-highlight signal (D-11/D-22) — a luminosity indicator,
+   * never an --color-accent substitute.
+   */
+  --color-suit-red: #F0645A;
+  --color-suit-yellow: #E8C547;
+  --color-suit-green: #4FBF8A;
+  --color-suit-blue: #6FA8FF;
+  --color-suit-white: #E7ECF7;
+  --color-suit-rainbow: #C9A8FF;
+  --color-suit-black: #B7C2D6;
+  --color-card-glow: #FFD98A;
 
   --size-touch-min: 44px;
 
@@ -77,4 +99,57 @@ body {
   color: var(--color-text);
   font-family: var(--font-sans);
   color-scheme: dark;
+}
+
+/*
+ * Fireworks-night transient motion (D-11/D-22): clue-touch highlight and
+ * stack-complete flash. Both are single-shot (`1` iteration), CSS-only,
+ * and degrade to an instant static style under prefers-reduced-motion
+ * rather than disappearing — the signal must remain visible for as long
+ * as React keeps the class applied (CLUE_HIGHLIGHT_MS / STACK_FLASH_MS).
+ *
+ * `.anim-clue-touch` is intended for a dedicated absolutely-positioned
+ * overlay span inside a card, never the luminosity frame element itself,
+ * so this transient animation can never override or erase the card's
+ * persistent luminosity box-shadow.
+ */
+@keyframes clue-touch-pulse {
+  from {
+    box-shadow: 0 0 0 3px var(--color-card-glow);
+  }
+  to {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes stack-complete-flash {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: none;
+  }
+  50% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 24px var(--color-card-glow));
+  }
+}
+
+.anim-clue-touch {
+  animation: clue-touch-pulse 2s ease-out 1;
+}
+
+.anim-stack-flash {
+  animation: stack-complete-flash 600ms ease-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-clue-touch {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--color-card-glow);
+  }
+
+  .anim-stack-flash {
+    animation: none;
+    filter: drop-shadow(0 0 24px var(--color-card-glow));
+  }
 }
