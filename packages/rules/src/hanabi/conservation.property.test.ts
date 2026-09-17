@@ -17,7 +17,12 @@ import { buildDeck } from "./deck";
 import { checkHanabiGameEnd } from "./endgame";
 import { canClue, canDiscard, canPlay, MAX_CLUE_TOKENS, MAX_FUSES } from "./legality";
 import { variantConfig } from "./variant";
-import { currentActorSeatId, enumerateLegalActions, locateAllCards } from "./test-support";
+import {
+  currentActorSeatId,
+  enumerateLegalActions,
+  enumerateReorderActions,
+  locateAllCards,
+} from "./test-support";
 import type { HanabiState } from "./state";
 
 const VARIANTS = ["base", "rainbow", "black"] as const;
@@ -42,6 +47,7 @@ function assertCardConservation(state: HanabiState, expectedDeckSize: number): v
 describe("property: conservation", () => {
   it("token and card conservation hold over 200 random games in every variant", () => {
     let totalSteps = 0;
+    let reorderSteps = 0;
 
     fc.assert(
       fc.property(
@@ -60,14 +66,52 @@ describe("property: conservation", () => {
 
           for (const index of actionIndexes) {
             if (checkHanabiGameEnd(state) !== null) break;
+
+            // D-23: every third step, drive an off-turn-or-on-turn reorder
+            // (index picks the seat, frequently NOT the active seat) and
+            // reassert conservation immediately after it lands.
+            if (index % 3 === 0) {
+              const reorderSeatId = state.seatIds[index % state.seatIds.length]!;
+              const reorderCandidates = enumerateReorderActions(state, reorderSeatId);
+              if (reorderCandidates.length > 0) {
+                const reorderAction = reorderCandidates[index % reorderCandidates.length]!;
+                const reorderResult = hanabiGame.applyAction(state, reorderSeatId, reorderAction);
+                if (reorderResult.ok) {
+                  state = reorderResult.state;
+                  reorderSteps++;
+                  assertTokenConservation(state);
+                  assertCardConservation(state, deckTotal);
+                }
+              }
+            }
+
             const legal = enumerateLegalActions(state);
             if (legal.length === 0) break;
             const action = legal[index % legal.length]!;
             const actorSeatId = currentActorSeatId(state);
+            const preActionState = state;
             const result = hanabiGame.applyAction(state, actorSeatId, action);
             if (result.ok) {
               state = result.state;
               totalSteps++;
+
+              // D-23: if this play/discard drew a replacement (history
+              // gained a trailing "draw" entry), the actor's hand index that
+              // held the played/discarded card must now hold the drawn
+              // card's id — slot-preserving, not append-at-end.
+              const lastEntry = state.history[state.history.length - 1];
+              if (
+                (action.type === "play" || action.type === "discard") &&
+                lastEntry !== undefined &&
+                lastEntry.type === "draw"
+              ) {
+                const preHand = preActionState.hands.find((h) => h.seatId === actorSeatId)!;
+                const vacatedIndex = preHand.slots.findIndex(
+                  (s) => s.card.id === action.cardId,
+                );
+                const postHand = state.hands.find((h) => h.seatId === actorSeatId)!;
+                expect(postHand.slots[vacatedIndex]?.card.id).toBe(lastEntry.cardId);
+              }
             }
             assertTokenConservation(state);
             assertCardConservation(state, deckTotal);
@@ -81,6 +125,7 @@ describe("property: conservation", () => {
     // regression that always produces an empty action list cannot pass this
     // property vacuously.
     expect(totalSteps).toBeGreaterThan(0);
+    expect(reorderSteps).toBeGreaterThan(0);
   });
 
   describe("test-support helpers", () => {

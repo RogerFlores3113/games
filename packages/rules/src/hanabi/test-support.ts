@@ -11,7 +11,7 @@
 // engine is correct. If a legality predicate is wrong, this helper must
 // reproduce that same wrongness, not silently correct it.
 
-import { activeSeatId, canClue, canDiscard, canPlay } from "./legality";
+import { activeSeatId, canClue, canDiscard, canPlay, canReorder } from "./legality";
 import { RANKS, variantConfig } from "./variant";
 import type { HanabiAction, HanabiState } from "./state";
 
@@ -63,6 +63,47 @@ export function enumerateLegalActions(state: HanabiState): HanabiAction[] {
     }
   }
 
+  return actions;
+}
+
+/** D-23 property-suite driver: candidate reorder actions for `seatId`,
+ * built from that seat's CURRENT hand — reversed order, rotated left by
+ * one, and a swap of the first two ids — de-duplicated by resulting order,
+ * then filtered through `legality.ts`'s exported `canReorder` ONLY (never a
+ * local re-derivation, per this module's T-03-24 header discipline). May
+ * legally be called for any seat, not just the active one (D-17: reorder is
+ * off-turn legal), so property suites can exercise reorders by seats other
+ * than the current actor. Returns `[]` for a hand of 0-1 cards (every
+ * candidate order is identical to the current order) or once the game has
+ * ended (`canReorder` rejects with `game_over`). */
+export function enumerateReorderActions(state: HanabiState, seatId: string): HanabiAction[] {
+  const hand = state.hands.find((h) => h.seatId === seatId);
+  if (hand === undefined) return [];
+  const currentIds = hand.slots.map((s) => s.card.id);
+  if (currentIds.length < 2) return [];
+
+  const candidates: string[][] = [
+    [...currentIds].reverse(),
+    [...currentIds.slice(1), currentIds[0]!],
+    (() => {
+      const swapped = [...currentIds];
+      const first = swapped[0]!;
+      swapped[0] = swapped[1]!;
+      swapped[1] = first;
+      return swapped;
+    })(),
+  ];
+
+  const seenOrders = new Set<string>();
+  const actions: HanabiAction[] = [];
+  for (const cardIds of candidates) {
+    const key = cardIds.join("|");
+    if (seenOrders.has(key)) continue;
+    seenOrders.add(key);
+    if (canReorder(state, seatId, cardIds).legal) {
+      actions.push({ type: "reorder", cardIds });
+    }
+  }
   return actions;
 }
 

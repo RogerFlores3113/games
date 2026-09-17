@@ -11,7 +11,8 @@ import fc from "fast-check";
 import { hanabiGame } from "./adapter";
 import { checkHanabiGameEnd } from "./endgame";
 import { checkHanabiViewForLeaks, secretsForHanabiSeat } from "./hanabi-leak-check";
-import { currentActorSeatId, enumerateLegalActions } from "./test-support";
+import { toHanabiPlayerView } from "./projection";
+import { currentActorSeatId, enumerateLegalActions, enumerateReorderActions } from "./test-support";
 import type { HanabiState } from "./state";
 
 const VARIANTS = ["base", "rainbow", "black"] as const;
@@ -40,6 +41,7 @@ describe("property: redaction", () => {
   it("no seat's view leaks its own cards over 200 random games per variant", () => {
     let totalSteps = 0;
     let totalSeatChecks = 0;
+    let reorderSteps = 0;
 
     fc.assert(
       fc.property(
@@ -54,6 +56,37 @@ describe("property: redaction", () => {
 
           for (const index of actionIndexes) {
             if (checkHanabiGameEnd(state) !== null) break;
+
+            // D-23: every third step, drive a reorder (frequently off-turn)
+            // and prove it neither leaks identity nor desyncs the submitted
+            // order from what every seat's projected view actually shows.
+            if (index % 3 === 0) {
+              const reorderSeatId = state.seatIds[index % state.seatIds.length]!;
+              const reorderCandidates = enumerateReorderActions(state, reorderSeatId);
+              if (reorderCandidates.length > 0) {
+                const reorderAction = reorderCandidates[index % reorderCandidates.length]!;
+                const reorderResult = hanabiGame.applyAction(state, reorderSeatId, reorderAction);
+                if (reorderResult.ok) {
+                  state = reorderResult.state;
+                  reorderSteps++;
+                  totalSeatChecks += assertNoLeaksForEverySeat(state, seed);
+
+                  const submittedIds =
+                    reorderAction.type === "reorder" ? reorderAction.cardIds : [];
+                  for (const observerSeatId of state.seatIds) {
+                    const view = toHanabiPlayerView(state, observerSeatId);
+                    const observedIds =
+                      observerSeatId === reorderSeatId
+                        ? view.yourHand.map((c) => c.id)
+                        : (view.otherHands.find((h) => h.seatId === reorderSeatId)?.cards.map(
+                            (c) => c.id,
+                          ) ?? []);
+                    expect(observedIds).toEqual(submittedIds);
+                  }
+                }
+              }
+            }
+
             const legal = enumerateLegalActions(state);
             if (legal.length === 0) break;
             const action = legal[index % legal.length]!;
@@ -76,5 +109,6 @@ describe("property: redaction", () => {
     // inside assertNoLeaksForEverySeat both actually ran.
     expect(totalSteps).toBeGreaterThan(0);
     expect(totalSeatChecks).toBeGreaterThan(0);
+    expect(reorderSteps).toBeGreaterThan(0);
   });
 });

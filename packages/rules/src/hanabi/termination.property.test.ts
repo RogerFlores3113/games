@@ -14,7 +14,7 @@ import { checkHanabiGameEnd, type EndReason } from "./endgame";
 import { MAX_FUSES } from "./legality";
 import { maxScoreFor, variantConfig } from "./variant";
 import type { Variant as HanabiVariant } from "../adapter";
-import { currentActorSeatId, enumerateLegalActions } from "./test-support";
+import { currentActorSeatId, enumerateLegalActions, enumerateReorderActions } from "./test-support";
 import type { HanabiState } from "./state";
 
 const VARIANTS = ["base", "rainbow", "black"] as const;
@@ -34,6 +34,7 @@ const MAX_SIMULATED_TURNS = 500;
 describe("property: termination", () => {
   it("every game driven by random legal actions ends within the hard turn bound", () => {
     let gamesEnded = 0;
+    let reorderSteps = 0;
 
     fc.assert(
       fc.property(
@@ -57,6 +58,31 @@ describe("property: termination", () => {
               break;
             }
             const index = actionIndexes[turn % actionIndexes.length]!;
+
+            // D-23: reorders must NOT consume a simulated turn — drive one
+            // every third step (using the same index, frequently an off-turn
+            // seat) and assert every turn/token/round/deck/history counter
+            // is byte-identical before and after.
+            if (index % 3 === 0) {
+              const reorderSeatId = state.seatIds[index % state.seatIds.length]!;
+              const reorderCandidates = enumerateReorderActions(state, reorderSeatId);
+              if (reorderCandidates.length > 0) {
+                const reorderAction = reorderCandidates[index % reorderCandidates.length]!;
+                const beforeReorder = state;
+                const reorderResult = hanabiGame.applyAction(state, reorderSeatId, reorderAction);
+                if (reorderResult.ok) {
+                  state = reorderResult.state;
+                  reorderSteps++;
+                  expect(state.turnIndex).toBe(beforeReorder.turnIndex);
+                  expect(state.clueTokens).toBe(beforeReorder.clueTokens);
+                  expect(state.fuses).toBe(beforeReorder.fuses);
+                  expect(state.finalTurnsRemaining).toBe(beforeReorder.finalTurnsRemaining);
+                  expect(state.deck.length).toBe(beforeReorder.deck.length);
+                  expect(state.history.length).toBe(beforeReorder.history.length);
+                }
+              }
+            }
+
             const action = legal[index % legal.length]!;
             const actorSeatId = currentActorSeatId(state);
             const result = hanabiGame.applyAction(state, actorSeatId, action);
@@ -83,6 +109,7 @@ describe("property: termination", () => {
     // games, so a generator regression that always exits before any action
     // is applied cannot pass this property vacuously.
     expect(gamesEnded).toBeGreaterThan(0);
+    expect(reorderSteps).toBeGreaterThan(0);
   });
 
   it("a game driven to deck exhaustion gives every seat exactly one more turn with no draws (RULES-15/16)", () => {
