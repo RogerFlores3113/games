@@ -19,6 +19,10 @@
  * --color-accent fill MUST use --color-bg as its label color (~10.9:1,
  * WCAG AA pass). --color-text on --color-accent is ~1.63:1 and FAILS AA —
  * it must never be used.
+ *
+ * Phase 06.2 adds seven new named tokens below (four tile-colour presets,
+ * a clue/fuse token-art disc/rim pair, and a tile drop-shadow) and adds
+ * ZERO new `--color-accent` uses — it is still exactly seven.
  */
 @theme {
   --color-bg: #0B0F1A;
@@ -92,6 +96,32 @@
   --text-display: 40px;
   --text-display--line-height: 1.2;
   --text-display--font-weight: 600;
+
+  /*
+   * Phase 06.2 (TILE-01/02/03, BOARD-02) — decorative/token-art colours,
+   * never a suit/accent/destructive signal. The four tile-preset tokens
+   * below are the tile-colour picker's fixed palette: purely a personal-
+   * preference fill a player may opt into (TILE-03), verified to stay
+   * distinguishable from every `--color-suit-*` hue and from
+   * `--color-card-glow` so a preference-coloured tile never reads as a
+   * hint-tinted one. `--color-token-disc` is clue/fuse token art only — it
+   * stays pure black independent of any future `--color-bg` change, so it
+   * is declared as its own token rather than reusing `--color-bg`.
+   * `--color-token-fuse-rim` is the fuse token's literal orange-red rim
+   * stroke per the owner's description, distinct from `--color-suit-yellow`
+   * and `--color-destructive` — token art only, never a semantic signal.
+   * `--color-tile-shadow` is an opacity-only black, following the same
+   * "derive from a fixed value, document why" discipline as the
+   * `.table-backdrop` scrim below (TILE-01's "object resting on a surface"
+   * cue, not a luminosity signal).
+   */
+  --color-tile-preset-warm-sand: #3A3220;
+  --color-tile-preset-cool-teal: #1A3236;
+  --color-tile-preset-plum: #2A1F35;
+  --color-tile-preset-charcoal: #1C1F26;
+  --color-token-disc: #000000;
+  --color-token-fuse-rim: #E8722C;
+  --color-tile-shadow: rgba(0, 0, 0, 0.4);
 }
 
 body {
@@ -207,4 +237,55 @@ body {
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
+}
+
+/*
+ * TILE-01/D-11/D-15: CSS-only wooden board texture for the tableau panel
+ * only — never applied to body/main, so the .table-backdrop city-at-night
+ * image above stays visible around the board's own edges/gaps. Base layer
+ * is `color-mix(in srgb, var(--color-surface) 85%, black 15%)`, a derived
+ * (not new) near-token value following the same "derive from an existing
+ * token, document why" discipline as the .table-backdrop scrim above — the
+ * CSS keyword `black` is used as the mix input (never a hex literal) so
+ * this stays inside the file's no-hex-outside-@theme rule. Two
+ * `repeating-linear-gradient` grain layers at low opacity (4-8%) sit on
+ * top via background-blend-mode to read as plank grain.
+ */
+.board-surface {
+  background-color: color-mix(in srgb, var(--color-surface) 85%, black 15%);
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.06) 0px,
+      rgba(255, 255, 255, 0.06) 2px,
+      transparent 2px,
+      transparent 96px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.08) 0px,
+      rgba(0, 0, 0, 0.08) 1px,
+      transparent 1px,
+      transparent 6px
+    );
+  background-blend-mode: overlay, multiply;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+/*
+ * DRAG-01/D-08: drag shift-aside motion for the non-dragged tiles that open
+ * a gap at the current drop index. Reuses .drag-snap's exact timing/easing
+ * rather than introducing a second motion curve. Under prefers-reduced-
+ * motion, tiles jump directly to their shifted position with no animated
+ * transition — the gap itself (the signal) still renders.
+ */
+.tile-shift {
+  transition: transform 150ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-shift {
+    transition: none;
+  }
 }

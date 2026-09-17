@@ -38,6 +38,7 @@ function baseView(overrides: Partial<HanabiView> = {}): HanabiView {
     ],
     stacks: [],
     discard: [],
+    discardOrder: [],
     clueTokens: 8,
     fuses: 0,
     deckCount: 30,
