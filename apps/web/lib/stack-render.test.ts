@@ -62,9 +62,9 @@ describe("stack-render: PlayedStack", () => {
     const markup = renderToStaticMarkup(
       createElement(PlayedStack, { stack: { suit: "rainbow", topRank: 3 } }),
     );
-    expect(markup).toContain(`left:0px`);
-    expect(markup).toContain(`left:${FAN_PEEK_PX}px`);
-    expect(markup).toContain(`left:${FAN_PEEK_PX * 2}px`);
+    expect(markup).toContain('data-testid="played-stack-rainbow-card-1" class="absolute" style="left:0;z-index:1"');
+    expect(markup).toContain(`style="left:${FAN_PEEK_PX}px;z-index:2"`);
+    expect(markup).toContain(`style="left:${FAN_PEEK_PX * 2}px;z-index:3"`);
   });
 
   it("applies the anim-stack-flash class when flashing", () => {
