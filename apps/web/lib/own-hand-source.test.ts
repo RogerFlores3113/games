@@ -17,9 +17,14 @@ import { describe, expect, it } from "vitest";
 
 const OWN_HAND_CARD_PATH = fileURLToPath(new URL("../components/hanabi/OwnHandCard.tsx", import.meta.url));
 const CANDIDATE_STRIP_PATH = fileURLToPath(new URL("../components/hanabi/CandidateStrip.tsx", import.meta.url));
+// 06.1-09 / RESEARCH.md Pitfall 3: clue marks relocated into MarksZone.tsx —
+// the D-15 source scan must cover this new file too, or a suit/rank leak
+// introduced here would go uncaught.
+const MARKS_ZONE_PATH = fileURLToPath(new URL("../components/hanabi/MarksZone.tsx", import.meta.url));
 
 const ownHandCardSource = readFileSync(OWN_HAND_CARD_PATH, "utf-8");
 const candidateStripSource = readFileSync(CANDIDATE_STRIP_PATH, "utf-8");
+const marksZoneSource = readFileSync(MARKS_ZONE_PATH, "utf-8");
 
 /**
  * Strips `//` line comments and `/* *\/` block comments from `source`,
@@ -167,5 +172,22 @@ describe("own-hand source scan (D-15)", () => {
 
   it("carries forward the Phase 4 load-bearing no-identity comment", () => {
     expect(ownHandCardSource).toContain("renders NO identity signal");
+  });
+
+  it("MarksZone.tsx code (comments stripped) never reads or destructures a suit or rank property", () => {
+    const code = stripComments(marksZoneSource);
+    expect(code).not.toMatch(PROPERTY_ACCESS);
+    expect(code).not.toMatch(DESTRUCTURING);
+  });
+
+  it("MarksZone.tsx never mentions exposeSuit or a suit-identity DOM marker anywhere, comments included", () => {
+    for (const token of FORBIDDEN_TOKENS) {
+      expect(marksZoneSource).not.toContain(token);
+    }
+  });
+
+  it("MarksZone's props type has no card member — it takes facts/variant only, never a card object", () => {
+    expect(marksZoneSource).not.toMatch(/\bcard\s*:/);
+    expect(marksZoneSource).not.toContain("HanabiCardView");
   });
 });
