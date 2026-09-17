@@ -63,7 +63,7 @@ function render(cards: HanabiCardView[]): string {
     onCardPointerDown: () => {},
     registerSlot: () => {},
     consumeClickSuppression: () => false,
-    hintsVisible: true,
+    hintsVisible: undefined,
     tileColor: undefined,
   };
   return renderToStaticMarkup(createElement(OwnHand, props));

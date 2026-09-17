@@ -223,7 +223,7 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await contextB.close();
   });
 
-  test("NOTE-02: a note survives refresh, is never sent, and clears when its card leaves", async ({
+  test("NOTE-03: a note autosaves (debounced, no Enter/blur needed), survives refresh, is never sent, and clears when its card leaves", async ({
     page: hostPage,
     browser,
   }) => {
@@ -236,24 +236,27 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
       });
     });
 
-    await activePage.getByTestId("note-chip-slot-1").click();
-    await activePage.getByTestId("note-input-slot-1").fill("r5? save");
-    await activePage.getByTestId("note-input-slot-1").press("Enter");
-    await expect(activePage.getByTestId("note-chip-slot-1")).toHaveText("r5? save");
+    // 06.2-06: NoteBox is always present and always editable — no
+    // click-to-reveal step, and autosave is debounced rather than gated on
+    // Enter/blur.
+    await activePage.getByTestId("note-box-slot-1").fill("r5? save");
+    await expect(activePage.getByTestId("note-box-slot-1")).toHaveValue("r5? save");
+    // Exceeds NoteBox's autosave debounce window before reloading.
+    await activePage.waitForTimeout(600);
 
     await activePage.reload();
     await expect(activePage.getByTestId("own-hand")).toBeVisible();
-    await expect(activePage.getByTestId("note-chip-slot-1")).toHaveText("r5? save");
+    await expect(activePage.getByTestId("note-box-slot-1")).toHaveValue("r5? save");
 
     expect(sentFrames.some((frame) => frame.includes("r5? save"))).toBe(false);
 
     // On the actor's turn, playing slot 1 draws a fresh card into that
-    // slot — its note chip resets to the empty "Add note" state.
+    // slot — its note box resets to the empty state.
     await activePage.getByTestId("own-hand-slot-1").click();
     await expect(activePage.getByTestId("play-button")).toBeEnabled();
     await activePage.getByTestId("play-button").click();
 
-    await expect(activePage.getByTestId("note-chip-slot-1")).toHaveAttribute("aria-label", "Add note");
+    await expect(activePage.getByTestId("note-box-slot-1")).toHaveValue("");
 
     await contextB.close();
   });

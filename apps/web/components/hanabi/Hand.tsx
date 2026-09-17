@@ -48,10 +48,11 @@ export interface TeammateHandProps {
   justCluedIds: ReadonlySet<string>;
   disabled: boolean;
   onSelectTarget: () => void;
-  /** HINT-03/D-05: whether every teammate card's hint overlay currently
-   * renders. Defaults to true so callers not yet wired to the keep-hints
-   * toggle still compile and render hints unconditionally. */
-  hintsVisible?: boolean;
+  /** HINT-03/D-05: the set of card ids whose hint overlay currently
+   * renders, derived per-render by `hintsVisibleForCard` (turn-history
+   * based, never a timer). `undefined` means "not yet wired" and every
+   * card renders its hint, matching the pre-06.2-06 default. */
+  hintsVisible?: ReadonlySet<string>;
   /** TILE-03/D-13: the viewer's personal tile-colour preference, applied to
    * every teammate tile too (D-13 — affects only that player's own view). */
   tileColor?: string;
@@ -76,7 +77,7 @@ export function TeammateHand({
   justCluedIds,
   disabled,
   onSelectTarget,
-  hintsVisible = true,
+  hintsVisible,
   tileColor,
 }: TeammateHandProps) {
   return (
@@ -137,7 +138,7 @@ export function TeammateHand({
             card={card}
             preview={previewIds.has(card.id)}
             justClued={justCluedIds.has(card.id)}
-            hintsVisible={hintsVisible}
+            hintsVisible={hintsVisible ? hintsVisible.has(card.id) : true}
             tileColor={tileColor}
           />
         ))}
@@ -165,10 +166,11 @@ export interface OwnHandProps {
   onCardPointerDown: (cardId: string, event: ReactPointerEvent) => void;
   registerSlot: (cardId: string, el: HTMLElement | null) => void;
   consumeClickSuppression: () => boolean;
-  /** HINT-03/D-05: whether every own-hand card's hint overlay currently
-   * renders. Defaults to true so callers not yet wired to the keep-hints
-   * toggle still compile and render hints unconditionally. */
-  hintsVisible?: boolean;
+  /** HINT-03/D-05: the set of card ids whose hint overlay currently
+   * renders, derived per-render by `hintsVisibleForCard` (turn-history
+   * based, never a timer). `undefined` means "not yet wired" and every
+   * card renders its hint, matching the pre-06.2-06 default. */
+  hintsVisible?: ReadonlySet<string>;
   /** TILE-03/D-13: the viewer's personal tile-colour preference. */
   tileColor?: string;
 }
@@ -197,7 +199,7 @@ export function OwnHand({
   onCardPointerDown,
   registerSlot,
   consumeClickSuppression,
-  hintsVisible = true,
+  hintsVisible,
   tileColor,
 }: OwnHandProps) {
   return (
@@ -269,7 +271,7 @@ export function OwnHand({
                 if (consumeClickSuppression()) return;
                 onSelectCard(card.id);
               }}
-              hintsVisible={hintsVisible}
+              hintsVisible={hintsVisible ? hintsVisible.has(card.id) : true}
               tileColor={tileColor}
             />
           </div>

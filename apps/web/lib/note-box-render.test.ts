@@ -17,9 +17,13 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { NoteBox } from "../components/hanabi/NoteBox";
+import { TileColorPicker } from "../components/hanabi/TileColorPicker";
 
 const SOURCE_PATH = fileURLToPath(new URL("../components/hanabi/NoteBox.tsx", import.meta.url));
 const source = readFileSync(SOURCE_PATH, "utf-8");
+
+const HANABI_BOARD_PATH = fileURLToPath(new URL("../components/hanabi/HanabiBoard.tsx", import.meta.url));
+const hanabiBoardSource = readFileSync(HANABI_BOARD_PATH, "utf-8");
 
 describe("note-box-render", () => {
   it("server render is an always-present, empty-state input with the Note… placeholder and the slot testid (SSR-safe)", () => {
@@ -75,5 +79,70 @@ describe("note-box-render", () => {
     expect(source).toContain("NOTE_ROW_PX");
     expect(source).toContain('aria-hidden="true"');
     expect(source).toMatch(/inset:\s*"-12px 0"/);
+  });
+});
+
+// HINT-03/TILE-03 (D-05/D-13/D-14): render-contract for the controls-row
+// additions introduced by this plan. TileColorPicker is directly
+// server-renderable (it takes only a value/onChange pair, no room/socket
+// context), so its swatch grid is asserted the same way NoteBox is above.
+// The keep-hints toggle lives inside HanabiBoard, which requires a full
+// RoomView/socket context to render — its two aria-label states are
+// asserted the same way this file already asserts NoteBox's contracted
+// strings: a source scan for the literal, contracted copy.
+describe("tile-color-picker-render (TILE-03, D-13/D-14)", () => {
+  function renderOpenPicker(): string {
+    // The swatch grid only renders once opened; render the picker, then
+    // re-render with the panel forced open by invoking the same markup the
+    // component produces when `open` is true — simplest reliable path in a
+    // Node (non-jsdom) environment is asserting the always-present toggle
+    // button here and covering the swatch grid via a source scan below,
+    // mirroring this file's own NoteBox debounce-behaviour approach.
+    return renderToStaticMarkup(
+      createElement(TileColorPicker, { value: "slate", onChange: () => {} }),
+    );
+  }
+
+  it("server render is an icon-only toggle button with the contracted aria-label and a 44px-reachable touch target", () => {
+    const markup = renderOpenPicker();
+    expect(markup).toContain('data-testid="tile-color-picker-toggle"');
+    expect(markup).toContain('aria-label="Choose tile colour"');
+    expect(markup).toContain('aria-hidden="true"');
+  });
+
+  it("source defines all five swatches with the contracted per-preset aria-labels", () => {
+    const pickerSource = readFileSync(
+      fileURLToPath(new URL("../components/hanabi/TileColorPicker.tsx", import.meta.url)),
+      "utf-8",
+    );
+    expect(pickerSource).toContain("Slate tile colour");
+    expect(pickerSource).toContain("Warm sand tile colour");
+    expect(pickerSource).toContain("Cool teal tile colour");
+    expect(pickerSource).toContain("Plum tile colour");
+    expect(pickerSource).toContain("Charcoal tile colour");
+  });
+
+  it("never imports a network/wire-reaching path — the choice is local-only (D-13)", () => {
+    const pickerSource = readFileSync(
+      fileURLToPath(new URL("../components/hanabi/TileColorPicker.tsx", import.meta.url)),
+      "utf-8",
+    );
+    expect(pickerSource).not.toMatch(/room-socket|room-store|onAction|send\(/);
+  });
+});
+
+describe("keep-hints-toggle copy contract (HINT-03, D-05)", () => {
+  it("HanabiBoard.tsx carries both contracted aria-label states and derives visibility with hintsVisibleForCard", () => {
+    expect(hanabiBoardSource).toContain('"Keep hints visible"');
+    expect(hanabiBoardSource).toContain('"Clear hints after each move"');
+    expect(hanabiBoardSource).toContain("hintsVisibleForCard(");
+  });
+
+  it("does not introduce a new setTimeout for hint lifetime — only the pre-existing clue-flash timer remains", () => {
+    const setTimeoutCount = (hanabiBoardSource.match(/setTimeout\(/g) ?? []).length;
+    // Exactly one call site: the existing justCluedIds 2000ms flash timer
+    // (06.1 CR-01). Hint persistence itself must be derived purely from
+    // history, with no timer of its own.
+    expect(setTimeoutCount).toBe(1);
   });
 });

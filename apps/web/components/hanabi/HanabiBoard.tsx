@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import type { RoomView } from "@games/schema";
 import { HanabiViewSchema } from "@games/schema/games/hanabi";
 import type { Clue, HanabiView } from "@games/rules";
@@ -10,6 +11,15 @@ import {
   turnIndicatorText,
 } from "../../lib/hanabi-board-logic";
 import { clearNotesForRoom, pruneNotesForSeat } from "../../lib/hanabi-notes";
+import { hintsVisibleForCard } from "../../lib/hanabi-hint-logic";
+import { readKeepHintsPref, writeKeepHintsPref } from "../../lib/keep-hints-pref";
+import {
+  TILE_COLOR_PRESETS,
+  readTileColorPref,
+  writeTileColorPref,
+  type TileColorId,
+} from "../../lib/tile-color-pref";
+import { CONTROLS_ROW_PX } from "../../lib/layout-budget";
 import {
   CLUE_HIGHLIGHT_MS,
   teammatesInTurnOrder,
@@ -25,6 +35,7 @@ import { EndOverlay } from "./EndOverlay";
 import { FlyToLayer } from "./FlyToLayer";
 import { ReconnectingBanner } from "../ReconnectingBanner";
 import { AudioControls } from "./AudioControls";
+import { TileColorPicker } from "./TileColorPicker";
 import { useHanabiAudio } from "./useHanabiAudio";
 import { useHandDrag } from "./useHandDrag";
 
@@ -83,6 +94,31 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
   const [justCluedIds, setJustCluedIds] = useState<ReadonlySet<string>>(new Set());
   const prevHistoryLengthRef = useRef<number | null>(null);
   const clueClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // HINT-03/D-05, TILE-03/D-13: personal, client-side-only preferences.
+  // Loaded in a mount effect (never the state initializer) so SSR and first
+  // client render both show the documented defaults (keepHints off, slate
+  // tile) before the real stored value is readable.
+  const [keepHints, setKeepHints] = useState(false);
+  const [tileColorId, setTileColorId] = useState<TileColorId>("slate");
+  useEffect(() => {
+    setKeepHints(readKeepHintsPref());
+    setTileColorId(readTileColorPref());
+  }, []);
+
+  function handleToggleKeepHints() {
+    setKeepHints((prev) => {
+      const next = !prev;
+      writeKeepHintsPref(next);
+      return next;
+    });
+  }
+
+  function handleTileColorChange(id: TileColorId) {
+    setTileColorId(id);
+    writeTileColorPref(id);
+  }
+  const tileColorCss = TILE_COLOR_PRESETS.find((preset) => preset.id === tileColorId)?.cssValue;
 
   // Unmount-only cleanup for the highlight-clear timer.
   useEffect(
@@ -205,6 +241,25 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
     clueTarget && activeClueValue ? clueTouchIdsForTarget(game, clueTarget, activeClueValue) : [],
   );
 
+  // HINT-03/D-05: every card's hint visibility, derived synchronously from
+  // `game.history` alone — no timer, no mutable cell (see
+  // hanabi-hint-logic.ts's header comment on why this must stay pure).
+  // Covers own hand and every teammate hand so both `OwnHand` and
+  // `TeammateHand` read from the one set.
+  const hintsVisibleIds = new Set<string>();
+  for (const card of game.yourHand) {
+    if (hintsVisibleForCard(game.history, card.id, { keepVisible: keepHints })) {
+      hintsVisibleIds.add(card.id);
+    }
+  }
+  for (const hand of game.otherHands) {
+    for (const card of hand.cards) {
+      if (hintsVisibleForCard(game.history, card.id, { keepVisible: keepHints })) {
+        hintsVisibleIds.add(card.id);
+      }
+    }
+  }
+
   // D-16: only computed while a drag is in flight, so Table never carries
   // drop-zone highlight/reason styling outside an active drag.
   const dropStatus =
@@ -243,6 +298,8 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
             justCluedIds={justCluedIds}
             disabled={controlsDisabled}
             onSelectTarget={() => setClueTarget(hand.seatId)}
+            hintsVisible={hintsVisibleIds}
+            tileColor={tileColorCss}
           />
         ))}
       </div>
@@ -274,6 +331,8 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
           onCardPointerDown={drag.onCardPointerDown}
           registerSlot={drag.registerSlot}
           consumeClickSuppression={drag.consumeClickSuppression}
+          hintsVisible={hintsVisibleIds}
+          tileColor={tileColorCss}
         />
 
         <CardActions
@@ -296,12 +355,45 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
           onGive={handleGiveClue}
         />
 
-        <AudioControls
-          muted={audio.muted}
-          volume={audio.volume}
-          onToggleMute={() => audio.setMuted(!audio.muted)}
-          onVolumeChange={audio.setVolume}
-        />
+        {/* HINT-03/D-05/TILE-03: grouped with AudioControls in a single
+            tight-gap wrapper (space-xs, not the row's own space-md) so the
+            two new personal-preference controls don't push the already
+            wrap-prone controls row past the UI-11 1280x720 fit. */}
+        <div className="flex items-center gap-[length:var(--space-xs)]">
+          <AudioControls
+            muted={audio.muted}
+            volume={audio.volume}
+            onToggleMute={() => audio.setMuted(!audio.muted)}
+            onVolumeChange={audio.setVolume}
+          />
+
+          {/* Icon-only, out-of-flow 44px touch target (matches the row's
+              other controls); label describes the action the NEXT click
+              performs, per the copy contract. */}
+          <span
+            className="relative inline-flex items-center justify-center rounded-md"
+            style={{ height: CONTROLS_ROW_PX, width: CONTROLS_ROW_PX }}
+          >
+            <button
+              type="button"
+              data-testid="keep-hints-toggle"
+              aria-label={keepHints ? "Clear hints after each move" : "Keep hints visible"}
+              aria-pressed={keepHints}
+              onClick={handleToggleKeepHints}
+              className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+              style={{ width: 28, height: 28 }}
+            >
+              {keepHints ? (
+                <Eye size={16} aria-hidden="true" color="var(--color-text)" />
+              ) : (
+                <EyeOff size={16} aria-hidden="true" color="var(--color-text-muted)" />
+              )}
+            </button>
+            <span aria-hidden="true" className="absolute" style={{ inset: "-8px" }} />
+          </span>
+
+          <TileColorPicker value={tileColorId} onChange={handleTileColorChange} />
+        </div>
       </div>
 
       <FlyToLayer game={game} reconnecting={reconnecting} suppressedCardIds={drag.droppedCardIdsRef} />

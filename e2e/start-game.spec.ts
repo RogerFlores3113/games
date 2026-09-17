@@ -382,10 +382,11 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     // Phase 6.1/6.2 D-01: the note/audio/discard-overlay additions and the
     // tile-borne hint surfaces still fit at 1280x720 alongside the rest of
     // the tableau. HINT-04 deletes the automatic clue-mark pip band —
-    // own-hand-slot-1 and note-chip-slot-1 (both present unconditionally)
-    // are the fit checks that replace the deleted pip-band assertions.
+    // own-hand-slot-1 and note-box-slot-1 (both present unconditionally,
+    // note-box-slot-1 replacing 06.2-06's deleted note-chip-slot-1) are the
+    // fit checks that replace the deleted pip-band assertions.
     await expect(hostPage.getByTestId("own-hand-slot-1")).toBeInViewport();
-    await expect(hostPage.getByTestId("note-chip-slot-1")).toBeInViewport();
+    await expect(hostPage.getByTestId("note-box-slot-1")).toBeInViewport();
     await expect(hostPage.getByTestId("audio-mute-toggle")).toBeInViewport();
     await expect(hostPage.getByTestId("discard-toggle")).toBeInViewport();
     await expect(
