@@ -33,6 +33,7 @@ function baseState(overrides: Partial<HanabiState> = {}): HanabiState {
     deck: [],
     stacks: stacksAt("base"),
     discard: [],
+    discardOrder: [],
     clueTokens: 8,
     fuses: 0,
     finalTurnsRemaining: null,

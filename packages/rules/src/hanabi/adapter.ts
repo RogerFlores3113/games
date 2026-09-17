@@ -31,6 +31,7 @@ export const hanabiGame: GameAdapter<HanabiState, HanabiAction> = {
       deck,
       stacks,
       discard: [],
+      discardOrder: [],
       clueTokens: MAX_CLUE_TOKENS,
       fuses: 0,
       finalTurnsRemaining: null,

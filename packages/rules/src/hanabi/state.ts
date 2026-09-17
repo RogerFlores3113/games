@@ -37,6 +37,15 @@ export type HanabiState = {
   readonly deck: readonly HanabiCard[];
   readonly stacks: readonly StackEntry[];
   readonly discard: readonly HanabiCard[];
+  /** D-23/D-28: the shared, player-arranged order of the discard pile. Always
+   * an exact permutation of `discard`'s ids — every seat's projected view
+   * carries the identical value (computed once in projection.ts's public
+   * section, never per seat). A newly discarded card (deliberate discard or
+   * misplay) always appends to the END of this array, never disturbing the
+   * existing arrangement. Mutated only by `reorderDiscard`; every other
+   * action branch carries it forward unchanged except where a new discard
+   * append is required. */
+  readonly discardOrder: readonly string[];
   readonly clueTokens: number;
   readonly fuses: number;
   readonly finalTurnsRemaining: number | null;
@@ -47,7 +56,8 @@ export type HanabiAction =
   | { readonly type: "play"; readonly cardId: string }
   | { readonly type: "discard"; readonly cardId: string }
   | { readonly type: "clue"; readonly targetSeatId: string; readonly clue: Clue }
-  | { readonly type: "reorder"; readonly cardIds: readonly string[] };
+  | { readonly type: "reorder"; readonly cardIds: readonly string[] }
+  | { readonly type: "reorderDiscard"; readonly cardIds: readonly string[] };
 
 // View types are deliberately NON-readonly plain objects/arrays so HanabiView
 // stays assignable to Phase 4's z.infer type (same split forehead-card.ts's
@@ -108,6 +118,7 @@ export type HanabiView = {
   otherHands: Array<{ seatId: string; cards: HanabiCardView[] }>;
   stacks: Array<{ suit: Suit; topRank: number }>;
   discard: Array<{ id: string; suit: Suit; rank: Rank }>;
+  discardOrder: string[];
   clueTokens: number;
   fuses: number;
   deckCount: number;

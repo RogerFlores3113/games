@@ -142,6 +142,7 @@ export const HanabiViewSchema = z.strictObject({
   otherHands: z.array(OtherHandSchema),
   stacks: z.array(StackViewSchema),
   discard: z.array(DiscardCardSchema),
+  discardOrder: z.array(z.string().min(1)),
   clueTokens: z.number().int().min(0).max(8),
   fuses: z.number().int().min(0).max(3),
   deckCount: z.number().int().nonnegative(),

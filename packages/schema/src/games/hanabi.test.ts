@@ -70,6 +70,7 @@ const baseValidView = {
   ],
   stacks: [{ suit: "red", topRank: 2 }],
   discard: [{ id: "card-3", suit: "white", rank: 1 }],
+  discardOrder: ["card-3"],
   clueTokens: 7,
   fuses: 3,
   deckCount: 30,

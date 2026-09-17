@@ -226,6 +226,7 @@ function applyPlay(
 
   let stacks: readonly StackEntry[] = state.stacks;
   let discard: readonly HanabiCard[] = state.discard;
+  let discardOrder: readonly string[] = state.discardOrder;
   let fuses = state.fuses;
   let clueTokens = state.clueTokens;
 
@@ -240,9 +241,12 @@ function applyPlay(
       clueTokens = clueTokens + 1;
     }
   } else {
-    // RULES-12: a misplay costs a fuse and sends the card to the discard pile.
+    // RULES-12: a misplay costs a fuse and sends the card to the discard
+    // pile. D-23: the misplayed card's id appends to the END of the shared
+    // discard arrangement, same as a deliberate discard.
     fuses = state.fuses + 1;
     discard = [...state.discard, card];
+    discardOrder = [...state.discardOrder, card.id];
   }
 
   const drawResult = drawCard({
@@ -284,6 +288,7 @@ function applyPlay(
       deck: drawResult.deck,
       stacks,
       discard,
+      discardOrder,
       clueTokens,
       fuses,
       finalTurnsRemaining,
@@ -309,6 +314,9 @@ function applyDiscard(
   const vacatedIndex = findHandIndex(state.hands, actorSeatId, cardId);
   const handsAfterRemoval = removeFromHand(state.hands, actorSeatId, cardId);
   const discard = [...state.discard, card];
+  // D-23: a deliberate discard's card id appends to the END of the shared
+  // discard arrangement, mirroring the discard array's own append above.
+  const discardOrder = [...state.discardOrder, card.id];
   const clueTokens = Math.min(state.clueTokens + 1, MAX_CLUE_TOKENS);
 
   const drawResult = drawCard({
@@ -349,6 +357,7 @@ function applyDiscard(
       deck: drawResult.deck,
       stacks: state.stacks,
       discard,
+      discardOrder,
       clueTokens,
       fuses: state.fuses,
       finalTurnsRemaining,
@@ -406,6 +415,7 @@ function applyClue(
       deck: state.deck,
       stacks: state.stacks,
       discard: state.discard,
+      discardOrder: state.discardOrder,
       clueTokens,
       fuses: state.fuses,
       finalTurnsRemaining,
@@ -444,6 +454,7 @@ function applyReorder(
       deck: state.deck,
       stacks: state.stacks,
       discard: state.discard,
+      discardOrder: state.discardOrder,
       clueTokens: state.clueTokens,
       fuses: state.fuses,
       finalTurnsRemaining: state.finalTurnsRemaining,
@@ -467,5 +478,8 @@ export function applyHanabiAction(
   if (action.type === "play") return applyPlay(state, actorSeatId, action.cardId);
   if (action.type === "discard") return applyDiscard(state, actorSeatId, action.cardId);
   if (action.type === "reorder") return applyReorder(state, actorSeatId, action.cardIds);
-  return applyClue(state, actorSeatId, action.targetSeatId, action.clue);
+  if (action.type === "clue") return applyClue(state, actorSeatId, action.targetSeatId, action.clue);
+  // action.type === "reorderDiscard": dispatch wired in Task 2 (canReorderDiscard/
+  // applyReorderDiscard do not exist yet at this point in the plan).
+  return { ok: false, error: "invalid_action" };
 }

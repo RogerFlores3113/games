@@ -193,6 +193,7 @@ describe("property: conservation", () => {
         deck: state.deck,
         stacks: state.stacks,
         discard: state.discard,
+        discardOrder: state.discardOrder,
         clueTokens: state.clueTokens,
         fuses: MAX_FUSES,
         finalTurnsRemaining: state.finalTurnsRemaining,

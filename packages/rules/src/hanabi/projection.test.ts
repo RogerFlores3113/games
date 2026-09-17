@@ -21,6 +21,7 @@ function buildState(variant: Variant): HanabiState {
     deck,
     stacks: config.suits.map((suit) => ({ suit, topRank: 0 })),
     discard: [],
+    discardOrder: [],
     clueTokens: 8,
     fuses: 0,
     finalTurnsRemaining: null,

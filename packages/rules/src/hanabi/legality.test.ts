@@ -34,6 +34,7 @@ function buildState(
     deck,
     stacks: config.suits.map((suit) => ({ suit, topRank: 0 })),
     discard: [],
+    discardOrder: [],
     clueTokens: MAX_CLUE_TOKENS,
     fuses: 0,
     finalTurnsRemaining: null,

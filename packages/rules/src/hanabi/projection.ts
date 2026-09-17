@@ -105,6 +105,10 @@ export function toHanabiPlayerView(state: HanabiState, seatId: string): HanabiVi
   const activeSeatId = state.seatIds[state.turnIndex] as string;
   const stacks = state.stacks.map((s) => ({ suit: s.suit, topRank: s.topRank }));
   const discard = state.discard.map((c) => ({ id: c.id, suit: c.suit, rank: c.rank }));
+  // D-28: computed ONCE here and reused verbatim in BOTH return literals
+  // below — never recomputed per branch, so every seat's projected view is
+  // identical (the whole point of a shared discard arrangement).
+  const discardOrder = [...state.discardOrder];
   const history = state.history.map(toHistoryEntryView);
   const score = currentScore(state);
 
@@ -125,6 +129,7 @@ export function toHanabiPlayerView(state: HanabiState, seatId: string): HanabiVi
       otherHands,
       stacks,
       discard,
+      discardOrder,
       clueTokens: state.clueTokens,
       fuses: state.fuses,
       deckCount: state.deck.length,
@@ -148,6 +153,7 @@ export function toHanabiPlayerView(state: HanabiState, seatId: string): HanabiVi
     otherHands,
     stacks,
     discard,
+    discardOrder,
     clueTokens: state.clueTokens,
     fuses: state.fuses,
     deckCount: state.deck.length,
