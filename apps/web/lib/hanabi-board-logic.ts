@@ -97,7 +97,13 @@ export function turnIndicatorText(
   game: Pick<HanabiView, "isYourTurn" | "activeSeatId">,
   seats: ReadonlyArray<{ seatId: string; connected: boolean }>,
   labelFor: (seatId: string) => string,
+  ended = false,
 ): string {
+  // WR-02: the engine advances turnIndex on the game-ending action too, so
+  // an ended game's isYourTurn/activeSeatId name a turn that never comes.
+  if (ended) {
+    return "Game over";
+  }
   if (game.isYourTurn) {
     return "Your turn";
   }

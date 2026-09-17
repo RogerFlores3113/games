@@ -190,7 +190,7 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
           youSeatId={view.youSeatId}
           connected={view.youSeatId !== null ? isSeatConnected(view.seats, view.youSeatId) : true}
           isYourTurn={game.isYourTurn && !ended}
-          turnText={turnIndicatorText(game, view.seats, labelFor)}
+          turnText={turnIndicatorText(game, view.seats, labelFor, ended)}
           selectedCardId={selectedCardId}
           justCluedIds={justCluedIds}
           disabled={controlsDisabled}

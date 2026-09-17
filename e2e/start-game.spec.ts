@@ -236,6 +236,8 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     for (const page of [hostPage, otherPage]) {
       await expect(page.getByTestId("end-overlay")).toBeVisible();
       await expect(page.getByTestId("game-over-heading")).toHaveText("Game over");
+      // WR-02: the turn indicator never names a turn after the game ended.
+      await expect(page.getByTestId("turn-indicator")).toHaveText("Game over");
       await expect(page.getByTestId("final-score")).toHaveText(/^Final score: \d+ \/ 25 — .+$/);
       await expect(page.getByTestId("end-reason")).toHaveText(
         /^(Three fuses were lost\.|Every stack was completed!|The deck ran out and the final round elapsed\.)$/,

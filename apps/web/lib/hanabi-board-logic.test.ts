@@ -297,6 +297,16 @@ describe("D-07: seat connection + turn text", () => {
       ),
     ).toBe("Waiting for Bianca — disconnected");
   });
+
+  it("turnIndicatorText says 'Game over' once the game has ended, even if the engine advanced the turn to the viewer", () => {
+    const seats = [{ seatId: "a", connected: true }, { seatId: "b", connected: true }];
+    expect(
+      turnIndicatorText({ isYourTurn: true, activeSeatId: "a" }, seats, () => "Anyone", true),
+    ).toBe("Game over");
+    expect(
+      turnIndicatorText({ isYourTurn: false, activeSeatId: "b" }, seats, () => "Bianca", true),
+    ).toBe("Game over");
+  });
 });
 
 describe("cluableColorsForView", () => {
