@@ -161,11 +161,14 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       expect(slotCount).toBeGreaterThan(0);
       for (let i = 0; i < slotCount; i++) {
         const slot = slots.nth(i);
+        // D-07: clue marks now render in a fixed marks-zone-slot-N above the
+        // card, not inside own-hand-slot-N itself.
+        const marksZone = page.getByTestId(`marks-zone-slot-${i + 1}`);
         await expect(slot).toHaveAttribute("data-luminosity", "unclued");
-        await expect(slot.locator('[data-testid="confirmed-rank"]')).toHaveCount(0);
-        await expect(slot.locator('[data-testid="confirmed-suit"]')).toHaveCount(0);
-        await expect(slot.locator('[data-testid="positive-marks"]')).toHaveCount(0);
-        const pipOpacities = await slot
+        await expect(marksZone.locator('[data-testid="confirmed-rank"]')).toHaveCount(0);
+        await expect(marksZone.locator('[data-testid="confirmed-suit"]')).toHaveCount(0);
+        await expect(marksZone.locator('[data-told="true"]')).toHaveCount(0);
+        const pipOpacities = await marksZone
           .locator('[data-testid="rank-pips"] > *, [data-testid="suit-pips"] > *')
           .evaluateAll((els) => els.map((el) => getComputedStyle(el).opacity));
         expect(pipOpacities.length).toBeGreaterThan(0);

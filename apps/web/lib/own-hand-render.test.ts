@@ -100,4 +100,22 @@ describe("own-hand render guard (D-15, WR-06)", () => {
     expect(render(narrowed)).not.toBe(render(VISIBLE_HAND));
     expect(render(narrowed)).toContain('data-testid="confirmed-rank"');
   });
+
+  it("renders a marks zone above the first own-hand slot (D-07 relocation)", () => {
+    expect(render(VISIBLE_HAND)).toContain("marks-zone-slot-1");
+  });
+
+  it("every own-hand card-back segment is byte-identical across slots (D-10)", () => {
+    const markup = render(VISIBLE_HAND);
+    const segments = markup.split('data-testid="own-hand-slot-').slice(1);
+    expect(segments.length).toBeGreaterThan(1);
+    const cardBackSvg = (segment: string): string => {
+      const start = segment.indexOf("<svg");
+      const end = segment.indexOf("</svg>", start) + "</svg>".length;
+      expect(start).toBeGreaterThan(-1);
+      return segment.slice(start, end);
+    };
+    const svgs = segments.map(cardBackSvg);
+    expect(new Set(svgs).size).toBe(1);
+  });
 });

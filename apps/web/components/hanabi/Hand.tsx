@@ -1,4 +1,5 @@
 import type { HanabiCardView, Variant } from "@games/rules";
+import { MarksZone } from "./MarksZone";
 import { OwnHandCard } from "./OwnHandCard";
 import { TeammateCard } from "./TeammateCard";
 
@@ -117,13 +118,10 @@ export function TeammateHand({
         }}
       >
         {hand.cards.map((card) => (
-          <TeammateCard
-            key={card.id}
-            card={card}
-            variant={variant}
-            preview={previewIds.has(card.id)}
-            justClued={justCluedIds.has(card.id)}
-          />
+          <div key={card.id} className="flex flex-col items-center">
+            <MarksZone facts={card.facts} variant={variant} scale="teammate" testId={`marks-zone-${card.id}`} />
+            <TeammateCard card={card} preview={previewIds.has(card.id)} justClued={justCluedIds.has(card.id)} />
+          </div>
         ))}
       </div>
     </div>
@@ -168,7 +166,7 @@ export function OwnHand({
         boxShadow: isYourTurn ? "0 0 12px 0 rgba(245, 185, 66, 0.4)" : "none",
       }}
     >
-      <div className="flex flex-col items-center gap-[length:var(--space-xs)]">
+      <div className="flex flex-row items-center gap-[length:var(--space-sm)]">
         <p
           data-testid="turn-indicator"
           data-your-turn={String(isYourTurn)}
@@ -200,16 +198,17 @@ export function OwnHand({
 
       <div data-testid="own-hand" className="flex gap-[length:var(--space-md)]">
         {cards.map((card, i) => (
-          <OwnHandCard
-            key={card.id}
-            facts={card.facts}
-            slotNumber={i + 1}
-            variant={variant}
-            selected={selectedCardId === card.id}
-            justClued={justCluedIds.has(card.id)}
-            disabled={disabled}
-            onSelect={() => onSelectCard(card.id)}
-          />
+          <div key={card.id} className="flex flex-col items-center">
+            <MarksZone facts={card.facts} variant={variant} scale="own" testId={`marks-zone-slot-${i + 1}`} />
+            <OwnHandCard
+              facts={card.facts}
+              slotNumber={i + 1}
+              selected={selectedCardId === card.id}
+              justClued={justCluedIds.has(card.id)}
+              disabled={disabled}
+              onSelect={() => onSelectCard(card.id)}
+            />
+          </div>
         ))}
       </div>
     </section>
