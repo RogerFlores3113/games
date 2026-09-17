@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { ALL_SUITS } from "@games/rules";
-import { SUIT_VISUALS } from "./suit-visuals";
+import { burstLayoutForRank, CARD_BACK_ART, SUIT_VISUALS } from "./suit-visuals";
 
 const GLOBALS_CSS_PATH = fileURLToPath(new URL("../app/globals.css", import.meta.url));
 const globalsCss = readFileSync(GLOBALS_CSS_PATH, "utf-8");
@@ -52,7 +52,7 @@ function countOccurrences(css: string, tokenName: string): number {
   return (css.match(re) ?? []).length;
 }
 
-describe("SuitGlyph visuals", () => {
+describe("suit-visuals", () => {
   it("SUIT_VISUALS is exhaustively keyed by every Suit, and only those suits", () => {
     const suitKeys = Object.keys(SUIT_VISUALS).sort();
     const allSuits = [...ALL_SUITS].sort();
@@ -119,6 +119,59 @@ describe("SuitGlyph visuals", () => {
     ];
     for (const token of preExistingTokens) {
       expect(countOccurrences(globalsCss, token)).toBe(1);
+    }
+  });
+
+  it("every suit has a silhouette descriptor, and all seven are pairwise distinct (colour-ignored)", () => {
+    const tuples = ALL_SUITS.map((suit) => {
+      const { spikes, rings, hollow } = SUIT_VISUALS[suit].silhouette;
+      return `${spikes}:${rings}:${hollow}`;
+    });
+    for (const suit of ALL_SUITS) {
+      const s = SUIT_VISUALS[suit].silhouette;
+      expect(typeof s.spikes).toBe("number");
+      expect(s.spikes).toBeGreaterThan(0);
+      expect([0, 1, 2]).toContain(s.rings);
+      expect(typeof s.hollow).toBe("boolean");
+    }
+    expect(new Set(tuples).size).toBe(tuples.length);
+  });
+
+  it("rainbow's visual has no gradient/multicolour field: hueVar is the single literal token", () => {
+    expect(SUIT_VISUALS.rainbow.hueVar).toBe("var(--color-suit-rainbow)");
+  });
+
+  it("every fillRule is a valid SVG fill-rule value", () => {
+    for (const suit of ALL_SUITS) {
+      expect(["nonzero", "evenodd"]).toContain(SUIT_VISUALS[suit].fillRule);
+    }
+  });
+
+  it("burstLayoutForRank returns exactly r entries with in-bounds, non-duplicate placements", () => {
+    for (const rank of [1, 2, 3, 4, 5] as const) {
+      const layout = burstLayoutForRank(rank);
+      expect(layout.length).toBe(rank);
+      const seen = new Set<string>();
+      for (const placement of layout) {
+        expect(placement.cx).toBeGreaterThanOrEqual(0);
+        expect(placement.cx).toBeLessThanOrEqual(1);
+        expect(placement.cy).toBeGreaterThanOrEqual(0);
+        expect(placement.cy).toBeLessThanOrEqual(1);
+        expect(placement.scale).toBeGreaterThan(0);
+        expect(placement.scale).toBeLessThanOrEqual(1);
+        const key = `${placement.cx}:${placement.cy}`;
+        expect(seen.has(key)).toBe(false);
+        seen.add(key);
+      }
+    }
+  });
+
+  it("CARD_BACK_ART contains only token var(...) colour references, no hex, no suit hue", () => {
+    expect(CARD_BACK_ART.layers.length).toBeGreaterThan(0);
+    for (const layer of CARD_BACK_ART.layers) {
+      expect(layer.fillVar).toMatch(/^var\(--/);
+      expect(layer.fillVar).not.toMatch(/#[0-9A-Fa-f]{3,8}/);
+      expect(layer.fillVar).not.toMatch(/--color-suit-/);
     }
   });
 });

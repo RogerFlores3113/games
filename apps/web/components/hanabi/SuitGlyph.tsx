@@ -37,7 +37,7 @@ export function SuitGlyph({ suit, size, className, title, exposeSuit = false }: 
       aria-hidden={title ? undefined : "true"}
       data-glyph={exposeSuit ? suit : undefined}
     >
-      <path d={visual.glyphPath} style={{ fill: visual.hueVar }} />
+      <path d={visual.glyphPath} fillRule={visual.fillRule} style={{ fill: visual.hueVar }} />
     </svg>
   );
 }

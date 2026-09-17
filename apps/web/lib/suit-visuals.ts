@@ -1,80 +1,239 @@
-// The always-on suit identity system (UI-06). This module is the ONLY place
-// glyph silhouettes and hue tokens are defined — SuitGlyph.tsx (and any
-// future consumer) reads from SUIT_VISUALS rather than hardcoding a shape or
-// a color per suit.
+// The always-on suit identity system (UI-06), reworked for Phase 6.1 (D-08)
+// into original firework-burst silhouettes. This module is the ONLY place
+// burst silhouettes, rank layouts, and card-back art are defined —
+// SuitGlyph.tsx / FireworkCard.tsx (and any future consumer) read from
+// SUIT_VISUALS / burstLayoutForRank / CARD_BACK_ART rather than hardcoding a
+// shape or a color per suit.
 //
-// D-06: all seven suits (including Rainbow and Black, not enabled until
-// Phase 7) are defined now so exhaustiveness is provable today; only their
-// *tests* (Rainbow/Black gameplay) land in Phase 7, not their designs.
+// D-08: each of the 7 suits has an original firework-burst silhouette,
+// pairwise distinct with colour ignored (the `silhouette` descriptor below
+// captures that colour-independent shape contract); Rainbow is a flat
+// single-tone fill, never a gradient/multicolour field.
+// D-09: rank is shown as burst COUNT (burstLayoutForRank) plus a small
+// corner numeral (FireworkCard.tsx owns the numeral).
+// D-10: CARD_BACK_ART is a single neutral card-back motif, identical for
+// every card, carrying zero suit/rank identity.
+// D-11: all art is hand-authored inline SVG path data, coloured only via
+// `var(--color-suit-*)` / `@theme` tokens — no hex outside globals.css.
 //
-// D-07: glyphs are hand-authored inline SVG path data (no icon font, no
-// third-party icon package, no new dependency) — see SuitGlyph.tsx for the
-// component that renders these paths.
-//
-// D-10: hue (hueVar) never varies with luminosity step — luminosity is
-// carried separately via --color-card-glow and opacity/box-shadow, never by
-// swapping a suit's hue token.
+// D-06 (carried forward): all seven suits (including Rainbow and Black, not
+// enabled until Phase 7) are defined now so exhaustiveness is provable
+// today; only their *tests* (Rainbow/Black gameplay) land in Phase 7.
 //
 // hueVar values are static literal `var(--color-suit-*)` strings (never
 // template-interpolated) so Tailwind v4's JIT scanner and any consumer can
 // treat them as plain CSS custom-property references.
 import type { Suit } from "@games/rules";
 
+export interface SuitSilhouette {
+  /** Number of primary spikes/points in the burst (colour-ignored shape signal). */
+  spikes: number;
+  /** How many concentric rings the burst is built from. */
+  rings: 0 | 1 | 2;
+  /** Whether the burst has a cut-out (evenodd) hole at its center. */
+  hollow: boolean;
+}
+
 export interface SuitVisual {
   label: string;
   hueVar: string;
   glyphPath: string;
+  fillRule: "nonzero" | "evenodd";
+  silhouette: SuitSilhouette;
+}
+
+export interface BurstPlacement {
+  cx: number;
+  cy: number;
+  scale: number;
+}
+
+export interface CardBackLayer {
+  d: string;
+  fillVar: string;
+  opacity: number;
+}
+
+export interface CardBackArt {
+  viewBox: string;
+  layers: readonly CardBackLayer[];
+}
+
+function round(n: number): number {
+  return Math.round(n * 1000) / 1000;
+}
+
+function polarPoint(cx: number, cy: number, r: number, angleDeg: number): { x: number; y: number } {
+  const rad = (angleDeg * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+/**
+ * Pure helper: builds a star-polygon path string alternating outer/inner
+ * vertices around (cx, cy). `outerR` may be a single radius (uniform spikes)
+ * or an array of radii cycled across the outer vertices (asymmetric spikes,
+ * e.g. blue's 4-long/4-short cross-star). Reproducible and deterministic —
+ * the resulting strings are frozen into SUIT_VISUALS below, never
+ * recomputed at render time.
+ */
+function starBurstPath(
+  spikeCount: number,
+  outerR: number | readonly number[],
+  innerR: number,
+  rotationDeg = 0,
+  cx = 12,
+  cy = 12,
+): string {
+  const totalVertices = spikeCount * 2;
+  const step = 360 / totalVertices;
+  const outerArr = Array.isArray(outerR) ? outerR : null;
+  const segments: string[] = [];
+  for (let i = 0; i < totalVertices; i++) {
+    const angle = -90 + rotationDeg + i * step;
+    const isOuter = i % 2 === 0;
+    const r = isOuter ? (outerArr ? outerArr[(i / 2) % outerArr.length]! : (outerR as number)) : innerR;
+    const { x, y } = polarPoint(cx, cy, r, angle);
+    segments.push(`${i === 0 ? "M" : "L"} ${round(x)} ${round(y)}`);
+  }
+  return `${segments.join(" ")} Z`;
+}
+
+/** Pure helper: a circle expressed as a two-arc path, used as an evenodd hole. */
+function circlePath(r: number, cx = 12, cy = 12): string {
+  return `M ${round(cx + r)} ${round(cy)} A ${r} ${r} 0 1 0 ${round(cx - r)} ${round(cy)} A ${r} ${r} 0 1 0 ${round(cx + r)} ${round(cy)} Z`;
+}
+
+/**
+ * Pure helper: a hollow ring burst — an outer star silhouette with a
+ * circular hole cut from its center via the evenodd fill rule (green's
+ * "willow-trail" ring, black's double-ring uses two of these).
+ */
+function ringBurstPath(
+  spikeCount: number,
+  outerR: number,
+  innerR: number,
+  holeR: number,
+  rotationDeg = 0,
+): string {
+  return `${starBurstPath(spikeCount, outerR, innerR, rotationDeg)} ${circlePath(holeR)}`;
 }
 
 export const SUIT_VISUALS: Readonly<Record<Suit, SuitVisual>> = {
   red: {
     label: "Red",
     hueVar: "var(--color-suit-red)",
-    // 5-point star, outer radius 10 / inner radius 4.5, point-up.
-    glyphPath:
-      "M12 2 L14.645 8.36 L21.511 8.91 L16.28 13.39 L17.878 20.09 L12 16.5 L6.122 20.09 L7.72 13.39 L2.489 8.91 L9.355 8.36 Z",
+    // Radiating 12-spike uniform chrysanthemum burst.
+    glyphPath: starBurstPath(12, 10.5, 4.5, 0),
+    fillRule: "nonzero",
+    silhouette: { spikes: 12, rings: 0, hollow: false },
   },
   yellow: {
     label: "Yellow",
     hueVar: "var(--color-suit-yellow)",
-    // Upward-pointing triangle.
-    glyphPath: "M12 3 L21 21 L3 21 Z",
+    // Dense round-petal burst: more, fatter petals (inner radius closer to
+    // outer than red's) so the silhouette reads distinctly in grayscale.
+    glyphPath: starBurstPath(16, 9.5, 7, 11.25),
+    fillRule: "nonzero",
+    silhouette: { spikes: 16, rings: 0, hollow: false },
   },
   green: {
     label: "Green",
     hueVar: "var(--color-suit-green)",
-    // Square inset to ~18px on a 24x24 viewBox.
-    glyphPath: "M3 3 H21 V21 H3 Z",
+    // Hollow ring of short trailing spikes (evenodd hole) — a donut-like
+    // outline, structurally distinct from red/yellow's solid radial fills.
+    glyphPath: ringBurstPath(10, 10, 8, 5, 0),
+    fillRule: "evenodd",
+    silhouette: { spikes: 10, rings: 1, hollow: true },
   },
   blue: {
     label: "Blue",
     hueVar: "var(--color-suit-blue)",
-    // Circle, radius 9, expressed as two arcs on a single path.
-    glyphPath: "M3 12 A9 9 0 1 0 21 12 A9 9 0 1 0 3 12 Z",
+    // 4 long + 4 short asymmetric cross-star (alternating outer radii).
+    glyphPath: starBurstPath(8, [11, 7], 3, 0),
+    fillRule: "nonzero",
+    silhouette: { spikes: 8, rings: 0, hollow: false },
   },
   white: {
     label: "White",
     hueVar: "var(--color-suit-white)",
-    // Diamond.
-    glyphPath: "M12 2 L22 12 L12 22 L2 12 Z",
+    // Sparse, wide-angle "sparkler" burst: fewer, longer, thinner spikes.
+    glyphPath: starBurstPath(6, 11, 2, 15),
+    fillRule: "nonzero",
+    silhouette: { spikes: 6, rings: 0, hollow: false },
   },
   rainbow: {
     label: "Rainbow",
     hueVar: "var(--color-suit-rainbow)",
-    // Flat single-tone 8-point starburst: 16 vertices, outer radius 11 /
-    // inner radius 3 — deliberately more and thinner points than the red
-    // star (10 vertices, outer 10 / inner 4.5) so the two never read alike.
-    glyphPath:
-      "M12 1 L13.148 9.228 L19.778 4.222 L14.772 10.852 L23 12 L14.772 13.148 L19.778 19.778 L13.148 14.772 L12 23 L10.852 14.772 L4.222 19.778 L9.228 13.148 L1 12 L9.228 10.852 L4.222 4.222 L10.852 9.228 Z",
+    // Largest burst silhouette, flat single-tone fill (no gradient), many
+    // thin rays — deliberately more/thinner points than every other suit
+    // so it never reads alike, per D-08's single-tone requirement.
+    glyphPath: starBurstPath(20, 11.5, 3, 0),
+    fillRule: "nonzero",
+    silhouette: { spikes: 20, rings: 0, hollow: false },
   },
   black: {
     label: "Black",
     hueVar: "var(--color-suit-black)",
-    // Hexagon with a V notch cut into the top edge.
-    glyphPath: "M21 12 L16.5 19.794 L7.5 19.794 L3 12 L7.5 4.206 L12 8 L16.5 4.206 Z",
+    // Compact double ring of short spikes (two concentric hollow rings).
+    // "Blackness" is name/shape only — rendered light silver via the hue
+    // token, never literal darkness (carried forward from Phase 6).
+    glyphPath: `${ringBurstPath(8, 9, 7.2, 6, 0)} ${ringBurstPath(8, 5, 3.8, 2.5, 22.5)}`,
+    fillRule: "evenodd",
+    silhouette: { spikes: 8, rings: 2, hollow: true },
   },
 };
 
 export function suitVisual(suit: Suit): SuitVisual {
   return SUIT_VISUALS[suit];
 }
+
+/**
+ * D-09: box-game-style burst arrangements per rank, in unit (0..1) card
+ * coordinates — callers scale/position against their own card box.
+ */
+const BURST_LAYOUTS: Readonly<Record<1 | 2 | 3 | 4 | 5, readonly BurstPlacement[]>> = {
+  1: [{ cx: 0.5, cy: 0.5, scale: 1 }],
+  2: [
+    { cx: 0.28, cy: 0.28, scale: 0.55 },
+    { cx: 0.72, cy: 0.72, scale: 0.55 },
+  ],
+  3: [
+    { cx: 0.22, cy: 0.22, scale: 0.45 },
+    { cx: 0.5, cy: 0.5, scale: 0.45 },
+    { cx: 0.78, cy: 0.78, scale: 0.45 },
+  ],
+  4: [
+    { cx: 0.26, cy: 0.26, scale: 0.4 },
+    { cx: 0.74, cy: 0.26, scale: 0.4 },
+    { cx: 0.26, cy: 0.74, scale: 0.4 },
+    { cx: 0.74, cy: 0.74, scale: 0.4 },
+  ],
+  5: [
+    { cx: 0.24, cy: 0.24, scale: 0.35 },
+    { cx: 0.76, cy: 0.24, scale: 0.35 },
+    { cx: 0.5, cy: 0.5, scale: 0.35 },
+    { cx: 0.24, cy: 0.76, scale: 0.35 },
+    { cx: 0.76, cy: 0.76, scale: 0.35 },
+  ],
+};
+
+export function burstLayoutForRank(rank: 1 | 2 | 3 | 4 | 5): readonly BurstPlacement[] {
+  return BURST_LAYOUTS[rank];
+}
+
+/**
+ * D-10: single neutral card-back motif (unlit shell / night silhouette),
+ * identical for every own-hand card regardless of true identity — zero
+ * suit/rank signal. Coloured exclusively via existing @theme tokens.
+ */
+export const CARD_BACK_ART: CardBackArt = {
+  viewBox: "0 0 24 32",
+  layers: [
+    { d: "M0 0H24V32H0Z", fillVar: "var(--color-border)", opacity: 1 },
+    { d: "M1 1H23V31H1Z", fillVar: "var(--color-surface)", opacity: 1 },
+    // Faint unlit-shell emblem (a diamond) — pure decoration, no identity.
+    { d: "M12 10 L17 16 L12 22 L7 16 Z", fillVar: "var(--color-text-muted)", opacity: 0.35 },
+    // Soft top glow arc — night-motif garnish only.
+    { d: "M4 7 A9 6 0 0 1 20 7 L18 8 A7 4.5 0 0 0 6 8 Z", fillVar: "var(--color-card-glow)", opacity: 0.15 },
+  ],
+};
