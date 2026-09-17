@@ -65,27 +65,35 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
   const [previewClue, setPreviewClue] = useState<Clue | null>(null);
   const [justCluedIds, setJustCluedIds] = useState<ReadonlySet<string>>(new Set());
   const prevHistoryLengthRef = useRef<number | null>(null);
+  const clueClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Unmount-only cleanup for the highlight-clear timer.
+  useEffect(
+    () => () => {
+      if (clueClearTimerRef.current !== null) clearTimeout(clueClearTimerRef.current);
+    },
+    [],
+  );
 
   // D-14: highlight the cards touched by a clue that landed after mount —
   // never on mount/refresh (ref starts null, first run only records length).
+  // CR-01: the clear timer lives in a ref and is NOT this effect's cleanup —
+  // `game` is a new object on every server frame, so returning the timer as
+  // cleanup let any frame inside the highlight window cancel the clear and
+  // leave the highlight stuck on stale cards.
   useEffect(() => {
     const historyLength = game?.history.length ?? null;
     const prev = prevHistoryLengthRef.current;
-    if (prev === null || historyLength === null) {
-      prevHistoryLengthRef.current = historyLength;
-      return;
-    }
-    if (historyLength > prev && game) {
-      const ids = touchedCardIdsFromLatestClue(game.history, prev);
-      prevHistoryLengthRef.current = historyLength;
-      if (ids.length === 0) return;
-      setJustCluedIds(new Set(ids));
-      const timer = setTimeout(() => {
-        setJustCluedIds(new Set());
-      }, CLUE_HIGHLIGHT_MS);
-      return () => clearTimeout(timer);
-    }
     prevHistoryLengthRef.current = historyLength;
+    if (prev === null || historyLength === null || !game || historyLength <= prev) return;
+    const ids = touchedCardIdsFromLatestClue(game.history, prev);
+    if (ids.length === 0) return;
+    setJustCluedIds(new Set(ids));
+    if (clueClearTimerRef.current !== null) clearTimeout(clueClearTimerRef.current);
+    clueClearTimerRef.current = setTimeout(() => {
+      clueClearTimerRef.current = null;
+      setJustCluedIds(new Set());
+    }, CLUE_HIGHLIGHT_MS);
   }, [game]);
 
   // Selection hygiene: drop a stale selection once the card leaves the hand

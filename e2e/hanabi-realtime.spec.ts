@@ -279,6 +279,46 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
 
     await contextB.close();
   });
+
+  test("CR-01: the just-clued highlight still clears when another action lands inside the highlight window (D-14)", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
+    const targetSeat = await seatIdOfOtherPlayer(activePage);
+
+    await activePage.getByTestId(`clue-target-${targetSeat}`).click();
+    await selectAClueValueThatTouchesSomething(activePage);
+    await activePage.getByTestId("give-clue-button").click();
+
+    const giverView = activePage.locator(`[data-testid="other-hand-${targetSeat}"] [data-just-clued="true"]`);
+    await expect(passivePage.locator('[data-testid="own-hand"] [data-just-clued="true"]').first()).toBeVisible();
+    await expect(giverView.first()).toBeVisible();
+
+    // Immediately (well inside CLUE_HIGHLIGHT_MS) the target discards a card
+    // that was NOT just clued, so the clued cards stay in hand and the
+    // highlight on them must still clear. Before the CR-01 fix, this second
+    // frame cancelled the clear timer and the highlight stuck until the next
+    // clue. If every card was clued, discarding one still leaves the others.
+    const unclued = passivePage.locator('[data-testid^="own-hand-slot-"][data-just-clued="false"]');
+    const slot = (await unclued.count()) > 0 ? unclued.first() : passivePage.getByTestId("own-hand-slot-1");
+    await slot.click();
+    await expect(slot).toHaveAttribute("data-selected", "true");
+    await passivePage.getByTestId("discard-button").click();
+    await expect(activePage.getByTestId("turn-indicator")).toHaveText("Your turn");
+
+    // Precondition: the discard frame landed while the highlight was still
+    // showing — otherwise this test would not exercise the CR-01 path.
+    expect(
+      await giverView.count(),
+      "discard must land inside CLUE_HIGHLIGHT_MS for this test to be meaningful",
+    ).toBeGreaterThan(0);
+
+    await expect(giverView).toHaveCount(0, { timeout: 5000 });
+    await expect(passivePage.locator('[data-just-clued="true"]')).toHaveCount(0, { timeout: 5000 });
+
+    await contextB.close();
+  });
 });
 
 test.describe("Phase 5 reconnect hardening (RT-04 + RT-06 + D-14)", () => {
