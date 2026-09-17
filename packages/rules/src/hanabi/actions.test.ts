@@ -4,6 +4,7 @@ import {
   isClueRequest,
   isDiscardRequest,
   isPlayRequest,
+  isReorderRequest,
   parseHanabiRequest,
 } from "./actions";
 import { initialClueFacts } from "./clue-facts";
@@ -64,6 +65,15 @@ describe("applyAction", () => {
     it("isDiscardRequest applies the same exact-key discipline", () => {
       expect(isDiscardRequest({ type: "discard", cardId: "x" })).toBe(true);
       expect(isDiscardRequest({ type: "discard", cardId: "x", resultingScore: 1 })).toBe(false);
+    });
+
+    it("isReorderRequest accepts exactly {type, cardIds} and rejects extra key, missing key, non-array, an array with a number, and null", () => {
+      expect(isReorderRequest({ type: "reorder", cardIds: ["a", "b"] })).toBe(true);
+      expect(isReorderRequest({ type: "reorder", cardIds: ["a"], extra: true })).toBe(false);
+      expect(isReorderRequest({ type: "reorder" })).toBe(false);
+      expect(isReorderRequest({ type: "reorder", cardIds: "a,b" })).toBe(false);
+      expect(isReorderRequest({ type: "reorder", cardIds: ["a", 5] })).toBe(false);
+      expect(isReorderRequest(null)).toBe(false);
     });
 
     it("isClueRequest rejects a clue sub-object with an extra key", () => {
@@ -402,6 +412,66 @@ describe("applyAction", () => {
         seatId: "seat-a",
         cardId: "seat-a-1",
       });
+    });
+  });
+
+  describe("reorder", () => {
+    it("applies an off-turn reorder, returning the actor's slots in the submitted order with each card's original facts", () => {
+      const state = baseState(); // seat-a's turn; reorder seat-b (off-turn)
+      const seatB = state.hands.find((h) => h.seatId === "seat-b")!;
+      const originalIds = seatB.slots.map((s) => s.card.id);
+      const reversedIds = [...originalIds].reverse();
+      const result = applyHanabiAction(state, "seat-b", { type: "reorder", cardIds: reversedIds });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      const reordered = result.state.hands.find((h) => h.seatId === "seat-b")!;
+      expect(reordered.slots.map((s) => s.card.id)).toEqual(reversedIds);
+      // Each card kept its own facts (matched by card id, not by position).
+      for (const slot of reordered.slots) {
+        const original = seatB.slots.find((s) => s.card.id === slot.card.id)!;
+        expect(slot.facts).toEqual(original.facts);
+      }
+    });
+
+    it("leaves turnIndex, clueTokens, fuses, deck, stacks, discard, finalTurnsRemaining, history, and every other seat's hand unchanged; history length is identical", () => {
+      const state = baseState();
+      const seatB = state.hands.find((h) => h.seatId === "seat-b")!;
+      const reversedIds = [...seatB.slots.map((s) => s.card.id)].reverse();
+      const result = applyHanabiAction(state, "seat-b", { type: "reorder", cardIds: reversedIds });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      expect(result.state.turnIndex).toBe(state.turnIndex);
+      expect(result.state.clueTokens).toBe(state.clueTokens);
+      expect(result.state.fuses).toBe(state.fuses);
+      expect(result.state.deck).toEqual(state.deck);
+      expect(result.state.stacks).toEqual(state.stacks);
+      expect(result.state.discard).toEqual(state.discard);
+      expect(result.state.finalTurnsRemaining).toBe(state.finalTurnsRemaining);
+      expect(result.state.history).toHaveLength(state.history.length);
+      const seatA = result.state.hands.find((h) => h.seatId === "seat-a")!;
+      const originalSeatA = state.hands.find((h) => h.seatId === "seat-a")!;
+      expect(seatA).toEqual(originalSeatA);
+      const seatC = result.state.hands.find((h) => h.seatId === "seat-c")!;
+      const originalSeatC = state.hands.find((h) => h.seatId === "seat-c")!;
+      expect(seatC).toEqual(originalSeatC);
+    });
+
+    it("a malformed reorder payload returns invalid_action and does not mutate state", () => {
+      const state = baseState();
+      const snapshot = structuredClone(state);
+      const result = applyHanabiAction(state, "seat-a", { type: "reorder", cardIds: "not-an-array" });
+      expect(result).toEqual({ ok: false, error: "invalid_action" });
+      expect(state).toEqual(snapshot);
+    });
+
+    it("rejects a reorder that is not an exact permutation with card_not_in_hand", () => {
+      const state = baseState();
+      const seatAIds = state.hands.find((h) => h.seatId === "seat-a")!.slots.map((s) => s.card.id);
+      const result = applyHanabiAction(state, "seat-a", {
+        type: "reorder",
+        cardIds: [seatAIds[0]!, seatAIds[0]!],
+      });
+      expect(result).toEqual({ ok: false, error: "card_not_in_hand" });
     });
   });
 

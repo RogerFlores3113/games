@@ -6,6 +6,7 @@ import {
   canClue,
   canDiscard,
   canPlay,
+  canReorder,
   cardsTouchedByClue,
   findOwnSlot,
   isActorsTurn,
@@ -182,6 +183,53 @@ describe("legality", () => {
     ];
     expect(cardsTouchedByClue(config, slots, { type: "color", value: "red" })).toEqual(["r1"]);
     expect(cardsTouchedByClue(config, slots, { type: "color", value: "blue" })).toEqual(["r1"]);
+  });
+
+  describe("canReorder", () => {
+    it("is legal for an exact permutation of the actor's hand ids, including identity order, when it is NOT the actor's turn", () => {
+      const state = buildState("base", ["a", "b", "c"], "seed-10");
+      // "b" is not the active seat (turnIndex 0 -> "a").
+      const bIds = state.hands.find((h) => h.seatId === "b")!.slots.map((s) => s.card.id);
+      expect(canReorder(state, "b", bIds)).toEqual({ legal: true });
+      expect(canReorder(state, "b", [...bIds].reverse())).toEqual({ legal: true });
+    });
+
+    it("rejects wrong length, a duplicate id, an id from another seat, an unknown id, or an unknown actor seat with card_not_in_hand", () => {
+      const state = buildState("base", ["a", "b", "c"], "seed-11");
+      const aIds = state.hands.find((h) => h.seatId === "a")!.slots.map((s) => s.card.id);
+      const bIds = state.hands.find((h) => h.seatId === "b")!.slots.map((s) => s.card.id);
+
+      expect(canReorder(state, "a", aIds.slice(1))).toEqual({
+        legal: false,
+        reason: "card_not_in_hand",
+      });
+      expect(canReorder(state, "a", [aIds[0]!, aIds[0]!])).toEqual({
+        legal: false,
+        reason: "card_not_in_hand",
+      });
+      expect(canReorder(state, "a", [aIds[0]!, bIds[0]!])).toEqual({
+        legal: false,
+        reason: "card_not_in_hand",
+      });
+      expect(canReorder(state, "a", ["not-a-real-id", aIds[1]!])).toEqual({
+        legal: false,
+        reason: "card_not_in_hand",
+      });
+      expect(canReorder(state, "not-a-seat", ["x"])).toEqual({
+        legal: false,
+        reason: "card_not_in_hand",
+      });
+    });
+
+    it("rejects with game_over when fuses >= MAX_FUSES or finalTurnsRemaining === 0", () => {
+      const stateFuses = buildState("base", ["a", "b"], "seed-12", { fuses: MAX_FUSES });
+      const aIds = stateFuses.hands.find((h) => h.seatId === "a")!.slots.map((s) => s.card.id);
+      expect(canReorder(stateFuses, "a", aIds)).toEqual({ legal: false, reason: "game_over" });
+
+      const stateFinal = buildState("base", ["a", "b"], "seed-13", { finalTurnsRemaining: 0 });
+      const aIds2 = stateFinal.hands.find((h) => h.seatId === "a")!.slots.map((s) => s.card.id);
+      expect(canReorder(stateFinal, "a", aIds2)).toEqual({ legal: false, reason: "game_over" });
+    });
   });
 
   it("every predicate is callable on any state without side effects", () => {

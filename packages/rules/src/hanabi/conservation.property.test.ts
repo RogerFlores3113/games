@@ -100,9 +100,11 @@ describe("property: conservation", () => {
           expect(canPlay(state, actorSeatId, action.cardId).legal).toBe(true);
         } else if (action.type === "discard") {
           expect(canDiscard(state, actorSeatId, action.cardId).legal).toBe(true);
-        } else {
+        } else if (action.type === "clue") {
           expect(canClue(state, actorSeatId, action.targetSeatId, action.clue).legal).toBe(true);
         }
+        // enumerateLegalActions never generates "reorder" (test-support.ts
+        // unchanged this plan), so no branch is needed for it here.
       }
     });
 

@@ -3,8 +3,11 @@
 // token economy that drifts, and (together with endgame.ts) a game that
 // never ends — so every branch below is written to be structurally incapable
 // of drifting: turn-end bookkeeping (turn index, final-round counter) is one
-// shared helper reused by all three action branches, and token/fuse math is
-// the only place those counters are touched.
+// shared helper reused by the three turn-consuming action branches (play,
+// discard, clue), and token/fuse math is the only place those counters are
+// touched. The fourth branch, reorder (D-17/D-22), deliberately does NOT
+// call this helper or touch the turn/token/fuse counters at all — it is
+// legal off-turn and spends no resource.
 //
 // HIDE-05/D-12 whitelist-construction discipline, extended from
 // forehead-card.ts:14-19 to STATE construction, not just views: every
@@ -23,7 +26,7 @@
 import type { AdapterResult } from "../adapter";
 import { appendHistory } from "./history";
 import { applyClueToSlotFacts, initialClueFacts } from "./clue-facts";
-import { canPlay, canDiscard, canClue, findOwnSlot, MAX_CLUE_TOKENS } from "./legality";
+import { canPlay, canDiscard, canClue, canReorder, findOwnSlot, MAX_CLUE_TOKENS } from "./legality";
 // Imported under a namespace on purpose: the clue-touch resolver must be
 // resolved exactly once in this file and reused for both the clue-fact
 // update and the history entry, never resolved twice (RESEARCH.md Pitfall 2).
@@ -107,11 +110,26 @@ export function isClueRequest(
   return isClueValueValid(c);
 }
 
-/** Dispatches across the three request guards; `null` for every payload none
+/** Same exact-own-key discipline as `isPlayRequest`/`isDiscardRequest`, for
+ * reorder: own keys exactly "type" and "cardIds", with "cardIds" an array of
+ * strings (D-22). */
+export function isReorderRequest(
+  request: unknown,
+): request is { type: "reorder"; cardIds: string[] } {
+  if (typeof request !== "object" || request === null) return false;
+  const keys = Object.keys(request);
+  if (keys.length !== 2 || !keys.includes("type") || !keys.includes("cardIds")) return false;
+  const r = request as { type: unknown; cardIds: unknown };
+  if (r.type !== "reorder" || !Array.isArray(r.cardIds)) return false;
+  return r.cardIds.every((id) => typeof id === "string");
+}
+
+/** Dispatches across the four request guards; `null` for every payload none
  * of them accept. */
 export function parseHanabiRequest(request: unknown): HanabiAction | null {
   if (isPlayRequest(request)) return request;
   if (isDiscardRequest(request)) return request;
+  if (isReorderRequest(request)) return request;
   if (isClueRequest(request)) return request;
   return null;
 }
@@ -396,6 +414,44 @@ function applyClue(
   };
 }
 
+/** D-17/D-22: reorders the actor's own hand to exactly match `cardIds`
+ * (validated by `canReorder` as an exact permutation). No turn advance, no
+ * token/fuse change, no draw, and no history entry — reorder stays quiet
+ * per D-18 (no history panel exists to show it). */
+function applyReorder(
+  state: HanabiState,
+  actorSeatId: string,
+  cardIds: readonly string[],
+): AdapterResult<HanabiState> {
+  const legality = canReorder(state, actorSeatId, cardIds);
+  if (!legality.legal) return { ok: false, error: legality.reason };
+
+  const hand = state.hands.find((h) => h.seatId === actorSeatId)!;
+  const slotsById = new Map(hand.slots.map((s) => [s.card.id, s]));
+  const reorderedSlots = cardIds.map((id) => slotsById.get(id)!);
+
+  const hands = state.hands.map((h) =>
+    h.seatId === actorSeatId ? { seatId: h.seatId, slots: reorderedSlots } : h,
+  );
+
+  return {
+    ok: true,
+    state: {
+      variant: state.variant,
+      seatIds: state.seatIds,
+      turnIndex: state.turnIndex,
+      hands,
+      deck: state.deck,
+      stacks: state.stacks,
+      discard: state.discard,
+      clueTokens: state.clueTokens,
+      fuses: state.fuses,
+      finalTurnsRemaining: state.finalTurnsRemaining,
+      history: state.history,
+    },
+  };
+}
+
 /** Parses `request` first (any payload no guard accepts is rejected with
  * `invalid_action`, never thrown), then dispatches to the matching branch.
  * Every legality refusal comes from `legality.ts`'s exported predicates —
@@ -410,5 +466,6 @@ export function applyHanabiAction(
 
   if (action.type === "play") return applyPlay(state, actorSeatId, action.cardId);
   if (action.type === "discard") return applyDiscard(state, actorSeatId, action.cardId);
+  if (action.type === "reorder") return applyReorder(state, actorSeatId, action.cardIds);
   return applyClue(state, actorSeatId, action.targetSeatId, action.clue);
 }

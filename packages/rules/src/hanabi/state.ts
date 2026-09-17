@@ -46,7 +46,8 @@ export type HanabiState = {
 export type HanabiAction =
   | { readonly type: "play"; readonly cardId: string }
   | { readonly type: "discard"; readonly cardId: string }
-  | { readonly type: "clue"; readonly targetSeatId: string; readonly clue: Clue };
+  | { readonly type: "clue"; readonly targetSeatId: string; readonly clue: Clue }
+  | { readonly type: "reorder"; readonly cardIds: readonly string[] };
 
 // View types are deliberately NON-readonly plain objects/arrays so HanabiView
 // stays assignable to Phase 4's z.infer type (same split forehead-card.ts's

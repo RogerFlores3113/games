@@ -95,6 +95,38 @@ export function canDiscard(state: HanabiState, actorSeatId: string, cardId: stri
   return { legal: true };
 }
 
+/** D-17: reorder is legal anytime, including off-turn — deliberately NO
+ * `isActorsTurn` check. It spends no resource and changes no scored state,
+ * so a client may permute its own hand order whenever it likes. Validates
+ * `cardIds` is an EXACT permutation of the actor's current hand ids: same
+ * length, no duplicates, every id present in the current hand. A partial
+ * list, a duplicate id, or an id belonging to another seat is rejected —
+ * this is the boundary that keeps a client from asserting a hand shape the
+ * server never dealt (D-22). */
+export function canReorder(
+  state: HanabiState,
+  actorSeatId: string,
+  cardIds: readonly string[],
+): Legality {
+  if (isGameOver(state)) return { legal: false, reason: "game_over" };
+  const hand = state.hands.find((h) => h.seatId === actorSeatId);
+  if (hand === undefined) return { legal: false, reason: "card_not_in_hand" };
+  const currentIds = hand.slots.map((s) => s.card.id);
+  if (cardIds.length !== currentIds.length) {
+    return { legal: false, reason: "card_not_in_hand" };
+  }
+  const currentSet = new Set(currentIds);
+  const suppliedSet = new Set(cardIds);
+  if (currentSet.size !== suppliedSet.size) {
+    // Duplicate id supplied (length matched, but the set collapsed).
+    return { legal: false, reason: "card_not_in_hand" };
+  }
+  for (const id of cardIds) {
+    if (!currentSet.has(id)) return { legal: false, reason: "card_not_in_hand" };
+  }
+  return { legal: true };
+}
+
 export function canClue(
   state: HanabiState,
   actorSeatId: string,
