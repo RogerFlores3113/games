@@ -256,6 +256,7 @@ Plans:
 **Wave 5** *(blocked on Wave 4 completion)*
 
 - [x] 06-07-PLAN.md — Phase gate + owner visual sign-off recorded verbatim (D-25), RT-04 phone check offered
+
 **UI hint**: yes
 **Research note**: No existing implementation combines a luminosity-as-signal theme with colorblind-safe rendering — this needs original design work at plan time, not an adapted reference; design the colorblind glyph system and the luminosity/lightness steps jointly since they compete for the same visual channel.
 
@@ -273,10 +274,29 @@ Plans:
   5. Distinct short sounds play for a clue, a play, a discard, a lost fuse, and a completed stack, over a static city-at-night background that leaves cards legible.
 
 **Notes:** Owner feedback recorded verbatim in `.planning/phases/06-game-interface/06-HUMAN-UAT.md`. HAND-01/HAND-03 change hand ordering in the engine and wire contract, so the per-seat redaction chokepoint and leak tests must stay intact. The owner asked for the box game's per-color burst designs; the art must be original work in that spirit, not copied publisher artwork — show the owner the burst shapes before building them into cards.
-**Plans:** 0 plans
+**Plans:** 15 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 06.1 to break down)
+
+- [ ] 06.1-01-PLAN.md — Engine: slot-preserving draw + server-validated reorder action (HAND-01, HAND-03)
+- [ ] 06.1-02-PLAN.md — Firework burst art in suit-visuals.ts, card face/back components, dev preview page (ART-01)
+- [ ] 06.1-03-PLAN.md — Pure client logic: safe storage, notes, discard grouping, drag resolution (NOTE-02, HAND-01/02)
+- [ ] 06.1-04-PLAN.md — Audio logic: live-history diff, cue selection, Web Audio engine + prefs (AUD-01)
+- [ ] 06.1-05-PLAN.md — City-at-night background image, license record, scrim (ART-02)
+- [ ] 06.1-06-PLAN.md — Property/projection/room-layer tests for reorder and slot-preserving draw (HAND-01, HAND-03)
+- [ ] 06.1-07-PLAN.md — Owner gate: burst shapes approved before building into cards (ART-01)
+- [ ] 06.1-08-PLAN.md — Audio wired into the board with mute/volume controls (AUD-01)
+- [ ] 06.1-09-PLAN.md — Clue marks above every card; firework faces and neutral card backs (NOTE-01, ART-01)
+- [ ] 06.1-10-PLAN.md — Stack/discard art, compact discard + full-art overlay (ART-01)
+- [ ] 06.1-11-PLAN.md — Private per-card notes on own hand (NOTE-02)
+- [ ] 06.1-12-PLAN.md — Drag to reorder/play/discard with drop zones (HAND-01, HAND-02)
+- [ ] 06.1-13-PLAN.md — Fly-to animation for departing cards (HAND-02, HAND-03)
+- [ ] 06.1-14-PLAN.md — Playwright proofs for the phase (all behavioural requirements)
+- [ ] 06.1-15-PLAN.md — Phase gate + owner visual/audio sign-off (D-31)
+
+**Cross-cutting constraints:**
+
+- Phase 6 D-01: five players still fit 1280x720 without scrolling
 
 ### Phase 7: Variant Support (Rainbow, Black)
 
