@@ -7,8 +7,15 @@
 //
 // D-08: each of the 7 suits has an original firework-burst silhouette,
 // pairwise distinct with colour ignored (the `silhouette` descriptor below
-// captures that colour-independent shape contract); Rainbow is a flat
-// single-tone fill, never a gradient/multicolour field.
+// captures that colour-independent shape contract). Rainbow's SILHOUETTE
+// (spike count/shape below) stays single-tone-describable and grayscale-
+// distinct on its own; per owner override during the 06.1-07 art review
+// ("I'd like if rainbow was actually rainbow as well"), the *rendered fill*
+// is no longer a flat single tone — SuitGlyph.tsx paints Rainbow's path with
+// a multicolour gradient built from the existing suit hue tokens. hueVar
+// below remains the single literal fallback/base token (used as the
+// gradient's final stop), so this module's shape/token contract is
+// unaffected; only SuitGlyph's fill decision changed.
 // D-09: rank is shown as burst COUNT (burstLayoutForRank) plus a small
 // corner numeral (FireworkCard.tsx owns the numeral).
 // D-10: CARD_BACK_ART is a single neutral card-back motif, identical for
@@ -164,9 +171,12 @@ export const SUIT_VISUALS: Readonly<Record<Suit, SuitVisual>> = {
   rainbow: {
     label: "Rainbow",
     hueVar: "var(--color-suit-rainbow)",
-    // Largest burst silhouette, flat single-tone fill (no gradient), many
-    // thin rays — deliberately more/thinner points than every other suit
-    // so it never reads alike, per D-08's single-tone requirement.
+    // Largest burst silhouette, many thin rays — deliberately more/thinner
+    // points than every other suit so its SILHOUETTE never reads alike in
+    // grayscale. Owner override (06.1-07 Task 3): the *fill* is rendered as
+    // an actual multicolour rainbow gradient by SuitGlyph.tsx, not the flat
+    // single tone originally proposed in D-08/UI-SPEC — hueVar here is kept
+    // as the gradient's final stop / non-SVG fallback.
     glyphPath: starBurstPath(20, 11.5, 3, 0),
     fillRule: "nonzero",
     silhouette: { spikes: 20, rings: 0, hollow: false },
@@ -208,12 +218,16 @@ const BURST_LAYOUTS: Readonly<Record<1 | 2 | 3 | 4 | 5, readonly BurstPlacement[
     { cx: 0.26, cy: 0.74, scale: 0.4 },
     { cx: 0.74, cy: 0.74, scale: 0.4 },
   ],
+  // Owner review (06.1-07 Task 3): center burst enlarged ~1.5x (0.35 -> 0.525)
+  // per the owner's explicit request; the four corner bursts are nudged
+  // outward (0.24/0.76 -> 0.22/0.78) so they stay clear of the larger center
+  // burst instead of clipping into it.
   5: [
-    { cx: 0.24, cy: 0.24, scale: 0.35 },
-    { cx: 0.76, cy: 0.24, scale: 0.35 },
-    { cx: 0.5, cy: 0.5, scale: 0.35 },
-    { cx: 0.24, cy: 0.76, scale: 0.35 },
-    { cx: 0.76, cy: 0.76, scale: 0.35 },
+    { cx: 0.22, cy: 0.22, scale: 0.35 },
+    { cx: 0.78, cy: 0.22, scale: 0.35 },
+    { cx: 0.5, cy: 0.5, scale: 0.525 },
+    { cx: 0.22, cy: 0.78, scale: 0.35 },
+    { cx: 0.78, cy: 0.78, scale: 0.35 },
   ],
 };
 

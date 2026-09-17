@@ -1,5 +1,24 @@
+import { useId } from "react";
 import type { Suit } from "@games/rules";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
+
+/**
+ * Owner override (06.1-07 Task 3, replacing D-08's original "Rainbow is
+ * always a flat single-tone fill" rule): Rainbow's burst is painted with a
+ * real multicolour gradient built only from the existing `--color-suit-*`
+ * tokens already in globals.css (red -> yellow -> green -> blue -> the
+ * rainbow token's own light-purple as the violet-ish final stop) — no new
+ * hex literals are introduced, keeping D-11's "no hex outside globals.css"
+ * rule intact. The silhouette (20-spike flat burst) is unchanged, so Rainbow
+ * still reads as its own distinct shape in the grayscale section.
+ */
+const RAINBOW_GRADIENT_STOPS: ReadonlyArray<{ offset: string; colorVar: string }> = [
+  { offset: "0%", colorVar: "var(--color-suit-red)" },
+  { offset: "25%", colorVar: "var(--color-suit-yellow)" },
+  { offset: "50%", colorVar: "var(--color-suit-green)" },
+  { offset: "75%", colorVar: "var(--color-suit-blue)" },
+  { offset: "100%", colorVar: "var(--color-suit-rainbow)" },
+];
 
 export interface SuitGlyphProps {
   suit: Suit;
@@ -24,6 +43,12 @@ export interface SuitGlyphProps {
  */
 export function SuitGlyph({ suit, size, className, title, exposeSuit = false }: SuitGlyphProps) {
   const visual = SUIT_VISUALS[suit];
+  const isRainbow = suit === "rainbow";
+  // React's useId is stable per component instance and unique across the
+  // whole tree, so many SuitGlyph instances (e.g. five rainbow bursts on one
+  // rank-5 card, or many cards on a table) never collide on the gradient's
+  // DOM id even though every instance shares the same visual definition.
+  const gradientId = useId();
 
   return (
     <svg
@@ -37,7 +62,20 @@ export function SuitGlyph({ suit, size, className, title, exposeSuit = false }: 
       aria-hidden={title ? undefined : "true"}
       data-glyph={exposeSuit ? suit : undefined}
     >
-      <path d={visual.glyphPath} fillRule={visual.fillRule} style={{ fill: visual.hueVar }} />
+      {isRainbow ? (
+        <defs>
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+            {RAINBOW_GRADIENT_STOPS.map((stop) => (
+              <stop key={stop.offset} offset={stop.offset} stopColor={stop.colorVar} />
+            ))}
+          </linearGradient>
+        </defs>
+      ) : null}
+      <path
+        d={visual.glyphPath}
+        fillRule={visual.fillRule}
+        style={{ fill: isRainbow ? `url(#${gradientId})` : visual.hueVar }}
+      />
     </svg>
   );
 }

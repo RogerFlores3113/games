@@ -49,40 +49,31 @@ function BurstGrid() {
           <Heading>{SUIT_VISUALS[suit].label} — card faces</Heading>
 
           <div className="flex items-end gap-[length:var(--space-sm)]">
-            <Label>64x84 (numeral body)</Label>
+            <Label>64x84 (burst count only — no corner numeral, owner review)</Label>
             {RANKS.map((rank) => (
-              <FireworkCardFace key={rank} suit={suit} rank={rank} width={64} height={84} numeralSize="body" />
+              <FireworkCardFace key={rank} suit={suit} rank={rank} width={64} height={84} exposeSuit />
             ))}
           </div>
 
           <div className="flex items-end gap-[length:var(--space-sm)]">
-            <Label>48x64, count vs numeral-only (label)</Label>
+            <Label>48x64 (owner decision: burst count only, no numeral)</Label>
             {RANKS.map((rank) => (
-              <span key={rank} className="flex gap-[length:var(--space-xs)]">
-                <FireworkCardFace
-                  suit={suit}
-                  rank={rank}
-                  width={48}
-                  height={64}
-                  showBurstCount
-                  numeralSize="label"
-                />
-                <FireworkCardFace
-                  suit={suit}
-                  rank={rank}
-                  width={48}
-                  height={64}
-                  showBurstCount={false}
-                  numeralSize="label"
-                />
-              </span>
+              <FireworkCardFace
+                key={rank}
+                suit={suit}
+                rank={rank}
+                width={48}
+                height={64}
+                showBurstCount
+                exposeSuit
+              />
             ))}
           </div>
 
           <div className="flex items-end gap-[length:var(--space-sm)]">
-            <Label>88x112 (own-card size)</Label>
+            <Label>88x112 (own-card size, burst count only)</Label>
             {RANKS.map((rank) => (
-              <FireworkCardFace key={rank} suit={suit} rank={rank} width={88} height={112} numeralSize="body" />
+              <FireworkCardFace key={rank} suit={suit} rank={rank} width={88} height={112} exposeSuit />
             ))}
           </div>
         </section>

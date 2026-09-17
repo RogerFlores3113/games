@@ -1,8 +1,6 @@
 import type { Suit } from "@games/rules";
-import { burstLayoutForRank, CARD_BACK_ART } from "../../lib/suit-visuals";
+import { burstLayoutForRank, CARD_BACK_ART, SUIT_VISUALS } from "../../lib/suit-visuals";
 import { SuitGlyph } from "./SuitGlyph";
-
-export type NumeralSize = "body" | "label";
 
 export interface FireworkCardFaceProps {
   suit: Suit;
@@ -14,23 +12,33 @@ export interface FireworkCardFaceProps {
    * false — own-hand rendering code must never pass this for a card whose
    * identity the viewer is not supposed to know (same contract as
    * SuitGlyph's `exposeSuit`).
+   *
+   * Owner override (06.1-07 Task 3, "peel th enumber of the 64x84 cards as
+   * well"): rank now reads from burst count ONLY — there is no visible
+   * corner numeral at any size (48x64 or 64x84/88x112). This prop still
+   * gates a `title`/`aria-label` of "{Suit} {rank}" on the wrapper, using the
+   * exact same identity-leak gate as `data-glyph`: an own-hand card the
+   * viewer isn't supposed to identify never gets the label, so screen
+   * readers/e2e selectors can read rank+suit only where the visual identity
+   * was already exposed.
    */
   exposeSuit?: boolean;
   /**
-   * D-09: rank is normally shown as burst COUNT (one burst per rank) plus a
-   * small corner numeral. At the smallest sizes a caller may pass `false`
-   * to fall back to a single burst (suit symbol) plus the numeral only.
+   * D-09 (owner-revised 06.1-07 Task 3): rank is shown as burst COUNT (one
+   * burst per rank) only. At the smallest sizes a caller may pass `false` to
+   * fall back to a single burst (suit symbol) with no count signal — rank is
+   * still available via the accessible label when `exposeSuit` is true.
    */
   showBurstCount?: boolean;
-  numeralSize?: NumeralSize;
 }
 
 /**
  * D-09, D-11: a face-up card's burst art. `burstLayoutForRank` drives how
- * many bursts render and where; the corner numeral is the fast read. Inner
- * `SuitGlyph` instances never receive `exposeSuit` — only the wrapper here
- * carries the identity marker, so a consumer scanning for `[data-glyph]`
- * gets exactly one match per card regardless of rank.
+ * many bursts render and where — burst count is the ONLY visible rank signal
+ * (no corner numeral, per owner review). Inner `SuitGlyph` instances never
+ * receive `exposeSuit` — only the wrapper here carries the identity marker,
+ * so a consumer scanning for `[data-glyph]` gets exactly one match per card
+ * regardless of rank.
  */
 export function FireworkCardFace({
   suit,
@@ -39,17 +47,17 @@ export function FireworkCardFace({
   height,
   exposeSuit = false,
   showBurstCount = true,
-  numeralSize = "body",
 }: FireworkCardFaceProps) {
   const layout = showBurstCount ? burstLayoutForRank(rank) : [{ cx: 0.5, cy: 0.5, scale: 1 }];
   const minDimension = Math.min(width, height);
-  const numeralTextVar = numeralSize === "body" ? "var(--text-body)" : "var(--text-label)";
-  const numeralLineHeightVar =
-    numeralSize === "body" ? "var(--text-body--line-height)" : "var(--text-label--line-height)";
+  const accessibleLabel = exposeSuit ? `${SUIT_VISUALS[suit].label} ${rank}` : undefined;
 
   return (
     <span
       data-glyph={exposeSuit ? suit : undefined}
+      role={accessibleLabel ? "img" : undefined}
+      aria-label={accessibleLabel}
+      title={accessibleLabel}
       className="relative inline-block overflow-hidden rounded-md"
       style={{ width, height, backgroundColor: "var(--color-surface)" }}
     >
@@ -69,18 +77,6 @@ export function FireworkCardFace({
           </span>
         );
       })}
-
-      <span
-        aria-hidden="true"
-        className="absolute left-[length:var(--space-xs)] top-[length:var(--space-xs)] font-semibold"
-        style={{
-          color: "var(--color-text)",
-          fontSize: numeralTextVar,
-          lineHeight: numeralLineHeightVar,
-        }}
-      >
-        {rank}
-      </span>
     </span>
   );
 }
