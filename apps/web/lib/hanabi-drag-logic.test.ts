@@ -8,6 +8,7 @@ import {
   reorderedCardIds,
   requestForDrop,
   resolveDropTarget,
+  shiftOffsetsForDrag,
 } from "./hanabi-drag-logic";
 import type { DropZones } from "./hanabi-drag-logic";
 import { disabledReasonFor } from "./hanabi-visual-logic";
@@ -166,6 +167,65 @@ describe("applyPendingOrder", () => {
 
   it("returns cards unchanged when pendingIds contains an unknown id", () => {
     expect(applyPendingOrder(cards, ["a", "b", "z"])).toBe(cards);
+  });
+});
+
+describe("shiftOffsetsForDrag", () => {
+  const SLOT_PITCH_PX = 96;
+
+  it("with no drag in progress (draggedId null), every slot's offset is 0", () => {
+    const offsets = shiftOffsetsForDrag(["a", "b", "c", "d"], null, 0, SLOT_PITCH_PX);
+    expect(offsets).toEqual({ a: 0, b: 0, c: 0, d: 0 });
+  });
+
+  it("dragging slot 0 toward slot 2 shifts slots 1 and 2 left by one slot pitch, leaves later slots at 0", () => {
+    const offsets = shiftOffsetsForDrag(["a", "b", "c", "d"], "a", 2, SLOT_PITCH_PX);
+    expect(offsets.a).toBe(0);
+    expect(offsets.b).toBe(-SLOT_PITCH_PX);
+    expect(offsets.c).toBe(-SLOT_PITCH_PX);
+    expect(offsets.d).toBe(0);
+  });
+
+  it("dragging slot 3 toward slot 1 shifts slots 1 and 2 right by one slot pitch", () => {
+    const offsets = shiftOffsetsForDrag(["a", "b", "c", "d"], "d", 1, SLOT_PITCH_PX);
+    expect(offsets.a).toBe(0);
+    expect(offsets.b).toBe(SLOT_PITCH_PX);
+    expect(offsets.c).toBe(SLOT_PITCH_PX);
+    expect(offsets.d).toBe(0);
+  });
+
+  it("the dragged tile's own offset is always 0", () => {
+    const offsets = shiftOffsetsForDrag(["a", "b", "c", "d"], "b", 3, SLOT_PITCH_PX);
+    expect(offsets.b).toBe(0);
+  });
+
+  it("a target index equal to the dragged tile's current index yields all-zero offsets", () => {
+    const offsets = shiftOffsetsForDrag(["a", "b", "c", "d"], "c", 2, SLOT_PITCH_PX);
+    expect(offsets).toEqual({ a: 0, b: 0, c: 0, d: 0 });
+  });
+
+  it("an out-of-range target index is clamped to the ends rather than producing an offset for a non-existent slot", () => {
+    const offsets = shiftOffsetsForDrag(["a", "b", "c", "d"], "a", 99, SLOT_PITCH_PX);
+    // clamps to the last valid position (same as reorderedCardIds's own clamp)
+    expect(offsets).toEqual({ a: 0, b: -SLOT_PITCH_PX, c: -SLOT_PITCH_PX, d: -SLOT_PITCH_PX });
+    const negative = shiftOffsetsForDrag(["a", "b", "c", "d"], "d", -99, SLOT_PITCH_PX);
+    expect(negative).toEqual({ a: SLOT_PITCH_PX, b: SLOT_PITCH_PX, c: SLOT_PITCH_PX, d: 0 });
+  });
+
+  it("the resulting order implied by the offsets always matches reorderedCardIds for the same inputs", () => {
+    const handIds = ["a", "b", "c", "d", "e"];
+    for (const draggedId of handIds) {
+      for (let targetIndex = 0; targetIndex < handIds.length; targetIndex += 1) {
+        const offsets = shiftOffsetsForDrag(handIds, draggedId, targetIndex, SLOT_PITCH_PX);
+        const expectedOrder = reorderedCardIds(handIds, draggedId, targetIndex).filter((id) => id !== draggedId);
+        const impliedOrder = handIds
+          .filter((id) => id !== draggedId)
+          .map((id) => ({ id, pos: handIds.indexOf(id) + offsets[id]! / SLOT_PITCH_PX }))
+          .sort((a, b) => a.pos - b.pos)
+          .map((entry) => entry.id);
+        expect(impliedOrder).toEqual(expectedOrder);
+      }
+    }
   });
 });
 
