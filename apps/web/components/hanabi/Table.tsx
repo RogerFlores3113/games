@@ -20,7 +20,19 @@ export interface TableProps {
 export function Table({ game }: TableProps) {
   const prevStacksRef = useRef<HanabiView["stacks"] | null>(null);
   const [flashingSuits, setFlashingSuits] = useState<ReadonlySet<Suit>>(new Set());
+  const flashClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Unmount-only cleanup for the flash-clear timer.
+  useEffect(
+    () => () => {
+      if (flashClearTimerRef.current !== null) clearTimeout(flashClearTimerRef.current);
+    },
+    [],
+  );
+
+  // WR-01: `game.stacks` is a new array on every server frame, so the clear
+  // timer must NOT be this effect's cleanup — a frame inside the flash window
+  // would cancel it and leave the flash stuck on.
   useEffect(() => {
     const prevStacks = prevStacksRef.current;
     prevStacksRef.current = game.stacks;
@@ -32,10 +44,11 @@ export function Table({ game }: TableProps) {
     if (completed.length === 0) return;
 
     setFlashingSuits(new Set(completed));
-    const timer = setTimeout(() => {
+    if (flashClearTimerRef.current !== null) clearTimeout(flashClearTimerRef.current);
+    flashClearTimerRef.current = setTimeout(() => {
+      flashClearTimerRef.current = null;
       setFlashingSuits(new Set());
     }, STACK_FLASH_MS);
-    return () => clearTimeout(timer);
   }, [game.stacks]);
 
   const fusesRemaining = fusesRemainingForView(game);
