@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 6
+current_plan: 8
 status: executing
-stopped_at: Completed 06.2-06-PLAN.md
-last_updated: "2026-09-17T22:00:49.523Z"
+stopped_at: Completed 06.2-07-PLAN.md (UI-11 overflow still open, see blockers)
+last_updated: "2026-09-17T22:16:40.063Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 70
-  completed_plans: 65
+  completed_plans: 66
   percent: 78
 ---
 
@@ -27,13 +27,13 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 06.2
-Plan: 6 of 11
-Current Plan: 6
+Plan: 8 of 11
+Current Plan: 8
 Total Plans in Phase: 11
 Status: Ready to execute
 Last activity: 2026-09-17
 
-Progress: [█████████░] 93%
+Progress: [█████████░] 94%
 
 ## Performance Metrics
 
@@ -126,6 +126,7 @@ Progress: [█████████░] 93%
 | Phase 06.2 P04 | 40min | 3 tasks | 13 files |
 | Phase 06.2 P05 | 25min | 3 tasks | 6 files |
 | Phase 06.2 P06 | 30min | 3 tasks | 10 files |
+| Phase 06.2 P07 | 55min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -266,6 +267,8 @@ Recent decisions affecting current work:
 - [Phase ?]: NOTE_MAX_LENGTH raised 20 -> 40 (D-10), note box always visible
 - [Phase ?]: hintsVisible widened from boolean to ReadonlySet<string> on OwnHand/TeammateHand props for genuine per-card D-05 turn-based lifetime
 - [Phase ?]: keep-hints toggle + TileColorPicker grouped with AudioControls in one tight-gap wrapper to limit controls-row width growth
+- [Phase 06.2-07]: Table.tsx rebuilt to BOARD-01..05 spec (labelled Play/Deck/Discard, TokenColumn, PlayedStack fan, discardOrder rendering) — its own layout now correctly matches its layout-budget for the first time
+- [Phase 06.2-07]: UI-11 1280x720 overflow root-caused to HanabiBoard.tsx's bottom controls row (440px measured vs 180px OWN_BAND_PX budget), not Table.tsx — fix deferred to 06.2-08 or 06.2-10 per this plan's own escape hatch, see deferred-items.md
 
 ### Pending Todos
 
@@ -276,6 +279,7 @@ Recent decisions affecting current work:
 - Plan 01-09 checkpoint left D-08 (second-tab supersede) and ROOM-07/D-14 (in-progress refusal screen) without browser-level manual verification — flagged as must-cover Playwright scenarios for Plan 01-10
 - RT-04 real-phone 10+ minute background check is deferred (owner-waived 2026-09-16); re-run docs/manual-checks/mobile-background.md once Phase 6/7 UI is finalized
 - e2e/start-game.spec.ts UI-11 pre-existing 5px viewport overflow, unrelated to 06.2-06 (see .planning/phases/06.2-board-redesign-hint-display-tile-styling-board-layout-tokens/deferred-items.md); needs 06.2-07 attention
+- UI-11 1280x720 overflow (STILL OPEN, worse than previously known): confirmed by 06.2-07's live-browser measurement to be 100% caused by HanabiBoard.tsx's bottom controls row (440px vs its own 180px OWN_BAND_PX budget) — not Table.tsx, which now correctly matches its layout budget. See .planning/phases/06.2-board-redesign-hint-display-tile-styling-board-layout-tokens/deferred-items.md for the full measurement table. Recommend fixing before/during 06.2-08 (already touches HanabiBoard.tsx) rather than deferring to 06.2-10.
 
 ## Deferred Items
 
@@ -287,6 +291,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T22:00:49.515Z
-Stopped at: Completed 06.2-06-PLAN.md
+Last session: 2026-09-17T22:16:40.054Z
+Stopped at: Completed 06.2-07-PLAN.md (UI-11 overflow still open, see blockers)
 Resume file: None
