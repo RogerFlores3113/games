@@ -14,8 +14,10 @@ import { safeGetItem, safeKeysWithPrefix, safeRemoveItem, safeSetItem } from "./
  * every note for a room, for an ended game.
  */
 
-/** Notes are short — capped at ~20 characters (D-06). */
-export const NOTE_MAX_LENGTH = 20;
+/** D-10: raised from 06.1's 20-character chip cap to 40 now that the note
+ * box is always visible and inviting longer text — still short, sized to
+ * the tile's width without truncation/ellipsis. */
+export const NOTE_MAX_LENGTH = 40;
 
 const NOTE_PREFIX = "hanabi-note";
 

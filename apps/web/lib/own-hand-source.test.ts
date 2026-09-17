@@ -20,10 +20,10 @@ const OWN_HAND_CARD_PATH = fileURLToPath(new URL("../components/hanabi/OwnHandCa
 // deleted (the pip rows they rendered are gone); HintIndicator.tsx is their
 // replacement and the D-15 source scan must cover it instead.
 const HINT_INDICATOR_PATH = fileURLToPath(new URL("../components/hanabi/HintIndicator.tsx", import.meta.url));
-// 06.1-11 / T-06.1-34: the note chip fills the own-hand note row and
+// 06.2-06 / T-06.2-13: the note box fills the own-hand note row and
 // receives only ids (never a card object) — the D-15 source scan must cover
-// this file too.
-const NOTE_CHIP_PATH = fileURLToPath(new URL("../components/hanabi/NoteChip.tsx", import.meta.url));
+// this file too. (Replaces the former NoteChip, deleted in 06.2-06.)
+const NOTE_BOX_PATH = fileURLToPath(new URL("../components/hanabi/NoteBox.tsx", import.meta.url));
 // 06.1-12 / T-06.1-37: the drag hook tracks own-hand cards by id only (drop
 // resolution and pending reorder never touch a card's suit/rank) — the D-15
 // source scan must cover this file too.
@@ -31,7 +31,7 @@ const USE_HAND_DRAG_PATH = fileURLToPath(new URL("../components/hanabi/useHandDr
 
 const ownHandCardSource = readFileSync(OWN_HAND_CARD_PATH, "utf-8");
 const hintIndicatorSource = readFileSync(HINT_INDICATOR_PATH, "utf-8");
-const noteChipSource = readFileSync(NOTE_CHIP_PATH, "utf-8");
+const noteBoxSource = readFileSync(NOTE_BOX_PATH, "utf-8");
 const useHandDragSource = readFileSync(USE_HAND_DRAG_PATH, "utf-8");
 
 /**
@@ -196,21 +196,21 @@ describe("own-hand source scan (D-15)", () => {
     expect(hintIndicatorSource).not.toContain("HanabiCardView");
   });
 
-  it("NoteChip.tsx code (comments stripped) never reads or destructures a suit or rank property", () => {
-    const code = stripComments(noteChipSource);
+  it("NoteBox.tsx code (comments stripped) never reads or destructures a suit or rank property", () => {
+    const code = stripComments(noteBoxSource);
     expect(code).not.toMatch(PROPERTY_ACCESS);
     expect(code).not.toMatch(DESTRUCTURING);
   });
 
-  it("NoteChip.tsx never mentions exposeSuit or a suit-identity DOM marker anywhere, comments included", () => {
+  it("NoteBox.tsx never mentions exposeSuit or a suit-identity DOM marker anywhere, comments included", () => {
     for (const token of FORBIDDEN_TOKENS) {
-      expect(noteChipSource).not.toContain(token);
+      expect(noteBoxSource).not.toContain(token);
     }
   });
 
-  it("NoteChip's props type has no card member — it takes ids only, never a card object", () => {
-    expect(noteChipSource).not.toMatch(/\bcard\s*:/);
-    expect(noteChipSource).not.toContain("HanabiCardView");
+  it("NoteBox's props type has no card member — it takes ids only, never a card object", () => {
+    expect(noteBoxSource).not.toMatch(/\bcard\s*:/);
+    expect(noteBoxSource).not.toContain("HanabiCardView");
   });
 
   it("useHandDrag.ts code (comments stripped) never reads or destructures a suit or rank property", () => {
