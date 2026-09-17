@@ -304,7 +304,7 @@ Plans:
 **Goal:** Rework the table's visual language and hint feedback so the board reads like a physical tile game, and give the discard pile a shared, player-arrangeable order.
 **Requirements**: HINT-01, HINT-02, HINT-03, HINT-04, NOTE-03, DRAG-01, TILE-01, TILE-02, TILE-03, BOARD-01, BOARD-02, BOARD-03, BOARD-04, BOARD-05, DISC-01 (from the 17 owner requests under "## Gaps" in .planning/phases/06.1-table-polish-firework-art-notes-drag-audio/06.1-HUMAN-UAT.md)
 **Depends on:** Phase 06.1
-**Plans:** 9/11 plans executed
+**Plans:** 10/11 plans executed
 
 Scope (owner requests, 06.1 sign-off):
 - Hint display: a clue highlights the tile in that clue's colour (not a generic yellow); a number clue shows the number on the tile back; a "keep hints visible" toggle (on = hints persist past the next player's move, off = they clear).
@@ -346,7 +346,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5)*
 
-- [ ] 06.2-10-PLAN.md — Playwright proofs for every behavioural requirement + measured 1280x720 worst-case fit
+- [x] 06.2-10-PLAN.md — Playwright proofs for every behavioural requirement + measured 1280x720 worst-case fit
 
 **Wave 7** *(blocked on Wave 6)*
 
