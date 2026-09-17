@@ -93,10 +93,10 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **HINT-03**: A per-player "keep hints visible" toggle controls whether hint indicators persist past the next player's move or clear; the toggle is remembered in the player's browser
 - [ ] **HINT-04**: The hint indicators replace the automatic clue-mark pip rows, which are removed (supersedes the display method of UI-05 and NOTE-01; accumulated clue information is now carried by the indicators themselves)
 - [ ] **NOTE-03**: Each tile in a player's own hand has an always-visible faint note box above it that accepts typed text, autosaves, and is visible only to that player (supersedes the pencil-chip interaction of NOTE-02)
-- [x] **DRAG-01**: During a drag reorder, the other tiles in the hand shift aside to show where the dragged tile will land
-- [x] **TILE-01**: Tiles render as objects visually distinct from the board surface beneath them
-- [x] **TILE-02**: The board renders a wooden (or comparable physical) surface treatment, behind which the city-at-night background remains
-- [x] **TILE-03**: A player can set their own tile colour from a preset palette; the choice affects only that player's view and is remembered in their browser
+- [ ] **DRAG-01**: During a drag reorder, the other tiles in the hand shift aside to show where the dragged tile will land
+- [ ] **TILE-01**: Tiles render as objects visually distinct from the board surface beneath them
+- [ ] **TILE-02**: The board renders a wooden (or comparable physical) surface treatment, behind which the city-at-night background remains
+- [ ] **TILE-03**: A player can set their own tile colour from a preset palette; the choice affects only that player's view and is remembered in their browser
 - [ ] **BOARD-01**: The Play area sits at the top of the board and the Discard area at the bottom, each with a subtle outline and a visible label
 - [ ] **BOARD-02**: Clue tokens render as black tokens with a blue question mark in a vertical line, and fuse tokens as black tokens with a yellow explosion with an orange-red rim beside them, both on the right of the board
 - [ ] **BOARD-03**: Spent clue and fuse tokens are removed from the board rather than dimmed, with a text count retained for accessibility
@@ -224,10 +224,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HINT-03 | Phase 6.2 | Pending |
 | HINT-04 | Phase 6.2 | Pending |
 | NOTE-03 | Phase 6.2 | Pending |
-| DRAG-01 | Phase 6.2 | Complete |
-| TILE-01 | Phase 6.2 | Complete |
-| TILE-02 | Phase 6.2 | Complete |
-| TILE-03 | Phase 6.2 | Complete |
+| DRAG-01 | Phase 6.2 | Pending |
+| TILE-01 | Phase 6.2 | Pending |
+| TILE-02 | Phase 6.2 | Pending |
+| TILE-03 | Phase 6.2 | Pending |
 | BOARD-01 | Phase 6.2 | Pending |
 | BOARD-02 | Phase 6.2 | Pending |
 | BOARD-03 | Phase 6.2 | Pending |
