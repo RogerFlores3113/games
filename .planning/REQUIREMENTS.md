@@ -86,6 +86,24 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **HAND-03**: A newly drawn card takes the hand slot of the card that was played or discarded, rather than joining the end of the hand
 - [x] **AUD-01**: Simple audio cues play for a clue, a play, a discard, a lost fuse, and a completed stack of five
 
+### Board Redesign (added 2026-09-17 at owner sign-off of Phase 6.1)
+
+- [ ] **HINT-01**: A colour clue highlights each touched tile in that suit's own colour, with a non-colour marker alongside so the highlight survives with colour ignored
+- [ ] **HINT-02**: A number clue shows that number on the back of each touched tile
+- [ ] **HINT-03**: A per-player "keep hints visible" toggle controls whether hint indicators persist past the next player's move or clear; the toggle is remembered in the player's browser
+- [ ] **HINT-04**: The hint indicators replace the automatic clue-mark pip rows, which are removed (supersedes the display method of UI-05 and NOTE-01; accumulated clue information is now carried by the indicators themselves)
+- [ ] **NOTE-03**: Each tile in a player's own hand has an always-visible faint note box above it that accepts typed text, autosaves, and is visible only to that player (supersedes the pencil-chip interaction of NOTE-02)
+- [ ] **DRAG-01**: During a drag reorder, the other tiles in the hand shift aside to show where the dragged tile will land
+- [ ] **TILE-01**: Tiles render as objects visually distinct from the board surface beneath them
+- [ ] **TILE-02**: The board renders a wooden (or comparable physical) surface treatment, behind which the city-at-night background remains
+- [ ] **TILE-03**: A player can set their own tile colour from a preset palette; the choice affects only that player's view and is remembered in their browser
+- [ ] **BOARD-01**: The Play area sits at the top of the board and the Discard area at the bottom, each with a subtle outline and a visible label
+- [ ] **BOARD-02**: Clue tokens render as black tokens with a blue question mark in a vertical line, and fuse tokens as black tokens with a yellow explosion with an orange-red rim beside them, both on the right of the board
+- [ ] **BOARD-03**: Spent clue and fuse tokens are removed from the board rather than dimmed, with a text count retained for accessibility
+- [ ] **BOARD-04**: A deck counter showing the remaining tile count beside a tile back sits between the Play and Discard areas
+- [ ] **BOARD-05**: Each played fireworks stack shows every card it contains, not only the top card
+- [ ] **DISC-01**: The discard area shows every discarded tile, any seated player can rearrange it at any time, and every player sees the same arrangement (server-authoritative, survives refresh)
+
 ### Foundation
 
 - [x] **FDN-01**: Room, seating, connection, and reconnect machinery is separated from Hanabi-specific rules behind a game-adapter interface
@@ -201,10 +219,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HAND-02 | Phase 6.1 | Complete |
 | HAND-03 | Phase 6.1 | Complete |
 | AUD-01 | Phase 6.1 | Complete |
+| HINT-01 | Phase 6.2 | Pending |
+| HINT-02 | Phase 6.2 | Pending |
+| HINT-03 | Phase 6.2 | Pending |
+| HINT-04 | Phase 6.2 | Pending |
+| NOTE-03 | Phase 6.2 | Pending |
+| DRAG-01 | Phase 6.2 | Pending |
+| TILE-01 | Phase 6.2 | Pending |
+| TILE-02 | Phase 6.2 | Pending |
+| TILE-03 | Phase 6.2 | Pending |
+| BOARD-01 | Phase 6.2 | Pending |
+| BOARD-02 | Phase 6.2 | Pending |
+| BOARD-03 | Phase 6.2 | Pending |
+| BOARD-04 | Phase 6.2 | Pending |
+| BOARD-05 | Phase 6.2 | Pending |
+| DISC-01 | Phase 6.2 | Pending |
 
 **Coverage:**
-- v1 requirements: 65 total
-- Mapped to phases: 65
+- v1 requirements: 80 total
+- Mapped to phases: 80
 - Unmapped: 0 ✓
 
 ---
