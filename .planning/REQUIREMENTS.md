@@ -73,7 +73,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **UI-08**: Card luminosity conveys accumulated clue information as a channel independent of hue
 - [x] **UI-09**: The interface presents a dark fireworks-night visual treatment
 - [x] **UI-10**: The end-of-game screen shows the final score, its band, and the completed stacks
-- [ ] **UI-11**: The interface is usable on a desktop browser at common window sizes
+- [x] **UI-11**: The interface is usable on a desktop browser at common window sizes
 
 ### Foundation
 
@@ -178,7 +178,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-08 | Phase 6 | Complete |
 | UI-09 | Phase 6 | Complete |
 | UI-10 | Phase 6 | Complete |
-| UI-11 | Phase 6 | Pending |
+| UI-11 | Phase 6 | Complete |
 | FDN-01 | Phase 1 | Complete |
 | FDN-02 | Phase 3 | Complete |
 | FDN-03 | Phase 1 | Complete |

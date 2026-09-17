@@ -246,7 +246,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 06-05-PLAN.md — Wire the board orchestrator into RoomClient, delete interim board, restyle banner, same-change e2e compatibility
+- [x] 06-05-PLAN.md — Wire the board orchestrator into RoomClient, delete interim board, restyle banner, same-change e2e compatibility
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -283,5 +283,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 3. Hanabi Rules Engine | 5/5 | Complete    | 2026-09-16 |
 | 4. Wire Engine Into Room Actor | 9/9 | Complete   | 2026-09-16 |
 | 5. Reconnect & Session Durability Hardening | 6/6 | Complete    | 2026-09-17 |
-| 6. Game Interface | 4/7 | In Progress|  |
+| 6. Game Interface | 5/7 | In Progress|  |
 | 7. Variant Support (Rainbow, Black) | 0/TBD | Not started | - |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-04-PLAN.md
-last_updated: "2026-09-17T02:06:54.798Z"
+stopped_at: Completed 06-05-PLAN.md
+last_updated: "2026-09-17T02:25:30.057Z"
 last_activity: 2026-09-17
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 44
-  completed_plans: 41
+  completed_plans: 42
   percent: 71
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 6 (Game Interface) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Status: Ready to execute
 Last activity: 2026-09-17
 
-Progress: [█████████░] 93%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -97,6 +97,7 @@ Progress: [█████████░] 93%
 | Phase 06 P02 | 15min | 2 tasks tasks | 4 files files |
 | Phase 06 P03 | 25min | 3 tasks | 6 files |
 | Phase 06 P04 | 20min | 3 tasks | 4 files |
+| Phase 06 P05 | 65min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -187,6 +188,8 @@ Recent decisions affecting current work:
 - [Phase 06]: Table.tsx inlines luminosity-frame.ts's 'known' border/box-shadow literals for stack-complete glow rather than importing a card-frame lookup into a stack-head context
 - [Phase 06]: CluePicker's selected-target outline uses a Tailwind outline-* className, never an inline style prop, since Button.tsx spreads ...rest (including any style) after its own minHeight/minWidth style
 - [Phase 06]: EndOverlay's score line extends the preserved final-score string to include / {max} per D-20, additive to bandForView's existing contract
+- [Phase 06-05]: ReconnectingBanner restyled to fixed top-center overlay (D-03) so it never pushes the three bands down
+- [Phase 06-05]: HIDE-01 assertion scoped to card-identity testid nested inside other-hand-card-*, since TeammateCard now also renders a candidate-strip glyph row inside the same element
 
 ### Pending Todos
 
@@ -207,6 +210,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T02:06:54.790Z
-Stopped at: Completed 06-04-PLAN.md
+Last session: 2026-09-17T02:25:30.048Z
+Stopped at: Completed 06-05-PLAN.md
 Resume file: None
