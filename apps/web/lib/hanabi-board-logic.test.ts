@@ -4,6 +4,7 @@ import { MAX_FUSES } from "@games/rules";
 import {
   bandForView,
   clueTouchCountForTarget,
+  clueTouchIdsForTarget,
   cluableColorsForView,
   fusesRemainingForView,
   isDiscardDisabled,
@@ -100,6 +101,89 @@ describe("clueTouchCountForTarget", () => {
       ],
     });
     expect(clueTouchCountForTarget(view, "seat-b", { type: "color", value: "red" })).toBe(0);
+  });
+});
+
+describe("clueTouchIdsForTarget", () => {
+  const twoCardView = () =>
+    baseView({
+      otherHands: [
+        {
+          seatId: "seat-b",
+          cards: [
+            {
+              id: "b1",
+              hidden: false,
+              suit: "red",
+              rank: 3,
+              facts: { possibleSuits: [], possibleRanks: [], positiveClues: [], negativeClues: [] },
+            },
+            {
+              id: "b2",
+              hidden: false,
+              suit: "blue",
+              rank: 3,
+              facts: { possibleSuits: [], possibleRanks: [], positiveClues: [], negativeClues: [] },
+            },
+          ],
+        },
+      ],
+    });
+
+  it("returns exactly the ids of visible cards a rank clue touches", () => {
+    const view = twoCardView();
+    expect(clueTouchIdsForTarget(view, "seat-b", { type: "rank", value: 3 })).toEqual(["b1", "b2"]);
+  });
+
+  it("returns exactly the ids of visible cards a color clue touches", () => {
+    const view = twoCardView();
+    expect(clueTouchIdsForTarget(view, "seat-b", { type: "color", value: "red" })).toEqual(["b1"]);
+  });
+
+  it("returns [] for an unknown seat", () => {
+    const view = twoCardView();
+    expect(clueTouchIdsForTarget(view, "seat-z", { type: "color", value: "red" })).toEqual([]);
+  });
+
+  it("in the rainbow variant, a color clue touches rainbow cards", () => {
+    const view = baseView({
+      variant: "rainbow",
+      otherHands: [
+        {
+          seatId: "seat-b",
+          cards: [
+            {
+              id: "b1",
+              hidden: false,
+              suit: "rainbow",
+              rank: 2,
+              facts: { possibleSuits: [], possibleRanks: [], positiveClues: [], negativeClues: [] },
+            },
+          ],
+        },
+      ],
+    });
+    expect(clueTouchIdsForTarget(view, "seat-b", { type: "color", value: "blue" })).toEqual(["b1"]);
+  });
+
+  it("never includes hidden cards", () => {
+    const view = baseView({
+      otherHands: [
+        {
+          seatId: "seat-b",
+          cards: [{ id: "b1", hidden: true, facts: { possibleSuits: [], possibleRanks: [], positiveClues: [], negativeClues: [] } }],
+        },
+      ],
+    });
+    expect(clueTouchIdsForTarget(view, "seat-b", { type: "color", value: "red" })).toEqual([]);
+  });
+
+  it("agrees with clueTouchCountForTarget's count for the same fixtures", () => {
+    const view = twoCardView();
+    const clue = { type: "rank" as const, value: 3 as const };
+    expect(clueTouchCountForTarget(view, "seat-b", clue)).toBe(
+      clueTouchIdsForTarget(view, "seat-b", clue).length,
+    );
   });
 });
 
