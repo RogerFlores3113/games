@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { nanoid } from "nanoid";
 import usePartySocket from "partysocket/react";
 import type { PartySocket } from "partysocket";
 import {
@@ -74,11 +75,25 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Room
   const joinReplyPendingRef = useRef(false);
   const pingSentAtRef = useRef<number | null>(null);
   const pongCheckTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  // D-01: partysocket's `reconnect()` is silently ignored while the socket
+  // is waiting out a backoff delay (`_connect()` bails on its internal
+  // connect lock, held for the whole wait), so after a long drop a resume
+  // could not reconnect until the next scheduled retry — up to 30s later.
+  // A resume that needs a reconnect on a non-OPEN socket instead bumps this
+  // generation, which changes `query` and makes usePartySocket close the
+  // old instance (cancelling its pending retry) and open a fresh one with
+  // no delay. `connectionId` keeps the partyserver connection id stable
+  // across that swap, exactly as an ordinary partysocket reconnect does.
+  const [socketGeneration, setSocketGeneration] = useState(0);
+  const [connectionId] = useState(() => nanoid());
+  const replacementRequestedForRef = useRef<PartySocket | null>(null);
 
   const socket = usePartySocket({
     host: WORKER_HOST,
     party: "room",
     room: code,
+    id: connectionId,
+    query: socketGeneration === 0 ? undefined : { resume: String(socketGeneration) },
     minReconnectionDelay: 1000,
     maxReconnectionDelay: 30000,
     reconnectionDelayGrowFactor: 1.5,
@@ -269,7 +284,17 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Room
         timing: HEARTBEAT_TIMING,
       });
       if (action === "reconnect") {
-        socket.reconnect();
+        if (socket.readyState === 1 /* OPEN */) {
+          // A stale-but-OPEN socket has no pending backoff, so partysocket's
+          // own reconnect() closes and redials immediately.
+          socket.reconnect();
+        } else if (replacementRequestedForRef.current !== socket) {
+          // CLOSED/CLOSING: partysocket is mid-backoff and would ignore
+          // reconnect() (see socketGeneration). Guarded per instance so an
+          // `online` + `visibilitychange` burst swaps the socket only once.
+          replacementRequestedForRef.current = socket;
+          setSocketGeneration((generation) => generation + 1);
+        }
       } else if (action === "ping") {
         sendPing();
       }
