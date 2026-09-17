@@ -84,7 +84,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **HAND-01**: A player can reorder their own hand by clicking and dragging, and every player sees the new order (server-authoritative, survives refresh)
 - [x] **HAND-02**: Dragging an own card to the center plays it and dragging it to a discard zone discards it, with the existing buttons kept as a keyboard fallback
 - [x] **HAND-03**: A newly drawn card takes the hand slot of the card that was played or discarded, rather than joining the end of the hand
-- [ ] **AUD-01**: Simple audio cues play for a clue, a play, a discard, a lost fuse, and a completed stack of five
+- [x] **AUD-01**: Simple audio cues play for a clue, a play, a discard, a lost fuse, and a completed stack of five
 
 ### Foundation
 
@@ -200,7 +200,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HAND-01 | Phase 6.1 | Complete |
 | HAND-02 | Phase 6.1 | Complete |
 | HAND-03 | Phase 6.1 | Complete |
-| AUD-01 | Phase 6.1 | Pending |
+| AUD-01 | Phase 6.1 | Complete |
 
 **Coverage:**
 - v1 requirements: 65 total
