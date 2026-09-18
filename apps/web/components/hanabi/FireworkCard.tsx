@@ -58,8 +58,20 @@ export function FireworkCardFace({
       role={accessibleLabel ? "img" : undefined}
       aria-label={accessibleLabel}
       title={accessibleLabel}
+      // UAT gap 26 (fourth owner review): every face-up tile gets a thin 2px
+      // pitch-black outline. `--color-token-disc` is already the pure-black
+      // token declared in @theme (clue/fuse token art) — reused here rather
+      // than a new raw hex literal, per D-11. This component only ever
+      // renders a card whose identity the viewer is already allowed to see
+      // (own-hand code renders FireworkCardBack, never this component), so a
+      // constant outline colour cannot become a per-card identity signal.
       className="relative inline-block overflow-hidden rounded-md"
-      style={{ width, height, backgroundColor: "var(--color-surface)" }}
+      style={{
+        width,
+        height,
+        backgroundColor: "var(--color-surface)",
+        border: "2px solid var(--color-token-disc)",
+      }}
     >
       {layout.map((placement, index) => {
         const burstSize = minDimension * placement.scale;
@@ -97,7 +109,19 @@ export function FireworkCardBack({ width, height }: FireworkCardBackProps) {
       className="relative inline-block overflow-hidden rounded-md"
       style={{ width, height, backgroundColor: "transparent" }}
     >
-      <svg viewBox={CARD_BACK_ART.viewBox} width={width} height={height} focusable="false" aria-hidden="true">
+      {/* UAT gap 26: `preserveAspectRatio="none"` maps the normalized 0..100
+          viewBox independently onto width/height (no uniform-scale
+          letterboxing), so the picture-frame inset reads as even on all
+          four sides at every card-back render size, not just a single
+          aspect ratio. */}
+      <svg
+        viewBox={CARD_BACK_ART.viewBox}
+        width={width}
+        height={height}
+        preserveAspectRatio="none"
+        focusable="false"
+        aria-hidden="true"
+      >
         {CARD_BACK_ART.layers.map((layer, index) => (
           <path key={index} d={layer.d} fill={layer.fillVar} opacity={layer.opacity} fillRule={layer.fillRule} />
         ))}

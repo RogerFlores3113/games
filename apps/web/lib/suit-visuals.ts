@@ -257,14 +257,28 @@ export function burstLayoutForRank(rank: 1 | 2 | 3 | 4 | 5): readonly BurstPlace
  * primitive; square corners (not rounded) read more "tile" than "card".
  * Still identical for every card and structurally incapable of leaking
  * identity (CARD_BACK_ART takes no suit/rank input).
+ *
+ * UAT gap 26 (fourth owner review, "you see how there's awkward margin to
+ * the right and left of the outer rectangle shade"): the viewBox is now a
+ * normalized 0..100 square, rendered with `preserveAspectRatio="none"`
+ * (FireworkCard.tsx) so x and y each scale independently to the caller's
+ * actual width/height — no more fixed 24x32 (0.75 aspect) viewBox getting
+ * letterboxed inside a wider card box (own-hand's 88x100 is 0.88 aspect),
+ * which is exactly what produced the uneven left/right dead space. Every
+ * inset below is expressed as an equal-percentage margin from its own axis
+ * (e.g. 2 units off both left/right, 2 units off both top/bottom), so the
+ * frame reads as evenly inset on all four sides at every render size (own
+ * hand, deck counter) instead of a fixed-pixel inset that only happened to
+ * look even at one specific aspect ratio.
  */
 export const CARD_BACK_ART: CardBackArt = {
-  viewBox: "0 0 24 32",
+  viewBox: "0 0 100 100",
   layers: [
-    { d: "M0 0H24V32H0Z", fillVar: "var(--color-bg)", opacity: 1 },
-    // Outer edge outline (the card's own outline).
+    { d: "M0 0H100V100H0Z", fillVar: "var(--color-bg)", opacity: 1 },
+    // Outer edge outline (the card's own outline) — evenly inset 2 units
+    // from every edge.
     {
-      d: "M0 0H24V32H0Z M1.5 1.5H22.5V30.5H1.5Z",
+      d: "M0 0H100V100H0Z M2 2H98V98H2Z",
       fillVar: "var(--color-border)",
       opacity: 1,
       fillRule: "evenodd",
@@ -272,7 +286,7 @@ export const CARD_BACK_ART: CardBackArt = {
     // Inset inner outline, evenly inset from the outer edge on all sides —
     // the "picture frame" mat line, with nothing drawn inside it.
     {
-      d: "M4 5H20V27H4Z M5.5 6.5H18.5V25.5H5.5Z",
+      d: "M14 14H86V86H14Z M18 18H82V82H18Z",
       fillVar: "var(--color-border)",
       opacity: 1,
       fillRule: "evenodd",
