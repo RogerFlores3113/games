@@ -180,8 +180,15 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     // whichever of colour/rank is enabled, preferring colour.
     const opened = await openTileCluePopover(activePage, targetSeat, 0);
     if (!opened) throw new Error("UI-02+UI-04: no legal clue available to give");
-    const useColor = await opened.colorButton.isEnabled();
-    await (useColor ? opened.colorButton : opened.rankButton).click();
+    // D-05 (Phase 7 07-03): variant-safe — a rainbow tile has zero matches
+    // for `colorButton` and non-zero for `colorRowButtons` (and vice versa
+    // for every other tile), so each must be `count()`-guarded before
+    // `isEnabled()` (a zero-match locator's `isEnabled()` waits out its
+    // timeout and throws rather than resolving false).
+    const useColor = (await opened.colorButton.count()) > 0 && (await opened.colorButton.isEnabled());
+    const useColorRow = !useColor && (await opened.colorRowButtons.count()) > 0 && (await opened.colorRowButtons.first().isEnabled());
+    const clueButton = useColor ? opened.colorButton : useColorRow ? opened.colorRowButtons.first() : opened.rankButton;
+    await clueButton.click();
 
     // The touched set is now read AFTER the clue lands, from the just-clued
     // transient highlight itself, rather than from a hover-preview step (the

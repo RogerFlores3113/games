@@ -89,52 +89,74 @@ export const OTHER_HAND_SELECTOR = '[data-testid^="other-hand-"]:not([data-testi
 export const OWN_HAND_SLOT_SELECTOR = '[data-testid^="own-hand-slot-"]:not([data-testid$="-hints"])';
 
 /**
- * UAT gap 16: opens the quick-clue popover for one of `targetSeatId`'s hand
- * tiles (`tileIndex`, default the first) by clicking it, and returns
- * Locators for its colour/rank buttons — or `null` if no popover opened at
- * all (the deleted `CluePicker`'s "prefer not opening it when clue-giving is
- * currently illegal" case: not the caller's turn, no clue tokens, the game
- * ended, or the page is reconnecting). Callers are responsible for either
- * clicking one of the returned buttons (which sends the clue and closes the
- * popover) or otherwise closing it (second click, Escape, click elsewhere).
+ * UAT gap 16 / D-05 (Phase 7 07-03): opens the quick-clue popover for one of
+ * `targetSeatId`'s hand tiles (`tileIndex`, default the first) by clicking
+ * it, and returns Locators for its colour/rank controls — or `null` if no
+ * popover opened at all (the deleted `CluePicker`'s "prefer not opening it
+ * when clue-giving is currently illegal" case: not the caller's turn, no
+ * clue tokens, the game ended, or the page is reconnecting).
+ *
+ * A tile's popover renders its colour slot in one of two mutually exclusive
+ * shapes (never both): most tiles get the single `tile-clue-color` button
+ * (`colorButton`); a rainbow tile (Rainbow variant only) instead gets a row
+ * of `tile-clue-color-{suit}` buttons for every nameable colour
+ * (`colorRowButtons`, a multi-match locator — its first entry is offered
+ * first, matching `cluableColors` order). Callers must `count()`-guard
+ * before calling `isEnabled()`/`click()` on either locator: on any given
+ * tile only ONE of the two will have matches, and Playwright's `isEnabled()`
+ * on a zero-match locator waits out its timeout and throws rather than
+ * resolving false. Callers are responsible for either clicking one of the
+ * returned buttons (which sends the clue and closes the popover) or
+ * otherwise closing it (second click, Escape, click elsewhere).
  */
 export async function openTileCluePopover(
   page: Page,
   targetSeatId: string,
   tileIndex = 0,
-): Promise<{ colorButton: Locator; rankButton: Locator } | null> {
+): Promise<{ colorButton: Locator; colorRowButtons: Locator; rankButton: Locator } | null> {
   const tile = page.locator(`[data-testid="other-hand-${targetSeatId}"] [data-testid^="other-hand-card-"]`).nth(tileIndex);
   await tile.click();
   const popover = page.getByTestId("tile-clue-popover");
   if ((await popover.count()) === 0) return null;
-  return { colorButton: page.getByTestId("tile-clue-color"), rankButton: page.getByTestId("tile-clue-rank") };
+  return {
+    colorButton: page.getByTestId("tile-clue-color"),
+    colorRowButtons: popover.locator('[data-testid^="tile-clue-color-"]'),
+    rankButton: page.getByTestId("tile-clue-rank"),
+  };
 }
 
 /**
- * UAT gap 16: gives a legal clue to `targetSeatId`, replacing the deleted
- * `CluePicker`'s target+value+give-clue-button flow. Since a tile's quick-
- * clue popover only ever offers clues derived from that tile's OWN suit/rank
- * (always touching at least that card), the rank button is enabled whenever
- * clue-giving is legal at all — this tries every hand tile (in case an
- * individual tile's colour is a non-nameable suit, e.g. Rainbow) and prefers
- * a colour clue when available, falling back to rank. Returns `false` if no
- * tile currently offers ANY legal clue (e.g. not the caller's turn).
+ * UAT gap 16 / D-05 (Phase 7 07-03): gives a legal clue to `targetSeatId`,
+ * replacing the deleted `CluePicker`'s target+value+give-clue-button flow.
+ * Tries every hand tile in turn; on each, prefers a colour clue (the single
+ * button, or — for a rainbow tile — the first entry of its colour row, both
+ * of which always touch at least the clicked card) and falls back to the
+ * rank button. Every `isEnabled()` check is guarded by a `count()` check
+ * first, since a rainbow tile has zero matches for `colorButton` and a
+ * non-rainbow tile has zero matches for `colorRowButtons` — calling
+ * `isEnabled()` on a zero-match locator waits out Playwright's timeout and
+ * throws rather than resolving false. Returns `false` if no tile currently
+ * offers ANY legal clue (e.g. not the caller's turn).
  */
 export async function giveAnyLegalClue(page: Page, targetSeatId: string): Promise<boolean> {
   const tileCount = await page.locator(`[data-testid="other-hand-${targetSeatId}"] [data-testid^="other-hand-card-"]`).count();
   for (let i = 0; i < tileCount; i += 1) {
     const opened = await openTileCluePopover(page, targetSeatId, i);
     if (!opened) return false;
-    const { colorButton, rankButton } = opened;
-    if (await colorButton.isEnabled()) {
+    const { colorButton, colorRowButtons, rankButton } = opened;
+    if ((await colorButton.count()) > 0 && (await colorButton.isEnabled())) {
       await colorButton.click();
       return true;
     }
-    if (await rankButton.isEnabled()) {
+    if ((await colorRowButtons.count()) > 0 && (await colorRowButtons.first().isEnabled())) {
+      await colorRowButtons.first().click();
+      return true;
+    }
+    if ((await rankButton.count()) > 0 && (await rankButton.isEnabled())) {
       await rankButton.click();
       return true;
     }
-    // Neither enabled on this tile (shouldn't normally happen once
+    // Nothing enabled on this tile (shouldn't normally happen once
     // clue-giving is legal at all) — close it and try the next tile.
     await page.locator(`[data-testid="other-hand-${targetSeatId}"] [data-testid^="other-hand-card-"]`).nth(i).click();
   }

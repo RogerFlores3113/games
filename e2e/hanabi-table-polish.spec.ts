@@ -33,23 +33,46 @@ async function readDeckCount(page: Page): Promise<number> {
 }
 
 /**
- * UAT gap 16: gives a clue of the requested kind (colour when `wantColor` is
- * true, rank otherwise) to `targetSeatId`, by opening each of that seat's
- * tile popovers in turn until one offers the wanted kind enabled. Returns
- * the sent value's own button text (the suit label for colour, the digit
- * for rank) captured BEFORE the click (the popover unmounts once the clue
- * is sent), or null if no tile currently offers that kind.
+ * UAT gap 16 / D-05 (Phase 7 07-03): gives a clue of the requested kind
+ * (colour when `wantColor` is true, rank otherwise) to `targetSeatId`, by
+ * opening each of that seat's tile popovers in turn until one offers the
+ * wanted kind enabled. Returns the sent value's own button text (the suit
+ * label for colour, the digit for rank) captured BEFORE the click (the
+ * popover unmounts once the clue is sent), or null if no tile currently
+ * offers that kind.
+ *
+ * Variant-safe (D-05): a colour request tries the single `colorButton`
+ * first, falling back to the rainbow tile's `colorRowButtons` first entry —
+ * each is `count()`-guarded before `isEnabled()`/`click()`, since only one
+ * of the two ever has matches on a given tile and `isEnabled()` on a
+ * zero-match locator waits out its timeout and throws rather than resolving
+ * false. These tests currently only ever run in the base variant (every
+ * caller uses `startTwoPlayerGame`, which has no variant option), so the
+ * colour-row branch is unreachable today but keeps this helper correct if a
+ * future variant-parametrized caller is added.
  */
 async function giveClueOfKind(page: Page, targetSeatId: string, wantColor: boolean): Promise<string | null> {
   const tileCount = await page.locator(`[data-testid="other-hand-${targetSeatId}"] [data-testid^="other-hand-card-"]`).count();
   for (let i = 0; i < tileCount; i += 1) {
     const opened = await openTileCluePopover(page, targetSeatId, i);
     if (!opened) return null;
-    const button = wantColor ? opened.colorButton : opened.rankButton;
-    if (await button.isEnabled()) {
-      const value = (await button.textContent())?.trim() ?? null;
-      await button.click();
-      return value;
+    if (!wantColor) {
+      if ((await opened.rankButton.count()) > 0 && (await opened.rankButton.isEnabled())) {
+        const value = (await opened.rankButton.textContent())?.trim() ?? null;
+        await opened.rankButton.click();
+        return value;
+      }
+    } else {
+      if ((await opened.colorButton.count()) > 0 && (await opened.colorButton.isEnabled())) {
+        const value = (await opened.colorButton.textContent())?.trim() ?? null;
+        await opened.colorButton.click();
+        return value;
+      }
+      if ((await opened.colorRowButtons.count()) > 0 && (await opened.colorRowButtons.first().isEnabled())) {
+        const value = (await opened.colorRowButtons.first().textContent())?.trim() ?? null;
+        await opened.colorRowButtons.first().click();
+        return value;
+      }
     }
     // Wanted kind not available on this tile — close and try the next.
     await page.locator(`[data-testid="other-hand-${targetSeatId}"] [data-testid^="other-hand-card-"]`).nth(i).click();
