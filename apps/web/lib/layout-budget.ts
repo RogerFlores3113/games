@@ -55,6 +55,20 @@
  * sub-pixel tie a real browser's floating-point layout resolves
  * inconsistently. It is now excluded, matching `useHandDrag.ts`'s
  * always-static slot-rect model.
+ *
+ * 06.2-19 reconciliation pass (UI-11, gap-closure): a fresh real-browser
+ * measurement at the same 1280x720 worst case (5 seats, Black variant, deep
+ * discard pile past `DISCARD_ROWS`, an advanced stack, a spent clue token)
+ * found `teammates-band=110.5`, `tableau=400` (exactly `TABLE_BAND_MIN_PX`
+ * — the prior header comment's own `TABLE_BAND_MIN_PX + BOARD_CHROME_PX`
+ * comparison double-counted `BOARD_CHROME_PX`, which is page-level chrome
+ * outside `tableau`'s own box, not part of it; the e2e check is corrected
+ * to compare `tableau` against `TABLE_BAND_MIN_PX` alone) and
+ * `bottom-controls-row=193` (exact match, no change). Only
+ * `TEAMMATE_BAND_PX` moved (110 -> 111, see its own comment) to stop
+ * understating the measured 110.5px. New total: 111 + 400 + 193 +
+ * `BOARD_CHROME_PX` (6) = 710, ~10px of real slack kept at the
+ * `VIEWPORT_TEST_HEIGHT_PX` (720) floor.
  */
 
 /** Playwright's fixed viewport for the UI-11 no-scroll verification task. */
@@ -253,8 +267,16 @@ export const TABLE_BAND_MIN_PX = BOARD_INNER_PX + 2 * BOARD_PANEL_PADDING_PX;
  * card row (78) + a single compact label+status row + minimal padding,
  * budgeted below the pre-06.2-21 140px measured-117px footprint with margin
  * for the real render.
+ *
+ * 06.2-19 reconciliation: real-browser re-measurement of `teammates-band` at
+ * the same 1280x720 worst case (5 seats, Black variant, deep discard pile,
+ * advanced stacks) came in at 110.5px — 0.5px over the then-current 110,
+ * which per this file's own rule ("the ledger holds measured numbers... if
+ * the render disagrees with the ledger, the ledger is corrected to the
+ * render, never the reverse") means the constant was corrected up to 111 so
+ * it never understates the real rendered height.
  */
-export const TEAMMATE_BAND_PX = 110;
+export const TEAMMATE_BAND_PX = 111;
 
 /**
  * UI-SPEC "Bottom (own hand)" row. Second owner review (UAT gaps 13/14):

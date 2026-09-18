@@ -792,10 +792,28 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       `Measured bands: teammates=${teammatesBandBox.height}, tableau=${tableauBox.height}, bottomRow=${bottomRowBox.height}`,
     );
 
-    const TOLERANCE_PX = 40;
+    // Real-browser reconciliation (06.2-19): `tableau`'s own inline style is
+    // exactly `TABLE_BAND_MIN_PX` (Table.tsx sets `height: BOARD_INNER_PX +
+    // 2 * BOARD_PANEL_PADDING_PX`, which IS `TABLE_BAND_MIN_PX`) — comparing
+    // against `TABLE_BAND_MIN_PX + BOARD_CHROME_PX` double-counted the
+    // page-level chrome that `BOARD_CHROME_PX` already accounts for
+    // separately (see this file's total-fit check above and
+    // layout-budget.ts's header comment). Corrected here; a tight tolerance
+    // catches real regressions instead of a 40px window wide enough to hide
+    // them.
+    const TOLERANCE_PX = 2;
     expect(Math.abs(teammatesBandBox.height - TEAMMATE_BAND_PX)).toBeLessThanOrEqual(TOLERANCE_PX);
-    expect(Math.abs(tableauBox.height - (TABLE_BAND_MIN_PX + BOARD_CHROME_PX))).toBeLessThanOrEqual(TOLERANCE_PX);
+    expect(Math.abs(tableauBox.height - TABLE_BAND_MIN_PX)).toBeLessThanOrEqual(TOLERANCE_PX);
     expect(Math.abs(bottomRowBox.height - OWN_BAND_PX)).toBeLessThanOrEqual(TOLERANCE_PX);
+
+    // 06.2-19: assert the newly-added elements this ledger reconciliation
+    // covers are still in the viewport at the worst case, not just present.
+    await expect(hostPage.getByTestId("settings-toggle")).toBeInViewport();
+    await expect(hostPage.getByTestId("discard-group-by-suit")).toBeInViewport();
+    const rankFiveSlot = hostPage
+      .locator('[data-testid^="played-slot-"][data-testid$="-5"], [data-testid^="played-stack-"][data-testid$="-card-5"]')
+      .first();
+    await expect(rankFiveSlot).toBeInViewport();
 
     for (const context of contexts) {
       await context.close();

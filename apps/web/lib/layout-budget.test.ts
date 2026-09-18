@@ -37,7 +37,11 @@ describe("layout-budget", () => {
     // fix(06.2-21): corrected 140 -> 110 — the vertical Play/Deck/Discard
     // stack needs the height back; TeammateHand's slimmed chrome (no
     // border/box-shadow/padding wrapper) funds this reduction.
-    expect(TEAMMATE_BAND_PX).toBe(110);
+    // fix(06.2-19): corrected 110 -> 111 — a real-browser re-measurement of
+    // `teammates-band` at the worst case came in at 110.5px, 0.5px over the
+    // ledger; corrected up so the constant never understates the rendered
+    // height (see TEAMMATE_BAND_PX's own doc comment).
+    expect(TEAMMATE_BAND_PX).toBe(111);
   });
 
   it("OWN_BAND_PX has no marks-band constant (HINT-04 removes the pip band)", () => {
