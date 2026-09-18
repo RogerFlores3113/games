@@ -819,4 +819,232 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       await context.close();
     }
   });
+
+  test("UAT gap 1 fixed geometry: the board's rendered box does not grow as tiles accumulate", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    test.setTimeout(180_000);
+
+    // The owner's core complaint, made mechanically checkable: "things
+    // should be taking up space that's already portioned out" — reserved
+    // board regions must render at the SAME box before and after real game
+    // progress, not merely "still fit the viewport" (that's UI-11's job).
+    const names = ["Roger", "Bianca", "Chen", "Dara", "Eli"];
+    const { pages, contexts } = await startGameWithPlayers(hostPage, browser, names, { variant: "black" });
+
+    // The rules engine advances turns strictly round-robin over `seatIds`
+    // (`packages/rules/src/hanabi/actions.ts`: `(state.turnIndex + 1) %
+    // state.seatIds.length`), and seats are assigned in join order — which
+    // is exactly `pages`'/`names`' order (`startGameWithPlayers`). So the
+    // page whose turn is next is always `pages[(activeIndex + 1) %
+    // pages.length]`, with no separate seatId lookup needed.
+    async function activePageIndex(): Promise<number> {
+      for (let i = 0; i < pages.length; i += 1) {
+        const text = ((await pages[i].getByTestId("turn-indicator").textContent()) ?? "").trim();
+        if (text === "Your turn") return i;
+      }
+      throw new Error("activePageIndex: no page currently has the active turn");
+    }
+
+    async function maxStackRank(): Promise<number> {
+      const ranks = await hostPage
+        .locator('[data-testid^="played-stack-"]:not([data-testid*="-card-"])')
+        .evaluateAll((els) => els.map((el) => Number(el.getAttribute("data-top-rank") ?? "0")));
+      return ranks.length ? Math.max(...ranks) : 0;
+    }
+
+    /** Suit keys whose played stack is currently empty (topRank 0) — a
+     * rank-1 card of one of these suits is unconditionally safe to play. */
+    async function stackZeroSuits(): Promise<Set<string>> {
+      const suits = await hostPage
+        .locator('[data-testid^="played-stack-"]:not([data-testid*="-card-"])')
+        .evaluateAll((els) =>
+          els
+            .filter((el) => Number(el.getAttribute("data-top-rank") ?? "0") === 0)
+            .map((el) => (el.getAttribute("data-testid") ?? "").replace("played-stack-", "")),
+        );
+      return new Set(suits);
+    }
+
+    /** Finds a card index inside `targetLabel`'s hand (as rendered on
+     * `viewerPage`) whose own suit/rank identity is a rank-1 of a suit in
+     * `zeroSuits` — i.e. one the game rules will always accept as a legal
+     * play right now. Teammates' cards are visible to every other seat
+     * (that's the whole Hanabi mechanic), so this reads real identity, not
+     * a guess. Returns `null` if no such card is currently held. */
+    async function findRankOneCandidate(
+      viewerPage: Page,
+      targetLabel: string,
+      zeroSuits: Set<string>,
+    ): Promise<number | null> {
+      const container = viewerPage
+        .locator('[data-testid^="other-hand-"]:not([data-testid^="other-hand-card-"])', { hasText: targetLabel })
+        .first();
+      if ((await container.count()) === 0) return null;
+      const cards = container.locator('[data-testid^="other-hand-card-"]');
+      const cardCount = await cards.count();
+      for (let i = 0; i < cardCount; i += 1) {
+        const identity = cards.nth(i).locator('[data-testid="card-identity"]');
+        if ((await identity.count()) === 0) continue;
+        const text = ((await identity.textContent()) ?? "").trim();
+        const match = text.match(/^(\S+)\s+(\d)$/);
+        if (!match || match[2] !== "1") continue;
+        if (zeroSuits.has(match[1].toLowerCase())) return i;
+      }
+      return null;
+    }
+
+    const regionsToMeasure = ["tableau", "play-zone", "discard-pile", "clue-tokens"] as const;
+    async function measureRegions(): Promise<Record<(typeof regionsToMeasure)[number], { width: number; height: number }>> {
+      const result = {} as Record<(typeof regionsToMeasure)[number], { width: number; height: number }>;
+      for (const testId of regionsToMeasure) {
+        const box = await hostPage.getByTestId(testId).boundingBox();
+        if (!box) throw new Error(`missing bounding box for ${testId}`);
+        result[testId] = { width: box.width, height: box.height };
+      }
+      return result;
+    }
+
+    // Measure immediately after game start, before any tiles have moved.
+    const boxesAtStart = await measureRegions();
+
+    // Play forward until at least eight tiles are discarded, at least one
+    // stack has advanced, and at least one clue token has been spent — the
+    // three kinds of state change gap 1 complained could reflow the board.
+    // Random own-hand plays risk misplays (fuse loss) that this bounded loop
+    // can't recover from within only 3 fuses, so the "stack has advanced"
+    // requirement is driven deterministically: find a teammate's real,
+    // currently-safe rank-1 card, clue it (spending the clue token this
+    // test also requires), then have that exact teammate play it next turn.
+    const TARGET_DISCARD_COUNT = 8;
+    let clueTokenSpent = false;
+    let guaranteedAdvanceDone = false;
+    for (let i = 0; i < 60; i += 1) {
+      if (await hostPage.getByTestId("end-overlay").isVisible()) break;
+      const discardCount = Number(await hostPage.getByTestId("discard-pile").getAttribute("data-discard-count"));
+      const rank = await maxStackRank();
+      if (discardCount >= TARGET_DISCARD_COUNT && rank >= 1 && clueTokenSpent) break;
+
+      const activeIdx = await activePageIndex();
+      const active = pages[activeIdx];
+      const clueTokensBefore = Number(await hostPage.getByTestId("clue-tokens").getAttribute("data-count"));
+
+      // Attempt 1: the deterministic guaranteed-safe advance (clue a real
+      // rank-1 card of a currently-empty stack to the next player, then have
+      // them play it) — tried at most once, only before it has succeeded.
+      if (!guaranteedAdvanceDone && clueTokensBefore > 0) {
+        const zeroSuits = await stackZeroSuits();
+        const nextIdx = (activeIdx + 1) % pages.length;
+        const candidateIndex = await findRankOneCandidate(active, names[nextIdx], zeroSuits);
+        if (candidateIndex !== null) {
+          const container = active
+            .locator('[data-testid^="other-hand-"]:not([data-testid^="other-hand-card-"])', { hasText: names[nextIdx] })
+            .first();
+          const card = container.locator('[data-testid^="other-hand-card-"]').nth(candidateIndex);
+          await card.click();
+          const rankButton = active.getByTestId("tile-clue-rank");
+          if (await rankButton.isEnabled()) {
+            await rankButton.click();
+            clueTokenSpent = true;
+            await expect.poll(async () => await activePageIndex()).toBe(nextIdx);
+
+            const targetPage = pages[nextIdx];
+            const hintedSlots = targetPage.locator('[data-testid^="own-hand-slot-"][data-testid$="-hints"]');
+            const hintedCount = await hintedSlots.count();
+            let slotNumber: string | null = null;
+            for (let h = 0; h < hintedCount; h += 1) {
+              const numeral = hintedSlots.nth(h).getByTestId("hint-numeral");
+              if ((await numeral.count()) > 0 && (await numeral.textContent())?.trim() === "1") {
+                const slotTestId = await hintedSlots.nth(h).getAttribute("data-testid");
+                slotNumber = slotTestId?.match(/own-hand-slot-(\d+)-hints/)?.[1] ?? null;
+                if (slotNumber) break;
+              }
+            }
+            if (slotNumber) {
+              await targetPage.getByTestId(`own-hand-slot-${slotNumber}`).click();
+              await expect(targetPage.getByTestId("play-button")).toBeEnabled({ timeout: 2000 });
+              await targetPage.getByTestId("play-button").click();
+              guaranteedAdvanceDone = true;
+            }
+            // The clue already consumed this turn (and, if the play above
+            // ran, the next one too) — re-loop from the top to re-read
+            // whichever page is active now, rather than reusing the stale
+            // `active`/`activeIdx` captured before the clue.
+            await expect
+              .poll(async () => {
+                if (await hostPage.getByTestId("end-overlay").isVisible()) return true;
+                return (await activePageIndex()) !== activeIdx;
+              })
+              .toBe(true);
+            continue;
+          }
+          // Popover offered nothing clickable — close it and fall through
+          // to the safe fallback below on this same turn.
+          await card.click();
+        }
+      }
+
+      // Fallback: discarding refunds a clue token (standard Hanabi rule),
+      // so clue tokens are periodically back at the 8-token max — and
+      // discarding is illegal while tokens are full. Give a clue whenever
+      // tokens are full (mirroring the worst-case test's own strategy) or
+      // a clue hasn't been spent yet; otherwise always discard — discarding
+      // never risks a fuse, so it reliably grows the pile toward the
+      // discard-count target without endangering the game.
+      let acted = false;
+      if (clueTokensBefore >= 8 || (!clueTokenSpent && clueTokensBefore > 0)) {
+        acted = await giveAnyLegalClueToAnyTeammate(active);
+        if (acted) clueTokenSpent = true;
+      }
+      if (!acted) {
+        await active.getByTestId("own-hand-slot-1").click();
+        await expect(active.getByTestId("discard-button")).toBeEnabled({ timeout: 2000 });
+        await active.getByTestId("discard-button").click();
+      }
+
+      await expect
+        .poll(async () => {
+          if (await hostPage.getByTestId("end-overlay").isVisible()) return true;
+          try {
+            return (await activePageIndex()) !== activeIdx;
+          } catch {
+            return false;
+          }
+        })
+        .toBe(true);
+    }
+
+    const finalDiscardCount = Number(await hostPage.getByTestId("discard-pile").getAttribute("data-discard-count"));
+    const finalMaxRank = await maxStackRank();
+    expect(finalDiscardCount).toBeGreaterThanOrEqual(TARGET_DISCARD_COUNT);
+    expect(finalMaxRank).toBeGreaterThanOrEqual(1);
+    expect(clueTokenSpent).toBe(true);
+
+    // Measure again after real game progress and assert the four reserved
+    // regions' width and height are byte-identical (1px tolerance only for
+    // sub-pixel rounding) — the board must not grow or reflow.
+    const boxesAtEnd = await measureRegions();
+    const TOLERANCE_PX = 1;
+    for (const testId of regionsToMeasure) {
+      expect(
+        Math.abs(boxesAtEnd[testId].width - boxesAtStart[testId].width),
+        `${testId} width changed from ${boxesAtStart[testId].width} to ${boxesAtEnd[testId].width}`,
+      ).toBeLessThanOrEqual(TOLERANCE_PX);
+      expect(
+        Math.abs(boxesAtEnd[testId].height - boxesAtStart[testId].height),
+        `${testId} height changed from ${boxesAtStart[testId].height} to ${boxesAtEnd[testId].height}`,
+      ).toBeLessThanOrEqual(TOLERANCE_PX);
+    }
+
+    const fitsNoScroll = await hostPage.evaluate(() => {
+      const el = document.scrollingElement;
+      return el !== null && el.scrollHeight <= el.clientHeight + 1;
+    });
+    expect(fitsNoScroll).toBe(true);
+
+    for (const context of contexts) {
+      await context.close();
+    }
+  });
 });
