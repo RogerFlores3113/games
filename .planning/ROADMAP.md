@@ -380,7 +380,7 @@ Plans:
 **Wave 1**
 
 - [x] 07-01-PLAN.md — Server fix: canClue rejects non-nameable colours (clue_color_not_nameable) threaded through rules, schema, worker; regression + property tests
-- [ ] 07-02-PLAN.md — Engine end-condition coverage per variant (D-16) and UI-07 rainbow glyph/gradient render checks (D-11)
+- [x] 07-02-PLAN.md — Engine end-condition coverage per variant (D-16) and UI-07 rainbow glyph/gradient render checks (D-11)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -407,4 +407,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Wire Engine Into Room Actor | 9/9 | Complete   | 2026-09-16 |
 | 5. Reconnect & Session Durability Hardening | 6/6 | Complete    | 2026-09-17 |
 | 6. Game Interface | 7/7 | Complete    | 2026-09-17 |
-| 7. Variant Support (Rainbow, Black) | 1/5 | In Progress|  |
+| 7. Variant Support (Rainbow, Black) | 2/5 | In Progress|  |
