@@ -1,7 +1,8 @@
+import type { CSSProperties } from "react";
 import type { Clue, HanabiCardView, HanabiView } from "@games/rules";
 import { cluableColorsForView } from "../../lib/hanabi-board-logic";
 import { disabledReasonFor, type ActionContext } from "../../lib/hanabi-visual-logic";
-import { hintDisplayFor } from "../../lib/hanabi-hint-logic";
+import { cluePulseColorFor, hintDisplayFor } from "../../lib/hanabi-hint-logic";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
 import { DEFAULT_TILE_COLOR_CSS } from "../../lib/tile-color-pref";
 import { CluePopover } from "./CluePopover";
@@ -191,7 +192,12 @@ export function TeammateCard({
         />
 
         {justClued && (
-          <span aria-hidden="true" className="anim-clue-touch pointer-events-none absolute inset-0 rounded-md" />
+          <span
+            aria-hidden="true"
+            data-testid={`clue-pulse-other-hand-card-${card.id}`}
+            className="anim-clue-touch pointer-events-none absolute inset-0 rounded-md"
+            style={{ "--clue-pulse-color": cluePulseColorFor(card.facts) } as CSSProperties}
+          />
         )}
       </button>
 

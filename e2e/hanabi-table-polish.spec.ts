@@ -423,6 +423,52 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
       .evaluate((el) => getComputedStyle(el).borderColor);
     expect(tileBorderColor).not.toContain(CARD_GLOW_RGB);
 
+    // UAT gap 32 follow-up: the 2s `.anim-clue-touch` pulse that fires the
+    // moment a clue lands must ALSO be the clue's own colour, never the
+    // shared yellow `--color-card-glow`. The pulse's `--clue-pulse-color`
+    // custom property (globals.css's `clue-touch-pulse` keyframes read it)
+    // is asserted directly rather than the animated `box-shadow` itself —
+    // the box-shadow's colour/alpha interpolate continuously across the 2s
+    // run, so sampling it mid-animation is inherently timing-dependent,
+    // while the custom property that drives it is set once, statically, and
+    // never itself animates. Chromium resolves a `var(--color-suit-*)`
+    // reference nested inside another custom property down to its final hex
+    // at computed-value time, so the read-back is the resolved hex, not the
+    // literal `var(...)` source string — compared here against the SAME
+    // `--color-suit-*`/`--color-card-glow` tokens read straight off
+    // `:root`, never a hand-copied hex literal.
+    const pulse = passivePage.getByTestId(`clue-pulse-${colorSlot}`);
+    await expect(pulse).toHaveCount(1);
+    const pulseColorVar = await pulse.evaluate((el) =>
+      getComputedStyle(el).getPropertyValue("--clue-pulse-color").trim(),
+    );
+    const rootStyles = await passivePage.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      return {
+        cardGlow: root.getPropertyValue("--color-card-glow").trim(),
+        suitRed: root.getPropertyValue("--color-suit-red").trim(),
+        suitYellow: root.getPropertyValue("--color-suit-yellow").trim(),
+        suitGreen: root.getPropertyValue("--color-suit-green").trim(),
+        suitBlue: root.getPropertyValue("--color-suit-blue").trim(),
+        suitWhite: root.getPropertyValue("--color-suit-white").trim(),
+        suitRainbow: root.getPropertyValue("--color-suit-rainbow").trim(),
+        suitBlack: root.getPropertyValue("--color-suit-black").trim(),
+      };
+    });
+    const suitHexBySuit: Record<string, string> = {
+      red: rootStyles.suitRed,
+      yellow: rootStyles.suitYellow,
+      green: rootStyles.suitGreen,
+      blue: rootStyles.suitBlue,
+      white: rootStyles.suitWhite,
+      rainbow: rootStyles.suitRainbow,
+      black: rootStyles.suitBlack,
+    };
+    const expectedSuitHex = suitHexBySuit[colorValue!.toLowerCase()];
+    expect(expectedSuitHex, `no known hex fixture for clued colour "${colorValue}"`).toBeDefined();
+    expect(pulseColorVar.toLowerCase()).not.toBe(rootStyles.cardGlow.toLowerCase());
+    expect(pulseColorVar.toLowerCase()).toBe(expectedSuitHex!.toLowerCase());
+
     // HINT-02: turn has passed to the formerly-passive player; it clues the
     // (now passive) other seat with a rank value, which stamps a numeral.
     const newActive = await activeOf(hostPage, pageB);
@@ -435,6 +481,29 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     expect(touchedAfterRank.length).toBeGreaterThan(0);
     const rankSlot = touchedAfterRank[0]!;
     await expect(newPassive.getByTestId(`${rankSlot}-hints`).getByTestId("hint-numeral")).toHaveText(rankValue!);
+
+    // UAT gap 32 follow-up (owner correction): a rank clue has no colour of
+    // its own, so its pulse uses the dedicated `--color-clue-number` pink —
+    // never yellow, and never `--color-text`/white (the owner's specific
+    // worry: "white overlaps with the white firework's color pulse").
+    const rankPulse = newPassive.getByTestId(`clue-pulse-${rankSlot}`);
+    await expect(rankPulse).toHaveCount(1);
+    const rankPulseColorVar = await rankPulse.evaluate((el) =>
+      getComputedStyle(el).getPropertyValue("--clue-pulse-color").trim(),
+    );
+    const rankRootStyles = await newPassive.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      return {
+        cardGlow: root.getPropertyValue("--color-card-glow").trim(),
+        text: root.getPropertyValue("--color-text").trim(),
+        suitWhite: root.getPropertyValue("--color-suit-white").trim(),
+        clueNumber: root.getPropertyValue("--color-clue-number").trim(),
+      };
+    });
+    expect(rankPulseColorVar.toLowerCase()).not.toBe(rankRootStyles.cardGlow.toLowerCase());
+    expect(rankPulseColorVar.toLowerCase()).not.toBe(rankRootStyles.text.toLowerCase());
+    expect(rankPulseColorVar.toLowerCase()).not.toBe(rankRootStyles.suitWhite.toLowerCase());
+    expect(rankPulseColorVar.toLowerCase()).toBe(rankRootStyles.clueNumber.toLowerCase());
 
     await contextB.close();
   });

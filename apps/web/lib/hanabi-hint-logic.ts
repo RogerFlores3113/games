@@ -1,5 +1,6 @@
 import type { Rank, Suit } from "@games/rules";
 import type { CardFacts, HistoryEntry } from "./hanabi-visual-logic";
+import { SUIT_VISUALS } from "./suit-visuals";
 
 /**
  * D-05/D-06/D-07 (HINT-01..04): the hint indicator system's data derivation.
@@ -59,6 +60,29 @@ export function hintDisplayFor(facts: CardFacts): HintDisplay {
     return { colorHints: [latest.value as Suit], numberHints: [] };
   }
   return { colorHints: [], numberHints: [latest.value as Rank] };
+}
+
+/** UAT gap 32 follow-up (sixth owner review's second yellow, 2026-09-18):
+ * "The highlights are still bright yellow - needs to be the color of the
+ * hint!" survived in the 2s `.anim-clue-touch` pulse (globals.css) even
+ * after the hint RING itself stopped using `--color-card-glow`. This reads
+ * the SAME latest-clue data `hintDisplayFor` derives (the last entry of
+ * `facts.positiveClues`) so the pulse and the ring always agree: a colour
+ * clue pulses in that suit's own `--color-suit-*` hue, and a rank clue (no
+ * colour of its own) pulses in `--color-clue-number` — a dedicated pink,
+ * never yellow, never a hardcoded hex, and never `--color-text` (owner
+ * correction: `--color-text` reads near-identical to `--color-suit-white`,
+ * so a white-suit colour clue and a number clue would have pulsed the
+ * same) or `--color-turn` (already the turn indicator's violet — reusing it
+ * would give one colour two meanings). Callers feed the result into the
+ * pulse span's `--clue-pulse-color` custom property; the keyframes/
+ * reduced-motion fallback in globals.css read that variable, never
+ * `--color-card-glow`. */
+export function cluePulseColorFor(facts: CardFacts): string {
+  const { colorHints } = hintDisplayFor(facts);
+  const suit = colorHints[0];
+  if (suit !== undefined) return SUIT_VISUALS[suit].hueVar;
+  return "var(--color-clue-number)";
 }
 
 export interface HintVisibilityOptions {

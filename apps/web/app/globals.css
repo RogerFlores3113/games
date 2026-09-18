@@ -51,6 +51,22 @@
    * the existing suit-hue contrast checks.
    */
   --color-turn: #9B65F7;
+  /*
+   * UAT gap 32 follow-up (2026-09-18, owner correction on the clue-touch
+   * pulse fix above): a number clue's pulse needs its own colour, distinct
+   * from every other signal on the board — NOT `--color-text` (near-
+   * identical to `--color-suit-white`, so a white-suit colour clue and a
+   * number clue would pulse the same) and NOT `--color-turn` (already the
+   * turn indicator's violet; reusing it would give one colour two
+   * meanings). This pink is picked to sit comfortably far (Euclidean RGB
+   * distance, same ~50-unit "clearly different" bar `--color-turn`'s own
+   * gap-38 test uses) from `--color-suit-red` (coral), `--color-suit-
+   * rainbow` (pale lavender), `--color-turn` (violet), and `--color-suit-
+   * white` all at once — verified in suit-visuals.test.ts alongside the
+   * existing distance/contrast checks. Passes WCAG AA (>=4.5:1) against
+   * both `--color-bg` and `--color-surface`.
+   */
+  --color-clue-number: #F472B6;
   --color-destructive: #F0453D;
   --color-text: #F4F6FB;
   --color-text-muted: #8B93A8;
@@ -165,10 +181,19 @@ body {
  * overlay span inside a card, never the luminosity frame element itself,
  * so this transient animation can never override or erase the card's
  * persistent luminosity box-shadow.
+ *
+ * UAT gap 32 follow-up (sixth owner review's second yellow, 2026-09-18):
+ * the pulse used to hardcode `--color-card-glow` (yellow) regardless of
+ * which clue fired it — the owner's "needs to be the color of the hint"
+ * instruction applies here too, not just to the hint ring. The pulse now
+ * reads `--clue-pulse-color`, a custom property the caller sets per-card
+ * from `cluePulseColorFor` (hanabi-hint-logic.ts) — a suit's own
+ * `--color-suit-*` hue for a colour clue, `--color-text` for a rank clue.
+ * No hardcoded hex, and no remaining yellow anywhere in this rule.
  */
 @keyframes clue-touch-pulse {
   from {
-    box-shadow: 0 0 0 3px var(--color-card-glow);
+    box-shadow: 0 0 0 3px var(--clue-pulse-color);
   }
   to {
     box-shadow: 0 0 0 0 transparent;
@@ -219,7 +244,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .anim-clue-touch {
     animation: none;
-    box-shadow: 0 0 0 3px var(--color-card-glow);
+    box-shadow: 0 0 0 3px var(--clue-pulse-color);
   }
 
   .anim-stack-flash {

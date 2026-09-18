@@ -1,6 +1,6 @@
-import type { PointerEvent as ReactPointerEvent } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import type { CardFacts } from "../../lib/hanabi-visual-logic";
-import { hintDisplayFor } from "../../lib/hanabi-hint-logic";
+import { cluePulseColorFor, hintDisplayFor } from "../../lib/hanabi-hint-logic";
 import { DEFAULT_TILE_COLOR_CSS } from "../../lib/tile-color-pref";
 import { FireworkCardBack } from "./FireworkCard";
 import { OwnHintIndicator } from "./HintIndicator";
@@ -187,7 +187,12 @@ export function OwnHandCard({
       </span>
 
       {justClued && (
-        <span aria-hidden="true" className="anim-clue-touch pointer-events-none absolute inset-0 rounded-md" />
+        <span
+          aria-hidden="true"
+          data-testid={`clue-pulse-own-hand-slot-${slotNumber}`}
+          className="anim-clue-touch pointer-events-none absolute inset-0 rounded-md"
+          style={{ "--clue-pulse-color": cluePulseColorFor(facts) } as CSSProperties}
+        />
       )}
     </button>
     </div>

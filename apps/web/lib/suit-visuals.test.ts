@@ -165,6 +165,41 @@ describe("suit-visuals", () => {
     expect(distance).toBeGreaterThan(50);
   });
 
+  it("UAT gap 32 follow-up: --color-clue-number passes WCAG AA (>=4.5:1) against --color-bg and --color-surface, and is clearly distinct from every colour it could be confused with", () => {
+    const themeBlock = extractThemeBlock(globalsCss);
+    const bgHex = tokenHex(themeBlock, "color-bg");
+    const surfaceHex = tokenHex(themeBlock, "color-surface");
+    const numberHex = tokenHex(themeBlock, "color-clue-number");
+
+    expect(contrastRatio(numberHex, bgHex)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(numberHex, surfaceHex)).toBeGreaterThanOrEqual(4.5);
+
+    // Never close enough to be confused, at a glance, with: the suit-red
+    // coral (a number clue's pulse sits right next to a red-clued tile's own
+    // ring sometimes), the pale-lavender Rainbow hue, the turn indicator's
+    // violet (--color-turn — already spoken for, HANABI-38), or
+    // --color-suit-white (the owner's specific worry: "white overlaps with
+    // the white firework's color pulse"). Same ~50-unit Euclidean-distance
+    // "clearly different colour" bar --color-turn's own gap-38 test uses.
+    const confusableWith: Record<string, string> = {
+      "color-suit-red": tokenHex(themeBlock, "color-suit-red"),
+      "color-suit-rainbow": tokenHex(themeBlock, "color-suit-rainbow"),
+      "color-turn": tokenHex(themeBlock, "color-turn"),
+      "color-suit-white": tokenHex(themeBlock, "color-suit-white"),
+    };
+    function channel(hex: string, offset: number): number {
+      return parseInt(hex.slice(offset, offset + 2), 16);
+    }
+    for (const [name, hex] of Object.entries(confusableWith)) {
+      expect(numberHex.toLowerCase(), `--color-clue-number must not equal --${name}`).not.toBe(hex.toLowerCase());
+      const dr = channel(numberHex, 1) - channel(hex, 1);
+      const dg = channel(numberHex, 3) - channel(hex, 3);
+      const db = channel(numberHex, 5) - channel(hex, 5);
+      const distance = Math.sqrt(dr * dr + dg * dg + db * db);
+      expect(distance, `--color-clue-number vs --${name}`).toBeGreaterThan(50);
+    }
+  });
+
   it("every fillRule is a valid SVG fill-rule value", () => {
     for (const suit of ALL_SUITS) {
       expect(["nonzero", "evenodd"]).toContain(SUIT_VISUALS[suit].fillRule);
