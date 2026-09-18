@@ -81,18 +81,23 @@ export function TeammateHand({
   hintsVisible,
   tileColor,
 }: TeammateHandProps) {
+  // 06.2-21, owner review: "hands are just username + hand itself on a
+  // small board (same tiling background as play board)" — the outer
+  // wrapper is now the same `.board-surface` tiled panel Table.tsx uses,
+  // with minimal padding rather than a bordered/padded card. The active-
+  // turn ring is now a thin box-shadow ring (adds no layout height) instead
+  // of a 2px border, so it doesn't grow the fixed teammate-band footprint.
   return (
     <div
       data-testid={"other-hand-" + hand.seatId}
       data-active={String(isActive)}
       data-target={String(isTarget)}
-      className="flex flex-col items-center gap-[length:var(--space-xs)] rounded-md p-[length:var(--space-xs)]"
+      className="board-surface flex flex-col items-center gap-[2px] rounded-md p-[2px]"
       style={{
-        border: isActive ? "2px solid var(--color-accent)" : "2px solid transparent",
-        boxShadow: isActive ? "0 0 12px 0 rgba(245, 185, 66, 0.4)" : "none",
+        boxShadow: isActive ? "0 0 0 2px var(--color-accent), 0 0 12px 0 rgba(245, 185, 66, 0.4)" : "none",
       }}
     >
-      <div className="flex items-center gap-[length:var(--space-sm)]">
+      <div className="flex items-center gap-[length:var(--space-xs)]">
         <span
           className="text-[length:var(--text-label)] font-semibold"
           style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
@@ -226,14 +231,16 @@ export function OwnHand({
     slotPitchPx ?? CARD_WIDTH,
   );
 
+  // 06.2-21, owner review: same board-surface/minimal-padding treatment as
+  // TeammateHand — the active-turn ring is a box-shadow ring (no layout
+  // height) instead of a 2px border.
   return (
     <section
       data-testid="own-band"
       data-active={String(isYourTurn)}
-      className="flex flex-col items-center gap-[3px] rounded-md p-[3px]"
+      className="board-surface flex flex-col items-center gap-[2px] rounded-md p-[2px]"
       style={{
-        border: isYourTurn ? "2px solid var(--color-accent)" : "2px solid transparent",
-        boxShadow: isYourTurn ? "0 0 12px 0 rgba(245, 185, 66, 0.4)" : "none",
+        boxShadow: isYourTurn ? "0 0 0 2px var(--color-accent), 0 0 12px 0 rgba(245, 185, 66, 0.4)" : "none",
       }}
     >
       <div className="flex flex-row items-center gap-[length:var(--space-sm)]">
