@@ -160,9 +160,14 @@ export function OwnHandCard({
         <FireworkCardBack width={CARD_WIDTH} height={CARD_HEIGHT} />
       </span>
 
+      {/* UAT gap 7 (06.2-17): testid deliberately does NOT start with
+          "own-hand-slot-" — several existing selectors/helpers do a prefix
+          match on that exact string (e.g. e2e's OWN_HAND_SLOT_SELECTOR) to
+          find the slot's own card-back element; a testid starting with that
+          prefix would silently double-match and corrupt those counts. */}
       <span
         aria-hidden="true"
-        data-testid={`own-hand-slot-${slotNumber}-tile-color-overlay`}
+        data-testid={`tile-color-overlay-own-hand-slot-${slotNumber}`}
         className="pointer-events-none absolute inset-0 rounded-md"
         style={{ backgroundColor: tileColor }}
       />

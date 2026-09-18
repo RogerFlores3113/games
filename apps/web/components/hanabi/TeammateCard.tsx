@@ -146,10 +146,16 @@ export function TeammateCard({
             its stacking level does not follow DOM order) — this overlay
             must carry a higher explicit z-index to actually paint above
             that opaque art and darken it, rather than being hidden beneath
-            it despite coming later in the markup. */}
+            it despite coming later in the markup.
+            The testid deliberately does NOT start with "other-hand-card-"
+            — several existing selectors/helpers (e2e's teammateHandCardIds,
+            production FlyToLayer.tsx's fly-to-source-rect lookup) prefix-
+            match that exact string to find the card's own tile element; a
+            testid starting with it would silently double-match and corrupt
+            both. */}
         <span
           aria-hidden="true"
-          data-testid={`other-hand-card-${card.id}-tile-color-overlay`}
+          data-testid={`tile-color-overlay-other-hand-card-${card.id}`}
           className="pointer-events-none absolute inset-0 rounded-md"
           style={{ backgroundColor: tileColor, zIndex: 11 }}
         />

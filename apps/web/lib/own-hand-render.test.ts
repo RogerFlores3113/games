@@ -145,7 +145,7 @@ describe("own-hand render guard (D-15, WR-06)", () => {
 
   it("UAT gap 7 (06.2-17): renders a tile-colour overlay span, and two different presets differ only in that span's background-color", () => {
     const markup = render(VISIBLE_HAND);
-    expect(markup).toContain('data-testid="own-hand-slot-1-tile-color-overlay"');
+    expect(markup).toContain('data-testid="tile-color-overlay-own-hand-slot-1"');
 
     function renderWithTileColor(tileColor: string): string {
       const props: OwnHandProps = {
@@ -179,7 +179,7 @@ describe("own-hand render guard (D-15, WR-06)", () => {
     // Strip out only the overlay spans' background-color and confirm the
     // rest of the markup is byte-identical (the only permitted diff).
     const stripOverlayColor = (markup: string) =>
-      markup.replace(/tile-color-overlay"[^>]*background-color:[^;"]*/g, 'tile-color-overlay" STRIPPED');
+      markup.replace(/(tile-color-overlay[^>]*background-color:)[^;"]*/g, "$1STRIPPED");
     expect(stripOverlayColor(withPlum)).toBe(stripOverlayColor(withCharcoal));
   });
 
@@ -213,7 +213,7 @@ describe("own-hand render guard (D-15, WR-06)", () => {
     const markup = render(VISIBLE_HAND);
     // UAT gap 7 (06.2-17): split on the exact slot testid only (digits then
     // a closing quote), not any suffixed variant like
-    // `own-hand-slot-1-tile-color-overlay` or `own-hand-slot-1-hints`.
+    // `tile-color-overlay-own-hand-slot-1` or `own-hand-slot-1-hints`.
     const segments = markup.split(/data-testid="own-hand-slot-\d+"/).slice(1);
     expect(segments.length).toBeGreaterThan(1);
     const cardBackSvg = (segment: string): string => {

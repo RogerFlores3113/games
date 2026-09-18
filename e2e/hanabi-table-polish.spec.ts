@@ -487,8 +487,13 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
   }) => {
     const { contextB, pageB } = await startTwoPlayerGame(hostPage, browser);
 
+    // UAT gap 7 (06.2-17): the preset is a translucent overlay painted above
+    // the card art, not the slot's own background — assertions read the
+    // overlay element, and the slot's own background is asserted constant.
     const slot = hostPage.getByTestId("own-hand-slot-1");
-    const before = await slot.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const overlay = hostPage.getByTestId("tile-color-overlay-own-hand-slot-1");
+    const slotBgBefore = await slot.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const overlayBefore = await overlay.evaluate((el) => getComputedStyle(el).backgroundColor);
 
     // 06.2-13: the tile-colour swatch grid now lives inside SettingsModal,
     // opened by the gear trigger.
@@ -497,8 +502,24 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await hostPage.getByTestId("settings-close").click();
     await expect(hostPage.getByTestId("settings-modal")).toHaveCount(0);
 
-    await expect.poll(() => slot.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(before);
-    const after = await slot.evaluate((el) => getComputedStyle(el).backgroundColor);
+    await expect.poll(() => overlay.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(overlayBefore);
+    const overlayAfter = await overlay.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    // Mechanical proof the overlay is translucent, not opaque: parse the
+    // computed colour string and assert alpha < 1. `color-mix()` resolves
+    // in Chromium either as `rgba(r, g, b, a)` or as a CSS Color 4
+    // `color(srgb r g b / a)` — both forms carry the alpha as the last
+    // number, optionally preceded by a `/`.
+    const rgbaAlpha = overlayAfter.match(/rgba\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*,\s*([\d.]+)\s*\)/);
+    const colorFnAlpha = overlayAfter.match(/color\([^)]*\/\s*([\d.]+)\s*\)/);
+    const alphaMatch = rgbaAlpha ?? colorFnAlpha;
+    expect(alphaMatch, `expected an rgba()/color() colour carrying alpha, got "${overlayAfter}"`).not.toBeNull();
+    const alpha = Number(alphaMatch![1]);
+    expect(alpha).toBeLessThan(1);
+
+    // The slot's own background-color does not change when the preset does.
+    const slotBgAfter = await slot.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(slotBgAfter).toBe(slotBgBefore);
 
     // Persists across a refresh.
     await hostPage.reload();
@@ -506,12 +527,17 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await hostPage.getByTestId("settings-toggle").click();
     await expect(hostPage.getByTestId("tile-color-swatch-plum")).toHaveAttribute("aria-pressed", "true");
     await hostPage.getByTestId("settings-close").click();
-    await expect(hostPage.getByTestId("own-hand-slot-1")).toHaveCSS("background-color", after);
+    await expect(hostPage.getByTestId("tile-color-overlay-own-hand-slot-1")).toHaveCSS(
+      "background-color",
+      overlayAfter,
+    );
 
     // The other player's own tiles are unaffected — a purely personal,
     // local preference (TILE-03).
-    const otherBg = await pageB.getByTestId("own-hand-slot-1").evaluate((el) => getComputedStyle(el).backgroundColor);
-    expect(otherBg).toBe(before);
+    const otherOverlayBg = await pageB
+      .getByTestId("tile-color-overlay-own-hand-slot-1")
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(otherOverlayBg).toBe(overlayBefore);
 
     await contextB.close();
   });
