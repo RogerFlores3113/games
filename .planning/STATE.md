@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 15
+current_plan: 16
 status: executing
-stopped_at: Completed 06.2-13-PLAN.md
-last_updated: "2026-09-18T01:52:45.917Z"
+stopped_at: Completed 06.2-16-PLAN.md
+last_updated: "2026-09-18T02:03:11.094Z"
 last_activity: 2026-09-18
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 79
-  completed_plans: 73
+  completed_plans: 74
   percent: 78
 ---
 
@@ -27,13 +27,13 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 06.2
-Plan: 15 of 20
-Current Plan: 15
+Plan: 16 of 20
+Current Plan: 16
 Total Plans in Phase: 20
 Status: Ready to execute
 Last activity: 2026-09-18
 
-Progress: [█████████░] 92%
+Progress: [█████████░] 94%
 
 ## Performance Metrics
 
@@ -134,6 +134,7 @@ Progress: [█████████░] 92%
 | Phase 06.2 P13 | ~35min | 3 tasks | 7 files |
 | Phase 06.2 P14 | 25min | 2 tasks | 5 files |
 | Phase 06.2 P15 | 35min | 2 tasks | 5 files |
+| Phase 06.2 P16 | 35min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -288,6 +289,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Token count text moved to an sr-only span inside the same fixed-size testid container rather than removed, keeping Playwright toHaveText/toBeInViewport assertions green while satisfying the owner's request to hide it visually
 - [Phase 06.2]: PlayedStack: completed-stack glow moved from inline style to globals.css [data-complete] attribute selectors, keeping the root's inline style byte-identical across ranks
 - [Phase 06.2]: PlayedStack column header emits its data-glyph via a manual attribute rather than SuitGlyph's exposeSuit prop, satisfying the plan's zero-exposeSuit acceptance grep
+- [Phase 06.2]: Play/Deck+Discard/Tokens laid out as items-start flex-row siblings, not items-stretch, since each board region now owns its own fixed height
+- [Phase 06.2]: Deck+Discard middle column uses flex:1/min-width:0 so the board panel's total width isn't a new hardcoded ledger constant
 
 ### Pending Todos
 
@@ -310,6 +313,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-18T01:52:38.883Z
-Stopped at: Completed 06.2-13-PLAN.md
+Last session: 2026-09-18T02:03:11.080Z
+Stopped at: Completed 06.2-16-PLAN.md
 Resume file: None
