@@ -70,7 +70,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **UI-05**: Each card in a player's own hand accumulates and displays both positive and negative clue information, narrowing the candidate suits and ranks as clues land
 - [x] **UI-06**: Every card carries a non-color suit identifier by default, with no accessibility mode to enable
 - [ ] **UI-07**: Suit identification remains unambiguous in the Rainbow variant, where color alone cannot distinguish a rainbow card
-- [x] **UI-08**: Card luminosity conveys accumulated clue information as a channel independent of hue
+- [x] ~~**UI-08**: Card luminosity conveys accumulated clue information as a channel independent of hue~~ — SUPERSEDED by the owner 2026-09-18 (06.2 sixth review, gap 35): the persistent yellow luminosity frame never cleared and was removed entirely. A card's only clue-driven visual is now the hint overlay itself (colour ring in the clue's own hue, or numeral), gated solely by the keep-hints-visible toggle — there is no separate luminosity channel anymore.
 - [x] **UI-09**: The interface presents a dark fireworks-night visual treatment
 - [x] **UI-10**: The end-of-game screen shows the final score, its band, and the completed stacks
 - [x] **UI-11**: The interface is usable on a desktop browser at common window sizes
@@ -203,7 +203,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-05 | Phase 6 | Complete |
 | UI-06 | Phase 6 | Complete |
 | UI-07 | Phase 7 | Pending |
-| UI-08 | Phase 6 | Complete |
+| UI-08 | Phase 6 | Superseded (06.2, 2026-09-18) |
 | UI-09 | Phase 6 | Complete |
 | UI-10 | Phase 6 | Complete |
 | UI-11 | Phase 6 | Complete |

@@ -15,6 +15,16 @@ import type { CardFacts, HistoryEntry } from "./hanabi-visual-logic";
  * nothing. If a future task wants that information back, that is a new
  * owner decision, not a bug fix to this file.
  *
+ * D-06 OVERTURNED (UAT sixth owner review, gap 34, 2026-09-18): hints no
+ * longer accumulate. A card's display shows ONLY what its MOST RECENT clue
+ * said — telling a card "2" after it was earlier told "blue" now shows the
+ * 2 alone, not both. `facts.positiveClues` is populated by
+ * `clue-facts.ts` via `[...facts.positiveClues, clue]` (append-only, never
+ * reordered or pruned — see `packages/rules/src/hanabi/clue-facts.ts`), so
+ * its LAST element is always the chronologically most recent clue that
+ * touched this specific card; `hintDisplayFor` reads only that last
+ * element rather than folding over the whole array.
+ *
  * Hint LIFETIME (`hintsVisibleForCard`, D-05/HINT-03) is TURN-based, never
  * time-based. This is deliberately NOT modeled with a delayed-clear timer,
  * a mutable-cell clear-timer, or an effect-cleanup callback —
@@ -34,33 +44,21 @@ export interface HintDisplay {
   numberHints: Rank[];
 }
 
-/** D-06: colour and number hints are independent channels — a card told
- * red then 3 carries both. De-duplicated, in first-told order, derived
- * only from `facts.positiveClues`. Ignores `negativeClues`, `possibleSuits`
- * and `possibleRanks` entirely (D-07). */
+/** D-06 (overturned by UAT gap 34): a card's hint display reflects only its
+ * MOST RECENT clue — never an accumulation across every clue it has ever
+ * received. A single clue is always exactly one type (colour or rank), so
+ * the returned display carries at most one channel populated: the latest
+ * clue's own type. Derived only from `facts.positiveClues`'s last entry
+ * (chronological append order — see this file's header comment). Ignores
+ * `negativeClues`, `possibleSuits` and `possibleRanks` entirely (D-07). */
 export function hintDisplayFor(facts: CardFacts): HintDisplay {
-  const colorHints: Suit[] = [];
-  const numberHints: Rank[] = [];
-  const seenColors = new Set<Suit>();
-  const seenRanks = new Set<Rank>();
+  const latest = facts.positiveClues[facts.positiveClues.length - 1];
+  if (latest === undefined) return { colorHints: [], numberHints: [] };
 
-  for (const clue of facts.positiveClues) {
-    if (clue.type === "color") {
-      const suit = clue.value as Suit;
-      if (!seenColors.has(suit)) {
-        seenColors.add(suit);
-        colorHints.push(suit);
-      }
-    } else {
-      const rank = clue.value as Rank;
-      if (!seenRanks.has(rank)) {
-        seenRanks.add(rank);
-        numberHints.push(rank);
-      }
-    }
+  if (latest.type === "color") {
+    return { colorHints: [latest.value as Suit], numberHints: [] };
   }
-
-  return { colorHints, numberHints };
+  return { colorHints: [], numberHints: [latest.value as Rank] };
 }
 
 export interface HintVisibilityOptions {

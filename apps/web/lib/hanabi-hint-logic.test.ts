@@ -17,7 +17,7 @@ describe("hintDisplayFor", () => {
     expect(hintDisplayFor(facts())).toEqual({ colorHints: [], numberHints: [] });
   });
 
-  it("returns one colour hint and one number hint for a card told red then 3", () => {
+  it("returns only the number hint for a card told red then 3 (D-06 overturned, UAT gap 34)", () => {
     const result = hintDisplayFor(
       facts({
         positiveClues: [
@@ -26,21 +26,33 @@ describe("hintDisplayFor", () => {
         ],
       }),
     );
-    expect(result).toEqual({ colorHints: ["red"], numberHints: [3] });
+    expect(result).toEqual({ colorHints: [], numberHints: [3] });
   });
 
-  it("de-duplicates repeated clues, keeping first-told order", () => {
+  it("returns only the colour hint for a card told 3 then red (order matters, not type)", () => {
+    const result = hintDisplayFor(
+      facts({
+        positiveClues: [
+          { type: "rank", value: 3 },
+          { type: "color", value: "red" },
+        ],
+      }),
+    );
+    expect(result).toEqual({ colorHints: ["red"], numberHints: [] });
+  });
+
+  it("never accumulates — only the LAST positive clue is ever reflected, however many preceded it", () => {
     const result = hintDisplayFor(
       facts({
         positiveClues: [
           { type: "color", value: "red" },
           { type: "rank", value: 3 },
-          { type: "color", value: "red" },
+          { type: "color", value: "blue" },
           { type: "rank", value: 1 },
         ],
       }),
     );
-    expect(result).toEqual({ colorHints: ["red"], numberHints: [3, 1] });
+    expect(result).toEqual({ colorHints: [], numberHints: [1] });
   });
 
   it("ignores negativeClues, possibleSuits and possibleRanks entirely (D-07)", () => {

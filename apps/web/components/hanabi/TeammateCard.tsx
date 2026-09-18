@@ -1,12 +1,12 @@
 import type { Clue, HanabiCardView, HanabiView } from "@games/rules";
 import { cluableColorsForView } from "../../lib/hanabi-board-logic";
-import { disabledReasonFor, luminosityStepFor, type ActionContext } from "../../lib/hanabi-visual-logic";
+import { disabledReasonFor, type ActionContext } from "../../lib/hanabi-visual-logic";
+import { hintDisplayFor } from "../../lib/hanabi-hint-logic";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
 import { DEFAULT_TILE_COLOR_CSS } from "../../lib/tile-color-pref";
 import { CluePopover } from "./CluePopover";
 import { FireworkCardBack, FireworkCardFace } from "./FireworkCard";
 import { TeammateHintIndicator } from "./HintIndicator";
-import { LUMINOSITY_FRAME } from "./luminosity-frame";
 
 export interface TeammateCardProps {
   card: HanabiCardView;
@@ -43,17 +43,19 @@ const DEFAULT_TILE_COLOR = DEFAULT_TILE_COLOR_CSS;
 /**
  * D-08/D-09/D-12/D-13: a teammate's face-up card renders the owner-approved
  * firework burst face (burst count is the only rank signal — no corner
- * numeral, per 06.1-07's owner override) via `FireworkCardFace`. The
- * luminosity frame is derived from the SAME `facts` the card's own holder
- * would see about it (D-09), and the burst art's hue stays fully solid at
- * every luminosity step (D-10) — only the frame below (border/box-shadow/
- * background layer) ever carries the luminosity signal. The automatic
- * clue-mark pip band is gone (HINT-04) — hints now render on the tile
- * itself via `TeammateHintIndicator`, and the tile gets its own raised,
- * opaque surface (TILE-01) distinct from the board beneath it. UAT gap 7
- * (06.2-17): the tile-colour preference is a translucent overlay painted
- * above the card art, not the tile's own background — the tile container's
- * background stays a constant `var(--color-surface)`.
+ * numeral, per 06.1-07's owner override) via `FireworkCardFace`, and the
+ * burst art's hue stays fully solid regardless of clue state (D-10). UAT
+ * gap 35 (sixth owner review, 2026-09-18): the Phase 6 luminosity frame
+ * that used to sit on the tile's border/box-shadow is deleted entirely —
+ * a card's border/box-shadow is now a fixed constant, and the only
+ * clue-driven visual is `TeammateHintIndicator`'s hint overlay (same facts
+ * the card's own holder would see about it, D-09). The automatic
+ * clue-mark pip band is gone (HINT-04) — hints render on the tile itself,
+ * and the tile gets its own raised, opaque surface (TILE-01) distinct
+ * from the board beneath it. UAT gap 7 (06.2-17): the tile-colour
+ * preference is a translucent overlay painted above the card art, not the
+ * tile's own background — the tile container's background stays a
+ * constant `var(--color-surface)`.
  */
 export function TeammateCard({
   card,
@@ -67,11 +69,15 @@ export function TeammateCard({
   hintsVisible,
   tileColor = DEFAULT_TILE_COLOR,
 }: TeammateCardProps) {
-  const step = luminosityStepFor(card.facts);
-  const frame = LUMINOSITY_FRAME[step];
+  const hints = hintDisplayFor(card.facts);
+  const hasHints = hintsVisible && (hints.colorHints.length > 0 || hints.numberHints.length > 0);
 
+  // TILE-01/D-12/UAT gap 35: a tile is a raised, opaque object distinct
+  // from the board beneath it — a downward drop-shadow. The Phase 6
+  // luminosity frame this shadow used to compose with is deleted entirely;
+  // border/box-shadow are now fixed, non-clue-driven constants.
+  const tileBorder = "1px solid var(--color-border)";
   const tileShadow = "0 2px 4px var(--color-tile-shadow)";
-  const composedBoxShadow = frame.boxShadow === "none" ? tileShadow : `${frame.boxShadow}, ${tileShadow}`;
 
   // UAT gap 16: a visible (non-hidden) card's own suit/rank ARE the two
   // quick-clue options — no new legality rule invented here. Rank always
@@ -109,8 +115,8 @@ export function TeammateCard({
       <button
         type="button"
         data-testid={`other-hand-card-${card.id}`}
-        data-luminosity={step}
         data-just-clued={String(justClued)}
+        data-hints={String(hasHints)}
         aria-haspopup={card.hidden ? undefined : "menu"}
         aria-expanded={card.hidden ? undefined : open}
         onClick={handleTileClick}
@@ -119,8 +125,8 @@ export function TeammateCard({
           width: CARD_WIDTH,
           height: CARD_HEIGHT,
           backgroundColor: "var(--color-surface)",
-          border: frame.border,
-          boxShadow: composedBoxShadow,
+          border: tileBorder,
+          boxShadow: tileShadow,
           cursor: card.hidden ? "default" : "pointer",
         }}
       >
@@ -175,14 +181,6 @@ export function TeammateCard({
           className="pointer-events-none absolute inset-0 rounded-md"
           style={{ backgroundColor: tileColor, zIndex: 11 }}
         />
-
-        {frame.backgroundFilter && (
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 rounded-md"
-            style={{ filter: frame.backgroundFilter, backgroundColor: "var(--color-surface)" }}
-          />
-        )}
 
         <TeammateHintIndicator
           facts={card.facts}

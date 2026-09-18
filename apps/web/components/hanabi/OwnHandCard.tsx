@@ -1,11 +1,9 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { CardFacts } from "../../lib/hanabi-visual-logic";
-import { luminosityStepFor } from "../../lib/hanabi-visual-logic";
 import { hintDisplayFor } from "../../lib/hanabi-hint-logic";
 import { DEFAULT_TILE_COLOR_CSS } from "../../lib/tile-color-pref";
 import { FireworkCardBack } from "./FireworkCard";
 import { OwnHintIndicator } from "./HintIndicator";
-import { LUMINOSITY_FRAME } from "./luminosity-frame";
 
 export interface OwnHandCardProps {
   facts: CardFacts;
@@ -88,16 +86,16 @@ export function OwnHandCard({
   tileColor = DEFAULT_TILE_COLOR,
   shiftOffsetPx = 0,
 }: OwnHandCardProps) {
-  const step = luminosityStepFor(facts);
-  const frame = LUMINOSITY_FRAME[step];
   const hints = hintDisplayFor(facts);
   const hasHints = hintsVisible && (hints.colorHints.length > 0 || hints.numberHints.length > 0);
 
   // TILE-01/D-12: a tile is a raised, opaque object distinct from the board
-  // beneath it — a downward drop-shadow composed WITH (not replacing) the
-  // existing luminosity glow, which stays the frame's border/box-shadow.
+  // beneath it — a downward drop-shadow. UAT gap 35: the Phase 6
+  // luminosity frame this shadow used to compose with is deleted entirely
+  // — a card's border/box-shadow is now a fixed, non-clue-driven constant;
+  // the only clue-driven visual lives in `OwnHintIndicator` below.
+  const tileBorder = "1px solid var(--color-border)";
   const tileShadow = "0 2px 4px var(--color-tile-shadow)";
-  const composedBoxShadow = frame.boxShadow === "none" ? tileShadow : `${frame.boxShadow}, ${tileShadow}`;
 
   // D-20: while dragging, the card lifts (elevated shadow + slight scale)
   // and tracks the pointer via a translate transform; releasing outside a
@@ -124,7 +122,6 @@ export function OwnHandCard({
     <button
       type="button"
       data-testid={`own-hand-slot-${slotNumber}`}
-      data-luminosity={step}
       data-selected={String(selected)}
       data-just-clued={String(justClued)}
       data-dragging={String(dragging)}
@@ -144,10 +141,8 @@ export function OwnHandCard({
         minHeight: "var(--size-touch-min)",
         minWidth: "var(--size-touch-min)",
         backgroundColor: "var(--color-surface)",
-        border: frame.border,
-        boxShadow: dragging
-          ? "0 8px 24px 0 rgba(0, 0, 0, 0.5), " + composedBoxShadow
-          : composedBoxShadow,
+        border: tileBorder,
+        boxShadow: dragging ? "0 8px 24px 0 rgba(0, 0, 0, 0.5), " + tileShadow : tileShadow,
         outline: selected ? "2px solid var(--color-text)" : undefined,
         outlineOffset: selected ? "2px" : undefined,
         touchAction: "none",
@@ -171,14 +166,6 @@ export function OwnHandCard({
         className="pointer-events-none absolute inset-0 rounded-md"
         style={{ backgroundColor: tileColor }}
       />
-
-      {frame.backgroundFilter && (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-md"
-          style={{ filter: frame.backgroundFilter, backgroundColor: "var(--color-surface)" }}
-        />
-      )}
 
       <OwnHintIndicator
         facts={facts}

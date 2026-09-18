@@ -5,14 +5,14 @@ import { clueTouchCountForTarget, isDiscardDisabled } from "./hanabi-board-logic
 /**
  * D-23 / D-15 boundary: every derivation below is a pure function over the
  * redacted `HanabiView` (or a piece of it) — no DOM types, no React imports,
- * no network/storage access. The own-hand helper (`luminosityStepFor`)
- * accepts ONLY `CardFacts` — a type with no `suit`/`rank` fields — because
- * that is the entire own-hand identity boundary (D-15, carried from Phase
- * 4): if a helper ever needs a card's actual suit/rank to render an
- * own-hand slot, stop, because that is exactly the leak this file exists to
- * make structurally impossible. Teammates' face-up cards may pass a
- * discriminated `HanabiCardView` to callers that need full identity, but
- * this function never does.
+ * no network/storage access. Own-hand-safe helpers accept ONLY `CardFacts`
+ * — a type with no `suit`/`rank` fields — because that is the entire
+ * own-hand identity boundary (D-15, carried from Phase 4): if a helper ever
+ * needs a card's actual suit/rank to render an own-hand slot, stop, because
+ * that is exactly the leak this file exists to make structurally
+ * impossible. Teammates' face-up cards may pass a discriminated
+ * `HanabiCardView` to callers that need full identity, but this file never
+ * does.
  *
  * HINT-04 (D-07): the automatic clue-mark pip rows' data-derivation
  * function and its display type were removed from this file in 06.2-04
@@ -21,29 +21,22 @@ import { clueTouchCountForTarget, isDiscardDisabled } from "./hanabi-board-logic
  * clues only, no ruled-out/negative information, per the owner's "Let it
  * go" decision) — do not reintroduce a candidate/ruled-out display here or
  * anywhere else.
+ *
+ * D-08/D-10/D-11 REMOVED (UAT sixth owner review, gap 35, 2026-09-18):
+ * `luminosityStepFor` and the "unclued/touched/known" frame it drove
+ * (`components/hanabi/luminosity-frame.ts`, since deleted) painted a
+ * persistent yellow `--color-card-glow` border on every clued card that
+ * never cleared — the owner's "yellow outline persists indefinitely" bug.
+ * A card's ONLY clue-driven visual signal now lives in
+ * `HintIndicator.tsx`'s hint overlay, whose colour comes from the clue's
+ * own suit and whose lifetime is governed exclusively by
+ * `hintsVisibleForCard` (below/`hanabi-hint-logic.ts`) — never a separate,
+ * always-on frame. Do not reintroduce a persistent per-card border/glow
+ * keyed off `luminosityStepFor`-style candidate narrowing.
  */
 
 export type CardFacts = HanabiCardView["facts"];
 export type HistoryEntry = HanabiView["history"][number];
-
-export type LuminosityStep = "unclued" | "touched" | "known";
-
-/** D-08: three discrete steps derived from a card's facts alone.
- * "Known" fires whenever both candidate arrays have narrowed to exactly one
- * entry, even if that narrowing came entirely from negative clues (no
- * positive clues at all) — see the state's own docs on negative-clue
- * narrowing. "Touched" requires at least one positive clue. Negative-only
- * narrowing without any positive clue stays "unclued" (D-08 anti-goal): a
- * card nobody pointed at must not look chosen. */
-export function luminosityStepFor(facts: CardFacts): LuminosityStep {
-  if (facts.possibleSuits.length === 1 && facts.possibleRanks.length === 1) {
-    return "known";
-  }
-  if (facts.positiveClues.length > 0) {
-    return "touched";
-  }
-  return "unclued";
-}
 
 /** D-14: the touched-card ids of the last clue entry at or after `sinceIndex`
  * in `history`, or [] when no such clue entry exists. Scans backwards from

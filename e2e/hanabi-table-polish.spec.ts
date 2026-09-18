@@ -366,7 +366,22 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await contextB.close();
   });
 
-  test("HINT-01/HINT-02: a colour clue tints the touched tile and a number clue stamps its numeral", async ({
+  // UAT sixth owner review (gap 32): the hint highlight's rgb per suit,
+  // matching apps/web/app/globals.css's `--color-suit-*` @theme tokens
+  // exactly — used to prove the ring is the CLUE's own colour, not the
+  // shared yellow luminosity colour (`--color-card-glow`, rgb(255, 217, 138)).
+  const SUIT_RGB: Record<string, string> = {
+    red: "rgb(240, 100, 90)",
+    yellow: "rgb(232, 197, 71)",
+    green: "rgb(79, 191, 138)",
+    blue: "rgb(111, 168, 255)",
+    white: "rgb(231, 236, 247)",
+    rainbow: "rgb(201, 168, 255)",
+    black: "rgb(183, 194, 214)",
+  };
+  const CARD_GLOW_RGB = "255, 217, 138";
+
+  test("HINT-01/HINT-02: a colour clue rings the touched tile in the clue's own colour (no wash, no yellow) and a number clue stamps its numeral", async ({
     page: hostPage,
     browser,
   }) => {
@@ -384,11 +399,29 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await expect(passivePage.getByTestId(colorSlot)).toHaveAttribute("data-hints", "true");
     const colorHintSpan = passivePage.getByTestId(`${colorSlot}-hints`);
     await expect(colorHintSpan).toHaveCount(1);
-    const tintBg = await colorHintSpan
-      .locator("> span")
-      .first()
-      .evaluate((el) => getComputedStyle(el).backgroundColor);
-    expect(tintBg).not.toBe("rgba(0, 0, 0, 0)");
+
+    // UAT gap 32: the highlight is a ring in the clue's own suit colour —
+    // never the shared yellow luminosity colour.
+    const ring = colorHintSpan.getByTestId("hint-color-ring");
+    await expect(ring).toHaveCount(1);
+    const ringBoxShadow = await ring.evaluate((el) => getComputedStyle(el).boxShadow);
+    expect(ringBoxShadow).not.toBe("none");
+    expect(ringBoxShadow).not.toContain(CARD_GLOW_RGB);
+    const expectedRgb = SUIT_RGB[colorValue!.toLowerCase()];
+    expect(expectedRgb, `no known rgb fixture for clued colour "${colorValue}"`).toBeDefined();
+    expect(ringBoxShadow).toContain(expectedRgb);
+
+    // UAT gap 33: no translucent wash across the tile face — the ring span
+    // itself paints no background fill.
+    const ringBackground = await ring.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(ringBackground).toBe("rgba(0, 0, 0, 0)");
+
+    // UAT gap 35: the tile's own border/box-shadow carries no persistent
+    // clue signal outside the hint overlay — no luminosity frame underneath.
+    const tileBorderColor = await passivePage
+      .getByTestId(colorSlot)
+      .evaluate((el) => getComputedStyle(el).borderColor);
+    expect(tileBorderColor).not.toContain(CARD_GLOW_RGB);
 
     // HINT-02: turn has passed to the formerly-passive player; it clues the
     // (now passive) other seat with a rank value, which stamps a numeral.
@@ -402,6 +435,74 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     expect(touchedAfterRank.length).toBeGreaterThan(0);
     const rankSlot = touchedAfterRank[0]!;
     await expect(newPassive.getByTestId(`${rankSlot}-hints`).getByTestId("hint-numeral")).toHaveText(rankValue!);
+
+    await contextB.close();
+  });
+
+  test("UAT gap 34: a card's hint shows only its MOST RECENT clue — a later rank clue replaces an earlier colour ring, not adds to it", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, pageB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
+
+    // Turn keep-hints ON up front so the first clue's mark survives the
+    // intervening move below (06.2-13: the toggle lives in SettingsModal).
+    await passivePage.getByTestId("settings-toggle").click();
+    await passivePage.getByTestId("keep-hints-toggle").click();
+    await expect(passivePage.getByTestId("keep-hints-toggle")).toHaveAttribute("aria-pressed", "true");
+    await passivePage.getByTestId("settings-close").click();
+
+    const passiveSeatId = await seatIdOfOtherPlayer(activePage);
+    const colorValue = await giveClueOfKind(activePage, passiveSeatId, true);
+    expect(colorValue).not.toBeNull();
+
+    const touchedAfterColor = await ownHandHintedSlots(passivePage);
+    expect(touchedAfterColor.length).toBeGreaterThan(0);
+    const colorSlot = touchedAfterColor[0]!;
+    await expect(passivePage.getByTestId(`${colorSlot}-hints`).getByTestId("hint-color-ring")).toHaveCount(1);
+
+    // Identify the clued card's real id (own-hand slots carry the card id on
+    // their wrapping div, D-15-safe — see Hand.tsx) so it can be targeted
+    // again by seat/id rather than by slot number, which the next move may
+    // reshuffle.
+    const cluedCardId = await passivePage
+      .locator(`[data-testid="own-hand"] > div`)
+      .filter({ has: passivePage.getByTestId(colorSlot) })
+      .first()
+      .getAttribute("data-card-id");
+    expect(cluedCardId).not.toBeNull();
+
+    // Passive player acts on a DIFFERENT card (not the clued one, and not
+    // any other card the colour clue also touched) to pass the turn back to
+    // active without disturbing the clued card's hint.
+    const touchedNumbers = new Set(touchedAfterColor.map((id) => Number(id.replace("own-hand-slot-", ""))));
+    const untouchedSlotNumber = [1, 2, 3, 4, 5].find((n) => !touchedNumbers.has(n));
+    if (untouchedSlotNumber === undefined) throw new Error("UAT gap 34: every own-hand slot was touched by the clue");
+    await passivePage.getByTestId(`own-hand-slot-${untouchedSlotNumber}`).click();
+    await expect(passivePage.getByTestId("discard-button")).toBeEnabled();
+    await passivePage.getByTestId("discard-button").click();
+
+    // Active gives a SECOND clue — a rank clue — directly at the same real
+    // card (active sees the passive player's true suit/rank via the
+    // teammate view, so it targets the tile by id rather than re-deriving
+    // via giveClueOfKind, which knows nothing about "the same card").
+    const teammateIds = await teammateHandCardIds(activePage, passiveSeatId);
+    const tileIndex = teammateIds.indexOf(cluedCardId!);
+    expect(tileIndex).toBeGreaterThanOrEqual(0);
+    const opened = await openTileCluePopover(activePage, passiveSeatId, tileIndex);
+    if (!opened) throw new Error("UAT gap 34: expected a legal clue to be available");
+    await expect(opened.rankButton).toBeEnabled();
+    await opened.rankButton.click();
+
+    // The same card's hint now shows ONLY the rank — no colour ring, no
+    // suit glyph — proving the display is the latest clue, not an
+    // accumulation of every clue the card has ever received.
+    const slotAfterRank = passivePage.locator(`[data-testid="own-hand"] > div[data-card-id="${cluedCardId}"] [data-testid^="own-hand-slot-"]:not([data-testid$="-hints"])`);
+    await expect(slotAfterRank).toHaveAttribute("data-hints", "true");
+    const slotTestId = (await slotAfterRank.getAttribute("data-testid"))!;
+    const hintSpan = passivePage.getByTestId(`${slotTestId}-hints`);
+    await expect(hintSpan.getByTestId("hint-numeral")).toHaveCount(1);
+    await expect(hintSpan.getByTestId("hint-color-ring")).toHaveCount(0);
 
     await contextB.close();
   });

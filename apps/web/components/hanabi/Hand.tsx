@@ -76,8 +76,8 @@ export interface TeammateHandProps {
  * may start with "other-hand-". The `variant` prop is unused now that the
  * deleted automatic clue-mark pip band (HINT-04) no longer reads a card's
  * candidate suits per variant, but stays on the props type — HanabiBoard.tsx
- * still threads it through, and TeammateCard's own luminosity/hint
- * derivation is variant-independent (facts alone). The deleted `CluePicker`'s
+ * still threads it through, and TeammateCard's own hint derivation is
+ * variant-independent (facts alone). The deleted `CluePicker`'s
  * separate "select a teammate as the clue target" step (the former `Clue`
  * button and the whole row's click-to-target affordance) is gone — a
  * teammate is now only ever a clue target by way of clicking one of their

@@ -14,13 +14,36 @@ export interface HintIndicatorProps {
 /**
  * D-01..D-07 (HINT-01..04): replaces the deleted automatic clue-mark pip
  * rows.
- * A colour clue tints the whole tile face and shows a faint, non-colour
- * suit-glyph marker (D-04 grayscale survival); a number clue stamps a
- * numeral chip on the tile back. The two channels are independent and never
- * overlap (D-06): the suit marker sits in the top-left corner, the numeral
- * chip in the bottom-right. No ruled-out/negative clue information is
- * rendered here or anywhere else (D-07, owner-confirmed 2026-09-17,
- * "Let it go") — `hintDisplayFor` reads only `facts.positiveClues`.
+ *
+ * UAT sixth owner review (gaps 32/33/35, 2026-09-18) rebuilt this
+ * component's colour channel:
+ * - Gap 32: a colour clue's highlight is a thin inset RING drawn in that
+ *   suit's own `--color-suit-*` hue — never the shared yellow
+ *   `--color-card-glow` luminosity colour, which this file never
+ *   references. The colourblind-safe non-colour marker (a faint suit
+ *   glyph, D-04) is kept alongside the ring so colour is never the sole
+ *   carrier.
+ * - Gap 33: there is no translucent colour wash across the tile face
+ *   anymore — the ring is the entire highlight; it paints no fill.
+ * - Gap 35: the Phase 6 luminosity frame (`data-luminosity`,
+ *   `LUMINOSITY_FRAME`, `--color-card-glow` border) that used to sit
+ *   underneath this overlay and never cleared is deleted entirely (see
+ *   `hanabi-visual-logic.ts`'s header comment). This overlay — gated by
+ *   `visible`, which the caller derives from `hintsVisibleForCard` — is now
+ *   the ONLY clue-driven visual on a card, so its lifetime already is
+ *   exactly the keep-hints-visible toggle's lifetime; there is nothing
+ *   else left to clear.
+ *
+ * A number clue stamps a numeral chip on the tile back, unchanged (the
+ * owner explicitly kept this one as-is). D-06 is overturned (gap 34):
+ * `hintDisplayFor` now returns at most ONE of {colour, number} — the most
+ * recent clue's own channel — never both at once from accumulated clues,
+ * so the two are no longer simultaneously renderable from unrelated
+ * clues; a single clue is one type, so composing both here would only
+ * ever happen if a future change re-introduces accumulation, which it must
+ * not. No ruled-out/negative clue information is rendered here or anywhere
+ * else (D-07, owner-confirmed 2026-09-17, "Let it go") — `hintDisplayFor`
+ * reads only `facts.positiveClues`.
  *
  * D-15 own-hand identity boundary: this file's props type is `facts: CardFacts`
  * only — never a card object, never a bare `suit`/`rank` prop — so both
@@ -52,10 +75,14 @@ function HintOverlay({ facts, visible, width, height, testId }: HintIndicatorPro
     >
       {suit !== null && (
         <>
+          {/* UAT gap 32/33: a ring in the clue's own suit colour, painted
+              with an inset box-shadow so it never fills the tile face —
+              highlight only, no wash. Never `--color-card-glow`. */}
           <span
+            data-testid="hint-color-ring"
             className="absolute inset-0 rounded-md"
             style={{
-              background: `color-mix(in srgb, ${SUIT_VISUALS[suit].hueVar} 22%, var(--color-surface))`,
+              boxShadow: `inset 0 0 0 3px ${SUIT_VISUALS[suit].hueVar}`,
             }}
           />
           <span

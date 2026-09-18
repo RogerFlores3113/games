@@ -190,9 +190,11 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     }
 
     // HIDE-01 browser surface (WR-07): with no clue given yet, every own-hand
-    // slot must show zero knowledge — no hint overlay rendered at all, and
-    // the unclued luminosity. A rendering leak of any identity signal
-    // changes at least one of these.
+    // slot must show zero knowledge — no hint overlay rendered at all. A
+    // rendering leak of any identity signal changes at least one of these.
+    // UAT gap 35: the Phase 6 luminosity frame (`data-luminosity`) that used
+    // to also assert an "unclued" step here is deleted entirely — `data-hints`
+    // is now the only clue-presence signal on a tile.
     for (const page of [hostPage, pageB]) {
       const slots = page.locator('[data-testid^="own-hand-slot-"]');
       const slotCount = await slots.count();
@@ -202,7 +204,6 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
         // HINT-01/02/04: clue hints now render on the tile itself via a
         // `own-hand-slot-N-hints` overlay (HintIndicator), not an automatic
         // clue-mark pip row above the card — that pip band is deleted.
-        await expect(slot).toHaveAttribute("data-luminosity", "unclued");
         await expect(slot).toHaveAttribute("data-hints", "false");
         await expect(page.getByTestId(`own-hand-slot-${i + 1}-hints`)).toHaveCount(0);
       }

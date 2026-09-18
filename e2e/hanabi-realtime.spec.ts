@@ -205,29 +205,28 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
       activePage.locator(`[data-testid="other-hand-${targetSeat}"] [data-just-clued="true"]`),
     ).toHaveCount(touchedCount);
 
-    // Persistent marks: on the giver's page, every previously-previewed card
-    // now carries a non-"unclued" luminosity, and the touched count matches
-    // exactly. On the target's own page, the same number of own-hand slots
-    // are non-"unclued".
+    // Persistent marks (UAT gap 35: the deleted Phase 6 luminosity frame's
+    // `data-luminosity` step used to carry this signal; `data-hints` is now
+    // the only clue-presence attribute on a tile): on the giver's page, every
+    // previously-previewed card now carries `data-hints="true"`, and the
+    // touched count matches exactly. On the target's own page, the same
+    // number of own-hand slots carry it too.
     for (const testId of touchedTestIds) {
       if (!testId) continue;
-      await expect(activePage.locator(`[data-testid="${testId}"]`)).toHaveAttribute(
-        "data-luminosity",
-        /^(touched|known)$/,
-      );
+      await expect(activePage.locator(`[data-testid="${testId}"]`)).toHaveAttribute("data-hints", "true");
     }
     await expect(
-      activePage.locator(`[data-testid="other-hand-${targetSeat}"] [data-luminosity]:not([data-luminosity="unclued"])`),
+      activePage.locator(`[data-testid="other-hand-${targetSeat}"] [data-hints="true"]`),
     ).toHaveCount(touchedCount);
     await expect(
-      passivePage.locator(`${OWN_HAND_SLOT_SELECTOR}:not([data-luminosity="unclued"])`),
+      passivePage.locator(`${OWN_HAND_SLOT_SELECTOR}[data-hints="true"]`),
     ).toHaveCount(touchedCount);
 
     // The transient highlight clears after CLUE_HIGHLIGHT_MS while the
     // persistent marks remain.
     await expect(passivePage.locator('[data-just-clued="true"]')).toHaveCount(0, { timeout: 5000 });
     await expect(
-      passivePage.locator(`${OWN_HAND_SLOT_SELECTOR}:not([data-luminosity="unclued"])`),
+      passivePage.locator(`${OWN_HAND_SLOT_SELECTOR}[data-hints="true"]`),
     ).toHaveCount(touchedCount);
 
     // UI-02 after: the active marker has moved to the target.
@@ -236,11 +235,11 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     await expect(activePage.getByTestId(`other-hand-${targetSeat}`)).toHaveAttribute("data-active", "true");
     await expect(activePage.getByTestId("own-band")).toHaveAttribute("data-active", "false");
 
-    // Refresh persistence (D-14): the target's own-hand luminosity survives
-    // a reload with no transient replay.
+    // Refresh persistence (D-14): the target's own-hand hint marks survive a
+    // reload with no transient replay.
     const before = await passivePage
       .locator(OWN_HAND_SLOT_SELECTOR)
-      .evaluateAll((els) => els.map((el) => el.getAttribute("data-luminosity")));
+      .evaluateAll((els) => els.map((el) => el.getAttribute("data-hints")));
 
     await passivePage.reload();
 
@@ -251,11 +250,11 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
       .poll(() =>
         passivePage
           .locator(OWN_HAND_SLOT_SELECTOR)
-          .evaluateAll((els) => els.map((el) => el.getAttribute("data-luminosity"))),
+          .evaluateAll((els) => els.map((el) => el.getAttribute("data-hints"))),
       )
       .toEqual(before);
     await expect(
-      passivePage.locator(`${OWN_HAND_SLOT_SELECTOR}:not([data-luminosity="unclued"])`),
+      passivePage.locator(`${OWN_HAND_SLOT_SELECTOR}[data-hints="true"]`),
     ).toHaveCount(touchedCount);
     await expect(passivePage.locator('[data-just-clued="true"]')).toHaveCount(0);
 

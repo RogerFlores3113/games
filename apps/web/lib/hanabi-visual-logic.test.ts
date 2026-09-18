@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HanabiView } from "@games/rules";
 import {
-  luminosityStepFor,
   touchedCardIdsFromLatestClue,
   newlyCompletedStacks,
   disabledReasonFor,
@@ -11,6 +10,7 @@ import {
   teammatesInTurnOrder,
 } from "./hanabi-visual-logic";
 import type { CardFacts, HistoryEntry } from "./hanabi-visual-logic";
+import { hintDisplayFor } from "./hanabi-hint-logic";
 
 // Copied verbatim from hanabi-board-logic.test.ts's baseView fixture shape
 // (do not import across test files).
@@ -59,39 +59,6 @@ function factsFor(partial: Partial<CardFacts> = {}): CardFacts {
     ...partial,
   };
 }
-
-const FIVE_SUITS = ["red", "yellow", "green", "blue", "white"] as const;
-const FIVE_RANKS = [1, 2, 3, 4, 5] as const;
-
-describe("luminosityStepFor", () => {
-  it("is unclued with full candidates and no clues", () => {
-    const facts = factsFor({ possibleSuits: [...FIVE_SUITS], possibleRanks: [...FIVE_RANKS] });
-    expect(luminosityStepFor(facts)).toBe("unclued");
-  });
-
-  it("is unclued (anti-goal) when negative clues narrowed candidates but there are zero positive clues", () => {
-    const facts = factsFor({
-      possibleSuits: ["red", "blue"],
-      possibleRanks: [...FIVE_RANKS],
-      negativeClues: [{ type: "color", value: "green" }],
-    });
-    expect(luminosityStepFor(facts)).toBe("unclued");
-  });
-
-  it("is touched with one positive color clue and possibleSuits narrowed to one suit but ranks unnarrowed", () => {
-    const facts = factsFor({
-      possibleSuits: ["red"],
-      possibleRanks: [...FIVE_RANKS],
-      positiveClues: [{ type: "color", value: "red" }],
-    });
-    expect(luminosityStepFor(facts)).toBe("touched");
-  });
-
-  it("is known when possibleSuits and possibleRanks both have length 1, even with empty positiveClues", () => {
-    const facts = factsFor({ possibleSuits: ["red"], possibleRanks: [3] });
-    expect(luminosityStepFor(facts)).toBe("known");
-  });
-});
 
 describe("touchedCardIdsFromLatestClue", () => {
   const clueEntry: HistoryEntry = {
@@ -167,10 +134,10 @@ describe("identity tripwire (D-15)", () => {
     }) as CardFacts & { __recordedKeys?: Set<string> };
   }
 
-  it("luminosityStepFor never reads a key outside the four allowed CardFacts keys", () => {
-    const realFacts: CardFacts = factsFor({ possibleSuits: ["red"], possibleRanks: [3] });
+  it("hintDisplayFor never reads a key outside the four allowed CardFacts keys", () => {
+    const realFacts: CardFacts = factsFor({ possibleSuits: ["red"], possibleRanks: [3], positiveClues: [{ type: "color", value: "red" }] });
     const proxied = tripwireFacts(realFacts);
-    expect(() => luminosityStepFor(proxied)).not.toThrow();
+    expect(() => hintDisplayFor(proxied)).not.toThrow();
   });
 });
 
