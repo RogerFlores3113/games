@@ -141,6 +141,18 @@ describe("suit-visuals", () => {
     expect(SUIT_VISUALS.rainbow.hueVar).toBe("var(--color-suit-rainbow)");
   });
 
+  it("UI-07: rainbow's glyphPath and silhouette differ from every other suit's", () => {
+    const rainbow = SUIT_VISUALS.rainbow;
+    for (const suit of ALL_SUITS) {
+      if (suit === "rainbow") continue;
+      const other = SUIT_VISUALS[suit];
+      expect(rainbow.glyphPath).not.toBe(other.glyphPath);
+      const rainbowSilhouette = `${rainbow.silhouette.spikes}:${rainbow.silhouette.rings}:${rainbow.silhouette.hollow}`;
+      const otherSilhouette = `${other.silhouette.spikes}:${other.silhouette.rings}:${other.silhouette.hollow}`;
+      expect(rainbowSilhouette).not.toBe(otherSilhouette);
+    }
+  });
+
   it("UAT gap 38: --color-turn passes WCAG AA (>=4.5:1) against --color-bg and --color-surface, and is clearly distinct from --color-suit-rainbow", () => {
     const themeBlock = extractThemeBlock(globalsCss);
     const bgHex = tokenHex(themeBlock, "color-bg");
