@@ -14,14 +14,6 @@ import { FuseTokenArt } from "./FuseTokenArt";
 export interface TokenColumnProps {
   clueTokens: number;
   fusesRemaining: number;
-  /**
-   * @deprecated Unused — the token area is now a fixed reservation
-   * (06.2-14, UAT gap 1) sized from layout-budget.ts's constants, never
-   * from a caller-supplied height. Accepted-and-ignored so `Table.tsx`'s
-   * existing call site stays green; plan 06.2-16 removes both the prop
-   * and the call site.
-   */
-  columnHeightPx?: number;
 }
 
 const CLUE_RUN_HEIGHT_PX = tokenRunHeightPx(MAX_CLUE_TOKENS, CLUE_TOKEN_COLUMNS);

@@ -1,5 +1,51 @@
 # Deferred items
 
+## `e2e/start-game.spec.ts`'s "BOARD-01..05: Play/Discard order and outline..." test now fails its vertical-stacking assumption (found by 06.2-16)
+
+**Status: deferred, out of scope for 06.2-16.** `e2e/start-game.spec.ts` is
+not in 06.2-16's `files_modified` — only `Table.tsx`, `TokenColumn.tsx`,
+`layout-budget.ts`, `layout-budget.test.ts`, and `table-render.test.ts` are.
+06.2-16's own Task 2 explicitly instructs: "If a failure requires changing a
+file this plan does not own (an e2e spec, `HanabiBoard.tsx`, a drag hook),
+stop and report rather than widening scope — 06.2-19 owns the e2e
+reconciliation."
+
+The failing assertion (`e2e/start-game.spec.ts:509`) reads:
+
+```ts
+// BOARD-04: the deck counter sits between Play and Discard in document
+// order (proven here by vertical position, since the left column is a
+// flex-col of exactly Play/Deck/Discard) ...
+expect(playBox.y).toBeLessThan(deckBox.y);
+expect(deckBox.y).toBeLessThan(discardBox.y);
+```
+
+This assumed the pre-06.2-16 layout, where Play/Deck/Discard were three
+rows stacked in a single vertical left column. 06.2-16 (closing UAT gap 1 at
+the board level, BOARD-01/02/04/05) deliberately replaced that with three
+horizontal sibling regions — Play (left), Deck-counter-above-Discard
+(middle), Tokens (right) — each a fixed reserved box, so the board no longer
+grows or reflows. Under the new layout `play-zone` and `deck-count` are
+side-by-side, not stacked, so `playBox.y < deckBox.y` no longer holds (both
+report `y` values from their now-horizontal positions instead).
+
+This is not a regression in board behavior — every testid, the outline/label
+treatment, and the deck-between-Play-and-Discard *document order* (not
+vertical position) all still hold, and are proven by
+`table-render.test.ts`'s new "renders the deck counter between the Play and
+Discard areas in document order" test and by
+`e2e/hanabi-table-polish.spec.ts`'s full 16-test suite (all green after
+06.2-16). The one other assertion in this same e2e test — BOARD-02: token
+column sits to the right of the Play/Deck/Discard column — should still
+hold since the token region remains the rightmost sibling; only the
+Play-above-Deck-above-Discard vertical assumption is broken.
+
+**Recommendation:** 06.2-19 (e2e reconciliation) should update
+`e2e/start-game.spec.ts:509-510` to assert horizontal ordering
+(`playBox.x < deckBox.x` or an equivalent document-order/testid-based
+check) instead of vertical `y` position, matching 06.2-16's three-sibling-
+region layout.
+
 ## Pre-existing flake: `e2e/hanabi-realtime.spec.ts`'s "UI-02 + UI-04" test (found by 06.2-10's full-suite run)
 
 **Status: deferred, out of scope for 06.2-10.** `e2e/hanabi-realtime.spec.ts`

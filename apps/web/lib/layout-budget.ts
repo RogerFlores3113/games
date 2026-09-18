@@ -180,14 +180,6 @@ export const MIDDLE_GAP_PX = 4;
  * behind `discard-toggle` is where the full pile is read.
  */
 export const DISCARD_AREA_PX = BOARD_INNER_PX - DECK_COUNTER_PX - MIDDLE_GAP_PX;
-/**
- * Left column's total height — the sum of Play + Deck counter + Discard.
- *
- * @deprecated plan 06.2-16 deletes this alias and `Table.tsx`'s call site
- * that still imports it; use `BOARD_INNER_PX` directly in new code.
- */
-export const LEFT_COLUMN_PX = BOARD_INNER_PX;
-
 /** Vertical/horizontal gap between adjacent tokens/slots — reuses --space-xs. */
 export const TOKEN_GAP_PX = 4;
 
