@@ -121,6 +121,98 @@ describe("ROOM-03: duplicate display names are disambiguated", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Join idempotency: a replayed tokenless join (reconnect before `joined`)
+// ---------------------------------------------------------------------------
+
+describe("join idempotency: a replayed join reclaims the seat it created", () => {
+  const JOIN_ID_A = "joinid-aaaaaaaaaaaaaaaa";
+  const JOIN_ID_B = "joinid-bbbbbbbbbbbbbbbb";
+
+  function joinWithId(state: RoomState, displayName: string, now: number, minter: ReturnType<typeof makeMinter>, joinId: string) {
+    return joinRoom(state, {
+      displayName,
+      now,
+      joinId,
+      mintSeatId: minter.mintSeatId,
+      mintSeatToken: minter.mintSeatToken,
+    });
+  }
+
+  it("a tokenless join replaying the same joinId returns the original seat and token, not a second seat", () => {
+    const minter = makeMinter();
+    const first = joinWithId(freshRoom(), "Eli", 1, minter, JOIN_ID_A);
+    if (!first.ok) throw new Error("unreachable");
+
+    const replay = joinWithId(first.state, "Eli", 2, minter, JOIN_ID_A);
+    if (!replay.ok) throw new Error("unreachable");
+    expect(replay.wasReclaim).toBe(true);
+    expect(replay.seatId).toBe(first.seatId);
+    expect(replay.seatToken).toBe(first.seatToken);
+    expect(replay.state.seats).toHaveLength(1);
+  });
+
+  it("the replay reclaims even when the room is now full, instead of being refused full", () => {
+    const minter = makeMinter();
+    let state = freshRoom();
+    const ids = ["joinid-1111111111111111", "joinid-2222222222222222", "joinid-3333333333333333", "joinid-4444444444444444"];
+    for (const [i, id] of ids.entries()) {
+      const r = joinWithId(state, `P${i}`, i, minter, id);
+      if (!r.ok) throw new Error("unreachable");
+      state = r.state;
+    }
+    const last = joinWithId(state, "Eli", 10, minter, JOIN_ID_A);
+    if (!last.ok) throw new Error("unreachable");
+    expect(last.state.seats).toHaveLength(MAX_PLAYERS);
+
+    const replay = joinWithId(last.state, "Eli", 11, minter, JOIN_ID_A);
+    expect(replay.ok).toBe(true);
+    if (!replay.ok) throw new Error("unreachable");
+    expect(replay.seatId).toBe(last.seatId);
+  });
+
+  it("the replay reclaims after the game has started, instead of being refused in_progress", () => {
+    const minter = makeMinter();
+    const host = joinWithId(freshRoom(), "Roger", 1, minter, JOIN_ID_A);
+    if (!host.ok) throw new Error("unreachable");
+    const guest = joinWithId(host.state, "Bianca", 2, minter, JOIN_ID_B);
+    if (!guest.ok) throw new Error("unreachable");
+    const started = startGame(guest.state, host.seatId, 3, "seed-1");
+    if (!started.ok) throw new Error("unreachable");
+
+    const replay = joinWithId(started.state, "Bianca", 4, minter, JOIN_ID_B);
+    if (!replay.ok) throw new Error("unreachable");
+    expect(replay.seatId).toBe(guest.seatId);
+  });
+
+  it("a different joinId is a different player and gets its own seat", () => {
+    const minter = makeMinter();
+    const first = joinWithId(freshRoom(), "Roger", 1, minter, JOIN_ID_A);
+    if (!first.ok) throw new Error("unreachable");
+    const second = joinWithId(first.state, "Roger", 2, minter, JOIN_ID_B);
+    if (!second.ok) throw new Error("unreachable");
+    expect(second.wasReclaim).toBe(false);
+    expect(second.seatId).not.toBe(first.seatId);
+    expect(second.state.seats).toHaveLength(2);
+  });
+
+  it("a join with no joinId never matches a seat created without one", () => {
+    const minter = makeMinter();
+    const first = join(freshRoom(), "Roger", 1, minter);
+    if (!first.ok) throw new Error("unreachable");
+    const second = join(first.state, "Roger", 2, minter);
+    if (!second.ok) throw new Error("unreachable");
+    expect(second.state.seats).toHaveLength(2);
+  });
+
+  it("the joinId is never part of a seat's client view", () => {
+    const minter = makeMinter();
+    const first = joinWithId(freshRoom(), "Roger", 1, minter, JOIN_ID_A);
+    if (!first.ok) throw new Error("unreachable");
+    expect(JSON.stringify(toSeatView(first.state, first.seatId))).not.toContain(JOIN_ID_A);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // ROOM-05 / D-13: variant lock
 // ---------------------------------------------------------------------------
 

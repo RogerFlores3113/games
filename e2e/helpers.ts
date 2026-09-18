@@ -15,11 +15,17 @@ export interface CreateRoomOptions {
  */
 export async function createRoom(page: Page, { name, variant = "base" }: CreateRoomOptions): Promise<string> {
   await page.goto("/");
+  // "Create room" stays disabled until the page has hydrated (app/page.tsx).
+  // Wait for that before touching the form: input typed into the server-
+  // rendered markup before React attaches is not in React's state, and a
+  // pre-hydration submit is a native GET that reloads an empty form.
+  const createButton = page.getByRole("button", { name: "Create room" });
+  await expect(createButton).toBeEnabled();
   await page.getByLabel("Your name").fill(name);
   if (variant !== "base") {
     await page.getByRole("radio", { name: variantLabel(variant) }).check();
   }
-  await page.getByRole("button", { name: "Create room" }).click();
+  await createButton.click();
   await page.waitForURL(/\/room\/[A-Z0-9]{6}$/);
   const code = new URL(page.url()).pathname.split("/").pop();
   if (!code) {

@@ -10,12 +10,25 @@ import { RefusalReasonSchema, RoomViewSchema, DisplayNameSchema, SeatTokenSchema
 // later phases must not erode.
 // ---------------------------------------------------------------------------
 
+/** Bounds for the client-minted `joinId` on `join`. The lower bound keeps it
+ * unguessable: until the `joined` reply lands it is the only thing tying a
+ * replayed join to the seat the first one created. */
+const JOIN_ID_MIN_LENGTH = 16;
+const JOIN_ID_MAX_LENGTH = 64;
+
 const JoinMessageSchema = z.strictObject({
   type: z.literal("join"),
   displayName: DisplayNameSchema,
   /** Presence means "reclaim an existing seat"; absence means "new join"
    * (D-05, ROOM-02). */
   seatToken: SeatTokenSchema.optional(),
+  /** Same idea as `game_action`'s `actionId` (D-07), for `join`: an opaque
+   * key the client mints once per page and replays verbatim on every
+   * automatic reconnect. A socket that drops after its first join reached
+   * the server but before the `joined` reply (and so the seat token)
+   * arrived replays a TOKENLESS join; without this key the server cannot
+   * tell that replay from a new player and seats the same person twice. */
+  joinId: z.string().min(JOIN_ID_MIN_LENGTH).max(JOIN_ID_MAX_LENGTH).optional(),
 });
 
 const SetVariantMessageSchema = z.strictObject({

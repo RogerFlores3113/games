@@ -91,6 +91,11 @@ export const SeatSchema = z.object({
    * persisted before this field existed still parse (same precedent as
    * `seed` on `RoomStateSchema` below). */
   lastAppliedActionId: z.string().nullable().optional(),
+  /** The `joinId` of the `join` that created this seat, so a replay of that
+   * same join (a reconnect before its `joined` reply arrived) reclaims this
+   * seat instead of minting a second one. Server-only, like `seatToken`;
+   * optional so rooms persisted before this field existed still parse. */
+  joinId: z.string().nullable().optional(),
 });
 export type Seat = z.infer<typeof SeatSchema>;
 

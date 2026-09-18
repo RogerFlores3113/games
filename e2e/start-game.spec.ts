@@ -839,51 +839,146 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     const names = ["Roger", "Bianca", "Chen", "Dara", "Eli"];
     const { pages, contexts } = await startGameWithPlayers(hostPage, browser, names, { variant: "black" });
 
-    // The rules engine advances turns strictly round-robin over `seatIds`
-    // (`packages/rules/src/hanabi/actions.ts`: `(state.turnIndex + 1) %
-    // state.seatIds.length`), and seats are assigned in join order — which
-    // is exactly `pages`'/`names`' order (`startGameWithPlayers`). So the
-    // page whose turn is next is always `pages[(activeIndex + 1) %
-    // pages.length]`, with no separate seatId lookup needed.
-    async function activePageIndex(): Promise<number> {
-      for (let i = 0; i < pages.length; i += 1) {
-        const text = ((await pages[i].getByTestId("turn-indicator").textContent()) ?? "").trim();
-        if (text === "Your turn") return i;
+    // Under load the five pages receive each server push at different
+    // moments, so no single page's DOM can be trusted as "the game state
+    // now". Reading one page (the host) for token/discard counts, and picking
+    // "the first page that says Your turn" as the actor, raced those lagging
+    // pages: the loop could act on a page whose turn had already passed
+    // ("Discard (Not your turn)"), or decide on a stale token count. Instead
+    // every step waits for a SETTLED board: all five pages render the same
+    // public state, it differs from the state before the action, and exactly
+    // one page holds the turn. Every decision is read from that settled
+    // state and every action is taken on the page it names.
+    interface BoardSnapshot {
+      key: string;
+      yourTurn: boolean;
+      ended: boolean;
+      clueTokens: number;
+      discardCount: number;
+      maxRank: number;
+      zeroSuits: string[];
+    }
+    interface SettledBoard extends Omit<BoardSnapshot, "yourTurn"> {
+      activeIdx: number;
+    }
+
+    async function readSnapshot(page: Page): Promise<BoardSnapshot> {
+      return page.evaluate(() => {
+        const byTestId = (id: string) => document.querySelector(`[data-testid="${id}"]`);
+        const stacks = [
+          ...document.querySelectorAll('[data-testid^="played-stack-"]:not([data-testid*="-card-"])'),
+        ].map((el) => ({
+          suit: (el.getAttribute("data-testid") ?? "").replace("played-stack-", ""),
+          rank: Number(el.getAttribute("data-top-rank") ?? "0"),
+        }));
+        const clueTokens = Number(byTestId("clue-tokens")?.getAttribute("data-count"));
+        const fuses = byTestId("fuse-tokens")?.getAttribute("data-count") ?? "";
+        const discardCount = Number(byTestId("discard-pile")?.getAttribute("data-discard-count"));
+        const deck = (byTestId("deck-count")?.textContent ?? "").trim();
+        const ended = byTestId("end-overlay") !== null;
+        // Every Hanabi action changes this public tuple: a clue spends a
+        // token, a discard grows the pile, a play draws from the deck or
+        // moves a stack or a fuse.
+        const key = [
+          clueTokens,
+          fuses,
+          discardCount,
+          deck,
+          stacks
+            .map((s) => `${s.suit}:${s.rank}`)
+            .sort()
+            .join(","),
+          ended,
+        ].join("|");
+        return {
+          key,
+          yourTurn: byTestId("turn-indicator")?.getAttribute("data-your-turn") === "true",
+          ended,
+          clueTokens,
+          discardCount,
+          maxRank: stacks.length ? Math.max(...stacks.map((s) => s.rank)) : 0,
+          zeroSuits: stacks.filter((s) => s.rank === 0).map((s) => s.suit),
+        };
+      });
+    }
+
+    /** Waits until every page renders one identical state that is not
+     * `previousKey`, with exactly one page holding the turn (or the game
+     * over on every page), and returns it. */
+    async function waitForSettledBoard(previousKey: string | null): Promise<SettledBoard> {
+      let settled: SettledBoard | null = null;
+      await expect
+        .poll(async () => {
+          const snapshots = await Promise.all(pages.map(readSnapshot));
+          const [first] = snapshots;
+          if (!snapshots.every((s) => s.key === first.key)) return "pages disagree";
+          if (first.key === previousKey) return "action not applied yet";
+          const holders = snapshots.flatMap((s, idx) => (s.yourTurn ? [idx] : []));
+          if (!first.ended && holders.length !== 1) return `turn held by ${holders.length} pages`;
+          settled = {
+            key: first.key,
+            ended: first.ended,
+            clueTokens: first.clueTokens,
+            discardCount: first.discardCount,
+            maxRank: first.maxRank,
+            zeroSuits: first.zeroSuits,
+            activeIdx: first.ended ? -1 : holders[0],
+          };
+          return "settled";
+        })
+        .toBe("settled");
+      return settled as unknown as SettledBoard;
+    }
+
+    /** After an action by `actorIdx`, waits for the settled board and
+     * asserts the turn passed strictly round-robin (`packages/rules/src/
+     * hanabi/actions.ts`: `(turnIndex + 1) % seatIds.length`; seats are in
+     * join order, which is `pages`' order). */
+    async function afterActionBy(actorIdx: number, previousKey: string): Promise<SettledBoard> {
+      const next = await waitForSettledBoard(previousKey);
+      if (!next.ended) expect(next.activeIdx).toBe((actorIdx + 1) % pages.length);
+      return next;
+    }
+
+    /** Runs one attempt at an action on `page`, re-trying only when the
+     * attempt could not act. Playwright's e2e heartbeat injection (1s ping,
+     * 1s pong deadline, playwright.config.ts) makes a loaded browser miss a
+     * pong now and then and force-reconnect; while "Reconnecting…" shows,
+     * the board drops every action (`HanabiBoard`'s `act` returns early and
+     * the clue popover never opens). So each attempt first waits for this
+     * page's own connection to be back, and an attempt caught by a fresh
+     * reconnect mid-way is simply made again. A retry cannot double-act: the
+     * server is authoritative and rejects any action once the turn moves. */
+    async function actWhenConnected(page: Page, attempt: () => Promise<boolean>): Promise<void> {
+      for (let tries = 0; tries < 5; tries += 1) {
+        await expect(page.getByTestId("reconnecting-banner")).toHaveCount(0);
+        if (await attempt()) return;
+        await page.keyboard.press("Escape"); // close any clue popover left open
       }
-      throw new Error("activePageIndex: no page currently has the active turn");
+      throw new Error("actWhenConnected: the action could not be taken in 5 connected attempts");
     }
 
-    async function maxStackRank(): Promise<number> {
-      const ranks = await hostPage
-        .locator('[data-testid^="played-stack-"]:not([data-testid*="-card-"])')
-        .evaluateAll((els) => els.map((el) => Number(el.getAttribute("data-top-rank") ?? "0")));
-      return ranks.length ? Math.max(...ranks) : 0;
+    /** `locator.click` that reports failure instead of throwing, bounded so
+     * a control a reconnect disabled mid-attempt fails this attempt fast. */
+    async function tryClick(locator: Locator): Promise<boolean> {
+      try {
+        await locator.click({ timeout: 2000 });
+        return true;
+      } catch {
+        return false;
+      }
     }
 
-    /** Suit keys whose played stack is currently empty (topRank 0) — a
-     * rank-1 card of one of these suits is unconditionally safe to play. */
-    async function stackZeroSuits(): Promise<Set<string>> {
-      const suits = await hostPage
-        .locator('[data-testid^="played-stack-"]:not([data-testid*="-card-"])')
-        .evaluateAll((els) =>
-          els
-            .filter((el) => Number(el.getAttribute("data-top-rank") ?? "0") === 0)
-            .map((el) => (el.getAttribute("data-testid") ?? "").replace("played-stack-", "")),
-        );
-      return new Set(suits);
-    }
-
-    /** Finds a card index inside `targetLabel`'s hand (as rendered on
-     * `viewerPage`) whose own suit/rank identity is a rank-1 of a suit in
-     * `zeroSuits` — i.e. one the game rules will always accept as a legal
-     * play right now. Teammates' cards are visible to every other seat
-     * (that's the whole Hanabi mechanic), so this reads real identity, not
-     * a guess. Returns `null` if no such card is currently held. */
+    /** The id of a card in `targetLabel`'s hand (as rendered on
+     * `viewerPage`) that is a rank-1 of a suit in `zeroSuits` — one the game
+     * rules will always accept as a legal play right now. Teammates' cards
+     * are visible to every other seat, so this reads real identity, not a
+     * guess. Returns `null` if no such card is currently held. */
     async function findRankOneCandidate(
       viewerPage: Page,
       targetLabel: string,
       zeroSuits: Set<string>,
-    ): Promise<number | null> {
+    ): Promise<string | null> {
       const container = viewerPage
         .locator('[data-testid^="other-hand-"]:not([data-testid^="other-hand-card-"])', { hasText: targetLabel })
         .first();
@@ -896,7 +991,9 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
         const text = ((await identity.textContent()) ?? "").trim();
         const match = text.match(/^(\S+)\s+(\d)$/);
         if (!match || match[2] !== "1") continue;
-        if (zeroSuits.has(match[1].toLowerCase())) return i;
+        if (!zeroSuits.has(match[1].toLowerCase())) continue;
+        const testId = (await cards.nth(i).getAttribute("data-testid")) ?? "";
+        return testId.replace(/^other-hand-card-/, "");
       }
       return null;
     }
@@ -922,109 +1019,87 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     // can't recover from within only 3 fuses, so the "stack has advanced"
     // requirement is driven deterministically: find a teammate's real,
     // currently-safe rank-1 card, clue it (spending the clue token this
-    // test also requires), then have that exact teammate play it next turn.
+    // test also requires), then have that exact teammate play that exact
+    // card (by id) on the very next turn, before anything else can change.
     const TARGET_DISCARD_COUNT = 8;
     let clueTokenSpent = false;
     let guaranteedAdvanceDone = false;
+    let pendingPlay: { seatIdx: number; cardId: string } | null = null;
+    let board = await waitForSettledBoard(null);
     for (let i = 0; i < 60; i += 1) {
-      if (await hostPage.getByTestId("end-overlay").isVisible()) break;
-      const discardCount = Number(await hostPage.getByTestId("discard-pile").getAttribute("data-discard-count"));
-      const rank = await maxStackRank();
-      if (discardCount >= TARGET_DISCARD_COUNT && rank >= 1 && clueTokenSpent) break;
+      if (board.ended) break;
+      if (board.discardCount >= TARGET_DISCARD_COUNT && board.maxRank >= 1 && clueTokenSpent) break;
 
-      const activeIdx = await activePageIndex();
+      const activeIdx = board.activeIdx;
       const active = pages[activeIdx];
-      const clueTokensBefore = Number(await hostPage.getByTestId("clue-tokens").getAttribute("data-count"));
+      const nextIdx = (activeIdx + 1) % pages.length;
 
-      // Attempt 1: the deterministic guaranteed-safe advance (clue a real
-      // rank-1 card of a currently-empty stack to the next player, then have
-      // them play it) — tried at most once, only before it has succeeded.
-      if (!guaranteedAdvanceDone && clueTokensBefore > 0) {
-        const zeroSuits = await stackZeroSuits();
-        const nextIdx = (activeIdx + 1) % pages.length;
-        const candidateIndex = await findRankOneCandidate(active, names[nextIdx], zeroSuits);
-        if (candidateIndex !== null) {
-          const container = active
-            .locator('[data-testid^="other-hand-"]:not([data-testid^="other-hand-card-"])', { hasText: names[nextIdx] })
-            .first();
-          const card = container.locator('[data-testid^="other-hand-card-"]').nth(candidateIndex);
+      // Step 2 of the guaranteed advance: the clued teammate plays the
+      // clued card. Turns are strictly round-robin, so this is the turn
+      // immediately after the clue and the card's stack is still empty.
+      if (pendingPlay !== null) {
+        expect(pendingPlay.seatIdx).toBe(activeIdx);
+        const cardSlot = active
+          .locator(`[data-testid="own-hand"] [data-card-id="${pendingPlay.cardId}"]`)
+          .locator('[data-testid^="own-hand-slot-"]:not([data-testid$="-hints"])');
+        await actWhenConnected(
+          active,
+          async () => (await tryClick(cardSlot)) && (await tryClick(active.getByTestId("play-button"))),
+        );
+        pendingPlay = null;
+        guaranteedAdvanceDone = true;
+        board = await afterActionBy(activeIdx, board.key);
+        continue;
+      }
+
+      // Step 1 of the guaranteed advance: clue a real rank-1 card of a
+      // currently-empty stack to the next player — tried until it succeeds.
+      if (!guaranteedAdvanceDone && board.clueTokens > 0) {
+        await expect(active.getByTestId("reconnecting-banner")).toHaveCount(0);
+        const candidateId = await findRankOneCandidate(active, names[nextIdx], new Set(board.zeroSuits));
+        if (candidateId !== null) {
+          const card = active.getByTestId(`other-hand-card-${candidateId}`);
           await card.click();
           const rankButton = active.getByTestId("tile-clue-rank");
           if (await rankButton.isEnabled()) {
             await rankButton.click();
             clueTokenSpent = true;
-            await expect.poll(async () => await activePageIndex()).toBe(nextIdx);
-
-            const targetPage = pages[nextIdx];
-            const hintedSlots = targetPage.locator('[data-testid^="own-hand-slot-"][data-testid$="-hints"]');
-            const hintedCount = await hintedSlots.count();
-            let slotNumber: string | null = null;
-            for (let h = 0; h < hintedCount; h += 1) {
-              const numeral = hintedSlots.nth(h).getByTestId("hint-numeral");
-              if ((await numeral.count()) > 0 && (await numeral.textContent())?.trim() === "1") {
-                const slotTestId = await hintedSlots.nth(h).getAttribute("data-testid");
-                slotNumber = slotTestId?.match(/own-hand-slot-(\d+)-hints/)?.[1] ?? null;
-                if (slotNumber) break;
-              }
-            }
-            if (slotNumber) {
-              await targetPage.getByTestId(`own-hand-slot-${slotNumber}`).click();
-              await expect(targetPage.getByTestId("play-button")).toBeEnabled({ timeout: 2000 });
-              await targetPage.getByTestId("play-button").click();
-              guaranteedAdvanceDone = true;
-            }
-            // The clue already consumed this turn (and, if the play above
-            // ran, the next one too) — re-loop from the top to re-read
-            // whichever page is active now, rather than reusing the stale
-            // `active`/`activeIdx` captured before the clue.
-            await expect
-              .poll(async () => {
-                if (await hostPage.getByTestId("end-overlay").isVisible()) return true;
-                return (await activePageIndex()) !== activeIdx;
-              })
-              .toBe(true);
+            pendingPlay = { seatIdx: nextIdx, cardId: candidateId };
+            board = await afterActionBy(activeIdx, board.key);
             continue;
           }
-          // Popover offered nothing clickable — close it and fall through
-          // to the safe fallback below on this same turn.
-          await card.click();
+          // Popover offered nothing clickable (or a reconnect began) —
+          // close it and fall through to the fallback below on this same
+          // turn, which retries through any reconnect.
+          await active.keyboard.press("Escape");
         }
       }
 
       // Fallback: discarding refunds a clue token (standard Hanabi rule),
       // so clue tokens are periodically back at the 8-token max — and
       // discarding is illegal while tokens are full. Give a clue whenever
-      // tokens are full (mirroring the worst-case test's own strategy) or
-      // a clue hasn't been spent yet; otherwise always discard — discarding
-      // never risks a fuse, so it reliably grows the pile toward the
-      // discard-count target without endangering the game.
-      let acted = false;
-      if (clueTokensBefore >= 8 || (!clueTokenSpent && clueTokensBefore > 0)) {
-        acted = await giveAnyLegalClueToAnyTeammate(active);
-        if (acted) clueTokenSpent = true;
+      // tokens are full or a clue hasn't been spent yet; otherwise always
+      // discard — discarding never risks a fuse, so it reliably grows the
+      // pile toward the discard-count target without endangering the game.
+      // `board.clueTokens` is the settled count every page agrees on, not
+      // one possibly-lagging page's.
+      if (board.clueTokens >= 8 || (!clueTokenSpent && board.clueTokens > 0)) {
+        await actWhenConnected(active, () => giveAnyLegalClueToAnyTeammate(active));
+        clueTokenSpent = true;
+      } else {
+        await actWhenConnected(
+          active,
+          async () =>
+            (await tryClick(active.getByTestId("own-hand-slot-1"))) &&
+            (await tryClick(active.getByTestId("discard-button"))),
+        );
       }
-      if (!acted) {
-        await active.getByTestId("own-hand-slot-1").click();
-        await expect(active.getByTestId("discard-button")).toBeEnabled({ timeout: 2000 });
-        await active.getByTestId("discard-button").click();
-      }
-
-      await expect
-        .poll(async () => {
-          if (await hostPage.getByTestId("end-overlay").isVisible()) return true;
-          try {
-            return (await activePageIndex()) !== activeIdx;
-          } catch {
-            return false;
-          }
-        })
-        .toBe(true);
+      board = await afterActionBy(activeIdx, board.key);
     }
 
-    const finalDiscardCount = Number(await hostPage.getByTestId("discard-pile").getAttribute("data-discard-count"));
-    const finalMaxRank = await maxStackRank();
-    expect(finalDiscardCount).toBeGreaterThanOrEqual(TARGET_DISCARD_COUNT);
-    expect(finalMaxRank).toBeGreaterThanOrEqual(1);
+    // `board` is the settled state all five pages agree on, host included.
+    expect(board.discardCount).toBeGreaterThanOrEqual(TARGET_DISCARD_COUNT);
+    expect(board.maxRank).toBeGreaterThanOrEqual(1);
     expect(clueTokenSpent).toBe(true);
 
     // Measure again after real game progress and assert the four reserved

@@ -86,6 +86,11 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Room
   // across that swap, exactly as an ordinary partysocket reconnect does.
   const [socketGeneration, setSocketGeneration] = useState(0);
   const [connectionId] = useState(() => nanoid());
+  // Join idempotency key (JoinMessage.joinId): minted once per page and
+  // replayed on every automatic reconnect, so a join whose `joined` reply
+  // was lost to a drop reclaims the seat it created instead of taking a
+  // second one.
+  const [joinId] = useState(() => nanoid());
   const replacementRequestedForRef = useRef<PartySocket | null>(null);
 
   const socket = usePartySocket({
@@ -163,6 +168,7 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Room
           // WR-05: a malformed stored token is dropped, not replayed into a
           // join the server must reject.
           seatToken: readJoinSeatToken(code),
+          joinId,
         }),
       );
     },

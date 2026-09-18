@@ -182,7 +182,7 @@ export class RoomDO extends Server<Env> {
       const room = await this.#ensureRoom();
 
       if (msg.type === "join") {
-        await this.#handleJoin(connection, room, msg.displayName, msg.seatToken, now);
+        await this.#handleJoin(connection, room, msg.displayName, msg.seatToken, msg.joinId, now);
         return;
       }
 
@@ -462,6 +462,7 @@ export class RoomDO extends Server<Env> {
     room: RoomState,
     displayName: string,
     seatToken: string | undefined,
+    joinId: string | undefined,
     now: number,
   ): Promise<void> {
     // WR-03: a connection that already holds a seat may not join again.
@@ -478,6 +479,7 @@ export class RoomDO extends Server<Env> {
     const result = joinRoom(room, {
       displayName,
       seatToken: seatToken as RoomState["seats"][number]["seatToken"] | undefined,
+      joinId,
       now,
       mintSeatId,
       mintSeatToken,

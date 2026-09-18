@@ -1,12 +1,27 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "../components/Button";
 import { writeDisplayName } from "../lib/seat-token";
 import { writePendingVariant } from "../lib/pending-variant";
 
 type VariantOption = "base" | "rainbow" | "black";
+
+// The page is server-rendered, so its form exists before React attaches
+// `onSubmit`. A click in that window falls through to a native GET submit
+// that reloads "/?displayName=…" with an empty form, and the name is lost.
+// `useSyncExternalStore` returns the server snapshot (false) during SSR and
+// hydration, and the client snapshot (true) afterwards, so "Create room"
+// only becomes clickable once the real handler is attached.
+const noopSubscribe = () => () => {};
+function useHydrated(): boolean {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
+}
 
 const VARIANTS: { value: VariantOption; label: string }[] = [
   { value: "base", label: "Base" },
@@ -26,6 +41,7 @@ export default function HomePage() {
   const [variant, setVariant] = useState<VariantOption>("base");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hydrated = useHydrated();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -135,7 +151,7 @@ export default function HomePage() {
           </div>
         </fieldset>
 
-        <Button type="submit" variant="primary" disabled={submitting}>
+        <Button type="submit" variant="primary" disabled={submitting || !hydrated}>
           {submitting ? "Creating..." : "Create room"}
         </Button>
       </form>

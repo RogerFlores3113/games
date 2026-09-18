@@ -56,6 +56,8 @@ export type JoinResult =
 export type JoinInput = {
   displayName: string;
   seatToken?: SeatToken;
+  /** The client's per-page join idempotency key (`JoinMessage.joinId`). */
+  joinId?: string;
   now: number;
   mintSeatId: () => string;
   mintSeatToken: () => SeatToken;
@@ -91,33 +93,40 @@ export function createEmptyRoom(
  *    this working while `status === "in_progress"`.
  * 2. A `seatToken` that matches nothing falls through to a new join — a
  *    stale token from a GC'd room must not hard-fail.
+ * 2b. A `joinId` that matches the seat an earlier `join` created is a
+ *    replay of that join (the socket dropped before the `joined` reply
+ *    delivered the token) and reclaims that seat, returning its token.
  * 3. A new join into a non-lobby room is refused `in_progress` (D-14).
  * 4. A new join at `MAX_PLAYERS` is refused `full` (D-06).
  * 5. Otherwise the seat is appended in join order (D-12); the first seat
  *    ever appended becomes host (D-03).
  */
 export function joinRoom(state: RoomState, input: JoinInput): JoinResult {
-  if (input.seatToken !== undefined) {
-    const existing = state.seats.find((seat) => seat.seatToken === input.seatToken);
-    if (existing !== undefined) {
-      const reclaimedSeats = state.seats.map((seat) =>
-        seat.seatId === existing.seatId
-          ? { ...seat, connected: true, disconnectedAt: null }
-          : seat,
-      );
-      const nextState: RoomState = {
-        ...state,
-        seats: reclaimedSeats,
-        lastActivityAt: input.now,
-      };
-      return {
-        ok: true,
-        state: nextState,
-        seatId: existing.seatId,
-        seatToken: existing.seatToken,
-        wasReclaim: true,
-      };
-    }
+  const byToken =
+    input.seatToken !== undefined ? state.seats.find((seat) => seat.seatToken === input.seatToken) : undefined;
+  const byJoinId =
+    byToken === undefined && input.joinId !== undefined
+      ? state.seats.find((seat) => seat.joinId === input.joinId)
+      : undefined;
+  const existing = byToken ?? byJoinId;
+  if (existing !== undefined) {
+    const reclaimedSeats = state.seats.map((seat) =>
+      seat.seatId === existing.seatId
+        ? { ...seat, connected: true, disconnectedAt: null }
+        : seat,
+    );
+    const nextState: RoomState = {
+      ...state,
+      seats: reclaimedSeats,
+      lastActivityAt: input.now,
+    };
+    return {
+      ok: true,
+      state: nextState,
+      seatId: existing.seatId,
+      seatToken: existing.seatToken,
+      wasReclaim: true,
+    };
   }
 
   if (state.status !== "lobby") {
@@ -143,6 +152,7 @@ export function joinRoom(state: RoomState, input: JoinInput): JoinResult {
     connected: true,
     joinedAt: input.now,
     disconnectedAt: null,
+    joinId: input.joinId ?? null,
   };
 
   const nextState: RoomState = {
