@@ -10,6 +10,15 @@
  * derived from the left column's height. Doubling the disc size to 40px
  * (gap 5) ruled out the old pitch-shrinks-to-fit approach — see
  * TOKEN_DISC_PX's own comment for the math.
+ *
+ * Owner review (06.2-15, UAT gap 1/gap 3): every board region — Play, Deck
+ * counter, Discard, Tokens — now reserves a FIXED height and width up front;
+ * content fills that reservation rather than the reservation being derived
+ * from whatever content happens to be present. This replaces the deleted
+ * "token pitch is sized FROM the left column's height" rule. The Play area
+ * in particular is no longer a horizontal fan (BOARD-05) — it is a fixed
+ * suit-column grid (`playGridHeightPx`/`playColumnWidthPx`), five rank
+ * slots per suit, all five always reserved whether filled or not.
  */
 
 /** Playwright's fixed viewport for the UI-11 no-scroll verification task. */
@@ -86,14 +95,98 @@ export const TURN_INDICATOR_PX = 24;
 /** UI-SPEC teammate status row height (connected/disconnected indicator). */
 export const STATUS_ROW_PX = 20;
 
-/** UI-SPEC Play area height (label 14 + fanned stacks 64 + outline padding). */
-export const PLAY_AREA_PX = 100;
+/**
+ * The board panel's own padding (`--space-sm`), one side — subtracted twice
+ * (top+bottom) from `TABLE_BAND_MIN_PX` to get the height every board region
+ * actually has available inside the panel (06.2-15, UAT gap 1).
+ */
+export const BOARD_PANEL_PADDING_PX = 8;
+
+/**
+ * The inner height every board region (Play/Deck/Discard/Tokens) shares,
+ * after the board panel's own top+bottom padding is removed from
+ * `TABLE_BAND_MIN_PX`. Every board region below reserves a fixed slice of
+ * this height up front rather than deriving its size from content.
+ */
+export const BOARD_INNER_PX = TABLE_BAND_MIN_PX - 2 * BOARD_PANEL_PADDING_PX;
+
+/** A labelled board area's label-row height (e.g. "Play", "Discard"). */
+export const AREA_LABEL_PX = 18;
+/** A labelled board area's own internal padding, one side. */
+export const AREA_PADDING_PX = 4;
+
+/** Reserved rank-slot count per suit column — Hanabi stacks always run 1-5. */
+export const MAX_RANK = 5;
+/** Reserved suit-column count — the Rainbow/Black variant worst case. */
+export const MAX_SUITS = 6;
+
+/** A single rank slot's width (06.2-15, UAT gap 3 — suits as columns). */
+export const RANK_SLOT_WIDTH_PX = 30;
+/** A single rank slot's height. */
+export const RANK_SLOT_HEIGHT_PX = 40;
+/** Vertical gap between adjacent rank slots within one suit column. */
+export const RANK_SLOT_GAP_PX = 2;
+/** Horizontal gap between adjacent suit columns. */
+export const SUIT_COLUMN_GAP_PX = 4;
+
+/**
+ * A suit column's rank grid height: `MAX_RANK` slots reserved top to bottom
+ * whether filled or not, so a column's rendered height never changes as
+ * cards are played (UAT gap 1).
+ */
+export function playGridHeightPx(): number {
+  return MAX_RANK * RANK_SLOT_HEIGHT_PX + (MAX_RANK - 1) * RANK_SLOT_GAP_PX;
+}
+
+/**
+ * The Play area's total reserved width for `suitCount` suit columns
+ * side-by-side, plus the area's own left+right padding.
+ */
+export function playColumnWidthPx(suitCount: number): number {
+  return suitCount * RANK_SLOT_WIDTH_PX + (suitCount - 1) * SUIT_COLUMN_GAP_PX + 2 * AREA_PADDING_PX;
+}
+
+/**
+ * The Play area's total reserved width at the Rainbow/Black worst case (six
+ * suit columns).
+ */
+export const PLAY_AREA_WIDTH_PX = playColumnWidthPx(MAX_SUITS);
+
+/**
+ * The Play area's total reserved content height: label row + gap + the
+ * rank grid + the area's own top+bottom padding. Proven at module load
+ * (layout-budget.test.ts) to fit within `BOARD_INNER_PX`.
+ */
+export function playAreaContentHeightPx(): number {
+  return AREA_LABEL_PX + AREA_PADDING_PX + playGridHeightPx() + 2 * AREA_PADDING_PX;
+}
+
+/**
+ * UI-SPEC Play area height (06.2-15, UAT gap 1/gap 3): the Play region now
+ * fills its whole reserved column height rather than a smaller
+ * content-derived box — the old horizontal fan (BOARD-05) is replaced by a
+ * five-row-per-suit column grid (see `playGridHeightPx`/`playColumnWidthPx`
+ * and `PlayedStack.tsx`).
+ */
+export const PLAY_AREA_PX = BOARD_INNER_PX;
 /** UI-SPEC deck-counter row height (small FireworkCardBack + "48" text, centered). */
-export const DECK_COUNTER_PX = 48;
-/** UI-SPEC Discard area height (label 14 + reorderable tile row 64-88 + outline padding). */
-export const DISCARD_AREA_PX = 112;
-/** Left column's total height — the sum of Play + Deck counter + Discard. */
-export const LEFT_COLUMN_PX = PLAY_AREA_PX + DECK_COUNTER_PX + DISCARD_AREA_PX;
+export const DECK_COUNTER_PX = 40;
+/** Gap between the Deck counter row and the Discard area below it. */
+export const MIDDLE_GAP_PX = 4;
+/**
+ * UI-SPEC Discard area height: `BOARD_INNER_PX` minus the Deck counter row
+ * and the gap between it and Discard. A deep discard pile wraps and clips
+ * inside this fixed box rather than growing it — the expanded overlay
+ * behind `discard-toggle` is where the full pile is read.
+ */
+export const DISCARD_AREA_PX = BOARD_INNER_PX - DECK_COUNTER_PX - MIDDLE_GAP_PX;
+/**
+ * Left column's total height — the sum of Play + Deck counter + Discard.
+ *
+ * @deprecated plan 06.2-16 deletes this alias and `Table.tsx`'s call site
+ * that still imports it; use `BOARD_INNER_PX` directly in new code.
+ */
+export const LEFT_COLUMN_PX = BOARD_INNER_PX;
 
 /** Vertical/horizontal gap between adjacent tokens/slots — reuses --space-xs. */
 export const TOKEN_GAP_PX = 4;
@@ -152,18 +245,3 @@ export const TOKEN_AREA_WIDTH_PX =
   TOKEN_GAP_PX * 4 +
   TOKEN_DISC_PX;
 
-/** Fanned-stack single card width (BOARD-05). */
-export const PLAYED_CARD_WIDTH_PX = 48;
-/** Fanned-stack row height — the existing single-card height, unchanged by fanning. */
-export const PLAYED_CARD_HEIGHT_PX = 64;
-/** Horizontal peek per additional fanned card, beyond the first (BOARD-05). */
-export const FAN_PEEK_PX = 16;
-
-/**
- * A fanned played stack's total on-screen width (BOARD-05): the first
- * card's full width, plus FAN_PEEK_PX of additional peek per extra card.
- */
-export function fannedStackWidth(cardCount: number): number {
-  if (cardCount <= 0) return 0;
-  return PLAYED_CARD_WIDTH_PX + (cardCount - 1) * FAN_PEEK_PX;
-}
