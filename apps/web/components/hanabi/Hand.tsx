@@ -1,6 +1,7 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
-import type { HanabiCardView, Variant } from "@games/rules";
+import type { Clue, HanabiCardView, HanabiView, Variant } from "@games/rules";
 import { shiftOffsetsForDrag } from "../../lib/hanabi-drag-logic";
+import type { ActionContext } from "../../lib/hanabi-visual-logic";
 import { NOTE_ROW_PX } from "../../lib/layout-budget";
 import { NoteBox } from "./NoteBox";
 import { CARD_WIDTH, OwnHandCard } from "./OwnHandCard";
@@ -44,11 +45,20 @@ export interface TeammateHandProps {
   connected: boolean;
   variant: Variant;
   isActive: boolean;
-  isTarget: boolean;
-  previewIds: ReadonlySet<string>;
   justCluedIds: ReadonlySet<string>;
-  disabled: boolean;
-  onSelectTarget: () => void;
+  /** UAT gap 16: the redacted view and shared action-legality context —
+   * threaded down to each `TeammateCard` so its quick-clue popover can
+   * derive its own two buttons' disabled state from the same
+   * `disabledReasonFor` source every other control uses, rather than a
+   * new invented rule. */
+  game: HanabiView;
+  ctx: ActionContext;
+  /** UAT gap 16: the id of the ONE card whose quick-clue popover is
+   * currently open (across the whole board, not just this hand), or null.
+   * Owned by `HanabiBoard` so at most one popover is ever open at once. */
+  openCardId: string | null;
+  onToggleCard: (cardId: string) => void;
+  onGiveClue: (targetSeatId: string, clue: Clue) => void;
   /** HINT-03/D-05: the set of card ids whose hint overlay currently
    * renders, derived per-render by `hintsVisibleForCard` (turn-history
    * based, never a timer). `undefined` means "not yet wired" and every
@@ -59,25 +69,31 @@ export interface TeammateHandProps {
   tileColor?: string;
 }
 
-/** D-02/D-16/D-19: one teammate's hand — the active-player ring, restyled
- * seat status, and a select-then-act "give this teammate a clue" button
- * wrapping their card row. Preserves `other-hand-{seatId}` /
+/** D-02/D-19, UAT gap 16: one teammate's hand — the active-player ring,
+ * restyled seat status, and a row of tiles each carrying its OWN quick-clue
+ * popover (via `TeammateCard`). Preserves `other-hand-{seatId}` /
  * `other-hand-card-{id}` testids (D-24) — no other testid in this component
  * may start with "other-hand-". The `variant` prop is unused now that the
  * deleted automatic clue-mark pip band (HINT-04) no longer reads a card's
  * candidate suits per variant, but stays on the props type — HanabiBoard.tsx
  * still threads it through, and TeammateCard's own luminosity/hint
- * derivation is variant-independent (facts alone). */
+ * derivation is variant-independent (facts alone). The deleted `CluePicker`'s
+ * separate "select a teammate as the clue target" step (the former `Clue`
+ * button and the whole row's click-to-target affordance) is gone — a
+ * teammate is now only ever a clue target by way of clicking one of their
+ * own tiles, which implies both the target (this hand's seat) and the clue
+ * itself (that tile's own suit/rank) at once. */
 export function TeammateHand({
   hand,
   label,
   connected,
   isActive,
-  isTarget,
-  previewIds,
   justCluedIds,
-  disabled,
-  onSelectTarget,
+  game,
+  ctx,
+  openCardId,
+  onToggleCard,
+  onGiveClue,
   hintsVisible,
   tileColor,
 }: TeammateHandProps) {
@@ -91,7 +107,6 @@ export function TeammateHand({
     <div
       data-testid={"other-hand-" + hand.seatId}
       data-active={String(isActive)}
-      data-target={String(isTarget)}
       className="board-surface flex flex-col items-center gap-[2px] rounded-md p-[2px]"
       style={{
         boxShadow: isActive ? "0 0 0 2px var(--color-accent), 0 0 12px 0 rgba(245, 185, 66, 0.4)" : "none",
@@ -105,45 +120,20 @@ export function TeammateHand({
           {label}
         </span>
         <SeatStatus seatId={hand.seatId} connected={connected} />
-        {/* WR-03: the keyboard/screen-reader clue-target control is a separate
-            button — wrapping the card row in a labelled button made every
-            card's identity text presentational (never announced). */}
-        <button
-          type="button"
-          aria-label={`Give ${label} a clue`}
-          aria-pressed={isTarget}
-          disabled={disabled}
-          onClick={onSelectTarget}
-          className="rounded px-[length:var(--space-xs)] text-[length:var(--text-label)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed"
-          style={{
-            color: "var(--color-text-muted)",
-            lineHeight: "var(--text-label--line-height)",
-            border: "1px solid var(--color-border)",
-          }}
-        >
-          Clue
-        </button>
       </div>
 
-      {/* Pointer shortcut: clicking the row also targets this teammate. The
-          row is a labelled group (not a button) so each card stays readable
-          by assistive tech; the button above is the accessible equivalent. */}
-      <div
-        role="group"
-        aria-label={`${label}'s cards`}
-        onClick={disabled ? undefined : onSelectTarget}
-        className={"flex gap-[length:var(--space-xs)] rounded-md" + (disabled ? " cursor-not-allowed" : " cursor-pointer")}
-        style={{
-          outline: isTarget ? "2px solid var(--color-text)" : undefined,
-          outlineOffset: isTarget ? "2px" : undefined,
-        }}
-      >
+      <div role="group" aria-label={`${label}'s cards`} className="flex gap-[length:var(--space-xs)] rounded-md">
         {hand.cards.map((card) => (
           <TeammateCard
             key={card.id}
             card={card}
-            preview={previewIds.has(card.id)}
+            seatId={hand.seatId}
+            game={game}
+            ctx={ctx}
             justClued={justCluedIds.has(card.id)}
+            open={openCardId === card.id}
+            onToggle={() => onToggleCard(card.id)}
+            onGiveClue={(clue) => onGiveClue(hand.seatId, clue)}
             hintsVisible={hintsVisible ? hintsVisible.has(card.id) : true}
             tileColor={tileColor}
           />
