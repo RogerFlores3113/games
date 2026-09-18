@@ -22,6 +22,7 @@ import {
   type ActionContext,
 } from "../../lib/hanabi-visual-logic";
 import { applyPendingOrder, dropZoneStatus } from "../../lib/hanabi-drag-logic";
+import { groupedBySuitOrder } from "../../lib/hanabi-discard-drag-logic";
 import { OwnHand, TeammateHand } from "./Hand";
 import { Table } from "./Table";
 import { CardActions } from "./CardActions";
@@ -298,6 +299,20 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
     setClueOpenCardId((prev) => (prev === cardId ? null : cardId));
   }
 
+  // UAT gap 10/DISC-01: re-sorts the shared discardOrder by suit for every
+  // player, through the same act()/reorderDiscard chokepoint a drag uses —
+  // not a new action, not a local view toggle (see groupedBySuitOrder's
+  // header comment). game.stacks' own order is the canonical suit order, so
+  // Rainbow/Black variants sort correctly without a hardcoded suit list.
+  function handleGroupDiscardBySuit() {
+    if (!game) return;
+    const cardIds = groupedBySuitOrder(
+      game.discard,
+      game.stacks.map((stack) => stack.suit),
+    );
+    act({ type: "reorderDiscard", cardIds });
+  }
+
   return (
     <main
       className="table-backdrop relative flex min-h-screen flex-col gap-[3px] overflow-y-auto px-[length:var(--space-md)] py-0"
@@ -369,6 +384,7 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
             discardPendingOrder={discardDrag.pendingOrder}
             registerDiscardTile={discardDrag.registerTile}
             onDiscardTilePointerDown={discardDrag.onTilePointerDown}
+            onGroupDiscardBySuit={controlsDisabled ? undefined : handleGroupDiscardBySuit}
           />
         </div>
 

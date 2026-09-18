@@ -48,6 +48,7 @@ const ALL_TESTIDS = [
   "deck-count",
   "discard-pile",
   "discard-toggle",
+  "discard-group-by-suit",
 ];
 
 function render(game: HanabiView, dropStatus?: Parameters<typeof Table>[0]["dropStatus"]) {
@@ -244,5 +245,68 @@ describe("table-render: discard order and empty state (Task 3)", () => {
     const game: HanabiView = { ...BASE_GAME, discard: [], discardOrder: [] };
     const markup = render(game);
     expect(markup).toContain("No tiles discarded yet");
+  });
+});
+
+describe("table-render: group-by-suit control (06.2-18, UAT gap 10)", () => {
+  function renderWithGroupHandler(game: HanabiView, onGroupDiscardBySuit?: () => void) {
+    return renderToStaticMarkup(
+      createElement(Table, { game, dropStatus: null, onGroupDiscardBySuit }),
+    );
+  }
+
+  it("renders with its testid and aria-label", () => {
+    const markup = renderWithGroupHandler(BASE_GAME, () => {});
+    expect(markup).toContain('data-testid="discard-group-by-suit"');
+    expect(markup).toContain('aria-label="Group discard by suit"');
+  });
+
+  it("is disabled with an empty pile and with a single tile", () => {
+    const emptyGame: HanabiView = { ...BASE_GAME, discard: [], discardOrder: [] };
+    const emptyMarkup = renderWithGroupHandler(emptyGame, () => {});
+    expect(emptyMarkup).toMatch(/data-testid="discard-group-by-suit"[^>]*disabled=""/);
+
+    const oneGame: HanabiView = {
+      ...BASE_GAME,
+      discard: [{ id: "d1", suit: "red", rank: 1 }],
+      discardOrder: ["d1"],
+    };
+    const oneMarkup = renderWithGroupHandler(oneGame, () => {});
+    expect(oneMarkup).toMatch(/data-testid="discard-group-by-suit"[^>]*disabled=""/);
+  });
+
+  it("is enabled with three tiles and a handler present", () => {
+    const threeGame: HanabiView = {
+      ...BASE_GAME,
+      discard: [
+        { id: "d1", suit: "red", rank: 1 },
+        { id: "d2", suit: "blue", rank: 2 },
+        { id: "d3", suit: "green", rank: 3 },
+      ],
+      discardOrder: ["d1", "d2", "d3"],
+    };
+    const markup = renderWithGroupHandler(threeGame, () => {});
+    const buttonMatch = markup.match(/<button[^>]*data-testid="discard-group-by-suit"[^>]*>/);
+    expect(buttonMatch?.[0]).not.toMatch(/\sdisabled=""/);
+  });
+
+  it("is disabled when the handler is absent, even with three tiles", () => {
+    const threeGame: HanabiView = {
+      ...BASE_GAME,
+      discard: [
+        { id: "d1", suit: "red", rank: 1 },
+        { id: "d2", suit: "blue", rank: 2 },
+        { id: "d3", suit: "green", rank: 3 },
+      ],
+      discardOrder: ["d1", "d2", "d3"],
+    };
+    const markup = renderWithGroupHandler(threeGame, undefined);
+    expect(markup).toMatch(/data-testid="discard-group-by-suit"[^>]*disabled=""/);
+  });
+
+  it("does not change discard-pile's inline style (the 06.2-16 fixed-geometry invariant still holds)", () => {
+    const withoutHandler = styleFor(render(BASE_GAME), "discard-pile");
+    const withHandler = styleFor(renderWithGroupHandler(BASE_GAME, () => {}), "discard-pile");
+    expect(withHandler).toBe(withoutHandler);
   });
 });

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent, RefObject } from "react";
-import { Layers } from "lucide-react";
+import { Group, Layers } from "lucide-react";
 import type { HanabiView, Suit } from "@games/rules";
 import { fusesRemainingForView } from "../../lib/hanabi-board-logic";
 import { deckCountText, newlyCompletedStacks, STACK_FLASH_MS } from "../../lib/hanabi-visual-logic";
@@ -47,6 +47,12 @@ export interface TableProps {
   discardPendingOrder?: string[] | null;
   registerDiscardTile?: (cardId: string, el: HTMLElement | null) => void;
   onDiscardTilePointerDown?: (cardId: string, event: ReactPointerEvent) => void;
+  /** UAT gap 10/DISC-01: re-sorts the shared discard order by suit for every
+   * player via the existing `reorderDiscard` action (see
+   * `groupedBySuitOrder`'s header comment). Optional so pre-06.2-18 render
+   * calls keep working unchanged; the button below is disabled whenever this
+   * is absent. */
+  onGroupDiscardBySuit?: () => void;
 }
 
 /** D-16: a drop-zone's box-shadow highlight (enabled zones only — a
@@ -128,6 +134,7 @@ export function Table({
   discardPendingOrder = null,
   registerDiscardTile,
   onDiscardTilePointerDown,
+  onGroupDiscardBySuit,
 }: TableProps) {
   const prevStacksRef = useRef<HanabiView["stacks"] | null>(null);
   const [flashingSuits, setFlashingSuits] = useState<ReadonlySet<Suit>>(new Set());
@@ -272,27 +279,52 @@ export function Table({
         >
           <div className="flex items-center justify-between gap-[length:var(--space-xs)]">
             <AreaLabel>Discard</AreaLabel>
-            <button
-              type="button"
-              data-testid="discard-toggle"
-              aria-label="Show full discard pile"
-              onClick={openExpandedView}
-              // The visible/flow box stays icon-sized so this header row does
-              // not grow past the "Discard" label's own height (needed for
-              // the UI-11 1280x720 no-scroll fit) — the 44px touch target is
-              // provided by an absolutely-positioned (out-of-flow) pseudo
-              // element instead, per --size-touch-min.
-              className="relative inline-flex items-center justify-center rounded-md before:absolute before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
-              style={{
-                width: 14,
-                height: 14,
-                color: "var(--color-text-muted)",
-                ["--touch-inset" as string]: "calc((var(--size-touch-min) - 14px) / -2)",
-              }}
-            >
-              <Layers aria-hidden="true" size={14} />
-              <span aria-hidden="true" className="absolute" style={{ inset: "var(--touch-inset)" }} />
-            </button>
+            <div className="flex items-center gap-[length:var(--space-xs)]">
+              {/* UAT gap 10/DISC-01: same icon-sized-box/out-of-flow-touch-
+                  target pattern as discard-toggle beside it — the hit-area
+                  span is a DESCENDANT of the button (06.2-10's fixed
+                  sibling-swallows-click bug), and the visible box stays
+                  icon-sized so this header row does not grow (the discard
+                  region is a fixed reservation, 06.2-16/21). */}
+              <button
+                type="button"
+                data-testid="discard-group-by-suit"
+                aria-label="Group discard by suit"
+                onClick={onGroupDiscardBySuit}
+                disabled={!onGroupDiscardBySuit || game.discard.length < 2}
+                className="relative inline-flex items-center justify-center rounded-md before:absolute before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:opacity-40"
+                style={{
+                  width: 14,
+                  height: 14,
+                  color: "var(--color-text-muted)",
+                  ["--touch-inset" as string]: "calc((var(--size-touch-min) - 14px) / -2)",
+                }}
+              >
+                <Group aria-hidden="true" size={14} />
+                <span aria-hidden="true" className="absolute" style={{ inset: "var(--touch-inset)" }} />
+              </button>
+              <button
+                type="button"
+                data-testid="discard-toggle"
+                aria-label="Show full discard pile"
+                onClick={openExpandedView}
+                // The visible/flow box stays icon-sized so this header row does
+                // not grow past the "Discard" label's own height (needed for
+                // the UI-11 1280x720 no-scroll fit) — the 44px touch target is
+                // provided by an absolutely-positioned (out-of-flow) pseudo
+                // element instead, per --size-touch-min.
+                className="relative inline-flex items-center justify-center rounded-md before:absolute before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+                style={{
+                  width: 14,
+                  height: 14,
+                  color: "var(--color-text-muted)",
+                  ["--touch-inset" as string]: "calc((var(--size-touch-min) - 14px) / -2)",
+                }}
+              >
+                <Layers aria-hidden="true" size={14} />
+                <span aria-hidden="true" className="absolute" style={{ inset: "var(--touch-inset)" }} />
+              </button>
+            </div>
           </div>
 
           <div
@@ -390,6 +422,7 @@ export function Table({
           discardPendingOrder={discardPendingOrder}
           registerDiscardTile={registerDiscardTile}
           onDiscardTilePointerDown={onDiscardTilePointerDown}
+          onGroupDiscardBySuit={onGroupDiscardBySuit}
         />
       )}
     </section>

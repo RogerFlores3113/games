@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { X } from "lucide-react";
+import { Group, X } from "lucide-react";
 import type { HanabiView, Variant } from "@games/rules";
 import { applyPendingOrder } from "../../lib/hanabi-discard-drag-logic";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
@@ -30,6 +30,11 @@ export interface DiscardOverlayProps {
   discardPendingOrder?: string[] | null;
   registerDiscardTile?: (cardId: string, el: HTMLElement | null) => void;
   onDiscardTilePointerDown?: (cardId: string, event: ReactPointerEvent) => void;
+  /** UAT gap 10/DISC-01: same shared re-sort `Table.tsx`'s compact discard
+   * header offers — this is where the suit grouping was lost when the
+   * single shared draggable order landed, so the expanded view gets its own
+   * copy of the control. Omitted entirely, the overlay renders as before. */
+  onGroupDiscardBySuit?: () => void;
 }
 
 /** DISC-01/T-06.2-15: mirrors `Table.tsx`'s `resolveDiscardOrder` exactly —
@@ -82,6 +87,7 @@ export function DiscardOverlay({
   discardPendingOrder = null,
   registerDiscardTile,
   onDiscardTilePointerDown,
+  onGroupDiscardBySuit,
 }: DiscardOverlayProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -127,21 +133,38 @@ export function DiscardOverlay({
           >
             Discard pile
           </h2>
-          <button
-            ref={closeRef}
-            type="button"
-            data-testid="discard-overlay-close"
-            aria-label="Show compact discard pile"
-            onClick={onClose}
-            className="inline-flex items-center justify-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
-            style={{
-              minHeight: "var(--size-touch-min)",
-              minWidth: "var(--size-touch-min)",
-              color: "var(--color-text)",
-            }}
-          >
-            <X aria-hidden="true" size={20} />
-          </button>
+          <div className="flex items-center gap-[length:var(--space-xs)]">
+            <button
+              type="button"
+              data-testid="discard-overlay-group-by-suit"
+              aria-label="Group discard by suit"
+              onClick={onGroupDiscardBySuit}
+              disabled={!onGroupDiscardBySuit || discard.length < 2}
+              className="inline-flex items-center justify-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:opacity-40"
+              style={{
+                minHeight: "var(--size-touch-min)",
+                minWidth: "var(--size-touch-min)",
+                color: "var(--color-text)",
+              }}
+            >
+              <Group aria-hidden="true" size={20} />
+            </button>
+            <button
+              ref={closeRef}
+              type="button"
+              data-testid="discard-overlay-close"
+              aria-label="Show compact discard pile"
+              onClick={onClose}
+              className="inline-flex items-center justify-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+              style={{
+                minHeight: "var(--size-touch-min)",
+                minWidth: "var(--size-touch-min)",
+                color: "var(--color-text)",
+              }}
+            >
+              <X aria-hidden="true" size={20} />
+            </button>
+          </div>
         </div>
 
         {orderedDiscard.length > 0 ? (

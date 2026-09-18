@@ -94,4 +94,57 @@ describe("discard-overlay-render", () => {
     expect(markup).toContain('data-testid="discard-overlay-close"');
     expect(markup).toContain('aria-label="Show compact discard pile"');
   });
+
+  it("UAT gap 10/DISC-01: renders the group-by-suit control with its testid and aria-label, disabled with fewer than two tiles, enabled at three", () => {
+    const emptyMarkup = renderToStaticMarkup(
+      createElement(DiscardOverlay, {
+        discard: [] as HanabiView["discard"],
+        variant: "base",
+        onClose: () => {},
+        onGroupDiscardBySuit: () => {},
+      }),
+    );
+    expect(emptyMarkup).toContain('data-testid="discard-overlay-group-by-suit"');
+    expect(emptyMarkup).toContain('aria-label="Group discard by suit"');
+    expect(emptyMarkup).toMatch(/data-testid="discard-overlay-group-by-suit"[^>]*disabled=""/);
+
+    const oneTile: HanabiView["discard"] = [{ id: "a", suit: "red", rank: 1 }] as HanabiView["discard"];
+    const oneMarkup = renderToStaticMarkup(
+      createElement(DiscardOverlay, {
+        discard: oneTile,
+        variant: "base",
+        onClose: () => {},
+        onGroupDiscardBySuit: () => {},
+      }),
+    );
+    expect(oneMarkup).toMatch(/data-testid="discard-overlay-group-by-suit"[^>]*disabled=""/);
+
+    const threeTiles: HanabiView["discard"] = [
+      { id: "a", suit: "red", rank: 1 },
+      { id: "b", suit: "blue", rank: 2 },
+      { id: "c", suit: "green", rank: 3 },
+    ] as HanabiView["discard"];
+    const threeMarkup = renderToStaticMarkup(
+      createElement(DiscardOverlay, {
+        discard: threeTiles,
+        variant: "base",
+        onClose: () => {},
+        onGroupDiscardBySuit: () => {},
+      }),
+    );
+    const buttonMatch = threeMarkup.match(/<button[^>]*data-testid="discard-overlay-group-by-suit"[^>]*>/);
+    expect(buttonMatch?.[0]).not.toMatch(/\sdisabled=""/);
+  });
+
+  it("UAT gap 10: the group-by-suit control is disabled when onGroupDiscardBySuit is absent", () => {
+    const threeTiles: HanabiView["discard"] = [
+      { id: "a", suit: "red", rank: 1 },
+      { id: "b", suit: "blue", rank: 2 },
+      { id: "c", suit: "green", rank: 3 },
+    ] as HanabiView["discard"];
+    const markup = renderToStaticMarkup(
+      createElement(DiscardOverlay, { discard: threeTiles, variant: "base", onClose: () => {} }),
+    );
+    expect(markup).toMatch(/data-testid="discard-overlay-group-by-suit"[^>]*disabled=""/);
+  });
 });
