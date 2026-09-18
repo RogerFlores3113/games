@@ -4,8 +4,9 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { HanabiView } from "@games/rules";
+import { MAX_FUSES, type HanabiView } from "@games/rules";
 import { Table } from "../components/hanabi/Table";
+import { PLAY_AREA_WIDTH_PX } from "./layout-budget";
 
 const BASE_GAME: HanabiView = {
   variant: "base",
@@ -86,6 +87,83 @@ describe("table-render: board skeleton (Task 1)", () => {
     const finalRound: HanabiView = { ...BASE_GAME, finalTurnsRemaining: 3 };
     const markup = render(finalRound);
     expect(markup).toContain('data-final-round="true"');
+  });
+});
+
+/** Returns the element's inline `style` attribute value, or `null` if React
+ * omitted the attribute entirely (it does this for an empty style object,
+ * e.g. an un-highlighted drop zone) — `null` is itself a valid, comparable
+ * "no inline style" state for the identical-at-every-content-level checks
+ * below. */
+function styleFor(markup: string, testid: string): string | null {
+  const match = markup.match(new RegExp(`data-testid="${testid}"[^>]*?style="([^"]*)"`));
+  return match?.[1] ?? null;
+}
+
+const FULL_BOARD: HanabiView = {
+  ...BASE_GAME,
+  stacks: [
+    { suit: "red", topRank: 5 },
+    { suit: "yellow", topRank: 5 },
+    { suit: "green", topRank: 5 },
+    { suit: "blue", topRank: 5 },
+    { suit: "white", topRank: 5 },
+  ],
+  discard: Array.from({ length: 30 }, (_, i) => {
+    const suits = ["red", "yellow", "green", "blue", "white"] as const;
+    return {
+      id: `full-d${i}`,
+      suit: suits[i % suits.length]!,
+      rank: ((i % 5) + 1) as 1 | 2 | 3 | 4 | 5,
+    };
+  }),
+  discardOrder: Array.from({ length: 30 }, (_, i) => `full-d${i}`),
+  clueTokens: 0,
+  fuses: MAX_FUSES,
+};
+
+const SIX_SUIT_GAME: HanabiView = {
+  ...BASE_GAME,
+  stacks: [
+    { suit: "red", topRank: 0 },
+    { suit: "yellow", topRank: 0 },
+    { suit: "green", topRank: 0 },
+    { suit: "blue", topRank: 0 },
+    { suit: "white", topRank: 0 },
+    { suit: "black", topRank: 0 },
+  ],
+};
+
+describe("table-render: fixed board regions (06.2-16)", () => {
+  it("the tableau's inline style is identical between an empty game and a full board", () => {
+    const emptyGame: HanabiView = { ...BASE_GAME, stacks: BASE_GAME.stacks.map((s) => ({ ...s, topRank: 0 })), discard: [], discardOrder: [] };
+    const emptyMarkup = render(emptyGame);
+    const fullMarkup = render(FULL_BOARD);
+    expect(styleFor(emptyMarkup, "tableau")).toBe(styleFor(fullMarkup, "tableau"));
+  });
+
+  it("discard-pile's inline style is identical at 0 and 30 discards", () => {
+    const emptyGame: HanabiView = { ...BASE_GAME, discard: [], discardOrder: [] };
+    const emptyMarkup = render(emptyGame);
+    const fullMarkup = render(FULL_BOARD);
+    expect(styleFor(emptyMarkup, "discard-pile")).toBe(styleFor(fullMarkup, "discard-pile"));
+  });
+
+  it("the Play region's inline width is PLAY_AREA_WIDTH_PX at 5 and at 6 suits", () => {
+    const fiveSuitMarkup = render(BASE_GAME);
+    const sixSuitMarkup = render(SIX_SUIT_GAME);
+    expect(fiveSuitMarkup).toContain('data-testid="play-zone"');
+    const fivePlayRegionStyle = fiveSuitMarkup.match(/style="width:(\d+)px;height:\d+px[^"]*"/);
+    const sixPlayRegionStyle = sixSuitMarkup.match(/style="width:(\d+)px;height:\d+px[^"]*"/);
+    expect(fivePlayRegionStyle?.[1]).toBe(String(PLAY_AREA_WIDTH_PX));
+    expect(sixPlayRegionStyle?.[1]).toBe(String(PLAY_AREA_WIDTH_PX));
+  });
+
+  it("every testid from the drag/e2e interface contract is present on a full board", () => {
+    const markup = render(FULL_BOARD);
+    for (const testid of ALL_TESTIDS) {
+      expect(markup).toContain(`data-testid="${testid}"`);
+    }
   });
 });
 

@@ -10,7 +10,17 @@ import { readDiscardViewPref, writeDiscardViewPref, type DiscardView } from "../
 import type { DropTarget, DropZoneStatus } from "../../lib/hanabi-drag-logic";
 import { applyPendingOrder } from "../../lib/hanabi-discard-drag-logic";
 import type { DiscardDragState } from "./useDiscardDrag";
-import { DECK_COUNTER_PX, DISCARD_AREA_PX, LEFT_COLUMN_PX, PLAY_AREA_PX } from "../../lib/layout-budget";
+import {
+  BOARD_INNER_PX,
+  BOARD_PANEL_PADDING_PX,
+  DECK_COUNTER_PX,
+  DISCARD_AREA_PX,
+  MIDDLE_GAP_PX,
+  PLAY_AREA_PX,
+  PLAY_AREA_WIDTH_PX,
+  SUIT_COLUMN_GAP_PX,
+  TOKEN_AREA_WIDTH_PX,
+} from "../../lib/layout-budget";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
 import { DiscardOverlay } from "./DiscardOverlay";
 import { FireworkCardBack, FireworkCardFace } from "./FireworkCard";
@@ -92,14 +102,18 @@ function AreaLabel({ children }: { children: string }) {
  * reaches rank 5 gets a single 600ms flash, never a continuously-running
  * animation.
  *
- * BOARD-01..05/TILE-02/DISC-01: a wooden `.board-surface` panel laid out as a
- * single `items-stretch` flex row with two children — the left column (Play
- * above Deck-counter above Discard, each a fixed layout-budget height) and
- * the right column (`TokenColumn`, stretched to the left column's exact
- * height so it can never force the board taller — RESEARCH.md Pitfall 1).
- * The Discard area renders every tile in the server's shared `discardOrder`
- * (resolved defensively via `resolveDiscardOrder`), and every played stack
- * shows every card via `PlayedStack`'s horizontal fan.
+ * BOARD-01..05/TILE-02/DISC-01 (06.2-16, UAT gap 1): a wooden `.board-surface`
+ * panel laid out as a single flex row of three fixed sibling regions —
+ * Play (fixed width/height suit-column grid), the Deck-counter+Discard
+ * column (fixed height, flexes horizontally to fill the remaining width),
+ * and Tokens (fixed width/height `TokenColumn`) — rather than a two-column
+ * stretch. The panel's own height is a constant, `BOARD_INNER_PX` plus its
+ * own top+bottom padding, identical whether the game is empty or full
+ * (RESEARCH.md Pitfall 1). The Discard area renders every tile in the
+ * server's shared `discardOrder` (resolved defensively via
+ * `resolveDiscardOrder`) inside its own fixed, clipping reservation; a pile
+ * deeper than that reservation is read through the expanded overlay rather
+ * than growing the board.
  */
 export function Table({
   game,
@@ -179,53 +193,60 @@ export function Table({
     <section
       data-testid="tableau"
       aria-label="Table"
-      className="board-surface flex items-stretch gap-[length:var(--space-md)] p-[length:var(--space-sm)]"
+      className="board-surface flex items-start gap-[length:var(--space-md)] p-[length:var(--space-sm)]"
+      style={{ height: BOARD_INNER_PX + 2 * BOARD_PANEL_PADDING_PX }}
     >
-      <div className="flex flex-col gap-[length:var(--space-xs)]" style={{ height: LEFT_COLUMN_PX }}>
-        {/* Play area (BOARD-01) */}
+      {/* Region 1: Play area (BOARD-01/BOARD-05) — fixed width and height,
+          never derived from suit count or stack progress. */}
+      <div
+        className="relative flex flex-col gap-[length:var(--space-xs)] overflow-hidden rounded-md border p-[length:var(--space-xs)]"
+        style={{ width: PLAY_AREA_WIDTH_PX, height: PLAY_AREA_PX, borderColor: "var(--color-border)" }}
+      >
+        <AreaLabel>Play</AreaLabel>
         <div
-          className="relative flex flex-col gap-[length:var(--space-xs)] overflow-hidden rounded-md border p-[length:var(--space-xs)]"
-          style={{ height: PLAY_AREA_PX, borderColor: "var(--color-border)" }}
+          ref={playZoneRef}
+          data-testid="play-zone"
+          data-drop-state={playDropState}
+          className="relative flex flex-1 items-start rounded-md"
+          style={{ gap: SUIT_COLUMN_GAP_PX, flexWrap: "nowrap", ...playHighlight }}
         >
-          <AreaLabel>Play</AreaLabel>
-          <div
-            ref={playZoneRef}
-            data-testid="play-zone"
-            data-drop-state={playDropState}
-            className="relative flex flex-1 flex-wrap items-center gap-[length:var(--space-sm)] rounded-md"
-            style={playHighlight}
-          >
-            {dropStatus && !dropStatus.play.enabled && dropStatus.play.reason && (
-              <span
-                data-testid="drop-reason-play"
-                role="status"
-                className="pointer-events-none absolute z-10 whitespace-nowrap rounded px-[length:var(--space-xs)] text-[length:var(--text-label)]"
-                style={{
-                  bottom: "100%",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  marginBottom: 4,
-                  color: "var(--color-text-muted)",
-                  backgroundColor: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
-                  lineHeight: "var(--text-label--line-height)",
-                }}
-              >
-                {dropStatus.play.reason}
-              </span>
-            )}
-            {game.stacks.map((stack) => (
-              <PlayedStack key={stack.suit} stack={stack} flashing={flashingSuits.has(stack.suit)} />
-            ))}
-          </div>
+          {dropStatus && !dropStatus.play.enabled && dropStatus.play.reason && (
+            <span
+              data-testid="drop-reason-play"
+              role="status"
+              className="pointer-events-none absolute z-10 whitespace-nowrap rounded px-[length:var(--space-xs)] text-[length:var(--text-label)]"
+              style={{
+                bottom: "100%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                marginBottom: 4,
+                color: "var(--color-text-muted)",
+                backgroundColor: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                lineHeight: "var(--text-label--line-height)",
+              }}
+            >
+              {dropStatus.play.reason}
+            </span>
+          )}
+          {game.stacks.map((stack) => (
+            <PlayedStack key={stack.suit} stack={stack} flashing={flashingSuits.has(stack.suit)} />
+          ))}
         </div>
+      </div>
 
-        {/* Deck counter (BOARD-04), between Play and Discard */}
+      {/* Region 2: Deck counter + Discard (BOARD-01/BOARD-04) — fixed
+          height, flexes horizontally to absorb the panel's remaining
+          width. */}
+      <div
+        className="flex flex-col"
+        style={{ height: BOARD_INNER_PX, flex: 1, minWidth: 0, gap: MIDDLE_GAP_PX }}
+      >
         <div
           className="flex items-center justify-center gap-[length:var(--space-xs)]"
           style={{ height: DECK_COUNTER_PX }}
         >
-          <FireworkCardBack width={32} height={44} />
+          <FireworkCardBack width={28} height={38} />
           <p
             data-testid="deck-count"
             data-final-round={String(game.finalTurnsRemaining !== null)}
@@ -236,7 +257,10 @@ export function Table({
           </p>
         </div>
 
-        {/* Discard area (BOARD-01) */}
+        {/* Discard area (BOARD-01/T-06.2-39): a fixed reservation with
+            overflow: hidden — a pile deeper than this box clips rather than
+            growing the board; the full pile is read through the expanded
+            overlay behind discard-toggle. */}
         <div
           className="relative flex flex-col gap-[length:var(--space-xs)] overflow-hidden rounded-md border p-[length:var(--space-xs)]"
           style={{ height: DISCARD_AREA_PX, borderColor: "var(--color-border)" }}
@@ -339,7 +363,11 @@ export function Table({
         </div>
       </div>
 
-      <TokenColumn clueTokens={game.clueTokens} fusesRemaining={fusesRemaining} columnHeightPx={LEFT_COLUMN_PX} />
+      {/* Region 3: Tokens (BOARD-02/BOARD-03) — fixed width, no height prop;
+          TokenColumn owns its own fixed reservation. */}
+      <div style={{ width: TOKEN_AREA_WIDTH_PX }}>
+        <TokenColumn clueTokens={game.clueTokens} fusesRemaining={fusesRemaining} />
+      </div>
 
       {view === "expanded" && (
         <DiscardOverlay
