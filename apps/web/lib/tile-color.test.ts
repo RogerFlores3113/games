@@ -102,6 +102,13 @@ describe("tile-color-pref", () => {
       expect(readTileColorPref()).toBe(preset.id);
     }
   });
+
+  it("UAT gap 7: every preset's cssValue is a translucent color-mix ending in transparent)", () => {
+    for (const preset of TILE_COLOR_PRESETS) {
+      expect(preset.cssValue).toMatch(/^color-mix\(.*transparent\)$/);
+      expect(preset.cssValue).not.toContain("#");
+    }
+  });
 });
 
 describe("source scan: browser-local only, no hex literals", () => {

@@ -7,12 +7,19 @@ import { safeGetItem, safeSetItem } from "./safe-storage";
  * websocket connection layer, the server-synced client state cache, or
  * an id-generation utility; nothing here can reach the wire.
  *
- * The five presets are a FIXED set (UI-SPEC "Tile-colour preset palette"):
- * each preset's `cssValue` is a `var(--color-*)` token reference, never a
- * raw hex literal — slate derives from the existing `--color-surface`
- * token via `color-mix`; the other four reference the `--color-tile-preset-*`
- * `@theme` tokens added by 06.2-02. These are decorative personal-
- * preference fills only, never a suit/hint/accent signal colour.
+ * UAT gap 7 (06.2-17): a preset is no longer an opaque tile fill — it is a
+ * TRANSLUCENT wash painted ON TOP of the card art (see OwnHandCard.tsx /
+ * TeammateCard.tsx's overlay span), so changing the preference tints and
+ * darkens the card underneath rather than hiding it entirely. The five
+ * presets are a FIXED set (UI-SPEC "Tile-colour preset palette"): each
+ * preset's `cssValue` is a `color-mix(in srgb, var(--color-*) N%,
+ * transparent)` expression, never a raw hex literal and never a fully
+ * opaque value — slate derives from the existing `--color-surface` token;
+ * the other four reference the `--color-tile-preset-*` `@theme` tokens
+ * added by 06.2-02. The N% alpha strength was chosen so the art beneath
+ * stays readable at every preset, reviewed by the owner at sign-off. These
+ * are decorative personal-preference fills only, never a suit/hint/accent
+ * signal colour.
  */
 
 export type TileColorId = "slate" | "warm-sand" | "cool-teal" | "plum" | "charcoal";
@@ -28,27 +35,27 @@ export const TILE_COLOR_PRESETS: TileColorPreset[] = [
   {
     id: "slate",
     label: "Slate",
-    cssValue: "color-mix(in srgb, var(--color-surface) 100%, transparent)",
+    cssValue: "color-mix(in srgb, var(--color-surface) 45%, transparent)",
   },
   {
     id: "warm-sand",
     label: "Warm sand",
-    cssValue: "var(--color-tile-preset-warm-sand)",
+    cssValue: "color-mix(in srgb, var(--color-tile-preset-warm-sand) 55%, transparent)",
   },
   {
     id: "cool-teal",
     label: "Cool teal",
-    cssValue: "var(--color-tile-preset-cool-teal)",
+    cssValue: "color-mix(in srgb, var(--color-tile-preset-cool-teal) 55%, transparent)",
   },
   {
     id: "plum",
     label: "Plum",
-    cssValue: "var(--color-tile-preset-plum)",
+    cssValue: "color-mix(in srgb, var(--color-tile-preset-plum) 55%, transparent)",
   },
   {
     id: "charcoal",
     label: "Charcoal",
-    cssValue: "var(--color-tile-preset-charcoal)",
+    cssValue: "color-mix(in srgb, var(--color-tile-preset-charcoal) 55%, transparent)",
   },
 ];
 
