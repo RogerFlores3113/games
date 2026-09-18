@@ -29,18 +29,22 @@ export interface TileColorPickerProps {
  * tints/darkens the card — it can never replace or hide the card surface
  * outright, which is the actual property D-14 was protecting.
  *
- * Uncontrolled by design (`defaultValue`, not `value`): the browser's own
- * colour-picker UI owns the live in-progress selection while it's open;
- * forcing this input controlled would fight that native UI on every
- * keystroke/drag inside the OS colour dialog. `key={value}` remounts the
- * input (refreshing its displayed swatch) whenever the external preference
- * changes from OUTSIDE this component — e.g. the very first paint after
- * `readTileColorPref()` resolves on mount. When `value` is `null` (no
- * custom colour chosen yet), `defaultValue` is left `undefined` rather than
- * a hardcoded literal fallback hex — the browser supplies its own built-in
- * default per the HTML spec, so this file authors zero hex literals,
- * matching tile-color-pref.ts's own "no hex outside @theme" source-scan
- * discipline.
+ * UAT gap 36 (seventh owner review): this input is CONTROLLED
+ * (`value`/`onChange`), not remounted per selection. An earlier revision
+ * used `defaultValue` plus `key={value}` to dodge fighting the native OS
+ * colour dialog's own in-progress state — but that `key` changes on every
+ * `onChange`, which unmounts and replaces the DOM node on the FIRST colour
+ * pick. The browser's native colour dialog keeps firing `input` events at
+ * that same (now-detached) node for as long as it stays open — e.g. every
+ * further drag on the OS colour wheel in one session — and a detached
+ * node's events never reach React's root listener, so every colour picked
+ * after the first is silently dropped. A plain controlled input has no
+ * such remount: React only ever updates the node's `value` property
+ * between renders, so the node stays identical (and still listening)
+ * across an entire native-dialog session. `value` falls back to an empty
+ * string (never a hardcoded hex) when no custom colour is chosen yet — the
+ * one fallback a controlled colour input requires — which keeps this file
+ * at zero hex literals per tile-color-pref.ts's source-scan discipline.
  */
 export function TileColorPicker({ value, onChange }: TileColorPickerProps) {
   const inputId = useId();
@@ -49,11 +53,10 @@ export function TileColorPicker({ value, onChange }: TileColorPickerProps) {
     <div className="flex items-center gap-[length:var(--space-sm)]">
       <input
         id={inputId}
-        key={value ?? "default"}
         type="color"
         data-testid="tile-color-input"
         aria-label="Tile colour"
-        defaultValue={value ?? undefined}
+        value={value ?? ""}
         onChange={(event) => {
           const hex = event.target.value;
           if (isValidHexColor(hex)) onChange(hex);

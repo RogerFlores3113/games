@@ -673,6 +673,54 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await contextB.close();
   });
 
+  test("UAT gap 36: the colour picker keeps listening after the first colour is chosen", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB } = await startTwoPlayerGame(hostPage, browser);
+    const overlay = hostPage.getByTestId("tile-color-overlay-own-hand-slot-1");
+
+    await hostPage.getByTestId("settings-toggle").click();
+
+    // Grab ONE element handle and keep reusing it for every colour change,
+    // exactly like a real OS colour dialog does: the browser's native
+    // picker keeps firing `input` events at the SAME `<input>` DOM node for
+    // as long as that dialog stays open, across multiple in-dialog colour
+    // changes. `.fill()`'s own re-query-per-call masked the real bug — the
+    // native dialog never re-queries the DOM, so this is the faithful
+    // reproduction of "picks a second colour in the same open dialog".
+    const inputHandle = await hostPage.getByTestId("tile-color-input").elementHandle();
+    if (!inputHandle) throw new Error("tile-color-input not found");
+
+    async function dispatchNativeColorInput(hex: string) {
+      await hostPage.evaluate(
+        ({ el, value }) => {
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
+          setter.call(el, value);
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+        },
+        { el: inputHandle, value: hex },
+      );
+    }
+
+    await dispatchNativeColorInput("#a37fd1");
+    const overlayAfterFirst = await overlay.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    // Pick a SECOND colour in the same picker session, without closing and
+    // reopening the settings modal in between — this is exactly the
+    // interaction the owner reported as broken ("the color picker only
+    // ever actually uses the color that's first selected. it stops
+    // listening after that").
+    await dispatchNativeColorInput("#2f8f5b");
+    const overlayAfterSecond = await overlay.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    expect(overlayAfterSecond).not.toBe(overlayAfterFirst);
+    await expect(hostPage.getByTestId("tile-color-input")).toHaveValue("#2f8f5b");
+
+    await hostPage.getByTestId("settings-close").click();
+    await contextB.close();
+  });
+
   test("UAT gap 31: the discard zone gains the same highlight as the play zone while a tile is dragged over it", async ({
     page: hostPage,
     browser,
