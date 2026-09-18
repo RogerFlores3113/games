@@ -5,11 +5,11 @@
  * helpers instead of writing new pixel literals; 06.2-07 and 06.2-10
  * measure the real, rendered layout against this ledger.
  *
- * Load-bearing rule: the right-column token pitch is sized FROM the left
- * column's height (`tokenPitchPx`), never the other way round — the left
- * column (Play/Deck/Discard) is never grown to make room for a comfortable
- * token pitch. See RESEARCH.md's flagged risk ("11 tokens at a comfortable
- * 20px pitch costs ~220px if laid out independently").
+ * Owner review (06.2-14, UAT gap 1): the right-column token area is now a
+ * FIXED reservation (`TOKEN_AREA_HEIGHT_PX`/`TOKEN_AREA_WIDTH_PX`), not one
+ * derived from the left column's height. Doubling the disc size to 40px
+ * (gap 5) ruled out the old pitch-shrinks-to-fit approach — see
+ * TOKEN_DISC_PX's own comment for the math.
  */
 
 /** Playwright's fixed viewport for the UI-11 no-scroll verification task. */
@@ -95,10 +95,62 @@ export const DISCARD_AREA_PX = 112;
 /** Left column's total height — the sum of Play + Deck counter + Discard. */
 export const LEFT_COLUMN_PX = PLAY_AREA_PX + DECK_COUNTER_PX + DISCARD_AREA_PX;
 
-/** Clue tokens (8 max) + fuse tokens (3 max) = the worst-case token count (BOARD-02/03). */
-export const MAX_TOKEN_COUNT = 11;
-/** Vertical gap between adjacent tokens in the right column — reuses --space-xs. */
+/** Vertical/horizontal gap between adjacent tokens/slots — reuses --space-xs. */
 export const TOKEN_GAP_PX = 4;
+
+/**
+ * A clue/fuse token disc's rendered size (UAT gap 5, "larger by 2x"). The
+ * measured baseline before owner review: `tokenPitchPx(260, 11)` clamped by
+ * the old `TOKEN_DISC_MAX_PX = 22`, which rendered discs at 20px. 2x that
+ * measured 20px baseline is 40px.
+ */
+export const TOKEN_DISC_PX = 40;
+
+/** Reserved clue-token slot count — always rendered, whether or not the
+ * token is still available (UAT gap 1, BOARD-02). */
+export const MAX_CLUE_TOKENS = 8;
+/** Reserved fuse-token slot count (UAT gap 1, BOARD-03). */
+export const MAX_FUSE_TOKENS = 3;
+
+/**
+ * The clue run is laid out as two columns of four rather than one column of
+ * eight so eight 40px discs fit the board's reserved height
+ * (`tokenRunHeightPx(8, 2) === 172 <= TABLE_BAND_MIN_PX`). The fuse run
+ * stays a single column of three.
+ */
+export const CLUE_TOKEN_COLUMNS = 2;
+
+/**
+ * A token run's total rendered height for `slotCount` fixed slots laid out
+ * in `columns` columns: `rows * TOKEN_DISC_PX + (rows - 1) * TOKEN_GAP_PX`,
+ * where `rows = Math.ceil(slotCount / columns)`. Returns 0 for an empty run.
+ */
+export function tokenRunHeightPx(slotCount: number, columns: number): number {
+  if (slotCount <= 0) return 0;
+  const rows = Math.ceil(slotCount / columns);
+  return rows * TOKEN_DISC_PX + (rows - 1) * TOKEN_GAP_PX;
+}
+
+/**
+ * The token area's fixed reserved height — the larger of the two runs,
+ * proven at module load to fit within `TABLE_BAND_MIN_PX` (see
+ * layout-budget.test.ts's invariant test).
+ */
+export const TOKEN_AREA_HEIGHT_PX = Math.max(
+  tokenRunHeightPx(MAX_CLUE_TOKENS, CLUE_TOKEN_COLUMNS),
+  tokenRunHeightPx(MAX_FUSE_TOKENS, 1),
+);
+
+/**
+ * The token area's fixed reserved width: the two clue columns, the gap
+ * between the clue run and the fuse run (reusing TOKEN_GAP_PX*4, the same
+ * inter-run gap `TokenColumn` renders), and the single fuse column.
+ */
+export const TOKEN_AREA_WIDTH_PX =
+  CLUE_TOKEN_COLUMNS * TOKEN_DISC_PX +
+  (CLUE_TOKEN_COLUMNS - 1) * TOKEN_GAP_PX +
+  TOKEN_GAP_PX * 4 +
+  TOKEN_DISC_PX;
 
 /** Fanned-stack single card width (BOARD-05). */
 export const PLAYED_CARD_WIDTH_PX = 48;
@@ -106,16 +158,6 @@ export const PLAYED_CARD_WIDTH_PX = 48;
 export const PLAYED_CARD_HEIGHT_PX = 64;
 /** Horizontal peek per additional fanned card, beyond the first (BOARD-05). */
 export const FAN_PEEK_PX = 16;
-
-/**
- * The right column's per-token pitch, computed FROM the left column's
- * height and the current token count — never the other way round. Shrinks
- * automatically if the left column grows (e.g. discard wraps to two rows).
- */
-export function tokenPitchPx(columnHeightPx: number, tokenCount: number): number {
-  if (tokenCount <= 0) return columnHeightPx;
-  return (columnHeightPx - (tokenCount - 1) * TOKEN_GAP_PX) / tokenCount;
-}
 
 /**
  * A fanned played stack's total on-screen width (BOARD-05): the first

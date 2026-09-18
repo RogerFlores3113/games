@@ -3,20 +3,22 @@
 import { describe, expect, it } from "vitest";
 import {
   BOARD_CHROME_PX,
+  CLUE_TOKEN_COLUMNS,
   DECK_COUNTER_PX,
   DISCARD_AREA_PX,
   FAN_PEEK_PX,
   LEFT_COLUMN_PX,
-  MAX_TOKEN_COUNT,
+  MAX_CLUE_TOKENS,
+  MAX_FUSE_TOKENS,
   OWN_BAND_PX,
   PLAY_AREA_PX,
   PLAYED_CARD_WIDTH_PX,
   TABLE_BAND_MIN_PX,
   TEAMMATE_BAND_PX,
-  TOKEN_GAP_PX,
+  TOKEN_AREA_HEIGHT_PX,
   VIEWPORT_TEST_HEIGHT_PX,
   fannedStackWidth,
-  tokenPitchPx,
+  tokenRunHeightPx,
 } from "./layout-budget";
 import * as layoutBudget from "./layout-budget";
 
@@ -43,20 +45,27 @@ describe("layout-budget", () => {
     expect(PLAY_AREA_PX + DECK_COUNTER_PX + DISCARD_AREA_PX).toBe(LEFT_COLUMN_PX);
   });
 
-  it("the token column's per-token pitch derived from LEFT_COLUMN_PX and MAX_TOKEN_COUNT is at least 16px", () => {
-    const pitch = tokenPitchPx(LEFT_COLUMN_PX, MAX_TOKEN_COUNT);
-    expect(pitch).toBeGreaterThanOrEqual(16);
+  it("tokenRunHeightPx(MAX_CLUE_TOKENS, CLUE_TOKEN_COLUMNS) is 172", () => {
+    expect(tokenRunHeightPx(MAX_CLUE_TOKENS, CLUE_TOKEN_COLUMNS)).toBe(172);
   });
 
-  it("tokenPitchPx shrinks the pitch as the left column's height grows, never the other way round", () => {
-    const smaller = tokenPitchPx(LEFT_COLUMN_PX, MAX_TOKEN_COUNT);
-    const larger = tokenPitchPx(LEFT_COLUMN_PX + 40, MAX_TOKEN_COUNT);
-    expect(larger).toBeGreaterThan(smaller);
+  it("tokenRunHeightPx(MAX_FUSE_TOKENS, 1) is 128", () => {
+    expect(tokenRunHeightPx(MAX_FUSE_TOKENS, 1)).toBe(128);
   });
 
-  it("tokenPitchPx accounts for TOKEN_GAP_PX between tokens", () => {
-    const pitch = tokenPitchPx(100, 5);
-    expect(pitch).toBe((100 - 4 * TOKEN_GAP_PX) / 5);
+  it("tokenRunHeightPx returns 0 for an empty run", () => {
+    expect(tokenRunHeightPx(0, CLUE_TOKEN_COLUMNS)).toBe(0);
+  });
+
+  it("TOKEN_AREA_HEIGHT_PX is the larger of the two runs and fits within TABLE_BAND_MIN_PX", () => {
+    expect(TOKEN_AREA_HEIGHT_PX).toBe(
+      Math.max(tokenRunHeightPx(MAX_CLUE_TOKENS, CLUE_TOKEN_COLUMNS), tokenRunHeightPx(MAX_FUSE_TOKENS, 1)),
+    );
+    expect(TOKEN_AREA_HEIGHT_PX).toBeLessThanOrEqual(TABLE_BAND_MIN_PX);
+  });
+
+  it("MAX_CLUE_TOKENS + MAX_FUSE_TOKENS equals the pre-existing worst-case token count of 11", () => {
+    expect(MAX_CLUE_TOKENS + MAX_FUSE_TOKENS).toBe(11);
   });
 
   it("fannedStackWidth returns PLAYED_CARD_WIDTH_PX for a single card", () => {
