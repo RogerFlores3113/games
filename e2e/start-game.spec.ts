@@ -6,6 +6,7 @@ import {
   giveAnyLegalClue,
   giveAnyLegalClueToAnyTeammate,
   joinAs,
+  playUntilGameEnds,
   seatIdOfOtherPlayer,
   startGameWithPlayers,
   startTwoPlayerGame,
@@ -284,122 +285,72 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     await contextB.close();
   });
 
-  test("UI-10: a game played to its end shows the designed end overlay (D-20/D-21)", async ({
-    page: hostPage,
-    browser,
-  }) => {
-    test.setTimeout(240_000);
+  // D-17: one shared test body proves the correct score ceiling, score ===
+  // sum of played-stack top ranks, and column count for base, Rainbow and
+  // Black — no per-variant branch beyond this table.
+  const UI10_VARIANTS = [
+    { variant: "base" as const, maxScore: 25, columns: 5 },
+    { variant: "rainbow" as const, maxScore: 30, columns: 6 },
+    { variant: "black" as const, maxScore: 30, columns: 6 },
+  ];
 
-    const { contextB, pageB } = await startTwoPlayerGame(hostPage, browser);
-    const otherPage = pageB;
+  for (const { variant, maxScore, columns } of UI10_VARIANTS) {
+    test(`UI-10 (${variant}): a game played to its end shows the designed end overlay (D-17/D-20/D-21)`, async ({
+      page: hostPage,
+      browser,
+    }) => {
+      test.setTimeout(240_000);
 
-    // WR-09: the game can end at any point inside an iteration. Once it does,
-    // the full-screen overlay covers (and the board disables) every control,
-    // so a plain `.click()` would retry until the 240s test timeout. Every
-    // click below uses a short timeout and, on failure, re-checks the overlay
-    // before moving on.
-    const endOverlayVisible = async () =>
-      (await hostPage.getByTestId("end-overlay").isVisible()) ||
-      (await otherPage.getByTestId("end-overlay").isVisible());
-    const tryClick = async (locator: Locator): Promise<boolean> => {
-      try {
-        await locator.click({ timeout: 2000 });
-        return true;
-      } catch {
-        return false;
-      }
-    };
+      const { pages, contexts } = await startGameWithPlayers(hostPage, browser, ["Roger", "Bianca"], { variant });
+      const [playerA, playerB] = pages as [Page, Page];
 
-    let sawEndOverlay = false;
-    for (let i = 0; i < 80; i++) {
-      if (await endOverlayVisible()) {
-        sawEndOverlay = true;
-        break;
-      }
+      await playUntilGameEnds(playerA, playerB, 80);
 
-      // Re-derive which page is active each iteration — the active seat
-      // alternates as the game progresses.
-      const hostText = ((await hostPage.getByTestId("turn-indicator").textContent()) ?? "").trim();
-      const activePlayer = hostText === "Your turn" ? hostPage : otherPage;
+      for (const page of pages) {
+        await expect(page.getByTestId("end-overlay")).toBeVisible();
+        await expect(page.getByTestId("game-over-heading")).toHaveText("Game over");
+        // WR-02: the turn indicator never names a turn after the game ended.
+        await expect(page.getByTestId("turn-indicator")).toHaveText("Game over");
 
-      if (await endOverlayVisible()) {
-        sawEndOverlay = true;
-        break;
-      }
-      if (!(await tryClick(activePlayer.getByTestId("own-hand-slot-1")))) {
-        if (await endOverlayVisible()) {
-          sawEndOverlay = true;
-          break;
+        const scoreRegex = new RegExp(`^Final score: (\\d+) / ${maxScore} — .+$`);
+        await expect(page.getByTestId("final-score")).toHaveText(scoreRegex);
+        const finalScoreText = (await page.getByTestId("final-score").textContent()) ?? "";
+        const match = finalScoreText.match(scoreRegex);
+        expect(match, `could not parse final score from "${finalScoreText}"`).not.toBeNull();
+        const finalScore = Number(match![1]);
+
+        await expect(page.getByTestId("end-reason")).toHaveText(
+          /^(Three fuses were lost\.|Every stack was completed!|The deck ran out and the final round elapsed\.)$/,
+        );
+
+        const endStacks = page.locator('[data-testid="end-stack"]');
+        await expect(endStacks).toHaveCount(columns);
+        const topRanks = await endStacks.evaluateAll((els) =>
+          els.map((el) => Number(el.getAttribute("data-top-rank") ?? "0")),
+        );
+        expect(finalScore).toBe(topRanks.reduce((sum, rank) => sum + rank, 0));
+
+        await expect(page.getByTestId("new-game-link")).toHaveAttribute("href", "/");
+        await expect(page.getByTestId("play-button")).toBeDisabled();
+        await expect(page.getByTestId("discard-button")).toBeDisabled();
+        // UAT gap 16: the deleted CluePicker's persistent give-clue-button is
+        // gone — an ended game's illegality now shows as the quick-clue
+        // popover simply not opening at all on a tile click.
+        const teammateTile = page.locator('[data-testid^="other-hand-card-"]').first();
+        if ((await teammateTile.count()) > 0) {
+          await teammateTile.click();
+          await expect(page.getByTestId("tile-clue-popover")).toHaveCount(0);
         }
-        continue;
+        await expect(page.getByTestId("tableau")).toBeVisible();
+
+        await expect(page.locator('[data-testid^="played-stack-"][data-top-rank]')).toHaveCount(columns);
       }
 
-      // Retrying wait for the play button (the selection re-render may not
-      // have landed yet), rather than a one-shot `isEnabled()` read.
-      const playEnabled = await expect(activePlayer.getByTestId("play-button"))
-        .toBeEnabled({ timeout: 2000 })
-        .then(() => true)
-        .catch(() => false);
-      if (!playEnabled) {
-        // Selection may have been dropped (card left the hand), it is not
-        // this page's turn after all, or the game ended; re-check the overlay
-        // before treating this as a failure.
-        if (await endOverlayVisible()) {
-          sawEndOverlay = true;
-          break;
-        }
-        continue;
+      for (const context of contexts) {
+        await context.close();
       }
-      if (!(await tryClick(activePlayer.getByTestId("play-button")))) {
-        if (await endOverlayVisible()) {
-          sawEndOverlay = true;
-          break;
-        }
-        continue;
-      }
-
-      await expect
-        .poll(async () => {
-          if (await hostPage.getByTestId("end-overlay").isVisible()) return true;
-          const stillYourTurn = ((await activePlayer.getByTestId("turn-indicator").textContent()) ?? "") === "Your turn";
-          return !stillYourTurn;
-        })
-        .toBe(true);
-    }
-
-    if (!sawEndOverlay) {
-      sawEndOverlay = await hostPage.getByTestId("end-overlay").isVisible();
-    }
-    if (!sawEndOverlay) {
-      throw new Error("UI-10: game did not reach an end state within 80 play iterations");
-    }
-
-    for (const page of [hostPage, otherPage]) {
-      await expect(page.getByTestId("end-overlay")).toBeVisible();
-      await expect(page.getByTestId("game-over-heading")).toHaveText("Game over");
-      // WR-02: the turn indicator never names a turn after the game ended.
-      await expect(page.getByTestId("turn-indicator")).toHaveText("Game over");
-      await expect(page.getByTestId("final-score")).toHaveText(/^Final score: \d+ \/ 25 — .+$/);
-      await expect(page.getByTestId("end-reason")).toHaveText(
-        /^(Three fuses were lost\.|Every stack was completed!|The deck ran out and the final round elapsed\.)$/,
-      );
-      await expect(page.locator('[data-testid="end-stack"]')).toHaveCount(5);
-      await expect(page.getByTestId("new-game-link")).toHaveAttribute("href", "/");
-      await expect(page.getByTestId("play-button")).toBeDisabled();
-      await expect(page.getByTestId("discard-button")).toBeDisabled();
-      // UAT gap 16: the deleted CluePicker's persistent give-clue-button is
-      // gone — an ended game's illegality now shows as the quick-clue
-      // popover simply not opening at all on a tile click.
-      const teammateTile = page.locator('[data-testid^="other-hand-card-"]').first();
-      if ((await teammateTile.count()) > 0) {
-        await teammateTile.click();
-        await expect(page.getByTestId("tile-clue-popover")).toHaveCount(0);
-      }
-      await expect(page.getByTestId("tableau")).toBeVisible();
-    }
-
-    await contextB.close();
-  });
+    });
+  }
 
   test("UI-11: five players fit a 1280x720 desktop without scrolling and stay usable at 1024 wide (D-01)", async ({
     page: hostPage,
