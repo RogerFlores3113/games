@@ -5,6 +5,7 @@ import {
   dragLocatorTo,
   expectSeatCount,
   giveAnyLegalClue,
+  giveAnyLegalClueToAnyTeammate,
   joinAs,
   openTileCluePopover,
   ownHandCardIds,
@@ -904,6 +905,54 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await observer.mouse.click(5, 5);
     await observer.waitForTimeout(1500);
     expect(await soundStarts(observer)).toBe(0);
+
+    await contextB.close();
+  });
+
+  // UAT gap 18 regression ("the 'X card left in deck' doesn't change"):
+  // plays several real turns against the live worker and asserts the
+  // counter falls on EVERY page each time, never staying put across a real
+  // draw. Live diagnosis (see this plan's SUMMARY) found no reproducible
+  // defect in the wire value, projection, or render layer across 2/4/5-
+  // player games, drag AND click actions, a mid-game reload, and rapid-fire
+  // turns — this is the permanent guard against a regression, run against
+  // the real worker rather than a static fixture (table-render.test.ts
+  // carries the render-layer half of this proof).
+  test("UAT gap 18: deck-count falls across several real turns and stays in sync on both pages", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
+    const pages = [activePage, passivePage];
+
+    const readings: number[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      let active = pages[0]!;
+      for (const p of pages) {
+        const text = ((await p.getByTestId("turn-indicator").textContent()) ?? "").trim();
+        if (text === "Your turn") active = p;
+      }
+      const passive = pages.find((p) => p !== active)!;
+      const before = await readDeckCount(active);
+      expect(await readDeckCount(passive)).toBe(before);
+      readings.push(before);
+
+      const own = active.locator('[data-testid^="own-hand-slot-"]').first();
+      await own.click();
+      const discardBtn = active.getByTestId("discard-button");
+      if (await discardBtn.isEnabled()) {
+        await discardBtn.click();
+        await expect.poll(() => readDeckCount(active)).toBe(before - 1);
+      } else {
+        // Clue tokens maxed — give a clue instead (legal, never draws).
+        await own.click();
+        await giveAnyLegalClueToAnyTeammate(active);
+      }
+    }
+
+    // The deck strictly decreased at least once across these turns — not
+    // frozen at its starting value the whole session.
+    expect(Math.min(...readings)).toBeLessThan(readings[0]!);
 
     await contextB.close();
   });

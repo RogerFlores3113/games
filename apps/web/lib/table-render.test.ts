@@ -89,6 +89,25 @@ describe("table-render: board skeleton (Task 1)", () => {
     const markup = render(finalRound);
     expect(markup).toContain('data-final-round="true"');
   });
+
+  // UAT gap 18 regression: the owner reported "the 'X card left in deck'
+  // doesn't change." Diagnosis (e2e-proven live against the real worker,
+  // across 2/4/5-player games, drag AND button-click actions, a mid-game
+  // reload, and rapid-fire turns with no settling delay) found the wire
+  // value, projection, and this render site all correct — `deckCountText`
+  // reads `game.deckCount` directly with no memoization or stale capture
+  // anywhere in the chain. This is the permanent, deterministic guard the
+  // task asked for: it fails immediately (no live server needed) the moment
+  // this render site stops reflecting `deckCount`, e.g. a future edit that
+  // hoists `deckCountText(game)` into a `useMemo` with incomplete deps, or
+  // that swaps `game.deckCount` for a locally-held snapshot.
+  it("UAT gap 18: deck-count's text tracks a changing deckCount prop", () => {
+    const full = render(BASE_GAME);
+    const drawnDown = render({ ...BASE_GAME, deckCount: BASE_GAME.deckCount - 7 });
+    expect(full).toContain(`${BASE_GAME.deckCount} cards left in deck`);
+    expect(drawnDown).toContain(`${BASE_GAME.deckCount - 7} cards left in deck`);
+    expect(full).not.toEqual(drawnDown);
+  });
 });
 
 /** Returns the element's inline `style` attribute value, or `null` if React
