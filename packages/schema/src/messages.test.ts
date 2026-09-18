@@ -206,7 +206,7 @@ describe("ErrorMessageSchema.detail (D-08 closed enum)", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts every one of the 9 ErrorDetail members", () => {
+  it("accepts every one of the 10 ErrorDetail members", () => {
     const members = [
       "view_unavailable",
       "not_your_turn",
@@ -217,8 +217,9 @@ describe("ErrorMessageSchema.detail (D-08 closed enum)", () => {
       "clue_touches_nothing",
       "clue_target_invalid",
       "discard_at_max_clues",
+      "clue_color_not_nameable",
     ];
-    expect(members).toHaveLength(9);
+    expect(members).toHaveLength(10);
     for (const member of members) {
       expect(ErrorDetailSchema.safeParse(member).success).toBe(true);
     }

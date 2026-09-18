@@ -154,6 +154,7 @@ export const ErrorDetailSchema = z.enum([
   "clue_touches_nothing",
   "clue_target_invalid",
   "discard_at_max_clues",
+  "clue_color_not_nameable",
 ]);
 export type ErrorDetail = z.infer<typeof ErrorDetailSchema>;
 

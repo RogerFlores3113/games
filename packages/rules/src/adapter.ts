@@ -27,7 +27,8 @@ export type AdapterError =
   | "no_clue_tokens"
   | "clue_touches_nothing"
   | "clue_target_invalid"
-  | "discard_at_max_clues";
+  | "discard_at_max_clues"
+  | "clue_color_not_nameable";
 
 /** Result of attempting to apply an action request to game state. */
 export type AdapterResult<TState> =

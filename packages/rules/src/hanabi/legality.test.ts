@@ -162,6 +162,77 @@ describe("legality", () => {
     });
   });
 
+  describe("canClue rejects a non-nameable colour with clue_color_not_nameable (D-01/D-04)", () => {
+    it("rejects every suit outside cluableColors, per variant, even when the target hand holds a card of that suit", () => {
+      let variantsSwept = 0;
+      for (const variant of VARIANTS) {
+        const config = variantConfig(variant);
+        const nonNameable = ["red", "yellow", "green", "blue", "white", "rainbow", "black"].filter(
+          (suit) => !config.cluableColors.includes(suit as never),
+        ) as Array<"red" | "yellow" | "green" | "blue" | "white" | "rainbow" | "black">;
+
+        for (const suit of nonNameable) {
+          // Craft the target hand so it holds a card of the non-nameable
+          // suit whenever that suit exists in this variant's deck (Rainbow:
+          // a rainbow card in the target hand). This proves the rejection is
+          // NOT an incidental clue_touches_nothing — the clue would
+          // otherwise touch something.
+          const state = buildState(variant, ["a", "b"], `seed-nameable-${variant}-${suit}`);
+          const targetHandIndex = state.hands.findIndex((h) => h.seatId === "b");
+          const craftedSlots = state.hands[targetHandIndex]!.slots.map((slot, i) => ({
+            ...slot,
+            card:
+              i === 0 && config.suits.includes(suit)
+                ? { ...slot.card, suit, rank: 1 as const }
+                : slot.card,
+          }));
+          const craftedState: HanabiState = {
+            ...state,
+            hands: state.hands.map((h, i) =>
+              i === targetHandIndex ? { seatId: h.seatId, slots: craftedSlots } : h,
+            ),
+          };
+
+          expect(canClue(craftedState, "a", "b", { type: "color", value: suit })).toEqual({
+            legal: false,
+            reason: "clue_color_not_nameable",
+          });
+        }
+        variantsSwept++;
+      }
+      expect(variantsSwept).toBe(3);
+    });
+
+    it("guard ordering: a non-nameable colour from the wrong actor still returns not_your_turn", () => {
+      const state = buildState("rainbow", ["a", "b", "c"], "seed-nameable-order");
+      expect(canClue(state, "b", "c", { type: "color", value: "rainbow" })).toEqual({
+        legal: false,
+        reason: "not_your_turn",
+      });
+    });
+
+    it("Black: naming black against a hand holding a black card stays legal", () => {
+      const config = variantConfig("black");
+      const state = buildState("black", ["a", "b"], "seed-nameable-black-positive");
+      const targetHandIndex = state.hands.findIndex((h) => h.seatId === "b");
+      const craftedSlots = state.hands[targetHandIndex]!.slots.map((slot, i) => ({
+        ...slot,
+        card: i === 0 ? { ...slot.card, suit: "black" as const, rank: 1 as const } : slot.card,
+      }));
+      const craftedState: HanabiState = {
+        ...state,
+        hands: state.hands.map((h, i) =>
+          i === targetHandIndex ? { seatId: h.seatId, slots: craftedSlots } : h,
+        ),
+      };
+      void config;
+
+      expect(canClue(craftedState, "a", "b", { type: "color", value: "black" })).toEqual({
+        legal: true,
+      });
+    });
+  });
+
   it("cardsTouchedByClue returns exactly the ids of matching slots, in slot order, for all three variants", () => {
     let ranOnce = false;
     for (const variant of VARIANTS) {

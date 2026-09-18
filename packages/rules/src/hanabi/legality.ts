@@ -180,6 +180,15 @@ export function canClue(
     return { legal: false, reason: "clue_target_invalid" };
   }
   const config = variantConfig(state.variant);
+  // RULES-14/D-01/T-07-01: a colour clue naming a colour the active variant
+  // does not name (e.g. "rainbow" in Rainbow, or "rainbow"/"black" in base)
+  // is illegal, even though the touch predicate would otherwise accept it —
+  // this closes a forged-frame cheating hole where a hand-crafted WebSocket
+  // message could name "rainbow" as a colour. Checked before the touch
+  // check, and reads only `config.cluableColors` — never a literal suit.
+  if (clue.type === "color" && !config.cluableColors.includes(clue.value)) {
+    return { legal: false, reason: "clue_color_not_nameable" };
+  }
   const touched = cardsTouchedByClue(config, targetHand.slots, clue);
   if (touched.length === 0) return { legal: false, reason: "clue_touches_nothing" };
   return { legal: true };

@@ -411,6 +411,8 @@ function mapAdapterError(error: AdapterError): ErrorDetail {
       return "clue_target_invalid";
     case "discard_at_max_clues":
       return "discard_at_max_clues";
+    case "clue_color_not_nameable":
+      return "clue_color_not_nameable";
     default: {
       const exhaustiveCheck: never = error;
       throw new Error(`Unrecognized AdapterError: ${String(exhaustiveCheck)}`);
