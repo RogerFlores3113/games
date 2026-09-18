@@ -32,3 +32,32 @@ export function computeBoardZoom(viewportWidthPx: number, viewportHeightPx: numb
   const scale = Math.min(heightRatio, widthRatio);
   return Math.min(BOARD_ZOOM_MAX, Math.max(1, scale));
 }
+
+/**
+ * UAT gaps 27/28 (fourth owner review): converts a screen-pixel measurement
+ * (a pointer-event `clientX`/`clientY` delta, or a distance derived from two
+ * `getBoundingClientRect()` calls) into pre-zoom CSS pixels — the unit a
+ * `transform: translate()` or a raw pixel value written into an element's
+ * `style` is interpreted in BEFORE the zoomed ancestor's CSS `zoom` scales it
+ * again for display.
+ *
+ * `event.clientX/Y` and `getBoundingClientRect()` already report POST-zoom
+ * screen pixels (the browser accounts for `zoom` the same way it would a
+ * native page zoom — this is exactly why hit-testing against those rects in
+ * `hanabi-drag-logic.ts`/`hanabi-discard-drag-logic.ts` needs no conversion:
+ * a pointer position and a target rect are both already in the same
+ * post-zoom space). A `translate()`/pixel style value, however, is read by
+ * the browser as a PRE-zoom CSS length and the zoomed ancestor then
+ * multiplies it by `zoom` again when painting. Applying a screen-pixel
+ * measurement directly as that kind of value therefore travels `zoom` times
+ * too far on screen — the reported symptom ("moves around 2x the speed of
+ * the cursor" at a 1.5x zoom, and reorder-preview tiles shifting aside too
+ * far by the same factor).
+ *
+ * This is the ONE named conversion point every pointer-drag hook must run a
+ * screen-pixel measurement through before turning it into an applied CSS
+ * pixel value — never a bare `/ zoom` scattered inline at each call site.
+ */
+export function screenPxToBoardPx(screenPx: number, zoom: number): number {
+  return screenPx / zoom;
+}

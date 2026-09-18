@@ -6,6 +6,7 @@ import type { HanabiView } from "@games/rules";
 import type { ActionContext } from "../../lib/hanabi-visual-logic";
 import type { DropRequest, DropTarget, DropZones, Point } from "../../lib/hanabi-drag-logic";
 import { exceedsDragThreshold, requestForDrop, resolveDropTarget } from "../../lib/hanabi-drag-logic";
+import { screenPxToBoardPx } from "../../lib/board-zoom";
 
 /** D-18/D-22: a stale optimistic reorder is discarded (falls back to the
  * server's own order) once this much time has passed without a confirming
@@ -32,6 +33,13 @@ export interface UseHandDragOptions {
   game: HanabiView | null;
   ctx: ActionContext;
   onDropRequest: (request: DropRequest) => void;
+  /** UAT gaps 27/28: the board's current CSS `zoom` factor (see
+   * `useBoardZoom`/`board-zoom.ts`) — required so every screen-pixel pointer
+   * measurement this hook produces (drag offset, measured slot pitch) is run
+   * through `screenPxToBoardPx` before it is handed to a caller that applies
+   * it as a pre-zoom CSS value (a `translate()`/pixel style). Defaults to 1
+   * (no-op) for existing callers/tests that predate zoom-awareness. */
+  zoom?: number;
 }
 
 export interface UseHandDragResult {
@@ -53,7 +61,7 @@ export interface UseHandDragResult {
  * completed drop (T-06.1-36). Nothing is sent on pointermove (D-18): the
  * hook never calls `onDropRequest` until pointerup resolves a target.
  */
-export function useHandDrag({ game, ctx, onDropRequest }: UseHandDragOptions): UseHandDragResult {
+export function useHandDrag({ game, ctx, onDropRequest, zoom = 1 }: UseHandDragOptions): UseHandDragResult {
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [pendingOrder, setPendingOrder] = useState<string[] | null>(null);
   const droppedCardIdsRef = useRef<Set<string>>(new Set());
@@ -74,6 +82,11 @@ export function useHandDrag({ game, ctx, onDropRequest }: UseHandDragOptions): U
   const gameRef = useRef(game);
   const ctxRef = useRef(ctx);
   const onDropRequestRef = useRef(onDropRequest);
+  // UAT gaps 27/28: read via ref inside the window-level pointer handlers
+  // for the same reason as game/ctx/onDropRequest above — a resize mid-drag
+  // (which changes `zoom`, see useBoardZoom) must never resolve against a
+  // stale zoom factor captured by the effect's closure.
+  const zoomRef = useRef(zoom);
   useEffect(() => {
     gameRef.current = game;
   }, [game]);
@@ -83,6 +96,9 @@ export function useHandDrag({ game, ctx, onDropRequest }: UseHandDragOptions): U
   useEffect(() => {
     onDropRequestRef.current = onDropRequest;
   }, [onDropRequest]);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
 
   const registerSlot = useCallback((cardId: string, el: HTMLElement | null) => {
     if (el === null) {
@@ -123,11 +139,16 @@ export function useHandDrag({ game, ctx, onDropRequest }: UseHandDragOptions): U
    * rects (sorted by their actual on-screen left edge, not registration
    * order, so a mid-drag Map insertion order never skews the measurement).
    * No new measurement mechanism, no new listener — reuses the rects
-   * `buildZones` already collects for drop resolution. */
+   * `buildZones` already collects for drop resolution.
+   *
+   * UAT gap 28: `rect.left` is a POST-zoom screen pixel (`getBoundingClientRect`),
+   * but the caller (`Hand.tsx`'s `shiftOffsetsForDrag`) applies this pitch as
+   * a pre-zoom `translateX` style — so the raw screen-pixel distance is
+   * converted through `screenPxToBoardPx` before it leaves this hook. */
   function slotPitchFromZones(zones: DropZones): number | null {
     if (zones.slots.length < 2) return null;
     const lefts = zones.slots.map((slot) => slot.rect.left).sort((a, b) => a - b);
-    return lefts[1]! - lefts[0]!;
+    return screenPxToBoardPx(lefts[1]! - lefts[0]!, zoomRef.current);
   }
 
   function endDrag(): void {
@@ -149,9 +170,17 @@ export function useHandDrag({ game, ctx, onDropRequest }: UseHandDragOptions): U
       }
       const zones = buildZones();
       const target = resolveDropTarget(point, zones);
+      // UAT gap 27: point/start are POST-zoom screen pixels (clientX/Y), but
+      // this offset is applied as a pre-zoom `translate()` on the dragged
+      // tile (OwnHandCard.tsx) — converted so the tile tracks the cursor
+      // 1:1 on screen instead of travelling `zoom` times too far.
+      const zoomNow = zoomRef.current;
       setDragState({
         cardId,
-        offset: { x: point.x - start.x, y: point.y - start.y },
+        offset: {
+          x: screenPxToBoardPx(point.x - start.x, zoomNow),
+          y: screenPxToBoardPx(point.y - start.y, zoomNow),
+        },
         target,
         dropIndex: target.kind === "reorder" ? target.targetIndex : null,
         slotPitchPx: slotPitchFromZones(zones),

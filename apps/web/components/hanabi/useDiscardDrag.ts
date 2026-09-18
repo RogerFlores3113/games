@@ -8,6 +8,7 @@ import { exceedsDragThreshold } from "../../lib/hanabi-drag-logic";
 import type { Point, Rect } from "../../lib/hanabi-drag-logic";
 import type { DiscardDropRequest } from "../../lib/hanabi-discard-drag-logic";
 import { discardDropIndex, requestForDiscardDrop } from "../../lib/hanabi-discard-drag-logic";
+import { screenPxToBoardPx } from "../../lib/board-zoom";
 
 /** D-27: a stale optimistic reorder is discarded (falls back to the
  * server's own order) once this much time has passed without a confirming
@@ -24,6 +25,10 @@ export interface UseDiscardDragOptions {
   game: HanabiView | null;
   ctx: ActionContext;
   onDropRequest: (request: DiscardDropRequest) => void;
+  /** UAT gaps 27/28: mirrors `useHandDrag.ts`'s own `zoom` option — see that
+   * hook's header comment. Defaults to 1 (no-op) for existing callers/tests
+   * that predate zoom-awareness. */
+  zoom?: number;
 }
 
 export interface UseDiscardDragResult {
@@ -44,7 +49,7 @@ export interface UseDiscardDragResult {
  * tile rects, since every drop here is a reorder (no play/discard outcome,
  * no per-seat ownership check per D-25).
  */
-export function useDiscardDrag({ game, ctx, onDropRequest }: UseDiscardDragOptions): UseDiscardDragResult {
+export function useDiscardDrag({ game, ctx, onDropRequest, zoom = 1 }: UseDiscardDragOptions): UseDiscardDragResult {
   const [dragState, setDragState] = useState<DiscardDragState | null>(null);
   const [pendingOrder, setPendingOrder] = useState<string[] | null>(null);
   const tilesRef = useRef<Map<string, HTMLElement>>(new Map());
@@ -61,6 +66,10 @@ export function useDiscardDrag({ game, ctx, onDropRequest }: UseDiscardDragOptio
   const gameRef = useRef(game);
   const ctxRef = useRef(ctx);
   const onDropRequestRef = useRef(onDropRequest);
+  // UAT gaps 27/28: mirrors useHandDrag.ts's zoomRef — read inside the
+  // window-level pointer handlers so a resize mid-drag never resolves
+  // against a stale zoom factor.
+  const zoomRef = useRef(zoom);
   useEffect(() => {
     gameRef.current = game;
   }, [game]);
@@ -70,6 +79,9 @@ export function useDiscardDrag({ game, ctx, onDropRequest }: UseDiscardDragOptio
   useEffect(() => {
     onDropRequestRef.current = onDropRequest;
   }, [onDropRequest]);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
 
   const registerTile = useCallback((cardId: string, el: HTMLElement | null) => {
     if (el === null) {
@@ -142,7 +154,18 @@ export function useDiscardDrag({ game, ctx, onDropRequest }: UseDiscardDragOptio
         draggingActiveRef.current = true;
       }
       const targetIndex = discardDropIndex(point, buildTiles(cardId));
-      setDragState({ cardId, offset: { x: point.x - start.x, y: point.y - start.y }, targetIndex });
+      // UAT gap 27: same screen-px-to-pre-zoom-css-px conversion as
+      // useHandDrag.ts — this offset is applied as a pre-zoom `translate()`
+      // on the dragged tile (DiscardOverlay.tsx/Table.tsx).
+      const zoomNow = zoomRef.current;
+      setDragState({
+        cardId,
+        offset: {
+          x: screenPxToBoardPx(point.x - start.x, zoomNow),
+          y: screenPxToBoardPx(point.y - start.y, zoomNow),
+        },
+        targetIndex,
+      });
     }
 
     function handlePointerUp(event: PointerEvent): void {

@@ -216,11 +216,14 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
   // unconditionally right after it) so the hook order never changes between
   // a null and a present `game` render.
   const ctx: ActionContext = { reconnecting, ended, labelFor };
-  const drag = useHandDrag({ game, ctx, onDropRequest: act });
-  const discardDrag = useDiscardDrag({ game, ctx, onDropRequest: act });
   // UAT gap 11: 1280x720 is the minimum supported size, not the design
-  // target — see useBoardZoom's own header comment.
+  // target — see useBoardZoom's own header comment. Read before the drag
+  // hooks below (UAT gaps 27/28) so both can convert their screen-pixel
+  // pointer measurements through the current zoom factor from their very
+  // first render.
   const boardZoom = useBoardZoom();
+  const drag = useHandDrag({ game, ctx, onDropRequest: act, zoom: boardZoom });
+  const discardDrag = useDiscardDrag({ game, ctx, onDropRequest: act, zoom: boardZoom });
 
   if (!game) {
     return (
