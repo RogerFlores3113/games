@@ -109,7 +109,7 @@ export function TeammateHand({
       data-active={String(isActive)}
       className="board-surface flex flex-col items-center gap-[2px] rounded-md p-[2px]"
       style={{
-        boxShadow: isActive ? "0 0 0 2px var(--color-accent), 0 0 12px 0 rgba(245, 185, 66, 0.4)" : "none",
+        boxShadow: isActive ? "0 0 0 2px var(--color-turn), 0 0 12px 0 rgba(155, 101, 247, 0.4)" : "none",
       }}
     >
       <div className="flex items-center gap-[length:var(--space-xs)]">
@@ -230,7 +230,7 @@ export function OwnHand({
       data-active={String(isYourTurn)}
       className="board-surface flex flex-col items-center gap-[2px] rounded-md p-[2px]"
       style={{
-        boxShadow: isYourTurn ? "0 0 0 2px var(--color-accent), 0 0 12px 0 rgba(245, 185, 66, 0.4)" : "none",
+        boxShadow: isYourTurn ? "0 0 0 2px var(--color-turn), 0 0 12px 0 rgba(155, 101, 247, 0.4)" : "none",
       }}
     >
       <div className="flex flex-row items-center gap-[length:var(--space-sm)]">
@@ -245,7 +245,7 @@ export function OwnHand({
           style={
             isYourTurn
               ? {
-                  backgroundColor: "var(--color-accent)",
+                  backgroundColor: "var(--color-turn)",
                   color: "var(--color-bg)",
                   lineHeight: "var(--text-label--line-height)",
                 }

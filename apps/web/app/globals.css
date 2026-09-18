@@ -6,14 +6,23 @@
  * board on TOP of these tokens and must NOT redefine them here or hardcode
  * a hex value anywhere outside this block.
  *
- * `--color-accent` is reserved for EXACTLY seven uses, per the
+ * `--color-accent` is reserved for EXACTLY FIVE uses, per the
  * approved UI-SPEC: primary CTA fill ("Create room" / "Join room" /
  * "Start game"), the room-code Display text, the own-seat "you are here"
- * ring, the active-turn indicator (placeholder counter game), focus
- * rings, the active-player hand-container ring/glow (D-02, in-game), and
- * the own-hand "Your turn" state accent (D-02, in-game). Nothing else may
- * use it. `--color-card-glow` is a separate, non-accent luminosity signal
- * (D-06/D-11/D-22) — it is never a substitute for --color-accent.
+ * ring, the active-turn indicator (placeholder counter game), and focus
+ * rings. Nothing else may use it. `--color-card-glow` is a separate,
+ * non-accent luminosity signal (D-06/D-11/D-22) — it is never a
+ * substitute for --color-accent.
+ *
+ * UAT gap 38 (06.2, seventh owner review, 2026-09-18): --color-accent
+ * used to be reserved for SEVEN uses; the in-game active-player
+ * hand-container ring/glow and the own-hand "Your turn" state accent (both
+ * D-02) MOVED OFF --color-accent (gold) onto the new --color-turn (violet)
+ * token below — the owner asked for turn indicators to "stand out nicely
+ * without being a firework color," and gold was already the primary-CTA
+ * accent, indistinguishable in meaning from every other accent use.
+ * --color-accent's reserved-use count dropped from seven to five as a
+ * result; no new accent use was added to replace them.
  *
  * Contrast rule (load-bearing, verified): anything sitting ON an
  * --color-accent fill MUST use --color-bg as its label color (~10.9:1,
@@ -21,13 +30,27 @@
  * it must never be used.
  *
  * Phase 06.2 adds seven new named tokens below (four tile-colour presets,
- * a clue/fuse token-art disc/rim pair, and a tile drop-shadow) and adds
- * ZERO new `--color-accent` uses — it is still exactly seven.
+ * a clue/fuse token-art disc/rim pair, and a tile drop-shadow) and added
+ * ZERO new `--color-accent` uses at the time — it was still exactly seven
+ * until gap 38 (above) moved two of those seven uses to `--color-turn`.
  */
 @theme {
   --color-bg: #0B0F1A;
   --color-surface: #141A2E;
   --color-accent: #F5B942;
+  /*
+   * UAT gap 38 (06.2, seventh owner review): the turn-indicator colour —
+   * deliberately a NEW, separate token rather than reusing --color-accent
+   * (see the header comment above). Deeper and more saturated than
+   * --color-suit-rainbow (#C9A8FF, a pale lavender at ~83% lightness) so a
+   * Rainbow-suit tile and a turn ring can never be confused: same hue
+   * family (~262°), but pulled down to ~68% lightness / ~90% saturation,
+   * which reads as a clearly deeper violet next to Rainbow's washed-out
+   * pastel. Passes WCAG AA (>=4.5:1) against both --color-bg (5.10:1) and
+   * --color-surface (4.60:1), verified in suit-visuals.test.ts alongside
+   * the existing suit-hue contrast checks.
+   */
+  --color-turn: #9B65F7;
   --color-destructive: #F0453D;
   --color-text: #F4F6FB;
   --color-text-muted: #8B93A8;

@@ -141,6 +141,30 @@ describe("suit-visuals", () => {
     expect(SUIT_VISUALS.rainbow.hueVar).toBe("var(--color-suit-rainbow)");
   });
 
+  it("UAT gap 38: --color-turn passes WCAG AA (>=4.5:1) against --color-bg and --color-surface, and is clearly distinct from --color-suit-rainbow", () => {
+    const themeBlock = extractThemeBlock(globalsCss);
+    const bgHex = tokenHex(themeBlock, "color-bg");
+    const surfaceHex = tokenHex(themeBlock, "color-surface");
+    const turnHex = tokenHex(themeBlock, "color-turn");
+    const rainbowHex = tokenHex(themeBlock, "color-suit-rainbow");
+
+    expect(contrastRatio(turnHex, bgHex)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(turnHex, surfaceHex)).toBeGreaterThanOrEqual(4.5);
+
+    // Never the same colour, and never close enough to be confused with the
+    // Rainbow suit hue at a glance — a Euclidean distance in 8-bit RGB space
+    // comfortably above the ~30-unit "clearly different colour" threshold.
+    expect(turnHex.toLowerCase()).not.toBe(rainbowHex.toLowerCase());
+    function channel(hex: string, offset: number): number {
+      return parseInt(hex.slice(offset, offset + 2), 16);
+    }
+    const dr = channel(turnHex, 1) - channel(rainbowHex, 1);
+    const dg = channel(turnHex, 3) - channel(rainbowHex, 3);
+    const db = channel(turnHex, 5) - channel(rainbowHex, 5);
+    const distance = Math.sqrt(dr * dr + dg * dg + db * db);
+    expect(distance).toBeGreaterThan(50);
+  });
+
   it("every fillRule is a valid SVG fill-rule value", () => {
     for (const suit of ALL_SUITS) {
       expect(["nonzero", "evenodd"]).toContain(SUIT_VISUALS[suit].fillRule);
