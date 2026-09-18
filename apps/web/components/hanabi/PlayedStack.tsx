@@ -8,7 +8,6 @@ import {
   playGridHeightPx,
 } from "../../lib/layout-budget";
 import { FireworkCardFace } from "./FireworkCard";
-import { SuitGlyph } from "./SuitGlyph";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
 
 export interface PlayedStackProps {
@@ -30,12 +29,23 @@ const HEADER_HEIGHT_PX = STACK_HEADER_HEIGHT_PX;
  * slot is reserved whether or not it is filled (UAT gap 1), so the column's
  * rendered height is identical at topRank 0 and topRank 5.
  *
- * The column header carries a single SuitGlyph, wrapped in the column's
- * only `data-glyph` emitter — which is what keeps the one-glyph-per-stack
- * e2e invariant true at every rank: filled rank cards render as plain
- * (non-identity-exposing) card faces, each with an `sr-only` "{Suit}
- * {rank}" label instead (same pattern `Table.tsx` already uses for
- * discard tiles).
+ * The column header carries the column's only `data-glyph` emitter — which
+ * is what keeps the one-glyph-per-stack e2e invariant true at every rank:
+ * filled rank cards render as plain (non-identity-exposing) card faces,
+ * each with an `sr-only` "{Suit} {rank}" label instead (same pattern
+ * `Table.tsx` already uses for discard tiles).
+ *
+ * UAT gap 23 (fourth owner review, "the play pile… at rest just look like a
+ * blank area… under the hood I want it to remain the same grid design, but
+ * visually there should be no indication of that"): the header renders NO
+ * visible glyph icon and the column renders NO background/border/panel —
+ * `data-glyph` and the accessible "{Suit}" label survive as an `sr-only`
+ * span with zero visible footprint, so the e2e "exactly one glyph per
+ * stack" assertion (`stack.locator("[data-glyph]")`) and screen-reader
+ * labelling both still hold even though nothing paints on screen. The
+ * completed-stack glow border in globals.css (`[data-complete="true"]`) is
+ * the one exception — that is real game-state feedback (a stack the
+ * players actually finished), not empty-state decoration, so it stays.
  *
  * Preserves every testid/data-attribute `Table.tsx` and the e2e suite rely
  * on: `data-testid="played-stack-{suit}"`, `data-top-rank`, `data-complete`,
@@ -67,19 +77,16 @@ export function PlayedStack({ stack, flashing = false }: PlayedStackProps) {
       data-testid={"played-stack-" + suit}
       data-top-rank={topRank}
       data-complete={String(complete)}
-      className={"flex flex-col items-center rounded-md" + (flashing ? " anim-stack-flash" : "")}
+      className={"flex flex-col items-center" + (flashing ? " anim-stack-flash" : "")}
       style={{
         width: RANK_SLOT_WIDTH_PX,
         height: playGridHeightPx() + HEADER_HEIGHT_PX,
-        backgroundColor: "var(--color-surface)",
       }}
     >
-      <div
-        className="flex items-center justify-center"
-        style={{ height: HEADER_HEIGHT_PX }}
-        data-glyph={suit}
-      >
-        <SuitGlyph suit={suit} size={16} />
+      {/* UAT gap 23: reserves the header's height (fixed geometry, unchanged)
+          but paints nothing — the suit identity survives only as the sole
+          `data-glyph` emitter + an `sr-only` label, both invisible. */}
+      <div style={{ height: HEADER_HEIGHT_PX }} data-glyph={suit}>
         <span className="sr-only">{suitLabel}</span>
       </div>
       <div className="flex flex-col" style={{ gap: RANK_SLOT_GAP_PX }}>

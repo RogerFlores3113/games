@@ -179,16 +179,18 @@ body {
  * fixed regardless of rank) stays byte-identical at topRank 0 and topRank
  * 5 — only this class differs, and that is asserted by className, not by
  * the style attribute.
+ *
+ * UAT gap 23 (fourth owner review): an incomplete stack (`data-complete=
+ * "false"`, which includes the empty/at-rest state) gets NO visible chrome
+ * at all — no border, no background — per "the play area must look blank
+ * at rest." Only a genuinely COMPLETED stack keeps its celebratory glow;
+ * that is real game-state feedback, not empty-state decoration.
  */
 [data-testid^="played-stack-"][data-complete="true"] {
   border: 2px solid var(--color-card-glow);
   box-shadow:
     0 0 16px 0 rgba(255, 217, 138, 0.65),
     0 0 4px 0 rgba(255, 217, 138, 0.9);
-}
-
-[data-testid^="played-stack-"][data-complete="false"] {
-  border: 1px solid var(--color-border);
 }
 
 @media (prefers-reduced-motion: reduce) {

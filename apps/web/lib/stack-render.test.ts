@@ -97,4 +97,39 @@ describe("stack-render: PlayedStack", () => {
     );
     expect(markup).toContain("anim-stack-flash");
   });
+
+  // UAT gap 23 (fourth owner review): "the play pile… should at rest just
+  // look like a blank area… under the hood I want it to remain the same
+  // grid design. But visually, there should be no indication of that."
+  it("an incomplete stack renders no visible column chrome — no background fill on the column root or header, no glyph header icon — while the reserved slots still occupy their fixed geometry", () => {
+    for (const topRank of [0, 3] as const) {
+      const markup = renderStack(topRank, "red");
+      // The column root's own inline style carries no background paint
+      // (width/height only) — a filled card's own surface colour deeper in
+      // the markup is unrelated content, not column chrome.
+      const rootStyle = markup.match(/data-testid="played-stack-red"[^>]*style="([^"]*)"/)?.[1];
+      expect(rootStyle).toBeDefined();
+      expect(rootStyle).not.toContain("background");
+      // The header row (the old glyph-icon slot) carries no styling beyond
+      // its reserved height either.
+      const headerStyle = markup.match(/data-glyph="red"[^>]*/)?.[0];
+      expect(headerStyle).toBeDefined();
+      expect(markup.match(/<div style="height:\d+px" data-glyph="red">/)).not.toBeNull();
+      expect(markup).toContain('data-filled="false"');
+    }
+    // A fully empty column (nothing played yet, the true "at rest" state)
+    // renders no <svg> at all — the only surviving suit signal is the
+    // invisible data-glyph attribute plus its sr-only label; a filled card's
+    // own burst-art <svg> only ever appears once a tile is actually played.
+    const empty = renderStack(0, "red");
+    expect(empty).not.toContain("<svg");
+    // The reserved slot geometry survives untouched: RANK_SLOT_WIDTH_PX/
+    // RANK_SLOT_HEIGHT_PX still size every empty slot (UAT gap 1/19).
+    expect(empty).toMatch(/data-testid="played-slot-red-1"[^>]*style="width:\d+px;height:\d+px"/);
+  });
+
+  it("a completed stack keeps its (real game-state) glow-border hook, unaffected by gap 23's at-rest chrome removal", () => {
+    const markup = renderStack(5, "blue");
+    expect(markup).toContain('data-complete="true"');
+  });
 });
