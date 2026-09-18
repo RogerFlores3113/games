@@ -662,6 +662,115 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await contextB.close();
   });
 
+  /** Reads each discard tile's suit/rank, in `discardTileOrder`'s DOM order,
+   * from the sr-only "{Suit} {rank}" text FireworkCardFace's caption
+   * renders beside every discard tile — discards are public, so this is a
+   * DISC-01-safe way to derive the facts `groupedBySuitOrder` sorts by
+   * without importing app source into the e2e project. */
+  async function discardTileFacts(page: Page): Promise<Array<{ id: string; suit: string; rank: number }>> {
+    const ids = await discardTileOrder(page);
+    const facts: Array<{ id: string; suit: string; rank: number }> = [];
+    for (const id of ids) {
+      const text = (await page.getByTestId(`discard-tile-${id}`).locator(".sr-only").textContent()) ?? "";
+      const match = text.trim().match(/^(\w+) (\d)$/);
+      if (!match) throw new Error(`discardTileFacts: could not parse "${text}"`);
+      facts.push({ id, suit: match[1]!.toLowerCase(), rank: Number(match[2]) });
+    }
+    return facts;
+  }
+
+  /** Mirrors `groupedBySuitOrder` (hanabi-discard-drag-logic.ts) exactly:
+   * suit position in the base variant's suit order, then rank ascending,
+   * then existing index — so this test can compute the expected grouped
+   * order from the actual dealt/discarded suits without importing app
+   * source into the e2e project. */
+  function expectedGroupedOrder(facts: ReadonlyArray<{ id: string; suit: string; rank: number }>): string[] {
+    const suitOrder = ["red", "yellow", "green", "blue", "white"];
+    return facts
+      .map((fact, index) => ({ fact, index }))
+      .sort((a, b) => {
+        const suitDiff = suitOrder.indexOf(a.fact.suit) - suitOrder.indexOf(b.fact.suit);
+        if (suitDiff !== 0) return suitDiff;
+        const rankDiff = a.fact.rank - b.fact.rank;
+        if (rankDiff !== 0) return rankDiff;
+        return a.index - b.index;
+      })
+      .map(({ fact }) => fact.id);
+  }
+
+  test("DISC-01: group-by-suit re-sorts the shared discard order for everyone, and dragging still works after grouping", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    test.setTimeout(60_000);
+    const { contextB, pageB } = await startTwoPlayerGame(hostPage, browser);
+
+    async function currentActive(): Promise<Page> {
+      const hostText = ((await hostPage.getByTestId("turn-indicator").textContent()) ?? "").trim();
+      return hostText === "Your turn" ? hostPage : pageB;
+    }
+
+    // Builds up 4 discarded tiles (mixed suits/ranks in whatever order the
+    // deck dealt them), alternating "give a clue" with a discard exactly
+    // like the DISC-01 reorder test above.
+    for (let i = 0; i < 4; i++) {
+      const active = await currentActive();
+      const other = active === hostPage ? pageB : hostPage;
+      const clueTokens = Number(await hostPage.getByTestId("clue-tokens").getAttribute("data-count"));
+
+      let discardActive = active;
+      if (clueTokens >= 8) {
+        const otherSeatId = await seatIdOfOtherPlayer(active);
+        expect(await giveAnyLegalClue(active, otherSeatId)).toBe(true);
+        await expect(other.getByTestId("turn-indicator")).toHaveText("Your turn");
+        discardActive = other;
+      }
+
+      await discardActive.getByTestId("own-hand-slot-1").click();
+      await expect(discardActive.getByTestId("discard-button")).toBeEnabled();
+      await discardActive.getByTestId("discard-button").click();
+
+      await expect
+        .poll(() => hostPage.getByTestId("discard-pile").getAttribute("data-discard-count"))
+        .toBe(String(i + 1));
+    }
+
+    const factsBefore = await discardTileFacts(hostPage);
+    expect(factsBefore.length).toBeGreaterThanOrEqual(4);
+    const grouped = expectedGroupedOrder(factsBefore);
+
+    // Page A (host) clicks group-by-suit.
+    await expect(hostPage.getByTestId("discard-group-by-suit")).toBeEnabled();
+    await hostPage.getByTestId("discard-group-by-suit").click();
+
+    await expect.poll(() => discardTileOrder(hostPage)).toEqual(grouped);
+    // Page B sees the identical grouped order with no refresh — proving
+    // this is shared state, not a local view.
+    await expect.poll(() => discardTileOrder(pageB)).toEqual(grouped);
+
+    // The grouped order survives a reload of page B.
+    await pageB.reload();
+    await expect(pageB.getByTestId("own-hand")).toBeVisible();
+    await expect.poll(() => discardTileOrder(pageB)).toEqual(grouped);
+
+    // Dragging still works after grouping: page B drags the grouped
+    // sequence's first tile to the end.
+    const draggedId = grouped[0]!;
+    const lastId = grouped[grouped.length - 1]!;
+    const afterDrag = expectedReorder(grouped, draggedId, grouped.length - 1);
+
+    await dragLocatorTo(
+      pageB,
+      pageB.getByTestId(`discard-tile-${draggedId}`),
+      pageB.getByTestId(`discard-tile-${lastId}`),
+    );
+
+    await expect.poll(() => discardTileOrder(pageB)).toEqual(afterDrag);
+    await expect.poll(() => discardTileOrder(hostPage)).toEqual(afterDrag);
+
+    await contextB.close();
+  });
+
   test("D-13: discard overlay opens, closes on Esc, and is remembered", async ({ page: hostPage, browser }) => {
     const { contextB } = await startTwoPlayerGame(hostPage, browser);
 

@@ -285,7 +285,12 @@ export function Table({
                   span is a DESCENDANT of the button (06.2-10's fixed
                   sibling-swallows-click bug), and the visible box stays
                   icon-sized so this header row does not grow (the discard
-                  region is a fixed reservation, 06.2-16/21). */}
+                  region is a fixed reservation, 06.2-16/21). The inward
+                  (right) side of this button's hit-area is capped at half
+                  the row's gap-xs rather than the full 44px reach, so it
+                  can never overlap discard-toggle's own hit-area beside it
+                  — a full symmetric expansion on both adjacent buttons
+                  would intercept each other's clicks. */}
               <button
                 type="button"
                 data-testid="discard-group-by-suit"
@@ -293,15 +298,14 @@ export function Table({
                 onClick={onGroupDiscardBySuit}
                 disabled={!onGroupDiscardBySuit || game.discard.length < 2}
                 className="relative inline-flex items-center justify-center rounded-md before:absolute before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:opacity-40"
-                style={{
-                  width: 14,
-                  height: 14,
-                  color: "var(--color-text-muted)",
-                  ["--touch-inset" as string]: "calc((var(--size-touch-min) - 14px) / -2)",
-                }}
+                style={{ width: 14, height: 14, color: "var(--color-text-muted)" }}
               >
                 <Group aria-hidden="true" size={14} />
-                <span aria-hidden="true" className="absolute" style={{ inset: "var(--touch-inset)" }} />
+                <span
+                  aria-hidden="true"
+                  className="absolute"
+                  style={{ top: -15, bottom: -15, left: -15, right: -2 }}
+                />
               </button>
               <button
                 type="button"
@@ -312,17 +316,18 @@ export function Table({
                 // not grow past the "Discard" label's own height (needed for
                 // the UI-11 1280x720 no-scroll fit) — the 44px touch target is
                 // provided by an absolutely-positioned (out-of-flow) pseudo
-                // element instead, per --size-touch-min.
+                // element instead, per --size-touch-min. The left (inward)
+                // side is capped at half the gap so it cannot overlap
+                // discard-group-by-suit's own hit-area beside it.
                 className="relative inline-flex items-center justify-center rounded-md before:absolute before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
-                style={{
-                  width: 14,
-                  height: 14,
-                  color: "var(--color-text-muted)",
-                  ["--touch-inset" as string]: "calc((var(--size-touch-min) - 14px) / -2)",
-                }}
+                style={{ width: 14, height: 14, color: "var(--color-text-muted)" }}
               >
                 <Layers aria-hidden="true" size={14} />
-                <span aria-hidden="true" className="absolute" style={{ inset: "var(--touch-inset)" }} />
+                <span
+                  aria-hidden="true"
+                  className="absolute"
+                  style={{ top: -15, bottom: -15, right: -15, left: -2 }}
+                />
               </button>
             </div>
           </div>
