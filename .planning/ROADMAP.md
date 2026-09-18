@@ -388,7 +388,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 07-04-PLAN.md — Rainbow gameplay e2e (D-18, zero-code retry) + live gradient; UI-10 parametrized over base/Rainbow/Black (D-17)
+- [x] 07-04-PLAN.md — Rainbow gameplay e2e (D-18, zero-code retry) + live gradient; UI-10 parametrized over base/Rainbow/Black (D-17)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -407,4 +407,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Wire Engine Into Room Actor | 9/9 | Complete   | 2026-09-16 |
 | 5. Reconnect & Session Durability Hardening | 6/6 | Complete    | 2026-09-17 |
 | 6. Game Interface | 7/7 | Complete    | 2026-09-17 |
-| 7. Variant Support (Rainbow, Black) | 3/5 | In Progress|  |
+| 7. Variant Support (Rainbow, Black) | 4/5 | In Progress|  |

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 3
+current_plan: 4
 status: executing
-stopped_at: Completed 07-03-PLAN.md
-last_updated: "2026-09-18T23:12:21.880Z"
+stopped_at: Completed 07-04-PLAN.md
+last_updated: "2026-09-18T23:26:20.525Z"
 last_activity: 2026-09-18
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 84
-  completed_plans: 80
+  completed_plans: 81
   percent: 78
 ---
 
@@ -27,13 +27,13 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 7
-Plan: 3 of 5
-Current Plan: 3
+Plan: 4 of 5
+Current Plan: 4
 Total Plans in Phase: 5
 Status: Ready to execute
 Last activity: 2026-09-18
 
-Progress: [██████████] 95%
+Progress: [██████████] 96%
 
 ## Performance Metrics
 
@@ -142,6 +142,7 @@ Progress: [██████████] 95%
 | Phase 07 P01 | 35min | 2 tasks | 9 files |
 | Phase 07 P02 | 35min | 2 tasks | 3 files |
 | Phase 07 P03 | 40min | 2 tasks | 6 files |
+| Phase 07 P04 | 50min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -308,6 +309,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 07-02]: variant-matrix.test.ts's end-condition scenarios built via legality.test.ts's buildState+override technique, not a new production helper (D-13)
 - [Phase ?]: [Phase 07-02]: rainbow-art-render.test.ts renders exactly one card per call site so the whole markup serves as the card's fragment for gradient resolution checks
 - [Phase 07-03]: colorRow row mode shares rank's disabled gate (D-07); anchor flip via useLayoutEffect (center/start/end) rather than wrap
+- [Phase 07-04]: D-18 mechanism chosen as seat-retry (3 seats, up to 6 attempts) over a dev-only wrangler --var hook, adding zero production/dev-only code
+- [Phase 07-04]: UI-10's inline 80-iteration play loop replaced by playUntilGameEnds so base/rainbow/black share one identical test body per D-17
 
 ### Pending Todos
 
@@ -330,6 +333,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-18T23:12:21.871Z
-Stopped at: Completed 07-03-PLAN.md
+Last session: 2026-09-18T23:26:20.516Z
+Stopped at: Completed 07-04-PLAN.md
 Resume file: None
