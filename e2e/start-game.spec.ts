@@ -414,9 +414,14 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     // own-hand-slot-1 and note-box-slot-1 (both present unconditionally,
     // note-box-slot-1 replacing 06.2-06's deleted note-chip-slot-1) are the
     // fit checks that replace the deleted pip-band assertions.
+    // 06.2-13: the mute toggle no longer lives on the board — every
+    // non-play preference control (including mute) moved into
+    // SettingsModal, reached via the gear trigger. Assert the gear itself
+    // fits, and that the modal is not present by default.
     await expect(hostPage.getByTestId("own-hand-slot-1")).toBeInViewport();
     await expect(hostPage.getByTestId("note-box-slot-1")).toBeInViewport();
-    await expect(hostPage.getByTestId("audio-mute-toggle")).toBeInViewport();
+    await expect(hostPage.getByTestId("settings-toggle")).toBeInViewport();
+    await expect(hostPage.getByTestId("settings-modal")).toHaveCount(0);
     await expect(hostPage.getByTestId("discard-toggle")).toBeInViewport();
     await expect(
       hostPage.locator('[data-testid="teammates-band"] [data-testid^="other-hand-card-"]').first(),

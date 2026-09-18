@@ -402,9 +402,13 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await expect(passive1.getByTestId(touchedSlot1)).toHaveAttribute("data-hints", "false");
 
     // Turn keep-hints ON for passive1, repeat, and this time the hint
-    // should survive the next move.
+    // should survive the next move. 06.2-13: the toggle now lives inside
+    // SettingsModal, opened by the gear trigger.
+    await passive1.getByTestId("settings-toggle").click();
     await passive1.getByTestId("keep-hints-toggle").click();
     await expect(passive1.getByTestId("keep-hints-toggle")).toHaveAttribute("aria-pressed", "true");
+    await passive1.getByTestId("settings-close").click();
+    await expect(passive1.getByTestId("settings-modal")).toHaveCount(0);
 
     const active2 = await activeOf(hostPage, pageB);
     await active2.locator('[data-testid^="clue-target-"]').first().click();
@@ -425,7 +429,9 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     // The keep-hints preference survives a refresh.
     await passive1.reload();
     await expect(passive1.getByTestId("own-hand")).toBeVisible();
+    await passive1.getByTestId("settings-toggle").click();
     await expect(passive1.getByTestId("keep-hints-toggle")).toHaveAttribute("aria-pressed", "true");
+    await passive1.getByTestId("settings-close").click();
 
     await contextB.close();
   });
@@ -448,8 +454,12 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     const slot = hostPage.getByTestId("own-hand-slot-1");
     const before = await slot.evaluate((el) => getComputedStyle(el).backgroundColor);
 
-    await hostPage.getByTestId("tile-color-picker-toggle").click();
+    // 06.2-13: the tile-colour swatch grid now lives inside SettingsModal,
+    // opened by the gear trigger.
+    await hostPage.getByTestId("settings-toggle").click();
     await hostPage.getByTestId("tile-color-swatch-plum").click();
+    await hostPage.getByTestId("settings-close").click();
+    await expect(hostPage.getByTestId("settings-modal")).toHaveCount(0);
 
     await expect.poll(() => slot.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(before);
     const after = await slot.evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -457,14 +467,35 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     // Persists across a refresh.
     await hostPage.reload();
     await expect(hostPage.getByTestId("own-hand")).toBeVisible();
-    await hostPage.getByTestId("tile-color-picker-toggle").click();
+    await hostPage.getByTestId("settings-toggle").click();
     await expect(hostPage.getByTestId("tile-color-swatch-plum")).toHaveAttribute("aria-pressed", "true");
+    await hostPage.getByTestId("settings-close").click();
     await expect(hostPage.getByTestId("own-hand-slot-1")).toHaveCSS("background-color", after);
 
     // The other player's own tiles are unaffected — a purely personal,
     // local preference (TILE-03).
     const otherBg = await pageB.getByTestId("own-hand-slot-1").evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(otherBg).toBe(before);
+
+    await contextB.close();
+  });
+
+  test("settings modal: the gear opens a dialog holding every relocated preference control, and Escape closes it without disturbing the board", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB } = await startTwoPlayerGame(hostPage, browser);
+
+    await hostPage.getByTestId("settings-toggle").click();
+    await expect(hostPage.getByTestId("settings-modal")).toBeVisible();
+    await expect(hostPage.getByTestId("audio-volume")).toBeVisible();
+    await expect(hostPage.getByTestId("audio-mute-toggle")).toBeVisible();
+    await expect(hostPage.getByTestId("keep-hints-toggle")).toBeVisible();
+    await expect(hostPage.getByTestId("tile-color-swatch-plum")).toBeVisible();
+
+    await hostPage.keyboard.press("Escape");
+    await expect(hostPage.getByTestId("settings-modal")).toHaveCount(0);
+    await expect(hostPage.getByTestId("own-hand")).toBeVisible();
 
     await contextB.close();
   });
