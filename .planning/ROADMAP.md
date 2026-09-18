@@ -375,7 +375,24 @@ Plans:
   2. In the Rainbow variant, a rainbow card remains visually unambiguous from every other suit despite no single color clue being able to identify it alone.
   3. A full game can be played and correctly scored in each of the three variants (base, Rainbow, Black) end to end, confirming the engine and UI built in earlier phases handle all three configurations without special-casing.
 
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+**Wave 1**
+
+- [ ] 07-01-PLAN.md — Server fix: canClue rejects non-nameable colours (clue_color_not_nameable) threaded through rules, schema, worker; regression + property tests
+- [ ] 07-02-PLAN.md — Engine end-condition coverage per variant (D-16) and UI-07 rainbow glyph/gradient render checks (D-11)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 07-03-PLAN.md — Rainbow tile quick-clue colour row (D-05..D-08) with anchor flip; row-aware e2e helpers
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 07-04-PLAN.md — Rainbow gameplay e2e (D-18, zero-code retry) + live gradient; UI-10 parametrized over base/Rainbow/Black (D-17)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 07-05-PLAN.md — Full gate and owner sign-off on live Rainbow and Black boards (checkpoint)
 
 ## Progress
 
