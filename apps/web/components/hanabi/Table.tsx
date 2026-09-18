@@ -424,12 +424,13 @@ export function Table({
               );
             })
           ) : (
-            <p
-              className="text-[length:var(--text-label)]"
-              style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
-            >
-              No tiles discarded yet
-            </p>
+            // UAT gap 24 (fourth owner review): "remove the 'No tiles
+            // discarded yet'" — empty means empty, no placeholder copy
+            // visible on screen; the "Discard" label above already names
+            // the region, so an sr-only equivalent is enough for screen
+            // readers/tests (matches gap 6's "accessible but not obtrusive"
+            // precedent).
+            <p className="sr-only">No tiles discarded yet</p>
           )}
         </div>
       </div>

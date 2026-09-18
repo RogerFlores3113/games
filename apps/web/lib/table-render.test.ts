@@ -265,10 +265,14 @@ describe("table-render: discard order and empty state (Task 3)", () => {
     expect(markup).not.toContain("discard-tile-unknown-id");
   });
 
-  it("renders the empty-state copy when discard is empty", () => {
+  // UAT gap 24 (fourth owner review): "remove the 'No tiles discarded
+  // yet'" — the copy survives for screen readers/tests only, marked
+  // sr-only so nothing renders visibly on screen.
+  it("renders the empty-state copy sr-only (not visible) when discard is empty", () => {
     const game: HanabiView = { ...BASE_GAME, discard: [], discardOrder: [] };
     const markup = render(game);
     expect(markup).toContain("No tiles discarded yet");
+    expect(markup).toContain('class="sr-only">No tiles discarded yet');
   });
 });
 

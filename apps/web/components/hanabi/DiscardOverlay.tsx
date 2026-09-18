@@ -208,12 +208,11 @@ export function DiscardOverlay({
             })}
           </div>
         ) : (
-          <p
-            className="text-[length:var(--text-label)]"
-            style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
-          >
-            No cards discarded yet
-          </p>
+          // UAT gap 24 (fourth owner review): "remove the 'No tiles discarded
+          // yet'" — empty means empty, no placeholder copy. The dialog's own
+          // heading ("Discard pile") plus the empty content area already
+          // communicate the state.
+          <p className="sr-only">No cards discarded yet</p>
         )}
       </div>
     </div>

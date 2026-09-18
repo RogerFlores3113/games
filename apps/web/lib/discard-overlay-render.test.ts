@@ -24,7 +24,9 @@ describe("discard-overlay-render", () => {
     expect(markup).toContain('aria-modal="true"');
     expect(markup).toContain('data-testid="discard-overlay"');
     expect(markup).toContain("Discard pile");
-    expect(markup).toContain("No cards discarded yet");
+    // UAT gap 24 (fourth owner review): the empty-state copy stays for
+    // screen readers/tests only, sr-only so nothing renders visibly.
+    expect(markup).toContain('class="sr-only">No cards discarded yet');
   });
 
   it("renders one discard-overlay-card per card, in discard's array order when discardOrder is omitted", () => {
