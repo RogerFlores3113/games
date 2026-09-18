@@ -2,7 +2,7 @@ import type { Clue, HanabiCardView, HanabiView } from "@games/rules";
 import { cluableColorsForView } from "../../lib/hanabi-board-logic";
 import { disabledReasonFor, luminosityStepFor, type ActionContext } from "../../lib/hanabi-visual-logic";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
-import { TILE_COLOR_PRESETS } from "../../lib/tile-color-pref";
+import { DEFAULT_TILE_COLOR_CSS } from "../../lib/tile-color-pref";
 import { CluePopover } from "./CluePopover";
 import { FireworkCardBack, FireworkCardFace } from "./FireworkCard";
 import { TeammateHintIndicator } from "./HintIndicator";
@@ -38,7 +38,7 @@ export interface TeammateCardProps {
 const CARD_WIDTH = 64;
 const CARD_HEIGHT = 78;
 
-const DEFAULT_TILE_COLOR = TILE_COLOR_PRESETS.find((preset) => preset.id === "slate")!.cssValue;
+const DEFAULT_TILE_COLOR = DEFAULT_TILE_COLOR_CSS;
 
 /**
  * D-08/D-09/D-12/D-13: a teammate's face-up card renders the owner-approved
@@ -125,7 +125,22 @@ export function TeammateCard({
         }}
       >
         {!card.hidden ? (
-          <span data-testid="card-identity" className="relative z-10">
+          // UAT gap 29 (fifth owner review): this wrapper must be `inline-flex`,
+          // not the default `block`. FireworkCardFace/FireworkCardBack render
+          // as `inline-block` — inside a `block` parent that participates in
+          // normal text-line layout, an inline-block child sits on the text
+          // baseline and leaves a small "descender" gap beneath it (classic
+          // inline-block whitespace-gap quirk), inflating this wrapper's own
+          // measured height a few px beyond the card's real 78px. Since this
+          // wrapper is the tile button's one flex item (button is
+          // `inline-flex items-center justify-center`), that inflated height
+          // shifted the visible card upward within the centered flex item,
+          // leaving a sliver of the button's own background exposed below the
+          // card — the "stray line" at the bottom of every face-up tile.
+          // `inline-flex` (matching every other FireworkCardFace/Back call
+          // site in Table.tsx/DiscardOverlay.tsx, which never had this bug)
+          // makes the card the flex item directly, with no baseline gap.
+          <span data-testid="card-identity" className="relative z-10 inline-flex">
             <FireworkCardFace suit={card.suit} rank={card.rank} width={CARD_WIDTH} height={CARD_HEIGHT} exposeSuit />
             {/* WR-03: the rank is part of the accessible name ("Red 3") —
                 FireworkCardFace's exposeSuit-gated title/aria-label already
@@ -136,7 +151,8 @@ export function TeammateCard({
         ) : (
           // An unseated viewer (spectator-shaped RoomView, no seat of their
           // own) gets the neutral card back here in place of the burst face.
-          <span className="relative z-10">
+          // Same `inline-flex` fix as the face-up branch above (UAT gap 29).
+          <span className="relative z-10 inline-flex">
             <FireworkCardBack width={CARD_WIDTH} height={CARD_HEIGHT} />
           </span>
         )}
