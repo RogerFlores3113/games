@@ -97,11 +97,31 @@ export function useDiscardDrag({ game, ctx, onDropRequest }: UseDiscardDragOptio
 
   useEffect(() => clearPendingOrderTimer, [clearPendingOrderTimer]);
 
-  function buildTiles(): ReadonlyArray<{ cardId: string; rect: Rect }> {
-    return Array.from(tilesRef.current.entries()).map(([cardId, el]) => ({
-      cardId,
-      rect: el.getBoundingClientRect(),
-    }));
+  /**
+   * Rule 1 fix (surfaced by the post-06.2-21 board-size follow-up): the
+   * currently-dragged tile must never appear in its own drop-index
+   * comparison set. `discardDropIndex` compares the pointer against each
+   * tile's rect in order, and the dragged tile's own rect visually FOLLOWS
+   * the pointer (D-20's translate-to-cursor drag feedback) — since a
+   * `dragLocatorTo`-style grab starts at the tile's own center, the
+   * dragged tile's rect center coincides almost exactly with the pointer
+   * for the entire drag, putting the very first comparison (against
+   * itself) on a sub-pixel tie that a real browser's floating-point
+   * layout resolves inconsistently. Depending on which side of that tie
+   * the accumulated rounding lands, the drop can resolve to the dragged
+   * tile's own original index — a silent no-op — before ever reaching the
+   * OTHER (static) tiles' comparisons. Excluding the dragged id here
+   * matches `useHandDrag.ts`'s own-hand equivalent, whose registered slot
+   * rects are the STATIC layout positions (never the moving card), so it
+   * never had this class of bug.
+   */
+  function buildTiles(excludeCardId: string | null): ReadonlyArray<{ cardId: string; rect: Rect }> {
+    return Array.from(tilesRef.current.entries())
+      .filter(([cardId]) => cardId !== excludeCardId)
+      .map(([cardId, el]) => ({
+        cardId,
+        rect: el.getBoundingClientRect(),
+      }));
   }
 
   function endDrag(): void {
@@ -121,7 +141,7 @@ export function useDiscardDrag({ game, ctx, onDropRequest }: UseDiscardDragOptio
         if (!exceedsDragThreshold(start, point)) return;
         draggingActiveRef.current = true;
       }
-      const targetIndex = discardDropIndex(point, buildTiles());
+      const targetIndex = discardDropIndex(point, buildTiles(cardId));
       setDragState({ cardId, offset: { x: point.x - start.x, y: point.y - start.y }, targetIndex });
     }
 
@@ -137,7 +157,7 @@ export function useDiscardDrag({ game, ctx, onDropRequest }: UseDiscardDragOptio
       }
 
       const point: Point = { x: event.clientX, y: event.clientY };
-      const targetIndex = discardDropIndex(point, buildTiles());
+      const targetIndex = discardDropIndex(point, buildTiles(cardId));
       const request = requestForDiscardDrop(targetIndex, cardId, game.discardOrder);
 
       if (request !== null) {
