@@ -8,6 +8,12 @@ import { CONTROLS_ROW_PX } from "../../lib/layout-budget";
 export interface TileColorPickerProps {
   value: TileColorId;
   onChange: (id: TileColorId) => void;
+  /** 06.2-13: when true, render only the swatch grid — no toggle button,
+   * no open/closed state. Used inside `SettingsModal`, which already
+   * provides its own labelled row and dialog chrome. Omitted/false keeps
+   * this component byte-identical to its pre-06.2-13 icon-button-opens-
+   * panel behaviour. */
+  embedded?: boolean;
 }
 
 const PRESET_LABEL_SUFFIX: Record<TileColorId, string> = {
@@ -29,8 +35,67 @@ const PRESET_LABEL_SUFFIX: Record<TileColorId, string> = {
  * Colours here are the fixed preset palette only — no accent colour beyond
  * the existing reserved focus-ring use (UI-SPEC "reserved accent uses").
  */
-export function TileColorPicker({ value, onChange }: TileColorPickerProps) {
+export function TileColorPicker({ value, onChange, embedded = false }: TileColorPickerProps) {
   const [open, setOpen] = useState(false);
+
+  const swatchGrid = (
+    <div
+      data-testid="tile-color-picker-panel"
+      role="group"
+      aria-label="Tile colour presets"
+      className={
+        embedded
+          ? "flex flex-wrap gap-[length:var(--space-xs)]"
+          : "absolute bottom-full left-1/2 mb-[length:var(--space-xs)] flex -translate-x-1/2 gap-[length:var(--space-xs)] rounded-md p-[length:var(--space-xs)]"
+      }
+      style={
+        embedded
+          ? undefined
+          : {
+              backgroundColor: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+            }
+      }
+    >
+      {TILE_COLOR_PRESETS.map((preset) => (
+        <span
+          key={preset.id}
+          className="relative inline-flex items-center justify-center"
+          style={{ width: 28, height: 28 }}
+        >
+          <button
+            type="button"
+            data-testid={`tile-color-swatch-${preset.id}`}
+            aria-label={PRESET_LABEL_SUFFIX[preset.id]}
+            aria-pressed={value === preset.id}
+            onClick={() => {
+              onChange(preset.id);
+              setOpen(false);
+            }}
+            className="relative inline-flex items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+            style={{
+              width: 24,
+              height: 24,
+              backgroundColor: preset.cssValue,
+              border:
+                value === preset.id
+                  ? "2px solid var(--color-text)"
+                  : "1px solid var(--color-border)",
+            }}
+          >
+            {/* fix(06.2-10): moved inside the button — see the toggle
+                button's own comment above for why a sibling overlay
+                silently swallows every click. */}
+            <span aria-hidden="true" className="absolute" style={{ inset: "-10px" }} />
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+
+  if (embedded) {
+    return swatchGrid;
+  }
 
   return (
     <div className="relative inline-flex">
@@ -58,52 +123,7 @@ export function TileColorPicker({ value, onChange }: TileColorPickerProps) {
         </button>
       </span>
 
-      {open && (
-        <div
-          data-testid="tile-color-picker-panel"
-          role="group"
-          aria-label="Tile colour presets"
-          className="absolute bottom-full left-1/2 mb-[length:var(--space-xs)] flex -translate-x-1/2 gap-[length:var(--space-xs)] rounded-md p-[length:var(--space-xs)]"
-          style={{
-            backgroundColor: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-          }}
-        >
-          {TILE_COLOR_PRESETS.map((preset) => (
-            <span
-              key={preset.id}
-              className="relative inline-flex items-center justify-center"
-              style={{ width: 28, height: 28 }}
-            >
-              <button
-                type="button"
-                data-testid={`tile-color-swatch-${preset.id}`}
-                aria-label={PRESET_LABEL_SUFFIX[preset.id]}
-                aria-pressed={value === preset.id}
-                onClick={() => {
-                  onChange(preset.id);
-                  setOpen(false);
-                }}
-                className="relative inline-flex items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
-                style={{
-                  width: 24,
-                  height: 24,
-                  backgroundColor: preset.cssValue,
-                  border:
-                    value === preset.id
-                      ? "2px solid var(--color-text)"
-                      : "1px solid var(--color-border)",
-                }}
-              >
-                {/* fix(06.2-10): moved inside the button — see the toggle
-                    button's own comment above for why a sibling overlay
-                    silently swallows every click. */}
-                <span aria-hidden="true" className="absolute" style={{ inset: "-10px" }} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
+      {open && swatchGrid}
     </div>
   );
 }
