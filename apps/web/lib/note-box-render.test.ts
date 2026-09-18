@@ -25,6 +25,9 @@ const source = readFileSync(SOURCE_PATH, "utf-8");
 const HANABI_BOARD_PATH = fileURLToPath(new URL("../components/hanabi/HanabiBoard.tsx", import.meta.url));
 const hanabiBoardSource = readFileSync(HANABI_BOARD_PATH, "utf-8");
 
+const SETTINGS_MODAL_PATH = fileURLToPath(new URL("../components/hanabi/SettingsModal.tsx", import.meta.url));
+const settingsModalSource = readFileSync(SETTINGS_MODAL_PATH, "utf-8");
+
 describe("note-box-render", () => {
   it("server render is an always-present, empty-state input with the Note… placeholder and the slot testid (SSR-safe)", () => {
     const markup = renderToStaticMarkup(
@@ -132,10 +135,10 @@ describe("tile-color-picker-render (TILE-03, D-13/D-14)", () => {
 });
 
 describe("keep-hints-toggle copy contract (HINT-03, D-05)", () => {
-  it("HanabiBoard.tsx carries both contracted aria-label states and derives visibility with hintsVisibleForCard", () => {
-    expect(hanabiBoardSource).toContain('"Keep hints visible"');
-    expect(hanabiBoardSource).toContain('"Clear hints after each move"');
+  it("HanabiBoard.tsx derives visibility with hintsVisibleForCard; SettingsModal.tsx carries both contracted aria-label states (06.2-13: the toggle itself moved into the settings modal)", () => {
     expect(hanabiBoardSource).toContain("hintsVisibleForCard(");
+    expect(settingsModalSource).toContain('"Keep hints visible"');
+    expect(settingsModalSource).toContain('"Clear hints after each move"');
   });
 
   it("does not introduce a new setTimeout for hint lifetime — only the pre-existing clue-flash timer remains", () => {

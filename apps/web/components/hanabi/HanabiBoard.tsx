@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Settings } from "lucide-react";
 import type { RoomView } from "@games/schema";
 import { HanabiViewSchema } from "@games/schema/games/hanabi";
 import type { Clue, HanabiView } from "@games/rules";
@@ -19,7 +19,6 @@ import {
   writeTileColorPref,
   type TileColorId,
 } from "../../lib/tile-color-pref";
-import { CONTROLS_ROW_PX } from "../../lib/layout-budget";
 import {
   CLUE_HIGHLIGHT_MS,
   teammatesInTurnOrder,
@@ -34,8 +33,7 @@ import { CluePicker } from "./CluePicker";
 import { EndOverlay } from "./EndOverlay";
 import { FlyToLayer } from "./FlyToLayer";
 import { ReconnectingBanner } from "../ReconnectingBanner";
-import { AudioControls } from "./AudioControls";
-import { TileColorPicker } from "./TileColorPicker";
+import { SettingsModal } from "./SettingsModal";
 import { useHanabiAudio } from "./useHanabiAudio";
 import { useHandDrag } from "./useHandDrag";
 import { useDiscardDrag } from "./useDiscardDrag";
@@ -103,6 +101,9 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
   // tile) before the real stored value is readable.
   const [keepHints, setKeepHints] = useState(false);
   const [tileColorId, setTileColorId] = useState<TileColorId>("slate");
+  // 06.2-13: gear-triggered settings modal open state — the modal is a
+  // pure overlay, never an unmount of the board underneath it.
+  const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => {
     setKeepHints(readKeepHintsPref());
     setTileColorId(readTileColorPref());
@@ -283,8 +284,36 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
 
   return (
     <main
-      className="table-backdrop flex min-h-screen flex-col gap-[3px] overflow-y-auto px-[length:var(--space-md)] py-[3px]"
+      className="table-backdrop relative flex min-h-screen flex-col gap-[3px] overflow-y-auto px-[length:var(--space-md)] py-[3px]"
     >
+      {/* 06.2-13: the gear trigger is absolutely positioned relative to this
+          `<main>` (now `position: relative`), so it adds ZERO flow height
+          to any band — UI-11's 1280x720 fit has no slack. */}
+      <span
+        className="absolute z-10"
+        style={{
+          top: "var(--space-sm)",
+          right: "var(--space-sm)",
+          height: 44,
+          width: 44,
+        }}
+      >
+        <button
+          type="button"
+          data-testid="settings-toggle"
+          aria-label="Open settings"
+          aria-expanded={settingsOpen}
+          onClick={() => setSettingsOpen(true)}
+          className="relative inline-flex items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+          style={{ width: 28, height: 28 }}
+        >
+          <Settings size={20} aria-hidden="true" color="var(--color-text)" />
+          {/* fix(06.2-10) pattern, preserved: the enlarged touch-target span
+              must be a DESCENDANT of the button, not a sibling. */}
+          <span aria-hidden="true" className="absolute" style={{ inset: "-8px" }} />
+        </button>
+      </span>
+
       {reconnecting && <ReconnectingBanner />}
 
       <div data-testid="teammates-band" className="flex flex-none flex-wrap justify-center gap-[length:var(--space-xs)]">
@@ -321,12 +350,10 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
       </div>
 
       {/* fix(06.2-10): testid added purely as a measurement hook — the
-          OWN_BAND_PX layout-budget constant covers this ENTIRE row (OwnHand
-          + CardActions + CluePicker + AudioControls + toggles, per that
-          constant's own doc comment), but the only pre-existing testid
-          scoped to any part of it ("own-band") wraps just OwnHand's own
-          section. Task 3's ledger-vs-render reconciliation needs to measure
-          the row this budget actually describes. */}
+          OWN_BAND_PX layout-budget constant covers this ENTIRE row. 06.2-13
+          stripped it to only OwnHand + CardActions + CluePicker (play
+          controls); every non-play preference control now lives inside
+          SettingsModal, opened by the gear trigger above. */}
       <div
         data-testid="bottom-controls-row"
         className="flex flex-none flex-wrap items-start justify-center gap-[length:var(--space-md)]"
@@ -362,66 +389,6 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
           onDiscard={() => selectedCardId && act({ type: "discard", cardId: selectedCardId })}
         />
 
-        {/* fix(06.2-10): moved BEFORE CluePicker (was after it). CluePicker
-            is the widest, most wrap-prone element in this row — its value
-            row grows by one button per extra cluable colour (Rainbow/
-            Black add a 6th), and at 5 players/1280px width that growth was
-            enough to push THIS group off the same wrapped line as
-            CluePicker, adding an entire extra line (~108px) to the whole
-            bottom-controls-row and breaking the UI-11 1280x720 fit for the
-            Black-variant worst case (measured: 369px vs the 300px
-            OWN_BAND_PX budget). Reordered so OwnHand+CardActions+this group
-            greedily fill the first wrapped line (they are comfortably
-            narrower, using slack CardActions/AudioControls always had),
-            leaving CluePicker to wrap onto its own line alone regardless of
-            how many colour buttons it renders — the same 2-row internal
-            shape either way, just never fighting a sibling for width.
-            HINT-03/D-05/TILE-03: grouped with AudioControls in a single
-            tight-gap wrapper (space-xs, not the row's own space-md). */}
-        <div className="flex items-center gap-[length:var(--space-xs)]">
-          <AudioControls
-            muted={audio.muted}
-            volume={audio.volume}
-            onToggleMute={() => audio.setMuted(!audio.muted)}
-            onVolumeChange={audio.setVolume}
-          />
-
-          {/* Icon-only, out-of-flow 44px touch target (matches the row's
-              other controls); label describes the action the NEXT click
-              performs, per the copy contract. */}
-          <span
-            className="relative inline-flex items-center justify-center rounded-md"
-            style={{ height: CONTROLS_ROW_PX, width: CONTROLS_ROW_PX }}
-          >
-            <button
-              type="button"
-              data-testid="keep-hints-toggle"
-              aria-label={keepHints ? "Clear hints after each move" : "Keep hints visible"}
-              aria-pressed={keepHints}
-              onClick={handleToggleKeepHints}
-              className="relative inline-flex items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
-              style={{ width: 28, height: 28 }}
-            >
-              {keepHints ? (
-                <Eye size={16} aria-hidden="true" color="var(--color-text)" />
-              ) : (
-                <EyeOff size={16} aria-hidden="true" color="var(--color-text-muted)" />
-              )}
-              {/* fix(06.2-10): the enlarged touch-target span must be a
-                  DESCENDANT of the button, not a sibling — a sibling span
-                  painted after the button in DOM order sits on top of it
-                  (same stacking context, no z-index), silently swallowing
-                  every pointer click at the button's own visual location in
-                  both a real browser and Playwright. Moved inside, matching
-                  Table.tsx's discard-toggle (the one button of this shape
-                  that was already click-safe). */}
-              <span aria-hidden="true" className="absolute" style={{ inset: "-8px" }} />
-            </button>
-          </span>
-
-          <TileColorPicker value={tileColorId} onChange={handleTileColorChange} />
-        </div>
-
         <CluePicker
           game={game}
           targets={teammates.map((hand) => ({ seatId: hand.seatId, label: labelFor(hand.seatId) }))}
@@ -436,6 +403,19 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
       </div>
 
       <FlyToLayer game={game} reconnecting={reconnecting} suppressedCardIds={drag.droppedCardIdsRef} />
+
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        muted={audio.muted}
+        volume={audio.volume}
+        onToggleMute={() => audio.setMuted(!audio.muted)}
+        onVolumeChange={audio.setVolume}
+        keepHints={keepHints}
+        onToggleKeepHints={handleToggleKeepHints}
+        tileColorId={tileColorId}
+        onTileColorChange={handleTileColorChange}
+      />
 
       {ended && <EndOverlay game={game} />}
     </main>

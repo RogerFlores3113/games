@@ -11,8 +11,11 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import type { RoomCode, RoomView } from "@games/schema";
+import type { HanabiView } from "@games/rules";
 import { SettingsModal } from "../components/hanabi/SettingsModal";
 import { TileColorPicker } from "../components/hanabi/TileColorPicker";
+import { HanabiBoard } from "../components/hanabi/HanabiBoard";
 
 const SOURCE_PATH = fileURLToPath(new URL("../components/hanabi/SettingsModal.tsx", import.meta.url));
 const source = readFileSync(SOURCE_PATH, "utf-8");
@@ -109,5 +112,53 @@ describe("TileColorPicker embedded mode", () => {
     const markup = renderToStaticMarkup(createElement(TileColorPicker, { value: "slate", onChange: () => {} }));
     expect(markup).toContain('data-testid="tile-color-picker-toggle"');
     expect(markup).not.toContain("tile-color-picker-panel");
+  });
+});
+
+// 06.2-13 Task 2: the bottom row is stripped to play controls only — the
+// relocated preference controls must render nowhere in the default
+// (closed-modal) HanabiBoard markup, only the gear trigger that opens them.
+const BASE_GAME: HanabiView = {
+  variant: "base",
+  yourSeatId: "seat-1",
+  yourHand: [],
+  otherHands: [],
+  stacks: [
+    { suit: "red", topRank: 0 },
+    { suit: "yellow", topRank: 0 },
+    { suit: "green", topRank: 0 },
+    { suit: "blue", topRank: 0 },
+    { suit: "white", topRank: 0 },
+  ],
+  discard: [],
+  discardOrder: [],
+  clueTokens: 8,
+  fuses: 3,
+  deckCount: 50,
+  finalTurnsRemaining: null,
+  activeSeatId: "seat-1",
+  isYourTurn: true,
+  score: 0,
+  history: [],
+};
+
+const BASE_VIEW: RoomView = {
+  code: "ABCDEF" as RoomCode,
+  variant: "base",
+  status: "in_progress",
+  hostSeatId: "seat-1",
+  youSeatId: "seat-1",
+  seats: [{ seatId: "seat-1", displayLabel: "Roger", connected: true, isHost: true }],
+  game: BASE_GAME,
+};
+
+describe("HanabiBoard: relocated controls live only inside the (closed) settings modal", () => {
+  it("default markup contains settings-toggle and none of the four relocated control testids", () => {
+    const markup = renderToStaticMarkup(createElement(HanabiBoard, { view: BASE_VIEW, onAction: () => {} }));
+    expect(markup).toContain('data-testid="settings-toggle"');
+    expect(markup).not.toContain("audio-mute-toggle");
+    expect(markup).not.toContain("audio-volume");
+    expect(markup).not.toContain("keep-hints-toggle");
+    expect(markup).not.toContain("tile-color-swatch-slate");
   });
 });
