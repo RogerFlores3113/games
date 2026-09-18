@@ -80,26 +80,40 @@ export function TeammateCard({
   const tileBorder = "1px solid var(--color-border)";
   const tileShadow = "0 2px 4px var(--color-tile-shadow)";
 
-  // UAT gap 16: a visible (non-hidden) card's own suit/rank ARE the two
-  // quick-clue options — no new legality rule invented here. Rank always
-  // touches its own card (RULES-11's `disabledReasonFor` is called with the
-  // real derived clue, never a placeholder), so `rankDisabled` reduces
-  // exactly to the shared ended/reconnecting/not-your-turn/no-tokens gate.
-  // `colorDisabled` adds one more real-world case on top: some suits (e.g.
-  // Rainbow) are never a nameable colour clue at all (`cluableColorsForView`
-  // excludes them) — that case has no accompanying written reason either,
-  // per the owner's "no obtrusive text" instruction (UAT gap 15's sibling
-  // rule); the button is simply disabled.
+  // UAT gap 16 / D-05..D-08 (Phase 7, owner-confirmed 2026-09-18): a visible
+  // (non-hidden) card's own rank IS always a legal quick-clue option — no
+  // new legality rule invented here. Rank always touches its own card
+  // (RULES-11's `disabledReasonFor` is called with the real derived clue,
+  // never a placeholder), so `rankDisabled` reduces exactly to the shared
+  // ended/reconnecting/not-your-turn/no-tokens gate.
+  //
+  // The colour slot is different: some suits (Rainbow) are never themselves
+  // a nameable colour clue (`cluableColorsForView` excludes them). Rather
+  // than disabling the colour button for such a tile (the pre-Phase-7
+  // behaviour, which made every legal colour clue that only touches a
+  // rainbow tile ungivable from the UI — RULES-14), the popover instead
+  // offers a compact ROW of the variant's nameable colours (`colorRow`
+  // below) — every nameable colour always touches the clicked rainbow tile
+  // by the engine's own rule, so the row shares rank's own gate (D-07): no
+  // per-entry legality check, never any disabled-reason text (UAT gap 15's
+  // sibling rule). `colorNameable` is the sole, variant-agnostic detection
+  // rule (`cluableColorsForView(game).includes(card.suit)`) — never a
+  // hardcoded suit-name comparison against the rainbow suit specifically,
+  // so a future variant with a second non-nameable suit would be handled
+  // correctly without editing this file.
   const rankDisabled =
     card.hidden ||
     disabledReasonFor(game, { kind: "clue", targetSeatId: seatId, clue: { type: "rank", value: card.rank } }, ctx) !==
       null;
   const colorNameable = !card.hidden && cluableColorsForView(game).includes(card.suit);
+  const colorRow = !card.hidden && !colorNameable ? cluableColorsForView(game) : null;
   const colorDisabled =
     card.hidden ||
-    !colorNameable ||
-    disabledReasonFor(game, { kind: "clue", targetSeatId: seatId, clue: { type: "color", value: card.suit } }, ctx) !==
-      null;
+    (colorRow !== null
+      ? rankDisabled
+      : !colorNameable ||
+        disabledReasonFor(game, { kind: "clue", targetSeatId: seatId, clue: { type: "color", value: card.suit } }, ctx) !==
+          null);
   // Prefer not opening the popover at all when nothing in it could ever be
   // clicked (RULES-11 constraint from the gap-closure task) — rank is the
   // more permissive of the two, so "openable" tracks it.
@@ -207,7 +221,8 @@ export function TeammateCard({
           rank={card.rank}
           colorDisabled={colorDisabled}
           rankDisabled={rankDisabled}
-          onGiveColor={() => onGiveClue({ type: "color", value: card.suit })}
+          colorRow={colorRow}
+          onGiveColor={(value) => onGiveClue({ type: "color", value })}
           onGiveRank={() => onGiveClue({ type: "rank", value: card.rank })}
         />
       )}
