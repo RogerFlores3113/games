@@ -257,14 +257,27 @@ body {
  * is rgba(11, 15, 26, 0.35), the same --color-bg-derived literal used by
  * .table-backdrop above, at a lower opacity so the wood's own colour still
  * reads through. Sourced, licence-verified and credited in
- * apps/web/public/backgrounds/CREDITS.md under "wood-board.webp".
+ * apps/web/public/backgrounds/CREDITS.md under "wood-tile.webp".
+ */
+/*
+ * TILE-02: the board is a dark walnut surface built from a small texture
+ * repeated in a grid, per the owner's direction ("shrink it and duplicate it
+ * to make a grid for the board") — not one photo stretched to fit, and not
+ * the CSS-generated grain the owner rejected. The tile is 800x600 and is
+ * drawn at 160px so the grain reads at board scale and the repeat is not
+ * obvious. The scrim keeps card and text contrast where it was: its rgba is
+ * --color-bg at partial opacity, the same documented exception .table-backdrop
+ * uses, since @theme tokens are hex and cannot carry an alpha here.
  */
 .board-surface {
   background-color: var(--color-surface);
   background-image: linear-gradient(rgba(11, 15, 26, 0.35), rgba(11, 15, 26, 0.35)),
-    url("/backgrounds/wood-board.webp");
-  background-size: cover;
-  background-position: center;
+    url("/backgrounds/wood-tile.webp");
+  background-size:
+    auto,
+    160px;
+  background-repeat: no-repeat, repeat;
+  background-position: center, center;
   border: 1px solid var(--color-border);
   border-radius: 12px;
 }

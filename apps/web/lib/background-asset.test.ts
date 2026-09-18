@@ -14,8 +14,8 @@ const GLOBALS_CSS_PATH = fileURLToPath(new URL("../app/globals.css", import.meta
 
 const BACKGROUND_ASSETS = [
   {
-    name: "wood-board.webp",
-    path: fileURLToPath(new URL("../public/backgrounds/wood-board.webp", import.meta.url)),
+    name: "wood-tile.webp",
+    path: fileURLToPath(new URL("../public/backgrounds/wood-tile.webp", import.meta.url)),
   },
   {
     name: "city-fireworks.webp",
@@ -63,13 +63,15 @@ describe("background-asset", () => {
     expect(rule).not.toMatch(/#[0-9A-Fa-f]{3,8}/);
   });
 
-  it("globals.css defines .board-surface with the sourced wood-board image, cover sizing, and no generated-texture layers", () => {
+  it("globals.css defines .board-surface as the wood tile repeated in a grid, with no generated-texture layers", () => {
     const css = readFileSync(GLOBALS_CSS_PATH, "utf-8");
     const match = css.match(/\.board-surface\s*{([\s\S]*?)}/);
     expect(match).not.toBeNull();
     const rule = match![1]!;
-    expect(rule).toMatch(/url\(["']\/backgrounds\/wood-board\.webp["']\)/);
-    expect(rule).toMatch(/background-size:\s*cover/);
+    expect(rule).toMatch(/url\(["']\/backgrounds\/wood-tile\.webp["']\)/);
+    // TILE-02: a small texture repeated in a grid, not one stretched photo.
+    expect(rule).toMatch(/background-repeat:[^;]*repeat/);
+    expect(rule).not.toMatch(/background-size:\s*cover\s*;/);
     expect(rule).not.toMatch(/repeating-linear-gradient/);
     expect(rule).not.toMatch(/background-blend-mode/);
     // No hex literal inside the rule itself.
