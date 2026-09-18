@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   applyPendingOrder,
   discardDropIndex,
+  groupedBySuitOrder,
   reorderedDiscardIds,
   requestForDiscardDrop,
 } from "./hanabi-discard-drag-logic";
 import type { Rect } from "./hanabi-discard-drag-logic";
+import type { Suit } from "@games/rules";
 
 describe("reorderedDiscardIds", () => {
   it('(["a","b","c","d"], "a", 2) -> ["b","c","a","d"]', () => {
@@ -63,5 +65,69 @@ describe("applyPendingOrder (re-exported, not redefined)", () => {
   it("reorders cards into the pending id order", () => {
     const cards = [{ id: "a" }, { id: "b" }, { id: "c" }];
     expect(applyPendingOrder(cards, ["c", "a", "b"]).map((c) => c.id)).toEqual(["c", "a", "b"]);
+  });
+});
+
+describe("groupedBySuitOrder", () => {
+  const suitOrder: readonly Suit[] = ["red", "yellow", "green", "blue", "white"];
+
+  it("sorts by suit position in suitOrder, then rank ascending, then existing index", () => {
+    const discard = [
+      { id: "d1", suit: "blue" as Suit, rank: 2 },
+      { id: "d2", suit: "red" as Suit, rank: 3 },
+      { id: "d3", suit: "red" as Suit, rank: 1 },
+      { id: "d4", suit: "blue" as Suit, rank: 1 },
+    ];
+    expect(groupedBySuitOrder(discard, suitOrder)).toEqual(["d3", "d2", "d4", "d1"]);
+  });
+
+  it("is always an exact permutation of the input ids (same length, same set, no duplicates)", () => {
+    const discard = [
+      { id: "a", suit: "white" as Suit, rank: 5 },
+      { id: "b", suit: "red" as Suit, rank: 1 },
+      { id: "c", suit: "green" as Suit, rank: 4 },
+      { id: "d", suit: "blue" as Suit, rank: 2 },
+      { id: "e", suit: "yellow" as Suit, rank: 3 },
+      { id: "f", suit: "red" as Suit, rank: 2 },
+    ];
+    const result = groupedBySuitOrder(discard, suitOrder);
+    expect(result).toHaveLength(discard.length);
+    expect(new Set(result)).toEqual(new Set(discard.map((c) => c.id)));
+    expect(new Set(result).size).toBe(result.length);
+  });
+
+  it("is idempotent — calling it twice on an already-grouped sequence returns the same order", () => {
+    const discard = [
+      { id: "a", suit: "white" as Suit, rank: 5 },
+      { id: "b", suit: "red" as Suit, rank: 1 },
+      { id: "c", suit: "green" as Suit, rank: 4 },
+    ];
+    const once = groupedBySuitOrder(discard, suitOrder);
+    const regrouped = once.map((id) => discard.find((c) => c.id === id)!);
+    const twice = groupedBySuitOrder(regrouped, suitOrder);
+    expect(twice).toEqual(once);
+  });
+
+  it("sorts a card whose suit is absent from suitOrder last, rather than throwing", () => {
+    const discard = [
+      { id: "a", suit: "black" as Suit, rank: 1 },
+      { id: "b", suit: "red" as Suit, rank: 1 },
+    ];
+    expect(() => groupedBySuitOrder(discard, suitOrder)).not.toThrow();
+    expect(groupedBySuitOrder(discard, suitOrder)).toEqual(["b", "a"]);
+  });
+
+  it("returns an empty array for an empty pile", () => {
+    expect(groupedBySuitOrder([], suitOrder)).toEqual([]);
+  });
+
+  it("never mutates the input array", () => {
+    const discard = [
+      { id: "a", suit: "blue" as Suit, rank: 2 },
+      { id: "b", suit: "red" as Suit, rank: 1 },
+    ];
+    const copy = [...discard];
+    groupedBySuitOrder(discard, suitOrder);
+    expect(discard).toEqual(copy);
   });
 });

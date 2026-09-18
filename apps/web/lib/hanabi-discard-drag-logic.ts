@@ -1,3 +1,4 @@
+import type { Suit } from "@games/rules";
 import type { Point, Rect } from "./hanabi-drag-logic";
 import { applyPendingOrder } from "./hanabi-drag-logic";
 
@@ -87,4 +88,42 @@ export function requestForDiscardDrop(
     return null;
   }
   return { type: "reorderDiscard", cardIds };
+}
+
+/** UAT gap 10/DISC-01: the one place the "group by suit" sort is computed.
+ * Its output is a `reorderDiscard` submission like any drag's — a shared
+ * re-sort of the server's `discardOrder`, not a local view toggle (the owner
+ * was asked explicitly and chose the shared re-sort). `canReorderDiscard`
+ * (packages/rules/src/hanabi/legality.ts) validates server-side that the
+ * result is an exact permutation of the current discard ids, so a bug here
+ * is rejected, never silently applied.
+ *
+ * Sorts by `suit`'s position in `suitOrder` (never a hardcoded suit list —
+ * `game.stacks.map((s) => s.suit)` is the caller's canonical source, correct
+ * for every variant including Rainbow/Black), then by `rank` ascending, then
+ * by the tile's existing index in `discard` — a total, deterministic order,
+ * so the same input always produces the same output on every client and the
+ * sort is idempotent on an already-grouped sequence. T-06.2-42: a suit
+ * absent from `suitOrder` (a malformed/stale frame) sorts last rather than
+ * throwing, so this can never break a click handler. Never mutates its
+ * input — sorts a copy. */
+export function groupedBySuitOrder(
+  discard: readonly { id: string; suit: Suit; rank: number }[],
+  suitOrder: readonly Suit[],
+): string[] {
+  function suitPosition(suit: Suit): number {
+    const index = suitOrder.indexOf(suit);
+    return index === -1 ? suitOrder.length : index;
+  }
+
+  return discard
+    .map((card, index) => ({ card, index }))
+    .sort((a, b) => {
+      const suitDiff = suitPosition(a.card.suit) - suitPosition(b.card.suit);
+      if (suitDiff !== 0) return suitDiff;
+      const rankDiff = a.card.rank - b.card.rank;
+      if (rankDiff !== 0) return rankDiff;
+      return a.index - b.index;
+    })
+    .map(({ card }) => card.id);
 }
