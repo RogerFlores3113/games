@@ -304,7 +304,7 @@ Plans:
 **Goal:** Rework the table's visual language and hint feedback so the board reads like a physical tile game, and give the discard pile a shared, player-arrangeable order.
 **Requirements**: HINT-01, HINT-02, HINT-03, HINT-04, NOTE-03, DRAG-01, TILE-01, TILE-02, TILE-03, BOARD-01, BOARD-02, BOARD-03, BOARD-04, BOARD-05, DISC-01 (from the 17 owner requests under "## Gaps" in .planning/phases/06.1-table-polish-firework-art-notes-drag-audio/06.1-HUMAN-UAT.md)
 **Depends on:** Phase 06.1
-**Plans:** 10/11 plans executed
+**Plans:** 20 plans (11 original + 9 gap-closure from the owner's rejection at the 06.2-11 sign-off)
 
 Scope (owner requests, 06.1 sign-off):
 - Hint display: a clue highlights the tile in that clue's colour (not a generic yellow); a number clue shows the number on the tile back; a "keep hints visible" toggle (on = hints persist past the next player's move, off = they clear).
@@ -350,7 +350,19 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6)*
 
-- [ ] 06.2-11-PLAN.md — Phase gate + owner visual sign-off recorded verbatim (checkpoint)
+- [x] 06.2-11-PLAN.md — Phase gate + owner visual sign-off recorded verbatim (checkpoint) — owner rejected: "no, bad job", ten gaps recorded in 06.2-HUMAN-UAT.md
+
+**Gap closure** *(sequential; from the ten gaps in 06.2-HUMAN-UAT.md)*
+
+- [ ] 06.2-12-PLAN.md — Sourced dark-wood board texture and city-on-the-water-with-fireworks background, licensed and credited (gaps 2, 9)
+- [ ] 06.2-13-PLAN.md — Settings modal behind a top-right gear; bottom row keeps only play controls (gap 8)
+- [ ] 06.2-14-PLAN.md — Blue-outlined clue tokens at 2x size in a fixed slot grid, count text moved to screen readers (gaps 4, 5, 6)
+- [ ] 06.2-15-PLAN.md — Play area as a suit-column grid with five reserved rank slots, fixed board geometry ledger (gaps 1, 3)
+- [ ] 06.2-16-PLAN.md — Table rebuilt as three fixed reserved regions that never grow or reflow (gap 1)
+- [ ] 06.2-17-PLAN.md — Tile colour as a translucent darkening overlay above the card art (gap 7)
+- [ ] 06.2-18-PLAN.md — Shared "group by suit" discard re-sort through reorderDiscard (gap 10)
+- [ ] 06.2-19-PLAN.md — Worst-case 1280x720 fit re-measure, ledger reconciliation, UI-SPEC update
+- [ ] 06.2-20-PLAN.md — Full gate + owner sign-off on the reworked board (checkpoint)
 
 ### Phase 7: Variant Support (Rainbow, Black)
 
