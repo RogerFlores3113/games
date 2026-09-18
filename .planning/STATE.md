@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 14
+current_plan: 15
 status: executing
 stopped_at: Completed 06.2-13-PLAN.md
-last_updated: "2026-09-18T01:42:17.437Z"
+last_updated: "2026-09-18T01:52:45.917Z"
 last_activity: 2026-09-18
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 79
-  completed_plans: 72
+  completed_plans: 73
   percent: 78
 ---
 
@@ -27,13 +27,13 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 06.2
-Plan: 14 of 20
-Current Plan: 14
+Plan: 15 of 20
+Current Plan: 15
 Total Plans in Phase: 20
 Status: Ready to execute
 Last activity: 2026-09-18
 
-Progress: [█████████░] 91%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
@@ -133,6 +133,7 @@ Progress: [█████████░] 91%
 | Phase 06.2 P12 | ~45min | 2 tasks | 5 files |
 | Phase 06.2 P13 | ~35min | 3 tasks | 7 files |
 | Phase 06.2 P14 | 25min | 2 tasks | 5 files |
+| Phase 06.2 P15 | 35min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -285,6 +286,8 @@ Recent decisions affecting current work:
 - [Phase 06.2]: SettingsModal renders every non-play preference control (tile colour, volume, mute, hint persistence) behind a top-right gear trigger; no preference state moved, only its render location
 - [Phase ?]: TOKEN_DISC_PX=40 derived from measured 20px pre-review baseline; clue run laid out as 2x4 grid rather than a single 8-tall column so the fixed 40px size fits within TABLE_BAND_MIN_PX
 - [Phase ?]: Token count text moved to an sr-only span inside the same fixed-size testid container rather than removed, keeping Playwright toHaveText/toBeInViewport assertions green while satisfying the owner's request to hide it visually
+- [Phase 06.2]: PlayedStack: completed-stack glow moved from inline style to globals.css [data-complete] attribute selectors, keeping the root's inline style byte-identical across ranks
+- [Phase 06.2]: PlayedStack column header emits its data-glyph via a manual attribute rather than SuitGlyph's exposeSuit prop, satisfying the plan's zero-exposeSuit acceptance grep
 
 ### Pending Todos
 
@@ -307,6 +310,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-18T01:42:17.429Z
+Last session: 2026-09-18T01:52:38.883Z
 Stopped at: Completed 06.2-13-PLAN.md
 Resume file: None
