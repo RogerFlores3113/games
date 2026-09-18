@@ -1,46 +1,18 @@
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
 import {
   createRoom,
   emulateVisibility,
   expectSeatCount,
   freezePage,
+  giveAnyLegalClue,
   joinAs,
+  openTileCluePopover,
   OTHER_HAND_SELECTOR,
   OWN_HAND_SLOT_SELECTOR,
   resumePage,
   seatIdOfOtherPlayer,
   startTwoPlayerGame,
 } from "./helpers";
-
-/**
- * Selects a clue value on `page` (already targeting the sole other seat)
- * that the board itself shows as touching at least one visible card, by
- * trying each rendered `clue-value-*` button in turn until the submit
- * button (`give-clue-button`) becomes enabled. Never guesses at card
- * identities — the deck is server-seeded and secret to this test.
- *
- * D-17: zero-touch clue-value options are now rendered disabled, so a
- * `.click()` on one would hang until Playwright's actionability timeout
- * (disabled elements never become clickable). Skip any button whose
- * `isEnabled()` is false before attempting to click it.
- */
-async function selectAClueValueThatTouchesSomething(page: Page): Promise<void> {
-  const valueButtons = page.locator('[data-testid^="clue-value-"]');
-  const count = await valueButtons.count();
-  for (let i = 0; i < count; i++) {
-    const button = valueButtons.nth(i);
-    if (!(await button.isEnabled())) {
-      continue;
-    }
-    await button.click();
-    const enabled = await page.getByTestId("give-clue-button").isEnabled();
-    if (enabled) {
-      return;
-    }
-  }
-  throw new Error("selectAClueValueThatTouchesSomething: no clue value touched any visible card");
-}
 
 test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
   test("RT-01: a clue and a play/discard taken in one browser appear on the other browser with no reload", async ({
@@ -67,12 +39,10 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     // already knows what it just did.
     const passiveClueTokensBefore = ((await passivePage.getByTestId("clue-tokens").textContent()) ?? "").trim();
 
-    // The active page targets the sole other seat and gives a clue that
-    // the board confirms touches at least one visible card.
-    const otherSeatButton = activePage.locator('[data-testid^="clue-target-"]').first();
-    await otherSeatButton.click();
-    await selectAClueValueThatTouchesSomething(activePage);
-    await activePage.getByTestId("give-clue-button").click();
+    // The active page targets the sole other seat and gives a clue via that
+    // player's own tile popover (UAT gap 16).
+    const passiveSeatIdForClue = await seatIdOfOtherPlayer(activePage);
+    expect(await giveAnyLegalClue(activePage, passiveSeatIdForClue)).toBe(true);
 
     // This test body never manually refreshes either page (no page-reload
     // call anywhere above or below this line) — the point of this test is
@@ -124,10 +94,8 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
 
     // Take at least one action before reloading, so this is genuinely a
     // mid-game reload rather than one at the opening state.
-    const otherSeatButton = activePage.locator('[data-testid^="clue-target-"]').first();
-    await otherSeatButton.click();
-    await selectAClueValueThatTouchesSomething(activePage);
-    await activePage.getByTestId("give-clue-button").click();
+    const otherSeatIdForClue = await seatIdOfOtherPlayer(activePage);
+    expect(await giveAnyLegalClue(activePage, otherSeatIdForClue)).toBe(true);
     await expect(otherPage.getByTestId("turn-indicator")).toHaveText("Your turn");
 
     // The page that reloads is now the active one (the clue's target, who
@@ -207,22 +175,25 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     await expect(passivePage.getByTestId(`other-hand-${giverSeat}`)).toHaveAttribute("data-active", "true");
     await expect(activePage.getByTestId(`other-hand-${targetSeat}`)).toHaveAttribute("data-active", "false");
 
-    // Giver targets the sole other seat and selects a clue value that
-    // touches at least one visible card, keeping focus on that value button
-    // (its preview stays active via onFocus/onBlur) — collect the preview
-    // ids before giving the clue.
-    await activePage.getByTestId(`clue-target-${targetSeat}`).click();
-    await selectAClueValueThatTouchesSomething(activePage);
+    // Giver opens the target's own quick-clue popover (UAT gap 16 — no
+    // separate target/value selection step exists anymore) and sends
+    // whichever of colour/rank is enabled, preferring colour.
+    const opened = await openTileCluePopover(activePage, targetSeat, 0);
+    if (!opened) throw new Error("UI-02+UI-04: no legal clue available to give");
+    const useColor = await opened.colorButton.isEnabled();
+    await (useColor ? opened.colorButton : opened.rankButton).click();
 
-    const previewLocator = activePage.locator(`[data-testid="other-hand-${targetSeat}"] [data-preview="true"]`);
-    await expect(previewLocator.first()).toBeVisible();
-    const previewTestIds = await previewLocator.evaluateAll((els) =>
+    // The touched set is now read AFTER the clue lands, from the just-clued
+    // transient highlight itself, rather than from a hover-preview step (the
+    // deleted CluePicker's onFocus/onBlur preview no longer exists — sending
+    // is immediate).
+    const giverJustCluedLocator = activePage.locator(`[data-testid="other-hand-${targetSeat}"] [data-just-clued="true"]`);
+    await expect(giverJustCluedLocator.first()).toBeVisible();
+    const touchedTestIds = await giverJustCluedLocator.evaluateAll((els) =>
       els.map((el) => el.getAttribute("data-testid")),
     );
-    expect(previewTestIds.length).toBeGreaterThan(0);
-    const touchedCount = previewTestIds.length;
-
-    await activePage.getByTestId("give-clue-button").click();
+    expect(touchedTestIds.length).toBeGreaterThan(0);
+    const touchedCount = touchedTestIds.length;
 
     // Transient (D-14): the just-clued highlight appears on BOTH the
     // target's own-hand (passivePage) and the giver's rendering of the
@@ -238,7 +209,7 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     // now carries a non-"unclued" luminosity, and the touched count matches
     // exactly. On the target's own page, the same number of own-hand slots
     // are non-"unclued".
-    for (const testId of previewTestIds) {
+    for (const testId of touchedTestIds) {
       if (!testId) continue;
       await expect(activePage.locator(`[data-testid="${testId}"]`)).toHaveAttribute(
         "data-luminosity",
@@ -298,9 +269,7 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
     const targetSeat = await seatIdOfOtherPlayer(activePage);
 
-    await activePage.getByTestId(`clue-target-${targetSeat}`).click();
-    await selectAClueValueThatTouchesSomething(activePage);
-    await activePage.getByTestId("give-clue-button").click();
+    expect(await giveAnyLegalClue(activePage, targetSeat)).toBe(true);
 
     const giverView = activePage.locator(`[data-testid="other-hand-${targetSeat}"] [data-just-clued="true"]`);
     await expect(passivePage.locator('[data-testid="own-hand"] [data-just-clued="true"]').first()).toBeVisible();
@@ -347,10 +316,8 @@ test.describe("Phase 5 reconnect hardening (RT-04 + RT-06 + D-14)", () => {
     // pass — the now-active page becomes the DROPPING page (so the other
     // player's "Waiting for X" text applies to it), and the other page is
     // the OBSERVER.
-    const otherSeatButton = activePage.locator('[data-testid^="clue-target-"]').first();
-    await otherSeatButton.click();
-    await selectAClueValueThatTouchesSomething(activePage);
-    await activePage.getByTestId("give-clue-button").click();
+    const passiveSeatIdForClue = await seatIdOfOtherPlayer(activePage);
+    expect(await giveAnyLegalClue(activePage, passiveSeatIdForClue)).toBe(true);
     await expect(passivePage.getByTestId("turn-indicator")).toHaveText("Your turn");
 
     const droppingPage = passivePage; // now active, per the assertion above
@@ -373,7 +340,14 @@ test.describe("Phase 5 reconnect hardening (RT-04 + RT-06 + D-14)", () => {
     await expect(droppingPage.getByTestId("reconnecting-banner")).toBeVisible({ timeout: 15_000 });
     await expect(droppingPage.getByTestId("play-button")).toBeDisabled();
     await expect(droppingPage.getByTestId("discard-button")).toBeDisabled();
-    await expect(droppingPage.getByTestId("give-clue-button")).toBeDisabled();
+    // UAT gap 16: the deleted CluePicker's persistent give-clue-button is
+    // gone — reconnecting's illegality now shows as the quick-clue popover
+    // simply not opening at all on a tile click.
+    const droppingTeammateTile = droppingPage.locator('[data-testid^="other-hand-card-"]').first();
+    if ((await droppingTeammateTile.count()) > 0) {
+      await droppingTeammateTile.click();
+      await expect(droppingPage.getByTestId("tile-clue-popover")).toHaveCount(0);
+    }
     // UAT gap 15 (second owner review): the inline disabled-reason caption
     // was deleted; the reason still lands in the button's accessible name.
     await expect(droppingPage.getByTestId("play-button")).toHaveAttribute(

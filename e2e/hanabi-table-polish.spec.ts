@@ -4,35 +4,14 @@ import {
   createRoom,
   dragLocatorTo,
   expectSeatCount,
+  giveAnyLegalClue,
   joinAs,
+  openTileCluePopover,
   ownHandCardIds,
   seatIdOfOtherPlayer,
   startTwoPlayerGame,
   teammateHandCardIds,
 } from "./helpers";
-
-/**
- * Selects a clue value on `page` (already targeting the sole other seat)
- * that the board itself shows as touching at least one visible card —
- * copied locally from hanabi-realtime.spec.ts (that file's own docblock
- * notes this pattern is not exported for reuse).
- */
-async function selectAClueValueThatTouchesSomething(page: Page): Promise<void> {
-  const valueButtons = page.locator('[data-testid^="clue-value-"]');
-  const count = await valueButtons.count();
-  for (let i = 0; i < count; i++) {
-    const button = valueButtons.nth(i);
-    if (!(await button.isEnabled())) {
-      continue;
-    }
-    await button.click();
-    const enabled = await page.getByTestId("give-clue-button").isEnabled();
-    if (enabled) {
-      return;
-    }
-  }
-  throw new Error("selectAClueValueThatTouchesSomething: no clue value touched any visible card");
-}
 
 /** Mirrors hanabi-drag-logic.ts's `reorderedCardIds` exactly, so this test
  * can compute the expected order from a captured `targetIndex` without
@@ -53,26 +32,26 @@ async function readDeckCount(page: Page): Promise<number> {
 }
 
 /**
- * Selects an enabled clue value (colour when `wantColor` is true, rank
- * otherwise) that currently touches at least one of the already-selected
- * target's cards. Assumes a clue target has already been clicked. Returns
- * the clicked value's testid, or null if no value of that kind currently
- * touches anything.
+ * UAT gap 16: gives a clue of the requested kind (colour when `wantColor` is
+ * true, rank otherwise) to `targetSeatId`, by opening each of that seat's
+ * tile popovers in turn until one offers the wanted kind enabled. Returns
+ * the sent value's own button text (the suit label for colour, the digit
+ * for rank) captured BEFORE the click (the popover unmounts once the clue
+ * is sent), or null if no tile currently offers that kind.
  */
-async function selectClueValueOfKind(page: Page, wantColor: boolean): Promise<string | null> {
-  const valueButtons = page.locator('[data-testid^="clue-value-"]');
-  const count = await valueButtons.count();
-  for (let i = 0; i < count; i++) {
-    const button = valueButtons.nth(i);
-    const testId = await button.getAttribute("data-testid");
-    if (!testId) continue;
-    const isRankValue = /^clue-value-\d+$/.test(testId);
-    if (isRankValue === wantColor) continue;
-    if (!(await button.isEnabled())) continue;
-    await button.click();
-    if (await page.getByTestId("give-clue-button").isEnabled()) {
-      return testId;
+async function giveClueOfKind(page: Page, targetSeatId: string, wantColor: boolean): Promise<string | null> {
+  const tileCount = await page.locator(`[data-testid="other-hand-${targetSeatId}"] [data-testid^="other-hand-card-"]`).count();
+  for (let i = 0; i < tileCount; i += 1) {
+    const opened = await openTileCluePopover(page, targetSeatId, i);
+    if (!opened) return null;
+    const button = wantColor ? opened.colorButton : opened.rankButton;
+    if (await button.isEnabled()) {
+      const value = (await button.textContent())?.trim() ?? null;
+      await button.click();
+      return value;
     }
+    // Wanted kind not available on this tile — close and try the next.
+    await page.locator(`[data-testid="other-hand-${targetSeatId}"] [data-testid^="other-hand-card-"]`).nth(i).click();
   }
   return null;
 }
@@ -189,10 +168,8 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
 
     // The active player gives a clue, dropping clue tokens below 8 so the
     // NEW active player (the current passive player) can discard.
-    const otherSeatButton = activePage.locator('[data-testid^="clue-target-"]').first();
-    await otherSeatButton.click();
-    await selectAClueValueThatTouchesSomething(activePage);
-    await activePage.getByTestId("give-clue-button").click();
+    const passiveSeatIdForClue = await seatIdOfOtherPlayer(activePage);
+    expect(await giveAnyLegalClue(activePage, passiveSeatIdForClue)).toBe(true);
 
     await expect(passivePage.getByTestId("turn-indicator")).toHaveText("Your turn");
 
@@ -324,6 +301,70 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await contextB.close();
   });
 
+  test("UAT gap 16: clicking an opponent tile opens a quick-clue popover (colour tinted, bold number below) that sends the right clue to the right player on both screens", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
+    const targetSeat = await seatIdOfOtherPlayer(activePage);
+    const tile = activePage.locator(`[data-testid="other-hand-${targetSeat}"] [data-testid^="other-hand-card-"]`).first();
+
+    // Opening: a click on the opponent's tile opens exactly one popover with
+    // both a colour and a number button.
+    await tile.click();
+    const popover = activePage.getByTestId("tile-clue-popover");
+    await expect(popover).toBeVisible();
+    await expect(activePage.getByTestId("tile-clue-color")).toBeVisible();
+    const rankButton = activePage.getByTestId("tile-clue-rank");
+    await expect(rankButton).toBeVisible();
+
+    // The colour button's own text colour is the suit's own colour token
+    // (never the default text colour), and it renders ABOVE the (bold)
+    // number button in DOM order.
+    const colorButton = activePage.getByTestId("tile-clue-color");
+    const colorTextColor = await colorButton.evaluate((el) => getComputedStyle(el).color);
+    const defaultTextColor = await activePage
+      .evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--color-text").trim());
+    expect(colorTextColor).not.toBe(""); // sanity: a real computed colour was read
+    expect(colorTextColor).not.toBe(defaultTextColor);
+    const rankFontWeight = await rankButton.evaluate((el) => getComputedStyle(el).fontWeight);
+    expect(Number(rankFontWeight)).toBeGreaterThanOrEqual(700);
+    const colorBox = await colorButton.boundingBox();
+    const rankBox = await rankButton.boundingBox();
+    if (!colorBox || !rankBox) throw new Error("missing popover button bounding box");
+    expect(rankBox.y).toBeGreaterThan(colorBox.y);
+
+    // Closing behaviours: second click on the same tile closes it.
+    await tile.click();
+    await expect(popover).toHaveCount(0);
+
+    // Escape closes it.
+    await tile.click();
+    await expect(popover).toBeVisible();
+    await activePage.keyboard.press("Escape");
+    await expect(popover).toHaveCount(0);
+
+    // Clicking elsewhere closes it — the far bottom-right viewport corner,
+    // well clear of both the tile and its popover (anchored just below the
+    // tile, near the top of the board).
+    await tile.click();
+    await expect(popover).toBeVisible();
+    await activePage.mouse.click(1270, 710);
+    await expect(popover).toHaveCount(0);
+
+    // Sending: clicking the colour button gives that clue to that player,
+    // and BOTH screens reflect it — no reload on either side.
+    await tile.click();
+    await expect(activePage.getByTestId("tile-clue-color")).toBeEnabled();
+    await activePage.getByTestId("tile-clue-color").click();
+    await expect(popover).toHaveCount(0);
+    await expect(passivePage.locator('[data-testid="own-hand"] [data-just-clued="true"]').first()).toBeVisible();
+    await expect(activePage.getByTestId("turn-indicator")).toContainText("Waiting for");
+    await expect(passivePage.getByTestId("turn-indicator")).toHaveText("Your turn");
+
+    await contextB.close();
+  });
+
   test("HINT-01/HINT-02: a colour clue tints the touched tile and a number clue stamps its numeral", async ({
     page: hostPage,
     browser,
@@ -332,10 +373,9 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
 
     // HINT-01: a colour clue from the active player touches at least one of
     // the passive player's own-hand cards.
-    await activePage.locator('[data-testid^="clue-target-"]').first().click();
-    const colorTestId = await selectClueValueOfKind(activePage, true);
-    expect(colorTestId).not.toBeNull();
-    await activePage.getByTestId("give-clue-button").click();
+    const passiveSeatId = await seatIdOfOtherPlayer(activePage);
+    const colorValue = await giveClueOfKind(activePage, passiveSeatId, true);
+    expect(colorValue).not.toBeNull();
 
     const touchedAfterColor = await ownHandHintedSlots(passivePage);
     expect(touchedAfterColor.length).toBeGreaterThan(0);
@@ -353,16 +393,14 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     // (now passive) other seat with a rank value, which stamps a numeral.
     const newActive = await activeOf(hostPage, pageB);
     const newPassive = newActive === hostPage ? pageB : hostPage;
-    await newActive.locator('[data-testid^="clue-target-"]').first().click();
-    const rankTestId = await selectClueValueOfKind(newActive, false);
-    expect(rankTestId).not.toBeNull();
-    const rankValue = rankTestId!.replace(/^clue-value-/, "");
-    await newActive.getByTestId("give-clue-button").click();
+    const newPassiveSeatId = await seatIdOfOtherPlayer(newActive);
+    const rankValue = await giveClueOfKind(newActive, newPassiveSeatId, false);
+    expect(rankValue).not.toBeNull();
 
     const touchedAfterRank = await ownHandHintedSlots(newPassive);
     expect(touchedAfterRank.length).toBeGreaterThan(0);
     const rankSlot = touchedAfterRank[0]!;
-    await expect(newPassive.getByTestId(`${rankSlot}-hints`).getByTestId("hint-numeral")).toHaveText(rankValue);
+    await expect(newPassive.getByTestId(`${rankSlot}-hints`).getByTestId("hint-numeral")).toHaveText(rankValue!);
 
     await contextB.close();
   });
@@ -386,9 +424,8 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
 
     // Default (OFF): clue passive1's hand, then have passive1 act on a
     // DIFFERENT slot — the touched card's hint should clear.
-    await active1.locator('[data-testid^="clue-target-"]').first().click();
-    expect(await selectClueValueOfKind(active1, true)).not.toBeNull();
-    await active1.getByTestId("give-clue-button").click();
+    const passive1SeatId = await seatIdOfOtherPlayer(active1);
+    expect(await giveClueOfKind(active1, passive1SeatId, true)).not.toBeNull();
 
     const touched1 = await ownHandHintedSlots(passive1);
     expect(touched1.length).toBeGreaterThan(0);
@@ -411,9 +448,8 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await expect(passive1.getByTestId("settings-modal")).toHaveCount(0);
 
     const active2 = await activeOf(hostPage, pageB);
-    await active2.locator('[data-testid^="clue-target-"]').first().click();
-    expect(await selectClueValueOfKind(active2, true)).not.toBeNull();
-    await active2.getByTestId("give-clue-button").click();
+    const passive1SeatIdAgain = await seatIdOfOtherPlayer(active2);
+    expect(await giveClueOfKind(active2, passive1SeatIdAgain, true)).not.toBeNull();
 
     const touched2 = await ownHandHintedSlots(passive1);
     expect(touched2.length).toBeGreaterThan(0);
@@ -559,9 +595,8 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
 
       let discardActive = active;
       if (clueTokens >= 8) {
-        await active.locator('[data-testid^="clue-target-"]').first().click();
-        await selectAClueValueThatTouchesSomething(active);
-        await active.getByTestId("give-clue-button").click();
+        const otherSeatId = await seatIdOfOtherPlayer(active);
+        expect(await giveAnyLegalClue(active, otherSeatId)).toBe(true);
         // Wait for the turn to actually flip before deriving who discards
         // next — a bare re-read races the socket round-trip.
         await expect(other.getByTestId("turn-indicator")).toHaveText("Your turn");
@@ -724,10 +759,8 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     // Gesture-unlock the observer.
     await observer.mouse.click(5, 5);
 
-    const otherSeatButton = activePage.locator('[data-testid^="clue-target-"]').first();
-    await otherSeatButton.click();
-    await selectAClueValueThatTouchesSomething(activePage);
-    await activePage.getByTestId("give-clue-button").click();
+    const observerSeatId = await seatIdOfOtherPlayer(activePage);
+    expect(await giveAnyLegalClue(activePage, observerSeatId)).toBe(true);
 
     await expect.poll(() => soundStarts(observer)).toBeGreaterThan(0);
 

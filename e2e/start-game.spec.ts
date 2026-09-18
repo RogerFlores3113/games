@@ -1,6 +1,15 @@
 import { expect, test } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
-import { createRoom, expectSeatCount, joinAs, startGameWithPlayers, startTwoPlayerGame } from "./helpers";
+import {
+  createRoom,
+  expectSeatCount,
+  giveAnyLegalClue,
+  giveAnyLegalClueToAnyTeammate,
+  joinAs,
+  seatIdOfOtherPlayer,
+  startGameWithPlayers,
+  startTwoPlayerGame,
+} from "./helpers";
 import {
   BOARD_CHROME_PX,
   OWN_BAND_PX,
@@ -377,7 +386,14 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       await expect(page.getByTestId("new-game-link")).toHaveAttribute("href", "/");
       await expect(page.getByTestId("play-button")).toBeDisabled();
       await expect(page.getByTestId("discard-button")).toBeDisabled();
-      await expect(page.getByTestId("give-clue-button")).toBeDisabled();
+      // UAT gap 16: the deleted CluePicker's persistent give-clue-button is
+      // gone — an ended game's illegality now shows as the quick-clue
+      // popover simply not opening at all on a tile click.
+      const teammateTile = page.locator('[data-testid^="other-hand-card-"]').first();
+      if ((await teammateTile.count()) > 0) {
+        await teammateTile.click();
+        await expect(page.getByTestId("tile-clue-popover")).toHaveCount(0);
+      }
       await expect(page.getByTestId("tableau")).toBeVisible();
     }
 
@@ -588,20 +604,8 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     await expect(hostPage.getByTestId("clue-tokens")).toHaveText(`${clueTokensBefore} clues left`);
 
     const clueGiver = await currentActivePage(hostPage, pageB);
-    await clueGiver.locator('[data-testid^="clue-target-"]').first().click();
-    const valueButtons = clueGiver.locator('[data-testid^="clue-value-"]');
-    const valueCount = await valueButtons.count();
-    let gaveClue = false;
-    for (let i = 0; i < valueCount; i += 1) {
-      const button = valueButtons.nth(i);
-      if (!(await button.isEnabled())) continue;
-      await button.click();
-      if (await clueGiver.getByTestId("give-clue-button").isEnabled()) {
-        await clueGiver.getByTestId("give-clue-button").click();
-        gaveClue = true;
-        break;
-      }
-    }
+    const clueTargetSeatId = await seatIdOfOtherPlayer(clueGiver);
+    const gaveClue = await giveAnyLegalClue(clueGiver, clueTargetSeatId);
     expect(gaveClue).toBe(true);
 
     await expect(hostPage.getByTestId("clue-tokens")).toHaveAttribute("data-count", String(clueTokensBefore - 1));
@@ -678,26 +682,6 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       throw new Error("activePageAmong: no page currently has the active turn");
     }
 
-    async function giveAnyLegalClue(page: Page): Promise<boolean> {
-      const targets = page.locator('[data-testid^="clue-target-"]');
-      const targetCount = await targets.count();
-      for (let t = 0; t < targetCount; t += 1) {
-        await targets.nth(t).click();
-        const valueButtons = page.locator('[data-testid^="clue-value-"]');
-        const valueCount = await valueButtons.count();
-        for (let v = 0; v < valueCount; v += 1) {
-          const button = valueButtons.nth(v);
-          if (!(await button.isEnabled())) continue;
-          await button.click();
-          if (await page.getByTestId("give-clue-button").isEnabled()) {
-            await page.getByTestId("give-clue-button").click();
-            return true;
-          }
-        }
-      }
-      return false;
-    }
-
     async function maxStackRank(): Promise<number> {
       const ranks = await hostPage
         .locator('[data-testid^="played-stack-"]:not([data-testid*="-card-"])')
@@ -722,7 +706,7 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       const fusesRemaining = Number(await hostPage.getByTestId("fuse-tokens").getAttribute("data-count"));
 
       if (clueTokens >= 8) {
-        const gave = await giveAnyLegalClue(active);
+        const gave = await giveAnyLegalClueToAnyTeammate(active);
         if (!gave) {
           await active.getByTestId("own-hand-slot-1").click();
           await expect(active.getByTestId("play-button")).toBeEnabled({ timeout: 2000 });

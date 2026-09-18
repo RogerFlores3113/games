@@ -82,6 +82,77 @@ export const OTHER_HAND_SELECTOR = '[data-testid^="other-hand-"]:not([data-testi
 export const OWN_HAND_SLOT_SELECTOR = '[data-testid^="own-hand-slot-"]:not([data-testid$="-hints"])';
 
 /**
+ * UAT gap 16: opens the quick-clue popover for one of `targetSeatId`'s hand
+ * tiles (`tileIndex`, default the first) by clicking it, and returns
+ * Locators for its colour/rank buttons — or `null` if no popover opened at
+ * all (the deleted `CluePicker`'s "prefer not opening it when clue-giving is
+ * currently illegal" case: not the caller's turn, no clue tokens, the game
+ * ended, or the page is reconnecting). Callers are responsible for either
+ * clicking one of the returned buttons (which sends the clue and closes the
+ * popover) or otherwise closing it (second click, Escape, click elsewhere).
+ */
+export async function openTileCluePopover(
+  page: Page,
+  targetSeatId: string,
+  tileIndex = 0,
+): Promise<{ colorButton: Locator; rankButton: Locator } | null> {
+  const tile = page.locator(`[data-testid="other-hand-${targetSeatId}"] [data-testid^="other-hand-card-"]`).nth(tileIndex);
+  await tile.click();
+  const popover = page.getByTestId("tile-clue-popover");
+  if ((await popover.count()) === 0) return null;
+  return { colorButton: page.getByTestId("tile-clue-color"), rankButton: page.getByTestId("tile-clue-rank") };
+}
+
+/**
+ * UAT gap 16: gives a legal clue to `targetSeatId`, replacing the deleted
+ * `CluePicker`'s target+value+give-clue-button flow. Since a tile's quick-
+ * clue popover only ever offers clues derived from that tile's OWN suit/rank
+ * (always touching at least that card), the rank button is enabled whenever
+ * clue-giving is legal at all — this tries every hand tile (in case an
+ * individual tile's colour is a non-nameable suit, e.g. Rainbow) and prefers
+ * a colour clue when available, falling back to rank. Returns `false` if no
+ * tile currently offers ANY legal clue (e.g. not the caller's turn).
+ */
+export async function giveAnyLegalClue(page: Page, targetSeatId: string): Promise<boolean> {
+  const tileCount = await page.locator(`[data-testid="other-hand-${targetSeatId}"] [data-testid^="other-hand-card-"]`).count();
+  for (let i = 0; i < tileCount; i += 1) {
+    const opened = await openTileCluePopover(page, targetSeatId, i);
+    if (!opened) return false;
+    const { colorButton, rankButton } = opened;
+    if (await colorButton.isEnabled()) {
+      await colorButton.click();
+      return true;
+    }
+    if (await rankButton.isEnabled()) {
+      await rankButton.click();
+      return true;
+    }
+    // Neither enabled on this tile (shouldn't normally happen once
+    // clue-giving is legal at all) — close it and try the next tile.
+    await page.locator(`[data-testid="other-hand-${targetSeatId}"] [data-testid^="other-hand-card-"]`).nth(i).click();
+  }
+  return false;
+}
+
+/**
+ * UAT gap 16: gives a legal clue to ANY teammate rendered on `page`, trying
+ * each `other-hand-{seatId}` container in turn via `giveAnyLegalClue`.
+ * Replaces call sites that used to click the first `clue-target-*` button
+ * with no specific seat in mind.
+ */
+export async function giveAnyLegalClueToAnyTeammate(page: Page): Promise<boolean> {
+  const containers = page.locator(OTHER_HAND_SELECTOR);
+  const count = await containers.count();
+  for (let i = 0; i < count; i += 1) {
+    const testId = await containers.nth(i).getAttribute("data-testid");
+    if (!testId) continue;
+    const seatId = testId.replace(/^other-hand-/, "");
+    if (await giveAnyLegalClue(page, seatId)) return true;
+  }
+  return false;
+}
+
+/**
  * Reads the seatId of the sole other player rendered on `observer`'s board,
  * by stripping the `other-hand-` prefix off the first matching container's
  * testid. The board never renders the viewer's own seatId (D-14/RT-03
