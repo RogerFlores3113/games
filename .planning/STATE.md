@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 11
-status: verifying
-stopped_at: Completed 06.2-12-PLAN.md
-last_updated: "2026-09-18T01:13:46.355Z"
+current_plan: 13
+status: in_progress
+stopped_at: Completed 06.2-13-PLAN.md
+last_updated: "2026-09-18T01:30:03.008Z"
 last_activity: 2026-09-18
 progress:
   total_phases: 9
   completed_phases: 7
-  total_plans: 79
-  completed_plans: 70
-  percent: 78
+  total_plans: 88
+  completed_plans: 72
+  percent: 82
 ---
 
 # Project State
@@ -27,13 +27,13 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 06.2
-Plan: 11 of 11
-Current Plan: 11
-Total Plans in Phase: 11
-Status: Phase complete — ready for verification
+Plan: 13 of 20
+Current Plan: 13
+Total Plans in Phase: 20
+Status: In progress — gap closure (06.2-14 through 06.2-20 remain)
 Last activity: 2026-09-18
 
-Progress: [█████████░] 89%
+Progress: [█████████░] 82%
 
 ## Performance Metrics
 
@@ -131,6 +131,7 @@ Progress: [█████████░] 89%
 | Phase 06.2 P09 | 25min | 2 tasks | 7 files |
 | Phase 06.2 P10 | 70min | 3 tasks | 5 files |
 | Phase 06.2 P12 | ~45min | 2 tasks | 5 files |
+| Phase 06.2 P13 | ~35min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -280,6 +281,7 @@ Recent decisions affecting current work:
 - [Phase ?]: 06.2-09: slot pitch measured from registered rects sorted by physical left position, not Map insertion order, to stay correct across a mid-drag optimistic reorder
 - [Phase 06.2]: 06.2-10: exercised Black variant at 5 seats for the UI-11 worst case (already selectable end to end) — Fixed a real bottom-controls-row overflow this exposed for 6-colour variants (CluePicker reordered to be the row's last child); no layout-budget.ts constant needed to change
 - [Phase 06.2-12]: Sourced wood-board.webp and city-fireworks.webp from Wikimedia Commons (CC BY-SA 3.0 / CC BY 2.0), replacing the owner-rejected CSS-generated board texture and the plain city-night background per UAT gaps 2 and 9
+- [Phase 06.2]: SettingsModal renders every non-play preference control (tile colour, volume, mute, hint persistence) behind a top-right gear trigger; no preference state moved, only its render location
 
 ### Pending Todos
 
@@ -302,6 +304,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-18T01:13:30.146Z
-Stopped at: Completed 06.2-12-PLAN.md
+Last session: 2026-09-18T01:30:03.000Z
+Stopped at: Completed 06.2-13-PLAN.md
 Resume file: None
