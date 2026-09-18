@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { ClueTokenArt } from "../components/hanabi/ClueTokenArt";
 import { FuseTokenArt } from "../components/hanabi/FuseTokenArt";
 import { TokenColumn } from "../components/hanabi/TokenColumn";
-import { MAX_TOKEN_COUNT, TABLE_BAND_MIN_PX } from "./layout-budget";
+import { MAX_CLUE_TOKENS, MAX_FUSE_TOKENS } from "./layout-budget";
 
 const CLUE_TOKEN_ART_PATH = fileURLToPath(new URL("../components/hanabi/ClueTokenArt.tsx", import.meta.url));
 const FUSE_TOKEN_ART_PATH = fileURLToPath(new URL("../components/hanabi/FuseTokenArt.tsx", import.meta.url));
@@ -53,6 +53,11 @@ describe("token-render: ClueTokenArt", () => {
   it("source contains no hex colour literal", () => {
     expect(noHexLiterals(clueTokenArtSource)).toBeNull();
   });
+
+  it("carries a blue rim stroke matching the fuse token's outline treatment (UAT gap 4)", () => {
+    const markup = renderToStaticMarkup(createElement(ClueTokenArt, { size: 16 }));
+    expect(markup).toContain("stroke:var(--color-suit-blue)");
+  });
 });
 
 describe("token-render: FuseTokenArt", () => {
@@ -92,23 +97,34 @@ describe("token-render: FuseTokenArt", () => {
 
 describe("token-render: TokenColumn", () => {
   it("with 5 clue tokens remaining, exactly 5 clue-token artworks are in the markup", () => {
-    const markup = renderToStaticMarkup(
-      createElement(TokenColumn, { clueTokens: 5, fusesRemaining: 3, columnHeightPx: 260 }),
-    );
+    const markup = renderToStaticMarkup(createElement(TokenColumn, { clueTokens: 5, fusesRemaining: 3 }));
     expect(countOccurrences(markup, 'data-testid="clue-token"')).toBe(5);
   });
 
   it("with 2 fuses remaining, exactly 2 fuse-token artworks are in the markup", () => {
-    const markup = renderToStaticMarkup(
-      createElement(TokenColumn, { clueTokens: 8, fusesRemaining: 2, columnHeightPx: 260 }),
-    );
+    const markup = renderToStaticMarkup(createElement(TokenColumn, { clueTokens: 8, fusesRemaining: 2 }));
     expect(countOccurrences(markup, 'data-testid="fuse-token"')).toBe(2);
   });
 
-  it("with 0 clues and 0 fuses remaining, no token artworks render but both counts still render as text", () => {
-    const markup = renderToStaticMarkup(
-      createElement(TokenColumn, { clueTokens: 0, fusesRemaining: 0, columnHeightPx: 260 }),
+  it("always renders exactly MAX_CLUE_TOKENS clue slots and MAX_FUSE_TOKENS fuse slots, filled or empty", () => {
+    const zero = renderToStaticMarkup(createElement(TokenColumn, { clueTokens: 0, fusesRemaining: 0 }));
+    const full = renderToStaticMarkup(
+      createElement(TokenColumn, { clueTokens: MAX_CLUE_TOKENS, fusesRemaining: MAX_FUSE_TOKENS }),
     );
+    for (const markup of [zero, full]) {
+      const clueSlots =
+        countOccurrences(markup, 'data-testid="clue-token"') +
+        countOccurrences(markup, 'data-testid="clue-token-slot-empty"');
+      const fuseSlots =
+        countOccurrences(markup, 'data-testid="fuse-token"') +
+        countOccurrences(markup, 'data-testid="fuse-token-slot-empty"');
+      expect(clueSlots).toBe(MAX_CLUE_TOKENS);
+      expect(fuseSlots).toBe(MAX_FUSE_TOKENS);
+    }
+  });
+
+  it("with 0 clues and 0 fuses remaining, no token artworks render but both counts still render as sr-only text", () => {
+    const markup = renderToStaticMarkup(createElement(TokenColumn, { clueTokens: 0, fusesRemaining: 0 }));
     expect(countOccurrences(markup, 'data-testid="clue-token"')).toBe(0);
     expect(countOccurrences(markup, 'data-testid="fuse-token"')).toBe(0);
     expect(markup).toContain("0 clues left");
@@ -116,17 +132,19 @@ describe("token-render: TokenColumn", () => {
   });
 
   it("the text counts are always present, including at zero tokens and at max tokens", () => {
-    const markup = renderToStaticMarkup(
-      createElement(TokenColumn, { clueTokens: 8, fusesRemaining: 3, columnHeightPx: 260 }),
-    );
+    const markup = renderToStaticMarkup(createElement(TokenColumn, { clueTokens: 8, fusesRemaining: 3 }));
     expect(markup).toContain("8 clues left");
     expect(markup).toContain("3 fuses left");
   });
 
+  it("the count text is carried by an sr-only span, not a visible text node", () => {
+    const markup = renderToStaticMarkup(createElement(TokenColumn, { clueTokens: 5, fusesRemaining: 2 }));
+    expect(markup).toMatch(/<span class="sr-only">5 clues left<\/span>/);
+    expect(markup).toMatch(/<span class="sr-only">2 fuses left<\/span>/);
+  });
+
   it("the clue-tokens element exposes data-count equal to the remaining clue count, and same for fuse-tokens", () => {
-    const markup = renderToStaticMarkup(
-      createElement(TokenColumn, { clueTokens: 4, fusesRemaining: 1, columnHeightPx: 260 }),
-    );
+    const markup = renderToStaticMarkup(createElement(TokenColumn, { clueTokens: 4, fusesRemaining: 1 }));
     expect(markup).toContain('data-testid="clue-tokens" data-count="4"');
     expect(markup).toContain('data-testid="fuse-tokens" data-count="1"');
   });
@@ -139,26 +157,39 @@ describe("token-render: TokenColumn", () => {
     expect(withoutComments).not.toMatch(/opacity|dim/i);
   });
 
-  it("token disc size never exceeds the column height budget even at the max supported token count", () => {
+  it("token discs render at TOKEN_DISC_PX (2x the pre-review 20px size) regardless of remaining count", () => {
     const markup = renderToStaticMarkup(
-      createElement(TokenColumn, {
-        clueTokens: 8,
-        fusesRemaining: 3,
-        columnHeightPx: TABLE_BAND_MIN_PX,
-      }),
+      createElement(TokenColumn, { clueTokens: MAX_CLUE_TOKENS, fusesRemaining: MAX_FUSE_TOKENS }),
     );
-    expect(MAX_TOKEN_COUNT).toBe(11);
     const widths = [...markup.matchAll(/<svg viewBox="0 0 24 24" width="([0-9.]+)"/g)].map((m) => Number(m[1]));
-    expect(widths.length).toBe(11);
+    expect(widths.length).toBe(MAX_CLUE_TOKENS + MAX_FUSE_TOKENS);
     for (const w of widths) {
-      expect(w * 11 + 10 * 4).toBeLessThanOrEqual(TABLE_BAND_MIN_PX + 1);
+      expect(w).toBe(40);
     }
   });
 
-  it("renders clue tokens and fuse tokens as two vertical runs within one right-hand column", () => {
-    const markup = renderToStaticMarkup(
-      createElement(TokenColumn, { clueTokens: 2, fusesRemaining: 1, columnHeightPx: 260 }),
+  it("the clue-tokens and fuse-tokens containers have an identical footprint at 0 remaining and at full remaining", () => {
+    const zero = renderToStaticMarkup(createElement(TokenColumn, { clueTokens: 0, fusesRemaining: 0 }));
+    const full = renderToStaticMarkup(
+      createElement(TokenColumn, { clueTokens: MAX_CLUE_TOKENS, fusesRemaining: MAX_FUSE_TOKENS }),
     );
+    const extractStyle = (markup: string, testid: string): string => {
+      const match = markup.match(new RegExp(`data-testid="${testid}"[^>]*style="([^"]*)"`));
+      if (!match) throw new Error(`no ${testid} element found`);
+      return match[1]!;
+    };
+    expect(extractStyle(zero, "clue-tokens")).toBe(extractStyle(full, "clue-tokens"));
+    expect(extractStyle(zero, "fuse-tokens")).toBe(extractStyle(full, "fuse-tokens"));
+  });
+
+  it("clamps filled slots to MAX_CLUE_TOKENS/MAX_FUSE_TOKENS even if given an out-of-range count (T-06.2-35)", () => {
+    const markup = renderToStaticMarkup(createElement(TokenColumn, { clueTokens: 99, fusesRemaining: 99 }));
+    expect(countOccurrences(markup, 'data-testid="clue-token"')).toBe(MAX_CLUE_TOKENS);
+    expect(countOccurrences(markup, 'data-testid="fuse-token"')).toBe(MAX_FUSE_TOKENS);
+  });
+
+  it("renders clue tokens and fuse tokens as two runs within one right-hand token area", () => {
+    const markup = renderToStaticMarkup(createElement(TokenColumn, { clueTokens: 2, fusesRemaining: 1 }));
     const clueIndex = markup.indexOf('data-testid="clue-tokens"');
     const fuseIndex = markup.indexOf('data-testid="fuse-tokens"');
     expect(clueIndex).toBeGreaterThan(-1);

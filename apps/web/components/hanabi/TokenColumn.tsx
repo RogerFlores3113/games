@@ -1,78 +1,103 @@
-import { TOKEN_GAP_PX, tokenPitchPx } from "../../lib/layout-budget";
+import {
+  CLUE_TOKEN_COLUMNS,
+  MAX_CLUE_TOKENS,
+  MAX_FUSE_TOKENS,
+  TOKEN_AREA_HEIGHT_PX,
+  TOKEN_AREA_WIDTH_PX,
+  TOKEN_DISC_PX,
+  TOKEN_GAP_PX,
+  tokenRunHeightPx,
+} from "../../lib/layout-budget";
 import { ClueTokenArt } from "./ClueTokenArt";
 import { FuseTokenArt } from "./FuseTokenArt";
 
 export interface TokenColumnProps {
   clueTokens: number;
   fusesRemaining: number;
-  columnHeightPx: number;
+  /**
+   * @deprecated Unused — the token area is now a fixed reservation
+   * (06.2-14, UAT gap 1) sized from layout-budget.ts's constants, never
+   * from a caller-supplied height. Accepted-and-ignored so `Table.tsx`'s
+   * existing call site stays green; plan 06.2-16 removes both the prop
+   * and the call site.
+   */
+  columnHeightPx?: number;
 }
 
-/** A sensible upper bound so a small token count never renders oversized
- * discs — `tokenPitchPx` already guarantees the column never exceeds
- * `columnHeightPx` (see layout-budget.ts's derivation), so this clamp only
- * ever shrinks, never grows, the computed pitch. */
-const TOKEN_DISC_MAX_PX = 22;
-const TOKEN_DISC_MIN_PX = 4;
+const CLUE_RUN_HEIGHT_PX = tokenRunHeightPx(MAX_CLUE_TOKENS, CLUE_TOKEN_COLUMNS);
+const FUSE_RUN_HEIGHT_PX = tokenRunHeightPx(MAX_FUSE_TOKENS, 1);
 
 /**
- * D-16/D-18/D-19/BOARD-02/BOARD-03: the right-hand column of the tableau —
- * a vertical run of clue tokens (black disc, blue "?") and a vertical run
- * of fuse tokens (black disc, yellow explosion, orange-red rim) beside them
- * in the same column, per the owner's literal description.
+ * D-16/D-18/D-19/BOARD-02/BOARD-03: the right-hand token area of the
+ * tableau — a fixed grid of clue-token slots (black disc, blue-outlined "?")
+ * beside a fixed column of fuse-token slots (black disc, yellow explosion,
+ * orange-red rim), per the owner's literal description.
  *
- * Spent tokens are REMOVED from the DOM entirely (BOARD-03, D-19) — never
- * faded or made transparent in place — with a text count retained alongside
- * for accessibility and for test assertions, always present even at zero.
+ * Owner review (06.2-14, UAT gaps 1/4/5/6): the token area is now a FIXED
+ * reservation, not one derived from a caller-supplied height. It always
+ * renders `MAX_CLUE_TOKENS` clue slots (2 columns x 4 rows) and
+ * `MAX_FUSE_TOKENS` fuse slots (1 column), each `TOKEN_DISC_PX` (40px, 2x
+ * the pre-review 20px disc size) square, whether or not the token remains —
+ * a spent token's slot stays reserved but empty (BOARD-03, D-19: removed
+ * from the DOM, never dimmed or faded in place). The visible "{n} clues
+ * left" / "{n} fuses left" text is gone from the board (UAT gap 6); it
+ * survives only as an `sr-only` span inside the same fixed-size run
+ * container so screen readers, `table-render.test.ts` and the Playwright
+ * specs reading `textContent` all still see it.
  *
- * Pitfall 1 mitigation (RESEARCH.md): the disc size is derived FROM the
- * supplied `columnHeightPx` via `tokenPitchPx`, never the reverse — this
- * column never forces the left column (and therefore the page) to grow.
+ * Filled slots are clamped to `MAX_CLUE_TOKENS`/`MAX_FUSE_TOKENS`
+ * (T-06.2-35) so a malformed frame reporting an out-of-range count cannot
+ * grow the reserved box past its fixed footprint.
  */
-export function TokenColumn({ clueTokens, fusesRemaining, columnHeightPx }: TokenColumnProps) {
-  const totalTokens = clueTokens + fusesRemaining;
-  const rawPitch = tokenPitchPx(columnHeightPx, totalTokens);
-  const discSize = Math.max(TOKEN_DISC_MIN_PX, Math.min(rawPitch, TOKEN_DISC_MAX_PX));
+export function TokenColumn({ clueTokens, fusesRemaining }: TokenColumnProps) {
+  const clueSlotsFilled = Math.max(0, Math.min(clueTokens, MAX_CLUE_TOKENS));
+  const fuseSlotsFilled = Math.max(0, Math.min(fusesRemaining, MAX_FUSE_TOKENS));
 
   return (
     <div
-      className="flex flex-col items-center justify-center gap-[length:var(--space-md)]"
-      style={{ height: columnHeightPx }}
+      className="flex items-start"
+      style={{ height: TOKEN_AREA_HEIGHT_PX, width: TOKEN_AREA_WIDTH_PX, gap: TOKEN_GAP_PX * 4 }}
     >
-      <div className="flex flex-col items-center gap-[length:var(--space-xs)]">
-        <p
-          data-testid="clue-tokens"
-          data-count={clueTokens}
-          className="text-[length:var(--text-body)]"
-          style={{ color: "var(--color-text)", lineHeight: "var(--text-body--line-height)" }}
+      <div data-testid="clue-tokens" data-count={clueTokens} style={{ height: CLUE_RUN_HEIGHT_PX }}>
+        <div
+          aria-hidden="true"
+          className="grid"
+          style={{ gridTemplateColumns: `repeat(${CLUE_TOKEN_COLUMNS}, ${TOKEN_DISC_PX}px)`, gap: TOKEN_GAP_PX }}
         >
-          {clueTokens} clues left
-        </p>
-        <div aria-hidden="true" className="flex flex-col items-center" style={{ gap: TOKEN_GAP_PX }}>
-          {Array.from({ length: clueTokens }, (_, i) => (
-            <span key={i} data-testid="clue-token">
-              <ClueTokenArt size={discSize} />
-            </span>
-          ))}
+          {Array.from({ length: MAX_CLUE_TOKENS }, (_, i) =>
+            i < clueSlotsFilled ? (
+              <span key={i} data-testid="clue-token" style={{ width: TOKEN_DISC_PX, height: TOKEN_DISC_PX }}>
+                <ClueTokenArt size={TOKEN_DISC_PX} />
+              </span>
+            ) : (
+              <span
+                key={i}
+                data-testid="clue-token-slot-empty"
+                style={{ width: TOKEN_DISC_PX, height: TOKEN_DISC_PX }}
+              />
+            ),
+          )}
         </div>
+        <span className="sr-only">{clueTokens} clues left</span>
       </div>
 
-      <div className="flex flex-col items-center gap-[length:var(--space-xs)]">
-        <p
-          data-testid="fuse-tokens"
-          data-count={fusesRemaining}
-          className="text-[length:var(--text-body)]"
-          style={{ color: "var(--color-text)", lineHeight: "var(--text-body--line-height)" }}
-        >
-          {fusesRemaining} fuses left
-        </p>
-        <div aria-hidden="true" className="flex flex-col items-center" style={{ gap: TOKEN_GAP_PX }}>
-          {Array.from({ length: fusesRemaining }, (_, i) => (
-            <span key={i} data-testid="fuse-token">
-              <FuseTokenArt size={discSize} />
-            </span>
-          ))}
+      <div data-testid="fuse-tokens" data-count={fusesRemaining} style={{ height: FUSE_RUN_HEIGHT_PX }}>
+        <div aria-hidden="true" className="flex flex-col" style={{ gap: TOKEN_GAP_PX }}>
+          {Array.from({ length: MAX_FUSE_TOKENS }, (_, i) =>
+            i < fuseSlotsFilled ? (
+              <span key={i} data-testid="fuse-token" style={{ width: TOKEN_DISC_PX, height: TOKEN_DISC_PX }}>
+                <FuseTokenArt size={TOKEN_DISC_PX} />
+              </span>
+            ) : (
+              <span
+                key={i}
+                data-testid="fuse-token-slot-empty"
+                style={{ width: TOKEN_DISC_PX, height: TOKEN_DISC_PX }}
+              />
+            ),
+          )}
         </div>
+        <span className="sr-only">{fusesRemaining} fuses left</span>
       </div>
     </div>
   );
