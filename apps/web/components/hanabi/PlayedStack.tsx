@@ -1,5 +1,12 @@
 import type { HanabiView } from "@games/rules";
-import { MAX_RANK, RANK_SLOT_GAP_PX, RANK_SLOT_HEIGHT_PX, RANK_SLOT_WIDTH_PX, playGridHeightPx } from "../../lib/layout-budget";
+import {
+  MAX_RANK,
+  RANK_SLOT_GAP_PX,
+  RANK_SLOT_HEIGHT_PX,
+  RANK_SLOT_WIDTH_PX,
+  STACK_HEADER_HEIGHT_PX,
+  playGridHeightPx,
+} from "../../lib/layout-budget";
 import { FireworkCardFace } from "./FireworkCard";
 import { SuitGlyph } from "./SuitGlyph";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
@@ -9,8 +16,11 @@ export interface PlayedStackProps {
   flashing?: boolean;
 }
 
-/** The column header row's fixed height — same at every topRank. */
-const HEADER_HEIGHT_PX = 20;
+/** The column header row's fixed height — same at every topRank. Sourced
+ * from layout-budget.ts's STACK_HEADER_HEIGHT_PX so Table.tsx's Play-area
+ * reservation (playAreaContentHeightPx) always matches what this component
+ * actually renders. */
+const HEADER_HEIGHT_PX = STACK_HEADER_HEIGHT_PX;
 
 /**
  * Owner review (06.2-15, UAT gap 3, superseding D-22/BOARD-05's horizontal

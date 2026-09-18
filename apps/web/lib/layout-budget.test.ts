@@ -6,13 +6,13 @@ import {
   BOARD_INNER_PX,
   CLUE_TOKEN_COLUMNS,
   DECK_COUNTER_PX,
-  DISCARD_AREA_PX,
+  DISCARD_COMPACT_PX,
   MAX_CLUE_TOKENS,
   MAX_FUSE_TOKENS,
   MAX_SUITS,
   MIDDLE_GAP_PX,
   OWN_BAND_PX,
-  PLAY_AREA_PX,
+  PLAY_AREA_HEIGHT_PX,
   TABLE_BAND_MIN_PX,
   TEAMMATE_BAND_PX,
   TOKEN_AREA_HEIGHT_PX,
@@ -32,39 +32,44 @@ describe("layout-budget", () => {
 
   it("TEAMMATE_BAND_PX has no marks-band constant (HINT-04 removes the pip band)", () => {
     expect((layoutBudget as Record<string, unknown>).MARKS_BAND_PX).toBeUndefined();
-    expect(TEAMMATE_BAND_PX).toBe(140);
+    // fix(06.2-21): corrected 140 -> 110 — the vertical Play/Deck/Discard
+    // stack needs the height back; TeammateHand's slimmed chrome (no
+    // border/box-shadow/padding wrapper) funds this reduction.
+    expect(TEAMMATE_BAND_PX).toBe(110);
   });
 
   it("OWN_BAND_PX has no marks-band constant (HINT-04 removes the pip band)", () => {
     expect((layoutBudget as Record<string, unknown>).MARKS_BAND_PX).toBeUndefined();
-    // fix(06.2): corrected from the fictional 180 to the measured ~285px
-    // real footprint (+ margin) of the whole bottom controls row — see
-    // OWN_BAND_PX's own doc comment in layout-budget.ts.
-    expect(OWN_BAND_PX).toBe(300);
+    // fix(06.2-21): corrected 300 -> 280 — OwnHand's slimmed chrome funds
+    // part of the vertical Play/Deck/Discard stack's height; CardActions
+    // and CluePicker (the bottom controls row's other two children) are
+    // unchanged by this fix.
+    expect(OWN_BAND_PX).toBe(280);
   });
 
-  it("BOARD_INNER_PX is TABLE_BAND_MIN_PX minus the board panel's own padding on both sides", () => {
-    expect(BOARD_INNER_PX).toBe(244);
+  it("BOARD_INNER_PX is Play + gap + Deck + gap + compact Discard, stacked (06.2-21)", () => {
+    expect(BOARD_INNER_PX).toBe(PLAY_AREA_HEIGHT_PX + MIDDLE_GAP_PX + DECK_COUNTER_PX + MIDDLE_GAP_PX + DISCARD_COMPACT_PX);
   });
 
   it("playGridHeightPx is MAX_RANK slots at RANK_SLOT_HEIGHT_PX with RANK_SLOT_GAP_PX between them", () => {
-    expect(playGridHeightPx()).toBe(208);
+    // fix(06.2-21): RANK_SLOT_HEIGHT_PX shrunk 40 -> 24 (208 -> 128) so the
+    // vertical stack's Play area fits within the funded BOARD_INNER_PX.
+    expect(playGridHeightPx()).toBe(128);
   });
 
-  it("playAreaContentHeightPx (label + gap + grid + padding) fits within BOARD_INNER_PX", () => {
-    expect(playAreaContentHeightPx()).toBeLessThanOrEqual(BOARD_INNER_PX);
+  it("playAreaContentHeightPx (label + gap + stack header + grid + padding) IS PLAY_AREA_HEIGHT_PX", () => {
+    expect(playAreaContentHeightPx()).toBe(PLAY_AREA_HEIGHT_PX);
   });
 
   it("playColumnWidthPx(MAX_SUITS) is the Rainbow/Black worst-case Play area width", () => {
-    expect(playColumnWidthPx(MAX_SUITS)).toBe(208);
+    // fix(06.2-21): RANK_SLOT_WIDTH_PX shrunk 30 -> 20 (208 -> 148).
+    expect(playColumnWidthPx(MAX_SUITS)).toBe(148);
   });
 
-  it("DECK_COUNTER_PX + MIDDLE_GAP_PX + DISCARD_AREA_PX equals BOARD_INNER_PX exactly", () => {
-    expect(DECK_COUNTER_PX + MIDDLE_GAP_PX + DISCARD_AREA_PX).toBe(BOARD_INNER_PX);
-  });
-
-  it("PLAY_AREA_PX fills the whole reserved BOARD_INNER_PX column height", () => {
-    expect(PLAY_AREA_PX).toBe(BOARD_INNER_PX);
+  it("Play/Deck/compact-Discard heights plus their gaps equal BOARD_INNER_PX exactly", () => {
+    expect(PLAY_AREA_HEIGHT_PX + MIDDLE_GAP_PX + DECK_COUNTER_PX + MIDDLE_GAP_PX + DISCARD_COMPACT_PX).toBe(
+      BOARD_INNER_PX,
+    );
   });
 
   it("TOKEN_AREA_HEIGHT_PX fits within BOARD_INNER_PX", () => {

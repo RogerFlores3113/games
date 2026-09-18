@@ -19,6 +19,20 @@
  * in particular is no longer a horizontal fan (BOARD-05) — it is a fixed
  * suit-column grid (`playGridHeightPx`/`playColumnWidthPx`), five rank
  * slots per suit, all five always reserved whether filled or not.
+ *
+ * Owner review (06.2-21, vertical stack restored): the owner's literal
+ * layout — Play at the TOP, the deck count between, Discard at the BOTTOM,
+ * clue/fuse tokens in a column to the RIGHT — is restored. 06.2-16's
+ * side-by-side (Play left / Deck+Discard middle / Tokens right) build was a
+ * documented tradeoff the owner rejected once shown it; the owner's fix was
+ * "discard can be shrunk by default, clicking it will expand" plus slimming
+ * the hand bands so the board gets the height the vertical stack needs.
+ * `RANK_SLOT_HEIGHT_PX`/`RANK_SLOT_WIDTH_PX` are shrunk deliberately (40x30
+ * -> 24x20) — a real-browser 1280x720 measurement (5 seats, Black variant)
+ * showed hand-slimming alone could not fund the ~230px the full-size grid
+ * would have needed. `DISCARD_COMPACT_PX` replaces `DISCARD_AREA_PX` — the
+ * compact strip is deliberately short (one clipped row); the existing
+ * `DiscardOverlay` (unchanged) is what reads the full pile.
  */
 
 /** Playwright's fixed viewport for the UI-11 no-scroll verification task. */
@@ -37,47 +51,6 @@ export const VIEWPORT_TEST_WIDTH_PX = 1280;
  * correction this phase's UI-11 fix required.
  */
 export const BOARD_CHROME_PX = 16;
-
-/**
- * UI-SPEC "Top (teammate hands)" row, this phase: 140px (seat label 20 +
- * card row 78 + status row 20 + gaps/padding). The 28px automatic clue-mark
- * pip band from 06.1 is removed (HINT-04) — there is no MARKS_BAND_PX
- * constant.
- */
-export const TEAMMATE_BAND_PX = 140;
-
-/**
- * UI-SPEC "Bottom (own hand)" row, this phase: originally set to 180px
- * (turn indicator 24 + card row 100 + controls row 44 + note-row 20 [now
- * always-visible, same 20px budget as 06.1's click-to-reveal chip],
- * gaps/padding). The 28px automatic clue-mark pip band from 06.1 is removed
- * (HINT-04) — there is no MARKS_BAND_PX constant.
- *
- * fix(06.2): 180 was never the real footprint of this band — it only
- * covered `OwnHand` itself (turn indicator + card row + note row, which
- * really does render at ~154px). It never accounted for `CardActions`,
- * `CluePicker`, `AudioControls`, and the keep-hints/tile-colour toggles,
- * which sit in the same bottom controls row but are separate flex children,
- * not sub-rows of `OwnHand`. Once Table.tsx stopped absorbing that gap
- * (06.2-07), a live 5-player 1280x720 measurement showed the true combined
- * height of the whole row (wrapped across two lines: OwnHand+CardActions on
- * one, CluePicker+AudioControls+toggles on the other) is ~285px, not 180px.
- * Corrected to 300px (285 measured + ~15px margin) — a real number this
- * phase's fixes (NoteBox width bug, CluePicker's compacted 2-row layout)
- * actually hit, not a number chosen to make the arithmetic below look
- * right. TEAMMATE_BAND_PX/TABLE_BAND_MIN_PX/BOARD_CHROME_PX keep their own
- * (now-accurate) values, and the four still sum to ≤720 — see
- * layout-budget.test.ts.
- */
-export const OWN_BAND_PX = 300;
-
-/**
- * UI-SPEC "Center (tableau)" row's minimum available height, this phase:
- * ~360px available, of which the left column (Play/Deck/Discard) occupies
- * ~260px and the right column (token line) stretches to match it via
- * `items-stretch`.
- */
-export const TABLE_BAND_MIN_PX = 260;
 
 /** UI-SPEC teammate card height (unchanged from 06.1's TeammateCard). */
 export const TEAMMATE_CARD_HEIGHT_PX = 78;
@@ -102,14 +75,6 @@ export const STATUS_ROW_PX = 20;
  */
 export const BOARD_PANEL_PADDING_PX = 8;
 
-/**
- * The inner height every board region (Play/Deck/Discard/Tokens) shares,
- * after the board panel's own top+bottom padding is removed from
- * `TABLE_BAND_MIN_PX`. Every board region below reserves a fixed slice of
- * this height up front rather than deriving its size from content.
- */
-export const BOARD_INNER_PX = TABLE_BAND_MIN_PX - 2 * BOARD_PANEL_PADDING_PX;
-
 /** A labelled board area's label-row height (e.g. "Play", "Discard"). */
 export const AREA_LABEL_PX = 18;
 /** A labelled board area's own internal padding, one side. */
@@ -120,14 +85,28 @@ export const MAX_RANK = 5;
 /** Reserved suit-column count — the Rainbow/Black variant worst case. */
 export const MAX_SUITS = 6;
 
-/** A single rank slot's width (06.2-15, UAT gap 3 — suits as columns). */
-export const RANK_SLOT_WIDTH_PX = 30;
-/** A single rank slot's height. */
-export const RANK_SLOT_HEIGHT_PX = 40;
+/**
+ * A single rank slot's width/height (06.2-21, vertical stack restored):
+ * shrunk deliberately from the 06.2-15 side-by-side build's 30x40 to 20x24
+ * — a real-browser measurement showed the vertical Play-above-Deck-above-
+ * Discard stack needed ~280px of column height that the full-size grid
+ * could not fund alongside a compact Discard strip and slimmed hand bands.
+ */
+export const RANK_SLOT_WIDTH_PX = 20;
+/** A single rank slot's height (06.2-21). */
+export const RANK_SLOT_HEIGHT_PX = 24;
 /** Vertical gap between adjacent rank slots within one suit column. */
 export const RANK_SLOT_GAP_PX = 2;
 /** Horizontal gap between adjacent suit columns. */
 export const SUIT_COLUMN_GAP_PX = 4;
+
+/**
+ * `PlayedStack`'s own column-header row (suit glyph) height — a single
+ * source of truth shared with `PlayedStack.tsx` so the Play area's reserved
+ * height calculation (`playAreaContentHeightPx`) always matches what
+ * `PlayedStack` actually renders on top of its rank grid.
+ */
+export const STACK_HEADER_HEIGHT_PX = 20;
 
 /**
  * A suit column's rank grid height: `MAX_RANK` slots reserved top to bottom
@@ -148,38 +127,87 @@ export function playColumnWidthPx(suitCount: number): number {
 
 /**
  * The Play area's total reserved width at the Rainbow/Black worst case (six
- * suit columns).
+ * suit columns) — also the width of the whole left column (Play/Deck/
+ * Discard all share this width, stacked, per the owner's literal layout).
  */
 export const PLAY_AREA_WIDTH_PX = playColumnWidthPx(MAX_SUITS);
 
 /**
- * The Play area's total reserved content height: label row + gap + the
- * rank grid + the area's own top+bottom padding. Proven at module load
- * (layout-budget.test.ts) to fit within `BOARD_INNER_PX`.
+ * The Play area's total reserved height: label row + gap + `PlayedStack`'s
+ * own header row + the rank grid + the area's own top+bottom padding. This
+ * IS the Play box's rendered height (06.2-21) — the vertical stack no
+ * longer lets Play fill the whole column the way the 06.2-16 side-by-side
+ * build did, so this function's return value is consumed directly rather
+ * than only being an internal fit-check.
  */
 export function playAreaContentHeightPx(): number {
-  return AREA_LABEL_PX + AREA_PADDING_PX + playGridHeightPx() + 2 * AREA_PADDING_PX;
+  return AREA_LABEL_PX + AREA_PADDING_PX + STACK_HEADER_HEIGHT_PX + playGridHeightPx() + 2 * AREA_PADDING_PX;
 }
 
-/**
- * UI-SPEC Play area height (06.2-15, UAT gap 1/gap 3): the Play region now
- * fills its whole reserved column height rather than a smaller
- * content-derived box — the old horizontal fan (BOARD-05) is replaced by a
- * five-row-per-suit column grid (see `playGridHeightPx`/`playColumnWidthPx`
- * and `PlayedStack.tsx`).
- */
-export const PLAY_AREA_PX = BOARD_INNER_PX;
+/** UI-SPEC Play area height (06.2-21) — see `playAreaContentHeightPx`. */
+export const PLAY_AREA_HEIGHT_PX = playAreaContentHeightPx();
+
 /** UI-SPEC deck-counter row height (small FireworkCardBack + "48" text, centered). */
 export const DECK_COUNTER_PX = 40;
-/** Gap between the Deck counter row and the Discard area below it. */
+/** Gap between Play/Deck/Discard, stacked vertically (06.2-21). */
 export const MIDDLE_GAP_PX = 4;
+
+/** A compact discard tile's rendered width/height (06.2-21) — small enough
+ * that the strip reads as "there are discards here", not a full pile. */
+export const DISCARD_TILE_WIDTH_PX = 16;
+export const DISCARD_TILE_HEIGHT_PX = 22;
+
 /**
- * UI-SPEC Discard area height: `BOARD_INNER_PX` minus the Deck counter row
- * and the gap between it and Discard. A deep discard pile wraps and clips
- * inside this fixed box rather than growing it — the expanded overlay
- * behind `discard-toggle` is where the full pile is read.
+ * UI-SPEC compact Discard strip height (06.2-21, owner review: "discard can
+ * be shrunk by default, clicking it will expand"): label row + gap + one
+ * clipped row of `DISCARD_TILE_HEIGHT_PX`-tall tiles + the area's own
+ * top+bottom padding. A pile deeper than one row wraps/clips inside this
+ * fixed box — `discard-toggle` opens the existing full-size
+ * `DiscardOverlay` (unchanged) to read the whole pile.
  */
-export const DISCARD_AREA_PX = BOARD_INNER_PX - DECK_COUNTER_PX - MIDDLE_GAP_PX;
+export const DISCARD_COMPACT_PX =
+  AREA_LABEL_PX + AREA_PADDING_PX + DISCARD_TILE_HEIGHT_PX + 2 * AREA_PADDING_PX;
+
+/**
+ * The left column's total reserved height (06.2-21): Play (top) + gap +
+ * Deck counter (middle) + gap + compact Discard (bottom), stacked
+ * vertically per the owner's literal description. This is also the inner
+ * height every board region shares inside the panel's own top+bottom
+ * padding — `TABLE_BAND_MIN_PX` below adds that padding back.
+ */
+export const BOARD_INNER_PX =
+  PLAY_AREA_HEIGHT_PX + MIDDLE_GAP_PX + DECK_COUNTER_PX + MIDDLE_GAP_PX + DISCARD_COMPACT_PX;
+
+/**
+ * UI-SPEC "Center (tableau)" row's height (06.2-21): the board panel's own
+ * top+bottom padding plus `BOARD_INNER_PX`, the left column's (Play/Deck/
+ * Discard) fixed content height — the right column (tokens,
+ * `TOKEN_AREA_HEIGHT_PX`, 172px) is shorter and does not drive this number.
+ */
+export const TABLE_BAND_MIN_PX = BOARD_INNER_PX + 2 * BOARD_PANEL_PADDING_PX;
+
+/**
+ * UI-SPEC "Top (teammate hands)" row, this phase (06.2-21, owner review:
+ * "hands are just username + hand itself on a small board... shouldn't
+ * need nearly as much padding"): `TeammateHand`'s outer border/box-shadow
+ * and padding are gone in favor of a slim `.board-surface`-tiled panel —
+ * card row (78) + a single compact label+status row + minimal padding,
+ * budgeted below the pre-06.2-21 140px measured-117px footprint with margin
+ * for the real render.
+ */
+export const TEAMMATE_BAND_PX = 110;
+
+/**
+ * UI-SPEC "Bottom (own hand)" row, this phase (06.2-21): `OwnHand`'s own
+ * border/box-shadow/padding are gone the same way `TeammateHand`'s are —
+ * the band's real footprint is still governed by the wrapped two-line
+ * `bottom-controls-row` (OwnHand+CardActions on line 1, CluePicker on line
+ * 2, per `CardActions`/`CluePicker`'s own unchanged layout, which this fix
+ * does not touch), budgeted below the pre-06.2-21 300px/285px-measured
+ * footprint with margin for the real render.
+ */
+export const OWN_BAND_PX = 280;
+
 /** Vertical/horizontal gap between adjacent tokens/slots — reuses --space-xs. */
 export const TOKEN_GAP_PX = 4;
 
