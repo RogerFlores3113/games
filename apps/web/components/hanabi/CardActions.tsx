@@ -13,61 +13,41 @@ export interface CardActionsProps {
 }
 
 /**
- * D-16/D-18: Play and Discard are always rendered (never hidden), disabled
- * with a visible inline reason from disabledReasonFor, linked by
- * aria-describedby (RULES-11).
+ * D-16/D-18: Play and Discard are always rendered (never hidden). RULES-11
+ * ("illegal actions are visibly unavailable") is satisfied by the disabled
+ * state itself — a visible, standard affordance. UAT gap 15 (second owner
+ * review): the inline disabled-reason text ("Select a card in your hand
+ * first", "Clue tokens are full…") was obtrusive and has been deleted along
+ * with its rendering and its `aria-describedby` link; `disabledReasonFor` is
+ * still used to compute WHETHER the button is disabled, just not to render
+ * a caption. Each button still gets a real `aria-label` for the disabled
+ * reason, kept out of the visual flow but still in the accessible name.
  */
 export function CardActions({ game, selectedCardId, ctx, onPlay, onDiscard }: CardActionsProps) {
   const playReason = disabledReasonFor(game, { kind: "play", selectedCardId }, ctx);
   const discardReason = disabledReasonFor(game, { kind: "discard", selectedCardId }, ctx);
 
   return (
-    <div className="flex flex-col items-center gap-[3px]">
-      <div className="flex gap-[length:var(--space-xs)]">
-        <div className="flex flex-col items-center gap-[length:var(--space-xs)]">
-          <Button
-            variant="ghost"
-            data-testid="play-button"
-            disabled={playReason !== null}
-            aria-describedby={playReason !== null ? "action-reason-play" : undefined}
-            onClick={onPlay}
-          >
-            Play
-          </Button>
-          {playReason !== null && (
-            <p
-              id="action-reason-play"
-              data-testid="action-reason-play"
-              className="text-[length:var(--text-label)]"
-              style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
-            >
-              {playReason}
-            </p>
-          )}
-        </div>
+    <div className="flex gap-[length:var(--space-xs)]">
+      <Button
+        variant="ghost"
+        data-testid="play-button"
+        disabled={playReason !== null}
+        aria-label={playReason !== null ? `Play (${playReason})` : "Play"}
+        onClick={onPlay}
+      >
+        Play
+      </Button>
 
-        <div className="flex flex-col items-center gap-[length:var(--space-xs)]">
-          <Button
-            variant="ghost"
-            data-testid="discard-button"
-            disabled={discardReason !== null}
-            aria-describedby={discardReason !== null ? "action-reason-discard" : undefined}
-            onClick={onDiscard}
-          >
-            Discard
-          </Button>
-          {discardReason !== null && (
-            <p
-              id="action-reason-discard"
-              data-testid="action-reason-discard"
-              className="text-[length:var(--text-label)]"
-              style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
-            >
-              {discardReason}
-            </p>
-          )}
-        </div>
-      </div>
+      <Button
+        variant="ghost"
+        data-testid="discard-button"
+        disabled={discardReason !== null}
+        aria-label={discardReason !== null ? `Discard (${discardReason})` : "Discard"}
+        onClick={onDiscard}
+      >
+        Discard
+      </Button>
     </div>
   );
 }

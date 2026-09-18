@@ -149,7 +149,7 @@ export function CluePicker({
           variant="ghost"
           data-testid="give-clue-button"
           disabled={clueReason !== null}
-          aria-describedby={clueReason !== null ? "action-reason-clue" : undefined}
+          aria-label={clueReason !== null ? `Give clue (${clueReason})` : "Give clue"}
           onClick={onGive}
         >
           Give clue
@@ -165,16 +165,14 @@ export function CluePicker({
           {`Dimmed options wouldn't touch any of ${zeroTouchTarget.label}'s cards`}
         </p>
       )}
-      {clueReason !== null && (
-        <p
-          id="action-reason-clue"
-          data-testid="action-reason-clue"
-          className="text-[length:var(--text-label)]"
-          style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
-        >
-          {clueReason}
-        </p>
-      )}
+      {/* UAT gap 15 (second owner review), "and any sibling strings" — the
+          give-clue button's own inline disabled-reason caption is the same
+          kind of obtrusive text CardActions' Play/Discard reasons were
+          (both sourced from disabledReasonFor). Deleted the same way: the
+          disabled state is the affordance, the reason moves into the
+          button's aria-label instead of a rendered <p>. This is the only
+          change gap 15 makes in this file — everything else here is left
+          alone for the imminent quick-clue-popover replacement (gap 16). */}
     </div>
   );
 }

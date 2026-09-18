@@ -374,7 +374,12 @@ test.describe("Phase 5 reconnect hardening (RT-04 + RT-06 + D-14)", () => {
     await expect(droppingPage.getByTestId("play-button")).toBeDisabled();
     await expect(droppingPage.getByTestId("discard-button")).toBeDisabled();
     await expect(droppingPage.getByTestId("give-clue-button")).toBeDisabled();
-    await expect(droppingPage.getByTestId("action-reason-play")).toHaveText("Reconnecting — actions paused");
+    // UAT gap 15 (second owner review): the inline disabled-reason caption
+    // was deleted; the reason still lands in the button's accessible name.
+    await expect(droppingPage.getByTestId("play-button")).toHaveAttribute(
+      "aria-label",
+      "Play (Reconnecting — actions paused)",
+    );
     await expect(droppingPage.getByText(/Connecting to room/)).toHaveCount(0);
     await expect(droppingPage.getByTestId("own-hand")).toBeVisible();
 
