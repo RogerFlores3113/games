@@ -85,44 +85,46 @@ describe("note-box-render", () => {
   });
 });
 
-// HINT-03/TILE-03 (D-05/D-13/D-14): render-contract for the controls-row
-// additions introduced by this plan. TileColorPicker is directly
-// server-renderable (it takes only a value/onChange pair, no room/socket
-// context), so its swatch grid is asserted the same way NoteBox is above.
-// The keep-hints toggle lives inside HanabiBoard, which requires a full
-// RoomView/socket context to render — its two aria-label states are
-// asserted the same way this file already asserts NoteBox's contracted
-// strings: a source scan for the literal, contracted copy.
-describe("tile-color-picker-render (TILE-03, D-13/D-14)", () => {
-  function renderOpenPicker(): string {
-    // The swatch grid only renders once opened; render the picker, then
-    // re-render with the panel forced open by invoking the same markup the
-    // component produces when `open` is true — simplest reliable path in a
-    // Node (non-jsdom) environment is asserting the always-present toggle
-    // button here and covering the swatch grid via a source scan below,
-    // mirroring this file's own NoteBox debounce-behaviour approach.
-    return renderToStaticMarkup(
-      createElement(TileColorPicker, { value: "slate", onChange: () => {} }),
-    );
+// HINT-03/TILE-03 (D-05/D-13, UAT gap 30 overturns D-14): render-contract
+// for the controls-row additions introduced by this plan. TileColorPicker is
+// directly server-renderable (it takes only a value/onChange pair, no
+// room/socket context), so its native colour input is asserted the same way
+// NoteBox is above.
+describe("tile-color-picker-render (TILE-03, UAT gap 30 overturns D-14)", () => {
+  function renderPicker(value: string | null = null): string {
+    return renderToStaticMarkup(createElement(TileColorPicker, { value, onChange: () => {} }));
   }
 
-  it("server render is an icon-only toggle button with the contracted aria-label and a 44px-reachable touch target", () => {
-    const markup = renderOpenPicker();
-    expect(markup).toContain('data-testid="tile-color-picker-toggle"');
-    expect(markup).toContain('aria-label="Choose tile colour"');
-    expect(markup).toContain('aria-hidden="true"');
+  it("server render is a native colour input with an accessible label", () => {
+    const markup = renderPicker();
+    expect(markup).toContain('data-testid="tile-color-input"');
+    expect(markup).toContain('type="color"');
+    expect(markup).toContain('aria-label="Tile colour"');
   });
 
-  it("source defines all five swatches with the contracted per-preset aria-labels", () => {
+  it("renders no preset swatch grid — the five-preset palette is gone (D-14 overturned)", () => {
+    const markup = renderPicker();
+    expect(markup).not.toContain("tile-color-swatch");
+    expect(markup).not.toContain("tile-color-picker-panel");
+    expect(markup).not.toContain("tile-color-picker-toggle");
+  });
+
+  it("passing a stored custom hex colour renders it as the input's default value", () => {
+    const markup = renderPicker("#3388ff");
+    expect(markup).toContain('value="#3388ff"');
+  });
+
+  it("passing null (no custom colour chosen) renders no hardcoded hex fallback value", () => {
+    const markup = renderPicker(null);
+    expect(markup).not.toMatch(/value="#[0-9a-fA-F]{6}"/);
+  });
+
+  it("source defines zero hex colour literals — the default falls back to the browser's own native default", () => {
     const pickerSource = readFileSync(
       fileURLToPath(new URL("../components/hanabi/TileColorPicker.tsx", import.meta.url)),
       "utf-8",
     );
-    expect(pickerSource).toContain("Slate tile colour");
-    expect(pickerSource).toContain("Warm sand tile colour");
-    expect(pickerSource).toContain("Cool teal tile colour");
-    expect(pickerSource).toContain("Plum tile colour");
-    expect(pickerSource).toContain("Charcoal tile colour");
+    expect(pickerSource).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 
   it("never imports a network/wire-reaching path — the choice is local-only (D-13)", () => {

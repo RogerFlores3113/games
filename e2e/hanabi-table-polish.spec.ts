@@ -496,10 +496,12 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     const slotBgBefore = await slot.evaluate((el) => getComputedStyle(el).backgroundColor);
     const overlayBefore = await overlay.evaluate((el) => getComputedStyle(el).backgroundColor);
 
-    // 06.2-13: the tile-colour swatch grid now lives inside SettingsModal,
-    // opened by the gear trigger.
+    // 06.2-13: the tile-colour control lives inside SettingsModal, opened by
+    // the gear trigger. UAT gap 30 (overturns D-14): a real colour picker,
+    // not a preset swatch grid — fill the native `<input type="color">`.
+    const CUSTOM_HEX = "#a37fd1";
     await hostPage.getByTestId("settings-toggle").click();
-    await hostPage.getByTestId("tile-color-swatch-plum").click();
+    await hostPage.getByTestId("tile-color-input").fill(CUSTOM_HEX);
     await hostPage.getByTestId("settings-close").click();
     await expect(hostPage.getByTestId("settings-modal")).toHaveCount(0);
 
@@ -526,7 +528,7 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await hostPage.reload();
     await expect(hostPage.getByTestId("own-hand")).toBeVisible();
     await hostPage.getByTestId("settings-toggle").click();
-    await expect(hostPage.getByTestId("tile-color-swatch-plum")).toHaveAttribute("aria-pressed", "true");
+    await expect(hostPage.getByTestId("tile-color-input")).toHaveValue(CUSTOM_HEX);
     await hostPage.getByTestId("settings-close").click();
     await expect(hostPage.getByTestId("tile-color-overlay-own-hand-slot-1")).toHaveCSS(
       "background-color",
@@ -543,6 +545,33 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await contextB.close();
   });
 
+  test("UAT gap 30 (overturns D-14): pure white, pure black, and a saturated colour all stay translucent, never opaque", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB } = await startTwoPlayerGame(hostPage, browser);
+    const overlay = hostPage.getByTestId("tile-color-overlay-own-hand-slot-1");
+
+    for (const hex of ["#ffffff", "#000000", "#ff0000"]) {
+      await hostPage.getByTestId("settings-toggle").click();
+      await hostPage.getByTestId("tile-color-input").fill(hex);
+      await hostPage.getByTestId("settings-close").click();
+
+      const overlayColor = await overlay.evaluate((el) => getComputedStyle(el).backgroundColor);
+      const rgbaAlpha = overlayColor.match(/rgba\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*,\s*([\d.]+)\s*\)/);
+      const colorFnAlpha = overlayColor.match(/color\([^)]*\/\s*([\d.]+)\s*\)/);
+      const alphaMatch = rgbaAlpha ?? colorFnAlpha;
+      expect(alphaMatch, `expected an rgba()/color() colour carrying alpha for ${hex}, got "${overlayColor}"`).not.toBeNull();
+      expect(Number(alphaMatch![1])).toBeLessThan(1);
+
+      // The card identity underneath is still visible through the tint —
+      // the overlay never becomes a fully opaque cover (gap 7's contract).
+      await expect(hostPage.getByTestId("own-hand-slot-1")).toBeVisible();
+    }
+
+    await contextB.close();
+  });
+
   test("settings modal: the gear opens a dialog holding every relocated preference control, and Escape closes it without disturbing the board", async ({
     page: hostPage,
     browser,
@@ -554,7 +583,7 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await expect(hostPage.getByTestId("audio-volume")).toBeVisible();
     await expect(hostPage.getByTestId("audio-mute-toggle")).toBeVisible();
     await expect(hostPage.getByTestId("keep-hints-toggle")).toBeVisible();
-    await expect(hostPage.getByTestId("tile-color-swatch-plum")).toBeVisible();
+    await expect(hostPage.getByTestId("tile-color-input")).toBeVisible();
 
     await hostPage.keyboard.press("Escape");
     await expect(hostPage.getByTestId("settings-modal")).toHaveCount(0);

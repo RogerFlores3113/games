@@ -30,7 +30,7 @@ function baseProps() {
     onVolumeChange: () => {},
     keepHints: false,
     onToggleKeepHints: () => {},
-    tileColorId: "slate" as const,
+    tileColorHex: null as string | null,
     onTileColorChange: () => {},
   };
 }
@@ -49,21 +49,18 @@ describe("settings-modal-render", () => {
     expect(markup).toContain('aria-label="Settings"');
   });
 
-  it("when open, contains all four control groups: audio volume/mute, keep-hints, and every tile-colour swatch", () => {
+  it("when open, contains all four control groups: audio volume/mute, keep-hints, and the tile-colour input", () => {
     const markup = renderToStaticMarkup(createElement(SettingsModal, baseProps()));
     expect(markup).toContain('data-testid="audio-volume"');
     expect(markup).toContain('data-testid="audio-mute-toggle"');
     expect(markup).toContain('data-testid="keep-hints-toggle"');
-    expect(markup).toContain('data-testid="tile-color-swatch-slate"');
-    expect(markup).toContain('data-testid="tile-color-swatch-warm-sand"');
-    expect(markup).toContain('data-testid="tile-color-swatch-cool-teal"');
-    expect(markup).toContain('data-testid="tile-color-swatch-plum"');
-    expect(markup).toContain('data-testid="tile-color-swatch-charcoal"');
+    expect(markup).toContain('data-testid="tile-color-input"');
   });
 
-  it("renders the embedded swatch grid directly — no tile-color-picker-toggle inside the modal", () => {
+  it("UAT gap 30 (overturns D-14): renders the native colour input directly — no preset swatch grid, no picker toggle", () => {
     const markup = renderToStaticMarkup(createElement(SettingsModal, baseProps()));
     expect(markup).not.toContain("tile-color-picker-toggle");
+    expect(markup).not.toContain("tile-color-swatch");
   });
 
   it("has a close button", () => {
@@ -98,20 +95,16 @@ describe("settings-modal-render", () => {
   });
 });
 
-describe("TileColorPicker embedded mode", () => {
-  it("embedded renders only the swatch grid — no toggle button", () => {
-    const markup = renderToStaticMarkup(
-      createElement(TileColorPicker, { value: "slate", onChange: () => {}, embedded: true }),
-    );
-    expect(markup).not.toContain("tile-color-picker-toggle");
-    expect(markup).toContain('data-testid="tile-color-picker-panel"');
-    expect(markup).toContain('data-testid="tile-color-swatch-slate"');
+describe("TileColorPicker (UAT gap 30, overturns D-14)", () => {
+  it("renders a native colour input with a null (default) value", () => {
+    const markup = renderToStaticMarkup(createElement(TileColorPicker, { value: null, onChange: () => {} }));
+    expect(markup).toContain('data-testid="tile-color-input"');
+    expect(markup).toContain('type="color"');
   });
 
-  it("default (non-embedded) render is unchanged — the toggle button still gates the panel", () => {
-    const markup = renderToStaticMarkup(createElement(TileColorPicker, { value: "slate", onChange: () => {} }));
-    expect(markup).toContain('data-testid="tile-color-picker-toggle"');
-    expect(markup).not.toContain("tile-color-picker-panel");
+  it("renders the stored hex colour as the input's value when one is chosen", () => {
+    const markup = renderToStaticMarkup(createElement(TileColorPicker, { value: "#a37fd1", onChange: () => {} }));
+    expect(markup).toContain('value="#a37fd1"');
   });
 });
 
@@ -159,6 +152,6 @@ describe("HanabiBoard: relocated controls live only inside the (closed) settings
     expect(markup).not.toContain("audio-mute-toggle");
     expect(markup).not.toContain("audio-volume");
     expect(markup).not.toContain("keep-hints-toggle");
-    expect(markup).not.toContain("tile-color-swatch-slate");
+    expect(markup).not.toContain("tile-color-input");
   });
 });

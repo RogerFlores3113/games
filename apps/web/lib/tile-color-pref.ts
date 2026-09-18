@@ -1,107 +1,100 @@
-import { safeGetItem, safeSetItem } from "./safe-storage";
+import { safeGetItem, safeRemoveItem, safeSetItem } from "./safe-storage";
 
 /**
- * D-13/D-14 (TILE-03): the tile-colour preset palette and the per-player
- * preference for which preset is active. Browser-local only, persisted
- * exclusively through `safe-storage.ts` — this module never imports the
- * websocket connection layer, the server-synced client state cache, or
- * an id-generation utility; nothing here can reach the wire.
+ * D-13 (TILE-03): the per-player tile-colour preference. Browser-local
+ * only, persisted exclusively through `safe-storage.ts` — this module never
+ * imports the websocket connection layer, the server-synced client state
+ * cache, or an id-generation utility; nothing here can reach the wire.
  *
- * UAT gap 7 (06.2-17): a preset is no longer an opaque tile fill — it is a
- * TRANSLUCENT wash painted ON TOP of the card art (see OwnHandCard.tsx /
- * TeammateCard.tsx's overlay span), so changing the preference tints and
- * darkens the card underneath rather than hiding it entirely. The five
- * presets are a FIXED set (UI-SPEC "Tile-colour preset palette"): each
- * preset's `cssValue` is a `color-mix(in srgb, var(--color-*) N%,
- * transparent)` expression, never a raw hex literal and never a fully
- * opaque value — slate derives from the existing `--color-surface` token;
- * the other four reference the `--color-tile-preset-*` `@theme` tokens
- * added by 06.2-02. The N% alpha strength was chosen so the art beneath
- * stays readable at every preset, reviewed by the owner at sign-off. These
- * are decorative personal-preference fills only, never a suit/hint/accent
- * signal colour.
+ * UAT gap 30 (fifth owner review, OVERTURNS D-14): D-14 originally chose a
+ * fixed five-preset palette specifically so every option stayed inside
+ * contrast limits against suit colours, glyphs and hint tints. The owner
+ * rejected that: "please give us a proper color picker, not just preset
+ * options." The preference is now an arbitrary player-chosen hex colour (or
+ * `null`, meaning "no custom colour chosen — use the default tint"),
+ * entered via a native `<input type="color">` (TileColorPicker.tsx).
  *
- * UAT gap 17 (06.2 third owner review, "the cards are dark"): slate is the
- * DEFAULT every player sees before ever opening the picker, so it must read
- * as "no visible tint," not just "translucent." Measured with a real
- * getComputedStyle probe against `own-hand-slot-1` at the OLD 45% alpha:
- * the overlay resolved to 45% of `--color-surface`, painted on top of the
- * card-back art's own `--color-border` picture-frame outline. Those two
- * tokens are close in luminance, so stacking a 45%-strength wash of one
- * over the other nearly halved the outline's already-subtle contrast
- * against the card's `--color-surface` container, which reads as a flat,
- * featureless dark rectangle exactly as the owner described — the
- * compounding is the DEFAULT overlay stacking on an already-dark neutral
- * card back (D-10), not an opacity/hiding regression (gap 7/12 already
- * fixed that separately). Dropping slate's alpha to 10% keeps it a real,
- * present translucent wash (never "none" — TILE-01 still wants every tile
- * to read as a raised, tinted object) while preserving roughly 90% of the
- * original border contrast, so the default reads clearly. The other four
- * presets keep their reviewed 55% strength: gap 7's "choosing a colour must
- * still tint and darken the card" behaviour is unchanged for anyone who
- * actually opens the picker.
+ * D-14's underlying contrast CONCERN is preserved structurally rather than
+ * by restricting the palette: every resolved tint — default or custom —
+ * stays a TRANSLUCENT wash painted ON TOP of the card art (see
+ * OwnHandCard.tsx/TeammateCard.tsx's overlay span), so it tints and darkens
+ * the card underneath rather than ever hiding it entirely (UAT gap 7,
+ * 06.2-17). `resolveTileColorCss` below is the ONE place that wraps a
+ * chosen colour in that `color-mix()` wash — a fully-saturated colour, pure
+ * white, or pure black all still only ever tint, never opaquely cover, the
+ * card beneath (verified for those three extremes in tile-color.test.ts).
+ *
+ * UAT gap 17 (06.2 third owner review, "the cards are dark"): the DEFAULT
+ * tint (no custom colour chosen) must read as "barely there," not a second
+ * dark wash stacked on the already-dark neutral card back (D-10) — measured
+ * against `--color-border`'s picture-frame outline on the card back, a
+ * stronger default wash nearly halved that outline's already-subtle
+ * contrast. `DEFAULT_TILE_COLOR_CSS` below keeps the same 10% strength that
+ * fix landed at; a player-chosen custom colour keeps the stronger, still
+ * fully-reviewed 55% strength the four non-default presets used.
+ *
+ * No hex literal appears anywhere in this file (enforced by the source-scan
+ * test in tile-color.test.ts) — the default tint is expressed purely via
+ * `var(--color-surface)`, and a player's custom colour is runtime DATA
+ * (typed by them into a native colour input, or read back out of
+ * `localStorage`), never a hardcoded value baked into source.
  */
-
-export type TileColorId = "slate" | "warm-sand" | "cool-teal" | "plum" | "charcoal";
-
-export interface TileColorPreset {
-  id: TileColorId;
-  label: string;
-  cssValue: string;
-}
-
-/** Picker order, matching the UI-SPEC's palette table. */
-export const TILE_COLOR_PRESETS: TileColorPreset[] = [
-  {
-    id: "slate",
-    label: "Slate",
-    // UAT gap 17: 10 percent, not the other presets' reviewed 55 percent —
-    // slate is the default every card renders with before a player ever
-    // opens the picker, so it must read as "barely there," not a second
-    // dark wash stacked on the already-dark neutral card back (see file
-    // header).
-    cssValue: "color-mix(in srgb, var(--color-surface) 10%, transparent)",
-  },
-  {
-    id: "warm-sand",
-    label: "Warm sand",
-    cssValue: "color-mix(in srgb, var(--color-tile-preset-warm-sand) 55%, transparent)",
-  },
-  {
-    id: "cool-teal",
-    label: "Cool teal",
-    cssValue: "color-mix(in srgb, var(--color-tile-preset-cool-teal) 55%, transparent)",
-  },
-  {
-    id: "plum",
-    label: "Plum",
-    cssValue: "color-mix(in srgb, var(--color-tile-preset-plum) 55%, transparent)",
-  },
-  {
-    id: "charcoal",
-    label: "Charcoal",
-    cssValue: "color-mix(in srgb, var(--color-tile-preset-charcoal) 55%, transparent)",
-  },
-];
-
-const KNOWN_IDS = new Set<TileColorId>(TILE_COLOR_PRESETS.map((preset) => preset.id));
 
 export const TILE_COLOR_KEY = "hanabi-tile-color";
 
-const DEFAULT_TILE_COLOR_ID: TileColorId = "slate";
+/** UAT gap 30: unchanged from the four non-default presets' reviewed
+ * strength — the wash a player's own chosen colour is applied at. */
+const CUSTOM_TINT_ALPHA_PERCENT = 55;
 
-/** Returns `"slate"` when nothing is stored or the stored id is not one of
- * the five known presets (T-06.2-07: a tampered/legacy value degrades to
- * the documented default rather than being trusted). Never throws. */
-export function readTileColorPref(): TileColorId {
-  const stored = safeGetItem(TILE_COLOR_KEY);
-  if (stored !== null && KNOWN_IDS.has(stored as TileColorId)) {
-    return stored as TileColorId;
-  }
-  return DEFAULT_TILE_COLOR_ID;
+/** UAT gap 17: the default (no custom colour chosen) wash stays deliberately
+ * faint so a fresh player never sees anything darker than "barely there". */
+const DEFAULT_TINT_ALPHA_PERCENT = 10;
+
+/** The tint every card renders with before a player ever picks a custom
+ * colour — a faint wash of the existing neutral surface token, never a raw
+ * hex literal. */
+export const DEFAULT_TILE_COLOR_CSS = `color-mix(in srgb, var(--color-surface) ${DEFAULT_TINT_ALPHA_PERCENT}%, transparent)`;
+
+const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+
+/** True for a well-formed 6-digit `#rrggbb` string — the exact shape a
+ * native `<input type="color">` always emits. */
+export function isValidHexColor(value: string): boolean {
+  return HEX_COLOR_PATTERN.test(value);
 }
 
-/** Persists the tile-colour preference. Never throws. */
-export function writeTileColorPref(id: TileColorId): void {
-  safeSetItem(TILE_COLOR_KEY, id);
+/** Wraps a player-chosen hex colour in the same translucent `color-mix()`
+ * wash every preset used (UAT gap 7: tint and darken, never hide, the card
+ * art beneath). */
+export function tileColorCssFromHex(hex: string): string {
+  return `color-mix(in srgb, ${hex} ${CUSTOM_TINT_ALPHA_PERCENT}%, transparent)`;
+}
+
+/** The CSS value a caller should actually paint: the custom-colour wash
+ * when `hex` is a valid stored/chosen colour, else the default wash. */
+export function resolveTileColorCss(hex: string | null): string {
+  return hex !== null && isValidHexColor(hex) ? tileColorCssFromHex(hex) : DEFAULT_TILE_COLOR_CSS;
+}
+
+/** Returns the stored custom hex colour, or `null` when nothing is stored
+ * or the stored value is not a well-formed 6-digit hex (tampered/legacy
+ * data degrades to "use the default tint" rather than being trusted — the
+ * same fail-safe shape the old preset-id gate used). Never throws. */
+export function readTileColorPref(): string | null {
+  const stored = safeGetItem(TILE_COLOR_KEY);
+  if (stored !== null && isValidHexColor(stored)) {
+    return stored;
+  }
+  return null;
+}
+
+/** Persists the custom tile-colour preference. Passing `null` clears the
+ * stored value, reverting every future read back to the default tint.
+ * Never throws. */
+export function writeTileColorPref(hex: string | null): void {
+  if (hex === null) {
+    safeRemoveItem(TILE_COLOR_KEY);
+    return;
+  }
+  safeSetItem(TILE_COLOR_KEY, hex);
 }

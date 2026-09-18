@@ -9,12 +9,7 @@ import { isSeatConnected, turnIndicatorText } from "../../lib/hanabi-board-logic
 import { clearNotesForRoom, pruneNotesForSeat } from "../../lib/hanabi-notes";
 import { hintsVisibleForCard } from "../../lib/hanabi-hint-logic";
 import { readKeepHintsPref, writeKeepHintsPref } from "../../lib/keep-hints-pref";
-import {
-  TILE_COLOR_PRESETS,
-  readTileColorPref,
-  writeTileColorPref,
-  type TileColorId,
-} from "../../lib/tile-color-pref";
+import { readTileColorPref, resolveTileColorCss, writeTileColorPref } from "../../lib/tile-color-pref";
 import {
   CLUE_HIGHLIGHT_MS,
   teammatesInTurnOrder,
@@ -98,13 +93,15 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
   // client render both show the documented defaults (keepHints off, slate
   // tile) before the real stored value is readable.
   const [keepHints, setKeepHints] = useState(false);
-  const [tileColorId, setTileColorId] = useState<TileColorId>("slate");
+  // UAT gap 30 (overturns D-14): `null` means "no custom colour chosen
+  // yet — use the default tint", not a preset id.
+  const [tileColorHex, setTileColorHex] = useState<string | null>(null);
   // 06.2-13: gear-triggered settings modal open state — the modal is a
   // pure overlay, never an unmount of the board underneath it.
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => {
     setKeepHints(readKeepHintsPref());
-    setTileColorId(readTileColorPref());
+    setTileColorHex(readTileColorPref());
   }, []);
 
   function handleToggleKeepHints() {
@@ -115,11 +112,11 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
     });
   }
 
-  function handleTileColorChange(id: TileColorId) {
-    setTileColorId(id);
-    writeTileColorPref(id);
+  function handleTileColorChange(hex: string) {
+    setTileColorHex(hex);
+    writeTileColorPref(hex);
   }
-  const tileColorCss = TILE_COLOR_PRESETS.find((preset) => preset.id === tileColorId)?.cssValue;
+  const tileColorCss = resolveTileColorCss(tileColorHex);
 
   // Unmount-only cleanup for the highlight-clear timer.
   useEffect(
@@ -452,7 +449,7 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
         onVolumeChange={audio.setVolume}
         keepHints={keepHints}
         onToggleKeepHints={handleToggleKeepHints}
-        tileColorId={tileColorId}
+        tileColorHex={tileColorHex}
         onTileColorChange={handleTileColorChange}
       />
 

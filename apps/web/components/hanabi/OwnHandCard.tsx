@@ -2,7 +2,7 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import type { CardFacts } from "../../lib/hanabi-visual-logic";
 import { luminosityStepFor } from "../../lib/hanabi-visual-logic";
 import { hintDisplayFor } from "../../lib/hanabi-hint-logic";
-import { TILE_COLOR_PRESETS } from "../../lib/tile-color-pref";
+import { DEFAULT_TILE_COLOR_CSS } from "../../lib/tile-color-pref";
 import { FireworkCardBack } from "./FireworkCard";
 import { OwnHintIndicator } from "./HintIndicator";
 import { LUMINOSITY_FRAME } from "./luminosity-frame";
@@ -54,7 +54,7 @@ export interface OwnHandCardProps {
 export const CARD_WIDTH = 88;
 const CARD_HEIGHT = 100;
 
-const DEFAULT_TILE_COLOR = TILE_COLOR_PRESETS.find((preset) => preset.id === "slate")!.cssValue;
+const DEFAULT_TILE_COLOR = DEFAULT_TILE_COLOR_CSS;
 
 /**
  * The one load-bearing rule this file must never violate: a card in the

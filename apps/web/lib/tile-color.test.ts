@@ -4,9 +4,12 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { KEEP_HINTS_KEY, readKeepHintsPref, writeKeepHintsPref } from "./keep-hints-pref";
 import {
+  DEFAULT_TILE_COLOR_CSS,
   TILE_COLOR_KEY,
-  TILE_COLOR_PRESETS,
+  isValidHexColor,
   readTileColorPref,
+  resolveTileColorCss,
+  tileColorCssFromHex,
   writeTileColorPref,
 } from "./tile-color-pref";
 
@@ -69,45 +72,59 @@ describe("keep-hints-pref", () => {
 });
 
 describe("tile-color-pref", () => {
-  it("TILE_COLOR_PRESETS has exactly the five expected ids, each with a label and cssValue", () => {
-    expect(TILE_COLOR_PRESETS.map((preset) => preset.id)).toEqual([
-      "slate",
-      "warm-sand",
-      "cool-teal",
-      "plum",
-      "charcoal",
-    ]);
-    for (const preset of TILE_COLOR_PRESETS) {
-      expect(typeof preset.label).toBe("string");
-      expect(preset.label.length).toBeGreaterThan(0);
-      expect(preset.cssValue).toMatch(/var\(--color-|color-mix\(/);
-    }
-  });
-
-  it("readTileColorPref returns slate when nothing is stored", () => {
+  it("readTileColorPref returns null when nothing is stored", () => {
     installFakeLocalStorage();
-    expect(readTileColorPref()).toBe("slate");
+    expect(readTileColorPref()).toBeNull();
   });
 
-  it("readTileColorPref returns slate when the stored id is not a known preset", () => {
+  it("readTileColorPref returns null when the stored value is not a well-formed hex (tampered/legacy preset id)", () => {
     const fake = installFakeLocalStorage();
-    fake.setItem(TILE_COLOR_KEY, "not-a-real-preset");
-    expect(readTileColorPref()).toBe("slate");
+    fake.setItem(TILE_COLOR_KEY, "slate");
+    expect(readTileColorPref()).toBeNull();
   });
 
-  it("round-trips each known preset id", () => {
+  it("round-trips a chosen hex colour", () => {
     installFakeLocalStorage();
-    for (const preset of TILE_COLOR_PRESETS) {
-      writeTileColorPref(preset.id);
-      expect(readTileColorPref()).toBe(preset.id);
+    writeTileColorPref("#3388ff");
+    expect(readTileColorPref()).toBe("#3388ff");
+  });
+
+  it("writing null clears the stored preference, reverting reads to null", () => {
+    installFakeLocalStorage();
+    writeTileColorPref("#3388ff");
+    writeTileColorPref(null);
+    expect(readTileColorPref()).toBeNull();
+  });
+
+  it("isValidHexColor accepts well-formed 6-digit hex and rejects everything else", () => {
+    expect(isValidHexColor("#3388ff")).toBe(true);
+    expect(isValidHexColor("#FFFFFF")).toBe(true);
+    expect(isValidHexColor("#000000")).toBe(true);
+    expect(isValidHexColor("slate")).toBe(false);
+    expect(isValidHexColor("#fff")).toBe(false);
+    expect(isValidHexColor("3388ff")).toBe(false);
+    expect(isValidHexColor("")).toBe(false);
+  });
+
+  it("UAT gap 30 (overturns D-14): resolveTileColorCss falls back to the default translucent wash for null/invalid input", () => {
+    expect(resolveTileColorCss(null)).toBe(DEFAULT_TILE_COLOR_CSS);
+    expect(resolveTileColorCss("not-a-hex")).toBe(DEFAULT_TILE_COLOR_CSS);
+  });
+
+  it("UAT gap 7 + gap 30: any hex colour resolves to a translucent color-mix ending in transparent), never opaque", () => {
+    // The three extremes the gap explicitly calls out: pure white, pure
+    // black, and a saturated colour at full strength.
+    for (const hex of ["#ffffff", "#000000", "#ff0000"]) {
+      const css = resolveTileColorCss(hex);
+      expect(css).toBe(tileColorCssFromHex(hex));
+      expect(css).toMatch(/^color-mix\(.*transparent\)$/);
+      expect(css).toContain(hex);
     }
   });
 
-  it("UAT gap 7: every preset's cssValue is a translucent color-mix ending in transparent)", () => {
-    for (const preset of TILE_COLOR_PRESETS) {
-      expect(preset.cssValue).toMatch(/^color-mix\(.*transparent\)$/);
-      expect(preset.cssValue).not.toContain("#");
-    }
+  it("the default (no custom colour) wash never contains a hex literal - token-only", () => {
+    expect(DEFAULT_TILE_COLOR_CSS).not.toContain("#");
+    expect(DEFAULT_TILE_COLOR_CSS).toMatch(/^color-mix\(.*transparent\)$/);
   });
 });
 

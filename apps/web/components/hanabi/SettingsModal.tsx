@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { Eye, EyeOff, X } from "lucide-react";
-import type { TileColorId } from "../../lib/tile-color-pref";
 import { AudioControls } from "./AudioControls";
 import { TileColorPicker } from "./TileColorPicker";
 
@@ -15,8 +14,10 @@ export interface SettingsModalProps {
   onVolumeChange: (volume: number) => void;
   keepHints: boolean;
   onToggleKeepHints: () => void;
-  tileColorId: TileColorId;
-  onTileColorChange: (id: TileColorId) => void;
+  /** UAT gap 30 (overturns D-14): `null` means no custom colour chosen —
+   * the default tint applies. */
+  tileColorHex: string | null;
+  onTileColorChange: (hex: string) => void;
 }
 
 /**
@@ -34,7 +35,7 @@ export interface SettingsModalProps {
  * a backdrop click closes, a click inside the panel does not.
  *
  * None of the preference STATE moves here — `audio`, `keepHints`,
- * `tileColorId` and their handlers stay owned by `HanabiBoard`; this
+ * `tileColorHex` and their handlers stay owned by `HanabiBoard`; this
  * component only renders them in a new location.
  */
 export function SettingsModal({
@@ -46,7 +47,7 @@ export function SettingsModal({
   onVolumeChange,
   keepHints,
   onToggleKeepHints,
-  tileColorId,
+  tileColorHex,
   onTileColorChange,
 }: SettingsModalProps) {
   useEffect(() => {
@@ -109,7 +110,7 @@ export function SettingsModal({
           >
             Tile colour
           </span>
-          <TileColorPicker embedded value={tileColorId} onChange={onTileColorChange} />
+          <TileColorPicker value={tileColorHex} onChange={onTileColorChange} />
         </div>
 
         <div className="flex flex-col gap-[length:var(--space-xs)]">
