@@ -217,12 +217,19 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     await expect(waitingPage.getByTestId("play-button")).toBeDisabled();
     await expect(waitingPage.getByTestId("discard-button")).toBeDisabled();
 
-    // RULES-11: every disabled control shows a visible reason.
-    await expect(waitingPage.getByTestId("action-reason-play")).toHaveText("Not your turn");
-    await expect(activePage.getByTestId("action-reason-discard")).toHaveText(
-      "Clue tokens are full — you can't discard",
+    // RULES-11: illegal actions are visibly unavailable — the disabled
+    // state itself is the affordance (UAT gap 15, second owner review
+    // deleted the obtrusive inline reason text, e.g. "Select a card in your
+    // hand first" / "Clue tokens are full"). The reason is still carried in
+    // each button's accessible name for screen readers, never rendered.
+    await expect(activePage.getByTestId("discard-button")).toHaveAttribute(
+      "aria-label",
+      "Discard (Clue tokens are full — you can't discard)",
     );
-    await expect(activePage.getByTestId("action-reason-play")).toHaveText("Select a card in your hand first");
+    await expect(activePage.getByTestId("play-button")).toHaveAttribute(
+      "aria-label",
+      "Play (Select a card in your hand first)",
+    );
 
     // Discard is disabled at the starting 8/8 clue tokens (D-12), so the
     // active player plays their first own-hand slot instead: the deck count
@@ -242,7 +249,7 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     ).join("|");
 
     await activePage.getByTestId("own-hand-slot-1").click();
-    await expect(activePage.getByTestId("action-reason-play")).toHaveCount(0);
+    await expect(activePage.getByTestId("play-button")).toHaveAttribute("aria-label", "Play");
     await expect(activePage.getByTestId("own-hand-slot-1")).toHaveAttribute("data-selected", "true");
     await expect(activePage.getByTestId("play-button")).toBeEnabled();
     await activePage.getByTestId("play-button").click();
@@ -456,6 +463,64 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     await hostPage.getByTestId("own-hand-slot-1").scrollIntoViewIfNeeded();
     await hostPage.getByTestId("own-hand-slot-1").click();
     await expect(hostPage.getByTestId("own-hand-slot-1")).toHaveAttribute("data-selected", "true");
+
+    for (const context of contexts) {
+      await context.close();
+    }
+  });
+
+  test("UI-11/gap-11: the board scales up on a larger-than-floor viewport (1280x720 is the minimum, not the target)", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    test.setTimeout(120_000);
+
+    const { contexts } = await startGameWithPlayers(hostPage, browser, ["Roger", "Bianca", "Chen", "Dara", "Eli"]);
+
+    // Default viewport is 1280x720 (playwright.config.ts sets none) — the
+    // floor. computeBoardZoom returns exactly 1 here, so this measurement
+    // is byte-identical to every other 1280x720 fit check in this file.
+    const tableauAt720 = await hostPage.getByTestId("tableau").boundingBox();
+    const rankSlotAt720 = await hostPage.locator('[data-testid^="played-stack-"]').first().boundingBox();
+    if (!tableauAt720 || !rankSlotAt720) throw new Error("missing bounding box at 1280x720");
+
+    // No scroll at the floor, matching every other UI-11 check.
+    const fitsNoScrollAt720 = await hostPage.evaluate(() => {
+      const el = document.scrollingElement;
+      return el !== null && el.scrollHeight <= el.clientHeight + 1;
+    });
+    expect(fitsNoScrollAt720).toBe(true);
+
+    // Grow the window well past the floor — gap 11 requires a real,
+    // measured increase in board size here, not merely "more empty margin
+    // around an unchanged board".
+    await hostPage.setViewportSize({ width: 1920, height: 1080 });
+    // CSS `zoom` recomputes on resize (see useBoardZoom); wait for the
+    // tableau's own rendered size to actually grow before asserting, so
+    // this never races the resize listener/re-render.
+    await expect
+      .poll(async () => (await hostPage.getByTestId("tableau").boundingBox())?.height ?? 0)
+      .toBeGreaterThan(tableauAt720.height * 1.2);
+
+    const tableauAt1080 = await hostPage.getByTestId("tableau").boundingBox();
+    const rankSlotAt1080 = await hostPage.locator('[data-testid^="played-stack-"]').first().boundingBox();
+    if (!tableauAt1080 || !rankSlotAt1080) throw new Error("missing bounding box at 1920x1080");
+
+    // computeBoardZoom(1920, 1080) === min(1080/720, 1920/1280) === 1.5 —
+    // assert real growth close to that factor on both the board region and
+    // an individual played-stack tile, not just a looser "is bigger" check.
+    expect(tableauAt1080.height).toBeGreaterThan(tableauAt720.height * 1.4);
+    expect(tableauAt1080.width).toBeGreaterThan(tableauAt720.width * 1.4);
+    expect(rankSlotAt1080.width).toBeGreaterThan(rankSlotAt720.width * 1.4);
+    expect(rankSlotAt1080.height).toBeGreaterThan(rankSlotAt720.height * 1.4);
+
+    // Still no scroll at the larger viewport — growth must stay
+    // proportional and never overflow the (also larger) window.
+    const fitsNoScrollAt1080 = await hostPage.evaluate(() => {
+      const el = document.scrollingElement;
+      return el !== null && el.scrollHeight <= el.clientHeight + 1 && el.scrollWidth <= el.clientWidth + 1;
+    });
+    expect(fitsNoScrollAt1080).toBe(true);
 
     for (const context of contexts) {
       await context.close();

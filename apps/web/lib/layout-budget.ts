@@ -49,8 +49,16 @@ export const VIEWPORT_TEST_WIDTH_PX = 1280;
  * rounding), with a small margin kept rather than the fictional 40px this
  * was previously set to. See OWN_BAND_PX's comment for the full ledger
  * correction this phase's UI-11 fix required.
+ *
+ * fix(06.2, UAT gaps 13/14): corrected 16 -> 6. Moving Play/Discard above
+ * the own hand (see OWN_BAND_PX) cost real height the 1280x720 floor did
+ * not have to spare, so `<main>`'s own vertical padding and the board-scale
+ * wrapper's inter-band gap were both trimmed to the minimum that still
+ * reads as distinct bands — real-browser measurement at the same UI-11
+ * worst case (5 seats, Black variant) confirmed the page fits at exactly
+ * 720px with this reduced overhead.
  */
-export const BOARD_CHROME_PX = 16;
+export const BOARD_CHROME_PX = 6;
 
 /** UI-SPEC teammate card height (unchanged from 06.1's TeammateCard). */
 export const TEAMMATE_CARD_HEIGHT_PX = 78;
@@ -198,15 +206,18 @@ export const TABLE_BAND_MIN_PX = BOARD_INNER_PX + 2 * BOARD_PANEL_PADDING_PX;
 export const TEAMMATE_BAND_PX = 110;
 
 /**
- * UI-SPEC "Bottom (own hand)" row, this phase (06.2-21): `OwnHand`'s own
- * border/box-shadow/padding are gone the same way `TeammateHand`'s are —
- * the band's real footprint is still governed by the wrapped two-line
- * `bottom-controls-row` (OwnHand+CardActions on line 1, CluePicker on line
- * 2, per `CardActions`/`CluePicker`'s own unchanged layout, which this fix
- * does not touch), budgeted below the pre-06.2-21 300px/285px-measured
- * footprint with margin for the real render.
+ * UI-SPEC "Bottom (own hand)" row. Second owner review (UAT gaps 13/14):
+ * Play/Discard (`CardActions`) now render as their own line ABOVE the own
+ * hand rather than beside it, and the own hand is wrapped in a
+ * `justify-center` band so it stays horizontally centred at any seat count
+ * or window width. `bottom-controls-row` is now three stacked lines —
+ * CardActions, OwnHand, CluePicker — not two; real-browser measurement at
+ * the 1280x720 floor (5 seats, Black variant, the same UI-11 worst case)
+ * came in at 310px with the row's own gaps trimmed to the minimum needed to
+ * still read as three distinct groups, up from the pre-gap-13/14 280px
+ * two-line footprint.
  */
-export const OWN_BAND_PX = 280;
+export const OWN_BAND_PX = 310;
 
 /** Vertical/horizontal gap between adjacent tokens/slots — reuses --space-xs. */
 export const TOKEN_GAP_PX = 4;

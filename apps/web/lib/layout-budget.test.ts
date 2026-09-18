@@ -40,11 +40,12 @@ describe("layout-budget", () => {
 
   it("OWN_BAND_PX has no marks-band constant (HINT-04 removes the pip band)", () => {
     expect((layoutBudget as Record<string, unknown>).MARKS_BAND_PX).toBeUndefined();
-    // fix(06.2-21): corrected 300 -> 280 — OwnHand's slimmed chrome funds
-    // part of the vertical Play/Deck/Discard stack's height; CardActions
-    // and CluePicker (the bottom controls row's other two children) are
-    // unchanged by this fix.
-    expect(OWN_BAND_PX).toBe(280);
+    // fix(06.2, UAT gaps 13/14): corrected 280 -> 310 — Play/Discard
+    // (CardActions) now render as their own line above the own hand
+    // instead of beside it, adding a third stacked line to
+    // bottom-controls-row; real-browser measurement at the 1280x720 floor
+    // confirmed 310px with the row's gaps trimmed to the minimum.
+    expect(OWN_BAND_PX).toBe(310);
   });
 
   it("BOARD_INNER_PX is Play + gap + Deck + gap + compact Discard, stacked (06.2-21)", () => {

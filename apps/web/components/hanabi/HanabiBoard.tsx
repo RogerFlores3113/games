@@ -37,6 +37,7 @@ import { SettingsModal } from "./SettingsModal";
 import { useHanabiAudio } from "./useHanabiAudio";
 import { useHandDrag } from "./useHandDrag";
 import { useDiscardDrag } from "./useDiscardDrag";
+import { useBoardZoom } from "./useBoardZoom";
 
 export type HanabiActionRequest =
   | { type: "play"; cardId: string }
@@ -205,6 +206,9 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
   const ctx: ActionContext = { reconnecting, ended, labelFor };
   const drag = useHandDrag({ game, ctx, onDropRequest: act });
   const discardDrag = useDiscardDrag({ game, ctx, onDropRequest: act });
+  // UAT gap 11: 1280x720 is the minimum supported size, not the design
+  // target — see useBoardZoom's own header comment.
+  const boardZoom = useBoardZoom();
 
   if (!game) {
     return (
@@ -284,7 +288,7 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
 
   return (
     <main
-      className="table-backdrop relative flex min-h-screen flex-col gap-[3px] overflow-y-auto px-[length:var(--space-md)] py-[3px]"
+      className="table-backdrop relative flex min-h-screen flex-col gap-[3px] overflow-y-auto px-[length:var(--space-md)] py-0"
     >
       {/* 06.2-13: the gear trigger is absolutely positioned relative to this
           `<main>` (now `position: relative`), so it adds ZERO flow height
@@ -316,90 +320,105 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
 
       {reconnecting && <ReconnectingBanner />}
 
-      <div data-testid="teammates-band" className="flex flex-none flex-wrap justify-center gap-[length:var(--space-xs)]">
-        {teammates.map((hand) => (
-          <TeammateHand
-            key={hand.seatId}
-            hand={hand}
-            label={labelFor(hand.seatId)}
-            connected={isSeatConnected(view.seats, hand.seatId)}
-            variant={game.variant}
-            isActive={hand.seatId === game.activeSeatId}
-            isTarget={clueTarget === hand.seatId}
-            previewIds={previewIds}
-            justCluedIds={justCluedIds}
-            disabled={controlsDisabled}
-            onSelectTarget={() => setClueTarget(hand.seatId)}
-            hintsVisible={hintsVisibleIds}
-            tileColor={tileColorCss}
+      {/* UAT gap 11: the whole board+hands region scales uniformly above the
+          1280x720 floor via CSS `zoom` (see useBoardZoom/computeBoardZoom) —
+          `zoom` is 1 at/under the floor, so this wrapper is a no-op at the
+          fit-tested viewport and every existing layout-budget measurement
+          still holds byte-for-byte. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-[2px]" style={{ zoom: boardZoom }}>
+        <div data-testid="teammates-band" className="flex flex-none flex-wrap justify-center gap-[length:var(--space-xs)]">
+          {teammates.map((hand) => (
+            <TeammateHand
+              key={hand.seatId}
+              hand={hand}
+              label={labelFor(hand.seatId)}
+              connected={isSeatConnected(view.seats, hand.seatId)}
+              variant={game.variant}
+              isActive={hand.seatId === game.activeSeatId}
+              isTarget={clueTarget === hand.seatId}
+              previewIds={previewIds}
+              justCluedIds={justCluedIds}
+              disabled={controlsDisabled}
+              onSelectTarget={() => setClueTarget(hand.seatId)}
+              hintsVisible={hintsVisibleIds}
+              tileColor={tileColorCss}
+            />
+          ))}
+        </div>
+
+        <div className="flex min-h-0 flex-1 justify-center">
+          <Table
+            game={game}
+            playZoneRef={drag.playZoneRef}
+            discardZoneRef={drag.discardZoneRef}
+            dropStatus={dropStatus}
+            discardDragState={discardDrag.dragState}
+            discardPendingOrder={discardDrag.pendingOrder}
+            registerDiscardTile={discardDrag.registerTile}
+            onDiscardTilePointerDown={discardDrag.onTilePointerDown}
           />
-        ))}
-      </div>
+        </div>
 
-      <div className="flex min-h-0 flex-1 justify-center">
-        <Table
-          game={game}
-          playZoneRef={drag.playZoneRef}
-          discardZoneRef={drag.discardZoneRef}
-          dropStatus={dropStatus}
-          discardDragState={discardDrag.dragState}
-          discardPendingOrder={discardDrag.pendingOrder}
-          registerDiscardTile={discardDrag.registerTile}
-          onDiscardTilePointerDown={discardDrag.onTilePointerDown}
-        />
-      </div>
+        {/* fix(06.2-10): testid added purely as a measurement hook — the
+            OWN_BAND_PX layout-budget constant covers this ENTIRE row. 06.2-13
+            stripped it to only OwnHand + CardActions + CluePicker (play
+            controls); every non-play preference control now lives inside
+            SettingsModal, opened by the gear trigger above.
+            UAT gaps 13/14 (second owner review): Play/Discard now sit ABOVE
+            the own hand rather than beside it, and the own hand row is
+            wrapped in a full-width `justify-center` band so it is always
+            horizontally centred, whatever the seat count or window width —
+            centring the column itself was not enough once CluePicker (a
+            variant-width sibling) sits underneath and could otherwise pull
+            the flex column's own intrinsic width off-center. */}
+        <div data-testid="bottom-controls-row" className="flex flex-none w-full flex-col items-center">
+          <CardActions
+            game={game}
+            selectedCardId={selectedCardId}
+            ctx={ctx}
+            onPlay={() => selectedCardId && act({ type: "play", cardId: selectedCardId })}
+            onDiscard={() => selectedCardId && act({ type: "discard", cardId: selectedCardId })}
+          />
 
-      {/* fix(06.2-10): testid added purely as a measurement hook — the
-          OWN_BAND_PX layout-budget constant covers this ENTIRE row. 06.2-13
-          stripped it to only OwnHand + CardActions + CluePicker (play
-          controls); every non-play preference control now lives inside
-          SettingsModal, opened by the gear trigger above. */}
-      <div
-        data-testid="bottom-controls-row"
-        className="flex flex-none flex-wrap items-start justify-center gap-[length:var(--space-md)]"
-      >
-        <OwnHand
-          cards={applyPendingOrder(game.yourHand, drag.pendingOrder)}
-          variant={game.variant}
-          roomCode={view.code}
-          youSeatId={view.youSeatId}
-          connected={view.youSeatId !== null ? isSeatConnected(view.seats, view.youSeatId) : true}
-          isYourTurn={game.isYourTurn && !ended}
-          turnText={turnIndicatorText(game, view.seats, labelFor, ended)}
-          selectedCardId={selectedCardId}
-          justCluedIds={justCluedIds}
-          disabled={controlsDisabled}
-          onSelectCard={(cardId) => setSelectedCardId(cardId)}
-          draggingCardId={drag.dragState?.cardId ?? null}
-          dragOffset={drag.dragState?.offset ?? null}
-          dropIndex={drag.dragState?.dropIndex ?? null}
-          slotPitchPx={drag.dragState?.slotPitchPx ?? null}
-          onCardPointerDown={drag.onCardPointerDown}
-          registerSlot={drag.registerSlot}
-          consumeClickSuppression={drag.consumeClickSuppression}
-          hintsVisible={hintsVisibleIds}
-          tileColor={tileColorCss}
-        />
+          <div className="flex w-full justify-center">
+            <OwnHand
+              cards={applyPendingOrder(game.yourHand, drag.pendingOrder)}
+              variant={game.variant}
+              roomCode={view.code}
+              youSeatId={view.youSeatId}
+              connected={view.youSeatId !== null ? isSeatConnected(view.seats, view.youSeatId) : true}
+              isYourTurn={game.isYourTurn && !ended}
+              turnText={turnIndicatorText(game, view.seats, labelFor, ended)}
+              selectedCardId={selectedCardId}
+              justCluedIds={justCluedIds}
+              disabled={controlsDisabled}
+              onSelectCard={(cardId) => setSelectedCardId(cardId)}
+              draggingCardId={drag.dragState?.cardId ?? null}
+              dragOffset={drag.dragState?.offset ?? null}
+              dropIndex={drag.dragState?.dropIndex ?? null}
+              slotPitchPx={drag.dragState?.slotPitchPx ?? null}
+              onCardPointerDown={drag.onCardPointerDown}
+              registerSlot={drag.registerSlot}
+              consumeClickSuppression={drag.consumeClickSuppression}
+              hintsVisible={hintsVisibleIds}
+              tileColor={tileColorCss}
+            />
+          </div>
 
-        <CardActions
-          game={game}
-          selectedCardId={selectedCardId}
-          ctx={ctx}
-          onPlay={() => selectedCardId && act({ type: "play", cardId: selectedCardId })}
-          onDiscard={() => selectedCardId && act({ type: "discard", cardId: selectedCardId })}
-        />
-
-        <CluePicker
-          game={game}
-          targets={teammates.map((hand) => ({ seatId: hand.seatId, label: labelFor(hand.seatId) }))}
-          clueTarget={clueTarget}
-          clueValue={clueValue}
-          ctx={ctx}
-          onSelectTarget={(seatId) => setClueTarget(seatId)}
-          onSelectValue={(clue) => setClueValue(clue)}
-          onPreview={(clue) => setPreviewClue(clue)}
-          onGive={handleGiveClue}
-        />
+          <div className="mt-[2px]">
+            <CluePicker
+              game={game}
+              targets={teammates.map((hand) => ({ seatId: hand.seatId, label: labelFor(hand.seatId) }))}
+              clueTarget={clueTarget}
+              clueValue={clueValue}
+              ctx={ctx}
+              onSelectTarget={(seatId) => setClueTarget(seatId)}
+              onSelectValue={(clue) => setClueValue(clue)}
+              onPreview={(clue) => setPreviewClue(clue)}
+              onGive={handleGiveClue}
+            />
+          </div>
+        </div>
       </div>
 
       <FlyToLayer game={game} reconnecting={reconnecting} suppressedCardIds={drag.droppedCardIdsRef} />
