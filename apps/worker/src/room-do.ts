@@ -55,6 +55,7 @@ import {
   startGame,
   applyGameAction,
   deleteRoom,
+  restartLobby,
 } from "./room-state";
 import {
   mintGameSeed,
@@ -244,6 +245,17 @@ export class RoomDO extends Server<Env> {
           this.#send(conn, { type: "room_closed", reason: "host_deleted" });
         }
         await this.#abandonRoom();
+        return;
+      }
+
+      if (msg.type === "restart_lobby") {
+        const result = restartLobby(room, actorSeatId, msg.actionId, now);
+        if (!result.ok) {
+          this.#send(connection, { type: "error", code: result.reason });
+          return;
+        }
+        await this.#commit(result.state, now);
+        await this.#pushState();
         return;
       }
 

@@ -10,14 +10,22 @@ import { SuitGlyph } from "./SuitGlyph";
 
 export interface EndOverlayProps {
   game: HanabiView;
+  /** Owner request (2026-09-18): only the host sees "Back to lobby". Hiding
+   * it is a UX nicety, not the security boundary — the worker independently
+   * refuses `restart_lobby` from a non-host with `not_host`. */
+  isHost?: boolean;
+  /** Absent for a non-host render. */
+  onRestartLobby?: () => void;
 }
 
 /**
  * D-20/D-21: end-of-game modal over the still-visible board. Score/max,
  * band, the derived end reason (when non-null), every stack with glyph and
- * rank, and a single "New game" action linking to "/" — no other action exists.
+ * rank, "New game" linking to "/", and — host only, owner request
+ * (2026-09-18) — "Back to lobby", which restarts the SAME room for
+ * everyone rather than starting a brand new one.
  */
-export function EndOverlay({ game }: EndOverlayProps) {
+export function EndOverlay({ game, isHost = false, onRestartLobby }: EndOverlayProps) {
   const linkRef = useRef<HTMLAnchorElement>(null);
   const reason = endReasonForView(game);
   const maxScore = maxScoreFor(variantConfig(game.variant));
@@ -96,15 +104,34 @@ export function EndOverlay({ game }: EndOverlayProps) {
           ))}
         </ul>
 
-        <Link
-          ref={linkRef}
-          href="/"
-          data-testid="new-game-link"
-          className="inline-flex items-center justify-center gap-2 rounded-md px-4 text-[length:var(--text-label)] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-bg)] hover:brightness-95"
-          style={{ minHeight: "var(--size-touch-min)", minWidth: "var(--size-touch-min)" }}
-        >
-          New game
-        </Link>
+        <div className="flex flex-wrap items-center justify-center gap-[length:var(--space-sm)]">
+          {isHost && onRestartLobby && (
+            <button
+              type="button"
+              data-testid="restart-lobby-button"
+              onClick={onRestartLobby}
+              className="inline-flex items-center justify-center gap-2 rounded-md border px-4 text-[length:var(--text-label)] font-semibold transition-colors hover:bg-[var(--color-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+              style={{
+                minHeight: "var(--size-touch-min)",
+                minWidth: "var(--size-touch-min)",
+                borderColor: "var(--color-border)",
+                color: "var(--color-text)",
+              }}
+            >
+              Back to lobby
+            </button>
+          )}
+
+          <Link
+            ref={linkRef}
+            href="/"
+            data-testid="new-game-link"
+            className="inline-flex items-center justify-center gap-2 rounded-md px-4 text-[length:var(--text-label)] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-bg)] hover:brightness-95"
+            style={{ minHeight: "var(--size-touch-min)", minWidth: "var(--size-touch-min)" }}
+          >
+            New game
+          </Link>
+        </div>
       </div>
     </div>
   );

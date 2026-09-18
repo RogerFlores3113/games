@@ -258,6 +258,7 @@ function ConnectedRoom({
       // shape as `game_action` above, tracked server-side against
       // `Seat.lastAppliedRoomActionId` (a separate field, room-state.ts).
       onDeleteRoom={() => send({ type: "delete_room", actionId: nanoid() })}
+      onRestartLobby={() => send({ type: "restart_lobby", actionId: nanoid() })}
     />
   );
 }

@@ -293,6 +293,60 @@ export function deleteRoom(
   return { ok: true, state: { ...state, seats, lastActivityAt: now } };
 }
 
+/** Owner request (2026-09-18), host-only: returns an ENDED room to the
+ * lobby with the same seats, room code, and seat tokens, clearing the
+ * finished game. Legal ONLY when `status === "ended"` (refused mid-game,
+ * D-4 style `bad_request`) — checked AFTER the dedup short-circuit, same
+ * placement rule `applyGameAction` documents: the action that ends the game
+ * flips status away from what this function requires, so a retry of the
+ * SAME actionId after a dropped response must still see idempotent success,
+ * not a spurious `bad_request` against the now-different status.
+ *
+ * FDN-01: clearing the game is done by setting the room's own `game` field
+ * to `null` — the exact pattern `createEmptyRoom` already uses for a brand
+ * new room — never by reaching into `state.game`'s Hanabi-specific shape.
+ * `seed` is cleared too (WR-07: a stale secret seed must not survive into a
+ * lobby that has not started a new game yet). */
+export function restartLobby(
+  state: RoomState,
+  actorSeatId: string,
+  actionId: string,
+  now: number,
+): RoomResult {
+  const actorSeat = state.seats.find((seat) => seat.seatId === actorSeatId);
+  if (actorSeat !== undefined && actorSeat.lastAppliedRoomActionId === actionId) {
+    return { ok: true, state };
+  }
+
+  if (actorSeatId !== state.hostSeatId) {
+    return { ok: false, reason: "not_host" };
+  }
+
+  if (state.status !== "ended") {
+    return { ok: false, reason: "bad_request" };
+  }
+
+  const seats = state.seats.map((seat) => ({
+    ...seat,
+    // A fresh game starts with a clean idempotency ledger, mirroring
+    // `createEmptyRoom`'s never-applied-anything starting point.
+    lastAppliedActionId: null,
+    lastAppliedRoomActionId: seat.seatId === actorSeatId ? actionId : seat.lastAppliedRoomActionId ?? null,
+  }));
+
+  return {
+    ok: true,
+    state: {
+      ...state,
+      status: "lobby",
+      game: null,
+      seed: undefined,
+      seats,
+      lastActivityAt: now,
+    },
+  };
+}
+
 /** ROOM-06, D-10/D-11: gated ONLY on host + a 2-5 seat count. There is
  * deliberately no ready-state check anywhere in this function — if you
  * find yourself adding one, it was cut from scope. */

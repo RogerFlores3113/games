@@ -14,6 +14,7 @@ import {
   joinRoom,
   markConnected,
   releaseSeat,
+  restartLobby,
   setVariant,
   startGame,
   toSeatView,
@@ -1200,3 +1201,74 @@ describe("Owner request: deleteRoom (host-only teardown gate)", () => {
   });
 });
 
+
+describe("Owner request: restartLobby (host-only, ended-game-only)", () => {
+  it("host may restart an ended game back to the lobby with the same seats/code/tokens", () => {
+    const { state, hostSeatId, guestSeatId } = endedTwoSeatRoom();
+    const before = state;
+
+    const result = restartLobby(state, hostSeatId, "restart-1", 200);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.state.status).toBe("lobby");
+    expect(result.state.game).toBeNull();
+    expect(result.state.seed).toBeUndefined();
+    expect(result.state.code).toBe(before.code);
+    expect(result.state.hostSeatId).toBe(hostSeatId);
+    expect(result.state.seats.map((s) => s.seatId).sort()).toEqual(
+      before.seats.map((s) => s.seatId).sort(),
+    );
+    // Same seat tokens — a stored token still reclaims the same seat.
+    for (const seat of before.seats) {
+      const after = result.state.seats.find((s) => s.seatId === seat.seatId)!;
+      expect(after.seatToken).toBe(seat.seatToken);
+    }
+    // A restarted room's ledger is clean for the next game.
+    const guestAfter = result.state.seats.find((s) => s.seatId === guestSeatId)!;
+    expect(guestAfter.lastAppliedActionId ?? null).toBeNull();
+  });
+
+  it("a non-host's restart_lobby is refused not_host", () => {
+    const { state, guestSeatId } = endedTwoSeatRoom();
+    const result = restartLobby(state, guestSeatId, "restart-2", 200);
+    expect(result).toEqual({ ok: false, reason: "not_host" });
+  });
+
+  it("restart_lobby mid-game (wrong status) is refused bad_request", () => {
+    const minter = makeMinter();
+    const hostJoin = join(freshRoom(), "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+    const guestJoin = join(hostJoin.state, "Guest", 2, minter);
+    if (!guestJoin.ok) throw new Error("unreachable");
+    const started = startGame(guestJoin.state, hostJoin.seatId, 3, "seed-mid-game");
+    if (!started.ok) throw new Error("unreachable");
+
+    const result = restartLobby(started.state, hostJoin.seatId, "restart-3", 10);
+    expect(result).toEqual({ ok: false, reason: "bad_request" });
+  });
+
+  it("restart_lobby in the lobby (never started) is refused bad_request", () => {
+    const minter = makeMinter();
+    const hostJoin = join(freshRoom(), "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+
+    const result = restartLobby(hostJoin.state, hostJoin.seatId, "restart-4", 10);
+    expect(result).toEqual({ ok: false, reason: "bad_request" });
+  });
+
+  it("a repeated actionId is idempotent even after status has moved on", () => {
+    const { state, hostSeatId } = endedTwoSeatRoom();
+
+    const first = restartLobby(state, hostSeatId, "restart-dedup", 200);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(first.state.status).toBe("lobby");
+
+    // The SAME actionId replayed after the room already moved to "lobby"
+    // must still report success (WR-01 placement: dedup runs before the
+    // status gate), not `bad_request` against the now-different status.
+    const second = restartLobby(first.state, hostSeatId, "restart-dedup", 999);
+    expect(second).toEqual({ ok: true, state: first.state });
+  });
+});

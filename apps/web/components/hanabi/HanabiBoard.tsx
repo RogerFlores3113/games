@@ -49,6 +49,9 @@ export interface HanabiBoardProps {
    * hiding the button is a UX nicety, not the security boundary; the worker
    * re-checks host on every `delete_room` regardless of what the UI shows. */
   onDeleteRoom?: () => void;
+  /** Owner request (2026-09-18), host-only: sends `restart_lobby`. Same
+   * "hiding is not the boundary" note as `onDeleteRoom` above. */
+  onRestartLobby?: () => void;
 }
 
 
@@ -70,6 +73,7 @@ export function HanabiBoard({
   onAction,
   reconnecting = false,
   onDeleteRoom,
+  onRestartLobby,
 }: HanabiBoardProps) {
   const isHost = view.youSeatId !== null && view.youSeatId === view.hostSeatId;
   // Parsed against the same strict wire schema the server's fail-closed gate
@@ -468,7 +472,7 @@ export function HanabiBoard({
         onDeleteRoom={onDeleteRoom}
       />
 
-      {ended && <EndOverlay game={game} />}
+      {ended && <EndOverlay game={game} isHost={isHost} onRestartLobby={onRestartLobby} />}
     </main>
   );
 }

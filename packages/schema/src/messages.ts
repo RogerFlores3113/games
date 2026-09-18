@@ -76,6 +76,17 @@ const DeleteRoomMessageSchema = z.strictObject({
   actionId: z.string().min(ACTION_ID_MIN_LENGTH).max(ACTION_ID_MAX_LENGTH),
 });
 
+/** Owner request (2026-09-18): host-only, legal only once the game has
+ * ended. Returns the room to `"lobby"` with the same seats/code/tokens and
+ * clears the finished game (room-state.ts's `restartLobby`, via the same
+ * "set `game` to null" pattern `createEmptyRoom` already uses — FDN-01: the
+ * room layer never reaches into Hanabi's own state to clear it). Same
+ * `actionId` idempotency shape as `delete_room` above. */
+const RestartLobbyMessageSchema = z.strictObject({
+  type: z.literal("restart_lobby"),
+  actionId: z.string().min(ACTION_ID_MIN_LENGTH).max(ACTION_ID_MAX_LENGTH),
+});
+
 export const ClientMessageSchema = z.discriminatedUnion("type", [
   JoinMessageSchema,
   SetVariantMessageSchema,
@@ -83,6 +94,7 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
   GameActionMessageSchema,
   LeaveMessageSchema,
   DeleteRoomMessageSchema,
+  RestartLobbyMessageSchema,
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 
