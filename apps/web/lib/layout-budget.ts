@@ -27,12 +27,34 @@
  * documented tradeoff the owner rejected once shown it; the owner's fix was
  * "discard can be shrunk by default, clicking it will expand" plus slimming
  * the hand bands so the board gets the height the vertical stack needs.
- * `RANK_SLOT_HEIGHT_PX`/`RANK_SLOT_WIDTH_PX` are shrunk deliberately (40x30
- * -> 24x20) — a real-browser 1280x720 measurement (5 seats, Black variant)
+ * `RANK_SLOT_HEIGHT_PX`/`RANK_SLOT_WIDTH_PX` were shrunk (40x30 -> 24x20) at
+ * that point — a real-browser 1280x720 measurement (5 seats, Black variant)
  * showed hand-slimming alone could not fund the ~230px the full-size grid
- * would have needed. `DISCARD_COMPACT_PX` replaces `DISCARD_AREA_PX` — the
- * compact strip is deliberately short (one clipped row); the existing
- * `DiscardOverlay` (unchanged) is what reads the full pile.
+ * would have needed. `DISCARD_COMPACT_PX` replaced `DISCARD_AREA_PX` — the
+ * compact strip was a single clipped row; the existing `DiscardOverlay`
+ * (unchanged) is what reads the full pile.
+ *
+ * Post-06.2-21 follow-up (spend the height gap 16's CluePicker deletion
+ * freed): `OWN_BAND_PX` dropping 310 -> 193 left ~117px of real slack at the
+ * 1280x720 floor (measured before: 110.5 + 294 + 193 + 6 = 603.5). That
+ * slack is spent back on the rank-slot grid FIRST (restored fully to the
+ * pre-06.2-21 40x30 — an 80px `TABLE_BAND_MIN_PX` cost: 294 -> 374), with
+ * what remains given to the compact Discard strip's reserved row count
+ * (`DISCARD_ROWS`, 1 -> 2, a further 26px: 374 -> 400) so a second row of
+ * the pile is visible before opening the full overlay. Real-browser
+ * re-measurement at the same 1280x720 worst case (5 seats, Black variant)
+ * after both changes: 110.5 + 400 + 193 + 6 = 709.5 — ~10.5px of real
+ * slack kept rather than tuning back to exactly 720px.
+ *
+ * That re-measurement also surfaced a real Rule-1 bug in
+ * `useDiscardDrag.ts`, unrelated to these pixel values in principle but
+ * only exposed by them in practice: `buildTiles()` included the
+ * currently-DRAGGED tile's own (pointer-following) rect in its drop-index
+ * comparison set, which — because a `dragLocatorTo`-style grab starts
+ * exactly at the tile's own center — put the very first comparison on a
+ * sub-pixel tie a real browser's floating-point layout resolves
+ * inconsistently. It is now excluded, matching `useHandDrag.ts`'s
+ * always-static slot-rect model.
  */
 
 /** Playwright's fixed viewport for the UI-11 no-scroll verification task. */
@@ -94,15 +116,16 @@ export const MAX_RANK = 5;
 export const MAX_SUITS = 6;
 
 /**
- * A single rank slot's width/height (06.2-21, vertical stack restored):
- * shrunk deliberately from the 06.2-15 side-by-side build's 30x40 to 20x24
- * — a real-browser measurement showed the vertical Play-above-Deck-above-
- * Discard stack needed ~280px of column height that the full-size grid
- * could not fund alongside a compact Discard strip and slimmed hand bands.
+ * A single rank slot's width/height. Shrunk from 30x40 to 20x24 at 06.2-21
+ * (vertical stack restored) when the full-size grid did not fit alongside
+ * the vertical Play/Deck/Discard stack; restored back to the full 30x40
+ * post-06.2-21 once deleting the clue-menu (gap 16) freed enough OWN_BAND_PX
+ * height for the 1280x720 floor to afford it again — real-browser
+ * measurement confirmed the fit (see this file's header comment).
  */
-export const RANK_SLOT_WIDTH_PX = 20;
-/** A single rank slot's height (06.2-21). */
-export const RANK_SLOT_HEIGHT_PX = 24;
+export const RANK_SLOT_WIDTH_PX = 30;
+/** A single rank slot's height — restored to 40 post-06.2-21 (see above). */
+export const RANK_SLOT_HEIGHT_PX = 40;
 /** Vertical gap between adjacent rank slots within one suit column. */
 export const RANK_SLOT_GAP_PX = 2;
 /** Horizontal gap between adjacent suit columns. */
@@ -165,16 +188,44 @@ export const MIDDLE_GAP_PX = 4;
 export const DISCARD_TILE_WIDTH_PX = 16;
 export const DISCARD_TILE_HEIGHT_PX = 22;
 
+/** Vertical gap between wrapped discard-tile rows — reuses --space-xs, same
+ * as the strip's own `gap-[length:var(--space-xs)]` (Table.tsx). */
+export const DISCARD_ROW_GAP_PX = 4;
+
+/**
+ * Reserved discard-strip row count (post-06.2-21 follow-up: spending the
+ * height gap 16's CluePicker deletion freed). 1 -> 2 — the strip's tile
+ * container already wraps (`flex-wrap`), so a taller reservation surfaces a
+ * second row of the pile before `discard-toggle` opens the full
+ * `DiscardOverlay`, with no Table.tsx changes needed.
+ */
+export const DISCARD_ROWS = 2;
+
+/**
+ * A compact Discard strip's total reserved height for `rows` rows of
+ * `DISCARD_TILE_HEIGHT_PX`-tall tiles: label row + gap + `rows` tile rows
+ * (with `DISCARD_ROW_GAP_PX` between them) + the area's own top+bottom
+ * padding.
+ */
+export function discardCompactHeightPx(rows: number): number {
+  return (
+    AREA_LABEL_PX +
+    AREA_PADDING_PX +
+    rows * DISCARD_TILE_HEIGHT_PX +
+    (rows - 1) * DISCARD_ROW_GAP_PX +
+    2 * AREA_PADDING_PX
+  );
+}
+
 /**
  * UI-SPEC compact Discard strip height (06.2-21, owner review: "discard can
- * be shrunk by default, clicking it will expand"): label row + gap + one
- * clipped row of `DISCARD_TILE_HEIGHT_PX`-tall tiles + the area's own
- * top+bottom padding. A pile deeper than one row wraps/clips inside this
- * fixed box — `discard-toggle` opens the existing full-size
- * `DiscardOverlay` (unchanged) to read the whole pile.
+ * be shrunk by default, clicking it will expand"; post-06.2-21 follow-up
+ * grew this from one row to `DISCARD_ROWS`). A pile deeper than
+ * `DISCARD_ROWS` rows wraps/clips inside this fixed box — `discard-toggle`
+ * opens the existing full-size `DiscardOverlay` (unchanged) to read the
+ * whole pile.
  */
-export const DISCARD_COMPACT_PX =
-  AREA_LABEL_PX + AREA_PADDING_PX + DISCARD_TILE_HEIGHT_PX + 2 * AREA_PADDING_PX;
+export const DISCARD_COMPACT_PX = discardCompactHeightPx(DISCARD_ROWS);
 
 /**
  * The left column's total reserved height (06.2-21): Play (top) + gap +

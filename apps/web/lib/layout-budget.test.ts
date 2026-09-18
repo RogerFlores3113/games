@@ -7,6 +7,7 @@ import {
   CLUE_TOKEN_COLUMNS,
   DECK_COUNTER_PX,
   DISCARD_COMPACT_PX,
+  DISCARD_ROWS,
   MAX_CLUE_TOKENS,
   MAX_FUSE_TOKENS,
   MAX_SUITS,
@@ -17,6 +18,7 @@ import {
   TEAMMATE_BAND_PX,
   TOKEN_AREA_HEIGHT_PX,
   VIEWPORT_TEST_HEIGHT_PX,
+  discardCompactHeightPx,
   playAreaContentHeightPx,
   playColumnWidthPx,
   playGridHeightPx,
@@ -54,9 +56,11 @@ describe("layout-budget", () => {
   });
 
   it("playGridHeightPx is MAX_RANK slots at RANK_SLOT_HEIGHT_PX with RANK_SLOT_GAP_PX between them", () => {
-    // fix(06.2-21): RANK_SLOT_HEIGHT_PX shrunk 40 -> 24 (208 -> 128) so the
-    // vertical stack's Play area fits within the funded BOARD_INNER_PX.
-    expect(playGridHeightPx()).toBe(128);
+    // fix(post-06.2-21 follow-up): RANK_SLOT_HEIGHT_PX restored 24 -> 40
+    // (128 -> 208) once deleting the clue-menu (gap 16) freed enough
+    // OWN_BAND_PX height for the 1280x720 floor to afford the full-size
+    // grid again.
+    expect(playGridHeightPx()).toBe(208);
   });
 
   it("playAreaContentHeightPx (label + gap + stack header + grid + padding) IS PLAY_AREA_HEIGHT_PX", () => {
@@ -64,8 +68,15 @@ describe("layout-budget", () => {
   });
 
   it("playColumnWidthPx(MAX_SUITS) is the Rainbow/Black worst-case Play area width", () => {
-    // fix(06.2-21): RANK_SLOT_WIDTH_PX shrunk 30 -> 20 (208 -> 148).
-    expect(playColumnWidthPx(MAX_SUITS)).toBe(148);
+    // fix(post-06.2-21 follow-up): RANK_SLOT_WIDTH_PX restored 20 -> 30
+    // (148 -> 208).
+    expect(playColumnWidthPx(MAX_SUITS)).toBe(208);
+  });
+
+  it("discardCompactHeightPx(DISCARD_ROWS) IS DISCARD_COMPACT_PX, and DISCARD_ROWS is 2 (post-06.2-21 follow-up)", () => {
+    expect(discardCompactHeightPx(DISCARD_ROWS)).toBe(DISCARD_COMPACT_PX);
+    expect(DISCARD_ROWS).toBe(2);
+    expect(DISCARD_COMPACT_PX).toBe(78);
   });
 
   it("Play/Deck/compact-Discard heights plus their gaps equal BOARD_INNER_PX exactly", () => {
