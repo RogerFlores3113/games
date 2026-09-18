@@ -64,3 +64,13 @@ with fireworks going off in the background" per the owner's literal wording (06.
 illuminated building signs (e.g. "AXA", "CCBI") are legible at full resolution as an unavoidable feature of
 a real skyline photograph; there is no overlaid caption, watermark, or date burned into the image, and no
 identifiable people.
+
+## wood-tile.webp
+
+- Source: supplied directly by the project owner (pasted into the build session on 2026-09-17)
+- Author: unknown — **provenance not verified**
+- License: unknown — the owner directed its use and takes responsibility for the rights
+- Retrieved: 2026-09-17
+- Modifications: re-encoded from PNG (800x600) to WebP quality 85
+- Purpose: dark walnut grain tiled across the board surface, replacing the CSS-generated texture the owner rejected and the lighter walnut photo in wood-board.webp
+- Note: if this repository is ever made public, replace this with a file whose license is recorded, or have the owner supply the source and license so this entry can be completed.
