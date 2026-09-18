@@ -316,8 +316,18 @@ export const TABLE_BAND_MIN_PX = BOARD_INNER_PX + 2 * BOARD_PANEL_PADDING_PX;
  * the render disagrees with the ledger, the ledger is corrected to the
  * render, never the reverse") means the constant was corrected up to 111 so
  * it never understates the real rendered height.
+ *
+ * UAT gap 29 reconciliation (fifth owner review): fixing the stray-line bug
+ * in `TeammateCard.tsx` (an inline-block child sitting on its `block`
+ * parent's text baseline, leaving an invisible "descender gap" below the
+ * card that had been silently padding out this band's height) legitimately
+ * changed the real rendered height — the fix makes `card-identity` an
+ * `inline-flex` flex item instead, which removes that gap. Re-measured at
+ * the same 1280x720 worst case post-fix: 114px. Per this file's own rule,
+ * the ledger is corrected to the new (correct) render, not the other way
+ * around — 111 -> 114.
  */
-export const TEAMMATE_BAND_PX = 111;
+export const TEAMMATE_BAND_PX = 114;
 
 /**
  * UI-SPEC "Bottom (own hand)" row. Second owner review (UAT gaps 13/14):

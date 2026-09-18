@@ -36,7 +36,10 @@ describe("layout-budget", () => {
 
   it("TEAMMATE_BAND_PX has no marks-band constant (HINT-04 removes the pip band)", () => {
     expect((layoutBudget as Record<string, unknown>).MARKS_BAND_PX).toBeUndefined();
-    expect(TEAMMATE_BAND_PX).toBe(111);
+    // UAT gap 29 reconciliation: fixing the inline-block descender-gap bug
+    // in TeammateCard.tsx legitimately changed the real rendered height of
+    // this band (111 -> 114) — see layout-budget.ts's own comment.
+    expect(TEAMMATE_BAND_PX).toBe(114);
   });
 
   it("OWN_BAND_PX has no marks-band constant (HINT-04 removes the pip band)", () => {
