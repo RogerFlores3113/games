@@ -56,6 +56,17 @@ export interface TableProps {
    * calls keep working unchanged; the button below is disabled whenever this
    * is absent. */
   onGroupDiscardBySuit?: () => void;
+  /** UAT gap 37 (seventh owner review): the board-level turn sign's copy —
+   * "{name}'s turn" / "Your turn!" / "" once the game has ended — computed
+   * by `turnSignText` (hanabi-board-logic.ts) and threaded straight through
+   * from `HanabiBoard`, same pattern as `OwnHand`'s existing `turnText`
+   * prop. Optional so pre-existing `table-render.test.ts` calls keep
+   * working unchanged; renders nothing when absent/empty. */
+  turnSignText?: string;
+  /** UAT gap 38: whether the viewer's own turn is current — gates the
+   * "Your turn!" text onto `--color-turn` (violet), matching the own-hand
+   * turn-indicator's own accent treatment. */
+  isYourTurn?: boolean;
 }
 
 /** D-16: a drop-zone's box-shadow highlight (enabled zones only — a
@@ -145,6 +156,8 @@ export function Table({
   registerDiscardTile,
   onDiscardTilePointerDown,
   onGroupDiscardBySuit,
+  turnSignText = "",
+  isYourTurn = false,
 }: TableProps) {
   const prevStacksRef = useRef<HanabiView["stacks"] | null>(null);
   const [flashingSuits, setFlashingSuits] = useState<ReadonlySet<Suit>>(new Set());
@@ -258,194 +271,236 @@ export function Table({
         </div>
       </div>
 
-      {/* Region 2 (BOARD-02/03/04, UAT gap 21): a narrow right-hand column —
-          the clue/fuse token runs stacked above the Deck counter, "{n} x
-          [card back]", per the owner's literal description. */}
-      <div className="flex flex-col" style={{ width: TOKEN_AREA_WIDTH_PX, gap: MIDDLE_GAP_PX }}>
-        <TokenColumn clueTokens={game.clueTokens} fusesRemaining={fusesRemaining} />
+      {/* Regions 2+3 (BOARD-02/03/04, UAT gap 21) plus the UAT gap 37 turn
+          sign: wrapped in one flex-col matching Play's own reserved height
+          (BOARD_INNER_PX) so the token column + compact Discard row sits at
+          the top exactly as before (byte-identical widths/heights — see
+          the two inner divs below, unchanged from their prior siblings-of-
+          section layout) and the sign fills the leftover space underneath,
+          which real-browser measurement confirmed is otherwise empty
+          (BOARD_INNER_PX 383 - the 156px token+deck/discard row = 227px of
+          previously-unused height, comfortably fitting the sign's single
+          text line with room to spare). This is purely a wrapping change —
+          `tableau`/`play-zone`/`discard-pile`/`clue-tokens`' own measured
+          boxes (UAT gap 1's fixed-geometry proof) are untouched. */}
+      <div className="flex flex-col" style={{ height: BOARD_INNER_PX, gap: MIDDLE_GAP_PX }}>
+        <div className="flex items-start gap-[length:var(--space-md)]">
+          {/* Region 2: the clue/fuse token runs stacked above the Deck
+              counter, "{n} x [card back]", per the owner's literal
+              description. */}
+          <div className="flex flex-col" style={{ width: TOKEN_AREA_WIDTH_PX, gap: MIDDLE_GAP_PX }}>
+            <TokenColumn clueTokens={game.clueTokens} fusesRemaining={fusesRemaining} />
 
-        <div
-          className="flex items-center justify-center gap-[length:var(--space-xs)]"
-          style={{ height: DECK_COUNTER_PX }}
-        >
-          {game.finalTurnsRemaining === null ? (
-            <span
-              data-testid="deck-count"
-              data-final-round="false"
-              className="flex items-center gap-[length:var(--space-xs)] text-[length:var(--text-label)] font-semibold"
-              style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
+            <div
+              className="flex items-center justify-center gap-[length:var(--space-xs)]"
+              style={{ height: DECK_COUNTER_PX }}
             >
-              {game.deckCount} x
-              <FireworkCardBack width={DECK_COUNTER_CARD_WIDTH_PX} height={DECK_COUNTER_CARD_HEIGHT_PX} />
-            </span>
-          ) : (
-            <span
-              data-testid="deck-count"
-              data-final-round="true"
-              className="text-[length:var(--text-label)] font-semibold"
-              style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
-            >
-              {deckCountText(game)}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Region 3 (BOARD-01/T-06.2-39/UAT gap 22, "discard can be shrunk by
-          default, clicking it will expand"): compact Discard, to the RIGHT
-          of the token column, per the owner's literal description — a
-          short, fixed, clipping strip; a pile deeper than DISCARD_ROWS
-          clips rather than growing the board. discard-toggle (and the
-          strip itself) opens the unchanged, full-size DiscardOverlay, which
-          carries the same shared drag order. */}
-      <div
-        className="relative flex flex-col gap-[length:var(--space-xs)] overflow-hidden rounded-md border p-[length:var(--space-xs)]"
-        style={{ width: DISCARD_COMPACT_WIDTH_PX, height: DISCARD_COMPACT_PX, borderColor: "var(--color-border)" }}
-      >
-        <div className="flex items-center justify-between gap-[length:var(--space-xs)]">
-          <AreaLabel>Discard</AreaLabel>
-          <div className="flex items-center gap-[length:var(--space-xs)]">
-            {/* UAT gap 10/DISC-01: same icon-sized-box/out-of-flow-touch-
-                target pattern as discard-toggle beside it — the hit-area
-                span is a DESCENDANT of the button (06.2-10's fixed
-                sibling-swallows-click bug), and the visible box stays
-                icon-sized so this header row does not grow (the discard
-                region is a fixed reservation, 06.2-16/21/22). The inward
-                (right) side of this button's hit-area is capped at half
-                the row's gap-xs rather than the full 44px reach, so it
-                can never overlap discard-toggle's own hit-area beside it
-                — a full symmetric expansion on both adjacent buttons
-                would intercept each other's clicks. */}
-            <button
-              type="button"
-              data-testid="discard-group-by-suit"
-              aria-label="Group discard by suit"
-              onClick={onGroupDiscardBySuit}
-              disabled={!onGroupDiscardBySuit || game.discard.length < 2}
-              className="relative inline-flex cursor-pointer items-center justify-center rounded-md before:absolute before:content-[''] transition-colors hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-[var(--color-text-muted)]"
-              style={{ width: 14, height: 14, color: "var(--color-text-muted)" }}
-            >
-              <Group aria-hidden="true" size={14} />
-              <span
-                aria-hidden="true"
-                className="absolute"
-                style={{ top: -15, bottom: -15, left: -15, right: -2 }}
-              />
-            </button>
-            <button
-              type="button"
-              data-testid="discard-toggle"
-              aria-label="Show full discard pile"
-              onClick={openExpandedView}
-              // The visible/flow box stays icon-sized so this header row does
-              // not grow past the "Discard" label's own height (needed for
-              // the UI-11 1280x720 no-scroll fit) — the 44px touch target is
-              // provided by an absolutely-positioned (out-of-flow) pseudo
-              // element instead, per --size-touch-min. The left (inward)
-              // side is capped at half the gap so it cannot overlap
-              // discard-group-by-suit's own hit-area beside it.
-              className="relative inline-flex cursor-pointer items-center justify-center rounded-md before:absolute before:content-[''] transition-colors hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
-              style={{ width: 14, height: 14, color: "var(--color-text-muted)" }}
-            >
-              <Layers aria-hidden="true" size={14} />
-              <span
-                aria-hidden="true"
-                className="absolute"
-                style={{ top: -15, bottom: -15, right: -15, left: -2 }}
-              />
-            </button>
+              {game.finalTurnsRemaining === null ? (
+                <span
+                  data-testid="deck-count"
+                  data-final-round="false"
+                  className="flex items-center gap-[length:var(--space-xs)] text-[length:var(--text-label)] font-semibold"
+                  style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
+                >
+                  {game.deckCount} x
+                  <FireworkCardBack width={DECK_COUNTER_CARD_WIDTH_PX} height={DECK_COUNTER_CARD_HEIGHT_PX} />
+                </span>
+              ) : (
+                <span
+                  data-testid="deck-count"
+                  data-final-round="true"
+                  className="text-[length:var(--text-label)] font-semibold"
+                  style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
+                >
+                  {deckCountText(game)}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* UAT gap 31 (fifth owner review): the highlight ring lives on this
-            OUTER div, which does NOT clip its own overflow — a box-shadow
-            painted on a self-clipping element gets clipped by its own
-            bounds in Chromium (the compact discard strip's tight padding
-            left no headroom, unlike the Play area's roomier wrapper), so
-            the ring rendered as a barely-visible sliver instead of the same
-            clean glow the Play area shows. The actual "clip a pile deeper
-            than DISCARD_ROWS" behavior moves to the INNER div below, which
-            keeps `overflow-hidden` — only pile CONTENT is clipped now, never
-            the hover highlight painted on the zone around it. Reuses the
-            exact same `dropZoneHighlightStyle` output Play already uses —
-            no second highlight style invented. */}
-        <div
-          ref={discardZoneRef}
-          data-testid="discard-pile"
-          data-discard-count={game.discard.length}
-          data-view={view}
-          data-drop-state={discardDropState}
-          className="relative flex min-h-0 flex-1 rounded-md"
-          style={discardHighlight}
-        >
-          {dropStatus && !dropStatus.discard.enabled && dropStatus.discard.reason && (
-            <span
-              data-testid="drop-reason-discard"
-              role="status"
-              className="pointer-events-none absolute z-10 whitespace-nowrap rounded px-[length:var(--space-xs)] text-[length:var(--text-label)]"
-              style={{
-                bottom: "100%",
-                left: "50%",
-                transform: "translateX(-50%)",
-                marginBottom: 4,
-                color: "var(--color-text-muted)",
-                backgroundColor: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
-                lineHeight: "var(--text-label--line-height)",
-              }}
-            >
-              {dropStatus.discard.reason}
-            </span>
-          )}
-          <div className="flex min-h-0 flex-1 flex-wrap items-start gap-[length:var(--space-xs)] overflow-hidden rounded-md">
-            {orderedDiscard.length > 0 ? (
-              orderedDiscard.map((card) => {
-                const dragging = discardDragState?.cardId === card.id;
-                // D-20: mirrors OwnHandCard's drag-lift transform — tracks
-                // the pointer via translate while dragging, no continuous
-                // animation otherwise (drag-snap handles the release).
-                const dragTransform =
-                  dragging && discardDragState
-                    ? `translate(${discardDragState.offset.x}px, ${discardDragState.offset.y}px) scale(1.05)`
-                    : undefined;
-                return (
-                  <span
-                    key={card.id}
-                    ref={(el) => registerDiscardTile?.(card.id, el)}
-                    data-testid={`discard-tile-${card.id}`}
-                    data-dragging={String(dragging)}
-                    onPointerDown={(event) => onDiscardTilePointerDown?.(card.id, event)}
-                    className={
-                      "relative inline-flex flex-col items-center" +
-                      (dragging ? " cursor-grabbing" : " cursor-grab") +
-                      (dragging ? "" : " drag-snap")
-                    }
-                    style={{
-                      transform: dragTransform,
-                      zIndex: dragging ? 10 : undefined,
-                      touchAction: "none",
-                    }}
-                  >
-                    <FireworkCardFace
-                      suit={card.suit}
-                      rank={card.rank}
-                      width={DISCARD_TILE_WIDTH_PX}
-                      height={DISCARD_TILE_HEIGHT_PX}
-                    />
-                    <span className="sr-only">{`${SUIT_VISUALS[card.suit].label} ${card.rank}`}</span>
-                  </span>
-                );
-              })
-            ) : (
-              // UAT gap 24 (fourth owner review): "remove the 'No tiles
-              // discarded yet'" — empty means empty, no placeholder copy
-              // visible on screen; the "Discard" label above already names
-              // the region, so an sr-only equivalent is enough for screen
-              // readers/tests (matches gap 6's "accessible but not obtrusive"
-              // precedent).
-              <p className="sr-only">No tiles discarded yet</p>
+          {/* Region 3 (BOARD-01/T-06.2-39/UAT gap 22, "discard can be shrunk
+              by default, clicking it will expand"): compact Discard, to the
+              RIGHT of the token column, per the owner's literal
+              description — a short, fixed, clipping strip; a pile deeper
+              than DISCARD_ROWS clips rather than growing the board.
+              discard-toggle (and the strip itself) opens the unchanged,
+              full-size DiscardOverlay, which carries the same shared drag
+              order. */}
+          <div
+            className="relative flex flex-col gap-[length:var(--space-xs)] overflow-hidden rounded-md border p-[length:var(--space-xs)]"
+            style={{ width: DISCARD_COMPACT_WIDTH_PX, height: DISCARD_COMPACT_PX, borderColor: "var(--color-border)" }}
+          >
+          <div className="flex items-center justify-between gap-[length:var(--space-xs)]">
+            <AreaLabel>Discard</AreaLabel>
+            <div className="flex items-center gap-[length:var(--space-xs)]">
+              {/* UAT gap 10/DISC-01: same icon-sized-box/out-of-flow-touch-
+                  target pattern as discard-toggle beside it — the hit-area
+                  span is a DESCENDANT of the button (06.2-10's fixed
+                  sibling-swallows-click bug), and the visible box stays
+                  icon-sized so this header row does not grow (the discard
+                  region is a fixed reservation, 06.2-16/21/22). The inward
+                  (right) side of this button's hit-area is capped at half
+                  the row's gap-xs rather than the full 44px reach, so it
+                  can never overlap discard-toggle's own hit-area beside it
+                  — a full symmetric expansion on both adjacent buttons
+                  would intercept each other's clicks. */}
+              <button
+                type="button"
+                data-testid="discard-group-by-suit"
+                aria-label="Group discard by suit"
+                onClick={onGroupDiscardBySuit}
+                disabled={!onGroupDiscardBySuit || game.discard.length < 2}
+                className="relative inline-flex cursor-pointer items-center justify-center rounded-md before:absolute before:content-[''] transition-colors hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-[var(--color-text-muted)]"
+                style={{ width: 14, height: 14, color: "var(--color-text-muted)" }}
+              >
+                <Group aria-hidden="true" size={14} />
+                <span
+                  aria-hidden="true"
+                  className="absolute"
+                  style={{ top: -15, bottom: -15, left: -15, right: -2 }}
+                />
+              </button>
+              <button
+                type="button"
+                data-testid="discard-toggle"
+                aria-label="Show full discard pile"
+                onClick={openExpandedView}
+                // The visible/flow box stays icon-sized so this header row does
+                // not grow past the "Discard" label's own height (needed for
+                // the UI-11 1280x720 no-scroll fit) — the 44px touch target is
+                // provided by an absolutely-positioned (out-of-flow) pseudo
+                // element instead, per --size-touch-min. The left (inward)
+                // side is capped at half the gap so it cannot overlap
+                // discard-group-by-suit's own hit-area beside it.
+                className="relative inline-flex cursor-pointer items-center justify-center rounded-md before:absolute before:content-[''] transition-colors hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+                style={{ width: 14, height: 14, color: "var(--color-text-muted)" }}
+              >
+                <Layers aria-hidden="true" size={14} />
+                <span
+                  aria-hidden="true"
+                  className="absolute"
+                  style={{ top: -15, bottom: -15, right: -15, left: -2 }}
+                />
+              </button>
+            </div>
+          </div>
+  
+          {/* UAT gap 31 (fifth owner review): the highlight ring lives on this
+              OUTER div, which does NOT clip its own overflow — a box-shadow
+              painted on a self-clipping element gets clipped by its own
+              bounds in Chromium (the compact discard strip's tight padding
+              left no headroom, unlike the Play area's roomier wrapper), so
+              the ring rendered as a barely-visible sliver instead of the same
+              clean glow the Play area shows. The actual "clip a pile deeper
+              than DISCARD_ROWS" behavior moves to the INNER div below, which
+              keeps `overflow-hidden` — only pile CONTENT is clipped now, never
+              the hover highlight painted on the zone around it. Reuses the
+              exact same `dropZoneHighlightStyle` output Play already uses —
+              no second highlight style invented. */}
+          <div
+            ref={discardZoneRef}
+            data-testid="discard-pile"
+            data-discard-count={game.discard.length}
+            data-view={view}
+            data-drop-state={discardDropState}
+            className="relative flex min-h-0 flex-1 rounded-md"
+            style={discardHighlight}
+          >
+            {dropStatus && !dropStatus.discard.enabled && dropStatus.discard.reason && (
+              <span
+                data-testid="drop-reason-discard"
+                role="status"
+                className="pointer-events-none absolute z-10 whitespace-nowrap rounded px-[length:var(--space-xs)] text-[length:var(--text-label)]"
+                style={{
+                  bottom: "100%",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  marginBottom: 4,
+                  color: "var(--color-text-muted)",
+                  backgroundColor: "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
+                  lineHeight: "var(--text-label--line-height)",
+                }}
+              >
+                {dropStatus.discard.reason}
+              </span>
             )}
+            <div className="flex min-h-0 flex-1 flex-wrap items-start gap-[length:var(--space-xs)] overflow-hidden rounded-md">
+              {orderedDiscard.length > 0 ? (
+                orderedDiscard.map((card) => {
+                  const dragging = discardDragState?.cardId === card.id;
+                  // D-20: mirrors OwnHandCard's drag-lift transform — tracks
+                  // the pointer via translate while dragging, no continuous
+                  // animation otherwise (drag-snap handles the release).
+                  const dragTransform =
+                    dragging && discardDragState
+                      ? `translate(${discardDragState.offset.x}px, ${discardDragState.offset.y}px) scale(1.05)`
+                      : undefined;
+                  return (
+                    <span
+                      key={card.id}
+                      ref={(el) => registerDiscardTile?.(card.id, el)}
+                      data-testid={`discard-tile-${card.id}`}
+                      data-dragging={String(dragging)}
+                      onPointerDown={(event) => onDiscardTilePointerDown?.(card.id, event)}
+                      className={
+                        "relative inline-flex flex-col items-center" +
+                        (dragging ? " cursor-grabbing" : " cursor-grab") +
+                        (dragging ? "" : " drag-snap")
+                      }
+                      style={{
+                        transform: dragTransform,
+                        zIndex: dragging ? 10 : undefined,
+                        touchAction: "none",
+                      }}
+                    >
+                      <FireworkCardFace
+                        suit={card.suit}
+                        rank={card.rank}
+                        width={DISCARD_TILE_WIDTH_PX}
+                        height={DISCARD_TILE_HEIGHT_PX}
+                      />
+                      <span className="sr-only">{`${SUIT_VISUALS[card.suit].label} ${card.rank}`}</span>
+                    </span>
+                  );
+                })
+              ) : (
+                // UAT gap 24 (fourth owner review): "remove the 'No tiles
+                // discarded yet'" — empty means empty, no placeholder copy
+                // visible on screen; the "Discard" label above already names
+                // the region, so an sr-only equivalent is enough for screen
+                // readers/tests (matches gap 6's "accessible but not obtrusive"
+                // precedent).
+                <p className="sr-only">No tiles discarded yet</p>
+              )}
+            </div>
           </div>
+          </div>
+        </div>
+
+        {/* UAT gap 37 (seventh owner review): "there's a lot of free space
+            below the discard/hint token area - that area can be a sign
+            saying 'X's turn'". Fills the leftover height in this flex-col
+            (see the wrapper's own header comment above) below the token
+            column + compact Discard row, at a fixed reservation so it never
+            grows/shrinks this column's own width and never reflows Play.
+            aria-live="polite" announces every turn change to screen-reader
+            users without an explicit re-focus. Empty string (game ended,
+            see turnSignText) renders an empty live region rather than no
+            region at all, so a screen reader that already has the region
+            focused hears silence, not a leftover stale announcement. */}
+        <div
+          data-testid="turn-sign"
+          role="status"
+          aria-live="polite"
+          className="flex flex-1 items-center justify-center text-center font-semibold"
+          style={{
+            color: isYourTurn ? "var(--color-turn)" : "var(--color-text-muted)",
+            fontSize: "var(--text-label)",
+            lineHeight: "var(--text-label--line-height)",
+          }}
+        >
+          {turnSignText}
         </div>
       </div>
 

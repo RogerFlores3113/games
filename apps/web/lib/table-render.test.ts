@@ -49,6 +49,7 @@ const ALL_TESTIDS = [
   "discard-pile",
   "discard-toggle",
   "discard-group-by-suit",
+  "turn-sign",
 ];
 
 function render(game: HanabiView, dropStatus?: Parameters<typeof Table>[0]["dropStatus"]) {
@@ -336,5 +337,43 @@ describe("table-render: group-by-suit control (06.2-18, UAT gap 10)", () => {
     const withoutHandler = styleFor(render(BASE_GAME), "discard-pile");
     const withHandler = styleFor(renderWithGroupHandler(BASE_GAME, () => {}), "discard-pile");
     expect(withHandler).toBe(withoutHandler);
+  });
+});
+
+describe("UAT gap 37/38: the turn sign below the discard/token area", () => {
+  function renderWithTurnSign(turnSignText: string, isYourTurn: boolean) {
+    return renderToStaticMarkup(
+      createElement(Table, { game: BASE_GAME, dropStatus: null, turnSignText, isYourTurn }),
+    );
+  }
+
+  it("renders the given turn-sign text as a polite live region", () => {
+    const markup = renderWithTurnSign("Bianca's turn", false);
+    expect(markup).toContain('data-testid="turn-sign"');
+    expect(markup).toMatch(/data-testid="turn-sign"[^>]*aria-live="polite"/);
+    expect(markup).toContain(">Bianca&#x27;s turn<");
+  });
+
+  it("renders an empty (but still present) live region once the game has ended", () => {
+    const markup = renderWithTurnSign("", false);
+    expect(markup).toMatch(/data-testid="turn-sign"[^>]*aria-live="polite"[^>]*><\/div>/);
+  });
+
+  it("colours 'Your turn!' with --color-turn (gap 38), not the muted default", () => {
+    const markup = renderWithTurnSign("Your turn!", true);
+    const style = styleFor(markup, "turn-sign");
+    expect(style).toContain("var(--color-turn)");
+  });
+
+  it("colours a teammate's turn with the muted default, not --color-turn", () => {
+    const markup = renderWithTurnSign("Bianca's turn", false);
+    const style = styleFor(markup, "turn-sign");
+    expect(style).toContain("var(--color-text-muted)");
+    expect(style).not.toContain("var(--color-turn)");
+  });
+
+  it("defaults to an empty turn sign when the prop is omitted (pre-existing render calls keep working)", () => {
+    const markup = renderToStaticMarkup(createElement(Table, { game: BASE_GAME, dropStatus: null }));
+    expect(markup).toMatch(/data-testid="turn-sign"[^>]*><\/div>/);
   });
 });

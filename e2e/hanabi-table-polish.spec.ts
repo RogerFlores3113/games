@@ -721,6 +721,57 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await contextB.close();
   });
 
+  test("UAT gap 37: a turn sign in the freed space below the discard/token area names whoever's turn it is, live-announced, and updates on every turn change", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser, {
+      host: "Roger",
+      guest: "Bianca",
+    });
+
+    const activeSign = activePage.getByTestId("turn-sign");
+    const passiveSign = passivePage.getByTestId("turn-sign");
+
+    // The active page always reads "Your turn!"; the passive page names the
+    // active player by their existing hand-panel display name.
+    await expect(activeSign).toHaveText("Your turn!");
+    const passiveSignTextBefore = ((await passiveSign.textContent()) ?? "").trim();
+    expect(passiveSignTextBefore).toMatch(/'s turn$/);
+    expect(passiveSignTextBefore).not.toBe("");
+
+    // Live region, per gap 37's screen-reader requirement.
+    await expect(activeSign).toHaveAttribute("aria-live", "polite");
+    await expect(passiveSign).toHaveAttribute("aria-live", "polite");
+
+    // The sign must sit inside the tableau's own already-reserved geometry
+    // (UAT gap 1 fixed-geometry contract) — never grow the board, never
+    // cause the 1280x720 floor to scroll.
+    const tableauBox = await activePage.getByTestId("tableau").boundingBox();
+    const signBox = await activeSign.boundingBox();
+    if (!tableauBox || !signBox) throw new Error("missing bounding box");
+    expect(signBox.y).toBeGreaterThanOrEqual(tableauBox.y);
+    expect(signBox.y + signBox.height).toBeLessThanOrEqual(tableauBox.y + tableauBox.height + 1);
+    const hasScroll = await activePage.evaluate(
+      () => document.documentElement.scrollHeight > document.documentElement.clientHeight,
+    );
+    expect(hasScroll).toBe(false);
+
+    // Give a clue — the turn passes to the other player — and confirm the
+    // sign updates on BOTH screens (gap 37's "must update on every turn
+    // change").
+    const gaveClue = await giveAnyLegalClueToAnyTeammate(activePage);
+    expect(gaveClue).toBe(true);
+
+    await expect(passiveSign).toHaveText("Your turn!");
+    const activeSignTextAfter = ((await activeSign.textContent()) ?? "").trim();
+    expect(activeSignTextAfter).toMatch(/'s turn$/);
+    expect(activeSignTextAfter).not.toBe(passiveSignTextBefore.replace("'s turn", "")); // sanity: not stuck on stale text
+    expect(activeSignTextAfter).not.toBe("Your turn!");
+
+    await contextB.close();
+  });
+
   test("UAT gap 31: the discard zone gains the same highlight as the play zone while a tile is dragged over it", async ({
     page: hostPage,
     browser,

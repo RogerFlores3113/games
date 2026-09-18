@@ -5,7 +5,7 @@ import { Settings } from "lucide-react";
 import type { RoomView } from "@games/schema";
 import { HanabiViewSchema } from "@games/schema/games/hanabi";
 import type { Clue, HanabiView } from "@games/rules";
-import { isSeatConnected, turnIndicatorText } from "../../lib/hanabi-board-logic";
+import { isSeatConnected, turnIndicatorText, turnSignText } from "../../lib/hanabi-board-logic";
 import { clearNotesForRoom, pruneNotesForSeat } from "../../lib/hanabi-notes";
 import { hintsVisibleForCard } from "../../lib/hanabi-hint-logic";
 import { readKeepHintsPref, writeKeepHintsPref } from "../../lib/keep-hints-pref";
@@ -385,6 +385,8 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
             registerDiscardTile={discardDrag.registerTile}
             onDiscardTilePointerDown={discardDrag.onTilePointerDown}
             onGroupDiscardBySuit={controlsDisabled ? undefined : handleGroupDiscardBySuit}
+            turnSignText={turnSignText(game, labelFor, ended)}
+            isYourTurn={game.isYourTurn && !ended}
           />
         </div>
 

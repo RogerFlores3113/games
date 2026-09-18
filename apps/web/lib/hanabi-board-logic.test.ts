@@ -12,6 +12,7 @@ import {
   isPlayDisabled,
   isSeatConnected,
   turnIndicatorText,
+  turnSignText,
 } from "./hanabi-board-logic";
 
 function baseView(overrides: Partial<HanabiView> = {}): HanabiView {
@@ -307,6 +308,27 @@ describe("D-07: seat connection + turn text", () => {
     expect(
       turnIndicatorText({ isYourTurn: false, activeSeatId: "b" }, seats, () => "Bianca", true),
     ).toBe("Game over");
+  });
+
+  it("turnSignText returns 'Your turn!' when it is the viewer's turn", () => {
+    expect(turnSignText({ isYourTurn: true, activeSeatId: "a" }, () => "Anyone")).toBe("Your turn!");
+  });
+
+  it("turnSignText returns \"{name}'s turn\" when it is a teammate's turn", () => {
+    expect(
+      turnSignText({ isYourTurn: false, activeSeatId: "b" }, (id) => (id === "b" ? "Bianca" : "…")),
+    ).toBe("Bianca's turn");
+  });
+
+  it("turnSignText updates between two players' turns", () => {
+    const labelFor = (id: string) => (id === "a" ? "Alice" : id === "b" ? "Bianca" : "…");
+    expect(turnSignText({ isYourTurn: false, activeSeatId: "a" }, labelFor)).toBe("Alice's turn");
+    expect(turnSignText({ isYourTurn: false, activeSeatId: "b" }, labelFor)).toBe("Bianca's turn");
+  });
+
+  it("turnSignText never claims a turn once the game has ended", () => {
+    expect(turnSignText({ isYourTurn: true, activeSeatId: "a" }, () => "Anyone", true)).toBe("");
+    expect(turnSignText({ isYourTurn: false, activeSeatId: "b" }, () => "Bianca", true)).toBe("");
   });
 });
 

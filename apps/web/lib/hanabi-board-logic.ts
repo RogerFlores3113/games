@@ -112,6 +112,23 @@ export function turnIndicatorText(
   return connected ? `Waiting for ${name}` : `Waiting for ${name} — disconnected`;
 }
 
+/** UAT gap 37 (06.2, seventh owner review): the board-level "turn sign" copy
+ * — a separate, larger-scale announcement from `turnIndicatorText`'s
+ * existing small own-hand label, placed in the freed space below the
+ * discard/token area (see Table.tsx). Reads "{name}'s turn" for a
+ * teammate's turn, "Your turn!" for the viewer's own turn, and an empty
+ * string once the game has ended — it must never claim it is anyone's turn
+ * after the game is over, matching `turnIndicatorText`'s own `ended` rule. */
+export function turnSignText(
+  game: Pick<HanabiView, "isYourTurn" | "activeSeatId">,
+  labelFor: (seatId: string) => string,
+  ended = false,
+): string {
+  if (ended) return "";
+  if (game.isYourTurn) return "Your turn!";
+  return `${labelFor(game.activeSeatId)}'s turn`;
+}
+
 /** The variant's nameable colours — never includes "rainbow" in the
  * rainbow variant (rainbow is touched by every colour clue but is never
  * itself a nameable clue colour). */
