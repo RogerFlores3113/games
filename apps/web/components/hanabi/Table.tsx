@@ -357,13 +357,25 @@ export function Table({
           </div>
         </div>
 
+        {/* UAT gap 31 (fifth owner review): the highlight ring lives on this
+            OUTER div, which does NOT clip its own overflow — a box-shadow
+            painted on a self-clipping element gets clipped by its own
+            bounds in Chromium (the compact discard strip's tight padding
+            left no headroom, unlike the Play area's roomier wrapper), so
+            the ring rendered as a barely-visible sliver instead of the same
+            clean glow the Play area shows. The actual "clip a pile deeper
+            than DISCARD_ROWS" behavior moves to the INNER div below, which
+            keeps `overflow-hidden` — only pile CONTENT is clipped now, never
+            the hover highlight painted on the zone around it. Reuses the
+            exact same `dropZoneHighlightStyle` output Play already uses —
+            no second highlight style invented. */}
         <div
           ref={discardZoneRef}
           data-testid="discard-pile"
           data-discard-count={game.discard.length}
           data-view={view}
           data-drop-state={discardDropState}
-          className="relative flex flex-1 flex-wrap items-start gap-[length:var(--space-xs)] overflow-hidden rounded-md"
+          className="relative flex min-h-0 flex-1 rounded-md"
           style={discardHighlight}
         >
           {dropStatus && !dropStatus.discard.enabled && dropStatus.discard.reason && (
@@ -385,53 +397,55 @@ export function Table({
               {dropStatus.discard.reason}
             </span>
           )}
-          {orderedDiscard.length > 0 ? (
-            orderedDiscard.map((card) => {
-              const dragging = discardDragState?.cardId === card.id;
-              // D-20: mirrors OwnHandCard's drag-lift transform — tracks
-              // the pointer via translate while dragging, no continuous
-              // animation otherwise (drag-snap handles the release).
-              const dragTransform =
-                dragging && discardDragState
-                  ? `translate(${discardDragState.offset.x}px, ${discardDragState.offset.y}px) scale(1.05)`
-                  : undefined;
-              return (
-                <span
-                  key={card.id}
-                  ref={(el) => registerDiscardTile?.(card.id, el)}
-                  data-testid={`discard-tile-${card.id}`}
-                  data-dragging={String(dragging)}
-                  onPointerDown={(event) => onDiscardTilePointerDown?.(card.id, event)}
-                  className={
-                    "relative inline-flex flex-col items-center" +
-                    (dragging ? " cursor-grabbing" : " cursor-grab") +
-                    (dragging ? "" : " drag-snap")
-                  }
-                  style={{
-                    transform: dragTransform,
-                    zIndex: dragging ? 10 : undefined,
-                    touchAction: "none",
-                  }}
-                >
-                  <FireworkCardFace
-                    suit={card.suit}
-                    rank={card.rank}
-                    width={DISCARD_TILE_WIDTH_PX}
-                    height={DISCARD_TILE_HEIGHT_PX}
-                  />
-                  <span className="sr-only">{`${SUIT_VISUALS[card.suit].label} ${card.rank}`}</span>
-                </span>
-              );
-            })
-          ) : (
-            // UAT gap 24 (fourth owner review): "remove the 'No tiles
-            // discarded yet'" — empty means empty, no placeholder copy
-            // visible on screen; the "Discard" label above already names
-            // the region, so an sr-only equivalent is enough for screen
-            // readers/tests (matches gap 6's "accessible but not obtrusive"
-            // precedent).
-            <p className="sr-only">No tiles discarded yet</p>
-          )}
+          <div className="flex min-h-0 flex-1 flex-wrap items-start gap-[length:var(--space-xs)] overflow-hidden rounded-md">
+            {orderedDiscard.length > 0 ? (
+              orderedDiscard.map((card) => {
+                const dragging = discardDragState?.cardId === card.id;
+                // D-20: mirrors OwnHandCard's drag-lift transform — tracks
+                // the pointer via translate while dragging, no continuous
+                // animation otherwise (drag-snap handles the release).
+                const dragTransform =
+                  dragging && discardDragState
+                    ? `translate(${discardDragState.offset.x}px, ${discardDragState.offset.y}px) scale(1.05)`
+                    : undefined;
+                return (
+                  <span
+                    key={card.id}
+                    ref={(el) => registerDiscardTile?.(card.id, el)}
+                    data-testid={`discard-tile-${card.id}`}
+                    data-dragging={String(dragging)}
+                    onPointerDown={(event) => onDiscardTilePointerDown?.(card.id, event)}
+                    className={
+                      "relative inline-flex flex-col items-center" +
+                      (dragging ? " cursor-grabbing" : " cursor-grab") +
+                      (dragging ? "" : " drag-snap")
+                    }
+                    style={{
+                      transform: dragTransform,
+                      zIndex: dragging ? 10 : undefined,
+                      touchAction: "none",
+                    }}
+                  >
+                    <FireworkCardFace
+                      suit={card.suit}
+                      rank={card.rank}
+                      width={DISCARD_TILE_WIDTH_PX}
+                      height={DISCARD_TILE_HEIGHT_PX}
+                    />
+                    <span className="sr-only">{`${SUIT_VISUALS[card.suit].label} ${card.rank}`}</span>
+                  </span>
+                );
+              })
+            ) : (
+              // UAT gap 24 (fourth owner review): "remove the 'No tiles
+              // discarded yet'" — empty means empty, no placeholder copy
+              // visible on screen; the "Discard" label above already names
+              // the region, so an sr-only equivalent is enough for screen
+              // readers/tests (matches gap 6's "accessible but not obtrusive"
+              // precedent).
+              <p className="sr-only">No tiles discarded yet</p>
+            )}
+          </div>
         </div>
       </div>
 

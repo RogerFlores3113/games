@@ -572,6 +572,50 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await contextB.close();
   });
 
+  test("UAT gap 31: the discard zone gains the same highlight as the play zone while a tile is dragged over it", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
+
+    // Discard is illegal at the max 8 clue tokens (standard rule) — give a
+    // clue first so the discard zone is actually enabled for this drag.
+    await giveAnyLegalClueToAnyTeammate(activePage);
+    await expect(passivePage.getByTestId("turn-indicator")).toHaveText("Your turn");
+
+    const nowActive = passivePage;
+    const slot = nowActive.getByTestId("own-hand-slot-1");
+    const discardZone = nowActive.getByTestId("discard-pile");
+
+    const sourceBox = await slot.boundingBox();
+    const discardBox = await discardZone.boundingBox();
+    if (!sourceBox || !discardBox) throw new Error("missing bounding box");
+
+    const sourceCenter = { x: sourceBox.x + sourceBox.width / 2, y: sourceBox.y + sourceBox.height / 2 };
+    const discardCenter = { x: discardBox.x + discardBox.width / 2, y: discardBox.y + discardBox.height / 2 };
+
+    const shadowBefore = await discardZone.evaluate((el) => getComputedStyle(el).boxShadow);
+    expect(shadowBefore).toBe("none");
+
+    await nowActive.mouse.move(sourceCenter.x, sourceCenter.y);
+    await nowActive.mouse.down();
+    // Clear the app's own drag threshold before resolving a drop target.
+    await nowActive.mouse.move(sourceCenter.x + 10, sourceCenter.y + 10, { steps: 2 });
+    await nowActive.mouse.move(discardCenter.x, discardCenter.y, { steps: 12 });
+
+    await expect(discardZone).toHaveAttribute("data-drop-state", "enabled");
+    const shadowWhileHovered = await discardZone.evaluate((el) => getComputedStyle(el).boxShadow);
+    expect(shadowWhileHovered).not.toBe("none");
+    // Reuses the exact same drop-zone highlight style the play zone uses
+    // (dropZoneHighlightStyle in Table.tsx) — not a second, invented style.
+    expect(shadowWhileHovered).toContain("4px");
+
+    await nowActive.mouse.move(-200, -200, { steps: 5 });
+    await nowActive.mouse.up();
+
+    await contextB.close();
+  });
+
   test("settings modal: the gear opens a dialog holding every relocated preference control, and Escape closes it without disturbing the board", async ({
     page: hostPage,
     browser,
