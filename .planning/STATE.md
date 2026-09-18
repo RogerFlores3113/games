@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_plan: 11
-status: executing
-stopped_at: Completed 06.2-10-PLAN.md
-last_updated: "2026-09-17T23:17:34.719Z"
-last_activity: 2026-09-17
+status: verifying
+stopped_at: Completed 06.2-12-PLAN.md
+last_updated: "2026-09-18T01:13:46.355Z"
+last_activity: 2026-09-18
 progress:
   total_phases: 9
   completed_phases: 7
-  total_plans: 70
-  completed_plans: 69
+  total_plans: 79
+  completed_plans: 70
   percent: 78
 ---
 
@@ -30,10 +30,10 @@ Phase: 06.2
 Plan: 11 of 11
 Current Plan: 11
 Total Plans in Phase: 11
-Status: Ready to execute
-Last activity: 2026-09-17
+Status: Phase complete — ready for verification
+Last activity: 2026-09-18
 
-Progress: [██████████] 99%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -130,6 +130,7 @@ Progress: [██████████] 99%
 | Phase 06.2 P08 | 35min | 3 tasks | 7 files |
 | Phase 06.2 P09 | 25min | 2 tasks | 7 files |
 | Phase 06.2 P10 | 70min | 3 tasks | 5 files |
+| Phase 06.2 P12 | ~45min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -278,6 +279,7 @@ Recent decisions affecting current work:
 - [Phase ?]: 06.2-09: shift-aside transform lives on a new wrapper div around OwnHandCard's button, composed with (not replacing) the button's own drag-follow transform
 - [Phase ?]: 06.2-09: slot pitch measured from registered rects sorted by physical left position, not Map insertion order, to stay correct across a mid-drag optimistic reorder
 - [Phase 06.2]: 06.2-10: exercised Black variant at 5 seats for the UI-11 worst case (already selectable end to end) — Fixed a real bottom-controls-row overflow this exposed for 6-colour variants (CluePicker reordered to be the row's last child); no layout-budget.ts constant needed to change
+- [Phase 06.2-12]: Sourced wood-board.webp and city-fireworks.webp from Wikimedia Commons (CC BY-SA 3.0 / CC BY 2.0), replacing the owner-rejected CSS-generated board texture and the plain city-night background per UAT gaps 2 and 9
 
 ### Pending Todos
 
@@ -300,6 +302,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-17T23:17:34.711Z
-Stopped at: Completed 06.2-10-PLAN.md
+Last session: 2026-09-18T01:13:30.146Z
+Stopped at: Completed 06.2-12-PLAN.md
 Resume file: None
