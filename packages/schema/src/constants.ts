@@ -39,11 +39,22 @@ export const SEAT_TOKEN_LENGTH = 24;
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 5;
 
-/** D-02: 1 hour idle for a lobby that never started. */
-export const IDLE_GC_LOBBY_MS = 60 * 60 * 1000;
+/** Owner request (2026-09-18): every room — lobby, in-progress, or ended —
+ * is garbage-collected 24 hours after its LAST ACTIVITY, never from
+ * creation. `computeRoomTimers` (scheduler.ts) derives `idle_gc` from
+ * `state.lastActivityAt` for every status, so an ended room with nobody
+ * watching the end screen is swept exactly like an idle lobby. WR-02 still
+ * holds: a room with a live seated socket is never idle (`deferIdleGc`
+ * restarts this clock from `now`), so an active game is never deleted
+ * mid-play. Previously 1 hour (lobby) / 12 hours (in-progress); both
+ * collapsed into one 24-hour constant used for every status. */
+export const IDLE_GC_LOBBY_MS = 24 * 60 * 60 * 1000;
 
-/** D-02: 12 hours idle for a room with a game in progress. */
-export const IDLE_GC_IN_PROGRESS_MS = 12 * 60 * 60 * 1000;
+/** See `IDLE_GC_LOBBY_MS` — kept as a distinct export (rather than deleting
+ * it and inlining one constant) so `scheduler.ts`'s per-status branch and
+ * any caller that still imports both names by status keeps compiling; both
+ * now resolve to the same 24-hour window. */
+export const IDLE_GC_IN_PROGRESS_MS = 24 * 60 * 60 * 1000;
 
 /** D-07: host auto-transfers to the next connected seat after 20s
  * disconnected, in the lobby only. Must stay SHORTER than

@@ -52,6 +52,22 @@ export type HanabiState = {
   readonly history: readonly HistoryEntry[];
 };
 
+/** Back-compat tolerance for rooms persisted before `discardOrder` existed
+ * (added after this field's introduction to `HanabiState`/`RoomStateSchema`
+ * — the ROOM layer's `game` field is `z.unknown()`, so an old blob loads
+ * without error and simply lacks this key at runtime, even though the
+ * compile-time type says it is always present). `applyHanabiAction` and
+ * `toHanabiPlayerView` are the two entry points a persisted-but-stale state
+ * value first reaches (RESEARCH.md/D-07 boundary), so both call this FIRST,
+ * before touching `state.discardOrder` at all. Defaults to the discard
+ * pile's OWN existing order (its ids in array order) rather than `[]`, so an
+ * old room's discard pile still renders in a stable, already-true order
+ * instead of resetting to empty and letting new discards reorder around it. */
+export function withDiscardOrderFallback(state: HanabiState): HanabiState {
+  if (Array.isArray(state.discardOrder)) return state;
+  return { ...state, discardOrder: state.discard.map((card) => card.id) };
+}
+
 export type HanabiAction =
   | { readonly type: "play"; readonly cardId: string }
   | { readonly type: "discard"; readonly cardId: string }

@@ -30,6 +30,7 @@ import type {
   HandSlot,
   HistoryEntryView,
 } from "./state";
+import { withDiscardOrderFallback } from "./state";
 import type { HistoryEntry } from "./history";
 
 function toClueFactsView(facts: ClueFacts): ClueFactsView {
@@ -101,7 +102,11 @@ function toHistoryEntryView(entry: HistoryEntry): HistoryEntryView {
 /** Projects `state` for exactly one seat. Pure: calling this twice for the
  * same (state, seatId) returns deep-equal views and never returns `state`
  * itself or any of its nested arrays by reference. */
-export function toHanabiPlayerView(state: HanabiState, seatId: string): HanabiView {
+export function toHanabiPlayerView(rawState: HanabiState, seatId: string): HanabiView {
+  // Tolerate a room persisted before `discardOrder` existed — see
+  // `withDiscardOrderFallback`'s doc comment. Must run before the
+  // `state.discardOrder` spread below.
+  const state = withDiscardOrderFallback(rawState);
   const activeSeatId = state.seatIds[state.turnIndex] as string;
   const stacks = state.stacks.map((s) => ({ suit: s.suit, topRank: s.topRank }));
   const discard = state.discard.map((c) => ({ id: c.id, suit: c.suit, rank: c.rank }));

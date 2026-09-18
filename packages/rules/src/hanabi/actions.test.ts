@@ -690,3 +690,25 @@ describe("applyAction", () => {
     });
   });
 });
+
+describe("back-compat: applyHanabiAction tolerates a state with no discardOrder key", () => {
+  it("a discard action against a legacy state (no discardOrder) does not throw and appends to a freshly-derived order", () => {
+    const state = baseState();
+    const legacyState = { ...state } as HanabiState;
+    delete (legacyState as { discardOrder?: unknown }).discardOrder;
+
+    expect(() =>
+      applyHanabiAction(legacyState, "seat-a", { type: "discard", cardId: "seat-a-1" }),
+    ).not.toThrow();
+
+    const result = applyHanabiAction(legacyState, "seat-a", {
+      type: "discard",
+      cardId: "seat-a-1",
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected success");
+    // Legacy discard pile was empty, so the derived fallback order starts
+    // empty and this discard's card id appends to the end (D-23).
+    expect(result.state.discardOrder).toEqual(["seat-a-1"]);
+  });
+});

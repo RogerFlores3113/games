@@ -51,6 +51,7 @@ import type {
   HistoryEntry,
   StackEntry,
 } from "./state";
+import { withDiscardOrderFallback } from "./state";
 
 /** Accepts ONLY an object whose own keys are exactly "type" and "cardId",
  * with type === "play" and cardId a string. Any extra own key (e.g. a
@@ -526,12 +527,17 @@ function applyReorderDiscard(
  * Every legality refusal comes from `legality.ts`'s exported predicates —
  * this function never re-derives a check locally. */
 export function applyHanabiAction(
-  state: HanabiState,
+  rawState: HanabiState,
   actorSeatId: string,
   request: unknown,
 ): AdapterResult<HanabiState> {
   const action = parseHanabiRequest(request);
   if (action === null) return { ok: false, error: "invalid_action" };
+
+  // Tolerate a room persisted before `discardOrder` existed (see
+  // `withDiscardOrderFallback`'s doc comment) BEFORE any branch below reads
+  // `state.discardOrder`.
+  const state = withDiscardOrderFallback(rawState);
 
   if (action.type === "play") return applyPlay(state, actorSeatId, action.cardId);
   if (action.type === "discard") return applyDiscard(state, actorSeatId, action.cardId);

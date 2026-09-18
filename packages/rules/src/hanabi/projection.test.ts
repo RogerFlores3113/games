@@ -246,3 +246,31 @@ describe("toHanabiPlayerView", () => {
     );
   });
 });
+
+describe("back-compat: rooms persisted before discardOrder existed", () => {
+  it("toHanabiPlayerView tolerates a state with no discardOrder key at all, defaulting to the discard pile's own order", () => {
+    const state = buildState("base");
+    // Simulate a room saved on the live server before discardOrder shipped:
+    // the room layer's `game` field is `z.unknown()` (persistence.ts), so an
+    // old blob loads without error and simply lacks this key at runtime, even
+    // though HanabiState's compile-time type says it is always present. This
+    // is why the cast is needed — it is reproducing a real persisted shape,
+    // not a type error in this test.
+    const legacyState = { ...state, discard: [], history: [] } as HanabiState;
+    delete (legacyState as { discardOrder?: unknown }).discardOrder;
+
+    expect(() => toHanabiPlayerView(legacyState, legacyState.seatIds[0]!)).not.toThrow();
+    const view = toHanabiPlayerView(legacyState, legacyState.seatIds[0]!);
+    expect(view.discardOrder).toEqual([]);
+  });
+
+  it("defaults discardOrder to the discard pile's existing ids when both are present but discardOrder is missing", () => {
+    const state = buildState("base");
+    const discard = [{ id: "card-1", suit: state.stacks[0]!.suit, rank: 1 as const }];
+    const legacyState = { ...state, discard } as HanabiState;
+    delete (legacyState as { discardOrder?: unknown }).discardOrder;
+
+    const view = toHanabiPlayerView(legacyState, legacyState.seatIds[0]!);
+    expect(view.discardOrder).toEqual(["card-1"]);
+  });
+});
