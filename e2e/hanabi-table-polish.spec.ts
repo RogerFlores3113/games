@@ -151,8 +151,8 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await expect(passivePage.getByTestId("drop-reason-play")).toBeVisible();
     await passivePage.mouse.up();
 
-    await expect(passivePage.getByTestId("deck-count")).toHaveText(`${deckBeforeOffTurn} cards left in deck`);
-    await expect(hostPage.getByTestId("deck-count")).toHaveText(`${deckBeforeOffTurn} cards left in deck`);
+    await expect(passivePage.getByTestId("deck-count")).toHaveText(`${deckBeforeOffTurn} x`);
+    await expect(hostPage.getByTestId("deck-count")).toHaveText(`${deckBeforeOffTurn} x`);
     expect(await ownHandCardIds(passivePage)).toEqual(orderBefore);
 
     // The active player drags slot 1 onto the play zone: a real play.

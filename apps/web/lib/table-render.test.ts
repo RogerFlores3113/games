@@ -101,11 +101,16 @@ describe("table-render: board skeleton (Task 1)", () => {
   // this render site stops reflecting `deckCount`, e.g. a future edit that
   // hoists `deckCountText(game)` into a `useMemo` with incomplete deps, or
   // that swaps `game.deckCount` for a locally-held snapshot.
-  it("UAT gap 18: deck-count's text tracks a changing deckCount prop", () => {
+  //
+  // UAT gap 21 (third owner review): the deck counter's on-screen text
+  // changed from "{n} cards left in deck" to "{n} x [card back]" — this
+  // guard is updated to the new format, still reading `game.deckCount`
+  // directly so a regression is still caught immediately.
+  it("UAT gap 18/21: deck-count's text tracks a changing deckCount prop, rendered as '{n} x'", () => {
     const full = render(BASE_GAME);
     const drawnDown = render({ ...BASE_GAME, deckCount: BASE_GAME.deckCount - 7 });
-    expect(full).toContain(`${BASE_GAME.deckCount} cards left in deck`);
-    expect(drawnDown).toContain(`${BASE_GAME.deckCount - 7} cards left in deck`);
+    expect(full).toContain(`${BASE_GAME.deckCount} x`);
+    expect(drawnDown).toContain(`${BASE_GAME.deckCount - 7} x`);
     expect(full).not.toEqual(drawnDown);
   });
 });

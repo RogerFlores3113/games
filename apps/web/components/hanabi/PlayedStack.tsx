@@ -47,6 +47,15 @@ const HEADER_HEIGHT_PX = STACK_HEADER_HEIGHT_PX;
  * element — so the root's inline `style` (width/height only) is byte-
  * identical at topRank 0 and topRank 5, which is what proves an empty slot
  * costs exactly what a filled one does (UAT gap 1).
+ *
+ * UAT gap 19 (third owner review, "the slots for the play area should be
+ * blank — just put the tiles down once they get there"): an unfilled rank
+ * slot renders NOTHING visible — no border, no background, no ghost box.
+ * It is a plain, zero-decoration `<span>` sized to `RANK_SLOT_WIDTH_PX` x
+ * `RANK_SLOT_HEIGHT_PX` — the space is still reserved (fixed geometry,
+ * unchanged from gap 1/3), it just paints nothing until a real tile lands
+ * there. `data-testid`/`data-filled="false"` are kept so e2e/sr tooling can
+ * still locate the reserved slot.
  */
 export function PlayedStack({ stack, flashing = false }: PlayedStackProps) {
   const { suit, topRank } = stack;
@@ -89,11 +98,10 @@ export function PlayedStack({ stack, flashing = false }: PlayedStackProps) {
               key={rank}
               data-testid={`played-slot-${suit}-${rank}`}
               data-filled="false"
-              className="block rounded-md"
+              className="block"
               style={{
                 width: RANK_SLOT_WIDTH_PX,
                 height: RANK_SLOT_HEIGHT_PX,
-                border: "1px solid var(--color-border)",
               }}
             />
           );

@@ -157,14 +157,14 @@ describe("token-render: TokenColumn", () => {
     expect(withoutComments).not.toMatch(/opacity|dim/i);
   });
 
-  it("token discs render at TOKEN_DISC_PX (2x the pre-review 20px size) regardless of remaining count", () => {
+  it("token discs render at TOKEN_DISC_PX (UAT gap 20: the prior 40px size cut by roughly a third, 27px) regardless of remaining count", () => {
     const markup = renderToStaticMarkup(
       createElement(TokenColumn, { clueTokens: MAX_CLUE_TOKENS, fusesRemaining: MAX_FUSE_TOKENS }),
     );
     const widths = [...markup.matchAll(/<svg viewBox="0 0 24 24" width="([0-9.]+)"/g)].map((m) => Number(m[1]));
     expect(widths.length).toBe(MAX_CLUE_TOKENS + MAX_FUSE_TOKENS);
     for (const w of widths) {
-      expect(w).toBe(40);
+      expect(w).toBe(27);
     }
   });
 

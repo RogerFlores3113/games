@@ -17,6 +17,8 @@ import {
   TABLE_BAND_MIN_PX,
   TEAMMATE_BAND_PX,
   TOKEN_AREA_HEIGHT_PX,
+  TOKEN_COLUMN_TOTAL_HEIGHT_PX,
+  TOKEN_DISC_PX,
   VIEWPORT_TEST_HEIGHT_PX,
   discardCompactHeightPx,
   playAreaContentHeightPx,
@@ -34,71 +36,68 @@ describe("layout-budget", () => {
 
   it("TEAMMATE_BAND_PX has no marks-band constant (HINT-04 removes the pip band)", () => {
     expect((layoutBudget as Record<string, unknown>).MARKS_BAND_PX).toBeUndefined();
-    // fix(06.2-21): corrected 140 -> 110 — the vertical Play/Deck/Discard
-    // stack needs the height back; TeammateHand's slimmed chrome (no
-    // border/box-shadow/padding wrapper) funds this reduction.
-    // fix(06.2-19): corrected 110 -> 111 — a real-browser re-measurement of
-    // `teammates-band` at the worst case came in at 110.5px, 0.5px over the
-    // ledger; corrected up so the constant never understates the rendered
-    // height (see TEAMMATE_BAND_PX's own doc comment).
     expect(TEAMMATE_BAND_PX).toBe(111);
   });
 
   it("OWN_BAND_PX has no marks-band constant (HINT-04 removes the pip band)", () => {
     expect((layoutBudget as Record<string, unknown>).MARKS_BAND_PX).toBeUndefined();
-    // fix(06.2, UAT gap 16): corrected 310 -> 193 — deleting `CluePicker`
-    // (the large clue-target/clue-value menu) removes the third stacked
-    // line bottom-controls-row used to carry; clue-giving now happens via
-    // each opponent tile's own quick-clue popover, an absolutely-positioned
-    // overlay that adds zero flow height. Real-browser measurement at the
-    // 1280x720 floor (5 seats, Black variant) confirmed 193px.
     expect(OWN_BAND_PX).toBe(193);
   });
 
-  it("BOARD_INNER_PX is Play + gap + Deck + gap + compact Discard, stacked (06.2-21)", () => {
-    expect(BOARD_INNER_PX).toBe(PLAY_AREA_HEIGHT_PX + MIDDLE_GAP_PX + DECK_COUNTER_PX + MIDDLE_GAP_PX + DISCARD_COMPACT_PX);
+  it("UAT gap 20: TOKEN_DISC_PX is the pre-review 40px cut by roughly a third", () => {
+    expect(TOKEN_DISC_PX).toBe(27);
   });
 
   it("playGridHeightPx is MAX_RANK slots at RANK_SLOT_HEIGHT_PX with RANK_SLOT_GAP_PX between them", () => {
-    // fix(post-06.2-21 follow-up): RANK_SLOT_HEIGHT_PX restored 24 -> 40
-    // (128 -> 208) once deleting the clue-menu (gap 16) freed enough
-    // OWN_BAND_PX height for the 1280x720 floor to afford the full-size
-    // grid again.
-    expect(playGridHeightPx()).toBe(208);
+    // fix(06.2-22, UAT gap 22): RANK_SLOT_HEIGHT_PX grown 40 -> 65 once
+    // Deck/Discard left the Play column and freed the vertical room it no
+    // longer has to share (208 -> 333).
+    expect(playGridHeightPx()).toBe(333);
   });
 
   it("playAreaContentHeightPx (label + gap + stack header + grid + padding) IS PLAY_AREA_HEIGHT_PX", () => {
     expect(playAreaContentHeightPx()).toBe(PLAY_AREA_HEIGHT_PX);
+    expect(PLAY_AREA_HEIGHT_PX).toBe(383);
   });
 
   it("playColumnWidthPx(MAX_SUITS) is the Rainbow/Black worst-case Play area width", () => {
-    // fix(post-06.2-21 follow-up): RANK_SLOT_WIDTH_PX restored 20 -> 30
-    // (148 -> 208).
-    expect(playColumnWidthPx(MAX_SUITS)).toBe(208);
+    // fix(06.2-22, UAT gap 22): RANK_SLOT_WIDTH_PX grown 30 -> 50
+    // (208 -> 328) — Play is now its own standalone region, no longer
+    // constrained to share a width with Deck/Discard.
+    expect(playColumnWidthPx(MAX_SUITS)).toBe(328);
   });
 
-  it("discardCompactHeightPx(DISCARD_ROWS) IS DISCARD_COMPACT_PX, and DISCARD_ROWS is 2 (post-06.2-21 follow-up)", () => {
+  it("discardCompactHeightPx(DISCARD_ROWS) IS DISCARD_COMPACT_PX, and DISCARD_ROWS is 5 (06.2-22, UAT gap 22)", () => {
     expect(discardCompactHeightPx(DISCARD_ROWS)).toBe(DISCARD_COMPACT_PX);
-    expect(DISCARD_ROWS).toBe(2);
-    expect(DISCARD_COMPACT_PX).toBe(78);
+    expect(DISCARD_ROWS).toBe(5);
+    expect(DISCARD_COMPACT_PX).toBe(156);
   });
 
-  it("Play/Deck/compact-Discard heights plus their gaps equal BOARD_INNER_PX exactly", () => {
-    expect(PLAY_AREA_HEIGHT_PX + MIDDLE_GAP_PX + DECK_COUNTER_PX + MIDDLE_GAP_PX + DISCARD_COMPACT_PX).toBe(
-      BOARD_INNER_PX,
-    );
+  it("TOKEN_COLUMN_TOTAL_HEIGHT_PX is the token run plus a gap plus the Deck counter (UAT gap 21)", () => {
+    expect(TOKEN_COLUMN_TOTAL_HEIGHT_PX).toBe(TOKEN_AREA_HEIGHT_PX + MIDDLE_GAP_PX + DECK_COUNTER_PX);
+    expect(TOKEN_COLUMN_TOTAL_HEIGHT_PX).toBe(156);
+  });
+
+  it("BOARD_INNER_PX is the MAX of Play / token+deck column / Discard, since gap 19-22 made them side-by-side regions, not a stack", () => {
+    expect(BOARD_INNER_PX).toBe(Math.max(PLAY_AREA_HEIGHT_PX, TOKEN_COLUMN_TOTAL_HEIGHT_PX, DISCARD_COMPACT_PX));
+    expect(BOARD_INNER_PX).toBe(PLAY_AREA_HEIGHT_PX);
+    expect(BOARD_INNER_PX).toBe(383);
+  });
+
+  it("TABLE_BAND_MIN_PX is BOARD_INNER_PX plus the board panel's own top+bottom padding", () => {
+    expect(TABLE_BAND_MIN_PX).toBe(399);
   });
 
   it("TOKEN_AREA_HEIGHT_PX fits within BOARD_INNER_PX", () => {
     expect(TOKEN_AREA_HEIGHT_PX).toBeLessThanOrEqual(BOARD_INNER_PX);
   });
 
-  it("tokenRunHeightPx(MAX_CLUE_TOKENS, CLUE_TOKEN_COLUMNS) is 172", () => {
-    expect(tokenRunHeightPx(MAX_CLUE_TOKENS, CLUE_TOKEN_COLUMNS)).toBe(172);
+  it("tokenRunHeightPx(MAX_CLUE_TOKENS, CLUE_TOKEN_COLUMNS) is 120 at the gap-20 disc size", () => {
+    expect(tokenRunHeightPx(MAX_CLUE_TOKENS, CLUE_TOKEN_COLUMNS)).toBe(120);
   });
 
-  it("tokenRunHeightPx(MAX_FUSE_TOKENS, 1) is 128", () => {
-    expect(tokenRunHeightPx(MAX_FUSE_TOKENS, 1)).toBe(128);
+  it("tokenRunHeightPx(MAX_FUSE_TOKENS, 1) is 89 at the gap-20 disc size", () => {
+    expect(tokenRunHeightPx(MAX_FUSE_TOKENS, 1)).toBe(89);
   });
 
   it("tokenRunHeightPx returns 0 for an empty run", () => {

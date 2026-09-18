@@ -28,14 +28,17 @@ const FUSE_RUN_HEIGHT_PX = tokenRunHeightPx(MAX_FUSE_TOKENS, 1);
  * Owner review (06.2-14, UAT gaps 1/4/5/6): the token area is now a FIXED
  * reservation, not one derived from a caller-supplied height. It always
  * renders `MAX_CLUE_TOKENS` clue slots (2 columns x 4 rows) and
- * `MAX_FUSE_TOKENS` fuse slots (1 column), each `TOKEN_DISC_PX` (40px, 2x
- * the pre-review 20px disc size) square, whether or not the token remains —
- * a spent token's slot stays reserved but empty (BOARD-03, D-19: removed
- * from the DOM, never dimmed or faded in place). The visible "{n} clues
- * left" / "{n} fuses left" text is gone from the board (UAT gap 6); it
- * survives only as an `sr-only` span inside the same fixed-size run
- * container so screen readers, `table-render.test.ts` and the Playwright
- * specs reading `textContent` all still see it.
+ * `MAX_FUSE_TOKENS` fuse slots (1 column), each `TOKEN_DISC_PX` square,
+ * whether or not the token remains — a spent token's slot stays reserved
+ * but empty (BOARD-03, D-19: removed from the DOM, never dimmed or faded in
+ * place). The visible "{n} clues left" / "{n} fuses left" text is gone from
+ * the board (UAT gap 6); it survives only as an `sr-only` span inside the
+ * same fixed-size run container so screen readers, `table-render.test.ts`
+ * and the Playwright specs reading `textContent` all still see it.
+ *
+ * Third owner review (06.2-22, UAT gap 20, "Hint tokens and Fuses are too
+ * large — cut by 33%"): `TOKEN_DISC_PX` cut from the second-review 40px
+ * (2x the original 20px) down to 27px.
  *
  * Filled slots are clamped to `MAX_CLUE_TOKENS`/`MAX_FUSE_TOKENS`
  * (T-06.2-35) so a malformed frame reporting an out-of-range count cannot

@@ -263,8 +263,8 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     await expect(activePage.getByTestId("play-button")).toBeEnabled();
     await activePage.getByTestId("play-button").click();
 
-    await expect(hostPage.getByTestId("deck-count")).toHaveText(`${initialDeckNumber - 1} cards left in deck`);
-    await expect(pageB.getByTestId("deck-count")).toHaveText(`${initialDeckNumber - 1} cards left in deck`);
+    await expect(hostPage.getByTestId("deck-count")).toHaveText(`${initialDeckNumber - 1} x`);
+    await expect(pageB.getByTestId("deck-count")).toHaveText(`${initialDeckNumber - 1} x`);
 
     await expect(async () => {
       const discardCount = Number(
@@ -581,21 +581,26 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     const playBox = await hostPage.getByTestId("play-zone").boundingBox();
     const deckBox = await hostPage.getByTestId("deck-count").boundingBox();
     const discardBox = await hostPage.getByTestId("discard-pile").boundingBox();
-    if (!playBox || !deckBox || !discardBox) throw new Error("missing bounding box");
-
-    // BOARD-04: the deck counter sits between Play and Discard in document
-    // order (proven here by vertical position, since the left column is a
-    // flex-col of exactly Play/Deck/Discard) and shows the remaining count
-    // beside the tile back.
-    expect(playBox.y).toBeLessThan(deckBox.y);
-    expect(deckBox.y).toBeLessThan(discardBox.y);
-    await expect(hostPage.getByTestId("deck-count")).toHaveText(/^\d+ cards left in deck$/);
-
-    // BOARD-02: the token column sits to the right of the left (Play/Deck/
-    // Discard) column.
     const clueTokensBox = await hostPage.getByTestId("clue-tokens").boundingBox();
-    if (!clueTokensBox) throw new Error("missing bounding box");
+    const fuseTokensBox = await hostPage.getByTestId("fuse-tokens").boundingBox();
+    if (!playBox || !deckBox || !discardBox || !clueTokensBox || !fuseTokensBox) {
+      throw new Error("missing bounding box");
+    }
+
+    // BOARD-02: the token column sits to the right of Play.
     expect(clueTokensBox.x).toBeGreaterThan(playBox.x + playBox.width);
+
+    // UAT gap 21 (third owner review): the deck counter sits BELOW the
+    // clue/fuse tokens, in the same narrow right-hand column, and shows
+    // "{n} x [card back]" rather than the old "{n} cards left in deck".
+    expect(deckBox.y).toBeGreaterThan(clueTokensBox.y + clueTokensBox.height);
+    expect(deckBox.y).toBeGreaterThan(fuseTokensBox.y + fuseTokensBox.height);
+    await expect(hostPage.getByTestId("deck-count")).toHaveText(/^\d+ x$/);
+
+    // UAT gap 22 (third owner review): Discard sits to the RIGHT of the
+    // clue/fuse token column, not stacked underneath Play any more.
+    expect(discardBox.x).toBeGreaterThan(clueTokensBox.x + clueTokensBox.width);
+    expect(discardBox.x).toBeGreaterThan(fuseTokensBox.x + fuseTokensBox.width);
 
     // BOARD-02/03: the clue-token element count and text track the
     // remaining clue count, and drop by one after a clue is given.

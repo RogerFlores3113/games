@@ -20,55 +20,31 @@
  * suit-column grid (`playGridHeightPx`/`playColumnWidthPx`), five rank
  * slots per suit, all five always reserved whether filled or not.
  *
- * Owner review (06.2-21, vertical stack restored): the owner's literal
- * layout — Play at the TOP, the deck count between, Discard at the BOTTOM,
- * clue/fuse tokens in a column to the RIGHT — is restored. 06.2-16's
- * side-by-side (Play left / Deck+Discard middle / Tokens right) build was a
- * documented tradeoff the owner rejected once shown it; the owner's fix was
- * "discard can be shrunk by default, clicking it will expand" plus slimming
- * the hand bands so the board gets the height the vertical stack needs.
- * `RANK_SLOT_HEIGHT_PX`/`RANK_SLOT_WIDTH_PX` were shrunk (40x30 -> 24x20) at
- * that point — a real-browser 1280x720 measurement (5 seats, Black variant)
- * showed hand-slimming alone could not fund the ~230px the full-size grid
- * would have needed. `DISCARD_COMPACT_PX` replaced `DISCARD_AREA_PX` — the
- * compact strip was a single clipped row; the existing `DiscardOverlay`
- * (unchanged) is what reads the full pile.
+ * Owner review (06.2-21, vertical stack, superseded — see below): Play at
+ * the TOP, the deck count between, Discard at the BOTTOM, clue/fuse tokens
+ * in a column to the RIGHT — all sharing the left column's fixed width.
  *
- * Post-06.2-21 follow-up (spend the height gap 16's CluePicker deletion
- * freed): `OWN_BAND_PX` dropping 310 -> 193 left ~117px of real slack at the
- * 1280x720 floor (measured before: 110.5 + 294 + 193 + 6 = 603.5). That
- * slack is spent back on the rank-slot grid FIRST (restored fully to the
- * pre-06.2-21 40x30 — an 80px `TABLE_BAND_MIN_PX` cost: 294 -> 374), with
- * what remains given to the compact Discard strip's reserved row count
- * (`DISCARD_ROWS`, 1 -> 2, a further 26px: 374 -> 400) so a second row of
- * the pile is visible before opening the full overlay. Real-browser
- * re-measurement at the same 1280x720 worst case (5 seats, Black variant)
- * after both changes: 110.5 + 400 + 193 + 6 = 709.5 — ~10.5px of real
- * slack kept rather than tuning back to exactly 720px.
- *
- * That re-measurement also surfaced a real Rule-1 bug in
- * `useDiscardDrag.ts`, unrelated to these pixel values in principle but
- * only exposed by them in practice: `buildTiles()` included the
- * currently-DRAGGED tile's own (pointer-following) rect in its drop-index
- * comparison set, which — because a `dragLocatorTo`-style grab starts
- * exactly at the tile's own center — put the very first comparison on a
- * sub-pixel tie a real browser's floating-point layout resolves
- * inconsistently. It is now excluded, matching `useHandDrag.ts`'s
- * always-static slot-rect model.
- *
- * 06.2-19 reconciliation pass (UI-11, gap-closure): a fresh real-browser
- * measurement at the same 1280x720 worst case (5 seats, Black variant, deep
- * discard pile past `DISCARD_ROWS`, an advanced stack, a spent clue token)
- * found `teammates-band=110.5`, `tableau=400` (exactly `TABLE_BAND_MIN_PX`
- * — the prior header comment's own `TABLE_BAND_MIN_PX + BOARD_CHROME_PX`
- * comparison double-counted `BOARD_CHROME_PX`, which is page-level chrome
- * outside `tableau`'s own box, not part of it; the e2e check is corrected
- * to compare `tableau` against `TABLE_BAND_MIN_PX` alone) and
- * `bottom-controls-row=193` (exact match, no change). Only
- * `TEAMMATE_BAND_PX` moved (110 -> 111, see its own comment) to stop
- * understating the measured 110.5px. New total: 111 + 400 + 193 +
- * `BOARD_CHROME_PX` (6) = 710, ~10px of real slack kept at the
- * `VIEWPORT_TEST_HEIGHT_PX` (720) floor.
+ * Third owner review (06.2-22, UAT gaps 19-22, "the slots for the play area
+ * should be blank... Hint tokens and Fuses are too large — cut by 33%. Put
+ * the 50 cards left in the deck as a '50 x [CARD IMAGE]', and put it below
+ * the hints and fuses icon. Then make the discard pile to the right of the
+ * hints and fuses. This should give us the real estate we need for a nice
+ * large board."): the tableau is now THREE side-by-side regions —
+ *   1. Play (left) — no longer sharing its column with Deck/Discard, so its
+ *      own reserved height/width can grow to use the space they vacated.
+ *   2. A narrow right-hand column: the clue/fuse token runs (now 33%
+ *      smaller, `TOKEN_DISC_PX` 40 -> 27) stacked above the Deck counter
+ *      (moved out of the Play column, now "{n} x [card back]" under the
+ *      tokens).
+ *   3. Discard, to the right of the token column.
+ * `BOARD_INNER_PX` (the tableau's total reserved inner height) is now the
+ * MAX of those three regions' own heights, not their sum — Play dominates
+ * (383px) so the reserved height a real-browser render needs is unchanged
+ * in practice (`TABLE_BAND_MIN_PX` 400 -> 399, within the existing 06.2-19
+ * measurement tolerance), which is what lets the freed vertical room fund a
+ * substantially larger `RANK_SLOT_WIDTH_PX`/`RANK_SLOT_HEIGHT_PX` (30x40 ->
+ * 50x65) without reopening the 1280x720 floor fit (see the total-fit test
+ * in layout-budget.test.ts: 111 + 193 + 399 + 6 = 709, 11px of slack kept).
  */
 
 /** Playwright's fixed viewport for the UI-11 no-scroll verification task. */
@@ -79,12 +55,6 @@ export const VIEWPORT_TEST_WIDTH_PX = 1280;
  * Page padding and inter-band gaps not attributed to any individual band
  * below — the fixed overhead the three main bands' sum must still fit
  * within, alongside VIEWPORT_TEST_HEIGHT_PX.
- *
- * fix(06.2): corrected 40 -> 16, matching the app's actual `gap-[3px]`/
- * `py-[3px]` main layout (measured: four 3px gaps ≈ 12px, plus a few px of
- * rounding), with a small margin kept rather than the fictional 40px this
- * was previously set to. See OWN_BAND_PX's comment for the full ledger
- * correction this phase's UI-11 fix required.
  *
  * fix(06.2, UAT gaps 13/14): corrected 16 -> 6. Moving Play/Discard above
  * the own hand (see OWN_BAND_PX) cost real height the 1280x720 floor did
@@ -130,16 +100,17 @@ export const MAX_RANK = 5;
 export const MAX_SUITS = 6;
 
 /**
- * A single rank slot's width/height. Shrunk from 30x40 to 20x24 at 06.2-21
- * (vertical stack restored) when the full-size grid did not fit alongside
- * the vertical Play/Deck/Discard stack; restored back to the full 30x40
- * post-06.2-21 once deleting the clue-menu (gap 16) freed enough OWN_BAND_PX
- * height for the 1280x720 floor to afford it again — real-browser
- * measurement confirmed the fit (see this file's header comment).
+ * A single rank slot's width/height. UAT gap 22 (third owner review):
+ * grown 30x40 -> 50x65 — moving the Deck counter and Discard out of the
+ * Play column (gaps 21/22) freed the vertical room this column no longer
+ * has to share, and the Play area's own width was never part of the tight
+ * 1280x720 HEIGHT budget in the first place (only the vertical fit is
+ * scroll-checked), so it grows too. See this file's header comment for the
+ * full before/after ledger math.
  */
-export const RANK_SLOT_WIDTH_PX = 30;
-/** A single rank slot's height — restored to 40 post-06.2-21 (see above). */
-export const RANK_SLOT_HEIGHT_PX = 40;
+export const RANK_SLOT_WIDTH_PX = 50;
+/** A single rank slot's height — see RANK_SLOT_WIDTH_PX's comment. */
+export const RANK_SLOT_HEIGHT_PX = 65;
 /** Vertical gap between adjacent rank slots within one suit column. */
 export const RANK_SLOT_GAP_PX = 2;
 /** Horizontal gap between adjacent suit columns. */
@@ -156,7 +127,9 @@ export const STACK_HEADER_HEIGHT_PX = 20;
 /**
  * A suit column's rank grid height: `MAX_RANK` slots reserved top to bottom
  * whether filled or not, so a column's rendered height never changes as
- * cards are played (UAT gap 1).
+ * cards are played (UAT gap 1). UAT gap 19: an unfilled slot renders
+ * nothing visible (see PlayedStack.tsx) but still reserves this exact
+ * height/width — the grid's total footprint is unchanged by gap 19.
  */
 export function playGridHeightPx(): number {
   return MAX_RANK * RANK_SLOT_HEIGHT_PX + (MAX_RANK - 1) * RANK_SLOT_GAP_PX;
@@ -172,33 +145,41 @@ export function playColumnWidthPx(suitCount: number): number {
 
 /**
  * The Play area's total reserved width at the Rainbow/Black worst case (six
- * suit columns) — also the width of the whole left column (Play/Deck/
- * Discard all share this width, stacked, per the owner's literal layout).
+ * suit columns) — Play is now its own standalone left region (UAT gap
+ * 21/22 moved Deck/Discard out of this column), so this is ALSO the Play
+ * region's own rendered width, not shared with anything else.
  */
 export const PLAY_AREA_WIDTH_PX = playColumnWidthPx(MAX_SUITS);
 
 /**
  * The Play area's total reserved height: label row + gap + `PlayedStack`'s
  * own header row + the rank grid + the area's own top+bottom padding. This
- * IS the Play box's rendered height (06.2-21) — the vertical stack no
- * longer lets Play fill the whole column the way the 06.2-16 side-by-side
- * build did, so this function's return value is consumed directly rather
- * than only being an internal fit-check.
+ * IS the Play box's rendered height — consumed directly by Table.tsx, not
+ * merely an internal fit-check.
  */
 export function playAreaContentHeightPx(): number {
   return AREA_LABEL_PX + AREA_PADDING_PX + STACK_HEADER_HEIGHT_PX + playGridHeightPx() + 2 * AREA_PADDING_PX;
 }
 
-/** UI-SPEC Play area height (06.2-21) — see `playAreaContentHeightPx`. */
+/** UI-SPEC Play area height — see `playAreaContentHeightPx`. */
 export const PLAY_AREA_HEIGHT_PX = playAreaContentHeightPx();
 
-/** UI-SPEC deck-counter row height (small FireworkCardBack + "48" text, centered). */
-export const DECK_COUNTER_PX = 40;
-/** Gap between Play/Deck/Discard, stacked vertically (06.2-21). */
+/**
+ * UI-SPEC deck-counter row height (UAT gap 21: "{n} x [card back]", moved
+ * into the right-hand column below the clue/fuse tokens). Shrunk from the
+ * pre-gap-21 40px now that it sits in the narrow `TOKEN_AREA_WIDTH_PX`
+ * column rather than the wide Play-column width.
+ */
+export const DECK_COUNTER_PX = 32;
+/** A deck-counter card-back image's rendered width/height (UAT gap 21). */
+export const DECK_COUNTER_CARD_WIDTH_PX = 20;
+export const DECK_COUNTER_CARD_HEIGHT_PX = 28;
+/** Gap between the token run and the Deck counter, stacked vertically in
+ * the right-hand column (UAT gap 21), and reused for the horizontal gap
+ * between the three tableau regions (Play / tokens+deck / Discard). */
 export const MIDDLE_GAP_PX = 4;
 
-/** A compact discard tile's rendered width/height (06.2-21) — small enough
- * that the strip reads as "there are discards here", not a full pile. */
+/** A compact discard tile's rendered width/height. */
 export const DISCARD_TILE_WIDTH_PX = 16;
 export const DISCARD_TILE_HEIGHT_PX = 22;
 
@@ -207,13 +188,13 @@ export const DISCARD_TILE_HEIGHT_PX = 22;
 export const DISCARD_ROW_GAP_PX = 4;
 
 /**
- * Reserved discard-strip row count (post-06.2-21 follow-up: spending the
- * height gap 16's CluePicker deletion freed). 1 -> 2 — the strip's tile
- * container already wraps (`flex-wrap`), so a taller reservation surfaces a
- * second row of the pile before `discard-toggle` opens the full
- * `DiscardOverlay`, with no Table.tsx changes needed.
+ * Reserved discard-strip row count. UAT gap 22 (third owner review): the
+ * compact Discard strip moved beside the token column instead of stacking
+ * under Play, and grew 2 -> 5 rows so its own reserved height roughly
+ * matches the token+deck column beside it (both ~156px) rather than reusing
+ * whatever row count the old vertical-stack layout needed.
  */
-export const DISCARD_ROWS = 2;
+export const DISCARD_ROWS = 5;
 
 /**
  * A compact Discard strip's total reserved height for `rows` rows of
@@ -231,31 +212,91 @@ export function discardCompactHeightPx(rows: number): number {
   );
 }
 
-/**
- * UI-SPEC compact Discard strip height (06.2-21, owner review: "discard can
- * be shrunk by default, clicking it will expand"; post-06.2-21 follow-up
- * grew this from one row to `DISCARD_ROWS`). A pile deeper than
- * `DISCARD_ROWS` rows wraps/clips inside this fixed box — `discard-toggle`
- * opens the existing full-size `DiscardOverlay` (unchanged) to read the
- * whole pile.
- */
+/** UI-SPEC compact Discard strip height — see `DISCARD_ROWS`'s comment. A
+ * pile deeper than `DISCARD_ROWS` rows wraps/clips inside this fixed box —
+ * `discard-toggle` opens the existing full-size `DiscardOverlay` (unchanged)
+ * to read the whole pile. */
 export const DISCARD_COMPACT_PX = discardCompactHeightPx(DISCARD_ROWS);
 
 /**
- * The left column's total reserved height (06.2-21): Play (top) + gap +
- * Deck counter (middle) + gap + compact Discard (bottom), stacked
- * vertically per the owner's literal description. This is also the inner
- * height every board region shares inside the panel's own top+bottom
- * padding — `TABLE_BAND_MIN_PX` below adds that padding back.
+ * The compact Discard strip's own reserved width (UAT gap 22). No longer
+ * shares `PLAY_AREA_WIDTH_PX` now that it sits beside the token column
+ * rather than stacked under Play — a narrower strip suits its new position
+ * better, and Play keeps the width Discard used to force it to share.
  */
-export const BOARD_INNER_PX =
-  PLAY_AREA_HEIGHT_PX + MIDDLE_GAP_PX + DECK_COUNTER_PX + MIDDLE_GAP_PX + DISCARD_COMPACT_PX;
+export const DISCARD_COMPACT_WIDTH_PX = 140;
+
+/** Vertical/horizontal gap between adjacent tokens/slots — reuses --space-xs. */
+export const TOKEN_GAP_PX = 4;
 
 /**
- * UI-SPEC "Center (tableau)" row's height (06.2-21): the board panel's own
- * top+bottom padding plus `BOARD_INNER_PX`, the left column's (Play/Deck/
- * Discard) fixed content height — the right column (tokens,
- * `TOKEN_AREA_HEIGHT_PX`, 172px) is shorter and does not drive this number.
+ * A clue/fuse token disc's rendered size. UAT gap 20 (third owner review,
+ * "Hint tokens and Fuses are too large — cut by 33%"): the prior 2x-owner-
+ * reviewed size (40px) cut by roughly a third: `Math.round(40 * (2 / 3))`
+ * = 27.
+ */
+export const TOKEN_DISC_PX = Math.round(40 * (2 / 3));
+
+/** Reserved clue-token slot count — always rendered, whether or not the
+ * token is still available (UAT gap 1, BOARD-02). */
+export const MAX_CLUE_TOKENS = 8;
+/** Reserved fuse-token slot count (UAT gap 1, BOARD-03). */
+export const MAX_FUSE_TOKENS = 3;
+
+/**
+ * The clue run is laid out as two columns of four rather than one column of
+ * eight so the discs fit the narrow right-hand column's reserved width.
+ * The fuse run stays a single column of three.
+ */
+export const CLUE_TOKEN_COLUMNS = 2;
+
+/**
+ * A token run's total rendered height for `slotCount` fixed slots laid out
+ * in `columns` columns: `rows * TOKEN_DISC_PX + (rows - 1) * TOKEN_GAP_PX`,
+ * where `rows = Math.ceil(slotCount / columns)`. Returns 0 for an empty run.
+ */
+export function tokenRunHeightPx(slotCount: number, columns: number): number {
+  if (slotCount <= 0) return 0;
+  const rows = Math.ceil(slotCount / columns);
+  return rows * TOKEN_DISC_PX + (rows - 1) * TOKEN_GAP_PX;
+}
+
+/**
+ * The token area's fixed reserved height — the larger of the two runs.
+ */
+export const TOKEN_AREA_HEIGHT_PX = Math.max(
+  tokenRunHeightPx(MAX_CLUE_TOKENS, CLUE_TOKEN_COLUMNS),
+  tokenRunHeightPx(MAX_FUSE_TOKENS, 1),
+);
+
+/**
+ * The token area's fixed reserved width: the two clue columns, the gap
+ * between the clue run and the fuse run (reusing TOKEN_GAP_PX*4, the same
+ * inter-run gap `TokenColumn` renders), and the single fuse column.
+ */
+export const TOKEN_AREA_WIDTH_PX =
+  CLUE_TOKEN_COLUMNS * TOKEN_DISC_PX +
+  (CLUE_TOKEN_COLUMNS - 1) * TOKEN_GAP_PX +
+  TOKEN_GAP_PX * 4 +
+  TOKEN_DISC_PX;
+
+/**
+ * The right-hand column's total reserved height (UAT gap 21): the token
+ * runs, a gap, then the Deck counter stacked below them.
+ */
+export const TOKEN_COLUMN_TOTAL_HEIGHT_PX = TOKEN_AREA_HEIGHT_PX + MIDDLE_GAP_PX + DECK_COUNTER_PX;
+
+/**
+ * The tableau's total reserved inner height (UAT gaps 19-22): Play, the
+ * token+deck column, and Discard now sit SIDE BY SIDE, so the reserved
+ * height is the MAX of the three regions, not their sum — Play dominates.
+ * See this file's header comment for the full before/after math.
+ */
+export const BOARD_INNER_PX = Math.max(PLAY_AREA_HEIGHT_PX, TOKEN_COLUMN_TOTAL_HEIGHT_PX, DISCARD_COMPACT_PX);
+
+/**
+ * UI-SPEC "Center (tableau)" row's height: the board panel's own top+bottom
+ * padding plus `BOARD_INNER_PX`.
  */
 export const TABLE_BAND_MIN_PX = BOARD_INNER_PX + 2 * BOARD_PANEL_PADDING_PX;
 
@@ -295,61 +336,3 @@ export const TEAMMATE_BAND_PX = 111;
  * came in at 193px, down from the CluePicker-era 310px three-line footprint.
  */
 export const OWN_BAND_PX = 193;
-
-/** Vertical/horizontal gap between adjacent tokens/slots — reuses --space-xs. */
-export const TOKEN_GAP_PX = 4;
-
-/**
- * A clue/fuse token disc's rendered size (UAT gap 5, "larger by 2x"). The
- * measured baseline before owner review: `tokenPitchPx(260, 11)` clamped by
- * the old `TOKEN_DISC_MAX_PX = 22`, which rendered discs at 20px. 2x that
- * measured 20px baseline is 40px.
- */
-export const TOKEN_DISC_PX = 40;
-
-/** Reserved clue-token slot count — always rendered, whether or not the
- * token is still available (UAT gap 1, BOARD-02). */
-export const MAX_CLUE_TOKENS = 8;
-/** Reserved fuse-token slot count (UAT gap 1, BOARD-03). */
-export const MAX_FUSE_TOKENS = 3;
-
-/**
- * The clue run is laid out as two columns of four rather than one column of
- * eight so eight 40px discs fit the board's reserved height
- * (`tokenRunHeightPx(8, 2) === 172 <= TABLE_BAND_MIN_PX`). The fuse run
- * stays a single column of three.
- */
-export const CLUE_TOKEN_COLUMNS = 2;
-
-/**
- * A token run's total rendered height for `slotCount` fixed slots laid out
- * in `columns` columns: `rows * TOKEN_DISC_PX + (rows - 1) * TOKEN_GAP_PX`,
- * where `rows = Math.ceil(slotCount / columns)`. Returns 0 for an empty run.
- */
-export function tokenRunHeightPx(slotCount: number, columns: number): number {
-  if (slotCount <= 0) return 0;
-  const rows = Math.ceil(slotCount / columns);
-  return rows * TOKEN_DISC_PX + (rows - 1) * TOKEN_GAP_PX;
-}
-
-/**
- * The token area's fixed reserved height — the larger of the two runs,
- * proven at module load to fit within `TABLE_BAND_MIN_PX` (see
- * layout-budget.test.ts's invariant test).
- */
-export const TOKEN_AREA_HEIGHT_PX = Math.max(
-  tokenRunHeightPx(MAX_CLUE_TOKENS, CLUE_TOKEN_COLUMNS),
-  tokenRunHeightPx(MAX_FUSE_TOKENS, 1),
-);
-
-/**
- * The token area's fixed reserved width: the two clue columns, the gap
- * between the clue run and the fuse run (reusing TOKEN_GAP_PX*4, the same
- * inter-run gap `TokenColumn` renders), and the single fuse column.
- */
-export const TOKEN_AREA_WIDTH_PX =
-  CLUE_TOKEN_COLUMNS * TOKEN_DISC_PX +
-  (CLUE_TOKEN_COLUMNS - 1) * TOKEN_GAP_PX +
-  TOKEN_GAP_PX * 4 +
-  TOKEN_DISC_PX;
-
