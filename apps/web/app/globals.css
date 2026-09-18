@@ -220,55 +220,51 @@ body {
 }
 
 /*
- * ART-02/D-14: static city-at-night backdrop behind the in-game table. The
- * 0.75 scrim below is --color-bg at 75% opacity (rgba(11, 15, 26, 0.75),
- * matching --color-bg's value) — written as a literal rgba() rather than a
+ * ART-02/D-14, reversed by owner review (06.2 UAT gap 9): static
+ * city-on-the-water-with-fireworks backdrop behind the in-game table,
+ * replacing the plain city-at-night image. The 0.75 scrim below is
+ * --color-bg at 75% opacity (rgba(11, 15, 26, 0.75), matching
+ * --color-bg's value) — written as a literal rgba() rather than a
  * var() reference because
  * Tailwind v4 @theme tokens are hex, not rgba, and this file's no-hex-
  * outside-@theme rule only forbids hex literals, not rgba() derived from a
  * documented token value. The image itself is static (no animation, no
  * parallax) per D-14 — background-attachment: fixed pins it in place rather
- * than scrolling with the board's own overflow-y-auto content.
+ * than scrolling with the board's own overflow-y-auto content. Sourced,
+ * licence-verified and credited in
+ * apps/web/public/backgrounds/CREDITS.md under "city-fireworks.webp".
  */
 .table-backdrop {
   background-color: var(--color-bg);
   background-image: linear-gradient(rgba(11, 15, 26, 0.75), rgba(11, 15, 26, 0.75)),
-    url("/backgrounds/city-night.webp");
+    url("/backgrounds/city-fireworks.webp");
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
 }
 
 /*
- * TILE-01/D-11/D-15: CSS-only wooden board texture for the tableau panel
- * only — never applied to body/main, so the .table-backdrop city-at-night
- * image above stays visible around the board's own edges/gaps. Base layer
- * is `color-mix(in srgb, var(--color-surface) 85%, black 15%)`, a derived
- * (not new) near-token value following the same "derive from an existing
- * token, document why" discipline as the .table-backdrop scrim above — the
- * CSS keyword `black` is used as the mix input (never a hex literal) so
- * this stays inside the file's no-hex-outside-@theme rule. Two
- * `repeating-linear-gradient` grain layers at low opacity (4-8%) sit on
- * top via background-blend-mode to read as plank grain.
+ * TILE-01/D-11/D-15's CSS-only wooden board texture preference is reversed
+ * by owner review (06.2 UAT gap 2): the owner explicitly rejected a
+ * generated texture ("don't generate the texture either — find something
+ * free online that looks good, looks board game-y"), so this rule now
+ * paints a sourced, licence-verified dark-wood photograph instead of the
+ * two `repeating-linear-gradient` grain layers this rule previously used.
+ * D-11 itself names an image as its documented fallback when the
+ * CSS-first approach doesn't hold up to review, which is what happened
+ * here. `background-color: var(--color-surface)` remains as the under-fill
+ * shown before the image loads; the 0.35 darkening scrim above the image
+ * is rgba(11, 15, 26, 0.35), the same --color-bg-derived literal used by
+ * .table-backdrop above, at a lower opacity so the wood's own colour still
+ * reads through. Sourced, licence-verified and credited in
+ * apps/web/public/backgrounds/CREDITS.md under "wood-board.webp".
  */
 .board-surface {
-  background-color: color-mix(in srgb, var(--color-surface) 85%, black 15%);
-  background-image:
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.06) 0px,
-      rgba(255, 255, 255, 0.06) 2px,
-      transparent 2px,
-      transparent 96px
-    ),
-    repeating-linear-gradient(
-      0deg,
-      rgba(0, 0, 0, 0.08) 0px,
-      rgba(0, 0, 0, 0.08) 1px,
-      transparent 1px,
-      transparent 6px
-    );
-  background-blend-mode: overlay, multiply;
+  background-color: var(--color-surface);
+  background-image: linear-gradient(rgba(11, 15, 26, 0.35), rgba(11, 15, 26, 0.35)),
+    url("/backgrounds/wood-board.webp");
+  background-size: cover;
+  background-position: center;
   border: 1px solid var(--color-border);
   border-radius: 12px;
 }
