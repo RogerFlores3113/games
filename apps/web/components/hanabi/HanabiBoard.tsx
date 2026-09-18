@@ -44,6 +44,11 @@ export interface HanabiBoardProps {
    * known view is display-only — every action control is disabled and the
    * `act()` wrapper below no-ops, so nothing is sent against a stale view. */
   reconnecting?: boolean;
+  /** Owner request (2026-09-18), host-only: sends `delete_room`. Only ever
+   * rendered (SettingsModal) when `view.youSeatId === view.hostSeatId` —
+   * hiding the button is a UX nicety, not the security boundary; the worker
+   * re-checks host on every `delete_room` regardless of what the UI shows. */
+  onDeleteRoom?: () => void;
 }
 
 
@@ -60,7 +65,13 @@ export interface HanabiBoardProps {
  * never the card itself — so this orchestrator cannot pass along a suit or
  * rank for its own seat even by accident.
  */
-export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoardProps) {
+export function HanabiBoard({
+  view,
+  onAction,
+  reconnecting = false,
+  onDeleteRoom,
+}: HanabiBoardProps) {
+  const isHost = view.youSeatId !== null && view.youSeatId === view.hostSeatId;
   // Parsed against the same strict wire schema the server's fail-closed gate
   // uses, so there is exactly one definition of "a valid HanabiView".
   // WR-04: a present-but-invalid game (e.g. worker/web deploy drift) is
@@ -453,6 +464,8 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
         onToggleKeepHints={handleToggleKeepHints}
         tileColorHex={tileColorHex}
         onTileColorChange={handleTileColorChange}
+        isHost={isHost}
+        onDeleteRoom={onDeleteRoom}
       />
 
       {ended && <EndOverlay game={game} />}

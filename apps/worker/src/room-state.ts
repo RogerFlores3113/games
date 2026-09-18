@@ -262,6 +262,37 @@ export function deferIdleGc(state: RoomState, now: number): RoomState {
   return { ...state, lastActivityAt: now };
 }
 
+/** Owner request (2026-09-18), host-only: irreversible room teardown. This
+ * pure function is ONLY the permission/idempotency gate — the actual
+ * storage wipe and socket teardown is DO-level I/O (room-do.ts's
+ * `#abandonRoom`, the SAME helper `onAlarm`'s idle-GC branch calls), never
+ * expressed here. No status restriction: a host may delete a lobby, an
+ * in-progress game, or an ended one. Dedup mirrors `applyGameAction`'s
+ * placement (WR-01): checked unconditionally, before any other gate, against
+ * `Seat.lastAppliedRoomActionId` — a field distinct from game-action dedup
+ * (room.ts) so the two idempotency keyspaces never collide. */
+export function deleteRoom(
+  state: RoomState,
+  actorSeatId: string,
+  actionId: string,
+  now: number,
+): RoomResult {
+  const actorSeat = state.seats.find((seat) => seat.seatId === actorSeatId);
+  if (actorSeat !== undefined && actorSeat.lastAppliedRoomActionId === actionId) {
+    return { ok: true, state };
+  }
+
+  if (actorSeatId !== state.hostSeatId) {
+    return { ok: false, reason: "not_host" };
+  }
+
+  const seats = state.seats.map((seat) =>
+    seat.seatId === actorSeatId ? { ...seat, lastAppliedRoomActionId: actionId } : seat,
+  );
+
+  return { ok: true, state: { ...state, seats, lastActivityAt: now } };
+}
+
 /** ROOM-06, D-10/D-11: gated ONLY on host + a 2-5 seat count. There is
  * deliberately no ready-state check anywhere in this function — if you
  * find yourself adding one, it was cut from scope. */

@@ -66,12 +66,23 @@ const LeaveMessageSchema = z.strictObject({
   type: z.literal("leave"),
 });
 
+/** Owner request (2026-09-18): host-only, irreversible room teardown. Follows
+ * the same `actionId` idempotency shape as `game_action` (D-07) — an opaque
+ * key minted once per click and replayed verbatim on any retry — but is
+ * tracked against `Seat.lastAppliedRoomActionId`, a SEPARATE field from
+ * game-action dedup (room.ts), never the adapter's own bookkeeping. */
+const DeleteRoomMessageSchema = z.strictObject({
+  type: z.literal("delete_room"),
+  actionId: z.string().min(ACTION_ID_MIN_LENGTH).max(ACTION_ID_MAX_LENGTH),
+});
+
 export const ClientMessageSchema = z.discriminatedUnion("type", [
   JoinMessageSchema,
   SetVariantMessageSchema,
   StartGameMessageSchema,
   GameActionMessageSchema,
   LeaveMessageSchema,
+  DeleteRoomMessageSchema,
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 
@@ -100,6 +111,17 @@ const RefusedMessageSchema = z.strictObject({
 
 const SupersededMessageSchema = z.strictObject({
   type: z.literal("superseded"),
+});
+
+/** Sent to every connection right before the host's `delete_room` closes
+ * them all with `ROOM_ABANDONED_CLOSE_CODE` (the SAME terminal code and
+ * teardown idle GC uses, per the owner's "reuse that path" instruction) —
+ * this frame is the only thing that distinguishes "closed by the host" from
+ * "closed for sitting idle" for the client's copy; the underlying
+ * disconnect/cleanup behavior is identical either way. */
+const RoomClosedMessageSchema = z.strictObject({
+  type: z.literal("room_closed"),
+  reason: z.literal("host_deleted"),
 });
 
 /** D-08/D-10: error frames must never carry state. `detail` is a CLOSED enum,
@@ -134,6 +156,7 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   StateMessageSchema,
   RefusedMessageSchema,
   SupersededMessageSchema,
+  RoomClosedMessageSchema,
   ErrorMessageSchema,
 ]);
 export type ServerMessage = z.infer<typeof ServerMessageSchema>;

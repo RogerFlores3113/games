@@ -54,6 +54,7 @@ import {
   deferIdleGc,
   startGame,
   applyGameAction,
+  deleteRoom,
 } from "./room-state";
 import {
   mintGameSeed,
@@ -229,6 +230,23 @@ export class RoomDO extends Server<Env> {
         return;
       }
 
+      if (msg.type === "delete_room") {
+        const result = deleteRoom(room, actorSeatId, msg.actionId, now);
+        if (!result.ok) {
+          this.#send(connection, { type: "error", code: result.reason });
+          return;
+        }
+        // Tell every connected player BEFORE tearing anything down — the
+        // same `#abandonRoom` teardown idle GC's `onAlarm` branch uses
+        // (detach-then-close, then wipe storage), so there is exactly one
+        // teardown implementation, not two.
+        for (const conn of this.getConnections()) {
+          this.#send(conn, { type: "room_closed", reason: "host_deleted" });
+        }
+        await this.#abandonRoom();
+        return;
+      }
+
       if (msg.type === "leave") {
         // CR-03: `releaseSeat` refuses mid-game — the seat stays in turn order.
         const result = releaseSeat(room, actorSeatId, now);
@@ -316,17 +334,7 @@ export class RoomDO extends Server<Env> {
           // Abandoned room: close every connection, wipe all storage, and
           // return WITHOUT rescheduling (ROOM-08). A deleted room must not
           // keep waking itself up.
-          // WR-01: detach each socket BEFORE closing it, so its `onClose`
-          // finds no seat and cannot write a fresh room back into the
-          // storage just wiped. The terminal close code stops `partysocket`
-          // from reconnecting into a brand-new empty lobby.
-          for (const connection of this.getConnections()) {
-            connection.setState(null);
-            connection.close(ROOM_ABANDONED_CLOSE_CODE, "room abandoned");
-          }
-          this.room = null;
-          this.#persisted = false;
-          await this.ctx.storage.deleteAll();
+          await this.#abandonRoom();
           return;
         } else if (event.type === "zombie_sweep") {
           // D-03: a seated socket can go half-open (mobile suspend, dead
@@ -444,6 +452,28 @@ export class RoomDO extends Server<Env> {
     if (liveOwner !== undefined && liveOwner !== closingConnectionId) return room;
     if (!this.#persisted || !room.seats.some((seat) => seat.seatId === seatId)) return room;
     return markConnected(room, seatId, false, now);
+  }
+
+  /** The ONE teardown implementation for "this room is gone right now,
+   * forever" — shared by `onAlarm`'s idle-GC branch (ROOM-08) and the
+   * host's `delete_room` action (owner request, 2026-09-18), so there is
+   * exactly one place that closes every socket and wipes storage rather than
+   * two copies that could drift.
+   *
+   * WR-01: detach each socket BEFORE closing it, so its `onClose` finds no
+   * seat and cannot write a fresh room back into the storage this is about
+   * to wipe. The terminal close code stops `partysocket` from reconnecting
+   * into a brand-new empty lobby — a later open of the same link creates an
+   * ordinary fresh WR-08 lobby rather than crashing, which is the "room not
+   * found" state the owner asked for. */
+  async #abandonRoom(): Promise<void> {
+    for (const connection of this.getConnections()) {
+      connection.setState(null);
+      connection.close(ROOM_ABANDONED_CLOSE_CODE, "room abandoned");
+    }
+    this.room = null;
+    this.#persisted = false;
+    await this.ctx.storage.deleteAll();
   }
 
   /** Read the seat straight off the connection's own attachment.

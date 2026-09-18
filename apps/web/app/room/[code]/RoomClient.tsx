@@ -110,6 +110,7 @@ function ConnectedRoom({
   const status = useRoomStore((state) => state.status);
   const refusalReason = useRoomStore((state) => state.refusalReason);
   const view = useRoomStore((state) => state.view);
+  const closeReason = useRoomStore((state) => state.closeReason);
   // D-11: guards against double-firing reclaimSeat on a double-click — reset
   // whenever we leave "superseded" so a tab superseded AGAIN later still has
   // a live button, never a permanently-disabled one.
@@ -203,7 +204,7 @@ function ConnectedRoom({
           className="text-[length:var(--text-body)]"
           style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-body--line-height)" }}
         >
-          This room closed after sitting idle.
+          {closeReason === "host_deleted" ? "The host closed this room." : "This room closed after sitting idle."}
         </p>
       </main>
     );
@@ -253,6 +254,10 @@ function ConnectedRoom({
         send({ type: "game_action", actionId: nanoid(), request })
       }
       reconnecting={status === "reconnecting"}
+      // Owner request (2026-09-18): same one-actionId-per-click idempotency
+      // shape as `game_action` above, tracked server-side against
+      // `Seat.lastAppliedRoomActionId` (a separate field, room-state.ts).
+      onDeleteRoom={() => send({ type: "delete_room", actionId: nanoid() })}
     />
   );
 }

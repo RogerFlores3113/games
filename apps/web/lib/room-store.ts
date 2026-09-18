@@ -35,6 +35,13 @@ export interface RoomStoreState {
   seatId: string | null;
   /** WR-05: the error code that failed the last join, if any. */
   joinError: RefusalReason | null;
+  /** Owner request (2026-09-18): set from the `room_closed` frame the host's
+   * `delete_room` sends every connection just before the SAME
+   * `ROOM_ABANDONED_CLOSE_CODE` terminal close idle GC uses (room-do.ts's
+   * `#abandonRoom`). Lets the "abandoned" UI branch distinguish "closed by
+   * the host" copy from "closed for sitting idle" without a second terminal
+   * status — the underlying disconnect/cleanup is identical either way. */
+  closeReason: "host_deleted" | null;
 }
 
 export interface RoomStoreActions {
@@ -56,6 +63,7 @@ const initialState: RoomStoreState = {
   refusalReason: null,
   seatId: null,
   joinError: null,
+  closeReason: null,
 };
 
 export const useRoomStore = create<RoomStoreState & RoomStoreActions>((set, get) => ({
@@ -81,6 +89,14 @@ export const useRoomStore = create<RoomStoreState & RoomStoreActions>((set, get)
         return;
       case "superseded":
         set({ status: "superseded" });
+        return;
+      case "room_closed":
+        // The terminal `abandoned` status itself is set by the socket
+        // layer's `onClose` when the paired `ROOM_ABANDONED_CLOSE_CODE`
+        // close arrives right after this frame — this only records WHY, so
+        // the "abandoned" UI branch can show host-deletion copy instead of
+        // the generic idle-GC copy.
+        set({ closeReason: message.reason });
         return;
       case "error":
         // WR-05: while joining OR reconnecting, the only frame we have sent

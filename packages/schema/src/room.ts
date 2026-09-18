@@ -96,6 +96,13 @@ export const SeatSchema = z.object({
    * seat instead of minting a second one. Server-only, like `seatToken`;
    * optional so rooms persisted before this field existed still parse. */
   joinId: z.string().nullable().optional(),
+  /** Idempotency bookkeeping for HOST-only room-level actions (`delete_room`,
+   * `restart_lobby`) — a separate field from `lastAppliedActionId` (which is
+   * scoped to in-game `game_action` dedup only) so a room-level actionId can
+   * never collide with a game one. Never read by the adapter, never reaching
+   * the wire. Optional/nullable so rooms persisted before this field existed
+   * still parse (same precedent as `lastAppliedActionId`). */
+  lastAppliedRoomActionId: z.string().nullable().optional(),
 });
 export type Seat = z.infer<typeof SeatSchema>;
 

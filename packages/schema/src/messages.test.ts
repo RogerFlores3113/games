@@ -175,8 +175,11 @@ describe("ServerMessageSchema / encodeServerMessage", () => {
 
 describe("closed unions", () => {
   it("ClientMessageSchema and ServerMessageSchema are both discriminated unions with the expected member counts", () => {
-    expect(ClientMessageSchema.options).toHaveLength(5);
-    expect(ServerMessageSchema.options).toHaveLength(5);
+    // Owner request (2026-09-18): +1 client member (`delete_room`) and +1
+    // server member (`room_closed`) — see messages.ts's doc comments on each
+    // for why they exist.
+    expect(ClientMessageSchema.options).toHaveLength(6);
+    expect(ServerMessageSchema.options).toHaveLength(6);
   });
 });
 

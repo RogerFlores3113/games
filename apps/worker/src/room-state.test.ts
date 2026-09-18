@@ -10,6 +10,7 @@ import {
   applyGameAction,
   createEmptyRoom,
   deferIdleGc,
+  deleteRoom,
   joinRoom,
   markConnected,
   releaseSeat,
@@ -1125,3 +1126,77 @@ describe("D-22: reorder through the room layer", () => {
     expect(result).toMatchObject({ ok: false, reason: "bad_request" });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Owner request (2026-09-18): host-only delete_room / restart_lobby
+// ---------------------------------------------------------------------------
+
+/** Drives a fresh 2-seat lobby all the way to an "ended" room, reusing the
+ * same legal-action loop `D-22`'s fixtures rely on elsewhere in this file. */
+function endedTwoSeatRoom() {
+  const minter = makeMinter();
+  const hostJoin = join(freshRoom(), "Host", 1, minter);
+  if (!hostJoin.ok) throw new Error("unreachable");
+  const guestJoin = join(hostJoin.state, "Guest", 2, minter);
+  if (!guestJoin.ok) throw new Error("unreachable");
+
+  const started = startGame(guestJoin.state, hostJoin.seatId, 3, "seed-ended-room");
+  if (!started.ok) throw new Error("unreachable");
+  let state = started.state;
+
+  let guard = 0;
+  while (state.status === "in_progress" && guard < 2000) {
+    guard++;
+    const game = state.game as ActiveGameState;
+    const actorSeatId = game.seatIds[game.turnIndex]!;
+    const action = legalActionFor(game);
+    const result = applyGameAction(state, actorSeatId, `end-action-${guard}`, action, 10 + guard);
+    if (!result.ok) throw new Error("unreachable");
+    state = result.state;
+  }
+  if (state.status !== "ended") throw new Error("fixture did not reach ended status");
+
+  return { state, hostSeatId: hostJoin.seatId, guestSeatId: guestJoin.seatId };
+}
+
+describe("Owner request: deleteRoom (host-only teardown gate)", () => {
+  it("host may request deletion from any room status", () => {
+    const minter = makeMinter();
+    const hostJoin = join(freshRoom(), "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+
+    const result = deleteRoom(hostJoin.state, hostJoin.seatId, "del-1", 5);
+    expect(result.ok).toBe(true);
+  });
+
+  it("a non-host's delete_room is refused not_host", () => {
+    const minter = makeMinter();
+    const hostJoin = join(freshRoom(), "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+    const guestJoin = join(hostJoin.state, "Guest", 2, minter);
+    if (!guestJoin.ok) throw new Error("unreachable");
+
+    const result = deleteRoom(guestJoin.state, guestJoin.seatId, "del-2", 5);
+    expect(result).toEqual({ ok: false, reason: "not_host" });
+  });
+
+  it("an ended room may still be deleted by its host", () => {
+    const { state, hostSeatId } = endedTwoSeatRoom();
+    const result = deleteRoom(state, hostSeatId, "del-3", 100);
+    expect(result.ok).toBe(true);
+  });
+
+  it("a repeated actionId is idempotent", () => {
+    const minter = makeMinter();
+    const hostJoin = join(freshRoom(), "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+
+    const first = deleteRoom(hostJoin.state, hostJoin.seatId, "del-dedup", 5);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+
+    const second = deleteRoom(first.state, hostJoin.seatId, "del-dedup", 999);
+    expect(second).toEqual({ ok: true, state: first.state });
+  });
+});
+
