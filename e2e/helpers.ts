@@ -330,3 +330,70 @@ export async function teammateHandCardIds(page: Page, seatId: string): Promise<s
     .evaluateAll((els) => els.map((el) => el.getAttribute("data-testid") ?? ""));
   return testIds.map((testId) => testId.replace(/^other-hand-card-/, ""));
 }
+
+/**
+ * Drives `hostPage`/`otherPage` (an already-started 2-seat game) by
+ * repeatedly playing each active player's first own-hand slot until the
+ * `end-overlay` appears on either page, or `maxIterations` is exhausted.
+ * Reuses the exact bounded-retry shape `start-game.spec.ts`'s "UI-10: a
+ * game played to its end" test established — playing blind (never checking
+ * suit/rank, which own-hand cards never expose to the UI anyway) reliably
+ * burns through the 3-fuse budget within a bounded number of turns, ending
+ * the game far faster than playing correctly toward a real win would.
+ * Throws if the game never reaches an end state within `maxIterations`.
+ */
+export async function playUntilGameEnds(
+  hostPage: Page,
+  otherPage: Page,
+  maxIterations = 80,
+): Promise<void> {
+  const endOverlayVisible = async () =>
+    (await hostPage.getByTestId("end-overlay").isVisible()) ||
+    (await otherPage.getByTestId("end-overlay").isVisible());
+  const tryClick = async (locator: Locator): Promise<boolean> => {
+    try {
+      await locator.click({ timeout: 2000 });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  for (let i = 0; i < maxIterations; i++) {
+    if (await endOverlayVisible()) return;
+
+    const hostText = ((await hostPage.getByTestId("turn-indicator").textContent()) ?? "").trim();
+    const activePlayer = hostText === "Your turn" ? hostPage : otherPage;
+
+    if (!(await tryClick(activePlayer.getByTestId("own-hand-slot-1")))) {
+      if (await endOverlayVisible()) return;
+      continue;
+    }
+
+    const playEnabled = await expect(activePlayer.getByTestId("play-button"))
+      .toBeEnabled({ timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!playEnabled) {
+      if (await endOverlayVisible()) return;
+      continue;
+    }
+    if (!(await tryClick(activePlayer.getByTestId("play-button")))) {
+      if (await endOverlayVisible()) return;
+      continue;
+    }
+
+    await expect
+      .poll(async () => {
+        if (await endOverlayVisible()) return true;
+        const stillYourTurn =
+          ((await activePlayer.getByTestId("turn-indicator").textContent()) ?? "") === "Your turn";
+        return !stillYourTurn;
+      })
+      .toBe(true);
+  }
+
+  if (!(await endOverlayVisible())) {
+    throw new Error(`playUntilGameEnds: game did not reach an end state within ${maxIterations} iterations`);
+  }
+}
