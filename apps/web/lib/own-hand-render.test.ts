@@ -143,6 +143,53 @@ describe("own-hand render guard (D-15, WR-06)", () => {
     expect(render(VISIBLE_HAND)).toContain("note-box-slot-1");
   });
 
+  it("UAT gap 7 (06.2-17): renders a tile-colour overlay span, and two different presets differ only in that span's background-color", () => {
+    const markup = render(VISIBLE_HAND);
+    expect(markup).toContain('data-testid="own-hand-slot-1-tile-color-overlay"');
+
+    function renderWithTileColor(tileColor: string): string {
+      const props: OwnHandProps = {
+        cards: VISIBLE_HAND,
+        variant: "base",
+        roomCode: "ABCD",
+        youSeatId: "seat-me",
+        connected: true,
+        isYourTurn: true,
+        turnText: "Your turn",
+        selectedCardId: "c2",
+        justCluedIds: new Set(["c3"]),
+        disabled: false,
+        onSelectCard: () => {},
+        draggingCardId: null,
+        dragOffset: null,
+        dropIndex: null,
+        slotPitchPx: null,
+        onCardPointerDown: () => {},
+        registerSlot: () => {},
+        consumeClickSuppression: () => false,
+        hintsVisible: undefined,
+        tileColor,
+      };
+      return renderToStaticMarkup(createElement(OwnHand, props));
+    }
+
+    const withPlum = renderWithTileColor("color-mix(in srgb, var(--color-tile-preset-plum) 55%, transparent)");
+    const withCharcoal = renderWithTileColor("color-mix(in srgb, var(--color-tile-preset-charcoal) 55%, transparent)");
+    expect(withPlum).not.toBe(withCharcoal);
+    // Strip out only the overlay spans' background-color and confirm the
+    // rest of the markup is byte-identical (the only permitted diff).
+    const stripOverlayColor = (markup: string) =>
+      markup.replace(/tile-color-overlay"[^>]*background-color:[^;"]*/g, 'tile-color-overlay" STRIPPED');
+    expect(stripOverlayColor(withPlum)).toBe(stripOverlayColor(withCharcoal));
+  });
+
+  it("UAT gap 7 (06.2-17): the tile container's own background-color is the constant var(--color-surface), not the preference", () => {
+    const markup = render(VISIBLE_HAND);
+    // The slot button's own inline style must carry the constant surface
+    // colour; the overlay span (asserted above) carries the preference.
+    expect(markup).toMatch(/data-testid="own-hand-slot-1"[^>]*style="[^"]*background-color:var\(--color-surface\)/);
+  });
+
   it("TeammateHand renders no note surface (D-03: notes are own-hand only)", () => {
     const markup = renderToStaticMarkup(
       createElement(TeammateHand, {
@@ -164,7 +211,10 @@ describe("own-hand render guard (D-15, WR-06)", () => {
 
   it("every own-hand card-back segment is byte-identical across slots (D-10)", () => {
     const markup = render(VISIBLE_HAND);
-    const segments = markup.split('data-testid="own-hand-slot-').slice(1);
+    // UAT gap 7 (06.2-17): split on the exact slot testid only (digits then
+    // a closing quote), not any suffixed variant like
+    // `own-hand-slot-1-tile-color-overlay` or `own-hand-slot-1-hints`.
+    const segments = markup.split(/data-testid="own-hand-slot-\d+"/).slice(1);
     expect(segments.length).toBeGreaterThan(1);
     const cardBackSvg = (segment: string): string => {
       const start = segment.indexOf("<svg");

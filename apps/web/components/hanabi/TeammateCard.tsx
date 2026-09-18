@@ -50,7 +50,10 @@ const DEFAULT_TILE_COLOR = TILE_COLOR_PRESETS.find((preset) => preset.id === "sl
  * background layer) ever carries the luminosity signal. The automatic
  * clue-mark pip band is gone (HINT-04) — hints now render on the tile
  * itself via `TeammateHintIndicator`, and the tile gets its own raised,
- * opaque surface (TILE-01) distinct from the board beneath it.
+ * opaque surface (TILE-01) distinct from the board beneath it. UAT gap 7
+ * (06.2-17): the tile-colour preference is a translucent overlay painted
+ * above the card art, not the tile's own background — the tile container's
+ * background stays a constant `var(--color-surface)`.
  */
 export function TeammateCard({
   card,
@@ -115,20 +118,12 @@ export function TeammateCard({
         style={{
           width: CARD_WIDTH,
           height: CARD_HEIGHT,
-          backgroundColor: tileColor,
+          backgroundColor: "var(--color-surface)",
           border: frame.border,
           boxShadow: composedBoxShadow,
           cursor: card.hidden ? "default" : "pointer",
         }}
       >
-        {frame.backgroundFilter && (
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 rounded-md"
-            style={{ filter: frame.backgroundFilter, backgroundColor: "var(--color-surface)" }}
-          />
-        )}
-
         {!card.hidden ? (
           <span data-testid="card-identity" className="relative z-10">
             <FireworkCardFace suit={card.suit} rank={card.rank} width={CARD_WIDTH} height={CARD_HEIGHT} exposeSuit />
@@ -144,6 +139,27 @@ export function TeammateCard({
           <span className="relative z-10">
             <FireworkCardBack width={CARD_WIDTH} height={CARD_HEIGHT} />
           </span>
+        )}
+
+        {/* UAT gap 7 (06.2-17): the card-art/identity span above is
+            `position: relative; z-index: 10` (not absolutely positioned, so
+            its stacking level does not follow DOM order) — this overlay
+            must carry a higher explicit z-index to actually paint above
+            that opaque art and darken it, rather than being hidden beneath
+            it despite coming later in the markup. */}
+        <span
+          aria-hidden="true"
+          data-testid={`other-hand-card-${card.id}-tile-color-overlay`}
+          className="pointer-events-none absolute inset-0 rounded-md"
+          style={{ backgroundColor: tileColor, zIndex: 11 }}
+        />
+
+        {frame.backgroundFilter && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 rounded-md"
+            style={{ filter: frame.backgroundFilter, backgroundColor: "var(--color-surface)" }}
+          />
         )}
 
         <TeammateHintIndicator

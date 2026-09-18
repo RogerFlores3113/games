@@ -69,6 +69,10 @@ const DEFAULT_TILE_COLOR = TILE_COLOR_PRESETS.find((preset) => preset.id === "sl
  * `facts: CardFacts` — a type with no suit/rank fields — never the card
  * object itself (D-15). The automatic clue-mark pip band is gone (HINT-04)
  * — hints now render on the tile itself via `OwnHintIndicator`.
+ *
+ * UAT gap 7 (06.2-17): the tile-colour overlay span below is painted from
+ * `tileColor`, a personal preference string, alone — never from `facts` or
+ * any derived signal — so it carries no identity information either.
  */
 export function OwnHandCard({
   facts,
@@ -139,7 +143,7 @@ export function OwnHandCard({
         height: CARD_HEIGHT,
         minHeight: "var(--size-touch-min)",
         minWidth: "var(--size-touch-min)",
-        backgroundColor: tileColor,
+        backgroundColor: "var(--color-surface)",
         border: frame.border,
         boxShadow: dragging
           ? "0 8px 24px 0 rgba(0, 0, 0, 0.5), " + composedBoxShadow
@@ -155,6 +159,13 @@ export function OwnHandCard({
       <span className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-md">
         <FireworkCardBack width={CARD_WIDTH} height={CARD_HEIGHT} />
       </span>
+
+      <span
+        aria-hidden="true"
+        data-testid={`own-hand-slot-${slotNumber}-tile-color-overlay`}
+        className="pointer-events-none absolute inset-0 rounded-md"
+        style={{ backgroundColor: tileColor }}
+      />
 
       {frame.backgroundFilter && (
         <span
