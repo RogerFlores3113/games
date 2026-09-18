@@ -20,6 +20,26 @@ import { safeGetItem, safeSetItem } from "./safe-storage";
  * stays readable at every preset, reviewed by the owner at sign-off. These
  * are decorative personal-preference fills only, never a suit/hint/accent
  * signal colour.
+ *
+ * UAT gap 17 (06.2 third owner review, "the cards are dark"): slate is the
+ * DEFAULT every player sees before ever opening the picker, so it must read
+ * as "no visible tint," not just "translucent." Measured with a real
+ * getComputedStyle probe against `own-hand-slot-1` at the OLD 45% alpha:
+ * the overlay resolved to 45% of `--color-surface`, painted on top of the
+ * card-back art's own `--color-border` picture-frame outline. Those two
+ * tokens are close in luminance, so stacking a 45%-strength wash of one
+ * over the other nearly halved the outline's already-subtle contrast
+ * against the card's `--color-surface` container, which reads as a flat,
+ * featureless dark rectangle exactly as the owner described — the
+ * compounding is the DEFAULT overlay stacking on an already-dark neutral
+ * card back (D-10), not an opacity/hiding regression (gap 7/12 already
+ * fixed that separately). Dropping slate's alpha to 10% keeps it a real,
+ * present translucent wash (never "none" — TILE-01 still wants every tile
+ * to read as a raised, tinted object) while preserving roughly 90% of the
+ * original border contrast, so the default reads clearly. The other four
+ * presets keep their reviewed 55% strength: gap 7's "choosing a colour must
+ * still tint and darken the card" behaviour is unchanged for anyone who
+ * actually opens the picker.
  */
 
 export type TileColorId = "slate" | "warm-sand" | "cool-teal" | "plum" | "charcoal";
@@ -35,7 +55,12 @@ export const TILE_COLOR_PRESETS: TileColorPreset[] = [
   {
     id: "slate",
     label: "Slate",
-    cssValue: "color-mix(in srgb, var(--color-surface) 45%, transparent)",
+    // UAT gap 17: 10 percent, not the other presets' reviewed 55 percent —
+    // slate is the default every card renders with before a player ever
+    // opens the picker, so it must read as "barely there," not a second
+    // dark wash stacked on the already-dark neutral card back (see file
+    // header).
+    cssValue: "color-mix(in srgb, var(--color-surface) 10%, transparent)",
   },
   {
     id: "warm-sand",

@@ -956,4 +956,41 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
 
     await contextB.close();
   });
+
+  // UAT gap 17 regression ("the cards are dark"): live-measured (see this
+  // plan's SUMMARY) that the pre-fix slate DEFAULT overlay was 45% of
+  // `--color-surface` stacked on top of an already-dark neutral card back
+  // (D-10), which nearly halved the picture-frame outline's contrast
+  // against its own container and read as a flat black rectangle. The fix
+  // dropped slate's alpha to 10%. This guards the resolved alpha directly
+  // against the real browser's `color-mix()` resolution (not just the
+  // source string), so a future edit to the preset can't silently regress
+  // the darkness without a test noticing.
+  test("UAT gap 17: the default (slate) tile overlay stays a light wash, not a second dark layer", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, activePage } = await startTwoPlayerGame(hostPage, browser);
+
+    const alpha = await activePage.evaluate(() => {
+      const overlay = document.querySelector(
+        '[data-testid="tile-color-overlay-own-hand-slot-1"]',
+      ) as HTMLElement | null;
+      if (!overlay) return null;
+      const resolved = getComputedStyle(overlay).backgroundColor;
+      const match = resolved.match(/\/\s*([\d.]+)\s*\)/);
+      return match ? Number(match[1]) : null;
+    });
+
+    expect(alpha).not.toBeNull();
+    // The default must stay a real, present translucent wash (TILE-01: a
+    // tile still reads as a raised, tinted object, never a bare "none") but
+    // far short of the 55% strength the other four, deliberately-chosen
+    // presets use — that headroom is what keeps the neutral card back's own
+    // picture-frame outline legible by default.
+    expect(alpha!).toBeGreaterThan(0);
+    expect(alpha!).toBeLessThanOrEqual(0.15);
+
+    await contextB.close();
+  });
 });
