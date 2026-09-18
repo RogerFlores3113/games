@@ -1,78 +1,94 @@
 import type { HanabiView } from "@games/rules";
-import { FAN_PEEK_PX, PLAYED_CARD_HEIGHT_PX, PLAYED_CARD_WIDTH_PX, fannedStackWidth } from "../../lib/layout-budget";
+import { MAX_RANK, RANK_SLOT_GAP_PX, RANK_SLOT_HEIGHT_PX, RANK_SLOT_WIDTH_PX, playGridHeightPx } from "../../lib/layout-budget";
 import { FireworkCardFace } from "./FireworkCard";
 import { SuitGlyph } from "./SuitGlyph";
+import { SUIT_VISUALS } from "../../lib/suit-visuals";
 
 export interface PlayedStackProps {
   stack: HanabiView["stacks"][number];
   flashing?: boolean;
 }
 
+/** The column header row's fixed height — same at every topRank. */
+const HEADER_HEIGHT_PX = 20;
+
 /**
- * D-22/BOARD-05: a played stack shows every card it contains, fanned
- * HORIZONTALLY (the cheap axis at 1280x720) rather than stacked vertically —
- * only the top card used to be visible; this renders ranks 1..topRank, each
- * peeking out by `FAN_PEEK_PX` and layered above the previous one so the
- * top rank sits frontmost. The row's HEIGHT never grows with card count —
- * it stays fixed at `PLAYED_CARD_HEIGHT_PX` — only its width grows, via
- * `fannedStackWidth`.
+ * Owner review (06.2-15, UAT gap 3, superseding D-22/BOARD-05's horizontal
+ * fan): each suit renders as a fixed vertical column, one reserved slot per
+ * rank 1..MAX_RANK, filling top to bottom as cards are played — "the next
+ * entries in the series go directly below… creating a grid." Every rank
+ * slot is reserved whether or not it is filled (UAT gap 1), so the column's
+ * rendered height is identical at topRank 0 and topRank 5.
  *
- * Preserves every testid/data-attribute and the completed-stack glow
- * `Table.tsx` previously inlined, so 06.2-07's layout rework is a drop-in.
+ * The column header carries a single SuitGlyph, wrapped in the column's
+ * only `data-glyph` emitter — which is what keeps the one-glyph-per-stack
+ * e2e invariant true at every rank: filled rank cards render as plain
+ * (non-identity-exposing) card faces, each with an `sr-only` "{Suit}
+ * {rank}" label instead (same pattern `Table.tsx` already uses for
+ * discard tiles).
+ *
+ * Preserves every testid/data-attribute `Table.tsx` and the e2e suite rely
+ * on: `data-testid="played-stack-{suit}"`, `data-top-rank`, `data-complete`,
+ * the `anim-stack-flash` class on `flashing`, and
+ * `played-stack-{suit}-card-{rank}` for filled ranks.
+ *
+ * The completed-stack static glow border/box-shadow now lives in
+ * globals.css, keyed off `[data-complete="true"]` — not inlined on this
+ * element — so the root's inline `style` (width/height only) is byte-
+ * identical at topRank 0 and topRank 5, which is what proves an empty slot
+ * costs exactly what a filled one does (UAT gap 1).
  */
 export function PlayedStack({ stack, flashing = false }: PlayedStackProps) {
   const { suit, topRank } = stack;
   const complete = topRank === 5;
-  // An empty stack still reserves a single card's worth of width for its
-  // placeholder — fannedStackWidth(0) is 0 by design (no cards to fan), but
-  // reserving 0px would collapse the empty-stack placeholder's box.
-  const width = topRank > 0 ? fannedStackWidth(topRank) : PLAYED_CARD_WIDTH_PX;
+  const suitLabel = SUIT_VISUALS[suit].label;
 
   return (
     <div
       data-testid={"played-stack-" + suit}
       data-top-rank={topRank}
       data-complete={String(complete)}
-      className={"relative flex items-center justify-center rounded-md" + (flashing ? " anim-stack-flash" : "")}
+      className={"flex flex-col items-center rounded-md" + (flashing ? " anim-stack-flash" : "")}
       style={{
-        width,
-        height: PLAYED_CARD_HEIGHT_PX,
+        width: RANK_SLOT_WIDTH_PX,
+        height: playGridHeightPx() + HEADER_HEIGHT_PX,
         backgroundColor: "var(--color-surface)",
-        // Completed-stack static glow: same LUMINOSITY_FRAME "known" values
-        // as luminosity-frame.ts, inlined here per Table.tsx's original.
-        border: complete ? "2px solid var(--color-card-glow)" : "1px solid var(--color-border)",
-        boxShadow: complete
-          ? "0 0 16px 0 rgba(255, 217, 138, 0.65), 0 0 4px 0 rgba(255, 217, 138, 0.9)"
-          : "none",
       }}
     >
-      {topRank > 0 ? (
-        Array.from({ length: topRank }, (_, index) => {
+      <div
+        className="flex items-center justify-center"
+        style={{ height: HEADER_HEIGHT_PX }}
+        data-glyph={suit}
+      >
+        <SuitGlyph suit={suit} size={16} />
+        <span className="sr-only">{suitLabel}</span>
+      </div>
+      <div className="flex flex-col" style={{ gap: RANK_SLOT_GAP_PX }}>
+        {Array.from({ length: MAX_RANK }, (_, index) => {
           const rank = (index + 1) as 1 | 2 | 3 | 4 | 5;
-          return (
+          const filled = rank <= topRank;
+          return filled ? (
+            <span key={rank} data-testid={`played-stack-${suit}-card-${rank}`} data-filled="true">
+              <FireworkCardFace suit={suit} rank={rank} width={RANK_SLOT_WIDTH_PX} height={RANK_SLOT_HEIGHT_PX} />
+              <span className="sr-only">
+                {suitLabel} {rank}
+              </span>
+            </span>
+          ) : (
             <span
               key={rank}
-              data-testid={`played-stack-${suit}-card-${rank}`}
-              className="absolute"
-              style={{ left: index * FAN_PEEK_PX, zIndex: index + 1 }}
-            >
-              <FireworkCardFace
-                suit={suit}
-                rank={rank}
-                width={PLAYED_CARD_WIDTH_PX}
-                height={PLAYED_CARD_HEIGHT_PX}
-                exposeSuit
-                showBurstCount
-              />
-            </span>
+              data-testid={`played-slot-${suit}-${rank}`}
+              data-filled="false"
+              className="block rounded-md"
+              style={{
+                width: RANK_SLOT_WIDTH_PX,
+                height: RANK_SLOT_HEIGHT_PX,
+                border: "1px solid var(--color-border)",
+              }}
+            />
           );
-        })
-      ) : (
-        <span style={{ opacity: 0.35 }}>
-          <SuitGlyph suit={suit} size={18} exposeSuit />
-        </span>
-      )}
-      <span className="sr-only">{suit}</span>
+        })}
+      </div>
     </div>
   );
 }
