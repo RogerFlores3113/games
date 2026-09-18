@@ -322,7 +322,7 @@ export function Table({
               aria-label="Group discard by suit"
               onClick={onGroupDiscardBySuit}
               disabled={!onGroupDiscardBySuit || game.discard.length < 2}
-              className="relative inline-flex items-center justify-center rounded-md before:absolute before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:opacity-40"
+              className="relative inline-flex cursor-pointer items-center justify-center rounded-md before:absolute before:content-[''] transition-colors hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-[var(--color-text-muted)]"
               style={{ width: 14, height: 14, color: "var(--color-text-muted)" }}
             >
               <Group aria-hidden="true" size={14} />
@@ -344,7 +344,7 @@ export function Table({
               // element instead, per --size-touch-min. The left (inward)
               // side is capped at half the gap so it cannot overlap
               // discard-group-by-suit's own hit-area beside it.
-              className="relative inline-flex items-center justify-center rounded-md before:absolute before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+              className="relative inline-flex cursor-pointer items-center justify-center rounded-md before:absolute before:content-[''] transition-colors hover:text-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
               style={{ width: 14, height: 14, color: "var(--color-text-muted)" }}
             >
               <Layers aria-hidden="true" size={14} />

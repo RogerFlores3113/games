@@ -26,7 +26,7 @@ export function AudioControls({ muted, volume, onToggleMute, onVolumeChange }: A
         aria-label={muted ? "Unmute sound" : "Mute sound"}
         aria-pressed={muted}
         onClick={onToggleMute}
-        className="inline-flex items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+        className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:border-[var(--color-text-muted)] hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
         style={{ minWidth: "var(--size-touch-min)", minHeight: "var(--size-touch-min)" }}
       >
         {muted ? (
@@ -44,7 +44,7 @@ export function AudioControls({ muted, volume, onToggleMute, onVolumeChange }: A
         max={100}
         value={percent}
         onChange={(event) => onVolumeChange(Number(event.target.value) / 100)}
-        className="accent-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+        className="cursor-pointer accent-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
         style={{ minWidth: "var(--size-touch-min)", minHeight: "var(--size-touch-min)" }}
       />
     </div>

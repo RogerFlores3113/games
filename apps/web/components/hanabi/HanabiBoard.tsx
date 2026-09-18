@@ -338,7 +338,7 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
           aria-label="Open settings"
           aria-expanded={settingsOpen}
           onClick={() => setSettingsOpen(true)}
-          className="relative inline-flex items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+          className="relative inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:border-[var(--color-text-muted)] hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
           style={{ width: 28, height: 28 }}
         >
           <Settings size={20} aria-hidden="true" color="var(--color-text)" />

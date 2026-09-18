@@ -55,7 +55,7 @@ export function CluePopover({ suit, rank, colorDisabled, rankDisabled, onGiveCol
         aria-label={`Give a ${suitVisual.label} clue`}
         disabled={colorDisabled}
         onClick={onGiveColor}
-        className="rounded px-[length:var(--space-xs)] py-[length:var(--space-xs)] text-[length:var(--text-label)] transition-colors hover:bg-[var(--color-bg)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+        className="cursor-pointer rounded px-[length:var(--space-xs)] py-[length:var(--space-xs)] text-[length:var(--text-label)] transition-colors hover:bg-[var(--color-bg)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
         style={{ color: suitVisual.hueVar, lineHeight: "var(--text-label--line-height)" }}
       >
         {suitVisual.label}
@@ -67,7 +67,7 @@ export function CluePopover({ suit, rank, colorDisabled, rankDisabled, onGiveCol
         aria-label={`Give a ${rank} clue`}
         disabled={rankDisabled}
         onClick={onGiveRank}
-        className="rounded px-[length:var(--space-xs)] py-[length:var(--space-xs)] text-[length:var(--text-label)] font-bold transition-colors hover:bg-[var(--color-bg)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+        className="cursor-pointer rounded px-[length:var(--space-xs)] py-[length:var(--space-xs)] text-[length:var(--text-label)] font-bold transition-colors hover:bg-[var(--color-bg)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
         style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
       >
         {rank}

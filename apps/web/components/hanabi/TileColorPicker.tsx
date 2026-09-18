@@ -72,7 +72,7 @@ export function TileColorPicker({ value, onChange, embedded = false }: TileColor
               onChange(preset.id);
               setOpen(false);
             }}
-            className="relative inline-flex items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+            className="relative inline-flex cursor-pointer items-center justify-center rounded-full transition-colors hover:border-[var(--color-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
             style={{
               width: 24,
               height: 24,
@@ -109,7 +109,7 @@ export function TileColorPicker({ value, onChange, embedded = false }: TileColor
           aria-label="Choose tile colour"
           aria-expanded={open}
           onClick={() => setOpen((prev) => !prev)}
-          className="relative inline-flex items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+          className="relative inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:border-[var(--color-text-muted)] hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
           style={{ width: 28, height: 28 }}
         >
           <Palette size={16} aria-hidden="true" color="var(--color-text-muted)" />

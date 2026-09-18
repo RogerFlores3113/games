@@ -91,7 +91,7 @@ export function SettingsModal({
             data-testid="settings-close"
             aria-label="Close settings"
             onClick={onClose}
-            className="inline-flex items-center justify-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+            className="inline-flex cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-[var(--color-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
             style={{
               minHeight: "var(--size-touch-min)",
               minWidth: "var(--size-touch-min)",
@@ -144,7 +144,7 @@ export function SettingsModal({
               aria-label={keepHints ? "Clear hints after each move" : "Keep hints visible"}
               aria-pressed={keepHints}
               onClick={onToggleKeepHints}
-              className="relative inline-flex items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+              className="relative inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:border-[var(--color-text-muted)] hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
               style={{ width: 28, height: 28 }}
             >
               {keepHints ? (

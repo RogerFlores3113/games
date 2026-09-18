@@ -140,7 +140,7 @@ export function DiscardOverlay({
               aria-label="Group discard by suit"
               onClick={onGroupDiscardBySuit}
               disabled={!onGroupDiscardBySuit || discard.length < 2}
-              className="inline-flex items-center justify-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:opacity-40"
+              className="inline-flex cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-[var(--color-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
               style={{
                 minHeight: "var(--size-touch-min)",
                 minWidth: "var(--size-touch-min)",
@@ -155,7 +155,7 @@ export function DiscardOverlay({
               data-testid="discard-overlay-close"
               aria-label="Show compact discard pile"
               onClick={onClose}
-              className="inline-flex items-center justify-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+              className="inline-flex cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-[var(--color-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
               style={{
                 minHeight: "var(--size-touch-min)",
                 minWidth: "var(--size-touch-min)",
