@@ -40,12 +40,13 @@ describe("layout-budget", () => {
 
   it("OWN_BAND_PX has no marks-band constant (HINT-04 removes the pip band)", () => {
     expect((layoutBudget as Record<string, unknown>).MARKS_BAND_PX).toBeUndefined();
-    // fix(06.2, UAT gaps 13/14): corrected 280 -> 310 — Play/Discard
-    // (CardActions) now render as their own line above the own hand
-    // instead of beside it, adding a third stacked line to
-    // bottom-controls-row; real-browser measurement at the 1280x720 floor
-    // confirmed 310px with the row's gaps trimmed to the minimum.
-    expect(OWN_BAND_PX).toBe(310);
+    // fix(06.2, UAT gap 16): corrected 310 -> 193 — deleting `CluePicker`
+    // (the large clue-target/clue-value menu) removes the third stacked
+    // line bottom-controls-row used to carry; clue-giving now happens via
+    // each opponent tile's own quick-clue popover, an absolutely-positioned
+    // overlay that adds zero flow height. Real-browser measurement at the
+    // 1280x720 floor (5 seats, Black variant) confirmed 193px.
+    expect(OWN_BAND_PX).toBe(193);
   });
 
   it("BOARD_INNER_PX is Play + gap + Deck + gap + compact Discard, stacked (06.2-21)", () => {

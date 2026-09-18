@@ -9,10 +9,34 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { HanabiCardView } from "@games/rules";
+import type { HanabiCardView, HanabiView } from "@games/rules";
 import { OwnHand, TeammateHand, type OwnHandProps } from "../components/hanabi/Hand";
 import type { OwnHandCardProps } from "../components/hanabi/OwnHandCard";
 import type { CardFacts } from "./hanabi-visual-logic";
+
+// Copied verbatim from hanabi-board-logic.test.ts's baseView fixture shape
+// (do not import across test files) — the minimal HanabiView TeammateHand
+// now needs (UAT gap 16) to derive its tiles' quick-clue popover legality.
+function baseView(overrides: Partial<HanabiView> = {}): HanabiView {
+  return {
+    variant: "base",
+    yourSeatId: "seat-me",
+    yourHand: [],
+    otherHands: [{ seatId: "seat-2", cards: [] }],
+    stacks: [],
+    discard: [],
+    discardOrder: [],
+    clueTokens: 8,
+    fuses: 0,
+    deckCount: 40,
+    finalTurnsRemaining: null,
+    activeSeatId: "seat-me",
+    isYourTurn: true,
+    score: 0,
+    history: [],
+    ...overrides,
+  };
+}
 
 type Facts = HanabiCardView["facts"];
 
@@ -127,11 +151,12 @@ describe("own-hand render guard (D-15, WR-06)", () => {
         connected: true,
         variant: "base",
         isActive: false,
-        isTarget: false,
-        previewIds: new Set<string>(),
         justCluedIds: new Set<string>(),
-        disabled: false,
-        onSelectTarget: () => {},
+        game: baseView({ otherHands: [{ seatId: "seat-2", cards: VISIBLE_HAND }] }),
+        ctx: { reconnecting: false, ended: false },
+        openCardId: null,
+        onToggleCard: () => {},
+        onGiveClue: () => {},
       }),
     );
     expect(markup).not.toContain("note-box");

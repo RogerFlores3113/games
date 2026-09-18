@@ -5,11 +5,7 @@ import { Settings } from "lucide-react";
 import type { RoomView } from "@games/schema";
 import { HanabiViewSchema } from "@games/schema/games/hanabi";
 import type { Clue, HanabiView } from "@games/rules";
-import {
-  clueTouchIdsForTarget,
-  isSeatConnected,
-  turnIndicatorText,
-} from "../../lib/hanabi-board-logic";
+import { isSeatConnected, turnIndicatorText } from "../../lib/hanabi-board-logic";
 import { clearNotesForRoom, pruneNotesForSeat } from "../../lib/hanabi-notes";
 import { hintsVisibleForCard } from "../../lib/hanabi-hint-logic";
 import { readKeepHintsPref, writeKeepHintsPref } from "../../lib/keep-hints-pref";
@@ -29,7 +25,6 @@ import { applyPendingOrder, dropZoneStatus } from "../../lib/hanabi-drag-logic";
 import { OwnHand, TeammateHand } from "./Hand";
 import { Table } from "./Table";
 import { CardActions } from "./CardActions";
-import { CluePicker } from "./CluePicker";
 import { EndOverlay } from "./EndOverlay";
 import { FlyToLayer } from "./FlyToLayer";
 import { ReconnectingBanner } from "../ReconnectingBanner";
@@ -57,11 +52,11 @@ export interface HanabiBoardProps {
 
 
 /**
- * D-01/D-02/D-14/D-16/D-17/D-20: the designed board orchestrator — a thin
- * layer that owns select-then-act state, the clue preview, the transient
- * just-clued highlight, and lays out the three bands (teammates / tableau /
- * own hand + controls), rendering EndOverlay over the still-visible board at
- * game end.
+ * D-01/D-02/D-14/D-20, UAT gap 16: the designed board orchestrator — a thin
+ * layer that owns select-then-act state, which opponent tile's quick-clue
+ * popover is open, the transient just-clued highlight, and lays out the
+ * three bands (teammates / tableau / own hand + controls), rendering
+ * EndOverlay over the still-visible board at game end.
  *
  * The one load-bearing rule this file must never violate (carried from the
  * interim board, D-15): a card in the viewer's own hand renders NO identity
@@ -89,9 +84,10 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
 
   const audio = useHanabiAudio(game, reconnecting);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
-  const [clueTarget, setClueTarget] = useState<string | null>(null);
-  const [clueValue, setClueValue] = useState<Clue | null>(null);
-  const [previewClue, setPreviewClue] = useState<Clue | null>(null);
+  // UAT gap 16: the id of the one opponent tile whose quick-clue popover is
+  // open, or null — replaces the deleted CluePicker's clueTarget/clueValue/
+  // previewClue selection state entirely (a tile click IS the target+value).
+  const [clueOpenCardId, setClueOpenCardId] = useState<string | null>(null);
   const [justCluedIds, setJustCluedIds] = useState<ReadonlySet<string>>(new Set());
   const prevHistoryLengthRef = useRef<number | null>(null);
   const clueClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -153,15 +149,30 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
     }, CLUE_HIGHLIGHT_MS);
   }, [game]);
 
-  // WR-05: a value button can become disabled under the pointer/focus
-  // without firing mouseleave/blur, which would leave a stale preview
-  // overriding the selected clue. Drop the preview whenever the conditions
-  // that disable value buttons change.
-  const isYourTurn = game?.isYourTurn ?? false;
-  const previewControlsDisabled = reconnecting || view.status === "ended";
+  // UAT gap 16: the quick-clue popover closes on Escape, and on any pointer
+  // click outside both the open tile and its own popover buttons — matched
+  // via the shared `data-clue-tile` wrapper TeammateCard renders around
+  // both, rather than this effect needing its own ref plumbing. A click ON
+  // the still-open tile itself is deliberately left alone here (it hits this
+  // same "inside" branch) — TeammateCard's own onClick handles the
+  // close-on-second-click toggle.
   useEffect(() => {
-    setPreviewClue(null);
-  }, [clueTarget, previewControlsDisabled, isYourTurn]);
+    if (clueOpenCardId === null) return;
+    function handlePointerDown(event: PointerEvent): void {
+      const target = event.target as Element | null;
+      if (target?.closest(`[data-clue-tile="${clueOpenCardId}"]`)) return;
+      setClueOpenCardId(null);
+    }
+    function handleKeyDown(event: KeyboardEvent): void {
+      if (event.key === "Escape") setClueOpenCardId(null);
+    }
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [clueOpenCardId]);
 
   // Selection hygiene: drop a stale selection once the card leaves the hand
   // (played/discarded), so a disabled action never fires against a dead id.
@@ -244,11 +255,6 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
     view.seats.map((s) => s.seatId),
     game.yourSeatId,
   );
-  const activeClueValue = previewClue ?? clueValue;
-  const previewIds = new Set<string>(
-    clueTarget && activeClueValue ? clueTouchIdsForTarget(game, clueTarget, activeClueValue) : [],
-  );
-
   // HINT-03/D-05: every card's hint visibility, derived synchronously from
   // `game.history` alone — no timer, no mutable cell (see
   // hanabi-hint-logic.ts's header comment on why this must stay pure).
@@ -279,11 +285,17 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
         }
       : null;
 
-  function handleGiveClue() {
-    if (!clueTarget || !clueValue) return;
-    act({ type: "clue", targetSeatId: clueTarget, clue: clueValue });
-    setClueValue(null);
-    setPreviewClue(null);
+  // UAT gap 16: fired by a tile's own quick-clue popover — the target seat
+  // and the clue are both already fully determined by which tile was
+  // clicked, so this sends immediately and closes the popover, with no
+  // separate "give clue" confirmation step.
+  function handleGiveClue(targetSeatId: string, clue: Clue) {
+    act({ type: "clue", targetSeatId, clue });
+    setClueOpenCardId(null);
+  }
+
+  function handleToggleClueCard(cardId: string) {
+    setClueOpenCardId((prev) => (prev === cardId ? null : cardId));
   }
 
   return (
@@ -335,11 +347,12 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
               connected={isSeatConnected(view.seats, hand.seatId)}
               variant={game.variant}
               isActive={hand.seatId === game.activeSeatId}
-              isTarget={clueTarget === hand.seatId}
-              previewIds={previewIds}
               justCluedIds={justCluedIds}
-              disabled={controlsDisabled}
-              onSelectTarget={() => setClueTarget(hand.seatId)}
+              game={game}
+              ctx={ctx}
+              openCardId={clueOpenCardId}
+              onToggleCard={handleToggleClueCard}
+              onGiveClue={handleGiveClue}
               hintsVisible={hintsVisibleIds}
               tileColor={tileColorCss}
             />
@@ -361,16 +374,18 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
 
         {/* fix(06.2-10): testid added purely as a measurement hook — the
             OWN_BAND_PX layout-budget constant covers this ENTIRE row. 06.2-13
-            stripped it to only OwnHand + CardActions + CluePicker (play
-            controls); every non-play preference control now lives inside
-            SettingsModal, opened by the gear trigger above.
+            stripped it to only OwnHand + CardActions (play controls); every
+            non-play preference control now lives inside SettingsModal,
+            opened by the gear trigger above.
             UAT gaps 13/14 (second owner review): Play/Discard now sit ABOVE
             the own hand rather than beside it, and the own hand row is
             wrapped in a full-width `justify-center` band so it is always
-            horizontally centred, whatever the seat count or window width —
-            centring the column itself was not enough once CluePicker (a
-            variant-width sibling) sits underneath and could otherwise pull
-            the flex column's own intrinsic width off-center. */}
+            horizontally centred, whatever the seat count or window width.
+            UAT gap 16: the deleted `CluePicker` (the large clue-target/
+            clue-value menu that used to sit below the hand here) is gone —
+            clue-giving now happens via each opponent tile's own quick-clue
+            popover (TeammateCard/CluePopover), so this row is down to two
+            lines (CardActions, OwnHand) instead of three. */}
         <div data-testid="bottom-controls-row" className="flex flex-none w-full flex-col items-center">
           <CardActions
             game={game}
@@ -402,20 +417,6 @@ export function HanabiBoard({ view, onAction, reconnecting = false }: HanabiBoar
               consumeClickSuppression={drag.consumeClickSuppression}
               hintsVisible={hintsVisibleIds}
               tileColor={tileColorCss}
-            />
-          </div>
-
-          <div className="mt-[2px]">
-            <CluePicker
-              game={game}
-              targets={teammates.map((hand) => ({ seatId: hand.seatId, label: labelFor(hand.seatId) }))}
-              clueTarget={clueTarget}
-              clueValue={clueValue}
-              ctx={ctx}
-              onSelectTarget={(seatId) => setClueTarget(seatId)}
-              onSelectValue={(clue) => setClueValue(clue)}
-              onPreview={(clue) => setPreviewClue(clue)}
-              onGive={handleGiveClue}
             />
           </div>
         </div>

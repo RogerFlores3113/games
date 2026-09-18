@@ -207,17 +207,21 @@ export const TEAMMATE_BAND_PX = 110;
 
 /**
  * UI-SPEC "Bottom (own hand)" row. Second owner review (UAT gaps 13/14):
- * Play/Discard (`CardActions`) now render as their own line ABOVE the own
- * hand rather than beside it, and the own hand is wrapped in a
- * `justify-center` band so it stays horizontally centred at any seat count
- * or window width. `bottom-controls-row` is now three stacked lines —
- * CardActions, OwnHand, CluePicker — not two; real-browser measurement at
- * the 1280x720 floor (5 seats, Black variant, the same UI-11 worst case)
- * came in at 310px with the row's own gaps trimmed to the minimum needed to
- * still read as three distinct groups, up from the pre-gap-13/14 280px
- * two-line footprint.
+ * Play/Discard (`CardActions`) render as their own line ABOVE the own hand
+ * rather than beside it, and the own hand is wrapped in a `justify-center`
+ * band so it stays horizontally centred at any seat count or window width.
+ *
+ * UAT gap 16: corrected 310 -> 193. Deleting `CluePicker` (the large
+ * clue-target/clue-value menu that used to render as this row's third
+ * stacked line) removes that whole line — clue-giving now happens via each
+ * opponent tile's own quick-clue popover (`CluePopover`, opened from
+ * `TeammateCard`), an absolutely-positioned overlay anchored to the clicked
+ * tile that adds zero flow height of its own. `bottom-controls-row` is back
+ * down to two stacked lines (CardActions, OwnHand); real-browser measurement
+ * at the 1280x720 floor (5 seats, Black variant, the same UI-11 worst case)
+ * came in at 193px, down from the CluePicker-era 310px three-line footprint.
  */
-export const OWN_BAND_PX = 310;
+export const OWN_BAND_PX = 193;
 
 /** Vertical/horizontal gap between adjacent tokens/slots — reuses --space-xs. */
 export const TOKEN_GAP_PX = 4;
