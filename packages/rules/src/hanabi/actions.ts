@@ -88,13 +88,16 @@ function isClueValueValid(clue: { type: unknown; value: unknown }): clue is Clue
 
 /** Accepts ONLY an object whose own keys are exactly "type", "targetSeatId"
  * and "clue", nesting a SECOND exact-own-key check on the `clue` sub-object
- * (exactly "type" and "value"). Whether the named color/rank is actually
- * cluable in the active variant (e.g. "rainbow" is never nameable) is left
- * to `canClue`'s touch-check downstream — a clue naming a color the active
- * variant does not use touches zero cards and is rejected with
- * `clue_touches_nothing`, so this generic guard only needs to know the value
- * is A suit or A rank, not which variant is active (this guard has no state
- * parameter to consult). */
+ * (exactly "type" and "value"). This guard is deliberately variant-agnostic
+ * — it has no state parameter to consult — and only confirms the value is A
+ * suit or A rank from the generic closed sets (`ALL_SUITS`/`RANKS`).
+ * Whether the named color is actually nameable in the active variant (e.g.
+ * "rainbow" is never nameable, even in Rainbow, where it would otherwise
+ * touch the rainbow cards) is enforced downstream by `canClue`'s dedicated
+ * nameable-colour check (RULES-14/D-01/D-03, `legality.ts`), which runs
+ * BEFORE the touch check and rejects with `clue_color_not_nameable` — never
+ * `clue_touches_nothing`, which would be wrong in Rainbow since such a clue
+ * does touch cards. */
 export function isClueRequest(
   request: unknown,
 ): request is { type: "clue"; targetSeatId: string; clue: Clue } {

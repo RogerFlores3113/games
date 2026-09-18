@@ -730,7 +730,7 @@ describe("purity: room-state functions never mutate their input", () => {
 // RT-09 / D-08 / D-09: duplicate actionId dedup, and D-10 typed error detail
 // ---------------------------------------------------------------------------
 
-function startedThreeSeatRoom(seed: string) {
+function startedThreeSeatRoom(seed: string, variant: "base" | "rainbow" | "black" = "base") {
   const minter = makeMinter();
   let state = freshRoom();
   const hostJoin = join(state, "Host", 1, minter);
@@ -742,6 +742,12 @@ function startedThreeSeatRoom(seed: string) {
   const thirdJoin = join(state, "Third", 3, minter);
   if (!thirdJoin.ok) throw new Error("unreachable");
   state = thirdJoin.state;
+
+  if (variant !== "base") {
+    const variantResult = setVariant(state, hostJoin.seatId, variant, 3);
+    if (!variantResult.ok) throw new Error("unreachable");
+    state = variantResult.state;
+  }
 
   const started = startGame(state, hostJoin.seatId, 4, seed);
   if (!started.ok) throw new Error("unreachable");
@@ -953,6 +959,35 @@ describe("D-10: every adapter refusal maps 1:1 onto a closed ErrorDetail", () =>
       reason: "bad_request",
       detail: "clue_touches_nothing",
     });
+  });
+});
+
+describe("RULES-14 / T-07-01: a forged non-nameable colour clue frame is refused", () => {
+  it.each([
+    { variant: "rainbow" as const, value: "rainbow" as const },
+    { variant: "base" as const, value: "black" as const },
+    { variant: "black" as const, value: "rainbow" as const },
+  ])("$variant room refuses a forged '$value' colour clue frame", ({ variant, value }) => {
+    const { state } = startedThreeSeatRoom("0123456789abcdef0123456789abcdef", variant);
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const targetSeatId = game.seatIds.find((id) => id !== activeSeatId)!;
+    const clueTokensBefore = game.clueTokens;
+
+    const result = applyGameAction(
+      state,
+      activeSeatId,
+      "forged-non-nameable",
+      { type: "clue", targetSeatId, clue: { type: "color", value } },
+      5,
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "bad_request",
+      detail: "clue_color_not_nameable",
+    });
+    expect((state.game as ActiveGameState).clueTokens).toBe(clueTokensBefore);
   });
 });
 

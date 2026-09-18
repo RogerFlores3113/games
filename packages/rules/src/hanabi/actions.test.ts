@@ -644,6 +644,51 @@ describe("applyAction", () => {
       expect(state.clueTokens).toBe(5);
     });
 
+    it("applyHanabiAction rejects every non-nameable colour with clue_color_not_nameable in base, rainbow and black (D-04)", () => {
+      let variantsSwept = 0;
+      const variants = ["base", "rainbow", "black"] as const;
+      for (const variant of variants) {
+        const config = variantConfig(variant);
+        const nonNameable = (
+          ["red", "yellow", "green", "blue", "white", "rainbow", "black"] as const
+        ).filter((suit) => !config.cluableColors.includes(suit));
+
+        for (const suit of nonNameable) {
+          const clueFacts = initialClueFacts(config);
+          const targetSlots = [
+            {
+              card: card(
+                "seat-b-1",
+                config.suits.includes(suit) ? suit : "red",
+                1,
+              ),
+              facts: clueFacts,
+            },
+          ];
+          const state = baseState({
+            variant,
+            stacks: emptyStacks(variant),
+            deck: [],
+            hands: [
+              { seatId: "seat-a", slots: [] },
+              { seatId: "seat-b", slots: targetSlots },
+              { seatId: "seat-c", slots: [] },
+            ],
+          });
+          const result = applyHanabiAction(state, "seat-a", {
+            type: "clue",
+            targetSeatId: "seat-b",
+            clue: { type: "color", value: suit },
+          });
+          expect(result).toEqual({ ok: false, error: "clue_color_not_nameable" });
+          expect(state.clueTokens).toBe(5);
+          expect(state.history).toHaveLength(0);
+        }
+        variantsSwept++;
+      }
+      expect(variantsSwept).toBe(3);
+    });
+
     it("a clue at zero tokens is rejected with no_clue_tokens", () => {
       const state = baseState({ clueTokens: 0, deck: [] });
       const result = applyHanabiAction(state, "seat-a", {
