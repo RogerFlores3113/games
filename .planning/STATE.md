@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 17
+current_plan: 18
 status: executing
 stopped_at: Completed 06.2-17-PLAN.md (tile-tint overlay); starting spend-freed-height follow-up
-last_updated: "2026-09-18T05:24:03.360Z"
+last_updated: "2026-09-18T05:57:29.803Z"
 last_activity: 2026-09-18
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 79
-  completed_plans: 75
+  completed_plans: 76
   percent: 78
 ---
 
@@ -27,13 +27,13 @@ See: .planning/PROJECT.md (updated 2026-09-01)
 ## Current Position
 
 Phase: 06.2
-Plan: 17 of 20
-Current Plan: 17
+Plan: 18 of 20
+Current Plan: 18
 Total Plans in Phase: 20
 Status: Ready to execute
 Last activity: 2026-09-18
 
-Progress: [██████████] 95%
+Progress: [██████████] 96%
 
 ## Performance Metrics
 
@@ -136,6 +136,7 @@ Progress: [██████████] 95%
 | Phase 06.2 P15 | 35min | 2 tasks | 5 files |
 | Phase 06.2 P16 | 35min | 2 tasks | 4 files |
 | Phase 06.2 P17 | 55min | 3 tasks | 6 files |
+| Phase 06.2 P18 | 50m | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -293,6 +294,8 @@ Recent decisions affecting current work:
 - [Phase 06.2]: Play/Deck+Discard/Tokens laid out as items-start flex-row siblings, not items-stretch, since each board region now owns its own fixed height
 - [Phase 06.2]: Deck+Discard middle column uses flex:1/min-width:0 so the board panel's total width isn't a new hardcoded ledger constant
 - [Phase 06.2]: 06.2-17: overlay testids put the overlay label first (tile-color-overlay-own-hand-slot-N), not last, to avoid colliding with existing own-hand-slot-/other-hand-card- prefix selectors in e2e helpers and production FlyToLayer.tsx
+- [Phase ?]: 06.2-18: onGroupDiscardBySuit passed as undefined (not a no-op) while reconnecting/ended, so Table's own 'handler absent' disabled check covers the gate without a new ctx prop
+- [Phase ?]: 06.2-18: groupedBySuitOrder's suit order is always game.stacks.map(s => s.suit) at the call site, never a hardcoded suit list, so Rainbow/Black sort correctly
 
 ### Pending Todos
 
@@ -315,6 +318,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-18T05:24:03.350Z
+Last session: 2026-09-18T05:57:26.175Z
 Stopped at: Completed 06.2-17-PLAN.md (tile-tint overlay); starting spend-freed-height follow-up
 Resume file: None

@@ -304,7 +304,7 @@ Plans:
 **Goal:** Rework the table's visual language and hint feedback so the board reads like a physical tile game, and give the discard pile a shared, player-arrangeable order.
 **Requirements**: HINT-01, HINT-02, HINT-03, HINT-04, NOTE-03, DRAG-01, TILE-01, TILE-02, TILE-03, BOARD-01, BOARD-02, BOARD-03, BOARD-04, BOARD-05, DISC-01 (from the 17 owner requests under "## Gaps" in .planning/phases/06.1-table-polish-firework-art-notes-drag-audio/06.1-HUMAN-UAT.md)
 **Depends on:** Phase 06.1
-**Plans:** 16/20 plans executed
+**Plans:** 17/20 plans executed
 
 Scope (owner requests, 06.1 sign-off):
 - Hint display: a clue highlights the tile in that clue's colour (not a generic yellow); a number clue shows the number on the tile back; a "keep hints visible" toggle (on = hints persist past the next player's move, off = they clear).
@@ -360,7 +360,7 @@ Plans:
 - [x] 06.2-15-PLAN.md — Play area as a suit-column grid with five reserved rank slots, fixed board geometry ledger (gaps 1, 3)
 - [x] 06.2-16-PLAN.md — Table rebuilt as three fixed reserved regions that never grow or reflow (gap 1)
 - [x] 06.2-17-PLAN.md — Tile colour as a translucent darkening overlay above the card art (gap 7)
-- [ ] 06.2-18-PLAN.md — Shared "group by suit" discard re-sort through reorderDiscard (gap 10)
+- [x] 06.2-18-PLAN.md — Shared "group by suit" discard re-sort through reorderDiscard (gap 10)
 - [ ] 06.2-19-PLAN.md — Worst-case 1280x720 fit re-measure, ledger reconciliation, UI-SPEC update
 - [ ] 06.2-20-PLAN.md — Full gate + owner sign-off on the reworked board (checkpoint)
 
