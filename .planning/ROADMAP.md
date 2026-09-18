@@ -384,7 +384,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 07-03-PLAN.md — Rainbow tile quick-clue colour row (D-05..D-08) with anchor flip; row-aware e2e helpers
+- [x] 07-03-PLAN.md — Rainbow tile quick-clue colour row (D-05..D-08) with anchor flip; row-aware e2e helpers
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -407,4 +407,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Wire Engine Into Room Actor | 9/9 | Complete   | 2026-09-16 |
 | 5. Reconnect & Session Durability Hardening | 6/6 | Complete    | 2026-09-17 |
 | 6. Game Interface | 7/7 | Complete    | 2026-09-17 |
-| 7. Variant Support (Rainbow, Black) | 2/5 | In Progress|  |
+| 7. Variant Support (Rainbow, Black) | 3/5 | In Progress|  |
