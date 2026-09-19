@@ -117,3 +117,17 @@ Confirmed listening via `ss -ltnp` (3100, 8787), left running in the background 
 5. Click a teammate's black tile. It shows a single "Black" button. Black is still silver with its double-ring burst, and there is no variant label anywhere on the board.
 6. The deck counter at the start reflects a 65-tile deck (65 minus the dealt hands). Play the Black game to the end: the end overlay reads "/ 35". Nothing warns about last copies, and the game ends only on fuses, a perfect score or the final round.
 7. Regression: a Rainbow game still has six columns and ends "/ 30"; a base game has five columns and ends "/ 25".
+
+## Owner's verbatim reply to the 7-suit Black checkpoint (2026-09-18)
+
+"black is not a color that accepts hints. You cannot hint at the color black. that's how black works. And black is reverse - there's 3x 5s, 2x of 4 3 2, and 1x 1s, and you play them in reverse order - 5 then 4 then 3 then 2 then 1. Also, can we take the discard area and swap that into the space that says "X's turn"? should give the discard pile more real estate to breathe and thus a larger tile size."
+
+result: issues
+
+## Gaps (round 2)
+
+2. **Black cannot be clued by colour.** "Black" is never a nameable colour clue, and colour clues never touch Black tiles; only rank clues touch them. The Phase 7 gap-1 implementation, which made Black nameable and made a Black clue touch Rainbow, is wrong and must be reversed. The Rainbow tile popover goes back to the five nameable colours. A Black tile's popover offers only the number. A server-side colour clue naming "black" is refused with `clue_color_not_nameable`.
+3. **Black is a reversed suit.** Copies: three 5s, two each of 4/3/2, and one 1, so 10 tiles. Play order is 5 -> 4 -> 3 -> 2 -> 1: the first playable Black tile is a 5, each next Black play must be exactly one lower, and the stack is complete when its 1 is played. That stack scores 5 like any other.
+   - The Black deck becomes 5 colours x 10 + Rainbow 10 (unchanged) + Black 10 = 70 tiles. The maximum score stays 35.
+   - Engine legality, stack state, completion, "max playable" and score must all be direction-aware, driven by the variant configuration rather than a `=== "black"` special case where possible.
+4. **Swap the discard area with the turn sign.** The discard pile moves into the large space below the tokens and deck that currently holds the "X's turn" sign; the turn sign moves into the smaller spot the discard vacates. The larger area gives discard tiles room to be bigger. Fixed geometry and the 1280x720 fit still hold.
