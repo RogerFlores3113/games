@@ -7,6 +7,7 @@ import { writeDisplayName } from "../lib/seat-token";
 import { writePendingVariant } from "../lib/pending-variant";
 
 type VariantOption = "base" | "rainbow" | "black";
+type GameOption = "" | "hanabi" | "innovation";
 
 // The page is server-rendered, so its form exists before React attaches
 // `onSubmit`. A click in that window falls through to a native GET submit
@@ -37,11 +38,13 @@ const VARIANTS: { value: VariantOption; label: string }[] = [
  */
 export default function HomePage() {
   const router = useRouter();
+  const [game, setGame] = useState<GameOption>("");
   const [displayName, setDisplayName] = useState("");
   const [variant, setVariant] = useState<VariantOption>("base");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hydrated = useHydrated();
+  const isHanabi = game === "hanabi";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -75,27 +78,67 @@ export default function HomePage() {
   }
 
   return (
-    <main
-      className="flex min-h-screen items-center justify-center px-[length:var(--space-md)]"
-      style={{ backgroundColor: "var(--color-bg)" }}
-    >
+    <main className="landing-backdrop flex min-h-screen items-center justify-center px-[length:var(--space-md)] py-[length:var(--space-xl)]">
       <form
         onSubmit={handleSubmit}
-        className="flex w-full max-w-sm flex-col gap-[length:var(--space-md)] rounded-lg p-[length:var(--space-lg)]"
-        style={{ backgroundColor: "var(--color-surface)" }}
+        className="flex w-full max-w-sm flex-col gap-[length:var(--space-md)] rounded-lg p-[length:var(--space-lg)] shadow-lg"
+        style={{
+          backgroundColor: "var(--color-landing-panel)",
+          border: "1px solid var(--color-landing-panel-border)",
+        }}
       >
         <h1
           className="text-[length:var(--text-heading)] font-semibold"
-          style={{ color: "var(--color-text)", lineHeight: "var(--text-heading--line-height)" }}
+          style={{
+            color: "var(--color-landing-text)",
+            lineHeight: "var(--text-heading--line-height)",
+          }}
         >
-          games.rogerflores.dev
+          Board games
         </h1>
+
+        <div className="flex flex-col gap-[length:var(--space-sm)]">
+          <label
+            htmlFor="game"
+            className="text-[length:var(--text-label)] font-semibold"
+            style={{
+              color: "var(--color-landing-text)",
+              lineHeight: "var(--text-label--line-height)",
+            }}
+          >
+            Game
+          </label>
+          <select
+            id="game"
+            name="game"
+            required
+            value={game}
+            onChange={(event) => setGame(event.target.value as GameOption)}
+            className="rounded-md border px-[length:var(--space-sm)] py-[length:var(--space-sm)] text-[length:var(--text-body)]"
+            style={{
+              backgroundColor: "var(--color-landing-panel)",
+              borderColor: "var(--color-landing-panel-border)",
+              color: "var(--color-landing-text)",
+            }}
+          >
+            <option value="" disabled>
+              Choose a game…
+            </option>
+            <option value="hanabi">Hanabi</option>
+            <option value="innovation" disabled>
+              Innovation - WIP
+            </option>
+          </select>
+        </div>
 
         <div className="flex flex-col gap-[length:var(--space-sm)]">
           <label
             htmlFor="displayName"
             className="text-[length:var(--text-label)] font-semibold"
-            style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
+            style={{
+              color: "var(--color-landing-text)",
+              lineHeight: "var(--text-label--line-height)",
+            }}
           >
             Your name
           </label>
@@ -109,51 +152,58 @@ export default function HomePage() {
             onChange={(event) => setDisplayName(event.target.value)}
             className="rounded-md border px-[length:var(--space-sm)] py-[length:var(--space-sm)] text-[length:var(--text-body)]"
             style={{
-              backgroundColor: "var(--color-bg)",
-              borderColor: "var(--color-border)",
-              color: "var(--color-text)",
+              backgroundColor: "var(--color-landing-panel)",
+              borderColor: "var(--color-landing-panel-border)",
+              color: "var(--color-landing-text)",
             }}
           />
           {error && (
             <p
               className="text-[length:var(--text-label)]"
-              style={{ color: "var(--color-destructive)" }}
+              style={{ color: "var(--color-landing-destructive)" }}
             >
               {error}
             </p>
           )}
         </div>
 
-        <fieldset className="flex flex-col gap-[length:var(--space-sm)]">
-          <legend
-            className="text-[length:var(--text-label)] font-semibold"
-            style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
-          >
-            Variant
-          </legend>
-          <div className="flex gap-[length:var(--space-md)]">
-            {VARIANTS.map(({ value, label }) => (
-              <label
-                key={value}
-                className="flex items-center gap-[length:var(--space-xs)] text-[length:var(--text-body)]"
-                style={{ color: "var(--color-text)" }}
+        {isHanabi && (
+          <>
+            <fieldset className="flex flex-col gap-[length:var(--space-sm)]">
+              <legend
+                className="text-[length:var(--text-label)] font-semibold"
+                style={{
+                  color: "var(--color-landing-text)",
+                  lineHeight: "var(--text-label--line-height)",
+                }}
               >
-                <input
-                  type="radio"
-                  name="variant"
-                  value={value}
-                  checked={variant === value}
-                  onChange={() => setVariant(value)}
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-        </fieldset>
+                Variant
+              </legend>
+              <div className="flex gap-[length:var(--space-md)]">
+                {VARIANTS.map(({ value, label }) => (
+                  <label
+                    key={value}
+                    className="flex items-center gap-[length:var(--space-xs)] text-[length:var(--text-body)]"
+                    style={{ color: "var(--color-landing-text)" }}
+                  >
+                    <input
+                      type="radio"
+                      name="variant"
+                      value={value}
+                      checked={variant === value}
+                      onChange={() => setVariant(value)}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
 
-        <Button type="submit" variant="primary" disabled={submitting || !hydrated}>
-          {submitting ? "Creating..." : "Create room"}
-        </Button>
+            <Button type="submit" variant="primary" disabled={submitting || !hydrated}>
+              {submitting ? "Creating..." : "Create room"}
+            </Button>
+          </>
+        )}
       </form>
     </main>
   );

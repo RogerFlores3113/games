@@ -161,6 +161,28 @@
   --color-token-disc: #000000;
   --color-token-fuse-rim: #E8722C;
   --color-tile-shadow: rgba(0, 0, 0, 0.4);
+
+  /*
+   * Landing-page-only "brighter tone" palette (owner request, 2026-09-19).
+   * The in-game table keeps the dark "fireworks night" tokens above
+   * untouched — these `--color-landing-*` tokens are used EXCLUSIVELY by
+   * app/page.tsx and the `.landing-backdrop` rule below, never by the room
+   * page. `--color-landing-panel` is opaque (not a translucent scrim) so
+   * the form reads clearly over a busy daylight photo without needing to
+   * darken the image itself. Contrast verified (WCAG AA, >=4.5:1 for body
+   * text): `--color-landing-text` on `--color-landing-panel` is 15.79:1,
+   * `--color-landing-text-muted` on `--color-landing-panel` is 7.47:1,
+   * `--color-landing-destructive` on `--color-landing-panel` is 5.25:1 (the
+   * dark "fireworks night" `--color-destructive` above computes to only
+   * 3.73:1 on a light panel and fails AA, hence this separate darker red
+   * rather than reusing that token here).
+   */
+  --color-landing-bg: #E7F1FB;
+  --color-landing-panel: #FFFFFF;
+  --color-landing-panel-border: #D7E3F0;
+  --color-landing-text: #10233D;
+  --color-landing-text-muted: #47566B;
+  --color-landing-destructive: #C7362F;
 }
 
 body {
@@ -366,4 +388,21 @@ body {
   .tile-shift {
     transition: none;
   }
+}
+
+/*
+ * Landing page only (owner request, 2026-09-19): daylight San Francisco Bay
+ * Area photo behind the "Board games" form, replacing the dark
+ * `--color-bg` fill the page used before. `--color-landing-bg` is the
+ * fallback shown before the image loads. No darkening scrim here — the
+ * opaque `--color-landing-panel` card (see app/page.tsx) sits on top and
+ * carries all the text contrast, so the photo itself is shown at full
+ * brightness. Sourced, licence-verified and credited in
+ * apps/web/public/backgrounds/CREDITS.md under "golden-gate-daylight.webp".
+ */
+.landing-backdrop {
+  background-color: var(--color-landing-bg);
+  background-image: url("/backgrounds/golden-gate-daylight.webp");
+  background-size: cover;
+  background-position: center;
 }

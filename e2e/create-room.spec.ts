@@ -53,6 +53,35 @@ test.describe("create room (ROOM-01)", () => {
   });
 });
 
+test.describe("landing page game picker (owner request, 2026-09-19)", () => {
+  test("title reads 'Board games', Innovation is disabled, and the variant/Create room controls stay hidden until Hanabi is chosen", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    await expect(page).toHaveTitle("Board games");
+    await expect(page.getByRole("heading", { name: "Board games" })).toBeVisible();
+
+    const innovationOption = page.locator('option[value="innovation"]');
+    await expect(innovationOption).toBeDisabled();
+    await expect(innovationOption).toHaveText("Innovation - WIP");
+
+    // Nothing Hanabi-specific shows until a game is chosen.
+    await expect(page.getByRole("radio", { name: "Base" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Create room" })).toHaveCount(0);
+
+    await page.getByLabel("Game").selectOption("hanabi");
+
+    await expect(page.getByRole("radio", { name: "Base" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Create room" })).toBeVisible();
+  });
+
+  test("a room can be created after choosing Hanabi", async ({ page }) => {
+    const code = await createRoom(page, { name: "Roger" });
+    expect(code).toMatch(ROOM_CODE_REGEX);
+  });
+});
+
 test.describe("rendered geometry (no collapsed layout)", () => {
   for (const [label, viewport] of [
     ["mobile", { width: 390, height: 844 }],

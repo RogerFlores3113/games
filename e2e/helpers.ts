@@ -19,6 +19,10 @@ export async function createRoom(page: Page, { name, variant = "base" }: CreateR
   // Wait for that before touching the form: input typed into the server-
   // rendered markup before React attaches is not in React's state, and a
   // pre-hydration submit is a native GET that reloads an empty form.
+  // The variant control and "Create room" stay hidden until a game is
+  // chosen from the dropdown (owner request, 2026-09-19) — Hanabi is the
+  // only playable option; Innovation is present but disabled ("WIP").
+  await page.getByLabel("Game").selectOption("hanabi");
   const createButton = page.getByRole("button", { name: "Create room" });
   await expect(createButton).toBeEnabled();
   await page.getByLabel("Your name").fill(name);

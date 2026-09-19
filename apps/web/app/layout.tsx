@@ -14,8 +14,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "games.rogerflores.dev",
+  title: "Board games",
   description: "Real-time multiplayer board games — click a link, start playing.",
+  openGraph: {
+    title: "Board games",
+    description: "Real-time multiplayer board games — click a link, start playing.",
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

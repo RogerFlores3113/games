@@ -65,6 +65,26 @@ illuminated building signs (e.g. "AXA", "CCBI") are legible at full resolution a
 a real skyline photograph; there is no overlaid caption, watermark, or date burned into the image, and no
 identifiable people.
 
+## golden-gate-daylight.webp
+
+Source URL: https://commons.wikimedia.org/wiki/File:Golden_Gate_Bridge_Above_the_Fog_from_Battery_Spencer.jpg
+Author: Dongmin03
+Author URL: https://commons.wikimedia.org/w/index.php?title=User:Dongmin03
+License: CC BY 4.0 (Creative Commons Attribution 4.0 International)
+License URL: https://creativecommons.org/licenses/by/4.0/
+License grant (quoted): "Share — copy and redistribute the material in any medium or format for any purpose, even commercially." (from the license deed's "You are free to:" section; the deed's "Under the following terms:" section additionally requires attribution, honored by this credit file)
+Retrieved: 2026-09-19
+Modifications: resized to 1920px wide (1920x1280), re-encoded as WebP quality 80 (165,310 bytes)
+
+Verified via the Wikimedia Commons API (`action=query&prop=imageinfo&iiprop=extmetadata`) against
+https://commons.wikimedia.org/wiki/File:Golden_Gate_Bridge_Above_the_Fog_from_Battery_Spencer.jpg,
+which returned `LicenseShortName: CC BY 4.0`, `LicenseUrl: https://creativecommons.org/licenses/by/4.0`,
+`AttributionRequired: true`, and `Artist: Dongmin03`. Original photo (4608x3072, taken 2025-09-16 from
+Battery Spencer in the Marin Headlands) shows both Golden Gate Bridge towers rising above a layer of fog
+in full daylight, blue sky above, with the San Francisco skyline faintly visible in the background —
+chosen for the landing page's brighter tone (as opposed to the in-game table's dark "fireworks night"
+theme, which this image does not touch). No readable text, no identifiable people.
+
 ## wood-tile.webp
 
 - Source: supplied directly by the project owner (pasted into the build session on 2026-09-17)
