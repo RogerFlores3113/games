@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 current_plan: Not started
 status: completed
-stopped_at: Paused after landing-page polish; 8 commits await deploy
+stopped_at: "Deployed polish batch 2026-09-19; Innovation base-game research complete (.planning/research/innovation/)"
 last_updated: "2026-09-19T19:03:13.393Z"
 last_activity: 2026-09-19
 progress:
@@ -352,5 +352,5 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-09-19T19:03:13.386Z
-Stopped at: Paused after landing-page polish; 8 commits await deploy
-Resume file: .planning/.continue-here.md
+Stopped at: Deployed polish batch; Innovation research complete, awaiting owner edition decision
+Resume file: None
