@@ -5,22 +5,24 @@
 // objects exported here, never from a hardcoded literal — that is what lets
 // Phase 7 enable Rainbow and Black without restructuring the engine.
 //
-// Resolved open question (RESEARCH.md "Open Questions — RESOLVED", #1):
-// Black is a normally color-cluable suit — "black" is a nameable clue color,
-// exactly like red or blue, matching the physical box product. Rainbow, by
-// contrast, is touched by every color clue and is NEVER itself a nameable
-// clue color (it never appears in `cluableColors`).
+// Owner gap closure round 2 (2026-09-18, UAT gap 2, supersedes 07-CONTEXT.md
+// D-08 and the round-1 "Black is nameable" behaviour from plan 07-07): Black
+// is NEVER a nameable colour clue, and NO colour clue ever touches a Black
+// tile — the owner, verbatim: "black is not a color that accepts hints. You
+// cannot hint at the color black." Only rank clues touch Black. Rainbow is
+// unchanged by this: it is still touched by every nameable colour clue and
+// is still never itself nameable.
 //
-// Owner gap closure (2026-09-18, supersedes the old 6-suit Black): Black is
-// 7 suits — the five colours, Rainbow, and Black. Inside Black, Rainbow
-// keeps its own Rainbow-variant rules unchanged (every nameable colour
-// clue touches it, including a Black clue, since Black is nameable; Rainbow
-// itself is never nameable and its rank distribution is untouched: three
-// 1s, two each of 2/3/4, one 5). Black stays its own nameable colour with
-// one copy of each rank. This is why `BLACK_CONFIG.colorClueTouches` reuses
-// the exact same "every nameable colour touches rainbow" predicate as
-// `RAINBOW_CONFIG` (hoisted below as `rainbowAwareColorClueTouches`) rather
-// than the plain exact-match rule every other suit uses.
+// Every suit's colour-clue behaviour is declared once, per-suit, in
+// `SUIT_RULES` below via a `ColorTouch` tag:
+//   - "named": the suit is itself a nameable colour and is touched only by a
+//     clue naming it exactly (red, yellow, green, blue, white).
+//   - "every": touched by every nameable colour clue and never itself
+//     nameable (rainbow).
+//   - "never": touched by no colour clue and never itself nameable (black).
+// `cluableColors`, `colorClueTouches`, and the per-variant configs are all
+// derived generically from this one table — there is no `=== "black"`
+// special case anywhere in this file's logic.
 //
 // Rainbow inference consequence (RESEARCH.md Pitfall 3), recorded beside
 // `colorClueTouches` because it explains behavior this predicate produces:
@@ -30,7 +32,10 @@
 // list through this predicate rather than assigning the named color
 // directly. A negative color clue, conversely, DOES rule out rainbow: a card
 // untouched by a color clue can never be rainbow, since rainbow is touched by
-// every color clue.
+// every color clue. Black is untouched by every colour clue (positive or
+// negative it never resolves anything about "black" as a candidate colour,
+// since it can never be named), so a negative colour clue does NOT rule out
+// black the way it rules out rainbow.
 //
 // Zero runtime dependencies (FDN-02): this file brings in nothing but types.
 
@@ -70,6 +75,29 @@ export const SINGLE_RANK_COUNTS: Readonly<Record<Rank, number>> = {
 
 const BASE_SUITS: readonly Suit[] = ["red", "yellow", "green", "blue", "white"];
 
+/** How a suit relates to colour clues (see file header). */
+export type ColorTouch = "named" | "every" | "never";
+
+/** Per-suit colour-touch behaviour plus its rank-count distribution. */
+export interface SuitRule {
+  readonly colorTouch: ColorTouch;
+  readonly rankCounts: Readonly<Record<Rank, number>>;
+}
+
+/** Single frozen source of truth for every suit's colour-clue behaviour and
+ * rank distribution (owner gap closure, 2026-09-18). Plan 07-10 changes
+ * Black's `rankCounts` and adds a play direction; this table's `colorTouch`
+ * values are not expected to change again. */
+const SUIT_RULES: Readonly<Record<Suit, SuitRule>> = Object.freeze({
+  red: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS },
+  yellow: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS },
+  green: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS },
+  blue: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS },
+  white: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS },
+  rainbow: { colorTouch: "every", rankCounts: BASE_RANK_COUNTS },
+  black: { colorTouch: "never", rankCounts: SINGLE_RANK_COUNTS },
+});
+
 export interface VariantConfig {
   readonly variant: Variant;
   readonly suits: readonly Suit[];
@@ -77,76 +105,44 @@ export interface VariantConfig {
   rankCountsFor(suit: Suit): Readonly<Record<Rank, number>>;
   colorClueTouches(suit: Suit, clueColor: Suit): boolean;
   rankClueTouches(rank: Rank, clueRank: Rank): boolean;
+  suitRule(suit: Suit): SuitRule;
 }
 
 function rankClueTouches(rank: Rank, clueRank: Rank): boolean {
   return rank === clueRank;
 }
 
-/** Shared by RAINBOW_CONFIG and BLACK_CONFIG (not duplicated): every
- * nameable colour clue touches a rainbow card, regardless of which colour
- * was named — this is the "touched by every colour" rule. In Black, Black
- * itself is nameable, so a Black clue touches rainbow cards too. */
-function rainbowAwareColorClueTouches(suit: Suit, clueColor: Suit): boolean {
-  if (suit === "rainbow") return true;
-  return suit === clueColor;
+/** Builds a `VariantConfig` for the given suit list, deriving every field
+ * generically from `SUIT_RULES` — no per-variant special-casing. */
+function buildVariantConfig(variant: Variant, suits: readonly Suit[]): VariantConfig {
+  const cluableColors = suits.filter((suit) => SUIT_RULES[suit].colorTouch === "named");
+
+  return Object.freeze({
+    variant,
+    suits,
+    cluableColors,
+    rankCountsFor(suit: Suit): Readonly<Record<Rank, number>> {
+      return SUIT_RULES[suit].rankCounts;
+    },
+    colorClueTouches(suit: Suit, clueColor: Suit): boolean {
+      const touch = SUIT_RULES[suit].colorTouch;
+      if (touch === "named") return suit === clueColor;
+      if (touch === "every") return cluableColors.includes(clueColor);
+      return false;
+    },
+    rankClueTouches,
+    suitRule(suit: Suit): SuitRule {
+      return SUIT_RULES[suit];
+    },
+  });
 }
 
-const BASE_CONFIG: VariantConfig = Object.freeze({
-  variant: "base",
-  suits: BASE_SUITS,
-  cluableColors: BASE_SUITS,
-  rankCountsFor(_suit: Suit): Readonly<Record<Rank, number>> {
-    return BASE_RANK_COUNTS;
-  },
-  colorClueTouches(suit: Suit, clueColor: Suit): boolean {
-    return suit === clueColor;
-  },
-  rankClueTouches,
-});
-
 const RAINBOW_SUITS: readonly Suit[] = [...BASE_SUITS, "rainbow"];
-
-const RAINBOW_CONFIG: VariantConfig = Object.freeze({
-  variant: "rainbow",
-  suits: RAINBOW_SUITS,
-  // Rainbow is never itself a nameable clue color (resolved open question).
-  cluableColors: BASE_SUITS,
-  rankCountsFor(_suit: Suit): Readonly<Record<Rank, number>> {
-    // Rainbow is a full 10-card suit, same distribution as any normal suit.
-    return BASE_RANK_COUNTS;
-  },
-  colorClueTouches: rainbowAwareColorClueTouches,
-  rankClueTouches,
-});
-
-// Black is 7 suits: the five colours, Rainbow, and Black (owner gap
-// closure, 2026-09-18). ALL_SUITS order is used directly so `suits` lists
-// red/yellow/green/blue/white/rainbow/black.
 const BLACK_SUITS: readonly Suit[] = [...BASE_SUITS, "rainbow", "black"];
 
-// Black's own nameable colours: the five colours plus Black itself.
-// "rainbow" is deliberately excluded — it is never nameable in any variant.
-const BLACK_CLUABLE: readonly Suit[] = [...BASE_SUITS, "black"];
-
-const BLACK_CONFIG: VariantConfig = Object.freeze({
-  variant: "black",
-  suits: BLACK_SUITS,
-  // Black IS a normal, color-cluable suit (resolved open question); Rainbow
-  // inside Black is never nameable, matching RAINBOW_CONFIG.
-  cluableColors: BLACK_CLUABLE,
-  rankCountsFor(suit: Suit): Readonly<Record<Rank, number>> {
-    // Rainbow inside Black keeps the full 10-card distribution ("do not
-    // adjust number of rainbow tiles" — owner gap closure); only Black
-    // itself is single-copy.
-    return suit === "black" ? SINGLE_RANK_COUNTS : BASE_RANK_COUNTS;
-  },
-  // Inside Black, Rainbow follows the Rainbow rule: every nameable colour
-  // clue touches it, including a Black clue, since Black is nameable here.
-  // Black itself behaves like any normal suit (exact match only).
-  colorClueTouches: rainbowAwareColorClueTouches,
-  rankClueTouches,
-});
+const BASE_CONFIG: VariantConfig = buildVariantConfig("base", BASE_SUITS);
+const RAINBOW_CONFIG: VariantConfig = buildVariantConfig("rainbow", RAINBOW_SUITS);
+const BLACK_CONFIG: VariantConfig = buildVariantConfig("black", BLACK_SUITS);
 
 /** Resolves a variant name to its `VariantConfig`. Exhaustive over the closed
  * `Variant` union — an unrecognized value throws rather than silently

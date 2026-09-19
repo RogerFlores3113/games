@@ -211,8 +211,7 @@ describe("legality", () => {
       });
     });
 
-    it("Black: naming black against a hand holding a black card stays legal", () => {
-      const config = variantConfig("black");
+    it("Black (owner gap closure, 2026-09-18): naming black against a hand holding a black card is refused with clue_color_not_nameable", () => {
       const state = buildState("black", ["a", "b"], "seed-nameable-black-positive");
       const targetHandIndex = state.hands.findIndex((h) => h.seatId === "b");
       const craftedSlots = state.hands[targetHandIndex]!.slots.map((slot, i) => ({
@@ -225,14 +224,14 @@ describe("legality", () => {
           i === targetHandIndex ? { seatId: h.seatId, slots: craftedSlots } : h,
         ),
       };
-      void config;
 
       expect(canClue(craftedState, "a", "b", { type: "color", value: "black" })).toEqual({
-        legal: true,
+        legal: false,
+        reason: "clue_color_not_nameable",
       });
     });
 
-    it("Black: naming black against a hand whose only candidate is a rainbow card is legal and touches exactly that card", () => {
+    it("Black (owner gap closure, 2026-09-18): naming black against a hand whose only candidate is a rainbow card is still refused, and no colour clue touches the rainbow card via black", () => {
       const state = buildState("black", ["a", "b"], "seed-nameable-black-touches-rainbow");
       const targetHandIndex = state.hands.findIndex((h) => h.seatId === "b");
       const craftedSlots = state.hands[targetHandIndex]!.slots.map((slot, i) => ({
@@ -250,14 +249,15 @@ describe("legality", () => {
       };
 
       expect(canClue(craftedState, "a", "b", { type: "color", value: "black" })).toEqual({
-        legal: true,
+        legal: false,
+        reason: "clue_color_not_nameable",
       });
       const touched = cardsTouchedByClue(
         variantConfig("black"),
         craftedState.hands[targetHandIndex]!.slots,
         { type: "color", value: "black" },
       );
-      expect(touched).toEqual([craftedSlots[0]!.card.id]);
+      expect(touched).toEqual([]);
     });
   });
 

@@ -19,5 +19,5 @@ export { canPlay, canDiscard, canClue, canReorder, cardsTouchedByClue, MAX_FUSES
 export { currentScore, scoreBand } from "./hanabi/endgame";
 export { checkHanabiViewForLeaks, secretsForHanabiSeat } from "./hanabi/hanabi-leak-check";
 export type { HanabiAction, HanabiState, HanabiView, HanabiCardView, ClueFacts, Clue } from "./hanabi/state";
-export type { Suit, Rank, VariantConfig } from "./hanabi/variant";
+export type { Suit, Rank, VariantConfig, ColorTouch, SuitRule } from "./hanabi/variant";
 export type { HanabiSeatSecrets } from "./hanabi/hanabi-leak-check";

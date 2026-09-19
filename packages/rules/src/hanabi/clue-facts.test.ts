@@ -74,24 +74,26 @@ describe("clue facts", () => {
     expect(next.possibleSuits).toEqual(["yellow", "green", "blue", "white"]);
   });
 
-  it("black variant, positive black color clue narrows to rainbow or black", () => {
+  it("black variant (owner gap closure, 2026-09-18), positive red color clue removes black from candidates and keeps red/rainbow", () => {
     const config = variantConfig("black");
     const facts = initialClueFacts(config);
 
-    const next = applyClueToSlotFacts(config, facts, { type: "color", value: "black" }, true);
+    const next = applyClueToSlotFacts(config, facts, { type: "color", value: "red" }, true);
 
-    expect(next.possibleSuits).toEqual(["rainbow", "black"]);
+    expect(next.possibleSuits).toEqual(["red", "rainbow"]);
+    expect(next.possibleSuits).not.toContain("black");
   });
 
-  it("black variant, negative black color clue rules out both rainbow and black", () => {
+  it("black variant (owner gap closure, 2026-09-18), negative red color clue rules out rainbow but leaves black in possibleSuits (black is never resolved by a colour clue)", () => {
     const config = variantConfig("black");
     const facts = initialClueFacts(config);
 
-    const next = applyClueToSlotFacts(config, facts, { type: "color", value: "black" }, false);
+    const next = applyClueToSlotFacts(config, facts, { type: "color", value: "red" }, false);
 
     expect(next.possibleSuits).not.toContain("rainbow");
-    expect(next.possibleSuits).not.toContain("black");
-    expect(next.possibleSuits).toEqual(["red", "yellow", "green", "blue", "white"]);
+    expect(next.possibleSuits).not.toContain("red");
+    expect(next.possibleSuits).toContain("black");
+    expect(next.possibleSuits).toEqual(["yellow", "green", "blue", "white", "black"]);
   });
 
   it("applying two clues in sequence intersects: candidate sets only shrink or stay equal", () => {

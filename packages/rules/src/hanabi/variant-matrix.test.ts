@@ -96,14 +96,15 @@ describe("variant matrix", () => {
       }
 
       if (variant === "black") {
-        // Black: "black" IS offered as a cluable color, "rainbow" is not,
-        // and a black color clue touches black cards AND rainbow cards
-        // (Rainbow keeps its Rainbow-variant rule inside Black).
-        expect(config.cluableColors.includes("black")).toBe(true);
+        // Black (owner gap closure, 2026-09-18): "black" is NEVER offered as
+        // a cluable color, "rainbow" is not either, and no colour clue ever
+        // touches a black card — only rank clues touch black.
+        expect(config.cluableColors.includes("black")).toBe(false);
         expect(config.cluableColors.includes("rainbow")).toBe(false);
-        expect(config.colorClueTouches("black", "black")).toBe(true);
+        expect(config.colorClueTouches("black", "black")).toBe(false);
+        expect(config.colorClueTouches("black", "red")).toBe(false);
         expect(config.colorClueTouches("red", "black")).toBe(false);
-        expect(config.colorClueTouches("rainbow", "black")).toBe(true);
+        expect(config.colorClueTouches("rainbow", "black")).toBe(false);
 
         // Each black rank exists exactly once in the deck, so discarding a
         // black card makes that rank's stack unachievable — a deck

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ALL_SUITS,
   BASE_RANK_COUNTS,
   RANKS,
   SINGLE_RANK_COUNTS,
@@ -43,10 +44,10 @@ describe("variant config", () => {
     expect(config.cluableColors).not.toContain("rainbow");
   });
 
-  it("black variant's cluableColors has 6 entries, includes black, and excludes rainbow (resolved open question)", () => {
+  it("black variant's cluableColors has 5 entries and excludes both rainbow and black (owner gap closure, 2026-09-18)", () => {
     const config = variantConfig("black");
-    expect(config.cluableColors.length).toBe(6);
-    expect(config.cluableColors).toContain("black");
+    expect([...config.cluableColors]).toEqual(["red", "yellow", "green", "blue", "white"]);
+    expect(config.cluableColors).not.toContain("black");
     expect(config.cluableColors).not.toContain("rainbow");
   });
 
@@ -65,9 +66,16 @@ describe("variant config", () => {
     expect(config.colorClueTouches("red", "blue")).toBe(false);
   });
 
-  it("black: a black clue touches black cards", () => {
-    const config = variantConfig("black");
-    expect(config.colorClueTouches("black", "black")).toBe(true);
+  it("black: no colour clue touches a black card, in any variant (owner gap closure, 2026-09-18)", () => {
+    let checked = 0;
+    for (const variant of VARIANTS) {
+      const config = variantConfig(variant);
+      for (const color of ALL_SUITS) {
+        expect(config.colorClueTouches("black", color)).toBe(false);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
   });
 
   it("black: a red clue does not touch black cards", () => {
@@ -75,7 +83,7 @@ describe("variant config", () => {
     expect(config.colorClueTouches("black", "red")).toBe(false);
   });
 
-  it("black: every nameable colour, including black, touches rainbow", () => {
+  it("black: every nameable colour touches rainbow, but a black clue never touches rainbow (black is never nameable)", () => {
     const config = variantConfig("black");
     let checked = 0;
     for (const color of config.cluableColors) {
@@ -83,7 +91,7 @@ describe("variant config", () => {
       checked++;
     }
     expect(checked).toBeGreaterThan(0);
-    expect(config.colorClueTouches("rainbow", "black")).toBe(true);
+    expect(config.colorClueTouches("rainbow", "black")).toBe(false);
   });
 
   it("black: rankCountsFor(rainbow) is BASE_RANK_COUNTS (rainbow tile count unchanged)", () => {

@@ -989,6 +989,41 @@ describe("RULES-14 / T-07-01: a forged non-nameable colour clue frame is refused
     });
     expect((state.game as ActiveGameState).clueTokens).toBe(clueTokensBefore);
   });
+
+  it("black room refuses a colour clue naming 'black' even when the target holds a Black tile (owner gap closure, 2026-09-18)", () => {
+    const { state } = startedThreeSeatRoom("0123456789abcdef0123456789abcdef", "black");
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const targetHand = game.hands.find((h) => h.seatId !== activeSeatId)!;
+    const targetSeatId = targetHand.seatId;
+    const clueTokensBefore = game.clueTokens;
+
+    // Force the target's first slot to hold a Black tile so the refusal is
+    // provably NOT an incidental clue_touches_nothing.
+    const craftedSlots = targetHand.slots.map((slot, i) =>
+      i === 0 ? { ...slot, card: { ...slot.card, suit: "black" as const, rank: 1 as const } } : slot,
+    );
+    const craftedGame: ActiveGameState = {
+      ...game,
+      hands: game.hands.map((h) => (h.seatId === targetSeatId ? { ...h, slots: craftedSlots } : h)),
+    };
+    const craftedState = { ...state, game: craftedGame };
+
+    const result = applyGameAction(
+      craftedState,
+      activeSeatId,
+      "forged-black-colour",
+      { type: "clue", targetSeatId, clue: { type: "color", value: "black" } },
+      5,
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "bad_request",
+      detail: "clue_color_not_nameable",
+    });
+    expect((craftedState.game as ActiveGameState).clueTokens).toBe(clueTokensBefore);
+  });
 });
 
 // ---------------------------------------------------------------------------
