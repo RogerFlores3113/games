@@ -42,3 +42,18 @@ Dev servers are up (`npm run dev --workspace apps/web -- -p 3100` with `NEXT_PUB
 ## Owner's verbatim reply
 
 *(pending)*
+
+## Owner's verbatim reply (2026-09-18)
+
+"black mode should have rainbows in it."
+
+Clarified in a follow-up, verbatim: "black variant has 5 colors + rainbow + black. do not adjust number of rainbow tiles."
+
+result: issues
+
+## Gaps
+
+1. **The Black variant must contain Rainbow as well.** Black is 7 suits: the five normal colours, plus Rainbow at its normal copy counts (three 1s, two each of 2/3/4, one 5 — exactly as in the Rainbow variant), plus Black at a single copy of each rank. That is 65 tiles and a maximum score of 35. Rainbow keeps its Rainbow-variant rules inside Black: every colour clue touches it, and it cannot be named. Black remains its own nameable colour clue.
+   - This supersedes RULES-03's "Black (6)" suit count.
+   - The board must fit 7 suit columns. `MAX_SUITS` is currently 6, and the 1280x720 floor has about 10px of slack.
+   - The owner's earlier answers still hold: Black keeps its silver colour, and there is no variant label.

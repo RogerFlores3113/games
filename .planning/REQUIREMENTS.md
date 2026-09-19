@@ -42,7 +42,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **RULES-01**: Game deals correct hand sizes — 5 cards for 2-3 players, 4 cards for 4-5 players
 - [x] **RULES-02**: Deck is constructed correctly for the selected variant, with three 1s, two each of 2/3/4, and one 5 per suit, and the Black suit instead holding a single copy of each rank
-- [x] **RULES-03**: Suit count is derived from the variant configuration rather than hardcoded, so base (5 suits), Rainbow (6), and Black (6) all resolve correctly
+- [x] **RULES-03**: Suit count is derived from the variant configuration rather than hardcoded, so base (5 suits), Rainbow (6), and Black (7: the five colours + Rainbow + Black, amended 2026-09-18 by the owner) all resolve correctly
 - [x] **RULES-04**: Player can play a card from their hand on their turn
 - [x] **RULES-05**: Player can discard a card from their hand on their turn, regaining a clue token
 - [x] **RULES-06**: Player can give a clue naming exactly one color or one rank to exactly one other player, spending a clue token
