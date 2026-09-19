@@ -400,9 +400,25 @@ body {
  * brightness. Sourced, licence-verified and credited in
  * apps/web/public/backgrounds/CREDITS.md under "golden-gate-daylight.webp".
  */
+/*
+ * Bug fix (owner report, 2026-09-19): the "Hanabi" option in the game
+ * `<select>` went invisible on hover/highlight — white text on a white
+ * highlight. Root cause: `body { color-scheme: dark }` above is inherited
+ * by this select's native option popup (color-scheme is an inherited CSS
+ * property), so the browser paints the popup with dark-scheme UI colours
+ * (light/white highlighted-option text) while the option itself sits
+ * inside this page's light `--color-landing-*` panel, which never
+ * overrides `color-scheme`. Scoping `color-scheme: light` here — the
+ * landing page's only container — tells the browser to render this
+ * select's native popup (and any other native form chrome on this page)
+ * with light-scheme UI colours instead, without touching the in-game dark
+ * "fireworks night" table, which never sets `.landing-backdrop` and keeps
+ * inheriting `color-scheme: dark` from `body` untouched.
+ */
 .landing-backdrop {
   background-color: var(--color-landing-bg);
   background-image: url("/backgrounds/golden-gate-daylight.webp");
   background-size: cover;
   background-position: center;
+  color-scheme: light;
 }
