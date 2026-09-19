@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   ALL_SUITS,
   BASE_RANK_COUNTS,
+  DESCENDING_RANK_COUNTS,
   RANKS,
-  SINGLE_RANK_COUNTS,
   handSizeFor,
+  isStackComplete,
   maxScoreFor,
+  nextPlayableRank,
+  playOrderFor,
   variantConfig,
 } from "./variant";
 import type { Variant } from "../adapter";
@@ -118,12 +121,51 @@ describe("variant config", () => {
     for (const variant of VARIANTS) {
       const config = variantConfig(variant);
       for (const suit of config.suits) {
-        const expected = variant === "black" && suit === "black" ? SINGLE_RANK_COUNTS : BASE_RANK_COUNTS;
+        const expected = variant === "black" && suit === "black" ? DESCENDING_RANK_COUNTS : BASE_RANK_COUNTS;
         expect(config.rankCountsFor(suit)).toEqual(expected);
         checked++;
       }
     }
     expect(checked).toBeGreaterThan(0);
+  });
+
+  it("black: rankCountsFor(black) is the reversed 3/2/2/2/1 distribution (owner gap closure, UAT gap 3)", () => {
+    const config = variantConfig("black");
+    expect(config.rankCountsFor("black")).toEqual({ 1: 1, 2: 2, 3: 2, 4: 2, 5: 3 });
+  });
+
+  it("direction: black is descending, every other suit in every variant is ascending", () => {
+    let checked = 0;
+    for (const variant of VARIANTS) {
+      const config = variantConfig(variant);
+      for (const suit of config.suits) {
+        const expected = suit === "black" ? "descending" : "ascending";
+        expect(config.suitRule(suit).direction).toBe(expected);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it("playOrderFor: black plays 5 -> 1, red plays 1 -> 5", () => {
+    const config = variantConfig("black");
+    expect(playOrderFor(config, "black")).toEqual([5, 4, 3, 2, 1]);
+    expect(playOrderFor(config, "red")).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("nextPlayableRank: black counts down from 5, red counts up from 1, null once complete", () => {
+    const config = variantConfig("black");
+    expect(nextPlayableRank(config, { suit: "black", playedRanks: [] })).toBe(5);
+    expect(nextPlayableRank(config, { suit: "black", playedRanks: [5, 4] })).toBe(3);
+    expect(nextPlayableRank(config, { suit: "black", playedRanks: [5, 4, 3, 2, 1] })).toBeNull();
+    expect(nextPlayableRank(config, { suit: "red", playedRanks: [] })).toBe(1);
+  });
+
+  it("isStackComplete: true once every rank in play order is played, regardless of direction", () => {
+    expect(isStackComplete({ playedRanks: [5, 4, 3, 2, 1] })).toBe(true);
+    expect(isStackComplete({ playedRanks: [5, 4, 3, 2] })).toBe(false);
+    expect(isStackComplete({ playedRanks: [1, 2, 3, 4, 5] })).toBe(true);
+    expect(isStackComplete({ playedRanks: [] })).toBe(false);
   });
 
   it("hand size is 5 for 2-3 players and 4 for 4-5 players", () => {

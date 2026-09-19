@@ -37,6 +37,15 @@
 // since it can never be named), so a negative colour clue does NOT rule out
 // black the way it rules out rainbow.
 //
+// Owner gap closure round 2 (2026-09-18, UAT gap 3): Black is a REVERSED
+// suit. The owner, verbatim: "black is reverse - there's 3x 5s, 2x of 4 3 2,
+// and 1x 1s, and you play them in reverse order - 5 then 4 then 3 then 2
+// then 1." A suit's play direction ("ascending" | "descending") is declared
+// once, per-suit, on `SuitRule.direction` — every other suit in every
+// variant is "ascending". `playOrderFor`, `nextPlayableRank`, and
+// `isStackComplete` below are the only places that read direction; no other
+// module in this package compares a suit to the literal "black".
+//
 // Zero runtime dependencies (FDN-02): this file brings in nothing but types.
 
 import type { Variant } from "../adapter";
@@ -64,13 +73,15 @@ export const BASE_RANK_COUNTS: Readonly<Record<Rank, number>> = {
   5: 1,
 };
 
-/** Black's 5-card-per-suit distribution: exactly one copy of each rank. */
-export const SINGLE_RANK_COUNTS: Readonly<Record<Rank, number>> = {
+/** Black's 10-card-per-suit descending distribution: three 5s, two each of
+ * 4/3/2, one 1 — the mirror image of BASE_RANK_COUNTS (owner gap closure,
+ * 2026-09-18, UAT gap 3). */
+export const DESCENDING_RANK_COUNTS: Readonly<Record<Rank, number>> = {
   1: 1,
-  2: 1,
-  3: 1,
-  4: 1,
-  5: 1,
+  2: 2,
+  3: 2,
+  4: 2,
+  5: 3,
 };
 
 const BASE_SUITS: readonly Suit[] = ["red", "yellow", "green", "blue", "white"];
@@ -78,24 +89,28 @@ const BASE_SUITS: readonly Suit[] = ["red", "yellow", "green", "blue", "white"];
 /** How a suit relates to colour clues (see file header). */
 export type ColorTouch = "named" | "every" | "never";
 
-/** Per-suit colour-touch behaviour plus its rank-count distribution. */
+/** A suit's play order. "ascending" plays 1 -> 5 (every suit but Black).
+ * "descending" plays 5 -> 1 (Black only, owner gap closure 2026-09-18). */
+export type StackDirection = "ascending" | "descending";
+
+/** Per-suit colour-touch behaviour, rank-count distribution, and play
+ * direction. */
 export interface SuitRule {
   readonly colorTouch: ColorTouch;
   readonly rankCounts: Readonly<Record<Rank, number>>;
+  readonly direction: StackDirection;
 }
 
-/** Single frozen source of truth for every suit's colour-clue behaviour and
- * rank distribution (owner gap closure, 2026-09-18). Plan 07-10 changes
- * Black's `rankCounts` and adds a play direction; this table's `colorTouch`
- * values are not expected to change again. */
+/** Single frozen source of truth for every suit's colour-clue behaviour,
+ * rank distribution, and play direction (owner gap closure, 2026-09-18). */
 const SUIT_RULES: Readonly<Record<Suit, SuitRule>> = Object.freeze({
-  red: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS },
-  yellow: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS },
-  green: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS },
-  blue: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS },
-  white: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS },
-  rainbow: { colorTouch: "every", rankCounts: BASE_RANK_COUNTS },
-  black: { colorTouch: "never", rankCounts: SINGLE_RANK_COUNTS },
+  red: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS, direction: "ascending" },
+  yellow: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS, direction: "ascending" },
+  green: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS, direction: "ascending" },
+  blue: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS, direction: "ascending" },
+  white: { colorTouch: "named", rankCounts: BASE_RANK_COUNTS, direction: "ascending" },
+  rainbow: { colorTouch: "every", rankCounts: BASE_RANK_COUNTS, direction: "ascending" },
+  black: { colorTouch: "never", rankCounts: DESCENDING_RANK_COUNTS, direction: "descending" },
 });
 
 export interface VariantConfig {
@@ -171,4 +186,32 @@ export function handSizeFor(playerCount: number): number {
 /** Max achievable score is five points per suit (one per completed stack). */
 export function maxScoreFor(config: VariantConfig): number {
   return config.suits.length * 5;
+}
+
+/** The order a suit's ranks must be played in: RANKS ascending, or its
+ * reverse for a "descending" suit (owner gap closure, 2026-09-18). The only
+ * place in the engine that reads `SuitRule.direction` besides
+ * `nextPlayableRank`/`isStackComplete`. */
+export function playOrderFor(config: VariantConfig, suit: Suit): readonly Rank[] {
+  const { direction } = config.suitRule(suit);
+  return direction === "descending" ? [...RANKS].reverse() : RANKS;
+}
+
+/** The next rank that would extend `stack`, or `null` once the stack is
+ * complete. Direction-aware: for Black this counts down from 5 to 1; for
+ * every other suit it counts up from 1 to 5. Server-side play legality is
+ * `card.rank === nextPlayableRank(config, stack)` — the client never decides
+ * this (T-07-10-03). */
+export function nextPlayableRank(
+  config: VariantConfig,
+  stack: { readonly suit: Suit; readonly playedRanks: readonly Rank[] },
+): Rank | null {
+  const order = playOrderFor(config, stack.suit);
+  return order[stack.playedRanks.length] ?? null;
+}
+
+/** A stack is complete once every rank in its play order has been played,
+ * regardless of direction. */
+export function isStackComplete(stack: { readonly playedRanks: readonly Rank[] }): boolean {
+  return stack.playedRanks.length === RANKS.length;
 }

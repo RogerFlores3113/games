@@ -14,10 +14,20 @@ export type {
 } from "./adapter";
 
 export { hanabiGame } from "./hanabi/adapter";
-export { variantConfig, handSizeFor, maxScoreFor, ALL_SUITS, RANKS } from "./hanabi/variant";
+export {
+  variantConfig,
+  handSizeFor,
+  maxScoreFor,
+  ALL_SUITS,
+  RANKS,
+  DESCENDING_RANK_COUNTS,
+  playOrderFor,
+  nextPlayableRank,
+  isStackComplete,
+} from "./hanabi/variant";
 export { canPlay, canDiscard, canClue, canReorder, cardsTouchedByClue, MAX_FUSES } from "./hanabi/legality";
 export { currentScore, scoreBand } from "./hanabi/endgame";
 export { checkHanabiViewForLeaks, secretsForHanabiSeat } from "./hanabi/hanabi-leak-check";
 export type { HanabiAction, HanabiState, HanabiView, HanabiCardView, ClueFacts, Clue } from "./hanabi/state";
-export type { Suit, Rank, VariantConfig, ColorTouch, SuitRule } from "./hanabi/variant";
+export type { Suit, Rank, VariantConfig, ColorTouch, SuitRule, StackDirection } from "./hanabi/variant";
 export type { HanabiSeatSecrets } from "./hanabi/hanabi-leak-check";

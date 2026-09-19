@@ -25,7 +25,7 @@ const END_REASONS: readonly EndReason[] = [
 ];
 
 // A real game cannot exceed roughly (deck size + hand size) turns before the
-// final round forces an end — the largest deck (Rainbow/Black, 60-65 cards)
+// final round forces an end — the largest deck (Rainbow/Black, 60-70 cards)
 // with the smallest hand size still ends well under this cap. The cap exists
 // to fail the property loudly rather than hang CI if a bug makes the engine
 // never satisfy checkHanabiGameEnd.

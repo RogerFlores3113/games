@@ -5,11 +5,11 @@ import type { Variant } from "../adapter";
 import type { Rank } from "./variant";
 
 const VARIANTS: readonly Variant[] = ["base", "rainbow", "black"] as const;
-const EXPECTED_TOTALS: Record<Variant, number> = { base: 50, rainbow: 60, black: 65 };
+const EXPECTED_TOTALS: Record<Variant, number> = { base: 50, rainbow: 60, black: 70 };
 const SEAT_COUNTS = [2, 3, 4, 5];
 
 describe("deck composition", () => {
-  it("buildDeck yields the correct total card count per variant (50 / 60 / 65)", () => {
+  it("buildDeck yields the correct total card count per variant (50 / 60 / 70)", () => {
     for (const variant of VARIANTS) {
       const config = variantConfig(variant);
       expect(buildDeck(config).length).toBe(EXPECTED_TOTALS[variant]);
@@ -30,13 +30,14 @@ describe("deck composition", () => {
     expect(checked).toBeGreaterThan(0);
   });
 
-  it("black variant: the black suit contributes exactly one card of each rank (5 total)", () => {
+  it("black variant: the black suit contributes three 5s, two each of 4/3/2, one 1 (10 total)", () => {
     const config = variantConfig("black");
     const deck = buildDeck(config);
     const blackCards = deck.filter((c) => c.suit === "black");
-    expect(blackCards.length).toBe(5);
-    const ranks = blackCards.map((c) => c.rank).sort();
-    expect(ranks).toEqual([1, 2, 3, 4, 5]);
+    expect(blackCards.length).toBe(10);
+    const rankCounts: Record<Rank, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const c of blackCards) rankCounts[c.rank]++;
+    expect(rankCounts).toEqual({ 1: 1, 2: 2, 3: 2, 4: 2, 5: 3 });
   });
 
   it("black variant: every non-black suit (five colours + rainbow) contributes 10 cards", () => {

@@ -27,7 +27,7 @@ const EXPECTED_SUIT_COUNT: Readonly<Record<Variant, number>> = {
 const EXPECTED_DECK_SIZE: Readonly<Record<Variant, number>> = {
   base: 50,
   rainbow: 60,
-  black: 65,
+  black: 70,
 };
 
 const EXPECTED_MAX_SCORE: Readonly<Record<Variant, number>> = {
@@ -106,13 +106,14 @@ describe("variant matrix", () => {
         expect(config.colorClueTouches("red", "black")).toBe(false);
         expect(config.colorClueTouches("rainbow", "black")).toBe(false);
 
-        // Each black rank exists exactly once in the deck, so discarding a
-        // black card makes that rank's stack unachievable — a deck
-        // composition consequence, not a new rule.
+        // Black is a descending, 10-tile suit: three 5s, two each of 4/3/2,
+        // one 1 (owner gap closure, 2026-09-18). Its rank-1 exists exactly
+        // once in the deck, so discarding it makes the stack unachievable —
+        // a deck composition consequence, not a new rule.
         const deck = buildDeck(config);
         const blackCards = deck.filter((c) => c.suit === "black");
-        expect(blackCards.length).toBe(5);
-        expect(blackCards.map((c) => c.rank).sort()).toEqual([1, 2, 3, 4, 5]);
+        expect(blackCards.length).toBe(10);
+        expect(blackCards.map((c) => c.rank).sort()).toEqual([1, 2, 2, 3, 3, 4, 4, 5, 5, 5]);
 
         // Rainbow inside Black keeps its full unchanged 10-card
         // distribution ("do not adjust number of rainbow tiles").
