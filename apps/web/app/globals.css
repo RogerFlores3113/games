@@ -391,14 +391,15 @@ body {
 }
 
 /*
- * Landing page only (owner request, 2026-09-19): daylight San Francisco Bay
- * Area photo behind the "Board games" form, replacing the dark
- * `--color-bg` fill the page used before. `--color-landing-bg` is the
- * fallback shown before the image loads. No darkening scrim here — the
- * opaque `--color-landing-panel` card (see app/page.tsx) sits on top and
+ * Landing page only (owner request, 2026-09-19, superseding an earlier
+ * Golden Gate Bridge photo the owner called "meh"): a board-game-night
+ * photo behind the "Board games" form, replacing the dark `--color-bg`
+ * fill the page used before. `--color-landing-bg` is the fallback shown
+ * before the image loads. No darkening scrim here — the opaque
+ * `--color-landing-panel` card (see app/page.tsx) sits on top and
  * carries all the text contrast, so the photo itself is shown at full
  * brightness. Sourced, licence-verified and credited in
- * apps/web/public/backgrounds/CREDITS.md under "golden-gate-daylight.webp".
+ * apps/web/public/backgrounds/CREDITS.md under "board-game-night.webp".
  */
 /*
  * Bug fix (owner report, 2026-09-19): the "Hanabi" option in the game
@@ -417,7 +418,7 @@ body {
  */
 .landing-backdrop {
   background-color: var(--color-landing-bg);
-  background-image: url("/backgrounds/golden-gate-daylight.webp");
+  background-image: url("/backgrounds/board-game-night.webp");
   background-size: cover;
   background-position: center;
   color-scheme: light;

@@ -14,7 +14,7 @@
  */
 export interface ImageCredit {
   /** Which background photo this credits — matches the CREDITS.md heading. */
-  id: "golden-gate-daylight" | "city-fireworks";
+  id: "board-game-night" | "city-fireworks";
   /** Commons file title, used as the visible "Photo: <title>" link text. */
   title: string;
   /** Commons `File:` page — the title links here. */
@@ -29,13 +29,12 @@ export interface ImageCredit {
 
 /** Landing page background — `.landing-backdrop` in `app/globals.css`. */
 export const LANDING_IMAGE_CREDIT: ImageCredit = {
-  id: "golden-gate-daylight",
-  title: "Golden Gate Bridge Above the Fog",
-  sourceUrl:
-    "https://commons.wikimedia.org/wiki/File:Golden_Gate_Bridge_Above_the_Fog_from_Battery_Spencer.jpg",
-  author: "Dongmin03",
-  license: "CC BY 4.0",
-  licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+  id: "board-game-night",
+  title: "Camel Up game - Poznań 2017",
+  sourceUrl: "https://commons.wikimedia.org/wiki/File:Camel_Up_game_-_Pozna%C5%84_2017.jpg",
+  author: "Klapi",
+  license: "CC BY-SA 4.0",
+  licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/",
 };
 
 /** In-game table background — `.table-backdrop` in `app/globals.css`. */

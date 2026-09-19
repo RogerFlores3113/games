@@ -67,6 +67,11 @@ identifiable people.
 
 ## golden-gate-daylight.webp
 
+Superseded by `board-game-night.webp` (owner review, 2026-09-19 — the owner called this bridge
+photo "meh" and asked for a board-game-ish background: "maybe catan, or just playing cards on a
+table"). This record is kept for historical reference; the file itself is deleted from
+`public/backgrounds/` once `globals.css` no longer references it.
+
 Source URL: https://commons.wikimedia.org/wiki/File:Golden_Gate_Bridge_Above_the_Fog_from_Battery_Spencer.jpg
 Author: Dongmin03
 Author URL: https://commons.wikimedia.org/w/index.php?title=User:Dongmin03
@@ -84,6 +89,34 @@ Battery Spencer in the Marin Headlands) shows both Golden Gate Bridge towers ris
 in full daylight, blue sky above, with the San Francisco skyline faintly visible in the background —
 chosen for the landing page's brighter tone (as opposed to the in-game table's dark "fireworks night"
 theme, which this image does not touch). No readable text, no identifiable people.
+
+## board-game-night.webp
+
+Source URL: https://commons.wikimedia.org/wiki/File:Camel_Up_game_-_Pozna%C5%84_2017.jpg
+Author: Klapi
+Author URL: https://commons.wikimedia.org/wiki/User:Klapi
+License: CC BY-SA 4.0 (Creative Commons Attribution-ShareAlike 4.0 International)
+License URL: https://creativecommons.org/licenses/by-sa/4.0/
+License grant (quoted): "Share — copy and redistribute the material in any medium or format for any purpose, even commercially." (from the license deed's "You are free to:" section; the deed's "Under the following terms:" section additionally requires attribution and ShareAlike, both honored by this credit file)
+Retrieved: 2026-09-19
+Modifications: resized to 1920px wide (1920x1301), re-encoded as WebP quality 78 (~180,000 bytes)
+
+Verified via the Wikimedia Commons API (`action=query&prop=imageinfo&iiprop=extmetadata`) against
+https://commons.wikimedia.org/wiki/File:Camel_Up_game_-_Pozna%C5%84_2017.jpg, which returned
+`LicenseShortName: CC BY-SA 4.0`, `LicenseUrl: https://creativecommons.org/licenses/by-sa/4.0`,
+`AttributionRequired: true`, and `Artist` linking to Commons user Klapi. Original photo (2166x1468,
+taken 2017-11-26 at a board-game meetup in Poznań, Poland) is a bright, well-lit overhead shot of a
+Camel Up board game in progress on a wooden table — a colourful pyramid centrepiece, playing
+cards, wooden tokens and a drink can, with several players' heads and arms visible but angled down
+toward the board rather than facing the camera (no one is posing for or looking at the lens).
+Rejected candidates: "Settlers of Catan Party Crew" (Flickr via Commons, CC BY 2.0) is a posed group
+photo at night with no board visible, all faces looking at the camera — reads as a costume party, not
+a game; "Gen Con - Giant Settlers of Catan Game" (Commons, CC BY 3.0) shows a real Catan board but in
+dim indoor convention lighting, working against the owner's earlier "brighter tone" request, and its
+subjects are prominently forward-facing; "A Group of Galaxy Truckers" (Commons, CC BY-SA 3.0) is a
+dim indoor party photo with a wine bottle in the foreground and people looking at the camera — same
+problem, plus off-tone for the app. No readable text, no watermark, no one identifiable as the
+photo's subject.
 
 ## wood-tile.webp
 
