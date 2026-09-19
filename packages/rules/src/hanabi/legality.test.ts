@@ -33,7 +33,7 @@ function buildState(
     turnIndex: 0,
     hands,
     deck,
-    stacks: config.suits.map((suit) => ({ suit, topRank: 0 })),
+    stacks: config.suits.map((suit) => ({ suit, playedRanks: [] })),
     discard: [],
     discardOrder: [],
     clueTokens: MAX_CLUE_TOKENS,

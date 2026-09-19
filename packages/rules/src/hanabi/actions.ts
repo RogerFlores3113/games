@@ -39,7 +39,7 @@ import {
 // resolved exactly once in this file and reused for both the clue-fact
 // update and the history entry, never resolved twice (RESEARCH.md Pitfall 2).
 import * as legalityNs from "./legality";
-import { variantConfig } from "./variant";
+import { variantConfig, isStackComplete, nextPlayableRank } from "./variant";
 import { ALL_SUITS, RANKS } from "./variant";
 import type {
   Clue,
@@ -245,7 +245,7 @@ function applyPlay(
   const card = slot.card;
   const stackIndex = state.stacks.findIndex((s) => s.suit === card.suit);
   const stack = state.stacks[stackIndex]!;
-  const success = card.rank === stack.topRank + 1;
+  const success = card.rank === nextPlayableRank(config, stack);
 
   // Captured from state.hands (PRE-removal) so the drawn card lands in the
   // exact slot the played card vacated (D-23, RESEARCH.md Pitfall 1).
@@ -259,13 +259,13 @@ function applyPlay(
   let clueTokens = state.clueTokens;
 
   if (success) {
-    stacks = state.stacks.map((s, i) =>
-      i === stackIndex ? { suit: s.suit, topRank: card.rank } : s,
-    );
-    // RULES-13: completing a stack with a 5 refunds a token, UNLESS clue
-    // tokens are already at the cap — the bonus is forfeit, never pushing
-    // the count above MAX_CLUE_TOKENS.
-    if (card.rank === 5 && clueTokens < MAX_CLUE_TOKENS) {
+    const newStack: StackEntry = { suit: stack.suit, playedRanks: [...stack.playedRanks, card.rank] };
+    stacks = state.stacks.map((s, i) => (i === stackIndex ? newStack : s));
+    // RULES-13: completing a stack (its last tile in play order — a 5 for
+    // an ascending suit, or a descending Black stack's 1) refunds a token,
+    // UNLESS clue tokens are already at the cap — the bonus is forfeit,
+    // never pushing the count above MAX_CLUE_TOKENS.
+    if (isStackComplete(newStack) && clueTokens < MAX_CLUE_TOKENS) {
       clueTokens = clueTokens + 1;
     }
   } else {

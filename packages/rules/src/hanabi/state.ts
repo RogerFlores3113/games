@@ -24,7 +24,14 @@ export type ClueFacts = {
 
 export type HandSlot = { readonly card: HanabiCard; readonly facts: ClueFacts };
 export type Hand = { readonly seatId: string; readonly slots: readonly HandSlot[] };
-export type StackEntry = { readonly suit: Suit; readonly topRank: number }; // 0 = empty stack
+/** Ranks played onto this suit's stack, in the order they were played. For
+ * an ascending suit this reads e.g. [1, 2, 3]; for Black (descending, owner
+ * gap closure 2026-09-18) it reads e.g. [5, 4, 3]. Direction lives only in
+ * the variant configuration (`SuitRule.direction`) -- this array never
+ * implies a direction on its own. Use `nextPlayableRank`/`isStackComplete`
+ * from ./variant to read progress; never assume the stack's "top" is a
+ * number to compare directly (that only holds for ascending suits). */
+export type StackEntry = { readonly suit: Suit; readonly playedRanks: readonly Rank[] };
 
 import type { HistoryEntry } from "./history";
 export type { HistoryEntry } from "./history";

@@ -166,6 +166,29 @@ describe("Phase 4 adapter swap (D-06): pre-swap forehead-card rooms reset", () =
   });
 });
 
+describe("Phase 7 plan 10 stack-shape swap (owner gap closure, UAT gap 3): pre-change topRank rooms reset", () => {
+  it("a schemaVersion 3 room with a topRank-shaped Hanabi game resets without reading the room blob", async () => {
+    expect(ROOM_SCHEMA_VERSION).toBeGreaterThan(3);
+
+    const { storage, getCalls } = makeFakeStorage();
+    await storage.put(STORAGE_KEYS.schemaVersion, 3);
+    await storage.put(STORAGE_KEYS.room, {
+      ...fallbackRoom(),
+      adapterId: "hanabi",
+      game: {
+        variant: "base",
+        stacks: [{ suit: "red", topRank: 2 }],
+      },
+    });
+    getCalls.length = 0; // reset instrumentation after seeding
+
+    const result = await loadRoom(storage, fallbackRoom);
+
+    expect(result.wasReset).toBe(true);
+    expect(getCalls).not.toContain(STORAGE_KEYS.room);
+  });
+});
+
 describe("corrupt-but-versioned storage", () => {
   it("returns wasReset: true rather than throwing when the room blob fails RoomStateSchema", async () => {
     const { storage, map } = makeFakeStorage();

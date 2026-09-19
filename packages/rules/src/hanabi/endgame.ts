@@ -23,10 +23,11 @@ import { maxScoreFor, variantConfig } from "./variant";
 
 export type EndReason = "fuses_exhausted" | "all_stacks_complete" | "final_round_elapsed";
 
-/** Sum of every stack's topRank. An untouched game (every stack at 0) scores
- * 0. */
+/** Sum of tiles played onto every stack. An untouched game (every stack
+ * empty) scores 0. Direction-agnostic: a descending Black stack scores the
+ * same way an ascending stack does, by tile count, not by rank value. */
 export function currentScore(state: HanabiState): number {
-  return state.stacks.reduce((total, stack) => total + stack.topRank, 0);
+  return state.stacks.reduce((total, stack) => total + stack.playedRanks.length, 0);
 }
 
 /** Descriptive band for `score` out of `maxScore`, matching the standard

@@ -8,14 +8,17 @@ function card(id: string, suit: string, rank: number): HanabiCard {
   return { id, suit: suit as HanabiCard["suit"], rank: rank as HanabiCard["rank"] };
 }
 
+/** Builds stacks with the given number of tiles played per suit (score is
+ * tile count, not rank value, so the specific ranks filled in are
+ * arbitrary -- 1..count is used for readability). */
 function stacksAt(
   variant: "base" | "rainbow" | "black",
-  topRankBySuit: Record<string, number> = {},
+  tileCountBySuit: Record<string, number> = {},
 ): StackEntry[] {
-  return variantConfig(variant).suits.map((suit) => ({
-    suit,
-    topRank: topRankBySuit[suit] ?? 0,
-  }));
+  return variantConfig(variant).suits.map((suit) => {
+    const count = tileCountBySuit[suit] ?? 0;
+    return { suit, playedRanks: Array.from({ length: count }, (_, i) => (i + 1) as StackEntry["playedRanks"][number]) };
+  });
 }
 
 function baseState(overrides: Partial<HanabiState> = {}): HanabiState {
@@ -43,13 +46,23 @@ function baseState(overrides: Partial<HanabiState> = {}): HanabiState {
 }
 
 function fullStacks(variant: "base" | "rainbow" | "black"): StackEntry[] {
-  return variantConfig(variant).suits.map((suit) => ({ suit, topRank: 5 }));
+  return variantConfig(variant).suits.map((suit) => ({ suit, playedRanks: [1, 2, 3, 4, 5] }));
 }
 
 describe("endgame", () => {
-  it("currentScore sums every stack's topRank; an untouched game scores 0", () => {
+  it("currentScore sums every stack's playedRanks.length; an untouched game scores 0", () => {
     expect(currentScore(baseState())).toBe(0);
     expect(currentScore(baseState({ stacks: stacksAt("base", { red: 3, blue: 5 }) }))).toBe(8);
+  });
+
+  it("Black (owner gap closure, UAT gap 3): a complete descending stack scores 5, same as any suit", () => {
+    const state = baseState({
+      variant: "black",
+      stacks: stacksAt("black", { black: 5 }),
+    });
+    expect(currentScore(state)).toBe(5);
+    const complete = { suit: "black" as const, playedRanks: [5, 4, 3, 2, 1] as const };
+    expect(currentScore({ ...state, stacks: [complete] })).toBe(5);
   });
 
   it("checkHanabiGameEnd returns null while the game continues", () => {

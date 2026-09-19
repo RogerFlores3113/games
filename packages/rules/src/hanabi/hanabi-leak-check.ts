@@ -37,8 +37,8 @@ function identityKey(suit: unknown, rank: unknown): string {
 /** Derives the secrets a given seat's view must never leak: its own cards'
  * identities, and the multiset of {suit,rank} pairs it MAY legitimately see
  * elsewhere (every other seat's hand, the whole discard pile, one entry per
- * played card implied by each stack's topRank). `ownCards` is empty for a
- * seat that is not (or no longer) seated. */
+ * played card implied by each stack's playedRanks). `ownCards` is empty for
+ * a seat that is not (or no longer) seated. */
 export function secretsForHanabiSeat(
   state: HanabiState,
   seatId: string,
@@ -62,9 +62,11 @@ export function secretsForHanabiSeat(
   }
   for (const card of state.discard) bump(card.suit, card.rank);
   // Deliberately NO per-rank bump for played stacks. A view's `stacks` entry
-  // is `{suit, topRank}` — it carries no `rank` key, so collectIdentityCounts
-  // never counts it, and a SUCCESSFULLY played card's identity appears in a
-  // view exactly once: in its own "play" history entry, bumped below.
+  // carries only a suit and a tile count (07-10 DESIGN DECISION: the wire
+  // shape stays a count, not a rank list) — it carries no `rank` key, so
+  // collectIdentityCounts never counts it, and a SUCCESSFULLY played card's
+  // identity appears in a view exactly once: in its own "play" history
+  // entry, bumped below.
   // Bumping here as well raised the allowance to 2 against an observed 1,
   // leaving one unit of slack per completed stack rank in which a genuine
   // duplicate reveal of an already-played identity went undetected

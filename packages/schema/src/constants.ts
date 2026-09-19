@@ -19,8 +19,13 @@
  * Bumped to 3 in Phase 4 when the forehead-card toy adapter was replaced by
  * the real Hanabi engine (D-06): a persisted room carrying toy-shaped `game`
  * state and `adapterId: "forehead-card"` resets to an empty lobby rather
- * than being handed to the Hanabi adapter. */
-export const ROOM_SCHEMA_VERSION = 3;
+ * than being handed to the Hanabi adapter.
+ *
+ * Bumped to 4 in Phase 7 plan 10 (owner gap closure, UAT gap 3) when
+ * `StackEntry` changed from `{suit, topRank}` to `{suit, playedRanks}`: a
+ * persisted pre-change game blob resets to an empty lobby rather than
+ * re-entering the engine with a stack shape it no longer understands. */
+export const ROOM_SCHEMA_VERSION = 4;
 
 /** D-01: 32 uppercase-safe characters — no `I`, `O`, `0`, `1` — because the
  * room code is read aloud over a voice call. Do not add lowercase. */

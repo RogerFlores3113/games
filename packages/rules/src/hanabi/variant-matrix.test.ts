@@ -11,7 +11,7 @@ import { hanabiGame } from "./adapter";
 import { buildDeck, dealInitialHands } from "./deck";
 import { checkHanabiGameEnd, currentScore, scoreBand } from "./endgame";
 import { MAX_CLUE_TOKENS, MAX_FUSES } from "./legality";
-import { maxScoreFor, variantConfig } from "./variant";
+import { maxScoreFor, playOrderFor, variantConfig } from "./variant";
 import type { Variant } from "../adapter";
 import { currentActorSeatId, enumerateLegalActions } from "./test-support";
 import type { HanabiCard, HanabiState } from "./state";
@@ -153,7 +153,7 @@ describe("variant matrix: every end condition per variant (D-16)", () => {
         const activeHandIndex = hands.findIndex((h) => h.seatId === active);
         const originalCardId = hands[activeHandIndex]!.slots[0]!.card.id;
         // A rank-5 card while the first suit's stack sits at 0 can never be
-        // a legal play (topRank + 1 === 1, not 5) — guaranteed misplay.
+        // a legal play (nextPlayableRank is 1, not 5) — guaranteed misplay.
         const unplayableCard = { id: originalCardId, suit: config.suits[0]!, rank: 5 as const };
         const craftedHands = hands.map((h, i) =>
           i === activeHandIndex
@@ -169,7 +169,7 @@ describe("variant matrix: every end condition per variant (D-16)", () => {
           turnIndex: 0,
           hands: craftedHands,
           deck,
-          stacks: config.suits.map((suit) => ({ suit, topRank: 0 })),
+          stacks: config.suits.map((suit) => ({ suit, playedRanks: [] })),
           discard: [],
           discardOrder: [],
           clueTokens: MAX_CLUE_TOKENS,
@@ -194,7 +194,10 @@ describe("variant matrix: every end condition per variant (D-16)", () => {
 
       // (b) all_stacks_complete: every stack full except the last suit
       // (the variant's sixth, box-specific suit in Rainbow/Black), and the
-      // active seat plays the completing card.
+      // active seat plays the completing card. Direction-aware: each suit's
+      // "full" and "one short" playedRanks come from its own play order, so
+      // Black's completing card is its rank-1 (owner gap closure, UAT gap 3),
+      // not a rank-5.
       {
         const seed = `end-complete-${variant}`;
         const { hands, deck } = dealInitialHands({ config, seatIds, seed });
@@ -202,7 +205,9 @@ describe("variant matrix: every end condition per variant (D-16)", () => {
         const activeHandIndex = hands.findIndex((h) => h.seatId === active);
         const originalCardId = hands[activeHandIndex]!.slots[0]!.card.id;
         const lastSuit = config.suits[config.suits.length - 1]!;
-        const completingCard = { id: originalCardId, suit: lastSuit, rank: 5 as const };
+        const lastSuitOrder = playOrderFor(config, lastSuit);
+        const completingRank = lastSuitOrder[lastSuitOrder.length - 1]!;
+        const completingCard = { id: originalCardId, suit: lastSuit, rank: completingRank };
         const craftedHands = hands.map((h, i) =>
           i === activeHandIndex
             ? {
@@ -217,7 +222,11 @@ describe("variant matrix: every end condition per variant (D-16)", () => {
           turnIndex: 0,
           hands: craftedHands,
           deck,
-          stacks: config.suits.map((suit) => ({ suit, topRank: suit === lastSuit ? 4 : 5 })),
+          stacks: config.suits.map((suit) => {
+            const order = playOrderFor(config, suit);
+            const playedRanks = suit === lastSuit ? order.slice(0, -1) : order;
+            return { suit, playedRanks };
+          }),
           discard: [],
           discardOrder: [],
           clueTokens: MAX_CLUE_TOKENS,
@@ -254,7 +263,7 @@ describe("variant matrix: every end condition per variant (D-16)", () => {
           turnIndex: 0,
           hands,
           deck: deck.slice(0, 1),
-          stacks: config.suits.map((suit) => ({ suit, topRank: 0 })),
+          stacks: config.suits.map((suit) => ({ suit, playedRanks: [] })),
           discard: [],
           discardOrder: [],
           clueTokens: 4,
@@ -310,7 +319,7 @@ describe("variant matrix: every end condition per variant (D-16)", () => {
           turnIndex: 0,
           hands: seatIds.map((seatId) => ({ seatId, slots: [] })),
           deck: [{ id: `end-unwinnable-deck-${variant}`, suit: config.suits[0]!, rank: 1 as const }],
-          stacks: config.suits.map((suit) => ({ suit, topRank: 0 })),
+          stacks: config.suits.map((suit) => ({ suit, playedRanks: [] })),
           discard,
           discardOrder: discard.map((c) => c.id),
           clueTokens: MAX_CLUE_TOKENS,

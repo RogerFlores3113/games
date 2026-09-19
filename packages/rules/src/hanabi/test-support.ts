@@ -110,8 +110,8 @@ export function enumerateReorderActions(state: HanabiState, seatId: string): Han
 /** Every card minted for this game, located exactly once: "deck" | "hand" |
  * "discard" | "stack". Returns a map from card id to location. Played
  * cards have no surviving minted id in state (a stack only tracks
- * `{suit, topRank}`), so this function represents each played card with a
- * synthetic, collision-free id (`${suit}:stack:${rank}`) rather than
+ * `{suit, playedRanks}`), so this function represents each played card with
+ * a synthetic, collision-free id (`${suit}:stack:${rank}`) rather than
  * omitting it from the count — omitting played cards would make the total
  * located count silently shrink as a game progresses, defeating the whole
  * point of a conservation check. If any REAL card id is recorded twice (a
@@ -131,7 +131,7 @@ export function locateAllCards(state: HanabiState): Map<string, string> {
   }
   for (const card of state.discard) record(card.id, "discard");
   for (const stack of state.stacks) {
-    for (let rank = 1; rank <= stack.topRank; rank++) {
+    for (const rank of stack.playedRanks) {
       record(`${stack.suit}:stack:${rank}`, "stack");
     }
   }

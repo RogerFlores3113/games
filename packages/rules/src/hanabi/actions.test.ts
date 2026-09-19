@@ -17,7 +17,7 @@ function card(id: string, suit: string, rank: number): HanabiCard {
 }
 
 function emptyStacks(variant: "base" | "rainbow" | "black" = "base"): StackEntry[] {
-  return variantConfig(variant).suits.map((suit) => ({ suit, topRank: 0 }));
+  return variantConfig(variant).suits.map((suit) => ({ suit, playedRanks: [] }));
 }
 
 function baseState(overrides: Partial<HanabiState> = {}): HanabiState {
@@ -111,13 +111,13 @@ describe("applyAction", () => {
   });
 
   describe("play", () => {
-    it("a play extending the stack advances topRank and removes the card from the hand", () => {
+    it("a play extending the stack advances playedRanks and removes the card from the hand", () => {
       const state = baseState();
       const result = applyHanabiAction(state, "seat-a", { type: "play", cardId: "seat-a-1" });
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error("expected success");
       const redStack = result.state.stacks.find((s) => s.suit === "red")!;
-      expect(redStack.topRank).toBe(1);
+      expect(redStack.playedRanks).toEqual([1]);
       const seatAHand = result.state.hands.find((h) => h.seatId === "seat-a")!;
       expect(seatAHand.slots.some((s) => s.card.id === "seat-a-1")).toBe(false);
     });
@@ -130,11 +130,13 @@ describe("applyAction", () => {
       expect(result.state.fuses).toBe(1);
       expect(result.state.discard.some((c) => c.id === "seat-a-2")).toBe(true);
       const blueStack = result.state.stacks.find((s) => s.suit === "blue")!;
-      expect(blueStack.topRank).toBe(0);
+      expect(blueStack.playedRanks).toEqual([]);
     });
 
     it("completing a stack with a 5 refunds a clue token", () => {
-      const stacks = emptyStacks().map((s) => (s.suit === "red" ? { suit: s.suit, topRank: 4 } : s));
+      const stacks = emptyStacks().map((s) =>
+        s.suit === "red" ? { suit: s.suit, playedRanks: [1, 2, 3, 4] as const } : s,
+      );
       const state = baseState({
         stacks,
         clueTokens: 5,
@@ -154,7 +156,9 @@ describe("applyAction", () => {
     });
 
     it("the token refund for completing a stack with a 5 is forfeit when already at 8", () => {
-      const stacks = emptyStacks().map((s) => (s.suit === "red" ? { suit: s.suit, topRank: 4 } : s));
+      const stacks = emptyStacks().map((s) =>
+        s.suit === "red" ? { suit: s.suit, playedRanks: [1, 2, 3, 4] as const } : s,
+      );
       const state = baseState({
         stacks,
         clueTokens: 8,
@@ -177,6 +181,87 @@ describe("applyAction", () => {
       const state = baseState();
       const result = applyHanabiAction(state, "seat-a", { type: "play", cardId: "seat-b-1" });
       expect(result).toEqual({ ok: false, error: "card_not_in_hand" });
+    });
+
+    it("Black (owner gap closure, UAT gap 3): a black 5 on an empty black stack succeeds, then a black 4 succeeds", () => {
+      const config = variantConfig("black");
+      let state = baseState({
+        variant: "black",
+        stacks: emptyStacks("black"),
+        deck: [],
+        hands: [
+          {
+            seatId: "seat-a",
+            slots: [
+              { card: card("black-5", "black", 5), facts: initialClueFacts(config) },
+              { card: card("black-4", "black", 4), facts: initialClueFacts(config) },
+            ],
+          },
+          { seatId: "seat-b", slots: [] },
+          { seatId: "seat-c", slots: [] },
+        ],
+      });
+
+      const firstPlay = applyHanabiAction(state, "seat-a", { type: "play", cardId: "black-5" });
+      expect(firstPlay.ok).toBe(true);
+      if (!firstPlay.ok) throw new Error("expected success");
+      // Turn advanced to seat-b; rewind to seat-a's turn so the second play
+      // in this test can also come from seat-a (turn order is not what this
+      // test is exercising).
+      state = { ...firstPlay.state, turnIndex: 0 };
+      expect(state.stacks.find((s) => s.suit === "black")!.playedRanks).toEqual([5]);
+      expect(state.fuses).toBe(0);
+
+      const secondPlay = applyHanabiAction(state, "seat-a", { type: "play", cardId: "black-4" });
+      expect(secondPlay.ok).toBe(true);
+      if (!secondPlay.ok) throw new Error("expected success");
+      expect(secondPlay.state.stacks.find((s) => s.suit === "black")!.playedRanks).toEqual([5, 4]);
+      expect(secondPlay.state.fuses).toBe(0);
+    });
+
+    it("Black: a black 1 on an empty black stack is a misplay", () => {
+      const config = variantConfig("black");
+      const state = baseState({
+        variant: "black",
+        stacks: emptyStacks("black"),
+        deck: [],
+        hands: [
+          { seatId: "seat-a", slots: [{ card: card("black-1", "black", 1), facts: initialClueFacts(config) }] },
+          { seatId: "seat-b", slots: [] },
+          { seatId: "seat-c", slots: [] },
+        ],
+      });
+
+      const result = applyHanabiAction(state, "seat-a", { type: "play", cardId: "black-1" });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      expect(result.state.fuses).toBe(1);
+      expect(result.state.discard.some((c) => c.id === "black-1")).toBe(true);
+      expect(result.state.stacks.find((s) => s.suit === "black")!.playedRanks).toEqual([]);
+    });
+
+    it("Black: playing the completing 1 onto [5,4,3,2] refunds a clue token, same as any suit's completing 5", () => {
+      const config = variantConfig("black");
+      const stacks = emptyStacks("black").map((s) =>
+        s.suit === "black" ? { suit: s.suit, playedRanks: [5, 4, 3, 2] as const } : s,
+      );
+      const state = baseState({
+        variant: "black",
+        stacks,
+        clueTokens: 5,
+        deck: [],
+        hands: [
+          { seatId: "seat-a", slots: [{ card: card("black-1", "black", 1), facts: initialClueFacts(config) }] },
+          { seatId: "seat-b", slots: [] },
+          { seatId: "seat-c", slots: [] },
+        ],
+      });
+
+      const result = applyHanabiAction(state, "seat-a", { type: "play", cardId: "black-1" });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("expected success");
+      expect(result.state.stacks.find((s) => s.suit === "black")!.playedRanks).toEqual([5, 4, 3, 2, 1]);
+      expect(result.state.clueTokens).toBe(6);
     });
   });
 
@@ -244,7 +329,7 @@ describe("applyAction", () => {
     });
 
     it("a successful play of the middle card (index 2): the drawn card lands at index 2, others unchanged", () => {
-      const stacks = emptyStacks().map((s) => (s.suit === "red" ? { suit: s.suit, topRank: 0 } : s));
+      const stacks = emptyStacks().map((s) => (s.suit === "red" ? { suit: s.suit, playedRanks: [] } : s));
       const state = fiveCardState({ stacks });
       const result = applyHanabiAction(state, "seat-a", { type: "play", cardId: "seat-a-3" }); // red rank 1, extends stack
       expect(result.ok).toBe(true);
@@ -261,7 +346,9 @@ describe("applyAction", () => {
 
     it("a misplay of the last card (index 4): the drawn card lands at index 4", () => {
       // Red stack already at 1, so red rank 1 misplays.
-      const stacks = emptyStacks().map((s) => (s.suit === "red" ? { suit: s.suit, topRank: 1 } : s));
+      const stacks = emptyStacks().map((s) =>
+        s.suit === "red" ? { suit: s.suit, playedRanks: [1] as const } : s,
+      );
       const state = fiveCardState({ stacks });
       const result = applyHanabiAction(state, "seat-a", { type: "play", cardId: "seat-a-5" });
       expect(result.ok).toBe(true);

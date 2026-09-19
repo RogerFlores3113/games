@@ -108,7 +108,11 @@ export function toHanabiPlayerView(rawState: HanabiState, seatId: string): Hanab
   // `state.discardOrder` spread below.
   const state = withDiscardOrderFallback(rawState);
   const activeSeatId = state.seatIds[state.turnIndex] as string;
-  const stacks = state.stacks.map((s) => ({ suit: s.suit, topRank: s.topRank }));
+  // Wire field `topRank` is bridged to the tile count for 07-10 (DESIGN
+  // DECISION, 07-10-PLAN.md): identical to today's value for every
+  // ascending stack. 07-11 replaces this field with `playedRanks` directly
+  // and updates every web consumer in the same task.
+  const stacks = state.stacks.map((s) => ({ suit: s.suit, topRank: s.playedRanks.length }));
   const discard = state.discard.map((c) => ({ id: c.id, suit: c.suit, rank: c.rank }));
   // D-28: computed ONCE here and reused verbatim in BOTH return literals
   // below — never recomputed per branch, so every seat's projected view is

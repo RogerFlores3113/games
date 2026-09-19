@@ -19,7 +19,7 @@ function buildState(variant: Variant): HanabiState {
     turnIndex: 0,
     hands,
     deck,
-    stacks: config.suits.map((suit) => ({ suit, topRank: 0 })),
+    stacks: config.suits.map((suit) => ({ suit, playedRanks: [] })),
     discard: [],
     discardOrder: [],
     clueTokens: 8,
@@ -155,7 +155,7 @@ describe("leak: canary suite", () => {
     const suit = variantConfig("base").suits[0]!;
     const playedState: HanabiState = {
       ...played,
-      stacks: played.stacks.map((stack) => (stack.suit === suit ? { suit, topRank: 1 } : stack)),
+      stacks: played.stacks.map((stack) => (stack.suit === suit ? { suit, playedRanks: [1] } : stack)),
       history: [
         { turn: 1, type: "play", seatId: "seat-b", cardId: "playedaa", suit, rank: 1, success: true },
       ],

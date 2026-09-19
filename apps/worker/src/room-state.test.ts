@@ -1342,3 +1342,83 @@ describe("Owner request: restartLobby (host-only, ended-game-only)", () => {
     expect(second).toEqual({ ok: true, state: first.state });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Owner gap closure round 2, UAT gap 3: Black is a descending suit, proven
+// through the room action path (07-10-PLAN.md Task 2) -- the server-side
+// legality decision, not just the engine unit tests.
+// ---------------------------------------------------------------------------
+
+describe("Black plays in reverse through the room action path (owner gap closure, UAT gap 3)", () => {
+  it("a black 5 on an empty black stack succeeds, then a black 4 succeeds", () => {
+    const { state } = startedThreeSeatRoom("0123456789abcdef0123456789abcdef", "black");
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const activeHand = game.hands.find((h) => h.seatId === activeSeatId)!;
+
+    // Force the active seat's first two slots to hold a black 5 and a black
+    // 4, same craft pattern the forged-clue tests above use.
+    const craftedSlots = activeHand.slots.map((slot, i) => {
+      if (i === 0) return { ...slot, card: { ...slot.card, suit: "black" as const, rank: 5 as const } };
+      if (i === 1) return { ...slot, card: { ...slot.card, suit: "black" as const, rank: 4 as const } };
+      return slot;
+    });
+    const craftedGame: ActiveGameState = {
+      ...game,
+      hands: game.hands.map((h) => (h.seatId === activeSeatId ? { ...h, slots: craftedSlots } : h)),
+    };
+    const craftedState = { ...state, game: craftedGame };
+    const firstCardId = craftedSlots[0]!.card.id;
+
+    const firstPlay = applyGameAction(craftedState, activeSeatId, "black-5-play", {
+      type: "play",
+      cardId: firstCardId,
+    }, 5);
+    expect(firstPlay.ok).toBe(true);
+    if (!firstPlay.ok) throw new Error("unreachable");
+    const gameAfterFirst = firstPlay.state.game as ActiveGameState;
+    expect(gameAfterFirst.stacks.find((s) => s.suit === "black")!.playedRanks).toEqual([5]);
+
+    // Rewind turnIndex to the same active seat so the second play in this
+    // test also comes from it -- turn order is not what this test exercises.
+    const rewound = { ...firstPlay.state, game: { ...gameAfterFirst, turnIndex: game.turnIndex } };
+    const secondCardId = craftedSlots[1]!.card.id;
+    const secondPlay = applyGameAction(rewound, activeSeatId, "black-4-play", {
+      type: "play",
+      cardId: secondCardId,
+    }, 6);
+    expect(secondPlay.ok).toBe(true);
+    if (!secondPlay.ok) throw new Error("unreachable");
+    const gameAfterSecond = secondPlay.state.game as ActiveGameState;
+    expect(gameAfterSecond.stacks.find((s) => s.suit === "black")!.playedRanks).toEqual([5, 4]);
+  });
+
+  it("a black 1 on an empty black stack is a misplay", () => {
+    const { state } = startedThreeSeatRoom("fedcba9876543210fedcba9876543210", "black");
+    const game = state.game as ActiveGameState;
+    const activeSeatId = game.seatIds[game.turnIndex]!;
+    const activeHand = game.hands.find((h) => h.seatId === activeSeatId)!;
+
+    const craftedSlots = activeHand.slots.map((slot, i) =>
+      i === 0 ? { ...slot, card: { ...slot.card, suit: "black" as const, rank: 1 as const } } : slot,
+    );
+    const craftedGame: ActiveGameState = {
+      ...game,
+      hands: game.hands.map((h) => (h.seatId === activeSeatId ? { ...h, slots: craftedSlots } : h)),
+    };
+    const craftedState = { ...state, game: craftedGame };
+    const cardId = craftedSlots[0]!.card.id;
+    const fusesBefore = game.fuses;
+
+    const result = applyGameAction(craftedState, activeSeatId, "black-1-misplay", {
+      type: "play",
+      cardId,
+    }, 5);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    const gameAfter = result.state.game as ActiveGameState;
+    expect(gameAfter.fuses).toBe(fusesBefore + 1);
+    expect(gameAfter.stacks.find((s) => s.suit === "black")!.playedRanks).toEqual([]);
+    expect(gameAfter.discard.some((c) => c.id === cardId)).toBe(true);
+  });
+});

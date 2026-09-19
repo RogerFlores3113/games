@@ -19,7 +19,7 @@ function buildState(variant: Variant): HanabiState {
     turnIndex: 0,
     hands,
     deck,
-    stacks: config.suits.map((suit) => ({ suit, topRank: 0 })),
+    stacks: config.suits.map((suit) => ({ suit, playedRanks: [] })),
     discard: [],
     discardOrder: [],
     clueTokens: 8,

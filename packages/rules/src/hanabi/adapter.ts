@@ -21,7 +21,7 @@ export const hanabiGame: GameAdapter<HanabiState, HanabiAction> = {
   createInitialState({ seatIds, variant, seed }): HanabiState {
     const config = variantConfig(variant);
     const { hands, deck } = dealInitialHands({ config, seatIds, seed });
-    const stacks: StackEntry[] = config.suits.map((suit) => ({ suit, topRank: 0 }));
+    const stacks: StackEntry[] = config.suits.map((suit) => ({ suit, playedRanks: [] }));
 
     return {
       variant,
