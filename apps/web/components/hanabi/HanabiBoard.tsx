@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Settings } from "lucide-react";
+import { PhotoCredit } from "../PhotoCredit";
+import { TABLE_IMAGE_CREDIT } from "../../lib/image-credits";
 import type { RoomView } from "@games/schema";
 import { HanabiViewSchema } from "@games/schema/games/hanabi";
 import type { Clue, HanabiView } from "@games/rules";
@@ -446,6 +448,8 @@ export function HanabiBoard({
           </div>
         </div>
       </div>
+
+      <PhotoCredit credit={TABLE_IMAGE_CREDIT} theme="dark" />
 
       <FlyToLayer game={game} reconnecting={reconnecting} suppressedCardIds={drag.droppedCardIdsRef} />
 

@@ -3,6 +3,8 @@
 import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "../components/Button";
+import { PhotoCredit } from "../components/PhotoCredit";
+import { LANDING_IMAGE_CREDIT } from "../lib/image-credits";
 import { writeDisplayName } from "../lib/seat-token";
 import { writePendingVariant } from "../lib/pending-variant";
 
@@ -205,6 +207,7 @@ export default function HomePage() {
           </>
         )}
       </form>
+      <PhotoCredit credit={LANDING_IMAGE_CREDIT} theme="light" />
     </main>
   );
 }
