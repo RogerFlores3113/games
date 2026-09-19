@@ -10,17 +10,24 @@ export interface CluePopoverProps {
   colorDisabled: boolean;
   rankDisabled: boolean;
   /**
-   * D-05/D-07: `null` renders today's single colour button for `suit`
-   * (every tile whose own suit IS itself a nameable colour — every
-   * non-rainbow tile in any variant, including a Black tile, D-08, since
-   * "black" is itself a nameable colour). A non-null array renders a
-   * compact row of that many colour entries instead — used only for a tile
-   * whose own suit is not in `cluableColorsForView(game)`: the rainbow
-   * tile case, in `cluableColors` order. In Rainbow this row has 5 entries
-   * (red/yellow/green/blue/white); in Black (07-07 gap closure) it has 6,
-   * ending in Black, since Black is a normal nameable colour that also
-   * touches Rainbow. This is always the variant's `cluableColors`; it never
-   * contains "rainbow".
+   * Owner gap closure (2026-09-18, UAT gap 2): whether this tile offers any
+   * colour control at all. `false` means no colour element renders — not
+   * even a disabled one — which is the Black tile's case: Black is never a
+   * nameable colour clue and no colour clue ever touches a Black tile
+   * ("you cannot hint at the color black"), so its popover is number-only.
+   * When `true`, `colorRow` (below) picks single-button vs row mode.
+   */
+  colorOffered: boolean;
+  /**
+   * D-05/D-07: only meaningful when `colorOffered` is true. `null` renders
+   * a single colour button for `suit` (every tile whose own suit IS itself
+   * a nameable colour — every non-rainbow, non-black tile). A non-null
+   * array renders a compact row of that many colour entries instead — used
+   * for a tile whose own suit is not itself nameable but IS touched by
+   * several nameable colours: the rainbow tile case, in `cluableColors`
+   * order. In both Rainbow and Black this row has the 5 nameable colours
+   * (red/yellow/green/blue/white) — Black itself is never a row entry,
+   * since Black is never nameable (owner gap closure, 2026-09-18).
    */
   colorRow: readonly Suit[] | null;
   onGiveColor: (value: Suit) => void;
@@ -37,23 +44,27 @@ type Align = "center" | "start" | "end";
  * wrapper — see TeammateCard.tsx), this popover offers the clues this
  * specific card's own identity supports.
  *
- * Two rendering modes for the colour slot (D-05/D-06/D-07/D-08, owner-
- * confirmed 2026-09-18):
- * - **Single-button mode** (`colorRow === null`): the card's own suit is
- *   itself a nameable colour (every non-rainbow tile, in every variant,
- *   including Black — "Black" is nameable). Renders byte-identical to the
- *   pre-Phase-7 popover: one colour button labelled/coloured for `suit`.
- * - **Row mode** (`colorRow` is an array): the card's own suit is NOT
- *   itself nameable — the rainbow tile, in both Rainbow (5 entries) and
- *   Black (6 entries, ending in Black — 07-07 gap closure). Renders a
- *   compact row of one button per nameable colour, each in that colour's
- *   own `--color-suit-*` hue, so every legal colour clue that touches a
- *   rainbow tile stays reachable from the UI. Every entry shares one
- *   disabled gate with the rank button (D-07) — never individually
- *   disabled, never any disabled-reason text. "Rainbow" itself is never a
- *   clickable option, in either variant.
+ * Three rendering shapes for the colour slot (D-05/D-06/D-07/D-08, owner
+ * gap closure 2026-09-18):
+ * - **No colour control** (`colorOffered === false`): the Black tile. No
+ *   colour clue ever touches Black, so neither `tile-clue-color` nor
+ *   `clue-color-row` renders — only the bold number button.
+ * - **Single-button mode** (`colorOffered === true`, `colorRow === null`):
+ *   the card's own suit is itself a nameable colour (every non-rainbow,
+ *   non-black tile). Renders one colour button labelled/coloured for
+ *   `suit`.
+ * - **Row mode** (`colorOffered === true`, `colorRow` is an array): the
+ *   card's own suit is not itself nameable but is touched by several
+ *   nameable colours — the rainbow tile, in both Rainbow and Black (5
+ *   entries: red/yellow/green/blue/white). Renders a compact row of one
+ *   button per nameable colour, each in that colour's own `--color-suit-*`
+ *   hue, so every legal colour clue that touches a rainbow tile stays
+ *   reachable from the UI. Every entry shares one disabled gate with the
+ *   rank button (D-07) — never individually disabled, never any
+ *   disabled-reason text. "Rainbow" and "black" are never clickable
+ *   options, in any variant.
  *
- * The bold NUMBER button stays below, unchanged, in both modes.
+ * The bold NUMBER button stays below, unchanged, in every shape.
  *
  * Row mode only: a `useLayoutEffect` measures the popover's own rendered
  * position against the viewport and flips its horizontal anchor (center ->
@@ -67,7 +78,16 @@ type Align = "center" | "start" | "end";
  * shared wrapper's `data-clue-tile` attribute) rather than needing this
  * component to intercept bubbling itself.
  */
-export function CluePopover({ suit, rank, colorDisabled, rankDisabled, colorRow, onGiveColor, onGiveRank }: CluePopoverProps) {
+export function CluePopover({
+  suit,
+  rank,
+  colorDisabled,
+  rankDisabled,
+  colorOffered,
+  colorRow,
+  onGiveColor,
+  onGiveRank,
+}: CluePopoverProps) {
   const suitVisual = SUIT_VISUALS[suit];
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [align, setAlign] = useState<Align>("center");
@@ -111,41 +131,42 @@ export function CluePopover({ suit, rank, colorDisabled, rankDisabled, colorRow,
         ...(colorRow !== null ? { width: "max-content" } : {}),
       }}
     >
-      {colorRow === null ? (
-        <button
-          type="button"
-          role="menuitem"
-          data-testid="tile-clue-color"
-          aria-label={`Give a ${suitVisual.label} clue`}
-          disabled={colorDisabled}
-          onClick={() => onGiveColor(suit)}
-          className="cursor-pointer rounded px-[length:var(--space-xs)] py-[length:var(--space-xs)] text-[length:var(--text-label)] transition-colors hover:bg-[var(--color-bg)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-          style={{ color: suitVisual.hueVar, lineHeight: "var(--text-label--line-height)" }}
-        >
-          {suitVisual.label}
-        </button>
-      ) : (
-        <div data-testid="clue-color-row" className="flex flex-row flex-nowrap gap-[length:var(--space-xs)]">
-          {colorRow.map((value) => {
-            const rowVisual = SUIT_VISUALS[value];
-            return (
-              <button
-                key={value}
-                type="button"
-                role="menuitem"
-                data-testid={`tile-clue-color-${value}`}
-                aria-label={`Give a ${rowVisual.label} clue`}
-                disabled={colorDisabled}
-                onClick={() => onGiveColor(value)}
-                className="cursor-pointer rounded px-[length:var(--space-xs)] py-[length:var(--space-xs)] text-[length:var(--text-label)] transition-colors hover:bg-[var(--color-bg)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                style={{ color: rowVisual.hueVar, lineHeight: "var(--text-label--line-height)" }}
-              >
-                {rowVisual.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {colorOffered &&
+        (colorRow === null ? (
+          <button
+            type="button"
+            role="menuitem"
+            data-testid="tile-clue-color"
+            aria-label={`Give a ${suitVisual.label} clue`}
+            disabled={colorDisabled}
+            onClick={() => onGiveColor(suit)}
+            className="cursor-pointer rounded px-[length:var(--space-xs)] py-[length:var(--space-xs)] text-[length:var(--text-label)] transition-colors hover:bg-[var(--color-bg)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+            style={{ color: suitVisual.hueVar, lineHeight: "var(--text-label--line-height)" }}
+          >
+            {suitVisual.label}
+          </button>
+        ) : (
+          <div data-testid="clue-color-row" className="flex flex-row flex-nowrap gap-[length:var(--space-xs)]">
+            {colorRow.map((value) => {
+              const rowVisual = SUIT_VISUALS[value];
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="menuitem"
+                  data-testid={`tile-clue-color-${value}`}
+                  aria-label={`Give a ${rowVisual.label} clue`}
+                  disabled={colorDisabled}
+                  onClick={() => onGiveColor(value)}
+                  className="cursor-pointer rounded px-[length:var(--space-xs)] py-[length:var(--space-xs)] text-[length:var(--text-label)] transition-colors hover:bg-[var(--color-bg)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                  style={{ color: rowVisual.hueVar, lineHeight: "var(--text-label--line-height)" }}
+                >
+                  {rowVisual.label}
+                </button>
+              );
+            })}
+          </div>
+        ))}
       <button
         type="button"
         role="menuitem"

@@ -96,18 +96,22 @@ export const OWN_HAND_SLOT_SELECTOR = '[data-testid^="own-hand-slot-"]:not([data
  * when clue-giving is currently illegal" case: not the caller's turn, no
  * clue tokens, the game ended, or the page is reconnecting).
  *
- * A tile's popover renders its colour slot in one of two mutually exclusive
- * shapes (never both): most tiles get the single `tile-clue-color` button
- * (`colorButton`); a rainbow tile (Rainbow variant only) instead gets a row
- * of `tile-clue-color-{suit}` buttons for every nameable colour
- * (`colorRowButtons`, a multi-match locator — its first entry is offered
- * first, matching `cluableColors` order). Callers must `count()`-guard
- * before calling `isEnabled()`/`click()` on either locator: on any given
- * tile only ONE of the two will have matches, and Playwright's `isEnabled()`
- * on a zero-match locator waits out its timeout and throws rather than
- * resolving false. Callers are responsible for either clicking one of the
- * returned buttons (which sends the clue and closes the popover) or
- * otherwise closing it (second click, Escape, click elsewhere).
+ * A tile's popover renders its colour slot in one of THREE mutually
+ * exclusive shapes (owner gap closure, 2026-09-18): most tiles get the
+ * single `tile-clue-color` button (`colorButton`); a rainbow tile (Rainbow
+ * or Black variant) instead gets a row of `tile-clue-color-{suit}` buttons
+ * for every nameable colour (`colorRowButtons`, a multi-match locator — its
+ * first entry is offered first, matching `cluableColors` order); a Black
+ * tile (Black variant) offers NEITHER — no colour clue ever touches Black,
+ * so both `colorButton` and `colorRowButtons` have zero matches and only
+ * `rankButton` is usable. Callers must `count()`-guard before calling
+ * `isEnabled()`/`click()` on either colour locator: on any given tile at
+ * most ONE of the two will have matches (possibly neither), and
+ * Playwright's `isEnabled()` on a zero-match locator waits out its timeout
+ * and throws rather than resolving false. Callers are responsible for
+ * either clicking one of the returned buttons (which sends the clue and
+ * closes the popover) or otherwise closing it (second click, Escape, click
+ * elsewhere).
  */
 export async function openTileCluePopover(
   page: Page,
@@ -126,17 +130,20 @@ export async function openTileCluePopover(
 }
 
 /**
- * UAT gap 16 / D-05 (Phase 7 07-03): gives a legal clue to `targetSeatId`,
+ * UAT gap 16 / D-05 (Phase 7 07-03; colour-shape rules updated by 07-09's
+ * owner gap closure, 2026-09-18): gives a legal clue to `targetSeatId`,
  * replacing the deleted `CluePicker`'s target+value+give-clue-button flow.
  * Tries every hand tile in turn; on each, prefers a colour clue (the single
  * button, or — for a rainbow tile — the first entry of its colour row, both
  * of which always touch at least the clicked card) and falls back to the
- * rank button. Every `isEnabled()` check is guarded by a `count()` check
- * first, since a rainbow tile has zero matches for `colorButton` and a
- * non-rainbow tile has zero matches for `colorRowButtons` — calling
- * `isEnabled()` on a zero-match locator waits out Playwright's timeout and
- * throws rather than resolving false. Returns `false` if no tile currently
- * offers ANY legal clue (e.g. not the caller's turn).
+ * rank button, which is the ONLY option on a Black tile (no colour clue
+ * ever touches Black). Every `isEnabled()` check is guarded by a `count()`
+ * check first, since a rainbow tile has zero matches for `colorButton`, a
+ * non-rainbow non-black tile has zero matches for `colorRowButtons`, and a
+ * Black tile has zero matches for BOTH — calling `isEnabled()` on a
+ * zero-match locator waits out Playwright's timeout and throws rather than
+ * resolving false. Returns `false` if no tile currently offers ANY legal
+ * clue (e.g. not the caller's turn).
  */
 export async function giveAnyLegalClue(page: Page, targetSeatId: string): Promise<boolean> {
   const tileCount = await page.locator(`[data-testid="other-hand-${targetSeatId}"] [data-testid^="other-hand-card-"]`).count();

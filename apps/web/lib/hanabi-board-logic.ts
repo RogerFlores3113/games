@@ -135,3 +135,18 @@ export function turnSignText(
 export function cluableColorsForView(view: HanabiView): readonly Suit[] {
   return variantConfig(view.variant).cluableColors;
 }
+
+/** Owner gap closure (2026-09-18, UAT gap 2): the single, variant-agnostic
+ * source of which colour buttons a tile of the given suit offers — the
+ * nameable colours that would actually touch a tile of that suit, per the
+ * variant's own `colorClueTouches` predicate. One entry equal to the tile's
+ * own suit means "single-button mode" (the normal case for a named colour);
+ * several entries means "row mode" (a rainbow tile: every nameable colour
+ * touches it); zero entries means "no colour control at all" (a Black tile:
+ * no colour clue ever touches it, per UAT gap 2 — "you cannot hint at the
+ * color black"). Never special-cases a suit by name; it just filters
+ * `cluableColors` through the variant's own touch predicate. */
+export function colorClueOptionsFor(view: HanabiView, suit: Suit): readonly Suit[] {
+  const config = variantConfig(view.variant);
+  return config.cluableColors.filter((colour) => config.colorClueTouches(suit, colour));
+}

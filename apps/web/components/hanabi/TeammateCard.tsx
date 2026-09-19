@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Clue, HanabiCardView, HanabiView } from "@games/rules";
-import { cluableColorsForView } from "../../lib/hanabi-board-logic";
+import { colorClueOptionsFor } from "../../lib/hanabi-board-logic";
 import { disabledReasonFor, type ActionContext } from "../../lib/hanabi-visual-logic";
 import { cluePulseColorFor, hintDisplayFor } from "../../lib/hanabi-hint-logic";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
@@ -87,31 +87,33 @@ export function TeammateCard({
   // never a placeholder), so `rankDisabled` reduces exactly to the shared
   // ended/reconnecting/not-your-turn/no-tokens gate.
   //
-  // The colour slot is different: some suits (Rainbow) are never themselves
-  // a nameable colour clue (`cluableColorsForView` excludes them). Rather
-  // than disabling the colour button for such a tile (the pre-Phase-7
-  // behaviour, which made every legal colour clue that only touches a
-  // rainbow tile ungivable from the UI — RULES-14), the popover instead
-  // offers a compact ROW of the variant's nameable colours (`colorRow`
-  // below) — every nameable colour always touches the clicked rainbow tile
-  // by the engine's own rule, so the row shares rank's own gate (D-07): no
-  // per-entry legality check, never any disabled-reason text (UAT gap 15's
-  // sibling rule). `colorNameable` is the sole, variant-agnostic detection
-  // rule (`cluableColorsForView(game).includes(card.suit)`) — never a
-  // hardcoded suit-name comparison against the rainbow suit specifically,
-  // so a future variant with a second non-nameable suit would be handled
-  // correctly without editing this file.
+  // The colour slot is different: which colour buttons (if any) a tile
+  // offers is derived from a single, variant-agnostic source of truth —
+  // `colorClueOptionsFor(game, card.suit)` — the nameable colours that
+  // actually touch a tile of this suit, per the engine's own
+  // `colorClueTouches` predicate. Zero options (Black, owner gap closure
+  // 2026-09-18: "you cannot hint at the color black") means no colour
+  // control at all, not even a disabled one. One option equal to the tile's
+  // own suit is the normal case: a single button. More than one option
+  // (Rainbow: every nameable colour touches it) is a compact ROW
+  // (`colorRow` below) — every entry always touches the clicked rainbow
+  // tile by the engine's own rule, so the row shares rank's own gate
+  // (D-07): no per-entry legality check, never any disabled-reason text
+  // (UAT gap 15's sibling rule). This is never a hardcoded suit-name
+  // comparison against rainbow or black specifically, so a future variant
+  // would be handled correctly without editing this file.
   const rankDisabled =
     card.hidden ||
     disabledReasonFor(game, { kind: "clue", targetSeatId: seatId, clue: { type: "rank", value: card.rank } }, ctx) !==
       null;
-  const colorNameable = !card.hidden && cluableColorsForView(game).includes(card.suit);
-  const colorRow = !card.hidden && !colorNameable ? cluableColorsForView(game) : null;
+  const colorOptions = card.hidden ? [] : colorClueOptionsFor(game, card.suit);
+  const colorOffered = colorOptions.length > 0;
+  const colorRow = colorOptions.length > 1 ? colorOptions : null;
   const colorDisabled =
     card.hidden ||
     (colorRow !== null
       ? rankDisabled
-      : !colorNameable ||
+      : !colorOffered ||
         disabledReasonFor(game, { kind: "clue", targetSeatId: seatId, clue: { type: "color", value: card.suit } }, ctx) !==
           null);
   // Prefer not opening the popover at all when nothing in it could ever be
@@ -222,6 +224,7 @@ export function TeammateCard({
           colorDisabled={colorDisabled}
           rankDisabled={rankDisabled}
           colorRow={colorRow}
+          colorOffered={colorOffered}
           onGiveColor={(value) => onGiveClue({ type: "color", value })}
           onGiveRank={() => onGiveClue({ type: "rank", value: card.rank })}
         />

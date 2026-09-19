@@ -119,15 +119,16 @@ describe("clue popover render (D-05..D-08)", () => {
     expect(fragment).toContain(">Red<");
   });
 
-  it("black view, rainbow card: a six-entry colour row ending in Black, no Rainbow entry (07-07 gap)", () => {
+  it("black view, rainbow card: a five-entry colour row (no Black, no Rainbow entry) (owner gap closure, 2026-09-18)", () => {
     const view = baseView({ variant: "black" });
     const fragment = renderPopover(view, card({ suit: "rainbow", rank: 2 }));
 
     expect(fragment).toContain('data-testid="clue-color-row"');
     expect(fragment).not.toContain('data-testid="tile-clue-color"');
     expect(fragment).not.toContain('data-testid="tile-clue-color-rainbow"');
+    expect(fragment).not.toContain('data-testid="tile-clue-color-black"');
 
-    const order = ["red", "yellow", "green", "blue", "white", "black"];
+    const order = ["red", "yellow", "green", "blue", "white"];
     const indices = order.map((suit) => fragment.indexOf(`data-testid="tile-clue-color-${suit}"`));
     for (const idx of indices) expect(idx).toBeGreaterThan(-1);
     for (let i = 1; i < indices.length; i++) {
@@ -143,20 +144,21 @@ describe("clue popover render (D-05..D-08)", () => {
     expect(fragment).toContain('aria-label="Give a Green clue"');
     expect(fragment).toContain('aria-label="Give a Blue clue"');
     expect(fragment).toContain('aria-label="Give a White clue"');
-    expect(fragment).toContain('aria-label="Give a Black clue"');
+    expect(fragment).not.toContain('aria-label="Give a Black clue"');
 
     // Rank button still follows the row.
     expect(fragment).toContain('data-testid="tile-clue-rank"');
     expect(fragment.indexOf('data-testid="clue-color-row"')).toBeLessThan(fragment.indexOf('data-testid="tile-clue-rank"'));
   });
 
-  it("black view, black card: single tile-clue-color button labelled Black (D-08)", () => {
+  it("black view, black card: no colour element at all, only tile-clue-rank (owner gap closure, 2026-09-18: 'you cannot hint at the color black')", () => {
     const view = baseView({ variant: "black" });
     const fragment = renderPopover(view, card({ suit: "black", rank: 1 }));
 
-    expect(fragment).toContain('data-testid="tile-clue-color"');
+    expect(fragment).not.toContain('data-testid="tile-clue-color"');
     expect(fragment).not.toContain('data-testid="clue-color-row"');
-    expect(fragment).toContain(">Black<");
+    expect(fragment).not.toContain('aria-label="Give a Black clue"');
+    expect(fragment).toContain('data-testid="tile-clue-rank"');
   });
 
   it("base view, red card: popover markup unchanged from before this task (single button, same classes/style)", () => {

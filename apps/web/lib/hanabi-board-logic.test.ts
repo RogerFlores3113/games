@@ -6,6 +6,7 @@ import {
   clueTouchCountForTarget,
   clueTouchIdsForTarget,
   cluableColorsForView,
+  colorClueOptionsFor,
   fusesRemainingForView,
   isDiscardDisabled,
   isGiveClueDisabled,
@@ -338,11 +339,33 @@ describe("cluableColorsForView", () => {
     expect(cluableColorsForView(view)).not.toContain("rainbow");
   });
 
-  it("includes black for the black variant, excludes rainbow, and has exactly 6 entries", () => {
+  it("excludes both black and rainbow for the black variant, and has exactly 5 entries (owner gap closure, 2026-09-18)", () => {
     const view = baseView({ variant: "black" });
     const colors = cluableColorsForView(view);
-    expect(colors).toContain("black");
+    expect(colors).not.toContain("black");
     expect(colors).not.toContain("rainbow");
-    expect(colors.length).toBe(6);
+    expect(colors.length).toBe(5);
+  });
+});
+
+describe("colorClueOptionsFor", () => {
+  it("base variant, red suit: exactly one option, red itself", () => {
+    const view = baseView({ variant: "base" });
+    expect(colorClueOptionsFor(view, "red")).toEqual(["red"]);
+  });
+
+  it("rainbow variant, rainbow suit: the five nameable colours, in cluableColors order", () => {
+    const view = baseView({ variant: "rainbow" });
+    expect(colorClueOptionsFor(view, "rainbow")).toEqual(["red", "yellow", "green", "blue", "white"]);
+  });
+
+  it("black variant, rainbow suit: the five nameable colours, no black entry", () => {
+    const view = baseView({ variant: "black" });
+    expect(colorClueOptionsFor(view, "rainbow")).toEqual(["red", "yellow", "green", "blue", "white"]);
+  });
+
+  it("black variant, black suit: no options at all (owner gap closure, 2026-09-18: 'you cannot hint at the color black')", () => {
+    const view = baseView({ variant: "black" });
+    expect(colorClueOptionsFor(view, "black")).toEqual([]);
   });
 });
