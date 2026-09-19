@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 current_plan: 8
 status: verifying
-stopped_at: Completed 07-11-PLAN.md
-last_updated: "2026-09-19T03:15:10.516Z"
+stopped_at: Completed 07-12-PLAN.md
+last_updated: "2026-09-19T03:38:35.655Z"
 last_activity: 2026-09-19
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 92
-  completed_plans: 86
+  completed_plans: 87
   percent: 78
 ---
 
@@ -33,7 +33,7 @@ Total Plans in Phase: 8
 Status: Phase complete — ready for verification
 Last activity: 2026-09-19
 
-Progress: [█████████░] 93%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -148,6 +148,7 @@ Progress: [█████████░] 93%
 | Phase 07 P09 | 55min | 2 tasks | 14 files |
 | Phase 07-variant-support-rainbow-black P10 | 70min | 2 tasks | 22 files |
 | Phase 07 P11 | 65min | 2 tasks | 23 files |
+| Phase 07 P12 | 90min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -325,6 +326,8 @@ Recent decisions affecting current work:
 - [Phase 07-10]: ROOM_SCHEMA_VERSION bumped 3 -> 4 — A pre-change persisted game resets rather than re-entering the engine with a topRank-shaped stack
 - [Phase ?]: PlayedStack takes an explicit nextRank prop from Table.tsx via nextPlayableRank, keeping PlayedStack itself direction-agnostic
 - [Phase ?]: hanabi-audio-cues stack-complete cue fires on completedSuits membership, not rank===5, so a Black stack's completing 1 triggers it correctly
+- [Phase ?]: TURN_SIGN_*/DISCARD_AREA_* are literal 1:1 swapped reservations (140x156 / 257x223), confirmed byte-identical to the live pre-swap render
+- [Phase ?]: discardTileSizeFor derives the discard tile size from the new area rather than hardcoding it, keeping layout-budget.ts the single source of truth for board-region sizes
 
 ### Pending Todos
 
@@ -347,6 +350,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-19T03:15:10.509Z
-Stopped at: Completed 07-11-PLAN.md
+Last session: 2026-09-19T03:38:35.646Z
+Stopped at: Completed 07-12-PLAN.md
 Resume file: None
