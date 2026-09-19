@@ -7,19 +7,19 @@ import { startTwoPlayerGame } from "./helpers";
 // test and the two pages read from).
 
 test.describe("photo credit (CC BY attribution)", () => {
-  test("landing page shows the Camel Up game credit with correct links", async ({ page }) => {
+  test("landing page shows the Settlers of Catan credit with correct links", async ({ page }) => {
     await page.goto("/");
 
     const credit = page.getByTestId("photo-credit");
     await expect(credit).toBeVisible();
-    await expect(credit).toContainText("Camel Up game - Poznań 2017");
-    await expect(credit).toContainText("Klapi");
+    await expect(credit).toContainText("Settlers of Catan completed");
+    await expect(credit).toContainText("Fritzmann2002");
     await expect(credit).toContainText("CC BY-SA 4.0");
 
-    const titleLink = credit.getByRole("link", { name: "Camel Up game - Poznań 2017" });
+    const titleLink = credit.getByRole("link", { name: "Settlers of Catan completed" });
     await expect(titleLink).toHaveAttribute(
       "href",
-      "https://commons.wikimedia.org/wiki/File:Camel_Up_game_-_Pozna%C5%84_2017.jpg",
+      "https://commons.wikimedia.org/wiki/File:Settlers_of_Catan_completed.jpg",
     );
     await expect(titleLink).toHaveAttribute("target", "_blank");
     await expect(titleLink).toHaveAttribute("rel", "noopener noreferrer");

@@ -30,9 +30,9 @@ export interface ImageCredit {
 /** Landing page background — `.landing-backdrop` in `app/globals.css`. */
 export const LANDING_IMAGE_CREDIT: ImageCredit = {
   id: "board-game-night",
-  title: "Camel Up game - Poznań 2017",
-  sourceUrl: "https://commons.wikimedia.org/wiki/File:Camel_Up_game_-_Pozna%C5%84_2017.jpg",
-  author: "Klapi",
+  title: "Settlers of Catan completed",
+  sourceUrl: "https://commons.wikimedia.org/wiki/File:Settlers_of_Catan_completed.jpg",
+  author: "Fritzmann2002",
   license: "CC BY-SA 4.0",
   licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/",
 };

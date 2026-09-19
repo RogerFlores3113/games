@@ -92,31 +92,31 @@ theme, which this image does not touch). No readable text, no identifiable peopl
 
 ## board-game-night.webp
 
-Source URL: https://commons.wikimedia.org/wiki/File:Camel_Up_game_-_Pozna%C5%84_2017.jpg
-Author: Klapi
-Author URL: https://commons.wikimedia.org/wiki/User:Klapi
+Source URL: https://commons.wikimedia.org/wiki/File:Settlers_of_Catan_completed.jpg
+Author: Fritzmann2002
+Author URL: https://commons.wikimedia.org/wiki/User:Fritzmann2002
 License: CC BY-SA 4.0 (Creative Commons Attribution-ShareAlike 4.0 International)
 License URL: https://creativecommons.org/licenses/by-sa/4.0/
 License grant (quoted): "Share — copy and redistribute the material in any medium or format for any purpose, even commercially." (from the license deed's "You are free to:" section; the deed's "Under the following terms:" section additionally requires attribution and ShareAlike, both honored by this credit file)
 Retrieved: 2026-09-19
-Modifications: resized to 1920px wide (1920x1301), re-encoded as WebP quality 78 (~180,000 bytes)
+Modifications: resized to 1920px wide (1920x1209), re-encoded as WebP quality 75 (~265,000 bytes)
 
 Verified via the Wikimedia Commons API (`action=query&prop=imageinfo&iiprop=extmetadata`) against
-https://commons.wikimedia.org/wiki/File:Camel_Up_game_-_Pozna%C5%84_2017.jpg, which returned
+https://commons.wikimedia.org/wiki/File:Settlers_of_Catan_completed.jpg, which returned
 `LicenseShortName: CC BY-SA 4.0`, `LicenseUrl: https://creativecommons.org/licenses/by-sa/4.0`,
-`AttributionRequired: true`, and `Artist` linking to Commons user Klapi. Original photo (2166x1468,
-taken 2017-11-26 at a board-game meetup in Poznań, Poland) is a bright, well-lit overhead shot of a
-Camel Up board game in progress on a wooden table — a colourful pyramid centrepiece, playing
-cards, wooden tokens and a drink can, with several players' heads and arms visible but angled down
-toward the board rather than facing the camera (no one is posing for or looking at the lens).
-Rejected candidates: "Settlers of Catan Party Crew" (Flickr via Commons, CC BY 2.0) is a posed group
-photo at night with no board visible, all faces looking at the camera — reads as a costume party, not
-a game; "Gen Con - Giant Settlers of Catan Game" (Commons, CC BY 3.0) shows a real Catan board but in
-dim indoor convention lighting, working against the owner's earlier "brighter tone" request, and its
-subjects are prominently forward-facing; "A Group of Galaxy Truckers" (Commons, CC BY-SA 3.0) is a
-dim indoor party photo with a wine bottle in the foreground and people looking at the camera — same
-problem, plus off-tone for the app. No readable text, no watermark, no one identifiable as the
-photo's subject.
+`AttributionRequired: true`, and `Artist` linking to Commons user Fritzmann2002. Original photo
+(4032x2539) is a bright, well-lit straight-down overhead shot of a fully set-up Settlers of Catan
+game on a green felt table — the hex board, resource cards, building-cost reference cards, wooden
+settlement/road pieces, and dice, with no people, faces, hands, or arms anywhere in frame. Chosen to
+satisfy the owner's explicit "no people in the board game background photo please" constraint
+(2026-09-19, superseding an earlier "playing Catan" direction) while still reading clearly as "game
+night." Rejected candidates: an earlier pick, "Camel Up game - Poznań 2017" (Commons, CC BY-SA 4.0),
+was reverted after the no-people constraint because it showed several players' heads and arms around
+the board; "Settlers of Catan Party Crew" (Flickr via Commons, CC BY 2.0) is a posed group photo at
+night with no board visible and every face looking at the camera; "Gen Con - Giant Settlers of Catan
+Game" (Commons, CC BY 3.0) shows a real Catan board but in dim convention lighting with prominently
+forward-facing people; "A Group of Galaxy Truckers" (Commons, CC BY-SA 3.0) is a dim indoor party
+photo with people looking at the camera. No readable text, no watermark, no people.
 
 ## wood-tile.webp
 
