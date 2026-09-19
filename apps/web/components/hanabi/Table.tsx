@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { Group, Layers } from "lucide-react";
 import type { HanabiView, Suit } from "@games/rules";
+import { nextPlayableRank, variantConfig } from "@games/rules";
 import { fusesRemainingForView } from "../../lib/hanabi-board-logic";
 import { deckCountText, newlyCompletedStacks, STACK_FLASH_MS } from "../../lib/hanabi-visual-logic";
 import { readDiscardViewPref, writeDiscardViewPref, type DiscardView } from "../../lib/hanabi-discard-logic";
@@ -266,7 +267,12 @@ export function Table({
             </span>
           )}
           {game.stacks.map((stack) => (
-            <PlayedStack key={stack.suit} stack={stack} flashing={flashingSuits.has(stack.suit)} />
+            <PlayedStack
+              key={stack.suit}
+              stack={stack}
+              nextRank={nextPlayableRank(variantConfig(game.variant), stack)}
+              flashing={flashingSuits.has(stack.suit)}
+            />
           ))}
         </div>
       </div>

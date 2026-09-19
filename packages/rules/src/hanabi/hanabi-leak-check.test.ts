@@ -148,9 +148,9 @@ describe("leak: canary suite", () => {
     // Regression guard. `secretsForHanabiSeat` used to bump the allowance for
     // a played card TWICE — once per completed stack rank and once for its
     // "play" history entry — while a view exposes that identity only once
-    // (stacks are {suit, topRank} and carry no `rank` key). That left one
-    // unit of slack per completed rank, so a genuine duplicate reveal went
-    // undetected. This canary fails against that older behavior.
+    // (stacks carry `playedRanks`, plain numbers, and carry no `rank` key).
+    // That left one unit of slack per completed rank, so a genuine duplicate
+    // reveal went undetected. This canary fails against that older behavior.
     const played = buildState("base");
     const suit = variantConfig("base").suits[0]!;
     const playedState: HanabiState = {
@@ -182,6 +182,51 @@ describe("leak: canary suite", () => {
       secrets: playedSecrets,
     });
     expect(reasons).toContain(`typed:identity-count-exceeded:${suit}:1`);
+  });
+
+  it("Canary J: a Black stack's playedRanks (descending, non-empty) raises no false leak", () => {
+    // Black's playedRanks starts at 5 and counts down. Its stack entry is
+    // {suit: "black", playedRanks: [5, 4]} -- plain numbers, no {suit,rank}
+    // pair to be mistaken for an identity. Each of those plays has its own
+    // "play" history entry, which is the sole source of that identity's
+    // legitimate appearance in the view.
+    const black = buildState("black");
+    const playedState: HanabiState = {
+      ...black,
+      stacks: black.stacks.map((stack) =>
+        stack.suit === "black" ? { suit: "black" as const, playedRanks: [5, 4] as const } : stack,
+      ),
+      history: [
+        {
+          turn: 1,
+          type: "play",
+          seatId: "seat-b",
+          cardId: "blackaa",
+          suit: "black",
+          rank: 5,
+          success: true,
+        },
+        {
+          turn: 2,
+          type: "play",
+          seatId: "seat-c",
+          cardId: "blackbb",
+          suit: "black",
+          rank: 4,
+          success: true,
+        },
+      ],
+    };
+    const viewer = "seat-a";
+    const secrets = secretsForHanabiSeat(playedState, viewer, SEED);
+    const view = toHanabiPlayerView(playedState, viewer);
+    expect(
+      checkHanabiViewForLeaks({
+        view,
+        serialized: JSON.stringify(view),
+        secrets,
+      }),
+    ).toEqual([]);
   });
 });
 

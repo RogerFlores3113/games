@@ -142,7 +142,7 @@ describe("validateGameView: fails closed on every leak shape", () => {
           cards: [{ id: "c2", hidden: false, suit: "blue", rank: 3, facts: otherFacts }],
         },
       ],
-      stacks: [{ suit: "red", topRank: 2 }],
+      stacks: [{ suit: "red", playedRanks: [1, 2] }],
       discard: [{ id: "c3", suit: "white", rank: 1 }],
       discardOrder: ["c3"],
       clueTokens: 7,

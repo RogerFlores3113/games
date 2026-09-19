@@ -23,12 +23,12 @@ function baseView(overrides: Partial<HanabiView> = {}): HanabiView {
     yourHand: [],
     otherHands: [{ seatId: "seat-2", cards: [] }],
     stacks: [
-      { suit: "red", topRank: 0 },
-      { suit: "yellow", topRank: 0 },
-      { suit: "green", topRank: 0 },
-      { suit: "blue", topRank: 0 },
-      { suit: "white", topRank: 0 },
-      { suit: "rainbow", topRank: 0 },
+      { suit: "red", playedRanks: [] },
+      { suit: "yellow", playedRanks: [] },
+      { suit: "green", playedRanks: [] },
+      { suit: "blue", playedRanks: [] },
+      { suit: "white", playedRanks: [] },
+      { suit: "rainbow", playedRanks: [] },
     ],
     discard: [],
     discardOrder: [],
@@ -109,12 +109,16 @@ describe("rainbow-art-render (UI-07/D-11)", () => {
   });
 
   it("played-stack slot: PlayedStack renders a resolvable gradient for a rainbow suit column", () => {
-    const markup = renderToStaticMarkup(createElement(PlayedStack, { stack: { suit: "rainbow", topRank: 2 } }));
+    const markup = renderToStaticMarkup(
+      createElement(PlayedStack, { stack: { suit: "rainbow", playedRanks: [1, 2] }, nextRank: 3 }),
+    );
     assertResolvableGradient(markup);
   });
 
   it("played-stack slot control: a red suit column renders no url(# gradient reference", () => {
-    const markup = renderToStaticMarkup(createElement(PlayedStack, { stack: { suit: "red", topRank: 2 } }));
+    const markup = renderToStaticMarkup(
+      createElement(PlayedStack, { stack: { suit: "red", playedRanks: [1, 2] }, nextRank: 3 }),
+    );
     expect(markup).not.toContain("url(#");
   });
 

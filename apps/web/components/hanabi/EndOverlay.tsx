@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import type { HanabiView } from "@games/rules";
-import { maxScoreFor, variantConfig } from "@games/rules";
+import { isStackComplete, maxScoreFor, variantConfig } from "@games/rules";
 import { bandForView } from "../../lib/hanabi-board-logic";
 import { END_REASON_COPY, endReasonForView } from "../../lib/hanabi-visual-logic";
 import { SuitGlyph } from "./SuitGlyph";
@@ -75,33 +75,36 @@ export function EndOverlay({ game, isHost = false, onRestartLobby }: EndOverlayP
         )}
 
         <ul data-testid="end-stacks" className="flex flex-wrap justify-center gap-[length:var(--space-sm)]">
-          {game.stacks.map((stack) => (
-            <li
-              key={stack.suit}
-              data-testid="end-stack"
-              data-top-rank={stack.topRank}
-              data-complete={String(stack.topRank === 5)}
-              className="flex flex-col items-center justify-center gap-[length:var(--space-xs)] rounded-md"
-              style={{
-                width: "48px",
-                height: "64px",
-                backgroundColor: "var(--color-surface)",
-                border: stack.topRank === 5 ? "2px solid var(--color-card-glow)" : "1px solid var(--color-border)",
-                boxShadow:
-                  stack.topRank === 5
+          {game.stacks.map((stack) => {
+            const complete = isStackComplete(stack);
+            const playedCount = stack.playedRanks.length;
+            return (
+              <li
+                key={stack.suit}
+                data-testid="end-stack"
+                data-played-count={playedCount}
+                data-complete={String(complete)}
+                className="flex flex-col items-center justify-center gap-[length:var(--space-xs)] rounded-md"
+                style={{
+                  width: "48px",
+                  height: "64px",
+                  backgroundColor: "var(--color-surface)",
+                  border: complete ? "2px solid var(--color-card-glow)" : "1px solid var(--color-border)",
+                  boxShadow: complete
                     ? "0 0 16px 0 rgba(255, 217, 138, 0.65), 0 0 4px 0 rgba(255, 217, 138, 0.9)"
                     : "none",
-              }}
-            >
-              <SuitGlyph suit={stack.suit} size={18} title={stack.suit} />
-              <span
-                className="text-[length:var(--text-label)] font-semibold"
-                style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
+                }}
               >
-                {stack.topRank > 0 ? stack.topRank : "—"}
-              </span>
-            </li>
-          ))}
+                <SuitGlyph suit={stack.suit} size={18} title={stack.suit} />
+                <span
+                  className="text-[length:var(--text-label)] font-semibold"
+                  style={{ color: "var(--color-text)", lineHeight: "var(--text-label--line-height)" }}
+                >
+                  {playedCount > 0 ? playedCount : "—"}
+                </span>
+              </li>
+            );
+          })}
         </ul>
 
         <div className="flex flex-wrap items-center justify-center gap-[length:var(--space-sm)]">

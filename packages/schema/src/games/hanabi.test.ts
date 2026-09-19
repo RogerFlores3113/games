@@ -68,7 +68,7 @@ const baseValidView = {
       cards: [otherVisibleCard],
     },
   ],
-  stacks: [{ suit: "red", topRank: 2 }],
+  stacks: [{ suit: "red", playedRanks: [1, 2] }],
   discard: [{ id: "card-3", suit: "white", rank: 1 }],
   discardOrder: ["card-3"],
   clueTokens: 7,
@@ -160,13 +160,28 @@ describe("HanabiViewSchema", () => {
   });
 
   it("rejects an unknown suit string", () => {
-    const view = { ...baseValidView, stacks: [{ suit: "purple", topRank: 1 }] };
+    const view = { ...baseValidView, stacks: [{ suit: "purple", playedRanks: [1] }] };
     expect(HanabiViewSchema.safeParse(view).success).toBe(false);
   });
 
   it("rejects a rank of 6", () => {
     const view = { ...baseValidView, discard: [{ id: "card-3", suit: "white", rank: 6 }] };
     expect(HanabiViewSchema.safeParse(view).success).toBe(false);
+  });
+
+  it("rejects a stack carrying the pre-07-11 ascending-progress-number field instead of playedRanks", () => {
+    const view = { ...baseValidView, stacks: [{ suit: "red", ["top" + "Rank"]: 2 }] };
+    expect(HanabiViewSchema.safeParse(view).success).toBe(false);
+  });
+
+  it("rejects a stack with more than 5 playedRanks", () => {
+    const view = { ...baseValidView, stacks: [{ suit: "black", playedRanks: [5, 4, 3, 2, 1, 1] }] };
+    expect(HanabiViewSchema.safeParse(view).success).toBe(false);
+  });
+
+  it("accepts a descending Black stack (5 first, then 4)", () => {
+    const view = { ...baseValidView, stacks: [{ suit: "black", playedRanks: [5, 4] }] };
+    expect(HanabiViewSchema.safeParse(view).success).toBe(true);
   });
 
   it("exposes HANABI_GAME_ID as 'hanabi'", () => {

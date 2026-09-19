@@ -14,11 +14,11 @@ const BASE_GAME: HanabiView = {
   yourHand: [],
   otherHands: [],
   stacks: [
-    { suit: "red", topRank: 3 },
-    { suit: "yellow", topRank: 0 },
-    { suit: "green", topRank: 5 },
-    { suit: "blue", topRank: 0 },
-    { suit: "white", topRank: 1 },
+    { suit: "red", playedRanks: [1, 2, 3] },
+    { suit: "yellow", playedRanks: [] },
+    { suit: "green", playedRanks: [1, 2, 3, 4, 5] },
+    { suit: "blue", playedRanks: [] },
+    { suit: "white", playedRanks: [1] },
   ],
   discard: [
     { id: "d1", suit: "red", rank: 1 },
@@ -129,11 +129,11 @@ function styleFor(markup: string, testid: string): string | null {
 const FULL_BOARD: HanabiView = {
   ...BASE_GAME,
   stacks: [
-    { suit: "red", topRank: 5 },
-    { suit: "yellow", topRank: 5 },
-    { suit: "green", topRank: 5 },
-    { suit: "blue", topRank: 5 },
-    { suit: "white", topRank: 5 },
+    { suit: "red", playedRanks: [1, 2, 3, 4, 5] },
+    { suit: "yellow", playedRanks: [1, 2, 3, 4, 5] },
+    { suit: "green", playedRanks: [1, 2, 3, 4, 5] },
+    { suit: "blue", playedRanks: [1, 2, 3, 4, 5] },
+    { suit: "white", playedRanks: [1, 2, 3, 4, 5] },
   ],
   discard: Array.from({ length: 30 }, (_, i) => {
     const suits = ["red", "yellow", "green", "blue", "white"] as const;
@@ -151,12 +151,12 @@ const FULL_BOARD: HanabiView = {
 const SIX_SUIT_GAME: HanabiView = {
   ...BASE_GAME,
   stacks: [
-    { suit: "red", topRank: 0 },
-    { suit: "yellow", topRank: 0 },
-    { suit: "green", topRank: 0 },
-    { suit: "blue", topRank: 0 },
-    { suit: "white", topRank: 0 },
-    { suit: "black", topRank: 0 },
+    { suit: "red", playedRanks: [] },
+    { suit: "yellow", playedRanks: [] },
+    { suit: "green", playedRanks: [] },
+    { suit: "blue", playedRanks: [] },
+    { suit: "white", playedRanks: [] },
+    { suit: "black", playedRanks: [] },
   ],
 };
 
@@ -166,19 +166,19 @@ const SEVEN_SUIT_GAME: HanabiView = {
   ...BASE_GAME,
   variant: "black",
   stacks: [
-    { suit: "red", topRank: 0 },
-    { suit: "yellow", topRank: 0 },
-    { suit: "green", topRank: 0 },
-    { suit: "blue", topRank: 0 },
-    { suit: "white", topRank: 0 },
-    { suit: "rainbow", topRank: 0 },
-    { suit: "black", topRank: 0 },
+    { suit: "red", playedRanks: [] },
+    { suit: "yellow", playedRanks: [] },
+    { suit: "green", playedRanks: [] },
+    { suit: "blue", playedRanks: [] },
+    { suit: "white", playedRanks: [] },
+    { suit: "rainbow", playedRanks: [] },
+    { suit: "black", playedRanks: [] },
   ],
 };
 
 describe("table-render: fixed board regions (06.2-16)", () => {
   it("the tableau's inline style is identical between an empty game and a full board", () => {
-    const emptyGame: HanabiView = { ...BASE_GAME, stacks: BASE_GAME.stacks.map((s) => ({ ...s, topRank: 0 })), discard: [], discardOrder: [] };
+    const emptyGame: HanabiView = { ...BASE_GAME, stacks: BASE_GAME.stacks.map((s) => ({ ...s, playedRanks: [] })), discard: [], discardOrder: [] };
     const emptyMarkup = render(emptyGame);
     const fullMarkup = render(FULL_BOARD);
     expect(styleFor(emptyMarkup, "tableau")).toBe(styleFor(fullMarkup, "tableau"));

@@ -600,7 +600,7 @@ describe("RoomDO integration (live wrangler dev)", () => {
       type GameViewShape = {
         yourHand: GameCard[];
         otherHands: { seatId: string; cards: GameCard[] }[];
-        stacks: { suit: string; topRank: number }[];
+        stacks: { suit: string; playedRanks: number[] }[];
         discard: { id: string; suit: string; rank: number }[];
         clueTokens: number;
         fuses: number;

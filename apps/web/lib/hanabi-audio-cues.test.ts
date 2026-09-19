@@ -50,8 +50,12 @@ function drawEntry(overrides: Partial<Extract<HistoryEntry, { type: "draw" }>> =
   };
 }
 
-function stacks(topRank: number, suit: Suit = "red"): HanabiView["stacks"] {
-  return [{ suit, topRank }];
+/** Builds a single-stack `stacks` array with `count` ranks played, in play
+ * order. Defaults to an ascending suit's play order (1, 2, 3, ...); pass
+ * `descending: true` for a Black-style stack (5, 4, 3, ...). */
+function stacks(count: number, suit: Suit = "red", descending = false): HanabiView["stacks"] {
+  const order = descending ? [5, 4, 3, 2, 1] : [1, 2, 3, 4, 5];
+  return [{ suit, playedRanks: order.slice(0, count) as (1 | 2 | 3 | 4 | 5)[] }];
 }
 
 describe("cueForEntry", () => {
@@ -67,6 +71,14 @@ describe("cueForEntry", () => {
     expect(cueForEntry(playEntry({ success: true, rank: 3, suit: "red" }), [])).toBe("play");
     // rank-5 success but suit not newly completed this transition -> plain play
     expect(cueForEntry(playEntry({ success: true, rank: 5, suit: "red" }), [])).toBe("play");
+  });
+
+  it("successful Black rank-1 play completing its (descending) suit -> stack-complete", () => {
+    // Black is a descending suit: its stack completes on its 1, not its 5.
+    // cueForEntry must not assume rank 5 to detect completion.
+    expect(cueForEntry(playEntry({ success: true, rank: 1, suit: "black" }), ["black"])).toBe(
+      "stack-complete",
+    );
   });
 
   it("discard -> discard", () => {
@@ -92,6 +104,15 @@ describe("cuesForTransition", () => {
     const next = {
       history: [playEntry({ success: true, rank: 5, suit: "red" })],
       stacks: stacks(5),
+    };
+    expect(cuesForTransition(prev, next)).toEqual(["stack-complete"]);
+  });
+
+  it("one successful Black rank-1 play completing its descending stack -> exactly ['stack-complete']", () => {
+    const prev = { history: [] as HistoryEntry[], stacks: stacks(4, "black", true) };
+    const next = {
+      history: [playEntry({ success: true, rank: 1, suit: "black" })],
+      stacks: stacks(5, "black", true),
     };
     expect(cuesForTransition(prev, next)).toEqual(["stack-complete"]);
   });

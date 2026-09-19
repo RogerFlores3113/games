@@ -62,8 +62,8 @@ export function secretsForHanabiSeat(
   }
   for (const card of state.discard) bump(card.suit, card.rank);
   // Deliberately NO per-rank bump for played stacks. A view's `stacks` entry
-  // carries only a suit and a tile count (07-10 DESIGN DECISION: the wire
-  // shape stays a count, not a rank list) — it carries no `rank` key, so
+  // carries a suit and `playedRanks` — plain numbers in play order, not
+  // `{suit, rank}` objects — so it carries no `rank` key, and
   // collectIdentityCounts never counts it, and a SUCCESSFULLY played card's
   // identity appears in a view exactly once: in its own "play" history
   // entry, bumped below.

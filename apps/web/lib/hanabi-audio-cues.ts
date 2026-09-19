@@ -19,7 +19,10 @@ export function cueForEntry(entry: HistoryEntry, completedSuits: readonly Suit[]
   switch (entry.type) {
     case "play": {
       if (!entry.success) return "fuse"; // D-24: misplay -> fuse cue, never "play"
-      if (entry.rank === 5 && completedSuits.includes(entry.suit)) return "stack-complete"; // D-28
+      // D-28: direction-agnostic. A successful play that completed its stack
+      // triggers "stack-complete" regardless of rank -- a descending (Black)
+      // stack completes on its 1, not its 5, so this must not assume rank 5.
+      if (completedSuits.includes(entry.suit)) return "stack-complete";
       return "play";
     }
     case "discard":

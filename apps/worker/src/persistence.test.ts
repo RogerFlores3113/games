@@ -166,8 +166,8 @@ describe("Phase 4 adapter swap (D-06): pre-swap forehead-card rooms reset", () =
   });
 });
 
-describe("Phase 7 plan 10 stack-shape swap (owner gap closure, UAT gap 3): pre-change topRank rooms reset", () => {
-  it("a schemaVersion 3 room with a topRank-shaped Hanabi game resets without reading the room blob", async () => {
+describe("Phase 7 plan 10 stack-shape swap (owner gap closure, UAT gap 3): pre-change (pre-playedRanks) rooms reset", () => {
+  it("a schemaVersion 3 room with an old-shaped Hanabi stack resets without reading the room blob", async () => {
     expect(ROOM_SCHEMA_VERSION).toBeGreaterThan(3);
 
     const { storage, getCalls } = makeFakeStorage();
@@ -177,7 +177,11 @@ describe("Phase 7 plan 10 stack-shape swap (owner gap closure, UAT gap 3): pre-c
       adapterId: "hanabi",
       game: {
         variant: "base",
-        stacks: [{ suit: "red", topRank: 2 }],
+        // Pre-07-11 wire shape: a single ascending-progress number rather
+        // than playedRanks. The exact old field name doesn't matter here —
+        // schemaVersion 3 resets unconditionally, without even reading this
+        // blob's contents.
+        stacks: [{ suit: "red", legacyStackProgress: 2 }],
       },
     });
     getCalls.length = 0; // reset instrumentation after seeding

@@ -84,7 +84,7 @@ const OtherHandSchema = z.strictObject({
 
 const StackViewSchema = z.strictObject({
   suit: SuitSchema,
-  topRank: z.number().int().min(0).max(5),
+  playedRanks: z.array(RankSchema).max(5),
 });
 
 const DiscardCardSchema = z.strictObject({

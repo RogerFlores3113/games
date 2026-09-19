@@ -103,16 +103,31 @@ describe("touchedCardIdsFromLatestClue", () => {
 });
 
 describe("newlyCompletedStacks", () => {
-  it("returns suits whose topRank went from <5 to 5", () => {
+  it("returns suits whose playedRanks count went from <5 to 5 (ascending suit)", () => {
     expect(
-      newlyCompletedStacks([{ suit: "red", topRank: 4 }], [{ suit: "red", topRank: 5 }]),
+      newlyCompletedStacks(
+        [{ suit: "red", playedRanks: [1, 2, 3, 4] }],
+        [{ suit: "red", playedRanks: [1, 2, 3, 4, 5] }],
+      ),
     ).toEqual(["red"]);
   });
 
-  it("returns [] when a stack stays at 5 -> 5", () => {
+  it("returns [] when a stack stays fully played across the transition", () => {
     expect(
-      newlyCompletedStacks([{ suit: "red", topRank: 5 }], [{ suit: "red", topRank: 5 }]),
+      newlyCompletedStacks(
+        [{ suit: "red", playedRanks: [1, 2, 3, 4, 5] }],
+        [{ suit: "red", playedRanks: [1, 2, 3, 4, 5] }],
+      ),
     ).toEqual([]);
+  });
+
+  it("returns the suit for a descending (Black) stack whose last play is a 1", () => {
+    expect(
+      newlyCompletedStacks(
+        [{ suit: "black", playedRanks: [5, 4, 3, 2] }],
+        [{ suit: "black", playedRanks: [5, 4, 3, 2, 1] }],
+      ),
+    ).toEqual(["black"]);
   });
 });
 

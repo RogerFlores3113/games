@@ -52,20 +52,22 @@ export function touchedCardIdsFromLatestClue(history: HistoryEntry[], sinceIndex
   return [];
 }
 
-/** D-11: suits whose stack went from below the max rank to exactly the max
- * rank between two stack snapshots. Uses `RANKS`' own last entry as the
- * "complete" rank rather than a bare literal 5. */
+/** D-11: suits whose stack went from fewer than every rank played to exactly
+ * every rank played (`playedRanks.length === RANKS.length`) between two
+ * stack snapshots. Direction-agnostic — a descending (Black) stack completes
+ * on its 1 exactly the same way an ascending stack completes on its 5,
+ * because this compares playedRanks LENGTH, never a specific rank value. */
 export function newlyCompletedStacks(
   prev: HanabiView["stacks"],
   next: HanabiView["stacks"],
 ): Suit[] {
-  const maxRank = RANKS[RANKS.length - 1];
-  const prevBySuit = new Map(prev.map((entry) => [entry.suit, entry.topRank]));
+  const totalRanks = RANKS.length;
+  const prevBySuit = new Map(prev.map((entry) => [entry.suit, entry.playedRanks.length]));
   const completed: Suit[] = [];
   for (const entry of next) {
-    if (entry.topRank !== maxRank) continue;
-    const prevRank = prevBySuit.get(entry.suit) ?? 0;
-    if (prevRank < maxRank) {
+    if (entry.playedRanks.length !== totalRanks) continue;
+    const prevCount = prevBySuit.get(entry.suit) ?? 0;
+    if (prevCount < totalRanks) {
       completed.push(entry.suit);
     }
   }

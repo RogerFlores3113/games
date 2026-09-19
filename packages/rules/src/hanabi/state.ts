@@ -139,7 +139,7 @@ export type HanabiView = {
   yourSeatId: string | null;
   yourHand: HanabiCardView[];
   otherHands: Array<{ seatId: string; cards: HanabiCardView[] }>;
-  stacks: Array<{ suit: Suit; topRank: number }>;
+  stacks: Array<{ suit: Suit; playedRanks: Rank[] }>;
   discard: Array<{ id: string; suit: Suit; rank: Rank }>;
   discardOrder: string[];
   clueTokens: number;

@@ -22,9 +22,10 @@
  * than being handed to the Hanabi adapter.
  *
  * Bumped to 4 in Phase 7 plan 10 (owner gap closure, UAT gap 3) when
- * `StackEntry` changed from `{suit, topRank}` to `{suit, playedRanks}`: a
- * persisted pre-change game blob resets to an empty lobby rather than
- * re-entering the engine with a stack shape it no longer understands. */
+ * `StackEntry` changed from a single ascending-progress number to
+ * `{suit, playedRanks}`: a persisted pre-change game blob resets to an
+ * empty lobby rather than re-entering the engine with a stack shape it no
+ * longer understands. */
 export const ROOM_SCHEMA_VERSION = 4;
 
 /** D-01: 32 uppercase-safe characters — no `I`, `O`, `0`, `1` — because the
