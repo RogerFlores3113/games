@@ -402,7 +402,7 @@ Plans:
 
 **Wave 6** *(blocked on 07-06)*
 
-- [ ] 07-07-PLAN.md — 7-suit Black engine (65 tiles, max 35, Black clue touches Rainbow), all Black assertions updated, six-colour rainbow row e2e
+- [x] 07-07-PLAN.md — 7-suit Black engine (65 tiles, max 35, Black clue touches Rainbow), all Black assertions updated, six-colour rainbow row e2e
 
 **Wave 7** *(blocked on 07-07)*
 
@@ -421,4 +421,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Wire Engine Into Room Actor | 9/9 | Complete   | 2026-09-16 |
 | 5. Reconnect & Session Durability Hardening | 6/6 | Complete    | 2026-09-17 |
 | 6. Game Interface | 7/7 | Complete    | 2026-09-17 |
-| 7. Variant Support (Rainbow, Black) | 5/8 | In Progress|  |
+| 7. Variant Support (Rainbow, Black) | 6/8 | In Progress|  |
