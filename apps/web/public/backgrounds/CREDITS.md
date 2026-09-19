@@ -99,7 +99,7 @@ License: CC BY-SA 4.0 (Creative Commons Attribution-ShareAlike 4.0 International
 License URL: https://creativecommons.org/licenses/by-sa/4.0/
 License grant (quoted): "Share — copy and redistribute the material in any medium or format for any purpose, even commercially." (from the license deed's "You are free to:" section; the deed's "Under the following terms:" section additionally requires attribution and ShareAlike, both honored by this credit file)
 Retrieved: 2026-09-19
-Modifications: resized to 1920px wide (1920x1209), re-encoded as WebP quality 75 (~265,000 bytes)
+Modifications: resized to 1920px wide (1920x1209), cropped 7% from the top to remove a person standing at the table edge (owner asked for no people in the photo), giving 1920x1125, re-encoded as WebP (~265,000 bytes)
 
 Verified via the Wikimedia Commons API (`action=query&prop=imageinfo&iiprop=extmetadata`) against
 https://commons.wikimedia.org/wiki/File:Settlers_of_Catan_completed.jpg, which returned
