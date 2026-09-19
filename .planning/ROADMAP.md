@@ -375,7 +375,7 @@ Plans:
   2. In the Rainbow variant, a rainbow card remains visually unambiguous from every other suit despite no single color clue being able to identify it alone.
   3. A full game can be played and correctly scored in each of the three variants (base, Rainbow, Black) end to end, confirming the engine and UI built in earlier phases handle all three configurations without special-casing.
 
-**Plans**: 5 plans
+**Plans**: 8 plans (5 + 3 gap closure)
 Plans:
 **Wave 1**
 
@@ -393,6 +393,20 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [ ] 07-05-PLAN.md — Full gate and owner sign-off on live Rainbow and Black boards (checkpoint)
+
+**Gap closure (owner UAT gap 1: Black = 5 colours + Rainbow + Black, 7 suits)**
+
+**Wave 5**
+
+- [ ] 07-06-PLAN.md — Board widened for a 7th suit column (MAX_SUITS 7, tiles unchanged 50x65), real-browser before/after fit measurement at 1280x720, 5 seats
+
+**Wave 6** *(blocked on 07-06)*
+
+- [ ] 07-07-PLAN.md — 7-suit Black engine (65 tiles, max 35, Black clue touches Rainbow), all Black assertions updated, six-colour rainbow row e2e
+
+**Wave 7** *(blocked on 07-07)*
+
+- [ ] 07-08-PLAN.md — Full gate, 07-HUMAN-UAT.md gap-closure record, owner re-verification checkpoint
 
 ## Progress
 
