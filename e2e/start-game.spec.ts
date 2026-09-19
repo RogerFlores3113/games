@@ -540,7 +540,8 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     const discardBox = await hostPage.getByTestId("discard-pile").boundingBox();
     const clueTokensBox = await hostPage.getByTestId("clue-tokens").boundingBox();
     const fuseTokensBox = await hostPage.getByTestId("fuse-tokens").boundingBox();
-    if (!playBox || !deckBox || !discardBox || !clueTokensBox || !fuseTokensBox) {
+    const turnSignBox = await hostPage.getByTestId("turn-sign").boundingBox();
+    if (!playBox || !deckBox || !discardBox || !clueTokensBox || !fuseTokensBox || !turnSignBox) {
       throw new Error("missing bounding box");
     }
 
@@ -554,10 +555,14 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     expect(deckBox.y).toBeGreaterThan(fuseTokensBox.y + fuseTokensBox.height);
     await expect(hostPage.getByTestId("deck-count")).toHaveText(/^\d+ x$/);
 
-    // UAT gap 22 (third owner review): Discard sits to the RIGHT of the
-    // clue/fuse token column, not stacked underneath Play any more.
-    expect(discardBox.x).toBeGreaterThan(clueTokensBox.x + clueTokensBox.width);
-    expect(discardBox.x).toBeGreaterThan(fuseTokensBox.x + fuseTokensBox.width);
+    // Gap closure 07-12 (owner gap 4, swap discard <-> turn sign): the turn
+    // sign now sits to the RIGHT of the clue/fuse token column, in the
+    // small spot Discard used to occupy — and Discard now sits BELOW that
+    // whole row, filling the large lower area the turn sign used to fill.
+    expect(turnSignBox.x).toBeGreaterThan(clueTokensBox.x + clueTokensBox.width);
+    expect(turnSignBox.x).toBeGreaterThan(fuseTokensBox.x + fuseTokensBox.width);
+    expect(discardBox.y).toBeGreaterThan(deckBox.y + deckBox.height);
+    expect(discardBox.y).toBeGreaterThan(turnSignBox.y + turnSignBox.height);
 
     // BOARD-02/03: the clue-token element count and text track the
     // remaining clue count, and drop by one after a clue is given.
@@ -966,7 +971,7 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       return null;
     }
 
-    const regionsToMeasure = ["tableau", "play-zone", "discard-pile", "clue-tokens"] as const;
+    const regionsToMeasure = ["tableau", "play-zone", "discard-pile", "clue-tokens", "turn-sign"] as const;
     async function measureRegions(): Promise<Record<(typeof regionsToMeasure)[number], { width: number; height: number }>> {
       const result = {} as Record<(typeof regionsToMeasure)[number], { width: number; height: number }>;
       for (const testId of regionsToMeasure) {
@@ -993,9 +998,20 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     let clueTokenSpent = false;
     let guaranteedAdvanceDone = false;
     let pendingPlay: { seatIdx: number; cardId: string } | null = null;
+    // Gap closure 07-12 (owner gap 4): the discard tile's own box must be
+    // just as fixed as the reserved regions above — captured the first
+    // time the pile holds exactly one tile, and compared against the same
+    // (first, by discardOrder) tile's box once the pile holds at least
+    // TARGET_DISCARD_COUNT.
+    let discardTileBoxAtOne: { width: number; height: number } | null = null;
     let board = await waitForSettledBoard(null);
     for (let i = 0; i < 60; i += 1) {
       if (board.ended) break;
+      if (discardTileBoxAtOne === null && board.discardCount >= 1) {
+        const box = await hostPage.locator('[data-testid^="discard-tile-"]').first().boundingBox();
+        if (!box) throw new Error("missing bounding box for first discard tile at count 1");
+        discardTileBoxAtOne = { width: box.width, height: box.height };
+      }
       if (board.discardCount >= TARGET_DISCARD_COUNT && board.maxPlayedCount >= 1 && clueTokenSpent) break;
 
       const activeIdx = board.activeIdx;
@@ -1070,7 +1086,7 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     expect(board.maxPlayedCount).toBeGreaterThanOrEqual(1);
     expect(clueTokenSpent).toBe(true);
 
-    // Measure again after real game progress and assert the four reserved
+    // Measure again after real game progress and assert the five reserved
     // regions' width and height are byte-identical (1px tolerance only for
     // sub-pixel rounding) — the board must not grow or reflow.
     const boxesAtEnd = await measureRegions();
@@ -1085,6 +1101,22 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
         `${testId} height changed from ${boxesAtStart[testId].height} to ${boxesAtEnd[testId].height}`,
       ).toBeLessThanOrEqual(TOLERANCE_PX);
     }
+
+    // Gap closure 07-12 (owner gap 4): a discard TILE's own rendered box is
+    // just as fixed as the reservation around it — the same first tile's
+    // box, measured at discardCount 1 and again at discardCount >=
+    // TARGET_DISCARD_COUNT, must be byte-identical.
+    if (discardTileBoxAtOne === null) throw new Error("never observed discardCount >= 1 during the loop");
+    const discardTileBoxAtEnd = await hostPage.locator('[data-testid^="discard-tile-"]').first().boundingBox();
+    if (!discardTileBoxAtEnd) throw new Error("missing bounding box for first discard tile at end");
+    expect(
+      Math.abs(discardTileBoxAtEnd.width - discardTileBoxAtOne.width),
+      `discard-tile width changed from ${discardTileBoxAtOne.width} to ${discardTileBoxAtEnd.width}`,
+    ).toBeLessThanOrEqual(TOLERANCE_PX);
+    expect(
+      Math.abs(discardTileBoxAtEnd.height - discardTileBoxAtOne.height),
+      `discard-tile height changed from ${discardTileBoxAtOne.height} to ${discardTileBoxAtEnd.height}`,
+    ).toBeLessThanOrEqual(TOLERANCE_PX);
 
     const fitsNoScroll = await hostPage.evaluate(() => {
       const el = document.scrollingElement;

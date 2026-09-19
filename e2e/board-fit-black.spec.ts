@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 import {
+  DISCARD_AREA_HEIGHT_PX,
+  DISCARD_AREA_WIDTH_PX,
   RANK_SLOT_HEIGHT_PX,
   RANK_SLOT_WIDTH_PX,
+  TURN_SIGN_HEIGHT_PX,
+  TURN_SIGN_WIDTH_PX,
 } from "../apps/web/lib/layout-budget";
 import { startGameWithPlayers } from "./helpers";
 
@@ -40,7 +44,15 @@ interface BoardFitMeasurements {
   playRegion: { x: number; width: number };
   columns: ColumnMeasurement[];
   slot: { width: number; height: number };
-  tokens: { clueWidth: number; fuseWidth: number; deckWidth: number; discardWidth: number; turnSignWidth: number };
+  tokens: {
+    clueWidth: number;
+    fuseWidth: number;
+    deckWidth: number;
+    discardWidth: number;
+    discardHeight: number;
+    turnSignWidth: number;
+    turnSignHeight: number;
+  };
   scrollWidth: number;
   scrollHeight: number;
   innerWidth: number;
@@ -107,6 +119,22 @@ test.describe("Black board fit (gap closure 07-06)", () => {
       throw new Error("board-fit-black: missing token/deck/discard/turn-sign bounding box");
     }
 
+    // Gap closure 07-12 (owner gap 4): Discard now fills the large lower
+    // area the turn sign used to fill, and the turn sign now fills the
+    // small spot Discard used to fill — this worst case (5 seats, Black)
+    // still lands on the exact same fixed reservations layout-budget.ts
+    // derives, not a shrunk/grown one. `discard-pile`'s own bordered
+    // ancestor (its direct parent — the non-clipping "highlight ring" div
+    // IS discard-pile itself, per the gap-31 comment in Table.tsx, so its
+    // parent is the bordered Discard box) carries the DISCARD_AREA_*
+    // reservation; discard-pile's own box is that minus the box's padding.
+    const discardOuterBox = await hostPage.getByTestId("discard-pile").locator("..").boundingBox();
+    if (!discardOuterBox) throw new Error("board-fit-black: missing discard box's bordered ancestor");
+    expect(Math.abs(discardOuterBox.width - DISCARD_AREA_WIDTH_PX)).toBeLessThanOrEqual(1);
+    expect(Math.abs(discardOuterBox.height - DISCARD_AREA_HEIGHT_PX)).toBeLessThanOrEqual(1);
+    expect(Math.abs(turnSignBox.width - TURN_SIGN_WIDTH_PX)).toBeLessThanOrEqual(1);
+    expect(Math.abs(turnSignBox.height - TURN_SIGN_HEIGHT_PX)).toBeLessThanOrEqual(1);
+
     const scrollSizes = await hostPage.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       scrollHeight: document.documentElement.scrollHeight,
@@ -129,7 +157,9 @@ test.describe("Black board fit (gap closure 07-06)", () => {
         fuseWidth: fuseBox.width,
         deckWidth: deckBox.width,
         discardWidth: discardBox.width,
+        discardHeight: discardBox.height,
         turnSignWidth: turnSignBox.width,
+        turnSignHeight: turnSignBox.height,
       },
       scrollWidth: scrollSizes.scrollWidth,
       scrollHeight: scrollSizes.scrollHeight,

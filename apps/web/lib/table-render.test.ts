@@ -6,7 +6,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { MAX_FUSES, type HanabiView } from "@games/rules";
 import { Table } from "../components/hanabi/Table";
-import { PLAY_AREA_WIDTH_PX } from "./layout-budget";
+import {
+  DISCARD_AREA_HEIGHT_PX,
+  DISCARD_AREA_WIDTH_PX,
+  PLAY_AREA_WIDTH_PX,
+  TURN_SIGN_HEIGHT_PX,
+  TURN_SIGN_WIDTH_PX,
+} from "./layout-budget";
 
 const BASE_GAME: HanabiView = {
   variant: "base",
@@ -394,5 +400,30 @@ describe("UAT gap 37/38: the turn sign below the discard/token area", () => {
   it("defaults to an empty turn sign when the prop is omitted (pre-existing render calls keep working)", () => {
     const markup = renderToStaticMarkup(createElement(Table, { game: BASE_GAME, dropStatus: null }));
     expect(markup).toMatch(/data-testid="turn-sign"[^>]*><\/div>/);
+  });
+});
+
+describe("gap closure 07-12 (owner gap 4): the turn sign and Discard swapped reservations", () => {
+  it("turn-sign's inline style reserves TURN_SIGN_WIDTH_PX/HEIGHT_PX — the old compact-Discard box's own size", () => {
+    const style = styleFor(render(BASE_GAME), "turn-sign");
+    expect(style).toContain(`width:${TURN_SIGN_WIDTH_PX}px`);
+    expect(style).toContain(`height:${TURN_SIGN_HEIGHT_PX}px`);
+  });
+
+  it("discard-pile's bordered ancestor reserves DISCARD_AREA_WIDTH_PX/HEIGHT_PX — the large lower area the turn sign vacated", () => {
+    const markup = render(BASE_GAME);
+    const boxStyleMatch = markup.match(
+      /<div class="relative flex flex-col[^"]*"\s+style="width:(\d+)px;height:(\d+)px[^"]*"[^>]*>\s*<div class="flex items-center justify-between/,
+    );
+    expect(boxStyleMatch?.[1]).toBe(String(DISCARD_AREA_WIDTH_PX));
+    expect(boxStyleMatch?.[2]).toBe(String(DISCARD_AREA_HEIGHT_PX));
+  });
+
+  it("turn-sign renders before discard-pile in document order (top row, above the large lower Discard area)", () => {
+    const markup = render(BASE_GAME);
+    const turnSignIndex = markup.indexOf('data-testid="turn-sign"');
+    const discardIndex = markup.indexOf('data-testid="discard-pile"');
+    expect(turnSignIndex).toBeGreaterThan(-1);
+    expect(discardIndex).toBeGreaterThan(turnSignIndex);
   });
 });

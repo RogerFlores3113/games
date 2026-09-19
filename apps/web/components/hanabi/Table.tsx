@@ -17,8 +17,8 @@ import {
   DECK_COUNTER_CARD_HEIGHT_PX,
   DECK_COUNTER_CARD_WIDTH_PX,
   DECK_COUNTER_PX,
-  DISCARD_COMPACT_PX,
-  DISCARD_COMPACT_WIDTH_PX,
+  DISCARD_AREA_HEIGHT_PX,
+  DISCARD_AREA_WIDTH_PX,
   DISCARD_TILE_HEIGHT_PX,
   DISCARD_TILE_WIDTH_PX,
   MIDDLE_GAP_PX,
@@ -26,6 +26,8 @@ import {
   PLAY_AREA_WIDTH_PX,
   SUIT_COLUMN_GAP_PX,
   TOKEN_AREA_WIDTH_PX,
+  TURN_SIGN_HEIGHT_PX,
+  TURN_SIGN_WIDTH_PX,
 } from "../../lib/layout-budget";
 import { SUIT_VISUALS } from "../../lib/suit-visuals";
 import { DiscardOverlay } from "./DiscardOverlay";
@@ -277,23 +279,27 @@ export function Table({
         </div>
       </div>
 
-      {/* Regions 2+3 (BOARD-02/03/04, UAT gap 21) plus the UAT gap 37 turn
-          sign: wrapped in one flex-col matching Play's own reserved height
-          (BOARD_INNER_PX) so the token column + compact Discard row sits at
-          the top exactly as before (byte-identical widths/heights — see
-          the two inner divs below, unchanged from their prior siblings-of-
-          section layout) and the sign fills the leftover space underneath,
-          which real-browser measurement confirmed is otherwise empty
-          (BOARD_INNER_PX 383 - the 156px token+deck/discard row = 227px of
-          previously-unused height, comfortably fitting the sign's single
-          text line with room to spare). This is purely a wrapping change —
-          `tableau`/`play-zone`/`discard-pile`/`clue-tokens`' own measured
-          boxes (UAT gap 1's fixed-geometry proof) are untouched. */}
+      {/* Regions 2+3 plus the turn sign, gap closure 07-12 (owner gap 4,
+          verbatim: "can we take the discard area and swap that into the
+          space that says 'X's turn'? should give the discard pile more
+          real estate to breathe and thus a larger tile size."): wrapped in
+          one flex-col matching Play's own reserved height (BOARD_INNER_PX).
+          The top row holds the token column plus, in the SMALL spot Discard
+          used to occupy beside it, the turn sign (own fixed
+          TURN_SIGN_WIDTH_PX/HEIGHT_PX reservation — the same box the
+          compact Discard strip used to fill). Below that row, Discard now
+          fills the LARGE leftover area (own fixed DISCARD_AREA_WIDTH_PX/
+          HEIGHT_PX reservation) that used to hold the turn sign — full
+          width of the right-hand column, substantially taller, so its
+          tiles render larger (see DISCARD_TILE_WIDTH_PX/HEIGHT_PX,
+          layout-budget.ts). `tableau`/`play-zone`/`clue-tokens`' own
+          measured boxes (UAT gap 1's fixed-geometry proof) are untouched by
+          this swap. */}
       <div className="flex flex-col" style={{ height: BOARD_INNER_PX, gap: MIDDLE_GAP_PX }}>
         <div className="flex items-start gap-[length:var(--space-md)]">
           {/* Region 2: the clue/fuse token runs stacked above the Deck
               counter, "{n} x [card back]", per the owner's literal
-              description. */}
+              description (unchanged by gap 4's swap). */}
           <div className="flex flex-col" style={{ width: TOKEN_AREA_WIDTH_PX, gap: MIDDLE_GAP_PX }}>
             <TokenColumn clueTokens={game.clueTokens} fusesRemaining={fusesRemaining} />
 
@@ -324,18 +330,43 @@ export function Table({
             </div>
           </div>
 
-          {/* Region 3 (BOARD-01/T-06.2-39/UAT gap 22, "discard can be shrunk
-              by default, clicking it will expand"): compact Discard, to the
-              RIGHT of the token column, per the owner's literal
-              description — a short, fixed, clipping strip; a pile deeper
-              than DISCARD_ROWS clips rather than growing the board.
-              discard-toggle (and the strip itself) opens the unchanged,
-              full-size DiscardOverlay, which carries the same shared drag
-              order. */}
+          {/* Turn sign (UAT gap 37, moved into this smaller spot by gap 4):
+              "{name}'s turn" / "Your turn!" / "" once the game has ended.
+              aria-live="polite" announces every turn change to
+              screen-reader users without an explicit re-focus. Empty string
+              (game ended, see turnSignText) renders an empty live region
+              rather than no region at all, so a screen reader that already
+              has the region focused hears silence, not a leftover stale
+              announcement. `break-words` lets a long "{name}'s turn" wrap
+              inside this now-narrower fixed box instead of overflowing. */}
           <div
-            className="relative flex flex-col gap-[length:var(--space-xs)] overflow-hidden rounded-md border p-[length:var(--space-xs)]"
-            style={{ width: DISCARD_COMPACT_WIDTH_PX, height: DISCARD_COMPACT_PX, borderColor: "var(--color-border)" }}
+            data-testid="turn-sign"
+            role="status"
+            aria-live="polite"
+            className="flex items-center justify-center break-words text-center font-semibold"
+            style={{
+              width: TURN_SIGN_WIDTH_PX,
+              height: TURN_SIGN_HEIGHT_PX,
+              color: isYourTurn ? "var(--color-turn)" : "var(--color-text-muted)",
+              fontSize: "var(--text-label)",
+              lineHeight: "var(--text-label--line-height)",
+            }}
           >
+            {turnSignText}
+          </div>
+        </div>
+
+        {/* Region 3 (BOARD-01/DISC-01, gap 4: "give the discard pile more
+            real estate to breathe and thus a larger tile size"): Discard
+            now fills the large lower area below the token+turn-sign row,
+            full width of the right-hand column. discard-toggle (and the
+            zone itself) still opens the unchanged, full-size
+            DiscardOverlay for a pile deeper than this box's own
+            DISCARD_MIN_VISIBLE_TILES reservation. */}
+        <div
+          className="relative flex flex-col gap-[length:var(--space-xs)] overflow-hidden rounded-md border p-[length:var(--space-xs)]"
+          style={{ width: DISCARD_AREA_WIDTH_PX, height: DISCARD_AREA_HEIGHT_PX, borderColor: "var(--color-border)" }}
+        >
           <div className="flex items-center justify-between gap-[length:var(--space-xs)]">
             <AreaLabel>Discard</AreaLabel>
             <div className="flex items-center gap-[length:var(--space-xs)]">
@@ -390,19 +421,19 @@ export function Table({
               </button>
             </div>
           </div>
-  
+
           {/* UAT gap 31 (fifth owner review): the highlight ring lives on this
               OUTER div, which does NOT clip its own overflow — a box-shadow
               painted on a self-clipping element gets clipped by its own
-              bounds in Chromium (the compact discard strip's tight padding
-              left no headroom, unlike the Play area's roomier wrapper), so
+              bounds in Chromium, unlike the Play area's roomier wrapper, so
               the ring rendered as a barely-visible sliver instead of the same
               clean glow the Play area shows. The actual "clip a pile deeper
-              than DISCARD_ROWS" behavior moves to the INNER div below, which
-              keeps `overflow-hidden` — only pile CONTENT is clipped now, never
-              the hover highlight painted on the zone around it. Reuses the
-              exact same `dropZoneHighlightStyle` output Play already uses —
-              no second highlight style invented. */}
+              than DISCARD_MIN_VISIBLE_TILES" behavior moves to the INNER div
+              below, which keeps `overflow-hidden` — only pile CONTENT is
+              clipped now, never the hover highlight painted on the zone
+              around it. Reuses the exact same `dropZoneHighlightStyle`
+              output Play already uses — no second highlight style
+              invented. */}
           <div
             ref={discardZoneRef}
             data-testid="discard-pile"
@@ -481,32 +512,6 @@ export function Table({
               )}
             </div>
           </div>
-          </div>
-        </div>
-
-        {/* UAT gap 37 (seventh owner review): "there's a lot of free space
-            below the discard/hint token area - that area can be a sign
-            saying 'X's turn'". Fills the leftover height in this flex-col
-            (see the wrapper's own header comment above) below the token
-            column + compact Discard row, at a fixed reservation so it never
-            grows/shrinks this column's own width and never reflows Play.
-            aria-live="polite" announces every turn change to screen-reader
-            users without an explicit re-focus. Empty string (game ended,
-            see turnSignText) renders an empty live region rather than no
-            region at all, so a screen reader that already has the region
-            focused hears silence, not a leftover stale announcement. */}
-        <div
-          data-testid="turn-sign"
-          role="status"
-          aria-live="polite"
-          className="flex flex-1 items-center justify-center text-center font-semibold"
-          style={{
-            color: isYourTurn ? "var(--color-turn)" : "var(--color-text-muted)",
-            fontSize: "var(--text-label)",
-            lineHeight: "var(--text-label--line-height)",
-          }}
-        >
-          {turnSignText}
         </div>
       </div>
 

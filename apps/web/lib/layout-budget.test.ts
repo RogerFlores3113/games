@@ -7,9 +7,12 @@ import {
   BOARD_PANEL_PADDING_PX,
   CLUE_TOKEN_COLUMNS,
   DECK_COUNTER_PX,
-  DISCARD_COMPACT_PX,
-  DISCARD_COMPACT_WIDTH_PX,
-  DISCARD_ROWS,
+  DISCARD_AREA_HEIGHT_PX,
+  DISCARD_AREA_WIDTH_PX,
+  DISCARD_MIN_VISIBLE_TILES,
+  DISCARD_ROW_GAP_PX,
+  DISCARD_TILE_HEIGHT_PX,
+  DISCARD_TILE_WIDTH_PX,
   MAX_CLUE_TOKENS,
   MAX_FUSE_TOKENS,
   MAX_SUITS,
@@ -19,14 +22,17 @@ import {
   PLAY_AREA_WIDTH_PX,
   RANK_SLOT_HEIGHT_PX,
   RANK_SLOT_WIDTH_PX,
+  RIGHT_ROW_GAP_PX,
   TABLE_BAND_MIN_PX,
   TEAMMATE_BAND_PX,
   TOKEN_AREA_HEIGHT_PX,
   TOKEN_AREA_WIDTH_PX,
   TOKEN_COLUMN_TOTAL_HEIGHT_PX,
   TOKEN_DISC_PX,
+  TURN_SIGN_HEIGHT_PX,
+  TURN_SIGN_WIDTH_PX,
   VIEWPORT_TEST_HEIGHT_PX,
-  discardCompactHeightPx,
+  discardTileSizeFor,
   playAreaContentHeightPx,
   playColumnWidthPx,
   playGridHeightPx,
@@ -85,24 +91,31 @@ describe("layout-budget", () => {
     expect(RANK_SLOT_HEIGHT_PX).toBe(65);
   });
 
-  it("07-06: the tableau's reserved width still fits the 1024px 'stays usable' floor at 7 suit columns", () => {
-    // 16 = the --space-md gap Table.tsx renders between the tableau's three
-    // side-by-side regions (Play | tokens+deck | Discard) — two such gaps.
+  it("07-06/07-12: the tableau's reserved width still fits the 1024px 'stays usable' floor", () => {
+    // 16 = the --space-md gap Table.tsx renders between the tableau's two
+    // side-by-side regions (Play | the token/turn-sign/Discard column).
     const INTER_REGION_GAP_PX = 16;
     const tableauReservedWidthPx =
-      2 * BOARD_PANEL_PADDING_PX +
-      PLAY_AREA_WIDTH_PX +
-      INTER_REGION_GAP_PX +
-      TOKEN_AREA_WIDTH_PX +
-      INTER_REGION_GAP_PX +
-      DISCARD_COMPACT_WIDTH_PX;
+      2 * BOARD_PANEL_PADDING_PX + PLAY_AREA_WIDTH_PX + INTER_REGION_GAP_PX + DISCARD_AREA_WIDTH_PX;
     expect(tableauReservedWidthPx).toBeLessThanOrEqual(1024);
   });
 
-  it("discardCompactHeightPx(DISCARD_ROWS) IS DISCARD_COMPACT_PX, and DISCARD_ROWS is 5 (06.2-22, UAT gap 22)", () => {
-    expect(discardCompactHeightPx(DISCARD_ROWS)).toBe(DISCARD_COMPACT_PX);
-    expect(DISCARD_ROWS).toBe(5);
-    expect(DISCARD_COMPACT_PX).toBe(156);
+  it("gap closure 07-12 (owner gap 4): the turn sign and Discard swapped reservations", () => {
+    // TURN_SIGN_* takes over the OLD compact-Discard box's own reservation
+    // (140 wide, matching the token+deck column's height).
+    expect(TURN_SIGN_WIDTH_PX).toBe(140);
+    expect(TURN_SIGN_HEIGHT_PX).toBe(TOKEN_COLUMN_TOTAL_HEIGHT_PX);
+    expect(TURN_SIGN_HEIGHT_PX).toBe(156);
+    // DISCARD_AREA_* takes over the OLD turn-sign's leftover-space
+    // reservation: the full right-hand column width, and whatever height
+    // remains below the token+deck row.
+    expect(DISCARD_AREA_WIDTH_PX).toBe(TOKEN_AREA_WIDTH_PX + RIGHT_ROW_GAP_PX + TURN_SIGN_WIDTH_PX);
+    expect(DISCARD_AREA_HEIGHT_PX).toBe(BOARD_INNER_PX - TOKEN_COLUMN_TOTAL_HEIGHT_PX - MIDDLE_GAP_PX);
+    // Real-browser measurement, pre-swap (07-12-SUMMARY.md's BEFORE line):
+    // the turn sign's own leftover box was exactly 257x223 — the swap
+    // reuses that same box for Discard, byte-for-byte.
+    expect(DISCARD_AREA_WIDTH_PX).toBe(257);
+    expect(DISCARD_AREA_HEIGHT_PX).toBe(223);
   });
 
   it("TOKEN_COLUMN_TOTAL_HEIGHT_PX is the token run plus a gap plus the Deck counter (UAT gap 21)", () => {
@@ -110,10 +123,33 @@ describe("layout-budget", () => {
     expect(TOKEN_COLUMN_TOTAL_HEIGHT_PX).toBe(156);
   });
 
-  it("BOARD_INNER_PX is the MAX of Play / token+deck column / Discard, since gap 19-22 made them side-by-side regions, not a stack", () => {
-    expect(BOARD_INNER_PX).toBe(Math.max(PLAY_AREA_HEIGHT_PX, TOKEN_COLUMN_TOTAL_HEIGHT_PX, DISCARD_COMPACT_PX));
+  it("BOARD_INNER_PX is the MAX of Play / token+deck column, since gap closure 07-12 moved Discard off this ceiling", () => {
+    expect(BOARD_INNER_PX).toBe(Math.max(PLAY_AREA_HEIGHT_PX, TOKEN_COLUMN_TOTAL_HEIGHT_PX));
     expect(BOARD_INNER_PX).toBe(PLAY_AREA_HEIGHT_PX);
     expect(BOARD_INNER_PX).toBe(383);
+  });
+
+  it("discardTileSizeFor derives a discard tile at least 1.5x the pre-swap 16px width, from the new Discard area", () => {
+    const size = discardTileSizeFor(
+      DISCARD_AREA_WIDTH_PX - 8, // 2 * AREA_PADDING_PX
+      DISCARD_AREA_HEIGHT_PX - 8 - 18 - DISCARD_ROW_GAP_PX, // padding + label row + header gap
+      DISCARD_MIN_VISIBLE_TILES,
+    );
+    expect(size.tileWidth).toBeGreaterThanOrEqual(24);
+    expect(size.columns * size.rows).toBeGreaterThanOrEqual(DISCARD_MIN_VISIBLE_TILES);
+    expect(DISCARD_TILE_WIDTH_PX).toBe(size.tileWidth);
+    expect(DISCARD_TILE_HEIGHT_PX).toBe(size.tileHeight);
+  });
+
+  it("discardTileSizeFor: larger aspect-locked tile height keeps roughly the original 16x22 ratio", () => {
+    const size = discardTileSizeFor(100, 100, 4);
+    expect(size.tileHeight).toBe(Math.round((size.tileWidth * 22) / 16));
+  });
+
+  it("discardTileSizeFor: falls back to a 1x1 minimum when the box is too small for even one tile", () => {
+    const size = discardTileSizeFor(1, 1, 24);
+    expect(size.tileWidth).toBeGreaterThanOrEqual(1);
+    expect(size.tileHeight).toBeGreaterThanOrEqual(1);
   });
 
   it("TABLE_BAND_MIN_PX is BOARD_INNER_PX plus the board panel's own top+bottom padding", () => {

@@ -197,52 +197,11 @@ export const DECK_COUNTER_CARD_HEIGHT_PX = 28;
  * between the three tableau regions (Play / tokens+deck / Discard). */
 export const MIDDLE_GAP_PX = 4;
 
-/** A compact discard tile's rendered width/height. */
-export const DISCARD_TILE_WIDTH_PX = 16;
-export const DISCARD_TILE_HEIGHT_PX = 22;
-
-/** Vertical gap between wrapped discard-tile rows — reuses --space-xs, same
- * as the strip's own `gap-[length:var(--space-xs)]` (Table.tsx). */
+/** Vertical/horizontal gap between wrapped discard-tile rows/columns —
+ * reuses --space-xs, same as the pile zone's own
+ * `gap-[length:var(--space-xs)]` (Table.tsx). Also the gap between the
+ * Discard box's header row (label + buttons) and the pile zone beneath it. */
 export const DISCARD_ROW_GAP_PX = 4;
-
-/**
- * Reserved discard-strip row count. UAT gap 22 (third owner review): the
- * compact Discard strip moved beside the token column instead of stacking
- * under Play, and grew 2 -> 5 rows so its own reserved height roughly
- * matches the token+deck column beside it (both ~156px) rather than reusing
- * whatever row count the old vertical-stack layout needed.
- */
-export const DISCARD_ROWS = 5;
-
-/**
- * A compact Discard strip's total reserved height for `rows` rows of
- * `DISCARD_TILE_HEIGHT_PX`-tall tiles: label row + gap + `rows` tile rows
- * (with `DISCARD_ROW_GAP_PX` between them) + the area's own top+bottom
- * padding.
- */
-export function discardCompactHeightPx(rows: number): number {
-  return (
-    AREA_LABEL_PX +
-    AREA_PADDING_PX +
-    rows * DISCARD_TILE_HEIGHT_PX +
-    (rows - 1) * DISCARD_ROW_GAP_PX +
-    2 * AREA_PADDING_PX
-  );
-}
-
-/** UI-SPEC compact Discard strip height — see `DISCARD_ROWS`'s comment. A
- * pile deeper than `DISCARD_ROWS` rows wraps/clips inside this fixed box —
- * `discard-toggle` opens the existing full-size `DiscardOverlay` (unchanged)
- * to read the whole pile. */
-export const DISCARD_COMPACT_PX = discardCompactHeightPx(DISCARD_ROWS);
-
-/**
- * The compact Discard strip's own reserved width (UAT gap 22). No longer
- * shares `PLAY_AREA_WIDTH_PX` now that it sits beside the token column
- * rather than stacked under Play — a narrower strip suits its new position
- * better, and Play keeps the width Discard used to force it to share.
- */
-export const DISCARD_COMPACT_WIDTH_PX = 140;
 
 /** Vertical/horizontal gap between adjacent tokens/slots — reuses --space-xs. */
 export const TOKEN_GAP_PX = 4;
@@ -305,18 +264,127 @@ export const TOKEN_AREA_WIDTH_PX =
 export const TOKEN_COLUMN_TOTAL_HEIGHT_PX = TOKEN_AREA_HEIGHT_PX + MIDDLE_GAP_PX + DECK_COUNTER_PX;
 
 /**
- * The tableau's total reserved inner height (UAT gaps 19-22): Play, the
- * token+deck column, and Discard now sit SIDE BY SIDE, so the reserved
- * height is the MAX of the three regions, not their sum — Play dominates.
- * See this file's header comment for the full before/after math.
+ * The tableau's total reserved inner height. Gap closure 07-12 (owner gap 4,
+ * swap discard <-> turn sign): Discard is no longer one of the three
+ * side-by-side regions this MAX is taken over — it moved to its own row
+ * BELOW the token+deck column (see DISCARD_AREA_HEIGHT_PX below), so it no
+ * longer competes for this ceiling. The two regions that remain
+ * side-by-side with Play are the token+deck column and (as of this gap
+ * closure) the turn sign beside it, both far shorter than Play — Play still
+ * dominates at 383, unchanged in value from the pre-swap ledger.
  */
-export const BOARD_INNER_PX = Math.max(PLAY_AREA_HEIGHT_PX, TOKEN_COLUMN_TOTAL_HEIGHT_PX, DISCARD_COMPACT_PX);
+export const BOARD_INNER_PX = Math.max(PLAY_AREA_HEIGHT_PX, TOKEN_COLUMN_TOTAL_HEIGHT_PX);
 
 /**
  * UI-SPEC "Center (tableau)" row's height: the board panel's own top+bottom
  * padding plus `BOARD_INNER_PX`.
  */
 export const TABLE_BAND_MIN_PX = BOARD_INNER_PX + 2 * BOARD_PANEL_PADDING_PX;
+
+/**
+ * Gap closure 07-12 (owner gap 4, 07-HUMAN-UAT.md "## Gaps (round 2)" item
+ * 4, verbatim: "can we take the discard area and swap that into the space
+ * that says 'X's turn'? should give the discard pile more real estate to
+ * breathe and thus a larger tile size."): the compact Discard box and the
+ * turn sign swap positions. The turn sign takes over the SMALL top-right
+ * spot Discard used to occupy (beside the token column, the same 140-wide
+ * reservation the pre-swap ledger gave Discard's compact box) —
+ * `TURN_SIGN_WIDTH_PX` is literally that old compact-Discard width, and
+ * `TURN_SIGN_HEIGHT_PX` matches the token+deck column's height so
+ * the two sit evenly in the same row. Discard takes over the LARGE area
+ * below that row — the same leftover space the turn sign used to fill
+ * (real-browser measurement pre-swap: 257x223, see 07-12-SUMMARY.md's
+ * BEFORE line), now `DISCARD_AREA_WIDTH_PX`/`DISCARD_AREA_HEIGHT_PX`.
+ */
+export const RIGHT_ROW_GAP_PX = 16; // Table.tsx's gap-[length:var(--space-md)] between the token column and its row sibling (globals.css --space-md).
+
+/** The turn sign's fixed reserved width, in its new small top-right spot —
+ * identical to the pre-swap compact Discard box's own width (140). */
+export const TURN_SIGN_WIDTH_PX = 140;
+/** The turn sign's fixed reserved height — matches the token+deck column
+ * beside it so the top row's two cells are the same height. */
+export const TURN_SIGN_HEIGHT_PX = TOKEN_COLUMN_TOTAL_HEIGHT_PX;
+
+/** Discard's new fixed reserved width: the full width of the right-hand
+ * column (token column + the inter-region gap + the turn sign beside it),
+ * so Discard spans edge-to-edge beneath that row. */
+export const DISCARD_AREA_WIDTH_PX = TOKEN_AREA_WIDTH_PX + RIGHT_ROW_GAP_PX + TURN_SIGN_WIDTH_PX;
+/** Discard's new fixed reserved height: whatever vertical room lies below
+ * the token+deck row inside `BOARD_INNER_PX` — the same leftover space the
+ * turn sign used to fill pre-swap. */
+export const DISCARD_AREA_HEIGHT_PX = BOARD_INNER_PX - TOKEN_COLUMN_TOTAL_HEIGHT_PX - MIDDLE_GAP_PX;
+
+/** A discard tile's rendered width/height, plus how many columns/rows of
+ * that size the pile zone reserves. */
+export interface DiscardTileSize {
+  tileWidth: number;
+  tileHeight: number;
+  columns: number;
+  rows: number;
+}
+
+/**
+ * A deeper pile than this still renders (clips inside the fixed Discard
+ * box) — `discard-toggle` opens the unchanged `DiscardOverlay` to read the
+ * rest. 24 keeps a real early/mid-game pile fully visible without wrapping
+ * before this reservation clips it.
+ */
+export const DISCARD_MIN_VISIBLE_TILES = 24;
+
+/**
+ * The largest integer `tileWidth` (with `tileHeight` derived to keep the
+ * original 16x22 discard-tile aspect ratio, `round(tileWidth * 22 / 16)`)
+ * such that at least `minVisibleTiles` tiles fit inside a
+ * `innerWidth` x `innerHeight` box, wrapping tile-sized cells with
+ * `DISCARD_ROW_GAP_PX` gaps both horizontally and vertically (mirrors the
+ * pile zone's own `flex-wrap` + `gap-[length:var(--space-xs)]` in
+ * Table.tsx). `innerWidth`/`innerHeight` are the Discard box's own content
+ * box — already reduced for its border/padding and header row by the
+ * caller. Pure function of its inputs; no import-time side effects, so
+ * `layout-budget.test.ts` can exercise it directly at arbitrary sizes.
+ */
+export function discardTileSizeFor(innerWidth: number, innerHeight: number, minVisibleTiles: number): DiscardTileSize {
+  let best: DiscardTileSize | null = null;
+  for (let tileWidth = 1; tileWidth <= innerWidth; tileWidth += 1) {
+    const tileHeight = Math.round((tileWidth * 22) / 16);
+    if (tileHeight > innerHeight) break;
+    const columns = Math.max(1, Math.floor((innerWidth + DISCARD_ROW_GAP_PX) / (tileWidth + DISCARD_ROW_GAP_PX)));
+    const rows = Math.max(1, Math.floor((innerHeight + DISCARD_ROW_GAP_PX) / (tileHeight + DISCARD_ROW_GAP_PX)));
+    if (columns * rows >= minVisibleTiles) {
+      best = { tileWidth, tileHeight, columns, rows };
+    }
+  }
+  return (
+    best ?? {
+      tileWidth: 1,
+      tileHeight: Math.round(22 / 16),
+      columns: 1,
+      rows: 1,
+    }
+  );
+}
+
+/** Discard box content width available to `discardTileSizeFor` — the box's
+ * own reserved width minus its left+right padding. */
+const DISCARD_CONTENT_WIDTH_PX = DISCARD_AREA_WIDTH_PX - 2 * AREA_PADDING_PX;
+/** Discard box content height available to `discardTileSizeFor` — the box's
+ * own reserved height minus its top+bottom padding, the label row, and the
+ * gap between the label row and the pile zone beneath it. */
+const DISCARD_CONTENT_HEIGHT_PX = DISCARD_AREA_HEIGHT_PX - 2 * AREA_PADDING_PX - AREA_LABEL_PX - DISCARD_ROW_GAP_PX;
+
+const DISCARD_TILE_SIZE = discardTileSizeFor(
+  DISCARD_CONTENT_WIDTH_PX,
+  DISCARD_CONTENT_HEIGHT_PX,
+  DISCARD_MIN_VISIBLE_TILES,
+);
+
+/** A discard tile's rendered width/height — derived from the new, much
+ * larger Discard area via `discardTileSizeFor` (gap closure 07-12, owner gap
+ * 4: "give the discard pile more real estate to breathe and thus a larger
+ * tile size"). Real-browser measurement pre-swap (07-12-SUMMARY.md's BEFORE
+ * line): 16x22. */
+export const DISCARD_TILE_WIDTH_PX = DISCARD_TILE_SIZE.tileWidth;
+export const DISCARD_TILE_HEIGHT_PX = DISCARD_TILE_SIZE.tileHeight;
 
 /**
  * UI-SPEC "Top (teammate hands)" row, this phase (06.2-21, owner review:

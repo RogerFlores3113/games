@@ -33,14 +33,26 @@ test.describe("Discard/turn-sign layout measurement (gap closure 07-12)", () => 
     // The clue passed the turn to the other player — that player discards a
     // tile by dragging an own-hand slot onto discard-pile, the same
     // DISC-01-safe pattern hanabi-table-polish.spec.ts uses.
+    // Retried (not just polled): under heavy parallel-worker CPU contention
+    // a single pointer-move sequence can occasionally land short of the
+    // app's own drag threshold and never fire a drop — same defensive
+    // pattern as helpers.ts's actWhenConnected, just for a plain (non-
+    // reconnect) drag rather than a click.
     const discarder = passivePage;
     const slot = discarder.getByTestId("own-hand-slot-1");
     const discardZone = discarder.getByTestId("discard-pile");
-    await dragLocatorTo(discarder, slot, discardZone);
-
-    await expect
-      .poll(async () => hostPage.getByTestId("discard-pile").getAttribute("data-discard-count"))
-      .toBe("1");
+    let discarded = false;
+    for (let attempt = 0; attempt < 5 && !discarded; attempt += 1) {
+      await dragLocatorTo(discarder, slot, discardZone);
+      discarded = await expect
+        .poll(async () => hostPage.getByTestId("discard-pile").getAttribute("data-discard-count"), {
+          timeout: 5000,
+        })
+        .toBe("1")
+        .then(() => true)
+        .catch(() => false);
+    }
+    expect(discarded).toBe(true);
 
     const tile = hostPage.locator('[data-testid="discard-pile"] [data-testid^="discard-tile-"]').first();
     const tileBox = await tile.boundingBox();
@@ -90,6 +102,20 @@ test.describe("Discard/turn-sign layout measurement (gap closure 07-12)", () => 
       return el !== null && el.scrollHeight <= el.clientHeight + 1;
     });
     expect(fitsNoScroll).toBe(true);
+
+    // Task 2 (post-swap) assertions — the new arrangement, tightened from
+    // Task 1's layout-independent-only checks. Real BEFORE measurement
+    // (07-12-SUMMARY.md): tile=16x22 area=130x121 box=140x156
+    // turnSign=257x223.
+    const BEFORE_TILE_WIDTH_PX = 16;
+    expect(tileBox.width).toBeGreaterThanOrEqual(BEFORE_TILE_WIDTH_PX * 1.5);
+    // Discard's bordered box now sits BELOW deck-count (the large lower
+    // area), and is at least 200px wide (the full right-hand column).
+    expect(discardBoxRect.width).toBeGreaterThanOrEqual(200);
+    expect(discardPileBox.y).toBeGreaterThan(deckCountBox.y + deckCountBox.height);
+    // The turn sign now sits to the RIGHT of the clue-tokens column, in the
+    // small spot Discard used to occupy.
+    expect(turnSignBox.x).toBeGreaterThan(clueTokensBox.x + clueTokensBox.width);
 
     await contextB.close();
   });

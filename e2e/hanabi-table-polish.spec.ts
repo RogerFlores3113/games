@@ -849,6 +849,13 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     );
     expect(hasScroll).toBe(false);
 
+    // Gap closure 07-12 (owner gap 4, swap discard <-> turn sign): the sign
+    // now sits ABOVE the (now much larger) discard-pile, in the small
+    // top-right spot Discard used to occupy.
+    const discardBoxForSign = await activePage.getByTestId("discard-pile").boundingBox();
+    if (!discardBoxForSign) throw new Error("missing discard-pile bounding box");
+    expect(signBox.y + signBox.height).toBeLessThanOrEqual(discardBoxForSign.y + 1);
+
     // Give a clue — the turn passes to the other player — and confirm the
     // sign updates on BOTH screens (gap 37's "must update on every turn
     // change").
