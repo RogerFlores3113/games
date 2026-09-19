@@ -119,6 +119,37 @@ describe("clue popover render (D-05..D-08)", () => {
     expect(fragment).toContain(">Red<");
   });
 
+  it("black view, rainbow card: a six-entry colour row ending in Black, no Rainbow entry (07-07 gap)", () => {
+    const view = baseView({ variant: "black" });
+    const fragment = renderPopover(view, card({ suit: "rainbow", rank: 2 }));
+
+    expect(fragment).toContain('data-testid="clue-color-row"');
+    expect(fragment).not.toContain('data-testid="tile-clue-color"');
+    expect(fragment).not.toContain('data-testid="tile-clue-color-rainbow"');
+
+    const order = ["red", "yellow", "green", "blue", "white", "black"];
+    const indices = order.map((suit) => fragment.indexOf(`data-testid="tile-clue-color-${suit}"`));
+    for (const idx of indices) expect(idx).toBeGreaterThan(-1);
+    for (let i = 1; i < indices.length; i++) {
+      const current = indices[i];
+      const previous = indices[i - 1];
+      expect(current).toBeDefined();
+      expect(previous).toBeDefined();
+      expect(current as number).toBeGreaterThan(previous as number);
+    }
+
+    expect(fragment).toContain('aria-label="Give a Red clue"');
+    expect(fragment).toContain('aria-label="Give a Yellow clue"');
+    expect(fragment).toContain('aria-label="Give a Green clue"');
+    expect(fragment).toContain('aria-label="Give a Blue clue"');
+    expect(fragment).toContain('aria-label="Give a White clue"');
+    expect(fragment).toContain('aria-label="Give a Black clue"');
+
+    // Rank button still follows the row.
+    expect(fragment).toContain('data-testid="tile-clue-rank"');
+    expect(fragment.indexOf('data-testid="clue-color-row"')).toBeLessThan(fragment.indexOf('data-testid="tile-clue-rank"'));
+  });
+
   it("black view, black card: single tile-clue-color button labelled Black (D-08)", () => {
     const view = baseView({ variant: "black" });
     const fragment = renderPopover(view, card({ suit: "black", rank: 1 }));

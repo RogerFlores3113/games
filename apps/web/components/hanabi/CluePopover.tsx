@@ -10,13 +10,17 @@ export interface CluePopoverProps {
   colorDisabled: boolean;
   rankDisabled: boolean;
   /**
-   * D-05/D-07: `null` renders today's single colour button for `suit` (every
-   * non-rainbow tile, D-06, and Black tiles, D-08, since "black" is itself a
-   * nameable colour). A non-null array renders a compact row of that many
-   * colour entries instead — used only for a tile whose own suit is not in
-   * `cluableColorsForView(game)` (the rainbow tile case, in `cluableColors`
-   * order). This is always the variant's `cluableColors`; it never contains
-   * "rainbow" or "black"-as-non-nameable.
+   * D-05/D-07: `null` renders today's single colour button for `suit`
+   * (every tile whose own suit IS itself a nameable colour — every
+   * non-rainbow tile in any variant, including a Black tile, D-08, since
+   * "black" is itself a nameable colour). A non-null array renders a
+   * compact row of that many colour entries instead — used only for a tile
+   * whose own suit is not in `cluableColorsForView(game)`: the rainbow
+   * tile case, in `cluableColors` order. In Rainbow this row has 5 entries
+   * (red/yellow/green/blue/white); in Black (07-07 gap closure) it has 6,
+   * ending in Black, since Black is a normal nameable colour that also
+   * touches Rainbow. This is always the variant's `cluableColors`; it never
+   * contains "rainbow".
    */
   colorRow: readonly Suit[] | null;
   onGiveColor: (value: Suit) => void;
@@ -40,12 +44,14 @@ type Align = "center" | "start" | "end";
  *   including Black — "Black" is nameable). Renders byte-identical to the
  *   pre-Phase-7 popover: one colour button labelled/coloured for `suit`.
  * - **Row mode** (`colorRow` is an array): the card's own suit is NOT
- *   itself nameable (the rainbow tile, in Rainbow only). Renders a compact
- *   row of one button per nameable colour, each in that colour's own
- *   `--color-suit-*` hue, so every legal Rainbow colour clue stays
- *   reachable from the UI. Every entry shares one disabled gate with the
- *   rank button (D-07) — never individually disabled, never any
- *   disabled-reason text. "Rainbow" itself is never a clickable option.
+ *   itself nameable — the rainbow tile, in both Rainbow (5 entries) and
+ *   Black (6 entries, ending in Black — 07-07 gap closure). Renders a
+ *   compact row of one button per nameable colour, each in that colour's
+ *   own `--color-suit-*` hue, so every legal colour clue that touches a
+ *   rainbow tile stays reachable from the UI. Every entry shares one
+ *   disabled gate with the rank button (D-07) — never individually
+ *   disabled, never any disabled-reason text. "Rainbow" itself is never a
+ *   clickable option, in either variant.
  *
  * The bold NUMBER button stays below, unchanged, in both modes.
  *
