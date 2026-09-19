@@ -45,6 +45,14 @@
  * substantially larger `RANK_SLOT_WIDTH_PX`/`RANK_SLOT_HEIGHT_PX` (30x40 ->
  * 50x65) without reopening the 1280x720 floor fit (see the total-fit test
  * in layout-budget.test.ts: 111 + 193 + 399 + 6 = 709, 11px of slack kept).
+ *
+ * Gap closure 07-06 (owner gap 1, 2026-09-18): a seventh suit column added
+ * for the 7-suit Black variant (five colours + Rainbow + Black).
+ * Width-only cost (+54px: one 50px rank slot plus one 4px
+ * SUIT_COLUMN_GAP_PX), heights unchanged; rank slots stay 50x65 - not
+ * shrunk, per the owner's standing "board too small" complaint. Owner
+ * decision (binding, verbatim): "just widen the board a bit to make space
+ * for black in that format."
  */
 
 /** Playwright's fixed viewport for the UI-11 no-scroll verification task. */
@@ -96,8 +104,15 @@ export const AREA_PADDING_PX = 4;
 
 /** Reserved rank-slot count per suit column — Hanabi stacks always run 1-5. */
 export const MAX_RANK = 5;
-/** Reserved suit-column count — the Rainbow/Black variant worst case. */
-export const MAX_SUITS = 6;
+/**
+ * Reserved suit-column count — the worst case is now the Black variant's
+ * seven suits (five colours + Rainbow + Black, owner gap 2026-09-18,
+ * 07-HUMAN-UAT.md gap 1: "Black variant includes Rainbow"). Rainbow alone is
+ * six. Widened from 6 -> 7 in gap closure 07-06 (width-only cost, see
+ * PLAY_AREA_WIDTH_PX's comment); rank slots stay at their existing 50x65
+ * size, never shrunk.
+ */
+export const MAX_SUITS = 7;
 
 /**
  * A single rank slot's width/height. UAT gap 22 (third owner review):
@@ -144,10 +159,13 @@ export function playColumnWidthPx(suitCount: number): number {
 }
 
 /**
- * The Play area's total reserved width at the Rainbow/Black worst case (six
- * suit columns) — Play is now its own standalone left region (UAT gap
- * 21/22 moved Deck/Discard out of this column), so this is ALSO the Play
- * region's own rendered width, not shared with anything else.
+ * The Play area's total reserved width at the Black-variant worst case
+ * (seven suit columns, gap closure 07-06) — Play is now its own standalone
+ * left region (UAT gap 21/22 moved Deck/Discard out of this column), so
+ * this is ALSO the Play region's own rendered width, not shared with
+ * anything else. Widening costs WIDTH only (328 -> 382, +54px = one 50px
+ * rank slot plus one 4px SUIT_COLUMN_GAP_PX): heights are untouched, so the
+ * 1280x720 vertical slack (TABLE_BAND_MIN_PX, unchanged) is unaffected.
  */
 export const PLAY_AREA_WIDTH_PX = playColumnWidthPx(MAX_SUITS);
 

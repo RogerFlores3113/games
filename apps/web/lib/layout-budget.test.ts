@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 import {
   BOARD_CHROME_PX,
   BOARD_INNER_PX,
+  BOARD_PANEL_PADDING_PX,
   CLUE_TOKEN_COLUMNS,
   DECK_COUNTER_PX,
   DISCARD_COMPACT_PX,
+  DISCARD_COMPACT_WIDTH_PX,
   DISCARD_ROWS,
   MAX_CLUE_TOKENS,
   MAX_FUSE_TOKENS,
@@ -14,9 +16,13 @@ import {
   MIDDLE_GAP_PX,
   OWN_BAND_PX,
   PLAY_AREA_HEIGHT_PX,
+  PLAY_AREA_WIDTH_PX,
+  RANK_SLOT_HEIGHT_PX,
+  RANK_SLOT_WIDTH_PX,
   TABLE_BAND_MIN_PX,
   TEAMMATE_BAND_PX,
   TOKEN_AREA_HEIGHT_PX,
+  TOKEN_AREA_WIDTH_PX,
   TOKEN_COLUMN_TOTAL_HEIGHT_PX,
   TOKEN_DISC_PX,
   VIEWPORT_TEST_HEIGHT_PX,
@@ -63,11 +69,34 @@ describe("layout-budget", () => {
     expect(PLAY_AREA_HEIGHT_PX).toBe(383);
   });
 
-  it("playColumnWidthPx(MAX_SUITS) is the Rainbow/Black worst-case Play area width", () => {
+  it("playColumnWidthPx(MAX_SUITS) is the 7-suit Black worst-case Play area width", () => {
     // fix(06.2-22, UAT gap 22): RANK_SLOT_WIDTH_PX grown 30 -> 50
     // (208 -> 328) — Play is now its own standalone region, no longer
     // constrained to share a width with Deck/Discard.
-    expect(playColumnWidthPx(MAX_SUITS)).toBe(328);
+    // fix(07-06, gap closure, owner gap 1): MAX_SUITS 6 -> 7 (Black now
+    // deals five colours + Rainbow + Black) widens this width-only
+    // (328 -> 382).
+    expect(playColumnWidthPx(MAX_SUITS)).toBe(382);
+  });
+
+  it("MAX_SUITS is 7 and rank slots are NOT shrunk to make room (07-06, owner-mandated)", () => {
+    expect(MAX_SUITS).toBe(7);
+    expect(RANK_SLOT_WIDTH_PX).toBe(50);
+    expect(RANK_SLOT_HEIGHT_PX).toBe(65);
+  });
+
+  it("07-06: the tableau's reserved width still fits the 1024px 'stays usable' floor at 7 suit columns", () => {
+    // 16 = the --space-md gap Table.tsx renders between the tableau's three
+    // side-by-side regions (Play | tokens+deck | Discard) — two such gaps.
+    const INTER_REGION_GAP_PX = 16;
+    const tableauReservedWidthPx =
+      2 * BOARD_PANEL_PADDING_PX +
+      PLAY_AREA_WIDTH_PX +
+      INTER_REGION_GAP_PX +
+      TOKEN_AREA_WIDTH_PX +
+      INTER_REGION_GAP_PX +
+      DISCARD_COMPACT_WIDTH_PX;
+    expect(tableauReservedWidthPx).toBeLessThanOrEqual(1024);
   });
 
   it("discardCompactHeightPx(DISCARD_ROWS) IS DISCARD_COMPACT_PX, and DISCARD_ROWS is 5 (06.2-22, UAT gap 22)", () => {

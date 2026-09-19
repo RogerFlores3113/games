@@ -160,6 +160,22 @@ const SIX_SUIT_GAME: HanabiView = {
   ],
 };
 
+/** Gap closure 07-06 (owner gap 1): the Black variant's 7-suit worst case
+ * (five colours + Rainbow + Black), stacks in variant order. */
+const SEVEN_SUIT_GAME: HanabiView = {
+  ...BASE_GAME,
+  variant: "black",
+  stacks: [
+    { suit: "red", topRank: 0 },
+    { suit: "yellow", topRank: 0 },
+    { suit: "green", topRank: 0 },
+    { suit: "blue", topRank: 0 },
+    { suit: "white", topRank: 0 },
+    { suit: "rainbow", topRank: 0 },
+    { suit: "black", topRank: 0 },
+  ],
+};
+
 describe("table-render: fixed board regions (06.2-16)", () => {
   it("the tableau's inline style is identical between an empty game and a full board", () => {
     const emptyGame: HanabiView = { ...BASE_GAME, stacks: BASE_GAME.stacks.map((s) => ({ ...s, topRank: 0 })), discard: [], discardOrder: [] };
@@ -175,14 +191,17 @@ describe("table-render: fixed board regions (06.2-16)", () => {
     expect(styleFor(emptyMarkup, "discard-pile")).toBe(styleFor(fullMarkup, "discard-pile"));
   });
 
-  it("the Play region's inline width is PLAY_AREA_WIDTH_PX at 5 and at 6 suits", () => {
+  it("the Play region's inline width is PLAY_AREA_WIDTH_PX at 5, 6 and 7 suits", () => {
     const fiveSuitMarkup = render(BASE_GAME);
     const sixSuitMarkup = render(SIX_SUIT_GAME);
+    const sevenSuitMarkup = render(SEVEN_SUIT_GAME);
     expect(fiveSuitMarkup).toContain('data-testid="play-zone"');
     const fivePlayRegionStyle = fiveSuitMarkup.match(/style="width:(\d+)px;height:\d+px[^"]*"/);
     const sixPlayRegionStyle = sixSuitMarkup.match(/style="width:(\d+)px;height:\d+px[^"]*"/);
+    const sevenPlayRegionStyle = sevenSuitMarkup.match(/style="width:(\d+)px;height:\d+px[^"]*"/);
     expect(fivePlayRegionStyle?.[1]).toBe(String(PLAY_AREA_WIDTH_PX));
     expect(sixPlayRegionStyle?.[1]).toBe(String(PLAY_AREA_WIDTH_PX));
+    expect(sevenPlayRegionStyle?.[1]).toBe(String(PLAY_AREA_WIDTH_PX));
   });
 
   it("every testid from the drag/e2e interface contract is present on a full board", () => {

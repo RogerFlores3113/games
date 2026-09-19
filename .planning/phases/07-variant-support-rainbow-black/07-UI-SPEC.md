@@ -171,3 +171,25 @@ No new npm packages this phase. The colour row is built from existing Tailwind u
 **Approval:** pending
 
 **Note on scope:** unlike Phase 6/6.1/6.2, this UI-SPEC does not introduce a new design system, palette, or component set — it is a small, additive contract layered on top of the fully owner-approved Phase 6.2 board. All colour, typography, and spacing values cited here are carried forward verbatim from `06-UI-SPEC.md` and confirmed still current against the live `globals.css`/`suit-visuals.ts`/`hanabi-board-logic.ts` at research time (2026-09-18). The three owner questions this phase's CONTEXT.md flagged (rainbow row shape, Black colour, variant label) were already answered directly by the owner on 2026-09-18 and are recorded as locked decisions above, not open items for a future sign-off.
+
+---
+
+## Addendum (gap closure 07-06, 2026-09-18)
+
+The owner's gap 1 (07-HUMAN-UAT.md "## Gaps") makes Black a 7-suit variant
+(five colours + Rainbow + Black, not five colours + Black alone). This
+supersedes the "no change to `layout-budget.ts`'s constants (`MAX_SUITS`,
+...)" line above: `MAX_SUITS` widened 6 -> 7 in plan 07-06 so the board
+already reserves a 7th suit column before the engine (plan 07-07) starts
+dealing 7 suits in the Black variant. The cost is width-only (+54px to
+`PLAY_AREA_WIDTH_PX`, 328 -> 382); rank slots stay `RANK_SLOT_WIDTH_PX` /
+`RANK_SLOT_HEIGHT_PX` (50x65), never shrunk — owner decision (binding,
+verbatim, 2026-09-18): "just widen the board a bit to make space for black
+in that format." No other constant in `layout-budget.ts` changes.
+
+The rainbow tile's colour row (this UI-SPEC's rainbow-row design, above) in
+the Black variant contains six nameable colours (red, yellow, green, blue,
+white, black); a black tile keeps its single "Black" `tile-clue-color`
+button. This engine/UI wiring is implemented in plan 07-07, not this plan —
+recorded here so the addendum's board-widening context and the row-content
+consequence stay in one place.
