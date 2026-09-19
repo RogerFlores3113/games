@@ -398,7 +398,7 @@ Plans:
 
 **Wave 5**
 
-- [ ] 07-06-PLAN.md — Board widened for a 7th suit column (MAX_SUITS 7, tiles unchanged 50x65), real-browser before/after fit measurement at 1280x720, 5 seats
+- [x] 07-06-PLAN.md — Board widened for a 7th suit column (MAX_SUITS 7, tiles unchanged 50x65), real-browser before/after fit measurement at 1280x720, 5 seats
 
 **Wave 6** *(blocked on 07-06)*
 
@@ -421,4 +421,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Wire Engine Into Room Actor | 9/9 | Complete   | 2026-09-16 |
 | 5. Reconnect & Session Durability Hardening | 6/6 | Complete    | 2026-09-17 |
 | 6. Game Interface | 7/7 | Complete    | 2026-09-17 |
-| 7. Variant Support (Rainbow, Black) | 4/5 | In Progress|  |
+| 7. Variant Support (Rainbow, Black) | 5/8 | In Progress|  |
