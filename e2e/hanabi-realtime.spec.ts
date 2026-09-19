@@ -1,14 +1,17 @@
 import { expect, test } from "@playwright/test";
 import {
   createRoom,
+  discardOwnHandSlot,
   emulateVisibility,
   expectSeatCount,
   freezePage,
   giveAnyLegalClue,
+  isDiscardCurrentlyLegal,
   joinAs,
   openTileCluePopover,
   OTHER_HAND_SELECTOR,
   OWN_HAND_SLOT_SELECTOR,
+  playOwnHandSlot,
   resumePage,
   seatIdOfOtherPlayer,
   startTwoPlayerGame,
@@ -61,12 +64,13 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
 
     const observerDeckCountBefore = ((await secondObservingPage.getByTestId("deck-count").textContent()) ?? "").trim();
 
-    await secondActingPage.getByTestId("own-hand-slot-1").click();
-    const discardEnabled = await secondActingPage.getByTestId("discard-button").isEnabled();
+    // HAND-02: the deleted own-hand-slot-1.click() + play/discard-button
+    // pair is replaced by the P/D keyboard fallback on the focused tile.
+    const discardEnabled = await isDiscardCurrentlyLegal(secondActingPage);
     if (discardEnabled) {
-      await secondActingPage.getByTestId("discard-button").click();
+      await discardOwnHandSlot(secondActingPage, 1);
     } else {
-      await secondActingPage.getByTestId("play-button").click();
+      await playOwnHandSlot(secondActingPage, 1);
     }
 
     await expect(secondObservingPage.getByTestId("deck-count")).not.toHaveText(observerDeckCountBefore);
@@ -288,9 +292,10 @@ test.describe("Hanabi realtime proofs (RT-01 + RT-03 + D-14)", () => {
     // clue. If every card was clued, discarding one still leaves the others.
     const unclued = passivePage.locator(`${OWN_HAND_SLOT_SELECTOR}[data-just-clued="false"]`);
     const slot = (await unclued.count()) > 0 ? unclued.first() : passivePage.getByTestId("own-hand-slot-1");
-    await slot.click();
-    await expect(slot).toHaveAttribute("data-selected", "true");
-    await passivePage.getByTestId("discard-button").click();
+    // HAND-02: discard via the P/D keyboard fallback (no selection state or
+    // visible button exists any more) — focus the tile, press D.
+    await slot.focus();
+    await slot.press("d");
     await expect(activePage.getByTestId("turn-indicator")).toHaveText("Your turn");
 
     // Precondition: the discard frame landed while the highlight was still
@@ -344,8 +349,12 @@ test.describe("Phase 5 reconnect hardening (RT-04 + RT-06 + D-14)", () => {
     await droppingContext.setOffline(true);
 
     await expect(droppingPage.getByTestId("reconnecting-banner")).toBeVisible({ timeout: 15_000 });
-    await expect(droppingPage.getByTestId("play-button")).toBeDisabled();
-    await expect(droppingPage.getByTestId("discard-button")).toBeDisabled();
+    // HAND-02: the deleted Play/Discard buttons' disabled state is replaced
+    // by the own-hand tile's own `disabled` attribute — tied to the exact
+    // same `reconnecting || ended` gate (HanabiBoard.tsx's controlsDisabled)
+    // the buttons used to read, so a disabled tile can neither be dragged
+    // nor accept the P/D keyboard fallback.
+    await expect(droppingPage.getByTestId("own-hand-slot-1")).toBeDisabled();
     // UAT gap 16: the deleted CluePicker's persistent give-clue-button is
     // gone — reconnecting's illegality now shows as the quick-clue popover
     // simply not opening at all on a tile click.
@@ -354,12 +363,6 @@ test.describe("Phase 5 reconnect hardening (RT-04 + RT-06 + D-14)", () => {
       await droppingTeammateTile.click();
       await expect(droppingPage.getByTestId("tile-clue-popover")).toHaveCount(0);
     }
-    // UAT gap 15 (second owner review): the inline disabled-reason caption
-    // was deleted; the reason still lands in the button's accessible name.
-    await expect(droppingPage.getByTestId("play-button")).toHaveAttribute(
-      "aria-label",
-      "Play (Reconnecting — actions paused)",
-    );
     await expect(droppingPage.getByText(/Connecting to room/)).toHaveCount(0);
     await expect(droppingPage.getByTestId("own-hand")).toBeVisible();
 

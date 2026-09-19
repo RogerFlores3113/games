@@ -1,4 +1,4 @@
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import type { CardFacts } from "../../lib/hanabi-visual-logic";
 import { cluePulseColorFor, hintDisplayFor } from "../../lib/hanabi-hint-logic";
 import { DEFAULT_TILE_COLOR_CSS } from "../../lib/tile-color-pref";
@@ -8,10 +8,15 @@ import { OwnHintIndicator } from "./HintIndicator";
 export interface OwnHandCardProps {
   facts: CardFacts;
   slotNumber: number;
-  selected: boolean;
   justClued: boolean;
   disabled: boolean;
-  onSelect: () => void;
+  /** HAND-02 (owner request, 2026-09-19): the visible Play/Discard buttons
+   * and click-to-select were removed — dragging the tile onto the Play/
+   * Discard zone is the primary path, and this is the keyboard fallback: a
+   * focused tile calls back with "play" or "discard" on P/D, routed by the
+   * caller through the exact same act()/legality gate a drag uses (an
+   * illegal key press is a no-op, never a bypass). */
+  onKeyAction: (action: "play" | "discard") => void;
   /** D-15/D-20: pointer-drag visuals only — no card identity involved. */
   dragging: boolean;
   dragOffset: { x: number; y: number } | null;
@@ -75,10 +80,9 @@ const DEFAULT_TILE_COLOR = DEFAULT_TILE_COLOR_CSS;
 export function OwnHandCard({
   facts,
   slotNumber,
-  selected,
   justClued,
   disabled,
-  onSelect,
+  onKeyAction,
   dragging,
   dragOffset,
   onPointerDown,
@@ -114,6 +118,25 @@ export function OwnHandCard({
   // replacing the button's own dragTransform. A shift-in-flight wrapper adds
   // no flow height/width of its own (inline-block, sized to its button
   // child) — UI-11's zero-slack 1280x720 fit depends on that.
+
+  // HAND-02 (owner request, 2026-09-19): the ONLY surviving way to play/
+  // discard an own-hand tile with a keyboard (no visible button exists any
+  // more) — P plays, D discards, dispatched through the caller's own
+  // legality gate (`onKeyAction`), so an illegal key press is silently a
+  // no-op exactly like an illegal drag drop. Case-insensitive (`key`
+  // already lowercased below) so Caps Lock/Shift don't defeat the shortcut.
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>): void {
+    if (disabled) return;
+    const key = event.key.toLowerCase();
+    if (key === "p") {
+      event.preventDefault();
+      onKeyAction("play");
+    } else if (key === "d") {
+      event.preventDefault();
+      onKeyAction("discard");
+    }
+  }
+
   return (
     <div
       className="tile-shift inline-block"
@@ -122,14 +145,15 @@ export function OwnHandCard({
     <button
       type="button"
       data-testid={`own-hand-slot-${slotNumber}`}
-      data-selected={String(selected)}
       data-just-clued={String(justClued)}
       data-dragging={String(dragging)}
       data-hints={String(hasHints)}
-      aria-pressed={selected}
+      // HAND-02: no visible affordance names these shortcuts, but a
+      // screen-reader/AT user tabbing to a tile can discover them here.
+      aria-keyshortcuts="p d"
       disabled={disabled}
-      onClick={onSelect}
       onPointerDown={onPointerDown}
+      onKeyDown={handleKeyDown}
       className={
         "relative inline-flex flex-col items-center justify-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed" +
         (dragging ? " cursor-grabbing" : " cursor-grab") +
@@ -143,8 +167,6 @@ export function OwnHandCard({
         backgroundColor: "var(--color-surface)",
         border: tileBorder,
         boxShadow: dragging ? "0 8px 24px 0 rgba(0, 0, 0, 0.5), " + tileShadow : tileShadow,
-        outline: selected ? "2px solid var(--color-text)" : undefined,
-        outlineOffset: selected ? "2px" : undefined,
         touchAction: "none",
         transform: dragTransform,
         zIndex: dragging ? 50 : undefined,

@@ -50,7 +50,6 @@ export interface UseHandDragResult {
   playZoneRef: RefObject<HTMLDivElement | null>;
   discardZoneRef: RefObject<HTMLDivElement | null>;
   onCardPointerDown: (cardId: string, event: ReactPointerEvent) => void;
-  consumeClickSuppression: () => boolean;
 }
 
 /**
@@ -72,7 +71,6 @@ export function useHandDrag({ game, ctx, onDropRequest, zoom = 1 }: UseHandDragO
   const startRef = useRef<Point | null>(null);
   const draggingCardIdRef = useRef<string | null>(null);
   const draggingActiveRef = useRef(false);
-  const suppressClickRef = useRef(false);
   const pendingOrderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // T-06.1-37/T-06.1-38: latest game/ctx/onDropRequest read via refs inside
@@ -218,7 +216,6 @@ export function useHandDrag({ game, ctx, onDropRequest, zoom = 1 }: UseHandDragO
         onDropRequestRef.current(request);
       }
 
-      suppressClickRef.current = true;
       endDrag();
     }
 
@@ -246,12 +243,6 @@ export function useHandDrag({ game, ctx, onDropRequest, zoom = 1 }: UseHandDragO
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
-  function consumeClickSuppression(): boolean {
-    const value = suppressClickRef.current;
-    suppressClickRef.current = false;
-    return value;
-  }
-
   return {
     dragState,
     pendingOrder,
@@ -260,6 +251,5 @@ export function useHandDrag({ game, ctx, onDropRequest, zoom = 1 }: UseHandDragO
     playZoneRef,
     discardZoneRef,
     onCardPointerDown,
-    consumeClickSuppression,
   };
 }

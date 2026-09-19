@@ -337,6 +337,41 @@ export async function dragLocatorTo(page: Page, source: Locator, target: Locator
 }
 
 /**
+ * HAND-02 (owner request, 2026-09-19): the visible Play/Discard buttons and
+ * click-to-select were removed — a drag onto the Play/Discard zone
+ * (`dragLocatorTo`, above) is the primary path, and these two helpers drive
+ * the keyboard fallback that replaces every former
+ * `own-hand-slot-N.click()` + `play-button`/`discard-button.click()` pair:
+ * focus the tile, then press P (play) or D (discard). An illegal press is a
+ * silent no-op on the app side (see OwnHandCard.tsx/HanabiBoard.tsx), so
+ * callers that need to know whether an action landed should assert on the
+ * resulting game state (turn indicator, deck count, hand contents) rather
+ * than a button's enabled/disabled attribute, which no longer exists.
+ */
+export async function playOwnHandSlot(page: Page, slotNumber: number): Promise<void> {
+  const slot = page.getByTestId(`own-hand-slot-${slotNumber}`);
+  await slot.focus();
+  await slot.press("p");
+}
+
+export async function discardOwnHandSlot(page: Page, slotNumber: number): Promise<void> {
+  const slot = page.getByTestId(`own-hand-slot-${slotNumber}`);
+  await slot.focus();
+  await slot.press("d");
+}
+
+/**
+ * Mirrors `isDiscardDisabled` (hanabi-board-logic.ts) from the DOM alone, via
+ * `clue-tokens`' own `data-count` attribute (token-render.test.ts) — used by
+ * specs that used to read the deleted `discard-button`'s enabled/disabled
+ * state to decide whether to discard or play.
+ */
+export async function isDiscardCurrentlyLegal(page: Page): Promise<boolean> {
+  const count = await page.getByTestId("clue-tokens").getAttribute("data-count");
+  return count !== null && Number(count) < 8;
+}
+
+/**
  * Reads `[data-card-id]` from the viewer's own hand, in DOM order — the
  * D-15-safe way to observe reorder/slot-replacement effects without ever
  * touching a card's suit/rank identity (own-hand cards carry no identity
@@ -379,14 +414,6 @@ export async function playUntilGameEnds(
   const endOverlayVisible = async () =>
     (await hostPage.getByTestId("end-overlay").isVisible()) ||
     (await otherPage.getByTestId("end-overlay").isVisible());
-  const tryClick = async (locator: Locator): Promise<boolean> => {
-    try {
-      await locator.click({ timeout: 2000 });
-      return true;
-    } catch {
-      return false;
-    }
-  };
 
   for (let i = 0; i < maxIterations; i++) {
     if (await endOverlayVisible()) return;
@@ -394,20 +421,13 @@ export async function playUntilGameEnds(
     const hostText = ((await hostPage.getByTestId("turn-indicator").textContent()) ?? "").trim();
     const activePlayer = hostText === "Your turn" ? hostPage : otherPage;
 
-    if (!(await tryClick(activePlayer.getByTestId("own-hand-slot-1")))) {
-      if (await endOverlayVisible()) return;
-      continue;
-    }
-
-    const playEnabled = await expect(activePlayer.getByTestId("play-button"))
-      .toBeEnabled({ timeout: 2000 })
-      .then(() => true)
-      .catch(() => false);
-    if (!playEnabled) {
-      if (await endOverlayVisible()) return;
-      continue;
-    }
-    if (!(await tryClick(activePlayer.getByTestId("play-button")))) {
+    // HAND-02: playing slot 1 via the keyboard fallback (P) replaces the
+    // deleted own-hand-slot-1.click() + play-button.click() pair. Play is
+    // always legal on your own turn (unlike discard, which has the 8-token
+    // ceiling), so no separate "is this enabled" check is needed here.
+    try {
+      await playOwnHandSlot(activePlayer, 1);
+    } catch {
       if (await endOverlayVisible()) return;
       continue;
     }

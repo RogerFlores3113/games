@@ -2,10 +2,13 @@ import { expect, test } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
 import {
   createRoom,
+  discardOwnHandSlot,
   expectSeatCount,
   giveAnyLegalClue,
   giveAnyLegalClueToAnyTeammate,
+  isDiscardCurrentlyLegal,
   joinAs,
+  playOwnHandSlot,
   playUntilGameEnds,
   seatIdOfOtherPlayer,
   startGameWithPlayers,
@@ -220,27 +223,32 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       pageB.getByTestId("own-hand").locator('[data-glyph], [data-testid="card-identity"]'),
     ).toHaveCount(0);
 
-    // Play/discard controls exist on both pages; disabled on the waiting
-    // player's page regardless of selection, since it is not their turn.
+    // HAND-02 (owner request, 2026-09-19): the visible Play/Discard buttons
+    // are gone — RULES-11 ("illegal actions are visibly unavailable") is now
+    // proven behaviourally: an off-turn P/D key press on the waiting
+    // player's own tile is a silent no-op (deck count and turn indicator
+    // both unchanged), routed through the same `disabledReasonFor` gate the
+    // deleted buttons' disabled state used to read.
     const activePage = hostIsActive ? hostPage : pageB;
     const waitingPage = hostIsActive ? pageB : hostPage;
 
-    await expect(waitingPage.getByTestId("play-button")).toBeDisabled();
-    await expect(waitingPage.getByTestId("discard-button")).toBeDisabled();
+    const waitingDeckCountBefore = ((await waitingPage.getByTestId("deck-count").textContent()) ?? "").trim();
+    const waitingTurnTextBefore = ((await waitingPage.getByTestId("turn-indicator").textContent()) ?? "").trim();
+    await playOwnHandSlot(waitingPage, 1);
+    await discardOwnHandSlot(waitingPage, 1);
+    await expect(waitingPage.getByTestId("deck-count")).toHaveText(waitingDeckCountBefore);
+    await expect(waitingPage.getByTestId("turn-indicator")).toHaveText(waitingTurnTextBefore);
 
-    // RULES-11: illegal actions are visibly unavailable — the disabled
-    // state itself is the affordance (UAT gap 15, second owner review
-    // deleted the obtrusive inline reason text, e.g. "Select a card in your
-    // hand first" / "Clue tokens are full"). The reason is still carried in
-    // each button's accessible name for screen readers, never rendered.
-    await expect(activePage.getByTestId("discard-button")).toHaveAttribute(
-      "aria-label",
-      "Discard (Clue tokens are full — you can't discard)",
-    );
-    await expect(activePage.getByTestId("play-button")).toHaveAttribute(
-      "aria-label",
-      "Play (Select a card in your hand first)",
-    );
+    // Discard is illegal at the starting 8/8 clue tokens (D-12) — confirm via
+    // `clue-tokens`' own data-count (the deleted discard-button's disabled
+    // state used to carry this) and prove a D press on the active page is
+    // also a no-op before falling through to the legal play below.
+    expect(await isDiscardCurrentlyLegal(activePage)).toBe(false);
+    const activeDeckCountBeforeDiscardAttempt = (
+      (await activePage.getByTestId("deck-count").textContent()) ?? ""
+    ).trim();
+    await discardOwnHandSlot(activePage, 1);
+    await expect(activePage.getByTestId("deck-count")).toHaveText(activeDeckCountBeforeDiscardAttempt);
 
     // Discard is disabled at the starting 8/8 clue tokens (D-12), so the
     // active player plays their first own-hand slot instead: the deck count
@@ -259,11 +267,7 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       await hostPage.locator('[data-testid^="played-stack-"]').allTextContents()
     ).join("|");
 
-    await activePage.getByTestId("own-hand-slot-1").click();
-    await expect(activePage.getByTestId("play-button")).toHaveAttribute("aria-label", "Play");
-    await expect(activePage.getByTestId("own-hand-slot-1")).toHaveAttribute("data-selected", "true");
-    await expect(activePage.getByTestId("play-button")).toBeEnabled();
-    await activePage.getByTestId("play-button").click();
+    await playOwnHandSlot(activePage, 1);
 
     await expect(hostPage.getByTestId("deck-count")).toHaveText(`${initialDeckNumber - 1} x`);
     await expect(pageB.getByTestId("deck-count")).toHaveText(`${initialDeckNumber - 1} x`);
@@ -336,8 +340,10 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
         expect(finalScore).toBe(playedCounts.reduce((sum, count) => sum + count, 0));
 
         await expect(page.getByTestId("new-game-link")).toHaveAttribute("href", "/");
-        await expect(page.getByTestId("play-button")).toBeDisabled();
-        await expect(page.getByTestId("discard-button")).toBeDisabled();
+        // HAND-02: the deleted Play/Discard buttons' disabled state is
+        // replaced by the own-hand tile's own `disabled` attribute, tied to
+        // the same `reconnecting || ended` gate.
+        await expect(page.getByTestId("own-hand-slot-1")).toBeDisabled();
         // UAT gap 16: the deleted CluePicker's persistent give-clue-button is
         // gone — an ended game's illegality now shows as the quick-clue
         // popover simply not opening at all on a tile click.
@@ -433,9 +439,13 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       await expect(stack).toBeVisible();
     }
 
-    await hostPage.getByTestId("own-hand-slot-1").scrollIntoViewIfNeeded();
-    await hostPage.getByTestId("own-hand-slot-1").click();
-    await expect(hostPage.getByTestId("own-hand-slot-1")).toHaveAttribute("data-selected", "true");
+    // HAND-02: no click-to-select state exists any more — the fit/reachability
+    // proof is that the tile can still be focused (the keyboard fallback's
+    // prerequisite) at this narrower viewport.
+    const ownSlot1 = hostPage.getByTestId("own-hand-slot-1");
+    await ownSlot1.scrollIntoViewIfNeeded();
+    await ownSlot1.focus();
+    await expect(ownSlot1).toBeFocused();
 
     for (const context of contexts) {
       await context.close();
@@ -589,13 +599,11 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       const active = await currentActivePage(hostPage, pageB);
       const fuseBefore = Number(await hostPage.getByTestId("fuse-tokens").getAttribute("data-count"));
 
-      await active.getByTestId("own-hand-slot-1").click();
-      const playEnabled = await expect(active.getByTestId("play-button"))
-        .toBeEnabled({ timeout: 2000 })
-        .then(() => true)
-        .catch(() => false);
-      if (!playEnabled) continue;
-      await active.getByTestId("play-button").click();
+      // HAND-02: play is always legal on the active player's own turn (no
+      // "selection" precondition exists any more), so the deleted enabled-
+      // check before clicking is gone too — just play via the keyboard
+      // fallback.
+      await playOwnHandSlot(active, 1);
 
       await expect
         .poll(async () => {
@@ -672,26 +680,22 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       const clueTokens = Number(await hostPage.getByTestId("clue-tokens").getAttribute("data-count"));
       const fusesRemaining = Number(await hostPage.getByTestId("fuse-tokens").getAttribute("data-count"));
 
+      // HAND-02: play is always legal on your own turn; discard is legal
+      // whenever clueTokens < 8 (already guaranteed by the branches below
+      // that reach a discard) — so, unlike the deleted buttons, neither
+      // keyboard-fallback press needs its own enabled check here.
       if (clueTokens >= 8) {
         const gave = await giveAnyLegalClueToAnyTeammate(active);
         if (!gave) {
-          await active.getByTestId("own-hand-slot-1").click();
-          await expect(active.getByTestId("play-button")).toBeEnabled({ timeout: 2000 });
-          await active.getByTestId("play-button").click();
+          await playOwnHandSlot(active, 1);
         }
       } else if (fusesRemaining <= 1) {
         // Preserve the game (only 3 fuses total) — discard only from here.
-        await active.getByTestId("own-hand-slot-1").click();
-        await expect(active.getByTestId("discard-button")).toBeEnabled({ timeout: 2000 });
-        await active.getByTestId("discard-button").click();
+        await discardOwnHandSlot(active, 1);
       } else if (i % 2 === 0) {
-        await active.getByTestId("own-hand-slot-1").click();
-        await expect(active.getByTestId("play-button")).toBeEnabled({ timeout: 2000 });
-        await active.getByTestId("play-button").click();
+        await playOwnHandSlot(active, 1);
       } else {
-        await active.getByTestId("own-hand-slot-1").click();
-        await expect(active.getByTestId("discard-button")).toBeEnabled({ timeout: 2000 });
-        await active.getByTestId("discard-button").click();
+        await discardOwnHandSlot(active, 1);
       }
 
       await expect
@@ -938,6 +942,20 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       }
     }
 
+    /** HAND-02: the keyboard-fallback equivalent of `tryClick` above — focus
+     * the tile then press P (play) or D (discard), reporting failure instead
+     * of throwing so a reconnect disabled mid-attempt fails this attempt
+     * fast, same as `tryClick`. */
+    async function tryKeyAction(locator: Locator, key: "p" | "d"): Promise<boolean> {
+      try {
+        await locator.focus({ timeout: 2000 });
+        await locator.press(key, { timeout: 2000 });
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
     /** The id of a card in `targetLabel`'s hand (as rendered on
      * `viewerPage`) whose identity's rank equals that suit's `nextRankBySuit`
      * entry — one the game rules will always accept as a legal play right
@@ -1026,10 +1044,7 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
         const cardSlot = active
           .locator(`[data-testid="own-hand"] [data-card-id="${pendingPlay.cardId}"]`)
           .locator('[data-testid^="own-hand-slot-"]:not([data-testid$="-hints"])');
-        await actWhenConnected(
-          active,
-          async () => (await tryClick(cardSlot)) && (await tryClick(active.getByTestId("play-button"))),
-        );
+        await actWhenConnected(active, async () => tryKeyAction(cardSlot, "p"));
         pendingPlay = null;
         guaranteedAdvanceDone = true;
         board = await afterActionBy(activeIdx, board.key);
@@ -1071,12 +1086,7 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
         await actWhenConnected(active, () => giveAnyLegalClueToAnyTeammate(active));
         clueTokenSpent = true;
       } else {
-        await actWhenConnected(
-          active,
-          async () =>
-            (await tryClick(active.getByTestId("own-hand-slot-1"))) &&
-            (await tryClick(active.getByTestId("discard-button"))),
-        );
+        await actWhenConnected(active, async () => tryKeyAction(active.getByTestId("own-hand-slot-1"), "d"));
       }
       board = await afterActionBy(activeIdx, board.key);
     }

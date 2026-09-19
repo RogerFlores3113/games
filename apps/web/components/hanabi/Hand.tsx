@@ -151,10 +151,12 @@ export interface OwnHandProps {
   connected: boolean;
   isYourTurn: boolean;
   turnText: string;
-  selectedCardId: string | null;
   justCluedIds: ReadonlySet<string>;
   disabled: boolean;
-  onSelectCard: (cardId: string) => void;
+  /** HAND-02 (owner request, 2026-09-19): the P/D keyboard fallback for a
+   * focused tile — bound per-card (with that card's id) below, and routed by
+   * the caller through the same legality gate a drag drop uses. */
+  onKeyAction: (cardId: string, action: "play" | "discard") => void;
   /** D-15/D-16/D-20: drag state and callbacks from `useHandDrag`, threaded
    * through unchanged — `OwnHand` never re-derives drag geometry itself. */
   draggingCardId: string | null;
@@ -168,7 +170,6 @@ export interface OwnHandProps {
   slotPitchPx?: number | null;
   onCardPointerDown: (cardId: string, event: ReactPointerEvent) => void;
   registerSlot: (cardId: string, el: HTMLElement | null) => void;
-  consumeClickSuppression: () => boolean;
   /** HINT-03/D-05: the set of card ids whose hint overlay currently
    * renders, derived per-render by `hintsVisibleForCard` (turn-history
    * based, never a timer). `undefined` means "not yet wired" and every
@@ -193,17 +194,15 @@ export function OwnHand({
   connected,
   isYourTurn,
   turnText,
-  selectedCardId,
   justCluedIds,
   disabled,
-  onSelectCard,
+  onKeyAction,
   draggingCardId,
   dragOffset,
   dropIndex,
   slotPitchPx,
   onCardPointerDown,
   registerSlot,
-  consumeClickSuppression,
   hintsVisible,
   tileColor,
 }: OwnHandProps) {
@@ -289,16 +288,12 @@ export function OwnHand({
             <OwnHandCard
               facts={card.facts}
               slotNumber={i + 1}
-              selected={selectedCardId === card.id}
               justClued={justCluedIds.has(card.id)}
               disabled={disabled}
               dragging={draggingCardId === card.id}
               dragOffset={draggingCardId === card.id ? dragOffset : null}
               onPointerDown={(event) => onCardPointerDown(card.id, event)}
-              onSelect={() => {
-                if (consumeClickSuppression()) return;
-                onSelectCard(card.id);
-              }}
+              onKeyAction={(action) => onKeyAction(card.id, action)}
               hintsVisible={hintsVisible ? hintsVisible.has(card.id) : true}
               tileColor={tileColor}
               shiftOffsetPx={shiftOffsets[card.id] ?? 0}

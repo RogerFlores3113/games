@@ -426,9 +426,16 @@ export const TEAMMATE_BAND_PX = 114;
  * stacked line) removes that whole line — clue-giving now happens via each
  * opponent tile's own quick-clue popover (`CluePopover`, opened from
  * `TeammateCard`), an absolutely-positioned overlay anchored to the clicked
- * tile that adds zero flow height of its own. `bottom-controls-row` is back
- * down to two stacked lines (CardActions, OwnHand); real-browser measurement
- * at the 1280x720 floor (5 seats, Black variant, the same UI-11 worst case)
- * came in at 193px, down from the CluePicker-era 310px three-line footprint.
+ * tile that adds zero flow height of its own. `bottom-controls-row` was down
+ * to two stacked lines (CardActions, OwnHand) at 193px.
+ *
+ * Owner request (2026-09-19, "dont need play or discard buttons really"):
+ * `CardActions` (the Play/Discard buttons line) is deleted outright — no
+ * visible affordance replaces it (dragging a tile onto the Play/Discard
+ * zone, or the P/D keyboard fallback on a focused tile, HAND-02). This row
+ * is back down to a single line (OwnHand only). Real-browser measurement at
+ * the same 1280x720 floor / 5-seat Black-variant UI-11 worst case:
+ * 149px, down from 193px — 44px of vertical slack freed and NOT re-spent by
+ * this change (see 07-14-SUMMARY.md for the freed-space accounting).
  */
-export const OWN_BAND_PX = 193;
+export const OWN_BAND_PX = 149;

@@ -312,9 +312,10 @@ test.describe("Rainbow variant e2e (RULES-14, UI-07)", () => {
       const cardSlot = receiverPage
         .locator(`[data-testid="own-hand"] [data-card-id="${rainbowCardId}"]`)
         .locator('[data-testid^="own-hand-slot-"]:not([data-testid$="-hints"])');
-      await cardSlot.click();
-      await expect(receiverPage.getByTestId("discard-button")).toBeEnabled();
-      await receiverPage.getByTestId("discard-button").click();
+      // HAND-02 (owner request, 2026-09-19): discard via the P/D keyboard
+      // fallback — the visible Discard button is gone.
+      await cardSlot.focus();
+      await cardSlot.press("d");
 
       const discardTile = receiverPage.getByTestId(`discard-tile-${rainbowCardId}`);
       await expect(discardTile).toBeVisible();

@@ -12,6 +12,7 @@ import { readKeepHintsPref, writeKeepHintsPref } from "../../lib/keep-hints-pref
 import { readTileColorPref, resolveTileColorCss, writeTileColorPref } from "../../lib/tile-color-pref";
 import {
   CLUE_HIGHLIGHT_MS,
+  disabledReasonFor,
   teammatesInTurnOrder,
   touchedCardIdsFromLatestClue,
   type ActionContext,
@@ -20,7 +21,6 @@ import { applyPendingOrder, dropZoneStatus } from "../../lib/hanabi-drag-logic";
 import { groupedBySuitOrder } from "../../lib/hanabi-discard-drag-logic";
 import { OwnHand, TeammateHand } from "./Hand";
 import { Table } from "./Table";
-import { CardActions } from "./CardActions";
 import { EndOverlay } from "./EndOverlay";
 import { FlyToLayer } from "./FlyToLayer";
 import { ReconnectingBanner } from "../ReconnectingBanner";
@@ -94,7 +94,6 @@ export function HanabiBoard({
   }, [parsed]);
 
   const audio = useHanabiAudio(game, reconnecting);
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   // UAT gap 16: the id of the one opponent tile whose quick-clue popover is
   // open, or null — replaces the deleted CluePicker's clueTarget/clueValue/
   // previewClue selection state entirely (a tile click IS the target+value).
@@ -186,15 +185,6 @@ export function HanabiBoard({
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [clueOpenCardId]);
-
-  // Selection hygiene: drop a stale selection once the card leaves the hand
-  // (played/discarded), so a disabled action never fires against a dead id.
-  useEffect(() => {
-    if (!game) return;
-    if (selectedCardId && !game.yourHand.some((card) => card.id === selectedCardId)) {
-      setSelectedCardId(null);
-    }
-  }, [game, selectedCardId]);
 
   // D-04: private note lifecycle. An ended game clears every note for the
   // room; otherwise, prune notes for own-hand cards that have left the hand
@@ -314,6 +304,18 @@ export function HanabiBoard({
     setClueOpenCardId((prev) => (prev === cardId ? null : cardId));
   }
 
+  // HAND-02 (owner request, 2026-09-19): the keyboard fallback for a focused
+  // own-hand tile — routed through the exact same `disabledReasonFor` gate
+  // every other play/discard affordance (drag, the deleted buttons) used,
+  // so an illegal key press (not your turn, discard at 8 clue tokens, etc.)
+  // is silently a no-op rather than a bypass.
+  function handleKeyAction(cardId: string, action: "play" | "discard") {
+    if (!game) return;
+    const reason = disabledReasonFor(game, { kind: action, selectedCardId: cardId }, ctx);
+    if (reason !== null) return;
+    act({ type: action, cardId });
+  }
+
   // UAT gap 10/DISC-01: re-sorts the shared discardOrder by suit for every
   // player, through the same act()/reorderDiscard chokepoint a drag uses —
   // not a new action, not a local view toggle (see groupedBySuitOrder's
@@ -406,28 +408,20 @@ export function HanabiBoard({
         </div>
 
         {/* fix(06.2-10): testid added purely as a measurement hook — the
-            OWN_BAND_PX layout-budget constant covers this ENTIRE row. 06.2-13
-            stripped it to only OwnHand + CardActions (play controls); every
-            non-play preference control now lives inside SettingsModal,
-            opened by the gear trigger above.
-            UAT gaps 13/14 (second owner review): Play/Discard now sit ABOVE
-            the own hand rather than beside it, and the own hand row is
-            wrapped in a full-width `justify-center` band so it is always
-            horizontally centred, whatever the seat count or window width.
+            OWN_BAND_PX layout-budget constant covers this ENTIRE row.
+            HAND-02 (owner request, 2026-09-19, "maybe remove selecting a
+            card? dont need play or discard buttons really"): the visible
+            `CardActions` (Play/Discard buttons) row above the hand is gone
+            — dragging a tile onto the Play/Discard zone (Table.tsx) plays
+            or discards it, and a focused tile's P/D keys are the keyboard
+            fallback (`handleKeyAction` below), with NO visible affordance.
+            This row is now just OwnHand; every non-play preference control
+            lives inside SettingsModal, opened by the gear trigger above.
             UAT gap 16: the deleted `CluePicker` (the large clue-target/
             clue-value menu that used to sit below the hand here) is gone —
             clue-giving now happens via each opponent tile's own quick-clue
-            popover (TeammateCard/CluePopover), so this row is down to two
-            lines (CardActions, OwnHand) instead of three. */}
+            popover (TeammateCard/CluePopover). */}
         <div data-testid="bottom-controls-row" className="flex flex-none w-full flex-col items-center">
-          <CardActions
-            game={game}
-            selectedCardId={selectedCardId}
-            ctx={ctx}
-            onPlay={() => selectedCardId && act({ type: "play", cardId: selectedCardId })}
-            onDiscard={() => selectedCardId && act({ type: "discard", cardId: selectedCardId })}
-          />
-
           <div className="flex w-full justify-center">
             <OwnHand
               cards={applyPendingOrder(game.yourHand, drag.pendingOrder)}
@@ -437,17 +431,15 @@ export function HanabiBoard({
               connected={view.youSeatId !== null ? isSeatConnected(view.seats, view.youSeatId) : true}
               isYourTurn={game.isYourTurn && !ended}
               turnText={turnIndicatorText(game, view.seats, labelFor, ended)}
-              selectedCardId={selectedCardId}
               justCluedIds={justCluedIds}
               disabled={controlsDisabled}
-              onSelectCard={(cardId) => setSelectedCardId(cardId)}
+              onKeyAction={handleKeyAction}
               draggingCardId={drag.dragState?.cardId ?? null}
               dragOffset={drag.dragState?.offset ?? null}
               dropIndex={drag.dragState?.dropIndex ?? null}
               slotPitchPx={drag.dragState?.slotPitchPx ?? null}
               onCardPointerDown={drag.onCardPointerDown}
               registerSlot={drag.registerSlot}
-              consumeClickSuppression={drag.consumeClickSuppression}
               hintsVisible={hintsVisibleIds}
               tileColor={tileColorCss}
             />

@@ -2,13 +2,16 @@ import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import {
   createRoom,
+  discardOwnHandSlot,
   dragLocatorTo,
   expectSeatCount,
   giveAnyLegalClue,
   giveAnyLegalClueToAnyTeammate,
+  isDiscardCurrentlyLegal,
   joinAs,
   openTileCluePopover,
   ownHandCardIds,
+  playOwnHandSlot,
   seatIdOfOtherPlayer,
   startTwoPlayerGame,
   teammateHandCardIds,
@@ -213,16 +216,73 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await contextB.close();
   });
 
-  test("HAND-02: Play and Discard buttons still work", async ({ page: hostPage, browser }) => {
+  test("HAND-02: the P/D keyboard fallback still works (owner request, 2026-09-19: buttons removed)", async ({
+    page: hostPage,
+    browser,
+  }) => {
     const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
 
     const deckBefore = await readDeckCount(passivePage);
 
-    await activePage.getByTestId("own-hand-slot-1").click();
-    await expect(activePage.getByTestId("play-button")).toBeEnabled();
-    await activePage.getByTestId("play-button").click();
+    await playOwnHandSlot(activePage, 1);
 
     await expect.poll(() => readDeckCount(passivePage)).toBe(deckBefore - 1);
+
+    await contextB.close();
+  });
+
+  test("HAND-02: a focused own-hand tile's P/D keys play/discard on your turn and are a silent no-op off-turn", async ({
+    page: hostPage,
+    browser,
+  }) => {
+    const { contextB, activePage, passivePage } = await startTwoPlayerGame(hostPage, browser);
+
+    // Off-turn: the passive player's own tile is focused and P/D pressed —
+    // no visible UI exists for either action (HAND-02, owner request
+    // 2026-09-19), so the proof is behavioural: neither key changes the
+    // deck count, discard pile, or whose turn it is.
+    const passiveOrderBefore = await ownHandCardIds(passivePage);
+    const deckBeforeOffTurn = await readDeckCount(passivePage);
+    const discardCountBeforeOffTurn = Number(
+      await passivePage.getByTestId("discard-pile").getAttribute("data-discard-count"),
+    );
+    const passiveSlot1 = passivePage.getByTestId("own-hand-slot-1");
+    await passiveSlot1.focus();
+    await passiveSlot1.press("p");
+    await passiveSlot1.press("d");
+
+    // No server round-trip to await for a no-op, so poll a few times that
+    // nothing changes rather than asserting immediately after the press.
+    await expect(passivePage.getByTestId("deck-count")).toHaveText(`${deckBeforeOffTurn} x`);
+    await expect
+      .poll(async () => Number(await passivePage.getByTestId("discard-pile").getAttribute("data-discard-count")))
+      .toBe(discardCountBeforeOffTurn);
+    expect(await ownHandCardIds(passivePage)).toEqual(passiveOrderBefore);
+    await expect(activePage.getByTestId("turn-indicator")).toHaveText("Your turn");
+
+    // On your turn: P plays slot 1 (deck count drops by one).
+    const deckBeforeOnTurn = await readDeckCount(passivePage);
+    const activeSlot1 = activePage.getByTestId("own-hand-slot-1");
+    await activeSlot1.focus();
+    await activeSlot1.press("p");
+    await expect.poll(() => readDeckCount(passivePage)).toBe(deckBeforeOnTurn - 1);
+    await expect(passivePage.getByTestId("turn-indicator")).toHaveText("Your turn");
+
+    // Now on the (new) active player's turn: D discards, if legal at the
+    // current clue-token count — otherwise this proof still shows a P play
+    // works, satisfying "press P on your turn and it plays; press D and it
+    // discards" without assuming discard is always legal at this point.
+    if (await isDiscardCurrentlyLegal(passivePage)) {
+      const discardCountBefore = Number(
+        await passivePage.getByTestId("discard-pile").getAttribute("data-discard-count"),
+      );
+      const passiveSlot1OnTurn = passivePage.getByTestId("own-hand-slot-1");
+      await passiveSlot1OnTurn.focus();
+      await passiveSlot1OnTurn.press("d");
+      await expect
+        .poll(async () => Number(await passivePage.getByTestId("discard-pile").getAttribute("data-discard-count")))
+        .toBe(discardCountBefore + 1);
+    }
 
     await contextB.close();
   });
@@ -235,9 +295,7 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     const teammateIdsBefore = await teammateHandCardIds(passivePage, activeSeatId);
     expect(actorIdsBefore).toEqual(teammateIdsBefore);
 
-    await activePage.getByTestId("own-hand-slot-2").click();
-    await expect(activePage.getByTestId("play-button")).toBeEnabled();
-    await activePage.getByTestId("play-button").click();
+    await playOwnHandSlot(activePage, 2);
 
     await expect
       .poll(async () => {
@@ -316,9 +374,7 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
 
     // On the actor's turn, playing slot 1 draws a fresh card into that
     // slot — its note box resets to the empty state.
-    await activePage.getByTestId("own-hand-slot-1").click();
-    await expect(activePage.getByTestId("play-button")).toBeEnabled();
-    await activePage.getByTestId("play-button").click();
+    await playOwnHandSlot(activePage, 1);
 
     await expect(activePage.getByTestId("note-box-slot-1")).toHaveValue("");
 
@@ -570,9 +626,12 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     const touchedNumbers = new Set(touchedAfterColor.map((id) => Number(id.replace("own-hand-slot-", ""))));
     const untouchedSlotNumber = [1, 2, 3, 4, 5].find((n) => !touchedNumbers.has(n));
     if (untouchedSlotNumber === undefined) throw new Error("UAT gap 34: every own-hand slot was touched by the clue");
-    await passivePage.getByTestId(`own-hand-slot-${untouchedSlotNumber}`).click();
-    await expect(passivePage.getByTestId("discard-button")).toBeEnabled();
-    await passivePage.getByTestId("discard-button").click();
+    await discardOwnHandSlot(passivePage, untouchedSlotNumber);
+    // Rule 1 fix (found running this test live, under parallel load): the
+    // discard above must actually land and the turn flip to active BEFORE
+    // targeting the second clue below, or a clue attempted mid-round-trip
+    // finds no legal target and this test flakes under load.
+    await expect(activePage.getByTestId("turn-indicator")).toHaveText("Your turn");
 
     // Active gives a SECOND clue — a rank clue — directly at the same real
     // card (active sees the passive player's true suit/rank via the
@@ -626,9 +685,7 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     const touchedSlot1 = touched1[0]!;
     await expect(passive1.getByTestId(touchedSlot1)).toHaveAttribute("data-hints", "true");
 
-    await passive1.getByTestId(`own-hand-slot-${otherSlotNumber(touched1)}`).click();
-    await expect(passive1.getByTestId("play-button")).toBeEnabled();
-    await passive1.getByTestId("play-button").click();
+    await playOwnHandSlot(passive1, otherSlotNumber(touched1));
 
     await expect(passive1.getByTestId(touchedSlot1)).toHaveAttribute("data-hints", "false");
 
@@ -650,9 +707,7 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     const touchedSlot2 = touched2[0]!;
     await expect(passive1.getByTestId(touchedSlot2)).toHaveAttribute("data-hints", "true");
 
-    await passive1.getByTestId(`own-hand-slot-${otherSlotNumber(touched2)}`).click();
-    await expect(passive1.getByTestId("play-button")).toBeEnabled();
-    await passive1.getByTestId("play-button").click();
+    await playOwnHandSlot(passive1, otherSlotNumber(touched2));
 
     await expect(passive1.getByTestId(touchedSlot2)).toHaveAttribute("data-hints", "true");
 
@@ -1002,9 +1057,7 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
         discardActive = other;
       }
 
-      await discardActive.getByTestId("own-hand-slot-1").click();
-      await expect(discardActive.getByTestId("discard-button")).toBeEnabled();
-      await discardActive.getByTestId("discard-button").click();
+      await discardOwnHandSlot(discardActive, 1);
 
       await expect
         .poll(() => hostPage.getByTestId("discard-pile").getAttribute("data-discard-count"))
@@ -1099,9 +1152,7 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
         discardActive = other;
       }
 
-      await discardActive.getByTestId("own-hand-slot-1").click();
-      await expect(discardActive.getByTestId("discard-button")).toBeEnabled();
-      await discardActive.getByTestId("discard-button").click();
+      await discardOwnHandSlot(discardActive, 1);
 
       await expect
         .poll(() => hostPage.getByTestId("discard-pile").getAttribute("data-discard-count"))
@@ -1309,15 +1360,13 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
       expect(await readDeckCount(passive)).toBe(before);
       readings.push(before);
 
-      const own = active.locator('[data-testid^="own-hand-slot-"]').first();
-      await own.click();
-      const discardBtn = active.getByTestId("discard-button");
-      if (await discardBtn.isEnabled()) {
-        await discardBtn.click();
+      if (await isDiscardCurrentlyLegal(active)) {
+        const own = active.locator('[data-testid^="own-hand-slot-"]').first();
+        await own.focus();
+        await own.press("d");
         await expect.poll(() => readDeckCount(active)).toBe(before - 1);
       } else {
         // Clue tokens maxed — give a clue instead (legal, never draws).
-        await own.click();
         await giveAnyLegalClueToAnyTeammate(active);
       }
     }

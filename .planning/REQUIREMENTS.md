@@ -82,7 +82,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **NOTE-01**: Clue marks a card has received are shown above the card rather than on its face
 - [x] **NOTE-02**: A player can type free-text notes on each card in their own hand; the automatic positive/negative clue tracking (UI-05) remains
 - [x] **HAND-01**: A player can reorder their own hand by clicking and dragging, and every player sees the new order (server-authoritative, survives refresh)
-- [x] **HAND-02**: Dragging an own card to the center plays it and dragging it to a discard zone discards it, with the existing buttons kept as a keyboard fallback
+- [x] **HAND-02**: Dragging an own card to the center plays it and dragging it to a discard zone discards it, with the existing buttons kept as a keyboard fallback. Owner request, 2026-09-19: "dont need play or discard buttons really" — the visible Play/Discard buttons and click-to-select were removed. The keyboard fallback is now P (play) / D (discard) on a focused own-hand tile, with no visible affordance (screen readers/AT discover it via `aria-keyshortcuts`), dispatched through the same legality gate the drag path uses.
 - [x] **HAND-03**: A newly drawn card takes the hand slot of the card that was played or discarded, rather than joining the end of the hand
 - [x] **AUD-01**: Simple audio cues play for a clue, a play, a discard, a lost fuse, and a completed stack of five
 

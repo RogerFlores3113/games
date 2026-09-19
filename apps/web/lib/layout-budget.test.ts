@@ -56,7 +56,9 @@ describe("layout-budget", () => {
 
   it("OWN_BAND_PX has no marks-band constant (HINT-04 removes the pip band)", () => {
     expect((layoutBudget as Record<string, unknown>).MARKS_BAND_PX).toBeUndefined();
-    expect(OWN_BAND_PX).toBe(193);
+    // Owner request (2026-09-19): CardActions (Play/Discard buttons) deleted
+    // outright, freeing 44px (193 -> 149) — see this constant's own comment.
+    expect(OWN_BAND_PX).toBe(149);
   });
 
   it("UAT gap 20: TOKEN_DISC_PX is the pre-review 40px cut by roughly a third", () => {
