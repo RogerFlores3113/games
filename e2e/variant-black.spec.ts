@@ -354,4 +354,37 @@ test.describe("Black variant e2e (07-09 gap closure round 2: Black is never colo
       for (const context of contexts) await context.close();
     }
   });
+
+  // 07-11 (UAT gap 3 round 2): Black is a descending, 10-tile suit (three
+  // 5s, two each of 4/3/2, one 1), so the Black deck grows to 70 tiles
+  // (5 colours x 10 + Rainbow 10 + Black 10) and the Black column's first
+  // playable tile is a 5, not a 1.
+  test("Black start state: 70-tile deck and a descending Black column", async ({ page: hostPage, browser }) => {
+    test.setTimeout(60_000);
+
+    const { contexts } = await startGameWithPlayers(
+      hostPage,
+      browser,
+      ["Roger", "Bianca", "Chen", "Dara", "Eli"],
+      { variant: "black" },
+    );
+
+    try {
+      // 5 seats x 4 cards dealt = 20 cards; 70 - 20 = 50 left in the deck.
+      await expect(hostPage.getByTestId("deck-count")).toHaveText(/^50 x$/);
+
+      const blackStack = hostPage.getByTestId("played-stack-black");
+      await expect(blackStack).toHaveAttribute("data-played-count", "0");
+      await expect(blackStack).toHaveAttribute("data-next-rank", "5");
+      await expect(blackStack.locator('[data-filled="true"]')).toHaveCount(0);
+
+      const redStack = hostPage.getByTestId("played-stack-red");
+      await expect(redStack).toHaveAttribute("data-next-rank", "1");
+
+      const rainbowStack = hostPage.getByTestId("played-stack-rainbow");
+      await expect(rainbowStack).toHaveAttribute("data-next-rank", "1");
+    } finally {
+      for (const context of contexts) await context.close();
+    }
+  });
 });

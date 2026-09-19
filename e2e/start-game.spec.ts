@@ -286,8 +286,8 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
   });
 
   // D-17: one shared test body proves the correct score ceiling, score ===
-  // sum of played-stack top ranks, and column count for base, Rainbow and
-  // Black — no per-variant branch beyond this table.
+  // sum of played-stack played counts, and column count for base, Rainbow
+  // and Black — no per-variant branch beyond this table.
   const UI10_VARIANTS = [
     { variant: "base" as const, maxScore: 25, columns: 5 },
     { variant: "rainbow" as const, maxScore: 30, columns: 6 },
@@ -304,11 +304,12 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       const { pages, contexts } = await startGameWithPlayers(hostPage, browser, ["Roger", "Bianca"], { variant });
       const [playerA, playerB] = pages as [Page, Page];
 
-      // 07-07: Black's deck grew to 65 tiles (7 suits); the shared
-      // playUntilGameEnds cap is raised uniformly for all three rows so a
-      // 2-player Black game (55 cards left to draw, plus clues and the
-      // final round) can't exhaust the iteration budget before it ends.
-      await playUntilGameEnds(playerA, playerB, 120);
+      // 07-10: Black's deck grew again to 70 tiles (three 5s, two each of
+      // 4/3/2, one 1); the shared playUntilGameEnds cap is raised uniformly
+      // for all three rows so a 2-player Black game (60 cards left to draw,
+      // plus clues and the final round) can't exhaust the iteration budget
+      // before it ends.
+      await playUntilGameEnds(playerA, playerB, 140);
 
       for (const page of pages) {
         await expect(page.getByTestId("end-overlay")).toBeVisible();
@@ -329,10 +330,10 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
 
         const endStacks = page.locator('[data-testid="end-stack"]');
         await expect(endStacks).toHaveCount(columns);
-        const topRanks = await endStacks.evaluateAll((els) =>
-          els.map((el) => Number(el.getAttribute("data-top-rank") ?? "0")),
+        const playedCounts = await endStacks.evaluateAll((els) =>
+          els.map((el) => Number(el.getAttribute("data-played-count") ?? "0")),
         );
-        expect(finalScore).toBe(topRanks.reduce((sum, rank) => sum + rank, 0));
+        expect(finalScore).toBe(playedCounts.reduce((sum, count) => sum + count, 0));
 
         await expect(page.getByTestId("new-game-link")).toHaveAttribute("href", "/");
         await expect(page.getByTestId("play-button")).toBeDisabled();
@@ -347,7 +348,7 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
         }
         await expect(page.getByTestId("tableau")).toBeVisible();
 
-        await expect(page.locator('[data-testid^="played-stack-"][data-top-rank]')).toHaveCount(columns);
+        await expect(page.locator('[data-testid^="played-stack-"][data-played-count]')).toHaveCount(columns);
       }
 
       for (const context of contexts) {
@@ -609,13 +610,13 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       .evaluateAll((els) =>
         els.map((el) => ({
           suit: (el.getAttribute("data-testid") ?? "").replace("played-stack-", ""),
-          rank: Number(el.getAttribute("data-top-rank") ?? "0"),
+          playedCount: Number(el.getAttribute("data-played-count") ?? "0"),
         })),
       );
-    const advanced = stacks.find((s) => s.rank > 0);
+    const advanced = stacks.find((s) => s.playedCount > 0);
     if (advanced) {
       await expect(hostPage.locator(`[data-testid^="played-stack-${advanced.suit}-card-"]`)).toHaveCount(
-        advanced.rank,
+        advanced.playedCount,
       );
     }
 
@@ -644,10 +645,10 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     }
 
     async function maxStackRank(): Promise<number> {
-      const ranks = await hostPage
+      const counts = await hostPage
         .locator('[data-testid^="played-stack-"]:not([data-testid*="-card-"])')
-        .evaluateAll((els) => els.map((el) => Number(el.getAttribute("data-top-rank") ?? "0")));
-      return ranks.length ? Math.max(...ranks) : 0;
+        .evaluateAll((els) => els.map((el) => Number(el.getAttribute("data-played-count") ?? "0")));
+      return counts.length ? Math.max(...counts) : 0;
     }
 
     // Drives the game toward the worst case this build supports for the fit
@@ -810,8 +811,11 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       ended: boolean;
       clueTokens: number;
       discardCount: number;
-      maxRank: number;
-      zeroSuits: string[];
+      maxPlayedCount: number;
+      /** Suit -> the rank that must be played next on that stack (direction-
+       * agnostic: a descending Black column's next rank starts at 5, not 1).
+       * A suit is absent once its stack is complete. */
+      nextRankBySuit: Record<string, number>;
     }
     interface SettledBoard extends Omit<BoardSnapshot, "yourTurn"> {
       activeIdx: number;
@@ -824,7 +828,8 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
           ...document.querySelectorAll('[data-testid^="played-stack-"]:not([data-testid*="-card-"])'),
         ].map((el) => ({
           suit: (el.getAttribute("data-testid") ?? "").replace("played-stack-", ""),
-          rank: Number(el.getAttribute("data-top-rank") ?? "0"),
+          playedCount: Number(el.getAttribute("data-played-count") ?? "0"),
+          nextRank: el.getAttribute("data-next-rank") ?? "",
         }));
         const clueTokens = Number(byTestId("clue-tokens")?.getAttribute("data-count"));
         const fuses = byTestId("fuse-tokens")?.getAttribute("data-count") ?? "";
@@ -840,19 +845,23 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
           discardCount,
           deck,
           stacks
-            .map((s) => `${s.suit}:${s.rank}`)
+            .map((s) => `${s.suit}:${s.playedCount}`)
             .sort()
             .join(","),
           ended,
         ].join("|");
+        const nextRankBySuit: Record<string, number> = {};
+        for (const s of stacks) {
+          if (s.nextRank !== "") nextRankBySuit[s.suit] = Number(s.nextRank);
+        }
         return {
           key,
           yourTurn: byTestId("turn-indicator")?.getAttribute("data-your-turn") === "true",
           ended,
           clueTokens,
           discardCount,
-          maxRank: stacks.length ? Math.max(...stacks.map((s) => s.rank)) : 0,
-          zeroSuits: stacks.filter((s) => s.rank === 0).map((s) => s.suit),
+          maxPlayedCount: stacks.length ? Math.max(...stacks.map((s) => s.playedCount)) : 0,
+          nextRankBySuit,
         };
       });
     }
@@ -875,8 +884,8 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
             ended: first.ended,
             clueTokens: first.clueTokens,
             discardCount: first.discardCount,
-            maxRank: first.maxRank,
-            zeroSuits: first.zeroSuits,
+            maxPlayedCount: first.maxPlayedCount,
+            nextRankBySuit: first.nextRankBySuit,
             activeIdx: first.ended ? -1 : holders[0],
           };
           return "settled";
@@ -925,14 +934,16 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     }
 
     /** The id of a card in `targetLabel`'s hand (as rendered on
-     * `viewerPage`) that is a rank-1 of a suit in `zeroSuits` — one the game
-     * rules will always accept as a legal play right now. Teammates' cards
-     * are visible to every other seat, so this reads real identity, not a
-     * guess. Returns `null` if no such card is currently held. */
-    async function findRankOneCandidate(
+     * `viewerPage`) whose identity's rank equals that suit's `nextRankBySuit`
+     * entry — one the game rules will always accept as a legal play right
+     * now, direction-agnostic (a descending Black column's next rank is 5,
+     * not 1). Teammates' cards are visible to every other seat, so this
+     * reads real identity, not a guess. Returns `null` if no such card is
+     * currently held. */
+    async function findPlayableCandidate(
       viewerPage: Page,
       targetLabel: string,
-      zeroSuits: Set<string>,
+      nextRankBySuit: Record<string, number>,
     ): Promise<string | null> {
       const container = viewerPage
         .locator('[data-testid^="other-hand-"]:not([data-testid^="other-hand-card-"])', { hasText: targetLabel })
@@ -945,8 +956,10 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
         if ((await identity.count()) === 0) continue;
         const text = ((await identity.textContent()) ?? "").trim();
         const match = text.match(/^(\S+)\s+(\d)$/);
-        if (!match || match[2] !== "1") continue;
-        if (!zeroSuits.has(match[1].toLowerCase())) continue;
+        if (!match) continue;
+        const suit = match[1].toLowerCase();
+        const rank = Number(match[2]);
+        if (nextRankBySuit[suit] !== rank) continue;
         const testId = (await cards.nth(i).getAttribute("data-testid")) ?? "";
         return testId.replace(/^other-hand-card-/, "");
       }
@@ -983,7 +996,7 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     let board = await waitForSettledBoard(null);
     for (let i = 0; i < 60; i += 1) {
       if (board.ended) break;
-      if (board.discardCount >= TARGET_DISCARD_COUNT && board.maxRank >= 1 && clueTokenSpent) break;
+      if (board.discardCount >= TARGET_DISCARD_COUNT && board.maxPlayedCount >= 1 && clueTokenSpent) break;
 
       const activeIdx = board.activeIdx;
       const active = pages[activeIdx];
@@ -1011,7 +1024,7 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       // currently-empty stack to the next player — tried until it succeeds.
       if (!guaranteedAdvanceDone && board.clueTokens > 0) {
         await expect(active.getByTestId("reconnecting-banner")).toHaveCount(0);
-        const candidateId = await findRankOneCandidate(active, names[nextIdx], new Set(board.zeroSuits));
+        const candidateId = await findPlayableCandidate(active, names[nextIdx], board.nextRankBySuit);
         if (candidateId !== null) {
           const card = active.getByTestId(`other-hand-card-${candidateId}`);
           await card.click();
@@ -1054,7 +1067,7 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
 
     // `board` is the settled state all five pages agree on, host included.
     expect(board.discardCount).toBeGreaterThanOrEqual(TARGET_DISCARD_COUNT);
-    expect(board.maxRank).toBeGreaterThanOrEqual(1);
+    expect(board.maxPlayedCount).toBeGreaterThanOrEqual(1);
     expect(clueTokenSpent).toBe(true);
 
     // Measure again after real game progress and assert the four reserved
