@@ -86,6 +86,7 @@ describe("groupDiscardsBySuit", () => {
       "green",
       "blue",
       "white",
+      "rainbow",
       "black",
     ]);
   });

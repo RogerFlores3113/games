@@ -11,6 +11,17 @@
 // contrast, is touched by every color clue and is NEVER itself a nameable
 // clue color (it never appears in `cluableColors`).
 //
+// Owner gap closure (2026-09-18, supersedes the old 6-suit Black): Black is
+// 7 suits — the five colours, Rainbow, and Black. Inside Black, Rainbow
+// keeps its own Rainbow-variant rules unchanged (every nameable colour
+// clue touches it, including a Black clue, since Black is nameable; Rainbow
+// itself is never nameable and its rank distribution is untouched: three
+// 1s, two each of 2/3/4, one 5). Black stays its own nameable colour with
+// one copy of each rank. This is why `BLACK_CONFIG.colorClueTouches` reuses
+// the exact same "every nameable colour touches rainbow" predicate as
+// `RAINBOW_CONFIG` (hoisted below as `rainbowAwareColorClueTouches`) rather
+// than the plain exact-match rule every other suit uses.
+//
 // Rainbow inference consequence (RESEARCH.md Pitfall 3), recorded beside
 // `colorClueTouches` because it explains behavior this predicate produces:
 // because rainbow is touched by every color, a positive color clue does NOT
@@ -72,6 +83,15 @@ function rankClueTouches(rank: Rank, clueRank: Rank): boolean {
   return rank === clueRank;
 }
 
+/** Shared by RAINBOW_CONFIG and BLACK_CONFIG (not duplicated): every
+ * nameable colour clue touches a rainbow card, regardless of which colour
+ * was named — this is the "touched by every colour" rule. In Black, Black
+ * itself is nameable, so a Black clue touches rainbow cards too. */
+function rainbowAwareColorClueTouches(suit: Suit, clueColor: Suit): boolean {
+  if (suit === "rainbow") return true;
+  return suit === clueColor;
+}
+
 const BASE_CONFIG: VariantConfig = Object.freeze({
   variant: "base",
   suits: BASE_SUITS,
@@ -96,31 +116,35 @@ const RAINBOW_CONFIG: VariantConfig = Object.freeze({
     // Rainbow is a full 10-card suit, same distribution as any normal suit.
     return BASE_RANK_COUNTS;
   },
-  colorClueTouches(suit: Suit, clueColor: Suit): boolean {
-    // Every color clue touches rainbow cards, regardless of which color was
-    // named (Pitfall 3 above) — this is the "touched by every color" rule.
-    if (suit === "rainbow") return true;
-    return suit === clueColor;
-  },
+  colorClueTouches: rainbowAwareColorClueTouches,
   rankClueTouches,
 });
 
-const BLACK_SUITS: readonly Suit[] = [...BASE_SUITS, "black"];
+// Black is 7 suits: the five colours, Rainbow, and Black (owner gap
+// closure, 2026-09-18). ALL_SUITS order is used directly so `suits` lists
+// red/yellow/green/blue/white/rainbow/black.
+const BLACK_SUITS: readonly Suit[] = [...BASE_SUITS, "rainbow", "black"];
+
+// Black's own nameable colours: the five colours plus Black itself.
+// "rainbow" is deliberately excluded — it is never nameable in any variant.
+const BLACK_CLUABLE: readonly Suit[] = [...BASE_SUITS, "black"];
 
 const BLACK_CONFIG: VariantConfig = Object.freeze({
   variant: "black",
   suits: BLACK_SUITS,
-  // Black IS a normal, color-cluable suit (resolved open question).
-  cluableColors: BLACK_SUITS,
+  // Black IS a normal, color-cluable suit (resolved open question); Rainbow
+  // inside Black is never nameable, matching RAINBOW_CONFIG.
+  cluableColors: BLACK_CLUABLE,
   rankCountsFor(suit: Suit): Readonly<Record<Rank, number>> {
+    // Rainbow inside Black keeps the full 10-card distribution ("do not
+    // adjust number of rainbow tiles" — owner gap closure); only Black
+    // itself is single-copy.
     return suit === "black" ? SINGLE_RANK_COUNTS : BASE_RANK_COUNTS;
   },
-  colorClueTouches(suit: Suit, clueColor: Suit): boolean {
-    // Black behaves like any normal suit for color-clue purposes — no
-    // special case needed here beyond the exact-match rule every other suit
-    // already uses.
-    return suit === clueColor;
-  },
+  // Inside Black, Rainbow follows the Rainbow rule: every nameable colour
+  // clue touches it, including a Black clue, since Black is nameable here.
+  // Black itself behaves like any normal suit (exact match only).
+  colorClueTouches: rainbowAwareColorClueTouches,
   rankClueTouches,
 });
 

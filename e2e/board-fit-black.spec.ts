@@ -19,7 +19,7 @@ import { startGameWithPlayers } from "./helpers";
  * reachable by scrolling. Every column's box must therefore lie fully
  * inside the Play region's box, not merely "be present in the DOM".
  */
-const EXPECTED_BLACK_COLUMNS = 6;
+const EXPECTED_BLACK_COLUMNS = 7;
 
 interface Box {
   x: number;

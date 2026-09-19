@@ -257,9 +257,14 @@ describe("endReasonForView", () => {
     expect(endReasonForView(view)).toBeNull();
   });
 
-  it("uses 30 as the black variant's max score for all_stacks_complete", () => {
-    const view = baseView({ variant: "black", fuses: 0, score: 30, finalTurnsRemaining: null });
+  it("uses 35 as the black variant's max score for all_stacks_complete", () => {
+    const view = baseView({ variant: "black", fuses: 0, score: 35, finalTurnsRemaining: null });
     expect(endReasonForView(view)).toBe("all_stacks_complete");
+  });
+
+  it("black variant score 30 is not an end (max score is 35, not 30)", () => {
+    const view = baseView({ variant: "black", fuses: 0, score: 30, finalTurnsRemaining: null });
+    expect(endReasonForView(view)).toBeNull();
   });
 
   it("END_REASON_COPY maps the three reasons to their exact strings", () => {

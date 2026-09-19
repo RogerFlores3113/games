@@ -231,6 +231,34 @@ describe("legality", () => {
         legal: true,
       });
     });
+
+    it("Black: naming black against a hand whose only candidate is a rainbow card is legal and touches exactly that card", () => {
+      const state = buildState("black", ["a", "b"], "seed-nameable-black-touches-rainbow");
+      const targetHandIndex = state.hands.findIndex((h) => h.seatId === "b");
+      const craftedSlots = state.hands[targetHandIndex]!.slots.map((slot, i) => ({
+        ...slot,
+        card:
+          i === 0
+            ? { ...slot.card, suit: "rainbow" as const, rank: 2 as const }
+            : { ...slot.card, suit: "red" as const, rank: 3 as const },
+      }));
+      const craftedState: HanabiState = {
+        ...state,
+        hands: state.hands.map((h, i) =>
+          i === targetHandIndex ? { seatId: h.seatId, slots: craftedSlots } : h,
+        ),
+      };
+
+      expect(canClue(craftedState, "a", "b", { type: "color", value: "black" })).toEqual({
+        legal: true,
+      });
+      const touched = cardsTouchedByClue(
+        variantConfig("black"),
+        craftedState.hands[targetHandIndex]!.slots,
+        { type: "color", value: "black" },
+      );
+      expect(touched).toEqual([craftedSlots[0]!.card.id]);
+    });
   });
 
   it("cardsTouchedByClue returns exactly the ids of matching slots, in slot order, for all three variants", () => {

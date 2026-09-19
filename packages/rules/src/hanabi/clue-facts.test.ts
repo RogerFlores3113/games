@@ -74,13 +74,24 @@ describe("clue facts", () => {
     expect(next.possibleSuits).toEqual(["yellow", "green", "blue", "white"]);
   });
 
-  it("black variant, positive black color clue narrows to exactly black", () => {
+  it("black variant, positive black color clue narrows to rainbow or black", () => {
     const config = variantConfig("black");
     const facts = initialClueFacts(config);
 
     const next = applyClueToSlotFacts(config, facts, { type: "color", value: "black" }, true);
 
-    expect(next.possibleSuits).toEqual(["black"]);
+    expect(next.possibleSuits).toEqual(["rainbow", "black"]);
+  });
+
+  it("black variant, negative black color clue rules out both rainbow and black", () => {
+    const config = variantConfig("black");
+    const facts = initialClueFacts(config);
+
+    const next = applyClueToSlotFacts(config, facts, { type: "color", value: "black" }, false);
+
+    expect(next.possibleSuits).not.toContain("rainbow");
+    expect(next.possibleSuits).not.toContain("black");
+    expect(next.possibleSuits).toEqual(["red", "yellow", "green", "blue", "white"]);
   });
 
   it("applying two clues in sequence intersects: candidate sets only shrink or stay equal", () => {

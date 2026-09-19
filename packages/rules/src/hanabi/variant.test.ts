@@ -25,9 +25,10 @@ describe("variant config", () => {
     expect(config.suits).toContain("rainbow");
   });
 
-  it("black variant has 6 suits, including black", () => {
+  it("black variant has 7 suits, including rainbow and black", () => {
     const config = variantConfig("black");
-    expect(config.suits.length).toBe(6);
+    expect(config.suits.length).toBe(7);
+    expect(config.suits).toContain("rainbow");
     expect(config.suits).toContain("black");
   });
 
@@ -42,10 +43,11 @@ describe("variant config", () => {
     expect(config.cluableColors).not.toContain("rainbow");
   });
 
-  it("black variant's cluableColors has 6 entries and includes black (resolved open question)", () => {
+  it("black variant's cluableColors has 6 entries, includes black, and excludes rainbow (resolved open question)", () => {
     const config = variantConfig("black");
     expect(config.cluableColors.length).toBe(6);
     expect(config.cluableColors).toContain("black");
+    expect(config.cluableColors).not.toContain("rainbow");
   });
 
   it("rainbow: every color clue touches the rainbow suit", () => {
@@ -71,6 +73,22 @@ describe("variant config", () => {
   it("black: a red clue does not touch black cards", () => {
     const config = variantConfig("black");
     expect(config.colorClueTouches("black", "red")).toBe(false);
+  });
+
+  it("black: every nameable colour, including black, touches rainbow", () => {
+    const config = variantConfig("black");
+    let checked = 0;
+    for (const color of config.cluableColors) {
+      expect(config.colorClueTouches("rainbow", color)).toBe(true);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(0);
+    expect(config.colorClueTouches("rainbow", "black")).toBe(true);
+  });
+
+  it("black: rankCountsFor(rainbow) is BASE_RANK_COUNTS (rainbow tile count unchanged)", () => {
+    const config = variantConfig("black");
+    expect(config.rankCountsFor("rainbow")).toEqual(BASE_RANK_COUNTS);
   });
 
   it("rankClueTouches is true exactly when rank matches clue rank, in all three variants", () => {
@@ -107,9 +125,9 @@ describe("variant config", () => {
     expect(handSizeFor(5)).toBe(4);
   });
 
-  it("maxScoreFor: base 25, rainbow 30, black 30", () => {
+  it("maxScoreFor: base 25, rainbow 30, black 35", () => {
     expect(maxScoreFor(variantConfig("base"))).toBe(25);
     expect(maxScoreFor(variantConfig("rainbow"))).toBe(30);
-    expect(maxScoreFor(variantConfig("black"))).toBe(30);
+    expect(maxScoreFor(variantConfig("black"))).toBe(35);
   });
 });

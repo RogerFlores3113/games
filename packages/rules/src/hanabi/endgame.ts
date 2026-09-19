@@ -12,8 +12,8 @@
 //
 // D-17: the engine returns the numeric score AND its descriptive band — the
 // UI computes neither. Band thresholds are derived from the score/maxScore
-// RATIO (not hardcoded score cutoffs), so Rainbow/Black's 30-point maximum
-// scales proportionally from the published 25-point base-game table
+// RATIO (not hardcoded score cutoffs), so Rainbow's 30 / Black's 35-point
+// maximum scales proportionally from the published 25-point base-game table
 // (RESEARCH.md Assumption A2 — no canonical source defines bands above 25).
 
 import type { GameEndResult } from "../adapter";

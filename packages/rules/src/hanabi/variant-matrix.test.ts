@@ -21,19 +21,19 @@ const VARIANTS = ["base", "rainbow", "black"] as const satisfies readonly Varian
 const EXPECTED_SUIT_COUNT: Readonly<Record<Variant, number>> = {
   base: 5,
   rainbow: 6,
-  black: 6,
+  black: 7,
 };
 
 const EXPECTED_DECK_SIZE: Readonly<Record<Variant, number>> = {
   base: 50,
   rainbow: 60,
-  black: 55,
+  black: 65,
 };
 
 const EXPECTED_MAX_SCORE: Readonly<Record<Variant, number>> = {
   base: 25,
   rainbow: 30,
-  black: 30,
+  black: 35,
 };
 
 const VALID_BANDS = [
@@ -96,11 +96,14 @@ describe("variant matrix", () => {
       }
 
       if (variant === "black") {
-        // Black: "black" IS offered as a cluable color, and a black color
-        // clue touches only black cards.
+        // Black: "black" IS offered as a cluable color, "rainbow" is not,
+        // and a black color clue touches black cards AND rainbow cards
+        // (Rainbow keeps its Rainbow-variant rule inside Black).
         expect(config.cluableColors.includes("black")).toBe(true);
+        expect(config.cluableColors.includes("rainbow")).toBe(false);
         expect(config.colorClueTouches("black", "black")).toBe(true);
         expect(config.colorClueTouches("red", "black")).toBe(false);
+        expect(config.colorClueTouches("rainbow", "black")).toBe(true);
 
         // Each black rank exists exactly once in the deck, so discarding a
         // black card makes that rank's stack unachievable — a deck
@@ -109,6 +112,11 @@ describe("variant matrix", () => {
         const blackCards = deck.filter((c) => c.suit === "black");
         expect(blackCards.length).toBe(5);
         expect(blackCards.map((c) => c.rank).sort()).toEqual([1, 2, 3, 4, 5]);
+
+        // Rainbow inside Black keeps its full unchanged 10-card
+        // distribution ("do not adjust number of rainbow tiles").
+        const rainbowCards = deck.filter((c) => c.suit === "rainbow");
+        expect(rainbowCards.length).toBe(10);
       }
     }
 

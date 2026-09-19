@@ -338,8 +338,11 @@ describe("cluableColorsForView", () => {
     expect(cluableColorsForView(view)).not.toContain("rainbow");
   });
 
-  it("includes black for the black variant", () => {
+  it("includes black for the black variant, excludes rainbow, and has exactly 6 entries", () => {
     const view = baseView({ variant: "black" });
-    expect(cluableColorsForView(view)).toContain("black");
+    const colors = cluableColorsForView(view);
+    expect(colors).toContain("black");
+    expect(colors).not.toContain("rainbow");
+    expect(colors.length).toBe(6);
   });
 });

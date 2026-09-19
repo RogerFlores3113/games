@@ -130,11 +130,11 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     await expect(hostPage.getByTestId("deck-count")).toBeInViewport();
     await expect(hostPage.getByTestId("discard-pile")).toBeInViewport();
 
-    // Black variant has 6 suits (base 5 + Black) — every played stack is
-    // present, in the viewport, and carries exactly one suit glyph (UI-03/
-    // UI-06).
+    // Black variant has 7 suits (5 colours + Rainbow + Black) — every played
+    // stack is present, in the viewport, and carries exactly one suit glyph
+    // (UI-03/UI-06).
     const playedStacks = hostPage.locator('[data-testid^="played-stack-"]');
-    await expect(playedStacks).toHaveCount(6);
+    await expect(playedStacks).toHaveCount(7);
     const playedStackCount = await playedStacks.count();
     for (let i = 0; i < playedStackCount; i++) {
       const stack = playedStacks.nth(i);
@@ -291,7 +291,7 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
   const UI10_VARIANTS = [
     { variant: "base" as const, maxScore: 25, columns: 5 },
     { variant: "rainbow" as const, maxScore: 30, columns: 6 },
-    { variant: "black" as const, maxScore: 30, columns: 6 },
+    { variant: "black" as const, maxScore: 35, columns: 7 },
   ];
 
   for (const { variant, maxScore, columns } of UI10_VARIANTS) {
@@ -304,7 +304,11 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
       const { pages, contexts } = await startGameWithPlayers(hostPage, browser, ["Roger", "Bianca"], { variant });
       const [playerA, playerB] = pages as [Page, Page];
 
-      await playUntilGameEnds(playerA, playerB, 80);
+      // 07-07: Black's deck grew to 65 tiles (7 suits); the shared
+      // playUntilGameEnds cap is raised uniformly for all three rows so a
+      // 2-player Black game (55 cards left to draw, plus clues and the
+      // final round) can't exhaust the iteration budget before it ends.
+      await playUntilGameEnds(playerA, playerB, 120);
 
       for (const page of pages) {
         await expect(page.getByTestId("end-overlay")).toBeVisible();
