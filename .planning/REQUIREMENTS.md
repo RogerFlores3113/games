@@ -41,7 +41,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Hanabi Rules Engine
 
 - [x] **RULES-01**: Game deals correct hand sizes — 5 cards for 2-3 players, 4 cards for 4-5 players
-- [x] **RULES-02**: Deck is constructed correctly for the selected variant, with three 1s, two each of 2/3/4, and one 5 per suit, and the Black suit instead holding a single copy of each rank
+- [x] **RULES-02**: Deck is constructed correctly for the selected variant, with three 1s, two each of 2/3/4, and one 5 per suit, and the Black suit instead holding three 5s, two each of 4/3/2, and one 1 (a reversed distribution, amended 2026-09-18 by the owner)
 - [x] **RULES-03**: Suit count is derived from the variant configuration rather than hardcoded, so base (5 suits), Rainbow (6), and Black (7: the five colours + Rainbow + a reversed Black suit — three 5s, two each of 4/3/2, one 1, played 5 down to 1, and never clued by colour; amended 2026-09-18 by the owner) all resolve correctly
 - [x] **RULES-04**: Player can play a card from their hand on their turn
 - [x] **RULES-05**: Player can discard a card from their hand on their turn, regaining a clue token
@@ -52,7 +52,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **RULES-10**: Discarding is unavailable when all 8 clue tokens are already available
 - [x] **RULES-11**: Illegal actions are visibly unavailable in the interface rather than only rejected on submission
 - [x] **RULES-12**: Playing a card that does not extend a stack loses a fuse and sends the card to the discard pile
-- [x] **RULES-13**: Completing a stack with a 5 regains a clue token, unless the team is already at 8, in which case the bonus is forfeit
+- [x] **RULES-13**: Completing a stack, meaning its last tile in play order — a 5, or a reversed Black stack's 1 — regains a clue token, unless the team is already at 8, in which case the bonus is forfeit
 - [x] **RULES-14**: In the Rainbow variant, rainbow cards are indicated by clues of every color, and no clue names "rainbow" as a color
 - [x] **RULES-15**: When the deck empties, a turns-remaining counter is set as explicit state, and every player including the one who drew the last card takes exactly one more turn
 - [x] **RULES-16**: No cards are drawn during the final round
