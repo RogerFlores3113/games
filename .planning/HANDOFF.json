@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-09-19T19:02:29.318Z",
+  "phase": "post-milestone",
+  "phase_name": "Post-v1.0 polish (all roadmap phases complete)",
+  "phase_dir": null,
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Remove own-hand selection and Play/Discard buttons; P/D keyboard fallback", "status": "done", "commit": "a9f24e6"},
+    {"id": 2, "name": "Centre firework burst art on tiles (2px border offset)", "status": "done", "commit": "f782f72"},
+    {"id": 3, "name": "Landing page redesign: 'Board games', game dropdown, brighter tone", "status": "done", "commit": "4f56890"},
+    {"id": 4, "name": "Visible CC BY photo credits on landing page and game table", "status": "done", "commit": "8d9ef7a"},
+    {"id": 5, "name": "Landing dropdown option invisible on hover (color-scheme)", "status": "done", "commit": "467cfe9"},
+    {"id": 6, "name": "Board-game (Catan) landing background, no people, cropped", "status": "done", "commit": "1f638bd"}
+  ],
+  "remaining_tasks": [
+    {"id": 7, "name": "Deploy the 8 unpushed commits (worker first, then push main for Vercel, then production smoke)", "status": "not_started"},
+    {"id": 8, "name": "Investigate 'Create room' button slow to enable under load (hydration gate)", "status": "not_started"},
+    {"id": 9, "name": "Milestone audit and archive (/gsd-audit-milestone, /gsd-complete-milestone)", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {"action": "Say 'deploy' to ship the 8 unpushed commits to production", "context": "The owner reviews locally before each deploy; nothing in this batch is live yet", "blocking": true},
+    {"action": "Confirm the landing dropdown no longer hides 'Hanabi' on hover, in a real browser", "context": "The native select popup can't be captured by Playwright; fixed via color-scheme: light on .landing-backdrop", "blocking": false},
+    {"action": "Choose which extra backgrounds join the per-room table rotation: San Diego, Sydney, Dresden, Toronto (all Commons-licensed, shortlisted)", "context": "Only the Hong Kong fireworks photo is wired in", "blocking": false},
+    {"action": "Supply the real source/licence of the owner-supplied walnut texture (wood-tile.webp)", "context": "Recorded in CREDITS.md as provenance unverified", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Black variant = 5 colours + Rainbow (normal copies) + reversed Black: three 5s, two each of 4/3/2, one 1, played 5 down to 1, never clued by colour. 70 tiles, max 35", "rationale": "Owner's house rules, 2026-09-18; direction lives in SUIT_RULES in packages/rules/src/hanabi/variant.ts", "phase": "7"},
+    {"decision": "Play/Discard buttons and card selection removed; drag is the pointer path, P/D on a focused tile is the keyboard fallback", "rationale": "Owner request 2026-09-19; HAND-02 annotated rather than deleted", "phase": "post"},
+    {"decision": "Never publish stock-site previews or watermarked/retailer images; source from Wikimedia Commons with a licence verified via API and a visible credit", "rationale": "Legal exposure on a public site; the owner was told and agreed to licensed equivalents", "phase": "06.2"}
+  ],
+  "uncommitted_files": [],
+  "next_action": "Ask the owner whether to deploy the 8 unpushed commits; if yes: npm run build --workspace apps/web, then (cd apps/worker && npx wrangler deploy), then git push origin main, then run PLAYWRIGHT_BASE_URL=https://games.rogerflores.dev npx playwright test create-room join-room",
+  "context_notes": "All roadmap phases (1-7) are complete and live except this local batch. The owner iterates visually and rejects work that passes tests but looks wrong, so show screenshots and check images for people or watermarks before reporting done. Kill orphaned dev servers on 3100/8787 by PID before any Playwright run: fuser alone lets wrangler respawn, and stale servers without the E2E timing vars have produced false reconnect failures several times."
+}
