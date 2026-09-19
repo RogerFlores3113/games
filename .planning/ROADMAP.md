@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: Game Interface** - Build the board render, persistent per-card clue memory, colorblind-safe glyphs, and dark "fireworks night" luminosity theme against the now-stable wire contract. (completed 2026-09-17)
 - [x] **Phase 6.1: Table Polish (INSERTED)** - Firework-burst card art per suit, clue marks above cards plus player notes, drag reorder/play/discard with slot-preserving draws, audio cues, and a city-at-night background. (completed 2026-09-17)
 - [x] **Phase 06.2: Board Redesign (INSERTED)** - Hint display (clue-coloured highlight, number on the tile back, keep-hints toggle), tile styling and player colour picker, wooden board texture, labelled Play/Discard areas with token art and deck counter, drag-reorder gap preview, always-visible private note box, and a shared rearrangeable discard order. Follow-on requests from the Phase 6.1 owner sign-off. (completed 2026-09-18)
-- [ ] **Phase 7: Variant Support (Rainbow, Black)** - Enable and test the Rainbow and Black configurations end to end, proving the variant-parametrized engine and UI built earlier need no special-casing.
+- [x] **Phase 7: Variant Support (Rainbow, Black)** - Enable and test the Rainbow and Black configurations end to end, proving the variant-parametrized engine and UI built earlier need no special-casing. (completed 2026-09-19)
 
 ## Phase Details
 
@@ -392,7 +392,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 07-05-PLAN.md — Full gate and owner sign-off on live Rainbow and Black boards (checkpoint)
+- [x] 07-05-PLAN.md — Full gate and owner sign-off on live Rainbow and Black boards (checkpoint)
 
 **Gap closure (owner UAT gap 1: Black = 5 colours + Rainbow + Black, 7 suits)**
 
@@ -406,7 +406,7 @@ Plans:
 
 **Wave 7** *(blocked on 07-07)*
 
-- [ ] 07-08-PLAN.md — Full gate, 07-HUMAN-UAT.md gap-closure record, owner re-verification checkpoint
+- [x] 07-08-PLAN.md — Full gate, 07-HUMAN-UAT.md gap-closure record, owner re-verification checkpoint
 
 ## Progress
 
@@ -421,4 +421,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Wire Engine Into Room Actor | 9/9 | Complete   | 2026-09-16 |
 | 5. Reconnect & Session Durability Hardening | 6/6 | Complete    | 2026-09-17 |
 | 6. Game Interface | 7/7 | Complete    | 2026-09-17 |
-| 7. Variant Support (Rainbow, Black) | 10/13 | In Progress|  |
+| 7. Variant Support (Rainbow, Black) | 13/13 | Complete    | 2026-09-19 |
