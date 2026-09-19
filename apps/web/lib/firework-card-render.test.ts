@@ -109,6 +109,36 @@ describe("firework-card-render", () => {
     expect(markup).not.toMatch(/#[0-9A-Fa-f]{3,8}/);
   });
 
+  it("owner report (2026-09-19): a rank-1 burst's centre is within 1px of the tile's own content-box centre, and the identity outline is never on the same element the burst position is computed against", () => {
+    // Regression for the containing-block bug: the burst wrapper span must
+    // carry no border of its own (a border there would shift the absolute-
+    // positioned burst's containing block by the border width, see this
+    // component's own header comment) — the border lives on a separate
+    // `inset: 0` overlay instead.
+    const width = 50;
+    const height = 65;
+    const markup = renderToStaticMarkup(
+      createElement(FireworkCardFace, { suit: "red", rank: 1, width, height }),
+    );
+    const wrapperStyle = markup.match(/^<span[^>]*style="([^"]*)"/)?.[1] ?? "";
+    expect(wrapperStyle).not.toMatch(/border/);
+    const overlayStyle = markup.match(/style="([^"]*border[^"]*)"/)?.[1] ?? "";
+    expect(overlayStyle).toContain("border:2px solid var(--color-token-disc)");
+
+    // Rank 1 is a single full-size burst (cx=0.5, cy=0.5, scale=1) — its
+    // computed left/top must place its centre within 1px of (width/2,
+    // height/2), the tile's own content-box centre.
+    const burstMatch = markup.match(/<span aria-hidden="true" class="absolute" style="left:([-\d.]+)(?:px)?;top:([-\d.]+)(?:px)?"/);
+    expect(burstMatch).not.toBeNull();
+    const left = Number(burstMatch?.[1]);
+    const top = Number(burstMatch?.[2]);
+    const burstSize = Math.min(width, height); // scale 1
+    const burstCenterX = left + burstSize / 2;
+    const burstCenterY = top + burstSize / 2;
+    expect(Math.abs(burstCenterX - width / 2)).toBeLessThanOrEqual(1);
+    expect(Math.abs(burstCenterY - height / 2)).toBeLessThanOrEqual(1);
+  });
+
   it("multiple rainbow bursts on one card get distinct gradient ids (no DOM id collision)", () => {
     // Rank 5 renders five bursts of the same suit on one card — each
     // SuitGlyph instance must mint its own gradient id via useId().

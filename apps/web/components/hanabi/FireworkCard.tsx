@@ -70,7 +70,6 @@ export function FireworkCardFace({
         width,
         height,
         backgroundColor: "var(--color-surface)",
-        border: "2px solid var(--color-token-disc)",
       }}
     >
       {layout.map((placement, index) => {
@@ -89,6 +88,29 @@ export function FireworkCardFace({
           </span>
         );
       })}
+
+      {/* Owner report (2026-09-19, "the bursts are a little off-centre on
+          the play and discard pile areas"): the burst spans above are
+          absolutely positioned using `width`/`height` as their containing
+          block's own dimensions. When this wrapper carried its own 2px
+          border directly (Tailwind's global `box-sizing: border-box`
+          preflight), the CSS spec's containing-block rule for an
+          absolutely-positioned descendant (the PADDING edge of the nearest
+          positioned ancestor, i.e. inside the border) made the true
+          containing block `width - 4` / `height - 4`, shifted 2px in from
+          this span's own border-box origin on every axis — every burst
+          rendered 2px right and 2px down of the mathematically-centred
+          position the layout above computes. Root cause, not a cosmetic
+          nudge: the border now lives on its own borderless-parent overlay
+          (absolutely positioned, `inset: 0`, drawn AFTER the bursts so it
+          paints on top), so the burst wrapper above is border-free and its
+          border-box width/height exactly match the coordinate space the
+          burst placement math already assumes — no manual offset needed. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 rounded-md"
+        style={{ border: "2px solid var(--color-token-disc)" }}
+      />
     </span>
   );
 }
