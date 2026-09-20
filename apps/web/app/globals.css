@@ -423,3 +423,46 @@ body {
   background-position: center;
   color-scheme: light;
 }
+
+/*
+ * Lobby backdrop (owner request, 2026-09-19: the pre-game lobby "is super
+ * ai-looking", asked for "a hanabi-esque background (fireworks), plus a
+ * better ui"). Deliberately the SAME licence-verified photo as
+ * `.table-backdrop` above (`city-fireworks.webp`, credited in
+ * apps/web/public/backgrounds/CREDITS.md) rather than a second image: the
+ * lobby is the room you are about to play in, so arriving at the table
+ * should read as the panel clearing, not as a scene change. Any page using
+ * this class MUST also render <PhotoCredit theme="dark" /> — the CC BY
+ * attribution is required wherever the photo is shown.
+ *
+ * Two stacked layers over the photo, both rgba() literals derived from
+ * --color-bg, the same documented "an rgba() outside @theme derived from a
+ * token value" exception `.table-backdrop` and PhotoCredit already use
+ * (spelled as rgba(), never as a hex literal — lib/theme-tokens.test.ts
+ * scans this file's comments too):
+ *   1. a radial vignette, transparent at the centre and 0.72 at the edges,
+ *      so the fireworks stay bright behind the panel's shoulders while the
+ *      corners fall away;
+ *   2. a flat 0.62 scrim so panel-adjacent text (--color-text-muted on the
+ *      photo, in the gap between panels) keeps its contrast wherever a
+ *      firework burst happens to land.
+ * The lobby's own panels are opaque --color-surface, so panel text contrast
+ * does not depend on either layer.
+ *
+ * `background-attachment: fixed` matches .table-backdrop, so the photo does
+ * not slide under the panel on a short scroll.
+ */
+.lobby-backdrop {
+  background-color: var(--color-bg);
+  background-image: radial-gradient(
+      ellipse at 50% 38%,
+      rgba(11, 15, 26, 0) 0%,
+      rgba(11, 15, 26, 0.35) 45%,
+      rgba(11, 15, 26, 0.72) 100%
+    ),
+    linear-gradient(rgba(11, 15, 26, 0.62), rgba(11, 15, 26, 0.62)),
+    url("/backgrounds/city-fireworks.webp");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
