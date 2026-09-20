@@ -587,7 +587,13 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await contextB.close();
   });
 
-  test("UAT gap 34: a card's hint shows only its MOST RECENT clue — a later rank clue replaces an earlier colour ring, not adds to it", async ({
+  // Owner report 2026-09-19: "with hint retention on - a new hint for a tile
+  // overlays the prior hint so information isn't well-retained. Not great!"
+  // Gap 34's latest-only rule was decided for the DEFAULT lifetime, where a
+  // hint clears as soon as the next player acts; it still governs that mode,
+  // and the tail of this test re-proves it. With keep-hints ON the card now
+  // shows every clue it has received instead.
+  test("keep-hints ON accumulates a card's clues (ring AND numeral); with the toggle OFF the display falls back to gap 34's latest clue only", async ({
     page: hostPage,
     browser,
   }) => {
@@ -645,13 +651,25 @@ test.describe("Hanabi table-polish e2e proofs (Phase 6.1)", () => {
     await expect(opened.rankButton).toBeEnabled();
     await opened.rankButton.click();
 
-    // The same card's hint now shows ONLY the rank — no colour ring, no
-    // suit glyph — proving the display is the latest clue, not an
-    // accumulation of every clue the card has ever received.
+    // With keep-hints ON the card keeps BOTH clues: the colour ring from the
+    // first clue and the numeral from the second. This is the retention the
+    // owner asked for — the second clue no longer overwrites the first.
     const slotAfterRank = passivePage.locator(`[data-testid="own-hand"] > div[data-card-id="${cluedCardId}"] [data-testid^="own-hand-slot-"]:not([data-testid$="-hints"])`);
     await expect(slotAfterRank).toHaveAttribute("data-hints", "true");
     const slotTestId = (await slotAfterRank.getAttribute("data-testid"))!;
     const hintSpan = passivePage.getByTestId(`${slotTestId}-hints`);
+    await expect(hintSpan.getByTestId("hint-numeral")).toHaveCount(1);
+    await expect(hintSpan.getByTestId("hint-color-ring")).toHaveCount(1);
+
+    // Gap 34 still governs the default mode: switching keep-hints back OFF
+    // drops the display to the latest clue alone, so the ring goes and the
+    // numeral stays. The rank clue was the most recent action, so the hint
+    // is still within its default lifetime and remains visible at all.
+    await passivePage.getByTestId("settings-toggle").click();
+    await passivePage.getByTestId("keep-hints-toggle").click();
+    await expect(passivePage.getByTestId("keep-hints-toggle")).toHaveAttribute("aria-pressed", "false");
+    await passivePage.getByTestId("settings-close").click();
+
     await expect(hintSpan.getByTestId("hint-numeral")).toHaveCount(1);
     await expect(hintSpan.getByTestId("hint-color-ring")).toHaveCount(0);
 

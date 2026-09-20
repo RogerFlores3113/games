@@ -9,7 +9,21 @@ export interface HintIndicatorProps {
   width: number;
   height: number;
   testId: string;
+  /** Set from the keep-hints-visible preference (D-05/HINT-03). While the
+   * toggle is on, the tile shows EVERY clue it has received instead of only
+   * the latest — see `hintDisplayFor`'s comment for why the two modes
+   * differ. Defaults to false, i.e. gap 34's latest-only display. */
+  accumulate?: boolean;
 }
+
+/** Ring thickness, shared by the single-colour box-shadow ring and the
+ * multi-colour gradient ring so both read as the same object. */
+const RING_PX = 3;
+
+/** Multi-colour rings start at 9 o'clock so a two-colour card splits into a
+ * top half and a bottom half (the owner's chosen layout) rather than left/
+ * right, which reads as two separate marks rather than one ring. */
+const RING_START_DEG = 270;
 
 /**
  * D-01..D-07 (HINT-01..04): replaces the deleted automatic clue-mark pip
@@ -35,13 +49,21 @@ export interface HintIndicatorProps {
  *   else left to clear.
  *
  * A number clue stamps a numeral chip on the tile back, unchanged (the
- * owner explicitly kept this one as-is). D-06 is overturned (gap 34):
- * `hintDisplayFor` now returns at most ONE of {colour, number} — the most
- * recent clue's own channel — never both at once from accumulated clues,
- * so the two are no longer simultaneously renderable from unrelated
- * clues; a single clue is one type, so composing both here would only
- * ever happen if a future change re-introduces accumulation, which it must
- * not. No ruled-out/negative clue information is rendered here or anywhere
+ * owner explicitly kept this one as-is).
+ *
+ * Two display modes, switched by the `accumulate` prop, which the board
+ * sets from the keep-hints-visible preference alone:
+ * - `accumulate: false` (default) — gap 34's behaviour: at most ONE of
+ *   {colour, number}, the most recent clue's own channel. With the default
+ *   lifetime a hint clears as soon as the next player acts, so the newest
+ *   clue is the whole story.
+ * - `accumulate: true` — every clue the card has received: an arc per
+ *   clued colour plus the numeral, together. The owner reported that a
+ *   retained hint being overwritten by the next one "isn't well-retained"
+ *   (2026-09-19), which is the whole point of the toggle. This is NOT a
+ *   re-reversal of gap 34 — that decision still governs the default mode,
+ *   and the two branches must stay distinct.
+ * No ruled-out/negative clue information is rendered here or anywhere
  * else (D-07, owner-confirmed 2026-09-17, "Let it go") — `hintDisplayFor`
  * reads only `facts.positiveClues`.
  *
@@ -58,13 +80,39 @@ export interface HintIndicatorProps {
  * address the own-hand path directly (own-hand-source.test.ts's
  * HINT_INDICATOR_PATH scan).
  */
-function HintOverlay({ facts, visible, width, height, testId }: HintIndicatorProps) {
+function HintOverlay({ facts, visible, width, height, testId, accumulate = false }: HintIndicatorProps) {
   if (!visible) return null;
 
-  const { colorHints, numberHints } = hintDisplayFor(facts);
+  const { colorHints, numberHints } = hintDisplayFor(facts, { accumulate });
   const suit = colorHints[0] ?? null;
   const rank = numberHints[0] ?? null;
   if (suit === null && rank === null) return null;
+
+  /* One arc per clued colour, oldest first, clockwise from the top. Built
+     with hard stops (each colour's start and end angle are identical
+     between neighbouring stops) so the ring reads as N solid arcs, never a
+     blend — a blended blue/red would invent a purple that means nothing. */
+  const arcSize = colorHints.length > 0 ? 360 / colorHints.length : 0;
+  const conicStops = colorHints
+    .map((hinted, i) => `${SUIT_VISUALS[hinted].hueVar} ${i * arcSize}deg ${(i + 1) * arcSize}deg`)
+    .join(", ");
+  /* Gap 33 (no wash across the tile face) applies to the gradient ring too:
+     a conic gradient paints the whole box, so the centre is masked out and
+     only the RING_PX padding band survives. Two mask layers — the full box
+     and the content box — composited with `exclude` leaves the border band
+     alone. `WebkitMaskComposite: "xor"` is the older Safari spelling of the
+     same operation and is harmless where the standard property applies.
+     The mask layers are spelled `black`, not a hex literal: this file is
+     source-scanned for hex colours (hint-render.test.ts). A mask reads only
+     alpha, so the keyword is equivalent. */
+  const gradientRingStyle = {
+    padding: RING_PX,
+    background: `conic-gradient(from ${RING_START_DEG}deg, ${conicStops})`,
+    mask: "linear-gradient(black 0 0) content-box, linear-gradient(black 0 0)",
+    maskComposite: "exclude",
+    WebkitMask: "linear-gradient(black 0 0) content-box, linear-gradient(black 0 0)",
+    WebkitMaskComposite: "xor",
+  } as const;
 
   return (
     <span
@@ -77,19 +125,37 @@ function HintOverlay({ facts, visible, width, height, testId }: HintIndicatorPro
         <>
           {/* UAT gap 32/33: a ring in the clue's own suit colour, painted
               with an inset box-shadow so it never fills the tile face —
-              highlight only, no wash. Never `--color-card-glow`. */}
+              highlight only, no wash. Never `--color-card-glow`.
+              One clued colour keeps exactly this ring; several (only
+              reachable while keep-hints is on, and in practice a rainbow
+              tile touched by two colour clues) split it into one arc each,
+              which is what makes a rainbow readable as rainbow. */}
+          {colorHints.length === 1 ? (
+            <span
+              data-testid="hint-color-ring"
+              className="absolute inset-0 rounded-md"
+              style={{
+                boxShadow: `inset 0 0 0 ${RING_PX}px ${SUIT_VISUALS[suit].hueVar}`,
+              }}
+            />
+          ) : (
+            <span
+              data-testid="hint-color-ring"
+              data-ring-colors={colorHints.length}
+              className="absolute inset-0 rounded-md"
+              style={gradientRingStyle}
+            />
+          )}
+          {/* One faint glyph per clued colour, in the same oldest-first
+              order as the arcs, so colour is never the sole carrier of a
+              retained clue (D-04). */}
           <span
-            data-testid="hint-color-ring"
-            className="absolute inset-0 rounded-md"
-            style={{
-              boxShadow: `inset 0 0 0 3px ${SUIT_VISUALS[suit].hueVar}`,
-            }}
-          />
-          <span
-            className="absolute rounded-full"
+            className="absolute flex items-center gap-[2px] rounded-full"
             style={{ top: "var(--space-xs)", left: "var(--space-xs)", opacity: 0.35 }}
           >
-            <SuitGlyph suit={suit} size={12} />
+            {colorHints.map((hinted) => (
+              <SuitGlyph key={hinted} suit={hinted} size={12} />
+            ))}
           </span>
         </>
       )}

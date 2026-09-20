@@ -64,6 +64,11 @@ export interface TeammateHandProps {
    * based, never a timer). `undefined` means "not yet wired" and every
    * card renders its hint, matching the pre-06.2-06 default. */
   hintsVisible?: ReadonlySet<string>;
+  /** Keep-hints-visible preference (D-05/HINT-03), threaded to each card's
+   * hint overlay where it switches the display from "the latest clue only"
+   * to "every clue this card has received" — see HintIndicator's header for
+   * why the toggle owns that distinction. */
+  accumulateHints?: boolean;
   /** TILE-03/D-13: the viewer's personal tile-colour preference, applied to
    * every teammate tile too (D-13 — affects only that player's own view). */
   tileColor?: string;
@@ -95,6 +100,7 @@ export function TeammateHand({
   onToggleCard,
   onGiveClue,
   hintsVisible,
+  accumulateHints = false,
   tileColor,
 }: TeammateHandProps) {
   // 06.2-21, owner review: "hands are just username + hand itself on a
@@ -135,6 +141,7 @@ export function TeammateHand({
             onToggle={() => onToggleCard(card.id)}
             onGiveClue={(clue) => onGiveClue(hand.seatId, clue)}
             hintsVisible={hintsVisible ? hintsVisible.has(card.id) : true}
+            accumulateHints={accumulateHints}
             tileColor={tileColor}
           />
         ))}
@@ -175,6 +182,11 @@ export interface OwnHandProps {
    * based, never a timer). `undefined` means "not yet wired" and every
    * card renders its hint, matching the pre-06.2-06 default. */
   hintsVisible?: ReadonlySet<string>;
+  /** Keep-hints-visible preference (D-05/HINT-03), threaded to each card's
+   * hint overlay where it switches the display from "the latest clue only"
+   * to "every clue this card has received" — see HintIndicator's header for
+   * why the toggle owns that distinction. */
+  accumulateHints?: boolean;
   /** TILE-03/D-13: the viewer's personal tile-colour preference. */
   tileColor?: string;
 }
@@ -204,6 +216,7 @@ export function OwnHand({
   onCardPointerDown,
   registerSlot,
   hintsVisible,
+  accumulateHints = false,
   tileColor,
 }: OwnHandProps) {
   // DRAG-01/D-08: the drop-gap preview — a pure function of the current
@@ -295,6 +308,7 @@ export function OwnHand({
               onPointerDown={(event) => onCardPointerDown(card.id, event)}
               onKeyAction={(action) => onKeyAction(card.id, action)}
               hintsVisible={hintsVisible ? hintsVisible.has(card.id) : true}
+              accumulateHints={accumulateHints}
               tileColor={tileColor}
               shiftOffsetPx={shiftOffsets[card.id] ?? 0}
             />

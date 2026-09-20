@@ -45,14 +45,53 @@ export interface HintDisplay {
   numberHints: Rank[];
 }
 
-/** D-06 (overturned by UAT gap 34): a card's hint display reflects only its
- * MOST RECENT clue — never an accumulation across every clue it has ever
- * received. A single clue is always exactly one type (colour or rank), so
- * the returned display carries at most one channel populated: the latest
- * clue's own type. Derived only from `facts.positiveClues`'s last entry
- * (chronological append order — see this file's header comment). Ignores
- * `negativeClues`, `possibleSuits` and `possibleRanks` entirely (D-07). */
-export function hintDisplayFor(facts: CardFacts): HintDisplay {
+export interface HintDisplayOptions {
+  /** When true, the display carries EVERY clue this card has received
+   * rather than only its latest. Set exclusively from the keep-hints-
+   * visible preference (D-05/HINT-03) — see the note below on why the two
+   * are tied together. Defaults to false, which is gap 34's behaviour. */
+  accumulate?: boolean;
+}
+
+/** D-06 (overturned by UAT gap 34, then re-scoped by the owner 2026-09-19):
+ * by default a card's hint display reflects only its MOST RECENT clue —
+ * telling a card "2" after it was earlier told "blue" shows the 2 alone.
+ *
+ * `accumulate: true` restores the full history for that card, and is set
+ * from the keep-hints-visible toggle alone. The owner's report that
+ * re-opened this ("with hint retention on - a new hint for a tile overlays
+ * the prior hint so information isn't well-retained") is specifically about
+ * that toggle: gap 34 was decided for the DEFAULT lifetime, where a hint
+ * clears the moment the next player acts, and "newest only" is right there.
+ * Keep-hints extends a hint to the card's whole life in hand, where
+ * discarding every earlier clue destroys exactly the information the toggle
+ * exists to retain. So the two modes genuinely differ — do NOT "simplify"
+ * this back into one branch in either direction.
+ *
+ * Accumulating mode returns each distinct suit and rank ONCE, in the order
+ * it was first clued (re-cluing the same colour must not add a second
+ * identical ring arc). A single clue is always exactly one type, so the
+ * non-accumulating branch still populates at most one channel.
+ *
+ * Derived only from `facts.positiveClues` (chronological append order — see
+ * this file's header comment). Ignores `negativeClues`, `possibleSuits` and
+ * `possibleRanks` entirely (D-07). */
+export function hintDisplayFor(facts: CardFacts, options: HintDisplayOptions = {}): HintDisplay {
+  if (options.accumulate === true) {
+    const colorHints: Suit[] = [];
+    const numberHints: Rank[] = [];
+    for (const clue of facts.positiveClues) {
+      if (clue.type === "color") {
+        const suit = clue.value as Suit;
+        if (!colorHints.includes(suit)) colorHints.push(suit);
+      } else {
+        const rank = clue.value as Rank;
+        if (!numberHints.includes(rank)) numberHints.push(rank);
+      }
+    }
+    return { colorHints, numberHints };
+  }
+
   const latest = facts.positiveClues[facts.positiveClues.length - 1];
   if (latest === undefined) return { colorHints: [], numberHints: [] };
 

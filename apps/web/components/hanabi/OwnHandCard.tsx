@@ -24,6 +24,9 @@ export interface OwnHandCardProps {
   /** HINT-03/D-05: whether this card's hint overlay should currently render
    * (the "keep hints visible" toggle's derived per-card visibility). */
   hintsVisible: boolean;
+  /** Keep-hints-visible preference (D-05/HINT-03): while on, the overlay
+   * shows every clue this card has received rather than only the latest. */
+  accumulateHints?: boolean;
   /** TILE-03/D-13: the viewer's personal tile-colour preference — a
    * `var(--color-*)`/`color-mix(...)` CSS value, never a raw hex literal.
    * Defaults to the slate preset so callers not yet wired to the picker
@@ -87,10 +90,11 @@ export function OwnHandCard({
   dragOffset,
   onPointerDown,
   hintsVisible,
+  accumulateHints = false,
   tileColor = DEFAULT_TILE_COLOR,
   shiftOffsetPx = 0,
 }: OwnHandCardProps) {
-  const hints = hintDisplayFor(facts);
+  const hints = hintDisplayFor(facts, { accumulate: accumulateHints });
   const hasHints = hintsVisible && (hints.colorHints.length > 0 || hints.numberHints.length > 0);
 
   // TILE-01/D-12: a tile is a raised, opaque object distinct from the board
@@ -194,6 +198,7 @@ export function OwnHandCard({
         visible={hintsVisible}
         width={CARD_WIDTH}
         height={CARD_HEIGHT}
+        accumulate={accumulateHints}
         testId={`own-hand-slot-${slotNumber}-hints`}
       />
 

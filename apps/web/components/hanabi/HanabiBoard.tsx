@@ -388,6 +388,7 @@ export function HanabiBoard({
               onToggleCard={handleToggleClueCard}
               onGiveClue={handleGiveClue}
               hintsVisible={hintsVisibleIds}
+              accumulateHints={keepHints}
               tileColor={tileColorCss}
             />
           ))}
@@ -443,6 +444,7 @@ export function HanabiBoard({
               onCardPointerDown={drag.onCardPointerDown}
               registerSlot={drag.registerSlot}
               hintsVisible={hintsVisibleIds}
+              accumulateHints={keepHints}
               tileColor={tileColorCss}
             />
           </div>

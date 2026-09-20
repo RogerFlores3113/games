@@ -41,7 +41,7 @@ describe("hintDisplayFor", () => {
     expect(result).toEqual({ colorHints: ["red"], numberHints: [] });
   });
 
-  it("never accumulates — only the LAST positive clue is ever reflected, however many preceded it", () => {
+  it("by default never accumulates — only the LAST positive clue is reflected, however many preceded it", () => {
     const result = hintDisplayFor(
       facts({
         positiveClues: [
@@ -69,6 +69,106 @@ describe("hintDisplayFor", () => {
   it("is pure: calling twice with the same facts returns equal results", () => {
     const input = facts({ positiveClues: [{ type: "color", value: "green" }] });
     expect(hintDisplayFor(input)).toEqual(hintDisplayFor(input));
+  });
+});
+
+describe("hintDisplayFor with accumulate (keep-hints-visible on)", () => {
+  // Owner report 2026-09-19: "with hint retention on - a new hint for a tile
+  // overlays the prior hint so information isn't well-retained." Gap 34's
+  // latest-only rule still governs the DEFAULT mode above; this mode is the
+  // keep-hints toggle's own display.
+  it("returns every distinct clue a card has received, colour and rank together", () => {
+    const result = hintDisplayFor(
+      facts({
+        positiveClues: [
+          { type: "color", value: "blue" },
+          { type: "rank", value: 4 },
+        ],
+      }),
+      { accumulate: true },
+    );
+    expect(result).toEqual({ colorHints: ["blue"], numberHints: [4] });
+  });
+
+  it("keeps both colours of a card touched by two different colour clues (how a rainbow reads as rainbow)", () => {
+    const result = hintDisplayFor(
+      facts({
+        positiveClues: [
+          { type: "color", value: "blue" },
+          { type: "color", value: "red" },
+        ],
+      }),
+      { accumulate: true },
+    );
+    expect(result).toEqual({ colorHints: ["blue", "red"], numberHints: [] });
+  });
+
+  it("orders hints oldest-first, matching the ring's arc order", () => {
+    const result = hintDisplayFor(
+      facts({
+        positiveClues: [
+          { type: "color", value: "green" },
+          { type: "color", value: "yellow" },
+          { type: "color", value: "red" },
+        ],
+      }),
+      { accumulate: true },
+    );
+    expect(result.colorHints).toEqual(["green", "yellow", "red"]);
+  });
+
+  it("de-duplicates a colour re-clued later — one arc per distinct colour, position kept from first mention", () => {
+    const result = hintDisplayFor(
+      facts({
+        positiveClues: [
+          { type: "color", value: "blue" },
+          { type: "color", value: "red" },
+          { type: "color", value: "blue" },
+        ],
+      }),
+      { accumulate: true },
+    );
+    expect(result.colorHints).toEqual(["blue", "red"]);
+  });
+
+  it("de-duplicates a repeated rank clue", () => {
+    const result = hintDisplayFor(
+      facts({
+        positiveClues: [
+          { type: "rank", value: 2 },
+          { type: "rank", value: 2 },
+        ],
+      }),
+      { accumulate: true },
+    );
+    expect(result.numberHints).toEqual([2]);
+  });
+
+  it("still returns empty arrays with no positive clues", () => {
+    expect(hintDisplayFor(facts(), { accumulate: true })).toEqual({ colorHints: [], numberHints: [] });
+  });
+
+  it("ignores negative clues in this mode too (D-07)", () => {
+    const result = hintDisplayFor(
+      facts({
+        positiveClues: [{ type: "color", value: "red" }],
+        negativeClues: [{ type: "rank", value: 5 }],
+        possibleSuits: ["red", "blue"],
+        possibleRanks: [1, 2],
+      }),
+      { accumulate: true },
+    );
+    expect(result).toEqual({ colorHints: ["red"], numberHints: [] });
+  });
+
+  it("accumulate: false is explicitly identical to the default", () => {
+    const input = facts({
+      positiveClues: [
+        { type: "color", value: "blue" },
+        { type: "rank", value: 4 },
+      ],
+    });
+    expect(hintDisplayFor(input, { accumulate: false })).toEqual(hintDisplayFor(input));
   });
 });
 

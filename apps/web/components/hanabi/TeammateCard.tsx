@@ -25,6 +25,9 @@ export interface TeammateCardProps {
   onGiveClue: (clue: Clue) => void;
   /** HINT-03/D-05: whether this card's hint overlay should currently render. */
   hintsVisible: boolean;
+  /** Keep-hints-visible preference (D-05/HINT-03): while on, the overlay
+   * shows every clue this card has received rather than only the latest. */
+  accumulateHints?: boolean;
   /** TILE-03/D-13: the viewer's personal tile-colour preference. Defaults to
    * the slate preset so callers not yet wired to the picker still compile. */
   tileColor?: string;
@@ -68,9 +71,10 @@ export function TeammateCard({
   onToggle,
   onGiveClue,
   hintsVisible,
+  accumulateHints = false,
   tileColor = DEFAULT_TILE_COLOR,
 }: TeammateCardProps) {
-  const hints = hintDisplayFor(card.facts);
+  const hints = hintDisplayFor(card.facts, { accumulate: accumulateHints });
   const hasHints = hintsVisible && (hints.colorHints.length > 0 || hints.numberHints.length > 0);
 
   // TILE-01/D-12/UAT gap 35: a tile is a raised, opaque object distinct
@@ -204,6 +208,7 @@ export function TeammateCard({
           visible={hintsVisible}
           width={CARD_WIDTH}
           height={CARD_HEIGHT}
+          accumulate={accumulateHints}
           testId={`other-hand-card-${card.id}-hints`}
         />
 
