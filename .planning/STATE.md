@@ -354,9 +354,10 @@ Items acknowledged and carried forward from previous milestone close:
 | Date | Task | Commit |
 |------|------|--------|
 | 2026-09-19 | Lobby fireworks backdrop + UI redesign (owner: "super ai-looking") | a42f008 |
+| 2026-09-19 | Retained hints accumulate instead of overwriting (re-scopes UAT gap 34) | 4006f42 |
 
 ## Session Continuity
 
 Last session: 2026-09-19T19:03:13.386Z
-Stopped at: Lobby redesign committed (a42f008), not deployed; Innovation research complete, awaiting owner edition decision
+Stopped at: Lobby redesign + hint retention fix committed (a42f008, 4006f42), not deployed; Innovation research complete, awaiting owner edition decision
 Resume file: None
