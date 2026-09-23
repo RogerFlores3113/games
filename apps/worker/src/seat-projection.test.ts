@@ -11,7 +11,7 @@ import type { HanabiCardView } from "@games/rules";
 import { createEmptyRoom, joinRoom, startGame, toSeatView } from "./room-state";
 import type { JoinInput } from "./room-state";
 import { mintSeatToken } from "./seat-identity";
-import { projectSeatView, validateGameView } from "./seat-projection";
+import { projectSeatView, toWireGameError, validateGameView } from "./seat-projection";
 import type { GameRegistry } from "./game-registration";
 import type { RoomCode } from "@games/schema";
 
@@ -376,5 +376,34 @@ describe("projectSeatView: fails closed when the room's gameId has no registry e
 
     expect(projectSeatView(started.state, guestJoin.seatId, EMPTY_REGISTRY)).toBeNull();
     expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(SEED);
+  });
+});
+
+describe("toWireGameError: D-15 wire gate for refused-action game errors (WR-04)", () => {
+  it("passes a valid detail naming the room's own game", () => {
+    expect(toWireGameError({ gameId: "hanabi", code: "not_your_turn" }, "hanabi")).toEqual({
+      gameId: "hanabi",
+      code: "not_your_turn",
+    });
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns undefined without logging when there is no game error", () => {
+    expect(toWireGameError(undefined, "hanabi")).toBeUndefined();
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it("drops and logs (redacted) a detail that fails the wire schema", () => {
+    expect(toWireGameError({ gameId: "hanabi", code: "secret_drifted_code" }, "hanabi")).toBeUndefined();
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    const call = errorSpy.mock.calls[0]!;
+    expect(String(call[0])).toContain("game error failed wire schema");
+    expect(JSON.stringify(call)).not.toContain("secret_drifted_code");
+  });
+
+  it("drops and logs a schema-valid detail whose gameId is not the room's game", () => {
+    expect(toWireGameError({ gameId: "hanabi", code: "not_your_turn" }, "__other__")).toBeUndefined();
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0]![1]).toEqual({ gameId: "__other__" });
   });
 });

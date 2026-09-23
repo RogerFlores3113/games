@@ -28,6 +28,11 @@ describe("D-08/D-09: GAME_REGISTRY / resolveGame", () => {
     expect(resolveGame("x")).toBeUndefined();
   });
 
+  it("resolveGame returns undefined for an entry registered under a key other than its own gameId (WR-04)", () => {
+    const misKeyed: GameRegistry = Object.freeze({ other: GAME_REGISTRY.hanabi });
+    expect(resolveGame("other", misKeyed)).toBeUndefined();
+  });
+
   it("Object.hasOwn guards resolveGame against prototype-chain keys even on a plain-object custom registry", () => {
     const customRegistry = {} as GameRegistry;
     expect(resolveGame("__proto__", customRegistry)).toBeUndefined();

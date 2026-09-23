@@ -154,9 +154,13 @@ export const DEFAULT_GAME_ID: GameId = HANABI_GAME_ID;
 /** Resolves a game id against a registry (defaulting to the production
  * `GAME_REGISTRY`), returning `undefined` for anything not an OWN key —
  * `Object.hasOwn` guards this against `"__proto__"`/`"toString"`/any other
- * prototype-chain property ever resolving to an entry (T-8-06). */
+ * prototype-chain property ever resolving to an entry (T-8-06). An entry
+ * whose own `gameId` differs from the key it is registered under also
+ * resolves to `undefined` (fail closed): otherwise its mapper could emit
+ * errors namespaced to another game (WR-04). */
 export function resolveGame(gameId: string, games: GameRegistry = GAME_REGISTRY): GameRegistryEntry | undefined {
-  return Object.hasOwn(games, gameId) ? games[gameId] : undefined;
+  const entry = Object.hasOwn(games, gameId) ? games[gameId] : undefined;
+  return entry !== undefined && entry.gameId === gameId ? entry : undefined;
 }
 
 /** Test-only convenience alias: `state.game`/`view.game` are `unknown` at

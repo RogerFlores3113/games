@@ -35,7 +35,6 @@
 import { Server, type Connection, type ConnectionContext } from "partyserver";
 import {
   encodeServerMessage,
-  GameErrorDetailSchema,
   HEARTBEAT_PING,
   HEARTBEAT_PONG,
   parseClientMessage,
@@ -70,7 +69,7 @@ import {
 import { computeRoomTimers, dueTimers, nextDueAt, type TimerEvent } from "./scheduler";
 import { loadRoom, loadTimers, saveRoom } from "./persistence";
 import { isOriginAllowed } from "./origin";
-import { projectSeatView, type OutboundFrame, type ProjectedRoomView } from "./seat-projection";
+import { projectSeatView, toWireGameError, type OutboundFrame, type ProjectedRoomView } from "./seat-projection";
 import {
   isHeartbeatPing,
   orphanedConnectedSeatIds,
@@ -225,16 +224,17 @@ export class RoomDO extends Server<Env> {
       if (msg.type === "game_action") {
         const result = applyGameAction(room, actorSeatId, msg.actionId, msg.request, now);
         if (!result.ok) {
-          // D-15 fail-closed: an unmappable/malformed gameError must never
-          // make encodeServerMessage throw inside the Durable Object — parse
-          // it here and simply omit the field on failure, rather than
-          // trusting result.gameError's shape.
-          const parsedGameError =
-            result.gameError !== undefined ? GameErrorDetailSchema.safeParse(result.gameError) : undefined;
+          // D-15 fail-closed: an unmappable/malformed gameError, or one
+          // naming a different game than this room's, must never make
+          // encodeServerMessage throw inside the Durable Object or reach the
+          // client mis-attributed — toWireGameError parses it, checks its
+          // gameId against the room's, logs redacted diagnostics on failure
+          // and returns undefined so the field is simply omitted.
+          const gameError = toWireGameError(result.gameError, room.gameId);
           this.#send(connection, {
             type: "error",
             code: result.reason,
-            ...(parsedGameError?.success ? { gameError: parsedGameError.data } : {}),
+            ...(gameError !== undefined ? { gameError } : {}),
           });
           return;
         }

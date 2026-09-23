@@ -10,7 +10,8 @@
 // caller (room-do.ts's #viewFor, Plan 04) turns a `null` into an `error`
 // frame with `detail: "view_unavailable"` — never a `state`/`joined` frame.
 
-import type { RoomState, RoomView, ServerMessage } from "@games/schema";
+import { GameErrorDetailSchema } from "@games/schema";
+import type { GameErrorDetail, RoomState, RoomView, ServerMessage } from "@games/schema";
 import { GAME_REGISTRY, resolveGame } from "./game-registration";
 import type { GameRegistry } from "./game-registration";
 import { toSeatView } from "./room-state";
@@ -87,4 +88,29 @@ export function projectSeatView(room: RoomState, seatId: string, games: GameRegi
     return null;
   }
   return validateGameView(toSeatView(room, seatId, games), games);
+}
+
+/** D-15 fail-closed wire gate for a refused action's namespaced game error.
+ * Returns the parsed detail only if it matches the closed wire schema AND
+ * names the room's own game; otherwise it logs redacted diagnostics (the
+ * room's gameId plus issue codes/paths, never the value itself) and returns
+ * `undefined`, so the caller omits the field instead of letting
+ * `encodeServerMessage` throw or sending a code attributed to another game. */
+export function toWireGameError(gameError: unknown, roomGameId: string): GameErrorDetail | undefined {
+  if (gameError === undefined) {
+    return undefined;
+  }
+  const parsed = GameErrorDetailSchema.safeParse(gameError);
+  if (!parsed.success) {
+    console.error("game error failed wire schema", {
+      gameId: roomGameId,
+      issues: parsed.error.issues.map((issue) => ({ code: issue.code, path: issue.path })),
+    });
+    return undefined;
+  }
+  if (parsed.data.gameId !== roomGameId) {
+    console.error("game error names a different game than the room", { gameId: roomGameId });
+    return undefined;
+  }
+  return parsed.data;
 }
