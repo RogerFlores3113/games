@@ -5,6 +5,8 @@ import { VariantSchema, type Variant } from "@games/schema";
 export interface HanabiLobbySettingsProps {
   config: unknown;
   onSetConfig: (config: unknown) => void;
+  /** D-05: disables every variant radio while the lobby is reconnecting. */
+  disabled: boolean;
 }
 
 const VARIANT_OPTIONS: { value: Variant; label: string; blurb: string }[] = [
@@ -23,7 +25,7 @@ const VARIANT_OPTIONS: { value: Variant; label: string; blurb: string }[] = [
  * real `<input type="radio">` elements with the accessible names
  * Base/Rainbow/Black (e2e drives them via `getByRole("radio", { name })`).
  */
-export function HanabiLobbySettings({ config, onSetConfig }: HanabiLobbySettingsProps) {
+export function HanabiLobbySettings({ config, onSetConfig, disabled }: HanabiLobbySettingsProps) {
   // D-05/UI-SPEC: the segmented picker's markup stays byte-identical; only
   // its selected value now derives from `config` (opaque at the schema
   // layer) instead of a top-level `variant` field. An unparseable config
@@ -72,6 +74,7 @@ export function HanabiLobbySettings({ config, onSetConfig }: HanabiLobbySettings
                 value={value}
                 aria-label={label}
                 checked={selected}
+                disabled={disabled}
                 onChange={() => onSetConfig(value)}
                 // Transparent but full-size, NOT `sr-only`: the
                 // e2e specs click the radio itself, and a clipped

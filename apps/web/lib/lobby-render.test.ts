@@ -79,4 +79,19 @@ describe("Lobby settings section (D-11/MGR-03)", () => {
     expect(markup).not.toContain("variant-picker");
     expect(markup).not.toContain('type="radio"');
   });
+
+  it("host + Hanabi view: every variant radio is disabled while reconnecting, enabled otherwise (D-05/MGR-04)", () => {
+    const radios = (markup: string) => markup.match(/<input[^>]*type="radio"[^>]*>/g) ?? [];
+    const reconnecting = renderToStaticMarkup(
+      createElement(Lobby, { view: makeView(), onSetConfig: () => {}, onStartGame: () => {}, reconnecting: true }),
+    );
+    expect(radios(reconnecting)).toHaveLength(3);
+    for (const input of radios(reconnecting)) expect(input).toContain("disabled=");
+
+    const live = renderToStaticMarkup(
+      createElement(Lobby, { view: makeView(), onSetConfig: () => {}, onStartGame: () => {} }),
+    );
+    expect(radios(live)).toHaveLength(3);
+    for (const input of radios(live)) expect(input).not.toContain("disabled=");
+  });
 });

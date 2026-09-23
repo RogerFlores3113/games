@@ -158,7 +158,7 @@ export function Lobby({ view, onSetConfig, onStartGame, reconnecting = false }: 
                 <>
                   <div className="h-px w-full" style={{ backgroundColor: "var(--color-border)" }} />
                   <section className="flex flex-col gap-[length:var(--space-md)] p-[length:var(--space-lg)]">
-                    <Settings config={view.config} onSetConfig={onSetConfig} />
+                    <Settings config={view.config} onSetConfig={onSetConfig} disabled={reconnecting} />
                   </section>
                 </>
               )}

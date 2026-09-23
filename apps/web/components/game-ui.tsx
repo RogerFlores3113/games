@@ -30,6 +30,9 @@ export const BOARD_COMPONENTS: Readonly<Record<GameId, ComponentType<BoardProps>
 export interface LobbySettingsProps {
   config: unknown;
   onSetConfig: (config: unknown) => void;
+  /** D-05: true while the socket is reconnecting — every host settings
+   * control must render disabled, since `send()` drops messages then. */
+  disabled: boolean;
 }
 
 // `Partial` here (unlike `BOARD_COMPONENTS`): a game with no in-lobby
