@@ -14,6 +14,7 @@ import { DEFAULT_GAME_ID, GAME_REGISTRY, resolveGame } from "./game-registration
 import type { GameRegistry, GameRegistryEntry } from "./game-registration";
 import type {
   GameErrorDetail,
+  GameId,
   PublicSeat,
   RefusalReason,
   RoomState,
@@ -66,6 +67,11 @@ export type JoinInput = {
   seatToken?: SeatToken;
   /** The client's per-page join idempotency key (`JoinMessage.joinId`). */
   joinId?: string;
+  /** D-01: the host's chosen game, carried on the room's very first join
+   * only. Read solely by the new-join branch of `joinRoom` below — never by
+   * the seatToken/joinId reclaim branches, which must not let a joiner
+   * change an already-locked room's game. */
+  gameId?: GameId;
   now: number;
   mintSeatId: () => string;
   mintSeatToken: () => SeatToken;
@@ -149,7 +155,26 @@ export function joinRoom(state: RoomState, input: JoinInput, games: GameRegistry
     return { ok: false, reason: "in_progress" };
   }
 
-  if (state.seats.length >= roomGame(state, games).limits.max) {
+  // D-01: the room's game is fixed by its first join. Only an unlocked room
+  // (nobody has joined yet) may resolve a different game via input.gameId —
+  // once gameLocked, this join's gameId is ignored entirely, matching the
+  // reclaim branches above (which never read it at all).
+  let targetGameId: GameId = state.gameId;
+  let targetConfig: unknown = state.config;
+  let targetAdapterId = state.adapterId;
+  let entry = roomGame(state, games);
+  if (!state.gameLocked && input.gameId !== undefined && input.gameId !== state.gameId) {
+    const resolved = resolveGame(input.gameId, games);
+    if (resolved === undefined) {
+      return { ok: false, reason: "bad_request" };
+    }
+    targetGameId = input.gameId;
+    targetConfig = resolved.defaultConfig;
+    targetAdapterId = resolved.adapter.id;
+    entry = resolved;
+  }
+
+  if (state.seats.length >= entry.limits.max) {
     return { ok: false, reason: "full" };
   }
 
@@ -173,6 +198,9 @@ export function joinRoom(state: RoomState, input: JoinInput, games: GameRegistry
 
   const nextState: RoomState = {
     ...state,
+    gameId: targetGameId,
+    config: targetConfig,
+    adapterId: targetAdapterId,
     seats: [...state.seats, newSeat],
     hostSeatId: state.hostSeatId ?? seatId,
     // D-01: first-write-wins, mirroring hostSeatId above — once locked, a

@@ -220,6 +220,86 @@ describe("join idempotency: a replayed join reclaims the seat it created", () =>
 // ROOM-05 / D-13: variant lock
 // ---------------------------------------------------------------------------
 
+describe("D-01: the first join's gameId locks the room's game", () => {
+  it("a first join carrying gameId 'hanabi' sets gameLocked true", () => {
+    const minter = makeMinter();
+    const first = joinRoom(freshRoom(), {
+      displayName: "Roger",
+      gameId: "hanabi",
+      now: 1,
+      mintSeatId: minter.mintSeatId,
+      mintSeatToken: minter.mintSeatToken,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) throw new Error("unreachable");
+    expect(first.state.gameLocked).toBe(true);
+    expect(first.state.gameId).toBe("hanabi");
+  });
+
+  it("a second join carrying a gameId leaves gameId/config unchanged once locked", () => {
+    const minter = makeMinter();
+    const first = joinRoom(freshRoom(), {
+      displayName: "Roger",
+      now: 1,
+      mintSeatId: minter.mintSeatId,
+      mintSeatToken: minter.mintSeatToken,
+    });
+    if (!first.ok) throw new Error("unreachable");
+    expect(first.state.gameLocked).toBe(true);
+
+    const second = joinRoom(first.state, {
+      displayName: "Alice",
+      // Cast: a second join asserting a different (unresolvable) game must
+      // be ignored entirely once the room is locked — this must not even
+      // attempt to resolve it.
+      gameId: "__toy__" as unknown as RoomState["gameId"],
+      now: 2,
+      mintSeatId: minter.mintSeatId,
+      mintSeatToken: minter.mintSeatToken,
+    });
+    expect(second.ok).toBe(true);
+    if (!second.ok) throw new Error("unreachable");
+    expect(second.state.gameId).toBe(first.state.gameId);
+    expect(second.state.config).toEqual(first.state.config);
+  });
+
+  it("a reclaim by seatToken carrying a gameId changes nothing", () => {
+    const minter = makeMinter();
+    const first = joinRoom(freshRoom(), {
+      displayName: "Roger",
+      now: 1,
+      mintSeatId: minter.mintSeatId,
+      mintSeatToken: minter.mintSeatToken,
+    });
+    if (!first.ok) throw new Error("unreachable");
+
+    const reclaim = joinRoom(first.state, {
+      displayName: "Roger",
+      seatToken: first.seatToken,
+      gameId: "__toy__" as unknown as RoomState["gameId"],
+      now: 2,
+      mintSeatId: minter.mintSeatId,
+      mintSeatToken: minter.mintSeatToken,
+    });
+    expect(reclaim.ok).toBe(true);
+    if (!reclaim.ok) throw new Error("unreachable");
+    expect(reclaim.state.gameId).toBe(first.state.gameId);
+    expect(reclaim.state.config).toEqual(first.state.config);
+  });
+
+  it("a first join whose gameId is not in the registry returns bad_request and the room stays unlocked", () => {
+    const minter = makeMinter();
+    const result = joinRoom(freshRoom(), {
+      displayName: "Roger",
+      gameId: "__toy__" as unknown as RoomState["gameId"],
+      now: 1,
+      mintSeatId: minter.mintSeatId,
+      mintSeatToken: minter.mintSeatToken,
+    });
+    expect(result).toEqual({ ok: false, reason: "bad_request" });
+  });
+});
+
 describe("ROOM-05: variant lock", () => {
   it("ROOM-05: host can change variant repeatedly in the lobby", () => {
     const minter = makeMinter();

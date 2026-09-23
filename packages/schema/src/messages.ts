@@ -4,7 +4,6 @@ import {
   RoomViewSchema,
   DisplayNameSchema,
   SeatTokenSchema,
-  VariantSchema,
   GameIdSchema,
 } from "./room";
 import { HanabiErrorCodeSchema } from "./games/hanabi-errors";
@@ -37,11 +36,21 @@ const JoinMessageSchema = z.strictObject({
    * arrived replays a TOKENLESS join; without this key the server cannot
    * tell that replay from a new player and seats the same person twice. */
   joinId: z.string().min(JOIN_ID_MIN_LENGTH).max(JOIN_ID_MAX_LENGTH).optional(),
+  /** D-01: the host's chosen game, carried on their first `join`. Honoured
+   * ONLY on the room's very first join — the write that also sets
+   * `gameLocked: true` server-side. Every later join, and every reclaim
+   * (seatToken or joinId match), ignores this field entirely: a joiner can
+   * never assert or change a room's already-locked game. */
+  gameId: GameIdSchema.optional(),
 });
 
-const SetVariantMessageSchema = z.strictObject({
-  type: z.literal("set_variant"),
-  variant: VariantSchema,
+const SetConfigMessageSchema = z.strictObject({
+  type: z.literal("set_config"),
+  /** Deliberately `unknown` here — validated downstream by the room's own
+   * game `configSchema` (registry-resolved), like `game_action`'s `request`
+   * field above. This schema package must not know what a game's config
+   * looks like (FDN-01). */
+  config: z.unknown(),
 });
 
 const StartGameMessageSchema = z.strictObject({
@@ -97,7 +106,7 @@ const RestartLobbyMessageSchema = z.strictObject({
 
 export const ClientMessageSchema = z.discriminatedUnion("type", [
   JoinMessageSchema,
-  SetVariantMessageSchema,
+  SetConfigMessageSchema,
   StartGameMessageSchema,
   GameActionMessageSchema,
   LeaveMessageSchema,

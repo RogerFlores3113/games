@@ -378,7 +378,7 @@ describe("RoomDO integration (live wrangler dev)", () => {
     await new Promise((r) => setTimeout(r, LOBBY_SEAT_RELEASE_GRACE_MS + 3000));
 
     const before = c2.parsed.length;
-    send(ws2, { type: "set_variant", variant: "rainbow" });
+    send(ws2, { type: "set_config", config: "rainbow" });
     const after = await c2.waitFor(
       (m) => c2.parsed.indexOf(m) >= before && (m.type === "state" || m.type === "error"),
       5000,
@@ -536,7 +536,7 @@ describe("RoomDO integration (live wrangler dev)", () => {
     await c1.waitFor((m) => m.type === "error", 5000);
     expect(c1.parsed.filter((m) => m.type === "error").length).toBeGreaterThan(errorsBefore);
 
-    send(ws1, { type: "set_variant", variant: "rainbow" });
+    send(ws1, { type: "set_config", config: "rainbow" });
     const afterVariant = await c1.waitFor(
       (m) => m.type === "state" && (m.view as { config: unknown }).config === "rainbow",
       5000,
@@ -558,7 +558,7 @@ describe("RoomDO integration (live wrangler dev)", () => {
     await c1.waitFor((m) => m.type === "error", 5000);
     expect(c1.parsed.filter((m) => m.type === "error").length).toBeGreaterThan(errorsBefore);
 
-    send(ws1, { type: "set_variant", variant: "rainbow" });
+    send(ws1, { type: "set_config", config: "rainbow" });
     const afterVariant = await c1.waitFor(
       (m) => m.type === "state" && (m.view as { config: unknown }).config === "rainbow",
       5000,
@@ -580,12 +580,35 @@ describe("RoomDO integration (live wrangler dev)", () => {
     await c1.waitFor((m) => m.type === "error", 5000);
     expect(c1.parsed.filter((m) => m.type === "error").length).toBeGreaterThan(errorsBefore);
 
-    send(ws1, { type: "set_variant", variant: "rainbow" });
+    send(ws1, { type: "set_config", config: "rainbow" });
     const afterVariant = await c1.waitFor(
       (m) => m.type === "state" && (m.view as { config: unknown }).config === "rainbow",
       5000,
     );
     expect(afterVariant.type).toBe("state");
+
+    ws1.close();
+  });
+
+  it("D-15: an old client's set_variant frame is refused bad_request and the DO keeps serving a following set_config from the same socket", async () => {
+    const code = mintRoomCode();
+    const ws1 = await openSocket(code);
+    const c1 = collectMessages(ws1);
+    send(ws1, { type: "join", displayName: "Alice" });
+    await c1.waitFor((m) => m.type === "joined");
+    const errorsBefore = c1.parsed.filter((m) => m.type === "error").length;
+
+    ws1.send(JSON.stringify({ type: "set_variant", variant: "rainbow" }));
+    const errorMsg = (await c1.waitFor((m) => m.type === "error", 5000)) as Parsed & { code: string };
+    expect(c1.parsed.filter((m) => m.type === "error").length).toBeGreaterThan(errorsBefore);
+    expect(errorMsg.code).toBe("bad_request");
+
+    send(ws1, { type: "set_config", config: "rainbow" });
+    const afterConfig = await c1.waitFor(
+      (m) => m.type === "state" && (m.view as { config: unknown }).config === "rainbow",
+      5000,
+    );
+    expect(afterConfig.type).toBe("state");
 
     ws1.close();
   });
@@ -894,7 +917,7 @@ describe("RoomDO integration (live wrangler dev)", () => {
     await c2.waitFor((m) => m.type === "joined");
     await c1.waitFor((m) => m.type === "state" && (m.view as { seats: unknown[] }).seats.length === 2);
 
-    send(ws1, { type: "set_variant", variant: "black" });
+    send(ws1, { type: "set_config", config: "black" });
     await c1.waitFor((m) => m.type === "state" && (m.view as { config: unknown }).config === "black", 5000);
 
     ws1.close();
@@ -1204,7 +1227,7 @@ describe("Phase 5 heartbeat spike (D-02, RESEARCH Open Question 1)", () => {
     }
     expect(c1.pongs.count).toBeGreaterThanOrEqual(3);
 
-    send(ws1, { type: "set_variant", variant: "rainbow" });
+    send(ws1, { type: "set_config", config: "rainbow" });
     const afterVariant = await c1.waitFor(
       (m) => m.type === "state" && (m.view as { config: unknown }).config === "rainbow",
       5000,
@@ -1307,7 +1330,7 @@ describe("Phase 5 dead-socket detection and reconnect (D-03, D-12, D-13, D-15)",
       let toggled = false;
       const chatInterval = setInterval(() => {
         if (wsAlice.readyState === WebSocket.OPEN) {
-          send(wsAlice, { type: "set_variant", variant: toggled ? "rainbow" : "base" });
+          send(wsAlice, { type: "set_config", config: toggled ? "rainbow" : "base" });
           toggled = !toggled;
         }
       }, 500);

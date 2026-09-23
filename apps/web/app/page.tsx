@@ -70,7 +70,7 @@ export default function HomePage() {
       // it survives into a new tab alongside the seat token.
       writeDisplayName(json.code, displayName.trim());
       // WR-04: the Durable Object always starts a room on "base"; the host's
-      // client applies this choice with `set_variant` after its first join.
+      // client applies this choice with `set_config` after its first join.
       writePendingVariant(json.code, variant);
       router.push(json.path);
     } catch {

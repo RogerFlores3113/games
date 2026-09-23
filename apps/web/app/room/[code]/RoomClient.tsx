@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { nanoid } from "nanoid";
-import type { ClientMessage, Variant } from "@games/schema";
+import type { ClientMessage } from "@games/schema";
 import { useRoomSocket } from "../../../lib/room-socket";
 import { useRoomStore } from "../../../lib/room-store";
 import { clearPendingVariant, readPendingVariant, variantToApply } from "../../../lib/pending-variant";
@@ -139,12 +139,13 @@ function ConnectedRoom({
     // against it. The next fresh `joined`/`state` frame re-runs this effect.
     if (status === "reconnecting") return;
     // WR-04: apply the variant picked on the create screen, once, through
-    // the ordinary host-only `set_variant` message. Cleared on the first
-    // seated view either way, so it can never fire later or for a joiner.
+    // the ordinary host-only `set_config` message (D-04). Cleared on the
+    // first seated view either way, so it can never fire later or for a
+    // joiner.
     const target = variantToApply(view, readPendingVariant(code));
     clearPendingVariant(code);
     if (target !== null) {
-      socket.send(JSON.stringify({ type: "set_variant", variant: target } satisfies ClientMessage));
+      socket.send(JSON.stringify({ type: "set_config", config: target } satisfies ClientMessage));
     }
   }, [view, code, socket, status]);
 
@@ -237,7 +238,7 @@ function ConnectedRoom({
     return (
       <Lobby
         view={view}
-        onSetVariant={(variant: Variant) => send({ type: "set_variant", variant })}
+        onSetConfig={(config: unknown) => send({ type: "set_config", config })}
         onStartGame={() => send({ type: "start_game" })}
         reconnecting={status === "reconnecting"}
       />

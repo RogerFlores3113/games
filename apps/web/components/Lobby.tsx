@@ -11,7 +11,7 @@ import { SeatRow } from "./SeatRow";
 
 export interface LobbyProps {
   view: RoomView;
-  onSetVariant: (variant: Variant) => void;
+  onSetConfig: (config: unknown) => void;
   onStartGame: () => void;
   /** D-05: while true, the store's own socket is degraded and this last-
    * known view is display-only — Start game and every host variant control
@@ -45,7 +45,7 @@ const VARIANT_OPTIONS: { value: Variant; label: string; blurb: string }[] = [
  * on a placeholder, since the e2e helpers count those rows to assert how
  * many players are seated.
  */
-export function Lobby({ view, onSetVariant, onStartGame, reconnecting = false }: LobbyProps) {
+export function Lobby({ view, onSetConfig, onStartGame, reconnecting = false }: LobbyProps) {
   const isHost = view.youSeatId === view.hostSeatId;
   const seatCount = view.seats.length;
   const canStart = seatCount >= view.limits.min && seatCount <= view.limits.max;
@@ -205,7 +205,7 @@ export function Lobby({ view, onSetVariant, onStartGame, reconnecting = false }:
                             aria-label={label}
                             checked={selected}
                             disabled={reconnecting}
-                            onChange={() => onSetVariant(value)}
+                            onChange={() => onSetConfig(value)}
                             // Transparent but full-size, NOT `sr-only`: the
                             // e2e specs click the radio itself, and a clipped
                             // 1x1 sr-only input sits under the label's own text

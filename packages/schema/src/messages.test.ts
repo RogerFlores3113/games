@@ -106,10 +106,42 @@ describe("ClientMessageSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts set_variant, start_game, and leave", () => {
-    expect(ClientMessageSchema.safeParse({ type: "set_variant", variant: "rainbow" }).success).toBe(true);
+  it("accepts set_config, start_game, and leave", () => {
+    expect(ClientMessageSchema.safeParse({ type: "set_config", config: "rainbow" }).success).toBe(true);
     expect(ClientMessageSchema.safeParse({ type: "start_game" }).success).toBe(true);
     expect(ClientMessageSchema.safeParse({ type: "leave" }).success).toBe(true);
+  });
+
+  it("accepts a join carrying gameId 'hanabi', and a join with no gameId at all", () => {
+    expect(
+      ClientMessageSchema.safeParse({ type: "join", displayName: "Roger", gameId: "hanabi" }).success,
+    ).toBe(true);
+    expect(ClientMessageSchema.safeParse({ type: "join", displayName: "Roger" }).success).toBe(true);
+  });
+
+  it("rejects a join carrying an unregistered gameId", () => {
+    expect(
+      ClientMessageSchema.safeParse({ type: "join", displayName: "Roger", gameId: "expedition" }).success,
+    ).toBe(false);
+    expect(
+      ClientMessageSchema.safeParse({ type: "join", displayName: "Roger", gameId: "__toy__" }).success,
+    ).toBe(false);
+  });
+
+  it("accepts set_config with a string config and with an arbitrary object config (validated downstream)", () => {
+    expect(ClientMessageSchema.safeParse({ type: "set_config", config: "rainbow" }).success).toBe(true);
+    expect(ClientMessageSchema.safeParse({ type: "set_config", config: { anything: 1 } }).success).toBe(true);
+  });
+
+  it("rejects a set_config with an extra key (strict mode)", () => {
+    expect(
+      ClientMessageSchema.safeParse({ type: "set_config", config: "rainbow", extra: true }).success,
+    ).toBe(false);
+  });
+
+  it("D-15: an old client's set_variant frame is refused as bad_request via parseClientMessage", () => {
+    const result = parseClientMessage(JSON.stringify({ type: "set_variant", variant: "rainbow" }));
+    expect(result).toEqual({ ok: false, reason: "bad_request" });
   });
 });
 

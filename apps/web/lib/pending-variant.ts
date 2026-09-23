@@ -5,7 +5,7 @@ import { seatTokenKey } from "./seat-token";
  * WR-04: the variant a creator picked on the landing page. `/api/room` only
  * mints a code and the Durable Object always starts a room on `"base"`, so
  * the choice is carried here and applied by the host's own client, through
- * the ordinary `set_variant` message, right after its first join. The
+ * the ordinary `set_config` message (D-04), right after its first join. The
  * server stays authoritative: a non-host or started room is refused there.
  *
  * SSR-safe and never throws, like `seat-token.ts`.

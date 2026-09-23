@@ -42,6 +42,7 @@ import {
   ROOM_ABANDONED_CLOSE_CODE,
   STALE_SOCKET_CLOSE_CODE,
   SUPERSEDED_CLOSE_CODE,
+  type GameId,
   type RoomCode,
   type RoomState,
 } from "@games/schema";
@@ -185,7 +186,7 @@ export class RoomDO extends Server<Env> {
       const room = await this.#ensureRoom();
 
       if (msg.type === "join") {
-        await this.#handleJoin(connection, room, msg.displayName, msg.seatToken, msg.joinId, now);
+        await this.#handleJoin(connection, room, msg.displayName, msg.seatToken, msg.joinId, msg.gameId, now);
         return;
       }
 
@@ -198,10 +199,8 @@ export class RoomDO extends Server<Env> {
         return;
       }
 
-      if (msg.type === "set_variant") {
-        // The wire frame stays `set_variant { variant }` in this plan (plan
-        // 08-06 replaces it); it now routes into the generalised `setConfig`.
-        const result = setConfig(room, actorSeatId, msg.variant, now);
+      if (msg.type === "set_config") {
+        const result = setConfig(room, actorSeatId, msg.config, now);
         if (!result.ok) {
           this.#send(connection, { type: "error", code: result.reason });
           return;
@@ -518,6 +517,7 @@ export class RoomDO extends Server<Env> {
     displayName: string,
     seatToken: string | undefined,
     joinId: string | undefined,
+    gameId: GameId | undefined,
     now: number,
   ): Promise<void> {
     // WR-03: a connection that already holds a seat may not join again.
@@ -535,6 +535,7 @@ export class RoomDO extends Server<Env> {
       displayName,
       seatToken: seatToken as RoomState["seats"][number]["seatToken"] | undefined,
       joinId,
+      gameId,
       now,
       mintSeatId,
       mintSeatToken,
