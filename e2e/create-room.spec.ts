@@ -53,8 +53,8 @@ test.describe("create room (ROOM-01)", () => {
   });
 });
 
-test.describe("landing page game picker (owner request, 2026-09-19)", () => {
-  test("title reads 'Board games', Innovation is disabled, and the variant/Create room controls stay hidden until Hanabi is chosen", async ({
+test.describe("landing page game picker (D-12, D-17)", () => {
+  test("title reads 'Board games', Expedition is disabled, Create room is visible before any game is chosen, and the variant fieldset only shows once Hanabi is chosen", async ({
     page,
   }) => {
     await page.goto("/");
@@ -62,23 +62,84 @@ test.describe("landing page game picker (owner request, 2026-09-19)", () => {
     await expect(page).toHaveTitle("Board games");
     await expect(page.getByRole("heading", { name: "Board games" })).toBeVisible();
 
-    const innovationOption = page.locator('option[value="innovation"]');
-    await expect(innovationOption).toBeDisabled();
-    await expect(innovationOption).toHaveText("Innovation - WIP");
+    const expeditionOption = page.locator('option[value="expedition"]');
+    await expect(expeditionOption).toBeDisabled();
+    await expect(expeditionOption).toHaveText("Expedition - coming soon");
+    await expect(page.locator('option[value="innovation"]')).toHaveCount(0);
 
-    // Nothing Hanabi-specific shows until a game is chosen.
+    // UI-SPEC note 3: "Create room"'s visibility is independent of the
+    // selected game — it is visible and enabled BEFORE any game is picked.
+    const createButton = page.getByRole("button", { name: "Create room" });
+    await expect(createButton).toBeVisible();
+    await expect(createButton).toBeEnabled();
+
+    // Only the per-game settings fieldset is gated on the selection.
     await expect(page.getByRole("radio", { name: "Base" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Create room" })).toHaveCount(0);
 
     await page.getByLabel("Game").selectOption("hanabi");
 
     await expect(page.getByRole("radio", { name: "Base" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Create room" })).toBeVisible();
+    await expect(createButton).toBeVisible();
   });
 
   test("a room can be created after choosing Hanabi", async ({ page }) => {
     const code = await createRoom(page, { name: "Roger" });
     expect(code).toMatch(ROOM_CODE_REGEX);
+  });
+});
+
+test.describe("Create room works before hydration (D-17)", () => {
+  test("a native form submit lands in the seated lobby with no query string, and the pending-room cookie is consumed on arrival", async ({
+    page,
+    context,
+  }) => {
+    // Block Next's client bundle so React never hydrates — proves the form
+    // works from a pure server-rendered page via its native POST fallback.
+    await page.route("**/_next/static/**", (route) => route.abort());
+
+    await page.goto("/");
+    await page.getByLabel("Game").selectOption("hanabi");
+    await expect(page.getByRole("radio", { name: "Rainbow" })).toBeVisible();
+    await page.getByRole("radio", { name: "Rainbow" }).check();
+    await page.getByLabel("Your name").fill("Roger");
+    await page.getByRole("button", { name: "Create room" }).click();
+    await page.waitForURL(/\/room\/[A-Z0-9]{6}$/);
+
+    const url = new URL(page.url());
+    expect(url.search).toBe("");
+    const code = url.pathname.split("/").pop()!;
+
+    const cookies = await context.cookies();
+    expect(cookies.some((c) => c.name === `pending_room_${code}`)).toBe(true);
+
+    // Unblock JS and reload so the room page's client hydrates, consumes
+    // the cookie, and auto-joins.
+    await page.unroute("**/_next/static/**");
+    await page.reload();
+
+    const selfRow = page.getByTestId("seat-row").and(page.locator('[data-self="true"]'));
+    await expect(selfRow).toBeVisible();
+    await expect(selfRow).toContainText("Roger");
+    await expect(selfRow).toContainText("Host");
+    await expect(page.getByRole("radio", { name: "Rainbow" })).toBeChecked();
+
+    const cookiesAfter = await context.cookies();
+    expect(cookiesAfter.some((c) => c.name === `pending_room_${code}`)).toBe(false);
+  });
+});
+
+test.describe("the share link never carries name, game or config (D-17)", () => {
+  test("Copy link copies exactly the room URL with no query string", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const code = await createRoom(page, { name: "Roger", variant: "rainbow" });
+
+    const url = new URL(page.url());
+    expect(url.search).toBe("");
+
+    await page.getByRole("button", { name: "Copy link" }).click();
+    await expect(page.getByRole("button", { name: "Copied!" })).toBeVisible();
+    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clipboardText).toBe(`${url.origin}/room/${code}`);
   });
 });
 

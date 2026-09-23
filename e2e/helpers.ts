@@ -15,13 +15,13 @@ export interface CreateRoomOptions {
  */
 export async function createRoom(page: Page, { name, variant = "base" }: CreateRoomOptions): Promise<string> {
   await page.goto("/");
-  // "Create room" stays disabled until the page has hydrated (app/page.tsx).
-  // Wait for that before touching the form: input typed into the server-
-  // rendered markup before React attaches is not in React's state, and a
-  // pre-hydration submit is a native GET that reloads an empty form.
-  // The variant control and "Create room" stay hidden until a game is
-  // chosen from the dropdown (owner request, 2026-09-19) — Hanabi is the
-  // only playable option; Innovation is present but disabled ("WIP").
+  // D-17 (plan 08-09): "Create room" now works before hydration — the form
+  // submits natively to POST /api/room, with a fetch-based JS handler
+  // layered on top once React attaches. `toBeEnabled()` below is now
+  // trivially true (the button is never disabled while a game is picked);
+  // it stays as a smoke check, not a hydration wait. The variant fieldset
+  // is CSS-driven (`:has()`), visible as soon as Hanabi is chosen, with or
+  // without JS.
   await page.getByLabel("Game").selectOption("hanabi");
   const createButton = page.getByRole("button", { name: "Create room" });
   await expect(createButton).toBeEnabled();
