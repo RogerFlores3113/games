@@ -120,7 +120,7 @@ A "camp" is one round: one deal, played to the last trick.
   **replayed** with a fresh deal and fresh objectives. The only way forward is to
   clear it.
 - 0 supplies ends the run. Clearing camp 6 wins it.
-- The room keeps a best-run record: furthest camp reached, supplies left.
+- ~~The room keeps a best-run record~~ Deferred by the owner at milestone scoping (2026-09-22); see `.planning/REQUIREMENTS.md` Future Requirements.
 
 ### 4.2 Gear: capacity, draft, loadout
 - **Capacity** equals the camp number: 1 bar at camp 1, 6 bars at camp 6. It is tied
@@ -177,7 +177,7 @@ generic; display names carry the theme, so a re-theme never touches rules code.
 | Spyglass | `peek` | 1 | between-tricks | See one random card from a chosen teammate's hand |
 | Signal Flare | `broadcast` | 1 | between-tricks | Your Whisper this camp is shown to everyone |
 | Camouflage ✦ | `ghost` | 1 | between-tricks | Drop one of your unresolved objectives. From then on, if you win any trick this camp, the camp fails. Unusable if you have already won a trick this camp |
-| Compass | `reroll` | 2 | objective-pick | Replace one face-up, not-yet-taken objective with a new valid one from the objective deck |
+| Compass | `reroll` | 2 | objective-pick | Replace one face-up, not-yet-taken objective with a new valid one from the objective deck. An ordered objective's replacement keeps its order marker |
 | Trained Monkey ✦ | `pickpocket` | 2 | between-tricks | Swap a card of your choice for a random card from a chosen teammate's hand. You might get something worse |
 | Machete | `commandeer` | 2 | between-tricks | You lead the next trick instead of the last trick's winner |
 | Rain Poncho ✦ | `jam` | 2 | pre-deal | Cancel this camp's boss twist. Nobody may Whisper this camp (gear that whispers is blocked too) |
@@ -290,7 +290,7 @@ The only way content changes state. Each operation keeps invariants by construct
 - `rng` — the seeded generator (§6.5).
 
 ### 6.4 Hidden information
-- A **reveal** is a card plus the list of seats allowed to see it. The Whisper,
+- A **reveal** is a card plus the list of seats allowed to see it. It stays visible to its audience for the rest of the camp and clears at camp end or replay (owner, 2026-09-22). The Whisper,
   Spyglass and Signal Flare are reveals with different audiences; future information
   gear uses the same mechanism.
 - A seat's view contains: its own hand; every other hand's size; objectives (all
@@ -437,3 +437,14 @@ clicks through it.
 | Setting | Jungle expedition camp; supplies instead of hull; expedition leader instead of captain |
 | Art sources | PixelLab generation and verified CC0/free packs |
 | Rendering | Phaser renders the whole game from a pure scene model; test bridge for e2e |
+
+**Milestone scoping decisions (owner, 2026-09-22, recorded in `.planning/REQUIREMENTS.md`):**
+
+| Decision | Choice |
+|---|---|
+| Saved rooms across the multi-game change | Reset on deploy (schema-version bump); deploy when no game is in progress |
+| Reveal lifetime | Visible to its audience for the rest of the camp; cleared at camp end or replay |
+| Compass on ordered objectives | Allowed; the replacement keeps the order marker |
+| Accessibility | Mouse only for v2.0, recorded as a Key Decision; keyboard and screen reader deferred |
+| Added from research | Legal-play dimming and led-card marker, last-trick glance, rules reference, confirm step for targeted gear and Whispers, explicit no-undo/no-auto-play |
+| Deferred | "Why we failed" moment, "what can I do now" window signal, best-run record, multi-trick history |
