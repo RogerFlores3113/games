@@ -8,7 +8,7 @@
 
 ### Multi-game rooms
 
-- [ ] **MGR-01**: The host chooses the game (Hanabi or Expedition) when creating a room, and the room link opens that game's lobby
+- [ ] **MGR-01**: The host chooses the game when creating a room, and the room link opens that game's lobby. Proven in Phase 8 with Hanabi plus a test-only second game; the Expedition option stays disabled until Phase 12 makes it playable
 - [ ] **MGR-02**: Each game sets its own seat limits (Hanabi 2–5, Expedition 3–5), and the lobby enforces them
 - [ ] **MGR-03**: Each game brings its own settings. The host sees only the current game's settings (Hanabi: variant; Expedition: none in v2.0)
 - [ ] **MGR-04**: Hanabi plays exactly as before. The full existing unit and e2e suites pass, with only fixture renames allowed as diffs
@@ -26,7 +26,7 @@
 - [ ] **XRULE-05**: Objectives are flipped from a second deck and taken one at a time, starting with the leader and going clockwise, until all are taken
 - [ ] **XRULE-06**: Objective kinds are win-card, ordered (①/②/last), no-tricks and exactly-N. Each objective's status (pending, done, failed) is always visible to everyone
 - [ ] **XRULE-07**: A camp succeeds when every objective is done, and fails the moment any objective becomes impossible or a failure check fires. Play stops at that point
-- [ ] **XRULE-08**: Played cards, used gear and Whispers are final: there is no undo and no auto-play of a queued card
+- [ ] **XRULE-08**: Played cards are final: there is no undo and no auto-play of a queued card
 
 ### Communication and hidden information
 
@@ -53,7 +53,7 @@
   - Camouflage: drops one of your objectives. Winning any later trick then fails the camp, and it can't be used after you've already won a trick.
 - [ ] **GEAR-03**: Table gear works as specced: Trained Monkey (swap a chosen card for a random card from a teammate), Machete (lead the next trick yourself)
 - [ ] **GEAR-04**: Run gear works as specced: Rain Poncho (cancel the boss twist, but no Whispers that camp; used before the deal), Energy Tonic (size 0, +2 capacity, and a failed camp costs 1 extra supply per equipped Tonic)
-- [ ] **GEAR-05**: Targeted gear and Whispers show a confirm step before they take effect
+- [ ] **GEAR-05**: Targeted gear and Whispers show a confirm step before they take effect, and are final once they resolve (no undo)
 - [ ] **GEAR-06**: Gear that can't be used right now shows the reason
 
 ### Boss twists
@@ -127,11 +127,63 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| MGR-01 | Phase 8 | Pending |
+| MGR-02 | Phase 8 | Pending |
+| MGR-03 | Phase 8 | Pending |
+| MGR-04 | Phase 8 | Pending |
+| MGR-05 | Phase 8 | Pending |
+| MGR-06 | Phase 8 | Pending |
+| MGR-07 | Phase 8 | Pending |
+| MGR-08 | Phase 8 | Pending |
+| XRULE-01 | Phase 9 | Pending |
+| XRULE-02 | Phase 9 | Pending |
+| XRULE-03 | Phase 9 | Pending |
+| XRULE-04 | Phase 9 | Pending |
+| XRULE-05 | Phase 9 | Pending |
+| XRULE-06 | Phase 9 | Pending |
+| XRULE-07 | Phase 9 | Pending |
+| XRULE-08 | Phase 9 | Pending |
+| COMM-01 | Phase 10 | Pending |
+| COMM-02 | Phase 10 | Pending |
+| COMM-03 | Phase 11 | Pending |
+| RUN-01 | Phase 10 | Pending |
+| RUN-02 | Phase 10 | Pending |
+| RUN-03 | Phase 10 | Pending |
+| RUN-04 | Phase 10 | Pending |
+| RUN-05 | Phase 10 | Pending |
+| RUN-06 | Phase 10 | Pending |
+| RUN-07 | Phase 10 | Pending |
+| GEAR-01 | Phase 10 | Pending |
+| GEAR-02 | Phase 10 | Pending |
+| GEAR-03 | Phase 10 | Pending |
+| GEAR-04 | Phase 10 | Pending |
+| GEAR-05 | Phase 10 | Pending |
+| GEAR-06 | Phase 10 | Pending |
+| BOSS-01 | Phase 10 | Pending |
+| ENG-01 | Phase 10 | Pending |
+| ENG-02 | Phase 10 | Pending |
+| ENG-03 | Phase 11 | Pending |
+| SCENE-01 | Phase 12 | Pending |
+| SCENE-02 | Phase 12 | Pending |
+| SCENE-03 | Phase 12 | Pending |
+| SCENE-04 | Phase 12 | Pending |
+| SCENE-05 | Phase 13 | Pending |
+| SCENE-06 | Phase 13 | Pending |
+| SCENE-07 | Phase 13 | Pending |
+| SCENE-08 | Phase 12 | Pending |
+| SCENE-09 | Phase 12 | Pending |
+| SCENE-10 | Phase 12 | Pending |
+| SCENE-11 | Phase 12 | Pending |
+| SCENE-12 | Phase 12 | Pending |
+| ARTX-01 | Phase 14 | Pending |
+| ARTX-02 | Phase 14 | Pending |
+| ARTX-03 | Phase 14 | Pending |
+| BAL-01 | Phase 15 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 52 total
-- Mapped to phases: 0 (filled by the roadmap)
+- Mapped to phases: 52/52 ✓
 
 ---
 *Requirements defined: 2026-09-22*
-*Last updated: 2026-09-22 after initial definition*
+*Last updated: 2026-09-22 after v2.0 roadmap creation (Phases 8-15, 52/52 requirements mapped)*

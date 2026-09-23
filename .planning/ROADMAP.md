@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 Hanabi**: Phases 1–7 (shipped 2026-09-19, archived 2026-09-22)
-- 📋 **Next:** Expedition, a roguelite co-op trick-taking game (not yet started; spec at `docs/superpowers/specs/2026-09-22-expedition-design.md`)
+- 🚧 **v2.0 Expedition** (in progress): Phases 8–15, a roguelite co-op trick-taking game (spec at `docs/superpowers/specs/2026-09-22-expedition-design.md`)
 
 ## Phases
 
@@ -27,6 +27,110 @@ Phase artifacts: `.planning/milestones/v1.0-phases/`
 
 </details>
 
+- [ ] **Phase 8: Multi-Game Rooms** - A room carries its game id; Hanabi keeps working unchanged behind a genuinely generic registry
+- [ ] **Phase 9: Expedition Rules Core** - A pure, property-tested deck/trick/objective engine for the Expedition round rules
+- [ ] **Phase 10: Run Layer, Gear Engine & Bosses** - The full six-camp run: draft, loadout, replay-on-fail, the hook/toolkit engine, the v1 gear and boss catalogues, and the Whisper
+- [ ] **Phase 11: Adapter, Schemas & Worker Wiring** - Expedition wired into the room actor with a leak-checked per-seat view proven across whole simulated runs
+- [ ] **Phase 12: Phaser Shell** - Expedition renders as a pixel-art camp scene, isolated from the rest of the site, with mount/unmount and test-bridge discipline established
+- [ ] **Phase 13: Fireside & Run-End Scenes** - The between-camps fireside, the run-end scene, and an in-scene rules reference
+- [ ] **Phase 14: Art Pass** - PixelLab and verified CC0 art replace placeholders, every asset licence-recorded, owner sign-off
+- [ ] **Phase 15: Balance Pass** - The camp ramp is tuned through play-tests until a run feels right
+
+## Phase Details
+
+### Phase 8: Multi-Game Rooms
+**Goal**: A room carries its `gameId`, with each game bringing its own config, seat limits and view schema looked up from a registry. Hanabi is re-registered through it and keeps working exactly as before. The registry is proven with a test-only second game; Expedition's option on the landing page stays visible but disabled until Phase 12 makes it playable, so no deploy ever offers an unplayable game.
+**Depends on**: Nothing (first phase of v2.0; builds on the `GameAdapter` seam v1.0 already proved)
+**Requirements**: MGR-01, MGR-02, MGR-03, MGR-04, MGR-05, MGR-06, MGR-07, MGR-08
+**Success Criteria** (what must be TRUE):
+  1. The host chooses the game when creating a room, and the link opens that game's lobby showing only that game's own settings. This is proven end to end with Hanabi plus a test-only second game; the Expedition option is shown disabled ("coming soon") on the live landing page.
+  2. Each game's seat limits (Hanabi 2–5, Expedition 3–5) are enforced when players join a new room of that game.
+  3. Deploying the multi-game change resets any saved rooms cleanly to empty lobbies rather than corrupting mid-game state (a schema-version bump), and the deploy is timed for when no game is in progress.
+  4. Hanabi's full existing unit and e2e suites pass with only fixture-rename diffs.
+  5. `npm run typecheck` works from the repo root via a root `tsconfig.json` with project references, and "Create room" stays usable promptly even under heavy parallel e2e load — both fixed at the cause, not with retries.
+**Plans**: TBD
+
+### Phase 9: Expedition Rules Core
+**Goal**: A pure, framework-free Expedition rules engine exists — deck construction, legal plays, trick winner, the camp state machine, and all four objective kinds — verified by property tests against the spec's rule text, not just hand-written examples.
+**Depends on**: Phase 8 (registry seam Expedition will plug into later; the engine itself is framework-free and could build in parallel, but is sequenced after per the owner-approved spec's build order)
+**Requirements**: XRULE-01, XRULE-02, XRULE-03, XRULE-04, XRULE-05, XRULE-06, XRULE-07, XRULE-08
+**Success Criteria** (what must be TRUE):
+  1. 3–5 players are dealt equal hands from the correctly-sized 54/52/50-card deck (2s removed per player count), with removed cards shown to everyone.
+  2. Follow-suit and trick-winner logic correctly handle the Sun/Moon two-card joker suit for both lead directions, proven by fast-check property tests across all deck sizes, not one hand-tested example.
+  3. The Sun holder (or A♠ when the Sun is out of play) is the expedition leader, picks the first objective, and leads first; every objective's status (pending/done/failed) is always visible to everyone.
+  4. A camp fails the instant any objective becomes impossible — including an exactly-N objective becoming mathematically unreachable before its holder's final relevant trick — proven by fast-check property tests on failure timing, not just the late-detectable case.
+  5. Played cards are final: there is no undo and no auto-play of a queued card. (Gear and Whisper finality is proven in Phase 10, where they exist.)
+**Plans**: TBD
+
+### Phase 10: Run Layer, Gear Engine & Bosses
+**Goal**: The full six-camp run — supplies, replay-on-failure, capacity, draft, loadout — built on the layered hook/toolkit engine (base → boss twist → gear), with the v1 gear catalogue, the provisional boss twists, and the Whisper communication mechanic all working end to end.
+**Depends on**: Phase 9 (rules core: camp state machine, objective evaluation)
+**Requirements**: COMM-01, COMM-02, RUN-01, RUN-02, RUN-03, RUN-04, RUN-05, RUN-06, RUN-07, GEAR-01, GEAR-02, GEAR-03, GEAR-04, GEAR-05, GEAR-06, BOSS-01, ENG-01, ENG-02
+**Success Criteria** (what must be TRUE):
+  1. A player can Whisper one card to one teammate once per camp, only after objectives are picked and only between tricks; everyone sees who whispered to whom, only the target sees the card, and the reveal stays visible to its audience for the rest of the camp before clearing at camp end or replay.
+  2. An explicit fail-then-replay integration test proves every camp-scoped resource — gear-used flags, active modifiers, the leader, Whisper availability, reveals — resets on replay, while owned and equipped gear correctly persists.
+  3. A full run replays deterministically from its seed and action log: every draft offer, deal, boss selection and random gear effect draws exclusively from the carried seeded RNG, never `Math.random()`.
+  4. Each player drafts 1 of 3 private, never-already-owned gear offers at the run's start and after each cleared camp, equips owned gear up to their camp-number capacity, and every loadout is publicly visible; each v1 gear item (info, objective, table, run gear) and the one v1 boss twist per boss camp work exactly as specced, with a confirm step before targeted gear/Whispers take effect, no undo once they resolve, and a visible reason when gear can't be used.
+  5. Adding a new gear item, objective kind, boss twist or interactable is a one-file-plus-registry-line change, and every registered entry is checked automatically for a unique id, valid size/window, deterministic effect, card conservation and no view leak.
+**Plans**: TBD
+
+### Phase 11: Adapter, Schemas & Worker Wiring
+**Goal**: `ExpeditionAdapter` implements `GameAdapter` and is wired through Phase 8's registry seam; the per-seat view is built from an explicit allowlist and proven leak-free across whole simulated runs, not just immediately after a reveal.
+**Depends on**: Phase 8 (registry seam), Phase 10 (run layer, gear/boss catalogue, reveals to leak-check)
+**Requirements**: COMM-03, ENG-03
+**Success Criteria** (what must be TRUE):
+  1. The leak checker asserts no seat's view or log ever contains another seat's card — except through a reveal addressed to that seat — at every step of full simulated runs, not only in the turn immediately following a reveal's creation.
+  2. Thick Fog's face-down objectives are omitted from the server's per-seat view payload itself, never merely hidden by a client-side conditional.
+  3. Property-based simulated runs across 3, 4 and 5 players, every boss twist, and random loadouts always end, never throw, conserve cards, and never leak.
+**Plans**: TBD
+
+### Phase 12: Phaser Shell
+**Goal**: Expedition renders as a pixel-art camp scene through a dynamically-imported Phaser canvas, isolated from the rest of the site, with the React mount/unmount discipline, pixel-art config, and Playwright test bridge established once, correctly, before scenes multiply.
+**Depends on**: Phase 11 (a real, leak-checked view schema to render against)
+**Requirements**: SCENE-01, SCENE-02, SCENE-03, SCENE-04, SCENE-08, SCENE-09, SCENE-10, SCENE-11, SCENE-12
+**Success Criteria** (what must be TRUE):
+  1. The Expedition option on the landing page is enabled, and creating an Expedition room works end to end. Expedition's Phaser bundle loads only on an Expedition game page; the landing page and Hanabi bundles never include Phaser.
+  2. The camp scene seats players around an oval stump table in turn order, with hand, trick, per-seat objectives and gear, supplies, camp number and boss twist all visible; cards you can't legally play are dimmed, the trick shows who led what, and a player can glance at the last completed trick.
+  3. Navigating away from and back into an Expedition room does not double-mount the canvas or leak a WebGL context, verified under React strict mode; pixel art stays crisp at 1280×720 and above, verified with placeholder art before the art pass.
+  4. A player chooses a card pack (Big Index default, Classic), saved per browser and affecting only their own view; the four interactables react to clicks without ever touching game state; a refresh or reconnect mid-camp — including during a draft, a loadout, or an open timing window — resumes the same seat and state.
+  5. Playwright drives a full camp (create room, draft, loadout, play, use gear, Whisper, refresh-and-resume) through `window.__expeditionTest`, which is absent from production builds; the owner reviews the placeholder-art camp scene and signs off that it reads correctly before the art pass begins.
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 13: Fireside & Run-End Scenes
+**Goal**: The between-camps fireside scene (trail, draft, loadout-as-backpack) and the run-end scene, plus an in-scene rules reference, built on Phase 12's established scene conventions.
+**Depends on**: Phase 12 (scene bootstrap, `buildSceneModel` conventions, test bridge)
+**Requirements**: SCENE-05, SCENE-06, SCENE-07
+**Success Criteria** (what must be TRUE):
+  1. The fireside scene shows the trail of six camps and where the crew stands, the draft of three gear items, and loadout packing into capacity slots, with gear rules text shown only on hover — minimal text otherwise.
+  2. The run-end scene shows whether the expedition reached the temple or turned back, with the camp reached and supplies left.
+  3. A rules reference can be opened from the scene, showing the trick rules, what each objective marker means, and the current boss twist.
+  4. The owner reviews both scenes with placeholder art and signs off that they read correctly before the art pass begins.
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 14: Art Pass
+**Goal**: PixelLab generations and verified CC0/permissive pixel packs replace every placeholder, each asset licence-verified and recorded at sourcing time, gated on the owner's visual sign-off.
+**Depends on**: Phase 12, Phase 13 (scenes to skin)
+**Requirements**: ARTX-01, ARTX-02, ARTX-03
+**Success Criteria** (what must be TRUE):
+  1. Every asset used — PixelLab generation or CC0/permissive pack — is recorded in `CREDITS.md` with its source and licence at the time it is sourced, not batched at the end of the phase.
+  2. No shipped asset shows people or watermarks.
+  3. PixelLab prompt specs are kept in the repo so assets can be regenerated consistently.
+  4. The owner signs off the finished scene art in a visual review.
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 15: Balance Pass
+**Goal**: The camp ramp's balance table is tuned through play-tests with the owner's group until a run feels right.
+**Depends on**: Phase 10, Phase 11, Phase 12, Phase 13 (the full loop must be playable end to end)
+**Requirements**: BAL-01
+**Success Criteria** (what must be TRUE):
+  1. The owner's group plays full runs end to end against the current balance table.
+  2. A typical run takes about 35–45 minutes.
+  3. The owner judges runs winnable but not trivial, and signs off on the tuned balance table.
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -40,3 +144,11 @@ Phase artifacts: `.planning/milestones/v1.0-phases/`
 | 6.1. Table Polish | v1.0 | 15/15 | Complete | 2026-09-17 |
 | 6.2. Board Redesign | v1.0 | 20/20 | Complete | 2026-09-18 |
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
+| 8. Multi-Game Rooms | v2.0 | 0/? | Not started | - |
+| 9. Expedition Rules Core | v2.0 | 0/? | Not started | - |
+| 10. Run Layer, Gear Engine & Bosses | v2.0 | 0/? | Not started | - |
+| 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
+| 12. Phaser Shell | v2.0 | 0/? | Not started | - |
+| 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
+| 14. Art Pass | v2.0 | 0/? | Not started | - |
+| 15. Balance Pass | v2.0 | 0/? | Not started | - |

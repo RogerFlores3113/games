@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: planning
-last_updated: "2026-09-23T06:09:09.062Z"
+last_updated: "2026-09-22T00:00:00.000Z"
 last_activity: 2026-09-23
 progress:
-  total_phases: 0
+  total_phases: 8
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 8 - Multi-Game Rooms (next; roadmap ready, not yet planned)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-23 — Milestone v2.0 started
+Status: Roadmap created — 52/52 v2.0 requirements mapped across Phases 8-15; awaiting /gsd:plan-phase 8
+Last activity: 2026-09-22 — v2.0 ROADMAP.md and REQUIREMENTS.md traceability written
 
 ## Performance Metrics
 
@@ -149,6 +149,7 @@ Last activity: 2026-09-23 — Milestone v2.0 started
 
 ### Roadmap Evolution
 
+- v2.0 ROADMAP.md created 2026-09-22: Phases 8-15 continue numbering from v1.0's close at Phase 7 (no reset). Phase order follows the owner-approved spec's §9 build order: multi-game rooms (8) -> rules core (9) -> run layer/gear/bosses (10) -> adapter/wiring (11) -> Phaser shell (12) -> fireside/run-end scenes (13) -> art pass (14) -> balance pass (15). MGR-07 (root tsconfig) and MGR-08 (Create-room hydration flake) folded into Phase 8 as v1.0 debt, per REQUIREMENTS.md. COMM-01/02 (Whisper, reveal lifetime) placed in Phase 10 with the toolkit/reveals rather than Phase 9's rules core, matching the spec's own build-order grouping. COMM-03 and ENG-03 (full-simulated-run leak/property checks) placed in Phase 11 with the adapter/wiring work they depend on, not bundled into Phase 10's catalogue work. 52/52 v2.0 requirements mapped, no orphans.
 - Phase 6.1 inserted after Phase 6: Owner-requested table polish after Phase 6 first-pass sign-off: per-suit firework burst card art, clue marks above cards plus player-typed notes, drag reorder/play/discard with slot-preserving draws, audio cues, city-at-night background
 - Phase 06.2 inserted after Phase 6: Board redesign: 17 follow-on requests from the 06.1 owner sign-off (hints, tokens, board layout, tile styling, shared discard order) (URGENT)
 
@@ -365,4 +366,5 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Review .planning/ROADMAP.md's v2.0 phases (8-15) and .planning/REQUIREMENTS.md's traceability table; approve or request revision
+- Once approved, run /gsd:plan-phase 8 to start Multi-Game Rooms
