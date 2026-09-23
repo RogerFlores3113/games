@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 08-04-PLAN.md
-last_updated: "2026-09-23T09:08:03.949Z"
+stopped_at: Completed 08-09-PLAN.md
+last_updated: "2026-09-23T09:23:32.915Z"
 last_activity: 2026-09-23
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 8 (Multi-Game Rooms) — EXECUTING
-Plan: 9 of 10
+Plan: 10 of 10
 Status: Ready to execute
 Last activity: 2026-09-23
 
@@ -153,6 +153,7 @@ Last activity: 2026-09-23
 | Phase 08 P06 | 45min | 2 tasks | 10 files |
 | Phase 08 P07 | 25min | 2 tasks | 3 files |
 | Phase 08 P08 | 40min | 2 tasks | 10 files |
+| Phase 08 P09 | 70min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -349,6 +350,8 @@ Recent decisions affecting current work:
 - [Phase 08]: 08-07: source-structure.test.ts gained D-11 assertions banning `gameId === "literal"` branching anywhere (including game-registration.ts) and confining the "hanabi" string literal to game-registration.ts
 - [Phase ?]: [Phase 08]: 08-08: game-ui.tsx is the sole web module naming a game's UI — BOARD_COMPONENTS (Record, compile-time exhaustive) / LOBBY_SETTINGS (Partial) keyed by GameId, replacing Lobby.tsx/RoomClient.tsx's isHanabi conditionals
 - [Phase ?]: [Phase 08]: 08-08: pending-room.ts generalizes pending-variant.ts to carry both the pending game (rides the first join frame as gameId, D-01/D-02) and the pending config; both tasks landed as one commit since Task 1 alone breaks typecheck (mirrors 08-06 precedent)
+- [Phase ?]: [Phase 08]: 08-09: D-17's pending_room_{code} cookie carries the raw JSON string as its value, never manually encodeURIComponent'd — NextResponse's cookie serializer always encodes the value itself, so pre-encoding double-encoded it and broke consumePendingRoomCookie's decode (found via TDD)
+- [Phase ?]: [Phase 08]: 08-09: LANDING_GAME_OPTIONS (game-ui.tsx) is deliberately NOT keyed by GameId, unlike BOARD_COMPONENTS/LOBBY_SETTINGS — Expedition isn't a registered GameId until Phase 11, so this is the one place allowed to name a not-yet-real game for the disabled picker option
 
 ### Pending Todos
 
@@ -385,8 +388,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-23T09:04:53.751Z
-Stopped at: Completed 08-04-PLAN.md
+Last session: 2026-09-23T09:23:32.907Z
+Stopped at: Completed 08-09-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

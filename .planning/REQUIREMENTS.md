@@ -15,7 +15,7 @@
 - [x] **MGR-05**: Every per-seat view is validated against its own game's view schema before it is sent
 - [x] **MGR-06**: Deploying the multi-game change resets saved rooms to empty lobbies (a schema-version bump), and the deploy is timed for when no game is in progress
 - [x] **MGR-07**: `npm run typecheck` works from the repo root, via a root `tsconfig.json` with project references (v1.0 debt)
-- [ ] **MGR-08**: "Create room" becomes usable promptly even under heavy parallel e2e load, fixed at the cause rather than with retries (v1.0 debt)
+- [x] **MGR-08**: "Create room" becomes usable promptly even under heavy parallel e2e load, fixed at the cause rather than with retries (v1.0 debt)
 
 ### Expedition rules
 
@@ -134,7 +134,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | MGR-05 | Phase 8 | Complete |
 | MGR-06 | Phase 8 | Complete |
 | MGR-07 | Phase 8 | Complete |
-| MGR-08 | Phase 8 | Pending |
+| MGR-08 | Phase 8 | Complete |
 | XRULE-01 | Phase 9 | Pending |
 | XRULE-02 | Phase 9 | Pending |
 | XRULE-03 | Phase 9 | Pending |
