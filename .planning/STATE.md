@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 08-03-PLAN.md
-last_updated: "2026-09-23T08:00:17.666Z"
+stopped_at: Completed 08-04-PLAN.md
+last_updated: "2026-09-23T08:16:50.059Z"
 last_activity: 2026-09-23
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 10
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 8 (Multi-Game Rooms) — EXECUTING
-Plan: 4 of 10
+Plan: 5 of 10
 Status: Ready to execute
 Last activity: 2026-09-23
 
@@ -148,6 +148,7 @@ Last activity: 2026-09-23
 | Phase 08 P01 | 25min | 2 tasks | 7 files |
 | Phase 08 P02 | 20min | 2 tasks | 17 files |
 | Phase 08 P03 | 45min | 2 tasks | 9 files |
+| Phase 08 P04 | 40min | 2 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -335,6 +336,7 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 08-03]: game-registration.ts's activeGame singleton became GAME_REGISTRY, a frozen gameId-keyed Record built via defineGame (type erasure happens only inside that function's return) and read via resolveGame(gameId, games = GAME_REGISTRY); Object.hasOwn guards against prototype-chain keys
 - [Phase ?]: [Phase 08-03]: every game-resolving room-state.ts/seat-projection.ts function takes a trailing games: GameRegistry = GAME_REGISTRY parameter (the injection seam plan 08-07's toy game uses) instead of reading a module-level adapter constant
 - [Phase ?]: [Phase 08-03]: ErrorDetailSchema split into RoomErrorDetailSchema (room-level) and GameErrorDetailSchema (a closed discriminated union keyed on gameId, one member per game with that game's own closed code enum) — zero unconstrained-string channel on the error frame
+- [Phase 08]: 08-04: RoomViewSchema switched to z.strictObject and gains gameId/gameDisplayName/config/limits, replacing the top-level variant field (D-04, D-05); toSeatView/validateGameView build and dispatch the new envelope through the gameId-keyed registry from 08-03
 
 ### Pending Todos
 
@@ -371,8 +373,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-23T08:00:17.659Z
-Stopped at: Completed 08-03-PLAN.md
+Last session: 2026-09-23T08:16:50.052Z
+Stopped at: Completed 08-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

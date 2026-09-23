@@ -68,7 +68,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 08-04-PLAN.md — Room view carries gameId/config/limits; per-game view validation; lobby reads limits (D-05, MGR-02, MGR-05)
+- [x] 08-04-PLAN.md — Room view carries gameId/config/limits; per-game view validation; lobby reads limits (D-05, MGR-02, MGR-05)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -210,7 +210,7 @@ Plans:
 | 6.1. Table Polish | v1.0 | 15/15 | Complete | 2026-09-17 |
 | 6.2. Board Redesign | v1.0 | 20/20 | Complete | 2026-09-18 |
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
-| 8. Multi-Game Rooms | v2.0 | 3/10 | In Progress|  |
+| 8. Multi-Game Rooms | v2.0 | 4/10 | In Progress|  |
 | 9. Expedition Rules Core | v2.0 | 0/? | Not started | - |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 0/? | Not started | - |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
