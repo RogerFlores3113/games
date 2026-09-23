@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
-status: planning
-last_updated: "2026-09-22T00:00:00.000Z"
-last_activity: 2026-09-23
+status: "Roadmap created — 52/52 v2.0 requirements mapped across Phases 8-15; awaiting /gsd:plan-phase 8"
+stopped_at: Phase 8 context gathered
+last_updated: "2026-09-23T06:35:15.528Z"
+last_activity: 2026-09-22 — v2.0 ROADMAP.md and REQUIREMENTS.md traceability written
 progress:
   total_phases: 8
   completed_phases: 0
@@ -360,9 +361,9 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-19T19:03:13.386Z
-Stopped at: v1.0 Hanabi archived and tagged; next: /gsd-new-milestone for Expedition
-Resume file: None
+Last session: 2026-09-23T06:35:15.520Z
+Stopped at: Phase 8 context gathered
+Resume file: .planning/phases/08-multi-game-rooms/08-CONTEXT.md
 
 ## Operator Next Steps
 
