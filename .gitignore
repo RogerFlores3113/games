@@ -1,6 +1,8 @@
 node_modules
 .next
 dist
+packages/*/dist/
+*.tsbuildinfo
 .wrangler
 test-results
 playwright-report
