@@ -1,0 +1,40 @@
+const VARIANTS: { value: string; label: string }[] = [
+  { value: "base", label: "Base" },
+  { value: "rainbow", label: "Rainbow" },
+  { value: "black", label: "Black" },
+];
+
+/**
+ * D-12/D-17: Hanabi's create-room variant fieldset, moved byte-for-byte out
+ * of the landing form into a per-game lookup entry (`LANDING_SETTINGS` in
+ * `game-ui.tsx`). Uncontrolled — `radio[name="config"]` — so the JS
+ * enhancement reads its value via `FormData`, and the native form POST
+ * (pre-hydration) carries it exactly the same way.
+ */
+export function HanabiCreateSettings() {
+  return (
+    <fieldset className="flex flex-col gap-[length:var(--space-sm)]">
+      <legend
+        className="text-[length:var(--text-label)] font-semibold"
+        style={{
+          color: "var(--color-landing-text)",
+          lineHeight: "var(--text-label--line-height)",
+        }}
+      >
+        Variant
+      </legend>
+      <div className="flex gap-[length:var(--space-md)]">
+        {VARIANTS.map(({ value, label }) => (
+          <label
+            key={value}
+            className="flex items-center gap-[length:var(--space-xs)] text-[length:var(--text-body)]"
+            style={{ color: "var(--color-landing-text)" }}
+          >
+            <input type="radio" name="config" value={value} defaultChecked={value === "base"} />
+            {label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}

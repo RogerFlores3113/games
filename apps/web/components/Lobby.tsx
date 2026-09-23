@@ -47,9 +47,9 @@ export function Lobby({ view, onSetConfig, onStartGame, reconnecting = false }: 
   const shareUrl =
     typeof window !== "undefined" ? window.location.href : `https://games.rogerflores.dev/room/${view.code}`;
   const slots = lobbySlots(view.seats, view.limits.max);
-  // D-11/MGR-03: per-game lookup, not an `isHanabi`/gameId conditional. A
-  // game with no registered entry (the D-10 toy game, Expedition today)
-  // renders no settings section at all.
+  // D-11/MGR-03: per-game lookup, not a per-game-name conditional. A game
+  // with no registered entry (the D-10 toy game, Expedition today) renders
+  // no settings section at all.
   const Settings = LOBBY_SETTINGS[view.gameId];
 
   return (

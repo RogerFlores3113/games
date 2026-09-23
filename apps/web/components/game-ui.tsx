@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import type { GameId, RoomView } from "@games/schema";
 import { HanabiBoard, type HanabiActionRequest } from "./hanabi/HanabiBoard";
 import { HanabiLobbySettings } from "./hanabi/HanabiLobbySettings";
+import { HanabiCreateSettings } from "./hanabi/HanabiCreateSettings";
 
 /**
  * D-11: the ONLY web module permitted to name a specific game's UI
@@ -36,6 +37,22 @@ export interface LobbySettingsProps {
 // renders no settings section at all rather than an empty one.
 export const LOBBY_SETTINGS: Readonly<Partial<Record<GameId, ComponentType<LobbySettingsProps>>>> = {
   hanabi: HanabiLobbySettings,
+};
+
+// D-12: the landing page's game picker options. Client-side only —
+// Expedition is NOT a registered GameId until Phase 11, so this list
+// (unlike BOARD_COMPONENTS/LOBBY_SETTINGS) is not keyed by GameId and is not
+// exhaustive over it; it is the one place allowed to name a not-yet-real
+// game for the "coming soon" disabled option.
+export const LANDING_GAME_OPTIONS: readonly { value: string; label: string; disabled: boolean }[] = [
+  { value: "hanabi", label: "Hanabi", disabled: false },
+  { value: "expedition", label: "Expedition - coming soon", disabled: true },
+];
+
+// Partial: a game with no create-time settings (the test-only toy game,
+// Expedition today) renders no fieldset at all, not an empty one.
+export const LANDING_SETTINGS: Readonly<Partial<Record<GameId, ComponentType>>> = {
+  hanabi: HanabiCreateSettings,
 };
 
 export type { HanabiActionRequest };

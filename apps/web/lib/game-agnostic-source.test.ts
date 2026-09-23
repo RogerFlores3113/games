@@ -93,6 +93,12 @@ function stripComments(source: string): string {
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const SCAN_DIRS = ["app/room", "components", "lib"];
+// D-12/D-17 (plan 08-09): the landing page's two files, scanned for the same
+// gameId-branching/isHanabi bans as the room-page files above, plus a
+// landing-specific ban on `useHydrated` (the D-17 hydration gate this plan
+// removes) and a quoted "hanabi" literal (the per-game lookup must never
+// hardcode which game it's rendering).
+const LANDING_FILES = ["app/page.tsx", "app/LandingForm.tsx"];
 
 function listFiles(dir: string): string[] {
   const entries = readdirSync(dir);
@@ -135,5 +141,16 @@ describe("game-agnostic-source (D-11)", () => {
     expect(code).not.toMatch(/\bMIN_PLAYERS\b/);
     expect(code).not.toMatch(/\bMAX_PLAYERS\b/);
     expect(code).not.toContain("variant-picker");
+  });
+
+  it("the landing page (page.tsx, LandingForm.tsx) has no isHanabi, gameId branching, useHydrated, or quoted \"hanabi\" literal", () => {
+    for (const file of LANDING_FILES) {
+      const full = path.join(ROOT, file);
+      const code = stripComments(readFileSync(full, "utf-8"));
+      expect(code, `${file} matches gameId branching`).not.toMatch(GAME_ID_BRANCH);
+      expect(code, `${file} contains isHanabi`).not.toMatch(/\bisHanabi\b/);
+      expect(code, `${file} contains useHydrated`).not.toMatch(/\buseHydrated\b/);
+      expect(code, `${file} contains a quoted "hanabi" literal`).not.toMatch(/["']hanabi["']/);
+    }
   });
 });
