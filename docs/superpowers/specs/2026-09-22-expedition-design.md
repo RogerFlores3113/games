@@ -195,6 +195,11 @@ generic; display names carry the theme, so a re-theme never touches rules code.
 
 ### 5.3 Boss twists
 
+**Provisional.** Owner review, 2026-09-22: "you're still very tied to the crew bosses
+- but they'll do for now." These four ship as placeholders to get the boss system
+working. More original, jungle-native twists are expected to replace them. Each is one
+catalogue entry (§6.1), so replacing them touches no core code.
+
 | Twist (display) | id | Effect |
 |---|---|---|
 | Monsoon | `radio-silence` | No Whispers this camp |
@@ -421,6 +426,7 @@ clicks through it.
 | Economy | Bars are capacity (equipment slots), +1 per camp; equip freely between camps |
 | Kit | Gear sizes in bars; once per camp each |
 | Ramp | Ramp plus boss camps |
+| Boss twists | The four v1 twists are provisional placeholders, too close to The Crew; to be replaced with original ones later |
 | Players | 3–5, removing 2s to even hands |
 | Round rules | Whisper between tricks only; objectives picked before whispering; a led Joker forces the other |
 | Run | Failed camp is replayed; capacity = camp number; loadouts public |
