@@ -14,8 +14,9 @@
  * of the suffix is that two voice-call participants can tell their seats
  * apart on screen, not that names get normalized.
  *
- * The probe is bounded: `MAX_PLAYERS` (5) means at most a handful of
- * iterations, so a simple linear search from 2 upward provably terminates.
+ * The probe is bounded: the room's game seat limit (at most 5 for Hanabi)
+ * means at most a handful of iterations, so a simple linear search from 2
+ * upward provably terminates.
  */
 export function deriveDisplayLabel(
   requestedName: string,

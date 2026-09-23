@@ -313,6 +313,20 @@ describe("HIDE-02/HIDE-03/D-06 structural chokepoint audit (D-09)", () => {
     ]);
   });
 
+  it("A9-sibling (D-08/D-09): resolveGame is defined only in game-registration.ts, and activeGame appears in no non-test worker file", () => {
+    const defHits = findFilesWithMatch(/export function resolveGame\(/g);
+    expect(
+      defHits,
+      `expected exactly 1 \`export function resolveGame(\` definition, in game-registration.ts, found in: ${JSON.stringify(defHits)}`,
+    ).toEqual([{ file: "game-registration.ts", count: 1 }]);
+
+    const activeGameHits = findFilesWithMatch(/\bactiveGame\b/g);
+    expect(
+      activeGameHits,
+      `expected zero activeGame occurrences (replaced by the registry), found in: ${JSON.stringify(activeGameHits)}`,
+    ).toEqual([]);
+  });
+
   // D-01/D-03: "confined to one file" (A9 above) and "appears nowhere" (this
   // test) are different claims — silently relaxing A9 into this shape would
   // leave a test that passes vacuously against a deleted name while proving

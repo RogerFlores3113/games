@@ -11,7 +11,8 @@
 // frame with `detail: "view_unavailable"` — never a `state`/`joined` frame.
 
 import type { RoomState, RoomView, ServerMessage } from "@games/schema";
-import { activeGame } from "./game-registration";
+import { DEFAULT_GAME_ID, GAME_REGISTRY, resolveGame } from "./game-registration";
+import type { GameRegistry } from "./game-registration";
 import { toSeatView } from "./room-state";
 
 declare const brand: unique symbol;
@@ -43,12 +44,25 @@ export type OutboundFrame =
  * see. On failure (D-07), logs only `seatId` and each issue's `code`/`path`
  * — never the view, the game, issue messages, or received values — and
  * returns `null`. */
-export function validateGameView(view: RoomView): ProjectedRoomView | null {
+export function validateGameView(view: RoomView, games: GameRegistry = GAME_REGISTRY): ProjectedRoomView | null {
   if (view.game === null) {
     return view as ProjectedRoomView;
   }
 
-  const result = activeGame.viewSchema.safeParse(view.game);
+  // Interim key (D-08): `RoomView` has no `gameId` field until plan 08-04;
+  // plan 08-04 changes this single lookup to `view.gameId`. Resolved FIRST —
+  // an unresolvable entry (itself a defense-in-depth impossibility while
+  // `GAME_REGISTRY` is production-frozen to Hanabi only) fails closed exactly
+  // like a schema mismatch, via the same redacted log and `null` return.
+  const entry = resolveGame(DEFAULT_GAME_ID, games);
+  if (entry === undefined) {
+    console.error("HIDE-03: projected game view failed — no registry entry for game id", {
+      seatId: view.youSeatId,
+    });
+    return null;
+  }
+
+  const result = entry.viewSchema.safeParse(view.game);
   if (result.success) {
     return view as ProjectedRoomView;
   }
@@ -63,6 +77,6 @@ export function validateGameView(view: RoomView): ProjectedRoomView | null {
 /** The ONE call site of `toSeatView` in the worker once Plan 04 lands.
  * Projects `room` for `seatId` and validates the result, returning `null`
  * on any schema failure (D-07 fail-closed). */
-export function projectSeatView(room: RoomState, seatId: string): ProjectedRoomView | null {
-  return validateGameView(toSeatView(room, seatId));
+export function projectSeatView(room: RoomState, seatId: string, games: GameRegistry = GAME_REGISTRY): ProjectedRoomView | null {
+  return validateGameView(toSeatView(room, seatId, games), games);
 }

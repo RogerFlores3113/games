@@ -10,9 +10,8 @@
 // `applyAction`, `toPlayerView`, `checkGameEnd`) — it never reaches into
 // `state.game`'s fields directly.
 
-import { activeGame } from "./game-registration";
-import type { ActiveGameState } from "./game-registration";
-import { MAX_PLAYERS, MIN_PLAYERS } from "@games/schema";
+import { DEFAULT_GAME_ID, GAME_REGISTRY, resolveGame } from "./game-registration";
+import type { GameRegistry, GameRegistryEntry } from "./game-registration";
 import type {
   GameErrorDetail,
   PublicSeat,
@@ -26,13 +25,25 @@ import type {
 import { deriveDisplayLabel } from "./seat-naming";
 
 // ---------------------------------------------------------------------------
-// D-02: the active game adapter, reached solely through the single
-// registration point (./game-registration). Module-level constant, not
-// threaded as a parameter through every function below — Phase 4 swaps
-// game-registration.ts's two imports for Hanabi, and that is the whole diff.
+// D-08: every function below that needs a game resolves it through this one
+// helper, reached solely through the single registration point
+// (./game-registration). `games` is an injectable, defaulted parameter (the
+// dependency-injection seam plan 08-07's test-only game uses) — production
+// callers never pass it explicitly and always get `GAME_REGISTRY`.
+//
+// `RoomState` has no `gameId` field until plan 08-05, so the interim lookup
+// key is `DEFAULT_GAME_ID`; `state` is threaded through now so that re-key
+// (to `state.gameId`) is a one-line change to this helper alone.
 // ---------------------------------------------------------------------------
 
-const adapter = activeGame.adapter;
+function roomGame(state: RoomState, games: GameRegistry): GameRegistryEntry {
+  void state;
+  const entry = resolveGame(DEFAULT_GAME_ID, games);
+  if (entry === undefined) {
+    throw new Error(`Unknown game id: ${DEFAULT_GAME_ID}`);
+  }
+  return entry;
+}
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -70,14 +81,19 @@ export function createEmptyRoom(
   code: RoomState["code"],
   variant: Variant,
   now: number,
+  games: GameRegistry = GAME_REGISTRY,
 ): RoomState {
+  const entry = resolveGame(DEFAULT_GAME_ID, games);
+  if (entry === undefined) {
+    throw new Error(`Unknown game id: ${DEFAULT_GAME_ID}`);
+  }
   return {
     code,
     variant,
     status: "lobby",
     hostSeatId: null,
     seats: [],
-    adapterId: adapter.id,
+    adapterId: entry.adapter.id,
     game: null,
     createdAt: now,
     lastActivityAt: now,
@@ -96,11 +112,11 @@ export function createEmptyRoom(
  *    replay of that join (the socket dropped before the `joined` reply
  *    delivered the token) and reclaims that seat, returning its token.
  * 3. A new join into a non-lobby room is refused `in_progress` (D-14).
- * 4. A new join at `MAX_PLAYERS` is refused `full` (D-06).
+ * 4. A new join at the room's game seat limit is refused `full` (D-06).
  * 5. Otherwise the seat is appended in join order (D-12); the first seat
  *    ever appended becomes host (D-03).
  */
-export function joinRoom(state: RoomState, input: JoinInput): JoinResult {
+export function joinRoom(state: RoomState, input: JoinInput, games: GameRegistry = GAME_REGISTRY): JoinResult {
   const byToken =
     input.seatToken !== undefined ? state.seats.find((seat) => seat.seatToken === input.seatToken) : undefined;
   const byJoinId =
@@ -132,7 +148,7 @@ export function joinRoom(state: RoomState, input: JoinInput): JoinResult {
     return { ok: false, reason: "in_progress" };
   }
 
-  if (state.seats.length >= MAX_PLAYERS) {
+  if (state.seats.length >= roomGame(state, games).limits.max) {
     return { ok: false, reason: "full" };
   }
 
@@ -354,19 +370,21 @@ export function startGame(
   actorSeatId: string,
   now: number,
   seed: string,
+  games: GameRegistry = GAME_REGISTRY,
 ): RoomResult {
   if (actorSeatId !== state.hostSeatId) {
     return { ok: false, reason: "not_host" };
   }
+  const entry = roomGame(state, games);
   if (
     state.status !== "lobby" ||
-    state.seats.length < MIN_PLAYERS ||
-    state.seats.length > MAX_PLAYERS
+    state.seats.length < entry.limits.min ||
+    state.seats.length > entry.limits.max
   ) {
     return { ok: false, reason: "bad_request" };
   }
 
-  const game = adapter.createInitialState({
+  const game = entry.adapter.createInitialState({
     seatIds: state.seats.map((seat) => seat.seatId),
     config: state.variant,
     seed,
@@ -399,6 +417,7 @@ export function applyGameAction(
   actionId: string,
   request: unknown,
   now: number,
+  games: GameRegistry = GAME_REGISTRY,
 ): RoomResult {
   // WR-01: the dedup check runs BEFORE the status gate. The action that ENDS
   // the game flips `status` to "ended"; a retry of that same `actionId` after
@@ -412,13 +431,13 @@ export function applyGameAction(
     return { ok: false, reason: "bad_request" };
   }
 
-  const gameState = state.game as ActiveGameState;
-  const result = adapter.applyAction(gameState, actorSeatId, request);
+  const entry = roomGame(state, games);
+  const result = entry.adapter.applyAction(state.game, actorSeatId, request);
   if (!result.ok) {
-    return { ok: false, reason: "bad_request", gameError: activeGame.mapError(result.error) };
+    return { ok: false, reason: "bad_request", gameError: entry.mapError(result.error) };
   }
 
-  const ended = adapter.checkGameEnd(result.state);
+  const ended = entry.adapter.checkGameEnd(result.state);
 
   const seats = state.seats.map((seat) =>
     seat.seatId === actorSeatId ? { ...seat, lastAppliedActionId: actionId } : seat,
@@ -445,7 +464,7 @@ export function applyGameAction(
 // introduced anywhere else in this codebase.
 // ---------------------------------------------------------------------------
 
-export function toSeatView(state: RoomState, seatId: string): RoomView {
+export function toSeatView(state: RoomState, seatId: string, games: GameRegistry = GAME_REGISTRY): RoomView {
   const seats: PublicSeat[] = state.seats.map((seat) => ({
     seatId: seat.seatId,
     displayLabel: seat.displayLabel,
@@ -460,6 +479,6 @@ export function toSeatView(state: RoomState, seatId: string): RoomView {
     hostSeatId: state.hostSeatId,
     youSeatId: seatId,
     seats,
-    game: state.game === null ? null : adapter.toPlayerView(state.game as ActiveGameState, seatId),
+    game: state.game === null ? null : roomGame(state, games).adapter.toPlayerView(state.game, seatId),
   };
 }

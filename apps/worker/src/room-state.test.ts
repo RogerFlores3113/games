@@ -4,7 +4,7 @@ import { IDLE_GC_LOBBY_MS, MAX_PLAYERS, RoomStateSchema } from "@games/schema";
 import type { HanabiAction, HanabiView } from "@games/rules";
 import { RANKS } from "@games/rules";
 import { computeRoomTimers } from "./scheduler";
-import { activeGame } from "./game-registration";
+import { GAME_REGISTRY } from "./game-registration";
 import type { ActiveGameState } from "./game-registration";
 import {
   applyGameAction,
@@ -622,8 +622,8 @@ describe("D-02 / FDN-01: game actions are delegated to the registered adapter on
     expect(createEmptyRoom(ROOM_CODE, "base", 0).adapterId).toBe("hanabi");
   });
 
-  it("D-06: activeGame.adapter.id matches the registered game view schema's game id", () => {
-    expect(activeGame.adapter.id).toBe(activeGame.gameId);
+  it("D-08: GAME_REGISTRY.hanabi.adapter.id matches the registered game view schema's game id", () => {
+    expect(GAME_REGISTRY.hanabi.adapter.id).toBe(GAME_REGISTRY.hanabi.gameId);
   });
 });
 
