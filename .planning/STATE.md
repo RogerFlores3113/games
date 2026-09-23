@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: Expedition
 status: executing
 stopped_at: Completed 08-04-PLAN.md
-last_updated: "2026-09-23T08:43:09.169Z"
+last_updated: "2026-09-23T08:53:09.286Z"
 last_activity: 2026-09-23
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 10
-  completed_plans: 6
+  completed_plans: 7
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 8 (Multi-Game Rooms) — EXECUTING
-Plan: 7 of 10
+Plan: 8 of 10
 Status: Ready to execute
 Last activity: 2026-09-23
 
@@ -151,6 +151,7 @@ Last activity: 2026-09-23
 | Phase 08 P04 | 40min | 2 tasks | 16 files |
 | Phase 08 P05 | 45min | 2 tasks | 10 files |
 | Phase 08 P06 | 45min | 2 tasks | 10 files |
+| Phase 08 P07 | 25min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -343,6 +344,8 @@ Recent decisions affecting current work:
 - [Phase 08-05]: createEmptyRoom's variant parameter removed entirely (not defaulted) — every call site already passed a hardcoded value
 - [Phase 08]: 08-06: joinRoom resolves input.gameId only while !state.gameLocked, sharing one resolved registry entry between the seat-limit check and the state write
 - [Phase 08]: 08-06: reclaim branches (seatToken/joinId match) structurally never read input.gameId, matching D-01
+- [Phase 08]: 08-07: D-10 proved with a test-only toy GameAdapter (apps/worker/test/toy-game.ts, 3-4 seat limits) run through the SAME room-state.ts/seat-projection.ts pure functions via the injectable `games` parameter — no new registration mechanism/env-var gate was needed, the 08-03..08-06 dependency-injection seam was already sufficient
+- [Phase 08]: 08-07: source-structure.test.ts gained D-11 assertions banning `gameId === "literal"` branching anywhere (including game-registration.ts) and confining the "hanabi" string literal to game-registration.ts
 
 ### Pending Todos
 
@@ -379,7 +382,7 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-23T08:40:39.402Z
+Last session: 2026-09-23T08:53:09.279Z
 Stopped at: Completed 08-04-PLAN.md
 Resume file: None
 
