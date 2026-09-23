@@ -12,6 +12,7 @@ import { createEmptyRoom, joinRoom, startGame, toSeatView } from "./room-state";
 import type { JoinInput } from "./room-state";
 import { mintSeatToken } from "./seat-identity";
 import { projectSeatView, validateGameView } from "./seat-projection";
+import type { GameRegistry } from "./game-registration";
 import type { RoomCode } from "@games/schema";
 
 const ROOM_CODE = "ABCDEF" as RoomCode;
@@ -346,5 +347,34 @@ describe("validateGameView: MGR-05 per-game dispatch via view.gameId", () => {
 
     const projected = projectSeatView(hostJoin.state, hostJoin.seatId);
     expect(projected).not.toBeNull();
+  });
+});
+
+describe("projectSeatView: fails closed when the room's gameId has no registry entry (WR-03)", () => {
+  const EMPTY_REGISTRY: GameRegistry = {};
+
+  it("returns null (never throws) for a lobby room, logging only the seatId", () => {
+    const minter = makeMinter();
+    const hostJoin = join(createEmptyRoom(ROOM_CODE, 0), "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+
+    expect(() => projectSeatView(hostJoin.state, hostJoin.seatId, EMPTY_REGISTRY)).not.toThrow();
+    expect(projectSeatView(hostJoin.state, hostJoin.seatId, EMPTY_REGISTRY)).toBeNull();
+    const call = errorSpy.mock.calls[0]!;
+    expect(String(call[0])).toContain("HIDE-03");
+    expect(call[1]).toEqual({ seatId: hostJoin.seatId });
+  });
+
+  it("returns null (never throws) for a started room", () => {
+    const minter = makeMinter();
+    const hostJoin = join(createEmptyRoom(ROOM_CODE, 0), "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+    const guestJoin = join(hostJoin.state, "Guest", 2, minter);
+    if (!guestJoin.ok) throw new Error("unreachable");
+    const started = startGame(guestJoin.state, hostJoin.seatId, 3, SEED);
+    if (!started.ok) throw new Error("unreachable");
+
+    expect(projectSeatView(started.state, guestJoin.seatId, EMPTY_REGISTRY)).toBeNull();
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(SEED);
   });
 });

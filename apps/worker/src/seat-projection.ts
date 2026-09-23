@@ -74,7 +74,17 @@ export function validateGameView(view: RoomView, games: GameRegistry = GAME_REGI
 
 /** The ONE call site of `toSeatView` in the worker once Plan 04 lands.
  * Projects `room` for `seatId` and validates the result, returning `null`
- * on any schema failure (D-07 fail-closed). */
+ * on any schema failure (D-07 fail-closed).
+ *
+ * The registry entry is resolved BEFORE `toSeatView`, which throws on an
+ * unknown gameId: without this check an unresolvable room game would throw
+ * out of the projection (aborting a whole `#pushState` fan-out) instead of
+ * failing closed to `view_unavailable` like any other projection failure.
+ * This also covers the lobby, where `validateGameView` returns early. */
 export function projectSeatView(room: RoomState, seatId: string, games: GameRegistry = GAME_REGISTRY): ProjectedRoomView | null {
+  if (resolveGame(room.gameId, games) === undefined) {
+    console.error("HIDE-03: projected game view failed — no registry entry for room game id", { seatId });
+    return null;
+  }
   return validateGameView(toSeatView(room, seatId, games), games);
 }
