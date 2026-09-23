@@ -72,7 +72,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 08-05-PLAN.md — Persisted room carries gameId/config/gameLocked; setConfig; schema v5 reset (D-03, D-04, D-13, MGR-06)
+- [x] 08-05-PLAN.md — Persisted room carries gameId/config/gameLocked; setConfig; schema v5 reset (D-03, D-04, D-13, MGR-06)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -210,7 +210,7 @@ Plans:
 | 6.1. Table Polish | v1.0 | 15/15 | Complete | 2026-09-17 |
 | 6.2. Board Redesign | v1.0 | 20/20 | Complete | 2026-09-18 |
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
-| 8. Multi-Game Rooms | v2.0 | 4/10 | In Progress|  |
+| 8. Multi-Game Rooms | v2.0 | 5/10 | In Progress|  |
 | 9. Expedition Rules Core | v2.0 | 0/? | Not started | - |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 0/? | Not started | - |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
