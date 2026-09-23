@@ -20,7 +20,7 @@ import type { ActiveGameState } from "./game-registration";
 const ROOM_CODE = "ABCDEF" as RoomCode;
 
 function buildStartedRoom(seatCount: number, seed: string) {
-  let state = createEmptyRoom(ROOM_CODE, "base", 0);
+  let state = createEmptyRoom(ROOM_CODE, 0);
   const seatIds: string[] = [];
   let now = 1;
   for (let i = 0; i < seatCount; i++) {

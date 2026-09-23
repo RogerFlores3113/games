@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RoomCode, RoomState } from "@games/schema";
 import { ROOM_SCHEMA_VERSION } from "@games/schema";
+import { hanabiGame } from "@games/rules";
 import { loadRoom, loadTimers, saveRoom, STORAGE_KEYS } from "./persistence";
 import type { RoomStorage } from "./persistence";
 import type { TimerEvent } from "./scheduler";
@@ -10,7 +11,9 @@ const ROOM_CODE = "ABCDEF" as RoomCode;
 function fallbackRoom(): RoomState {
   return {
     code: ROOM_CODE,
-    variant: "base",
+    gameId: "hanabi",
+    config: "base",
+    gameLocked: false,
     status: "lobby",
     hostSeatId: null,
     seats: [],
@@ -190,6 +193,65 @@ describe("Phase 7 plan 10 stack-shape swap (owner gap closure, UAT gap 3): pre-c
 
     expect(result.wasReset).toBe(true);
     expect(getCalls).not.toContain(STORAGE_KEYS.room);
+  });
+});
+
+describe("Phase 8 multi-game envelope (D-13): pre-change v4 Hanabi rooms reset", () => {
+  it("a schemaVersion 4 room with a real v4 Hanabi blob (top-level variant, no gameId/config/gameLocked) resets to an empty lobby without reading the room blob", async () => {
+    expect(ROOM_SCHEMA_VERSION).toBe(5);
+    expect(ROOM_SCHEMA_VERSION).toBeGreaterThan(4);
+
+    const { storage, getCalls } = makeFakeStorage();
+    await storage.put(STORAGE_KEYS.schemaVersion, 4);
+    await storage.put(STORAGE_KEYS.room, {
+      code: ROOM_CODE,
+      // Pre-D-04 shape: top-level `variant`, no `gameId`/`config`/`gameLocked`.
+      variant: "rainbow",
+      status: "in_progress",
+      hostSeatId: "s1",
+      seats: [
+        {
+          seatId: "s1",
+          seatToken: "a".repeat(24),
+          displayName: "Roger",
+          displayLabel: "Roger",
+          connected: true,
+          joinedAt: 0,
+          disconnectedAt: null,
+        },
+        {
+          seatId: "s2",
+          seatToken: "b".repeat(24),
+          displayName: "Bianca",
+          displayLabel: "Bianca",
+          connected: true,
+          joinedAt: 1,
+          disconnectedAt: null,
+        },
+      ],
+      adapterId: "hanabi",
+      game: hanabiGame.createInitialState({ seatIds: ["s1", "s2"], config: "rainbow", seed: "d13" }),
+      createdAt: 0,
+      lastActivityAt: 0,
+    });
+    getCalls.length = 0; // reset instrumentation after seeding
+
+    const result = await loadRoom(storage, fallbackRoom);
+
+    expect(result.wasReset).toBe(true);
+    // D-13/Pitfall 1: proves the VERSION-CHECK path fired (the old blob was
+    // never even read), not merely that the room ended up reset — a corrupt-
+    // blob fallback would also produce wasReset: true but WOULD read the key.
+    expect(getCalls).not.toContain(STORAGE_KEYS.room);
+    expect(result.room).toEqual(fallbackRoom());
+    expect(result.room.status).toBe("lobby");
+    expect(result.room.seats).toEqual([]);
+    expect(result.room.gameId).toBe("hanabi");
+    expect(result.room.gameLocked).toBe(false);
+
+    // The reset is persisted on the next save with the CURRENT version.
+    await saveRoom(storage, result.room, []);
+    expect(await storage.get(STORAGE_KEYS.schemaVersion)).toBe(ROOM_SCHEMA_VERSION);
   });
 });
 

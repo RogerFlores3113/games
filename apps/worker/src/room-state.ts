@@ -20,7 +20,6 @@ import type {
   RoomView,
   Seat,
   SeatToken,
-  Variant,
 } from "@games/schema";
 import { deriveDisplayLabel } from "./seat-naming";
 
@@ -31,16 +30,15 @@ import { deriveDisplayLabel } from "./seat-naming";
 // dependency-injection seam plan 08-07's test-only game uses) — production
 // callers never pass it explicitly and always get `GAME_REGISTRY`.
 //
-// `RoomState` has no `gameId` field until plan 08-05, so the interim lookup
-// key is `DEFAULT_GAME_ID`; `state` is threaded through now so that re-key
-// (to `state.gameId`) is a one-line change to this helper alone.
+// D-04/D-08: keyed by the room's own `state.gameId` (no longer the interim
+// `DEFAULT_GAME_ID` constant plan 08-03/08-04 used before `RoomState` had
+// this field).
 // ---------------------------------------------------------------------------
 
 function roomGame(state: RoomState, games: GameRegistry): GameRegistryEntry {
-  void state;
-  const entry = resolveGame(DEFAULT_GAME_ID, games);
+  const entry = resolveGame(state.gameId, games);
   if (entry === undefined) {
-    throw new Error(`Unknown game id: ${DEFAULT_GAME_ID}`);
+    throw new Error(`Unknown game id: ${state.gameId}`);
   }
   return entry;
 }
@@ -79,7 +77,6 @@ export type JoinInput = {
 
 export function createEmptyRoom(
   code: RoomState["code"],
-  variant: Variant,
   now: number,
   games: GameRegistry = GAME_REGISTRY,
 ): RoomState {
@@ -89,7 +86,11 @@ export function createEmptyRoom(
   }
   return {
     code,
-    variant,
+    // D-03: an empty room nobody has joined yet defaults to Hanabi and its
+    // default config; D-01: gameLocked flips true on the room's first join.
+    gameId: DEFAULT_GAME_ID,
+    config: entry.defaultConfig,
+    gameLocked: false,
     status: "lobby",
     hostSeatId: null,
     seats: [],
@@ -174,6 +175,9 @@ export function joinRoom(state: RoomState, input: JoinInput, games: GameRegistry
     ...state,
     seats: [...state.seats, newSeat],
     hostSeatId: state.hostSeatId ?? seatId,
+    // D-01: first-write-wins, mirroring hostSeatId above — once locked, a
+    // later join's requested game can never change the room's game.
+    gameLocked: true,
     lastActivityAt: input.now,
   };
 
@@ -249,13 +253,17 @@ export function transferHost(state: RoomState, now: number): RoomState {
   return { ...state, hostSeatId: nextHost.seatId, lastActivityAt: now };
 }
 
-/** ROOM-05, D-13: the host may change the variant at any point in the
- * lobby; it is refused (not merely hidden) once the game has started. */
-export function setVariant(
+/** ROOM-05, D-13, D-04/MGR-03: the host may change the room's game config at
+ * any point in the lobby; it is refused (not merely hidden) once the game
+ * has started. Validated fail-closed against the room's OWN game's
+ * `configSchema` before any mutation — a malformed or wrongly-shaped config
+ * never reaches `RoomState` (T-8-02). */
+export function setConfig(
   state: RoomState,
   actorSeatId: string,
-  variant: Variant,
+  config: unknown,
   now: number,
+  games: GameRegistry = GAME_REGISTRY,
 ): RoomResult {
   if (actorSeatId !== state.hostSeatId) {
     return { ok: false, reason: "not_host" };
@@ -263,7 +271,12 @@ export function setVariant(
   if (state.status !== "lobby") {
     return { ok: false, reason: "bad_request" };
   }
-  return { ok: true, state: { ...state, variant, lastActivityAt: now } };
+  const entry = roomGame(state, games);
+  const parsed = entry.configSchema.safeParse(config);
+  if (!parsed.success) {
+    return { ok: false, reason: "bad_request" };
+  }
+  return { ok: true, state: { ...state, config: parsed.data, lastActivityAt: now } };
 }
 
 /** WR-02 / D-02: idle GC measures idleness, and a room with live connected
@@ -384,9 +397,16 @@ export function startGame(
     return { ok: false, reason: "bad_request" };
   }
 
+  // Defence in depth (T-8-02): re-validate the persisted config against the
+  // room's OWN game's configSchema before handing it to the adapter.
+  const parsedConfig = entry.configSchema.safeParse(state.config);
+  if (!parsedConfig.success) {
+    return { ok: false, reason: "bad_request" };
+  }
+
   const game = entry.adapter.createInitialState({
     seatIds: state.seats.map((seat) => seat.seatId),
-    config: state.variant,
+    config: parsedConfig.data,
     seed,
   });
 
@@ -476,13 +496,9 @@ export function toSeatView(state: RoomState, seatId: string, games: GameRegistry
 
   return {
     code: state.code,
-    // D-04: interim — `RoomState` gains its own `gameId` field in plan
-    // 08-05; until then this is always `DEFAULT_GAME_ID` via `roomGame`.
-    gameId: DEFAULT_GAME_ID,
+    gameId: state.gameId,
     gameDisplayName: entry.displayName,
-    // D-04: interim — plan 08-05 switches this to `state.config`, once
-    // `RoomState`'s top-level `variant` field is itself replaced.
-    config: state.variant,
+    config: state.config,
     limits: { min: entry.limits.min, max: entry.limits.max },
     status: state.status,
     hostSeatId: state.hostSeatId,

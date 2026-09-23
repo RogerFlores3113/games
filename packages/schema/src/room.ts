@@ -118,7 +118,20 @@ export type Seat = z.infer<typeof SeatSchema>;
 /** The PERSISTED room record. */
 export const RoomStateSchema = z.object({
   code: RoomCodeSchema,
-  variant: VariantSchema,
+  /** D-09: which game this room plays. Set once, at the room's very first
+   * join (see `gameLocked` below); an empty room defaults to `"hanabi"`
+   * (D-03) until then. */
+  gameId: GameIdSchema,
+  /** Opaque to this package — the room's game config (e.g. Hanabi's
+   * `Variant`), validated per-game by the worker registry's `configSchema`
+   * (D-04). Mirrors the existing `game: z.unknown()` convention below, where
+   * the shape is intentionally unchecked at this layer. */
+  config: z.unknown(),
+  /** D-01: false until the room's first ever join, true from then on
+   * (first-write-wins, like `hostSeatId`). Once true, a later join's
+   * `gameId` is ignored — the room's game can never change after its first
+   * seat claims it. Server-only bookkeeping; never serialized to a client. */
+  gameLocked: z.boolean(),
   status: RoomStatusSchema,
   /** Null only in the instant between `createEmptyRoom` and the first seat
    * joining (D-03: in practice the creator joins in the same request, so a

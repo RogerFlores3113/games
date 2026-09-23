@@ -48,7 +48,7 @@ afterEach(() => {
 describe("projectSeatView: lobby room", () => {
   it("returns a non-null view whose game is null", () => {
     const minter = makeMinter();
-    const room = createEmptyRoom(ROOM_CODE, "base", 0);
+    const room = createEmptyRoom(ROOM_CODE, 0);
     const hostJoin = join(room, "Host", 1, minter);
     if (!hostJoin.ok) throw new Error("unreachable");
 
@@ -62,7 +62,7 @@ describe("projectSeatView: lobby room", () => {
 describe("projectSeatView: started room", () => {
   it("returns a non-null view for every seat, each hidden yourHand entry sorted keys [\"facts\",\"hidden\",\"id\"]", () => {
     const minter = makeMinter();
-    let state = createEmptyRoom(ROOM_CODE, "base", 0);
+    let state = createEmptyRoom(ROOM_CODE, 0);
     const hostJoin = join(state, "Host", 1, minter);
     if (!hostJoin.ok) throw new Error("unreachable");
     state = hostJoin.state;
@@ -96,7 +96,7 @@ describe("projectSeatView: started room", () => {
 describe("validateGameView: accepts a real clean projection", () => {
   it("returns non-null for a rebuilt real view with hidden yourHand entries { id, hidden: true, facts }", () => {
     const minter = makeMinter();
-    let state = createEmptyRoom(ROOM_CODE, "base", 0);
+    let state = createEmptyRoom(ROOM_CODE, 0);
     const hostJoin = join(state, "Host", 1, minter);
     if (!hostJoin.ok) throw new Error("unreachable");
     state = hostJoin.state;
@@ -335,7 +335,7 @@ describe("validateGameView: MGR-05 per-game dispatch via view.gameId", () => {
 
   it("still projects a valid Hanabi view via its own gameId", () => {
     const minter = makeMinter();
-    const room = createEmptyRoom(ROOM_CODE, "base", 0);
+    const room = createEmptyRoom(ROOM_CODE, 0);
     const hostJoin = join(room, "Host", 1, minter);
     if (!hostJoin.ok) throw new Error("unreachable");
 

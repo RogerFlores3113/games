@@ -51,7 +51,7 @@ import {
   releaseSeat,
   markConnected,
   transferHost,
-  setVariant,
+  setConfig,
   deferIdleGc,
   startGame,
   applyGameAction,
@@ -147,7 +147,7 @@ export class RoomDO extends Server<Env> {
     this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(HEARTBEAT_PING, HEARTBEAT_PONG));
 
     const { room, wasReset } = await loadRoom(this.ctx.storage, () =>
-      createEmptyRoom(this.name as RoomCode, "base", Date.now()),
+      createEmptyRoom(this.name as RoomCode, Date.now()),
     );
     this.room = room;
     this.#persisted = !wasReset;
@@ -199,7 +199,9 @@ export class RoomDO extends Server<Env> {
       }
 
       if (msg.type === "set_variant") {
-        const result = setVariant(room, actorSeatId, msg.variant, now);
+        // The wire frame stays `set_variant { variant }` in this plan (plan
+        // 08-06 replaces it); it now routes into the generalised `setConfig`.
+        const result = setConfig(room, actorSeatId, msg.variant, now);
         if (!result.ok) {
           this.#send(connection, { type: "error", code: result.reason });
           return;

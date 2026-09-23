@@ -32,7 +32,9 @@ function makeSeat(overrides: Partial<Seat>): Seat {
 function makeRoom(overrides: Partial<RoomState>): RoomState {
   return {
     code: ROOM_CODE,
-    variant: "base",
+    gameId: "hanabi",
+    config: "base",
+    gameLocked: false,
     status: "lobby",
     hostSeatId: null,
     seats: [],

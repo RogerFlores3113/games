@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RoomCode, RoomState, SeatToken } from "@games/schema";
-import { IDLE_GC_LOBBY_MS, MAX_PLAYERS, RoomStateSchema } from "@games/schema";
+import { IDLE_GC_LOBBY_MS, RoomStateSchema } from "@games/schema";
 import type { HanabiAction, HanabiView } from "@games/rules";
 import { RANKS } from "@games/rules";
 import { computeRoomTimers } from "./scheduler";
@@ -15,12 +15,14 @@ import {
   markConnected,
   releaseSeat,
   restartLobby,
-  setVariant,
+  setConfig,
   startGame,
   toSeatView,
   transferHost,
 } from "./room-state";
 import type { JoinInput } from "./room-state";
+
+const MAX_PLAYERS = GAME_REGISTRY.hanabi.limits.max;
 
 // ---------------------------------------------------------------------------
 // Deterministic fixture helpers
@@ -55,7 +57,7 @@ function join(
 }
 
 function freshRoom(now = 0): RoomState {
-  return createEmptyRoom(ROOM_CODE, "base", now);
+  return createEmptyRoom(ROOM_CODE, now);
 }
 
 /** Derives ONE legal Hanabi action for the active seat, in priority order:
@@ -225,16 +227,16 @@ describe("ROOM-05: variant lock", () => {
     if (!hostJoin.ok) throw new Error("unreachable");
     let state = hostJoin.state;
 
-    const r1 = setVariant(state, hostJoin.seatId, "rainbow", 2);
+    const r1 = setConfig(state, hostJoin.seatId, "rainbow", 2);
     expect(r1.ok).toBe(true);
     if (!r1.ok) throw new Error("unreachable");
-    expect(r1.state.variant).toBe("rainbow");
+    expect(r1.state.config).toBe("rainbow");
     state = r1.state;
 
-    const r2 = setVariant(state, hostJoin.seatId, "black", 3);
+    const r2 = setConfig(state, hostJoin.seatId, "black", 3);
     expect(r2.ok).toBe(true);
     if (!r2.ok) throw new Error("unreachable");
-    expect(r2.state.variant).toBe("black");
+    expect(r2.state.config).toBe("black");
   });
 
   it("WR-02: a variant change counts as lobby activity", () => {
@@ -242,7 +244,7 @@ describe("ROOM-05: variant lock", () => {
     const hostJoin = join(freshRoom(), "Host", 1, minter);
     if (!hostJoin.ok) throw new Error("unreachable");
 
-    const result = setVariant(hostJoin.state, hostJoin.seatId, "rainbow", 99);
+    const result = setConfig(hostJoin.state, hostJoin.seatId, "rainbow", 99);
     if (!result.ok) throw new Error("unreachable");
     expect(result.state.lastActivityAt).toBe(99);
   });
@@ -254,7 +256,7 @@ describe("ROOM-05: variant lock", () => {
     const guestJoin = join(hostJoin.state, "Guest", 2, minter);
     if (!guestJoin.ok) throw new Error("unreachable");
 
-    const result = setVariant(guestJoin.state, guestJoin.seatId, "rainbow", 3);
+    const result = setConfig(guestJoin.state, guestJoin.seatId, "rainbow", 3);
     expect(result).toEqual({ ok: false, reason: "not_host" });
   });
 
@@ -273,9 +275,9 @@ describe("ROOM-05: variant lock", () => {
     if (!started.ok) throw new Error("unreachable");
     state = started.state;
 
-    const attempt = setVariant(state, hostJoin.seatId, "black", 4);
+    const attempt = setConfig(state, hostJoin.seatId, "black", 4);
     expect(attempt).toEqual({ ok: false, reason: "bad_request" });
-    expect(state.variant).toBe("base");
+    expect(state.config).toBe("base");
   });
 });
 
@@ -619,7 +621,7 @@ describe("D-02 / FDN-01: game actions are delegated to the registered adapter on
   });
 
   it("D-02: createEmptyRoom registers the active adapter's id", () => {
-    expect(createEmptyRoom(ROOM_CODE, "base", 0).adapterId).toBe("hanabi");
+    expect(createEmptyRoom(ROOM_CODE, 0).adapterId).toBe("hanabi");
   });
 
   it("D-08: GAME_REGISTRY.hanabi.adapter.id matches the registered game view schema's game id", () => {
@@ -705,7 +707,7 @@ describe("purity: room-state functions never mutate their input", () => {
     expect(clone3).toEqual(structuredClone(baseState));
 
     const clone4 = structuredClone(baseState);
-    setVariant(clone4, hostJoin.seatId, "rainbow", 6);
+    setConfig(clone4, hostJoin.seatId, "rainbow", 6);
     expect(clone4).toEqual(structuredClone(baseState));
 
     const clone5 = structuredClone(baseState);
@@ -744,7 +746,7 @@ function startedThreeSeatRoom(seed: string, variant: "base" | "rainbow" | "black
   state = thirdJoin.state;
 
   if (variant !== "base") {
-    const variantResult = setVariant(state, hostJoin.seatId, variant, 3);
+    const variantResult = setConfig(state, hostJoin.seatId, variant, 3);
     if (!variantResult.ok) throw new Error("unreachable");
     state = variantResult.state;
   }

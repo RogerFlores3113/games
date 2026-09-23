@@ -3,6 +3,7 @@ import {
   GameIdSchema,
   PublicSeatSchema,
   RoomCodeSchema,
+  RoomStateSchema,
   RoomViewSchema,
   SeatTokenSchema,
   type RoomCode,
@@ -137,5 +138,54 @@ describe("RoomViewSchema (D-04, D-05, MGR-02)", () => {
   it("rejects gameId \"expedition\" (not production-registered)", () => {
     const view = { ...baseView(), gameId: "expedition" };
     expect(RoomViewSchema.safeParse(view).success).toBe(false);
+  });
+});
+
+describe("RoomStateSchema (D-04): gameId/config/gameLocked envelope", () => {
+  function baseState(): Record<string, unknown> {
+    return {
+      code: "ABCDEF",
+      gameId: "hanabi",
+      config: "base",
+      gameLocked: false,
+      status: "lobby",
+      hostSeatId: null,
+      seats: [],
+      adapterId: "hanabi",
+      game: null,
+      createdAt: 0,
+      lastActivityAt: 0,
+    };
+  }
+
+  it("accepts the new gameId/config/gameLocked envelope", () => {
+    expect(RoomStateSchema.safeParse(baseState()).success).toBe(true);
+  });
+
+  it("rejects a pre-D-04 (v4) shaped state carrying variant but no gameId/config/gameLocked", () => {
+    const state = {
+      code: "ABCDEF",
+      variant: "base",
+      status: "lobby",
+      hostSeatId: null,
+      seats: [],
+      adapterId: "hanabi",
+      game: null,
+      createdAt: 0,
+      lastActivityAt: 0,
+    };
+    expect(RoomStateSchema.safeParse(state).success).toBe(false);
+  });
+
+  it("rejects a state missing gameId", () => {
+    const state = baseState();
+    delete (state as Record<string, unknown>).gameId;
+    expect(RoomStateSchema.safeParse(state).success).toBe(false);
+  });
+
+  it("rejects a state missing gameLocked", () => {
+    const state = baseState();
+    delete (state as Record<string, unknown>).gameLocked;
+    expect(RoomStateSchema.safeParse(state).success).toBe(false);
   });
 });

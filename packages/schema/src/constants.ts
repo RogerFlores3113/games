@@ -25,8 +25,13 @@
  * `StackEntry` changed from a single ascending-progress number to
  * `{suit, playedRanks}`: a persisted pre-change game blob resets to an
  * empty lobby rather than re-entering the engine with a stack shape it no
- * longer understands. */
-export const ROOM_SCHEMA_VERSION = 4;
+ * longer understands.
+ *
+ * Bumped to 5 in Phase 8 when the top-level `variant` field was replaced by
+ * `gameId` + `config` (D-04): a persisted pre-change room resets to an empty
+ * lobby rather than being parsed against the new envelope (D-13; owner
+ * decision: reset on deploy, no migration). */
+export const ROOM_SCHEMA_VERSION = 5;
 
 /** D-01: 32 uppercase-safe characters — no `I`, `O`, `0`, `1` — because the
  * room code is read aloud over a voice call. Do not add lowercase. */
@@ -40,10 +45,6 @@ export const ROOM_CODE_LENGTH = 6;
  * deliberately not 6 characters — conflating the two is the RT-07
  * seat-hijack failure mode (see RESEARCH.md Security Domain). */
 export const SEAT_TOKEN_LENGTH = 24;
-
-/** ROOM-06, D-10 */
-export const MIN_PLAYERS = 2;
-export const MAX_PLAYERS = 5;
 
 /** Owner request (2026-09-18): every room — lobby, in-progress, or ended —
  * is garbage-collected 24 hours after its LAST ACTIVITY, never from
