@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-09-23T07:27:37.585Z"
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-09-23T07:37:47.452Z"
 last_activity: 2026-09-23
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 10
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 8 (Multi-Game Rooms) — EXECUTING
-Plan: 2 of 10
+Plan: 3 of 10
 Status: Ready to execute
 Last activity: 2026-09-23
 
@@ -146,6 +146,7 @@ Last activity: 2026-09-23
 | Phase 07 P11 | 65min | 2 tasks | 23 files |
 | Phase 07 P12 | 90min | 2 tasks | 8 files |
 | Phase 08 P01 | 25min | 2 tasks | 7 files |
+| Phase 08 P02 | 20min | 2 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -327,6 +328,9 @@ Recent decisions affecting current work:
 - [Phase ?]: TURN_SIGN_*/DISCARD_AREA_* are literal 1:1 swapped reservations (140x156 / 257x223), confirmed byte-identical to the live pre-swap render
 - [Phase ?]: discardTileSizeFor derives the discard tile size from the new area rather than hardcoding it, keeping layout-budget.ts the single source of truth for board-region sizes
 - [Phase 08]: MGR-07 closed: root tsconfig.json with project references; packages/schema and packages/rules need composite:true+noEmit:false, apps/web/apps/worker stay non-composite leaves with a references array
+- [Phase 08-02]: GameAdapter widened to GameAdapter<TState, TAction, TConfig, TEndResult, TError extends string> with no default type arguments (D-06), so a future registration must name a game's config/end-result/error types explicitly rather than silently reusing Hanabi's (Pitfall 17)
+- [Phase 08-02]: Per-game closed error enums (HanabiErrorCodeSchema) mirror AdapterError 1:1 by name and are re-exported through the existing games/<name> subpath rather than a new package export, alias or tsconfig path (D-07 prep)
+- [Phase 08-02]: packages/rules/src/hanabi/actions.ts's six AdapterResult<HanabiState> annotations widened to AdapterResult<HanabiState, AdapterError> as a Rule 3 blocking-issue fix once AdapterResult gained its TError parameter — not a file the plan listed, required for the widened generic to typecheck
 
 ### Pending Todos
 
