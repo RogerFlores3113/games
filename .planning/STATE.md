@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Phase 8 UI-SPEC approved
-last_updated: "2026-09-23T07:20:20.467Z"
-last_activity: 2026-09-23 -- Phase 8 planning complete
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-09-23T07:27:37.585Z"
+last_activity: 2026-09-23
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 10
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-22)
 
 **Core value:** A friend clicks a link and is playing within seconds — and the game does not break, stall, or lose their seat for the rest of the session.
-**Current focus:** v1.0 archived; next milestone is Expedition (spec: docs/superpowers/specs/2026-09-22-expedition-design.md)
+**Current focus:** Phase 8 — Multi-Game Rooms
 
 ## Current Position
 
-Phase: 8 - Multi-Game Rooms (next; roadmap ready, not yet planned)
-Plan: —
+Phase: 8 (Multi-Game Rooms) — EXECUTING
+Plan: 2 of 10
 Status: Ready to execute
-Last activity: 2026-09-23 -- Phase 8 planning complete
+Last activity: 2026-09-23
 
 ## Performance Metrics
 
@@ -145,6 +145,7 @@ Last activity: 2026-09-23 -- Phase 8 planning complete
 | Phase 07-variant-support-rainbow-black P10 | 70min | 2 tasks | 22 files |
 | Phase 07 P11 | 65min | 2 tasks | 23 files |
 | Phase 07 P12 | 90min | 2 tasks | 8 files |
+| Phase 08 P01 | 25min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -325,6 +326,7 @@ Recent decisions affecting current work:
 - [Phase ?]: hanabi-audio-cues stack-complete cue fires on completedSuits membership, not rank===5, so a Black stack's completing 1 triggers it correctly
 - [Phase ?]: TURN_SIGN_*/DISCARD_AREA_* are literal 1:1 swapped reservations (140x156 / 257x223), confirmed byte-identical to the live pre-swap render
 - [Phase ?]: discardTileSizeFor derives the discard tile size from the new area rather than hardcoding it, keeping layout-budget.ts the single source of truth for board-region sizes
+- [Phase 08]: MGR-07 closed: root tsconfig.json with project references; packages/schema and packages/rules need composite:true+noEmit:false, apps/web/apps/worker stay non-composite leaves with a references array
 
 ### Pending Todos
 
@@ -361,9 +363,9 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-23T06:46:17.993Z
-Stopped at: Phase 8 UI-SPEC approved
-Resume file: .planning/phases/08-multi-game-rooms/08-UI-SPEC.md
+Last session: 2026-09-23T07:27:37.577Z
+Stopped at: Completed 08-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 

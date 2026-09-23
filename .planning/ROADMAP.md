@@ -56,7 +56,7 @@ Phase artifacts: `.planning/milestones/v1.0-phases/`
 Plans:
 **Wave 1**
 
-- [ ] 08-01-PLAN.md — Root tsconfig with project references; `npm run typecheck` works (MGR-07)
+- [x] 08-01-PLAN.md — Root tsconfig with project references; `npm run typecheck` works (MGR-07)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -210,7 +210,7 @@ Plans:
 | 6.1. Table Polish | v1.0 | 15/15 | Complete | 2026-09-17 |
 | 6.2. Board Redesign | v1.0 | 20/20 | Complete | 2026-09-18 |
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
-| 8. Multi-Game Rooms | v2.0 | 0/? | Not started | - |
+| 8. Multi-Game Rooms | v2.0 | 1/10 | In Progress|  |
 | 9. Expedition Rules Core | v2.0 | 0/? | Not started | - |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 0/? | Not started | - |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |

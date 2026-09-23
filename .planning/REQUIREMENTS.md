@@ -14,7 +14,7 @@
 - [ ] **MGR-04**: Hanabi plays exactly as before. The full existing unit and e2e suites pass, with only fixture renames allowed as diffs
 - [ ] **MGR-05**: Every per-seat view is validated against its own game's view schema before it is sent
 - [ ] **MGR-06**: Deploying the multi-game change resets saved rooms to empty lobbies (a schema-version bump), and the deploy is timed for when no game is in progress
-- [ ] **MGR-07**: `npm run typecheck` works from the repo root, via a root `tsconfig.json` with project references (v1.0 debt)
+- [x] **MGR-07**: `npm run typecheck` works from the repo root, via a root `tsconfig.json` with project references (v1.0 debt)
 - [ ] **MGR-08**: "Create room" becomes usable promptly even under heavy parallel e2e load, fixed at the cause rather than with retries (v1.0 debt)
 
 ### Expedition rules
@@ -133,7 +133,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | MGR-04 | Phase 8 | Pending |
 | MGR-05 | Phase 8 | Pending |
 | MGR-06 | Phase 8 | Pending |
-| MGR-07 | Phase 8 | Pending |
+| MGR-07 | Phase 8 | Complete |
 | MGR-08 | Phase 8 | Pending |
 | XRULE-01 | Phase 9 | Pending |
 | XRULE-02 | Phase 9 | Pending |
