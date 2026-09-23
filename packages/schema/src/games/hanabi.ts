@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+// D-07 prep: re-exported so the worker keeps importing Hanabi's schema only
+// through this existing @games/schema/games/hanabi subpath — no new
+// package.json export, alias or tsconfig path is added for hanabi-errors.ts.
+export { HanabiErrorCodeSchema } from "./hanabi-errors";
+export type { HanabiErrorCode } from "./hanabi-errors";
+
 // D-05/D-06: strict, game-namespaced wire schema for Hanabi's per-seat view.
 // Every object schema here is z.strictObject, declared independently — never
 // via `.omit()`/`.extend()`/`.partial()` — at EVERY nesting level, so a stray

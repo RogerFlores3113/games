@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HANABI_GAME_ID, HanabiViewSchema } from "./hanabi";
+import { HANABI_GAME_ID, HanabiErrorCodeSchema, HanabiViewSchema } from "./hanabi";
 
 const ownCardFacts = {
   possibleSuits: ["red", "yellow"],
@@ -186,5 +186,25 @@ describe("HanabiViewSchema", () => {
 
   it("exposes HANABI_GAME_ID as 'hanabi'", () => {
     expect(HANABI_GAME_ID).toBe("hanabi");
+  });
+});
+
+describe("HanabiErrorCodeSchema (D-07 prep)", () => {
+  it("options equals exactly the 9 AdapterError names, in the same order as the rules union", () => {
+    expect(HanabiErrorCodeSchema.options).toEqual([
+      "not_your_turn",
+      "invalid_action",
+      "game_over",
+      "card_not_in_hand",
+      "no_clue_tokens",
+      "clue_touches_nothing",
+      "clue_target_invalid",
+      "discard_at_max_clues",
+      "clue_color_not_nameable",
+    ]);
+  });
+
+  it("rejects an unrecognized code", () => {
+    expect(HanabiErrorCodeSchema.safeParse("view_unavailable").success).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  GameIdSchema,
   PublicSeatSchema,
   RoomCodeSchema,
   SeatTokenSchema,
@@ -79,5 +80,19 @@ describe("branded types (compile-time)", () => {
     acceptsRoomCode(seatToken);
 
     expect(seatToken).toBeTruthy();
+  });
+});
+
+describe("GameIdSchema (D-09)", () => {
+  it("options is exactly [\"hanabi\"]", () => {
+    expect(GameIdSchema.options).toEqual(["hanabi"]);
+  });
+
+  it("accepts \"hanabi\"", () => {
+    expect(GameIdSchema.safeParse("hanabi").success).toBe(true);
+  });
+
+  it.each(["expedition", "innovation", "__toy__", ""])("rejects %j", (value) => {
+    expect(GameIdSchema.safeParse(value).success).toBe(false);
   });
 });

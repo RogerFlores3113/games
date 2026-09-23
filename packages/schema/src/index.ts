@@ -5,3 +5,4 @@ export const SCHEMA_SMOKE = "schema-smoke-ok";
 export * from "./constants";
 export * from "./room";
 export * from "./messages";
+export * from "./create-room";
