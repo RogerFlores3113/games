@@ -356,6 +356,48 @@ describe("HIDE-02/HIDE-03/D-06 structural chokepoint audit (D-09)", () => {
     expect(existsSync(rulesToyPath), `expected ${rulesToyPath} to not exist`).toBe(false);
     expect(existsSync(schemaToyPath), `expected ${schemaToyPath} to not exist`).toBe(false);
   });
+
+  // D-10 (plan 08-07): the test-only toy game (apps/worker/test/toy-game.ts)
+  // must never become reachable from production source — neither by import,
+  // nor by its literal gameId string leaking into a non-test file.
+  it("D-10: no non-test src file imports from test/ or toy-game, or contains the literal __toy__", () => {
+    const importHits = findFilesWithMatch(/\btoy-game\b/g);
+    expect(importHits, `expected zero toy-game references in src, found in: ${JSON.stringify(importHits)}`).toEqual([]);
+
+    const testDirImportHits = findFilesWithMatch(/from\s+["'][^"']*\btest\/[^"']*["']/g);
+    expect(
+      testDirImportHits,
+      `expected zero imports of a test/ path in src, found in: ${JSON.stringify(testDirImportHits)}`,
+    ).toEqual([]);
+
+    const toyIdHits = findFilesWithMatch(/__toy__/g);
+    expect(toyIdHits, `expected zero __toy__ occurrences in src, found in: ${JSON.stringify(toyIdHits)}`).toEqual([]);
+  });
+
+  // D-11 (Pitfall 17): the registry is the ONLY place a gameId is resolved.
+  // No file anywhere (including game-registration.ts itself) may branch on
+  // `gameId === "..."` / `gameId !== "..."` — every game-specific decision
+  // must be reached by looking up a registry entry, never by string-comparing
+  // the id.
+  it("D-11: no src file (including game-registration.ts) compares gameId to a string literal", () => {
+    const hits = findFilesWithMatch(/gameId\s*[!=]==\s*["'`]/g);
+    expect(hits, `expected zero gameId ===/!== "literal" comparisons, found in: ${JSON.stringify(hits)}`).toEqual([]);
+  });
+
+  // D-11/D-08: the string literal "hanabi" may appear in at most one file —
+  // game-registration.ts, the single registration point — and nowhere else.
+  // Today it appears in zero non-test files (HANABI_GAME_ID is imported, not
+  // spelled out), which still satisfies "no other file names a specific
+  // game"; this assertion guards against a future regression reintroducing
+  // the literal in a second file.
+  it('D-11/D-08: the string literal "hanabi" appears in no non-test src file other than game-registration.ts', () => {
+    const hits = findFilesWithMatch(/["'`]hanabi["'`]/g);
+    const otherFiles = hits.filter((h) => h.file !== "game-registration.ts");
+    expect(
+      otherFiles,
+      `expected the "hanabi" literal only in game-registration.ts, found elsewhere in: ${JSON.stringify(otherFiles)}`,
+    ).toEqual([]);
+  });
 });
 
 describe("Phase 5 heartbeat / RT-05 structural audit (D-02, D-13)", () => {
