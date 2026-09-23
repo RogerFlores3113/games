@@ -57,7 +57,7 @@ describe("property: conservation", () => {
         fc.array(fc.nat({ max: 40 }), { minLength: 1, maxLength: 60 }),
         (variant, seatCount, seed, actionIndexes) => {
           const seatIds = Array.from({ length: seatCount }, (_, i) => `seat-${i}`);
-          let state = hanabiGame.createInitialState({ seatIds, variant, seed });
+          let state = hanabiGame.createInitialState({ seatIds, config: variant, seed });
           const config = variantConfig(variant);
           const deckTotal = buildDeck(config).length;
 
@@ -133,7 +133,7 @@ describe("property: conservation", () => {
       const seatIds = ["seat-0", "seat-1", "seat-2"];
       const state = hanabiGame.createInitialState({
         seatIds,
-        variant: "base",
+        config: "base",
         seed: "0".repeat(32),
       });
       const actorSeatId = currentActorSeatId(state);
@@ -157,7 +157,7 @@ describe("property: conservation", () => {
       const seatIds = ["seat-0", "seat-1", "seat-2"];
       const initialState = hanabiGame.createInitialState({
         seatIds,
-        variant: "base",
+        config: "base",
         seed: "1".repeat(32),
       });
       // At the initial state clueTokens is at MAX_CLUE_TOKENS, so discard is
@@ -182,7 +182,7 @@ describe("property: conservation", () => {
       const seatIds = ["seat-0", "seat-1", "seat-2"];
       const state = hanabiGame.createInitialState({
         seatIds,
-        variant: "base",
+        config: "base",
         seed: "2".repeat(32),
       });
       const endedState: HanabiState = {
@@ -208,7 +208,7 @@ describe("property: conservation", () => {
       const config = variantConfig("black");
       const state = hanabiGame.createInitialState({
         seatIds,
-        variant: "black",
+        config: "black",
         seed: "3".repeat(32),
       });
       assertCardConservation(state, buildDeck(config).length);

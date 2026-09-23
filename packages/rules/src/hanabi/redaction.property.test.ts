@@ -51,7 +51,7 @@ describe("property: redaction", () => {
         fc.array(fc.nat({ max: 40 }), { minLength: 1, maxLength: 60 }),
         (variant, seatCount, seed, actionIndexes) => {
           const seatIds = Array.from({ length: seatCount }, (_, i) => `seat-${i}`);
-          let state = hanabiGame.createInitialState({ seatIds, variant, seed });
+          let state = hanabiGame.createInitialState({ seatIds, config: variant, seed });
           totalSeatChecks += assertNoLeaksForEverySeat(state, seed);
 
           for (const index of actionIndexes) {

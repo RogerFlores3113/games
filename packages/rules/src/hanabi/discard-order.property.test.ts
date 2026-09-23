@@ -49,7 +49,7 @@ describe("property: discard order", () => {
         fc.array(fc.nat({ max: 40 }), { minLength: 1, maxLength: 60 }),
         (variant, seatCount, seed, actionIndexes) => {
           const seatIds = Array.from({ length: seatCount }, (_, i) => `seat-${i}`);
-          let state = hanabiGame.createInitialState({ seatIds, variant, seed });
+          let state = hanabiGame.createInitialState({ seatIds, config: variant, seed });
           assertDiscardOrderIsPermutation(state);
 
           for (const index of actionIndexes) {
@@ -100,7 +100,7 @@ describe("property: discard order", () => {
 
   it("a card newly discarded after a reorder appears LAST in discardOrder while the earlier arrangement is unchanged", () => {
     const seatIds = ["seat-0", "seat-1", "seat-2"];
-    let state = hanabiGame.createInitialState({ seatIds, variant: "base", seed: "1".repeat(32) });
+    let state = hanabiGame.createInitialState({ seatIds, config: "base", seed: "1".repeat(32) });
 
     // Discarding requires clueTokens < 8; a discard itself refunds a token,
     // so tokens return to MAX after every single discard from a fresh clue.

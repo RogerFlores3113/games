@@ -14,7 +14,7 @@ import type { HanabiAction, HanabiState } from "./hanabi/state";
  */
 export function describeAdapterConformance(
   name: string,
-  adapter: GameAdapter<any, any>,
+  adapter: GameAdapter<any, any, any, any, any>,
   sampleActions: unknown[],
   /** Returns one legal move for the current state; used to play a game to
    * completion so `checkGameEnd`'s non-null branch is genuinely exercised. */
@@ -22,7 +22,7 @@ export function describeAdapterConformance(
 ) {
   describe(`${name} adapter conformance`, () => {
     const seatIds = ["seat-a", "seat-b", "seat-c"];
-    const createInput = { seatIds, variant: "base" as const, seed: "conformance-seed" };
+    const createInput = { seatIds, config: "base" as const, seed: "conformance-seed" };
 
     it("createInitialState is deterministic", () => {
       const a = adapter.createInitialState(createInput);

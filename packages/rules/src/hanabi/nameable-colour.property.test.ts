@@ -29,7 +29,7 @@ describe("property: nameable colour", () => {
         fc.array(fc.constantFrom(...ALL_SUITS), { minLength: 1, maxLength: 40 }),
         (variant, seatCount, seed, actionIndexes, forgedColours) => {
           const seatIds = Array.from({ length: seatCount }, (_, i) => `seat-${i}`);
-          let state = hanabiGame.createInitialState({ seatIds, variant, seed });
+          let state = hanabiGame.createInitialState({ seatIds, config: variant, seed });
           const config = variantConfig(variant);
 
           let turn = 0;

@@ -23,7 +23,7 @@
 // OWN hand only, so a client can never assert knowledge of another seat's
 // card (T-03-10).
 
-import type { AdapterResult } from "../adapter";
+import type { AdapterError, AdapterResult } from "../adapter";
 import { appendHistory } from "./history";
 import { applyClueToSlotFacts, initialClueFacts } from "./clue-facts";
 import {
@@ -236,7 +236,7 @@ function applyPlay(
   state: HanabiState,
   actorSeatId: string,
   cardId: string,
-): AdapterResult<HanabiState> {
+): AdapterResult<HanabiState, AdapterError> {
   const legality = canPlay(state, actorSeatId, cardId);
   if (!legality.legal) return { ok: false, error: legality.reason };
 
@@ -329,7 +329,7 @@ function applyDiscard(
   state: HanabiState,
   actorSeatId: string,
   cardId: string,
-): AdapterResult<HanabiState> {
+): AdapterResult<HanabiState, AdapterError> {
   const legality = canDiscard(state, actorSeatId, cardId);
   if (!legality.legal) return { ok: false, error: legality.reason };
 
@@ -399,7 +399,7 @@ function applyClue(
   actorSeatId: string,
   targetSeatId: string,
   clue: Clue,
-): AdapterResult<HanabiState> {
+): AdapterResult<HanabiState, AdapterError> {
   const legality = canClue(state, actorSeatId, targetSeatId, clue);
   if (!legality.legal) return { ok: false, error: legality.reason };
 
@@ -460,7 +460,7 @@ function applyReorder(
   state: HanabiState,
   actorSeatId: string,
   cardIds: readonly string[],
-): AdapterResult<HanabiState> {
+): AdapterResult<HanabiState, AdapterError> {
   const legality = canReorder(state, actorSeatId, cardIds);
   if (!legality.legal) return { ok: false, error: legality.reason };
 
@@ -502,7 +502,7 @@ function applyReorderDiscard(
   state: HanabiState,
   actorSeatId: string,
   cardIds: readonly string[],
-): AdapterResult<HanabiState> {
+): AdapterResult<HanabiState, AdapterError> {
   const legality = canReorderDiscard(state, actorSeatId, cardIds);
   if (!legality.legal) return { ok: false, error: legality.reason };
 
@@ -533,7 +533,7 @@ export function applyHanabiAction(
   rawState: HanabiState,
   actorSeatId: string,
   request: unknown,
-): AdapterResult<HanabiState> {
+): AdapterResult<HanabiState, AdapterError> {
   const action = parseHanabiRequest(request);
   if (action === null) return { ok: false, error: "invalid_action" };
 

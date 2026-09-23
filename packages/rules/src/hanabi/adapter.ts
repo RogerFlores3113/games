@@ -6,7 +6,7 @@
 // `checkGameEnd` contain no logic of their own; they delegate entirely to
 // actions.ts/projection.ts/endgame.ts.
 
-import type { GameAdapter } from "../adapter";
+import type { AdapterError, GameAdapter, GameEndResult, Variant } from "../adapter";
 import { applyHanabiAction } from "./actions";
 import { checkHanabiGameEnd } from "./endgame";
 import { dealInitialHands } from "./deck";
@@ -15,10 +15,10 @@ import { MAX_CLUE_TOKENS } from "./legality";
 import { variantConfig } from "./variant";
 import type { HanabiAction, HanabiState, StackEntry } from "./state";
 
-export const hanabiGame: GameAdapter<HanabiState, HanabiAction> = {
+export const hanabiGame: GameAdapter<HanabiState, HanabiAction, Variant, GameEndResult, AdapterError> = {
   id: "hanabi",
 
-  createInitialState({ seatIds, variant, seed }): HanabiState {
+  createInitialState({ seatIds, config: variant, seed }): HanabiState {
     const config = variantConfig(variant);
     const { hands, deck } = dealInitialHands({ config, seatIds, seed });
     const stacks: StackEntry[] = config.suits.map((suit) => ({ suit, playedRanks: [] }));

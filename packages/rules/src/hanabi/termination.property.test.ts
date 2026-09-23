@@ -44,7 +44,7 @@ describe("property: termination", () => {
         fc.array(fc.nat({ max: 40 }), { minLength: 1, maxLength: 40 }),
         (variant, seatCount, seed, actionIndexes) => {
           const seatIds = Array.from({ length: seatCount }, (_, i) => `seat-${i}`);
-          let state = hanabiGame.createInitialState({ seatIds, variant, seed });
+          let state = hanabiGame.createInitialState({ seatIds, config: variant, seed });
           const maxScore = maxScoreFor(variantConfig(variant));
 
           let turn = 0;
@@ -122,7 +122,7 @@ describe("property: termination", () => {
     // a clue when discard is momentarily illegal at the clue-token cap. This
     // deterministically exhausts the deck without ever ending the game
     // early via the other two end conditions.
-    let state = hanabiGame.createInitialState({ seatIds, variant, seed });
+    let state = hanabiGame.createInitialState({ seatIds, config: variant, seed });
     let preFinalRoundTurns = 0;
     const HARD_BOUND = 2000;
     while (state.deck.length > 0) {

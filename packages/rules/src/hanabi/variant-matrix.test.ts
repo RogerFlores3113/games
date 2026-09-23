@@ -64,7 +64,7 @@ describe("variant matrix", () => {
       // across runs.
       const seatIds = ["seat-0", "seat-1", "seat-2"];
       const seed = "5".repeat(32);
-      let state = hanabiGame.createInitialState({ seatIds, variant, seed });
+      let state = hanabiGame.createInitialState({ seatIds, config: variant, seed });
       let turns = 0;
       const HARD_BOUND = 2000;
       while (checkHanabiGameEnd(state) === null && turns < HARD_BOUND) {

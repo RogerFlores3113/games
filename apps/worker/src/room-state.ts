@@ -369,7 +369,7 @@ export function startGame(
 
   const game = adapter.createInitialState({
     seatIds: state.seats.map((seat) => seat.seatId),
-    variant: state.variant,
+    config: state.variant,
     seed,
   });
 
