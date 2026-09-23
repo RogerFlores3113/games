@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-09-23T07:37:47.452Z"
+stopped_at: Completed 08-03-PLAN.md
+last_updated: "2026-09-23T08:00:17.666Z"
 last_activity: 2026-09-23
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 10
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 8 (Multi-Game Rooms) — EXECUTING
-Plan: 3 of 10
+Plan: 4 of 10
 Status: Ready to execute
 Last activity: 2026-09-23
 
@@ -147,6 +147,7 @@ Last activity: 2026-09-23
 | Phase 07 P12 | 90min | 2 tasks | 8 files |
 | Phase 08 P01 | 25min | 2 tasks | 7 files |
 | Phase 08 P02 | 20min | 2 tasks | 17 files |
+| Phase 08 P03 | 45min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -331,6 +332,9 @@ Recent decisions affecting current work:
 - [Phase 08-02]: GameAdapter widened to GameAdapter<TState, TAction, TConfig, TEndResult, TError extends string> with no default type arguments (D-06), so a future registration must name a game's config/end-result/error types explicitly rather than silently reusing Hanabi's (Pitfall 17)
 - [Phase 08-02]: Per-game closed error enums (HanabiErrorCodeSchema) mirror AdapterError 1:1 by name and are re-exported through the existing games/<name> subpath rather than a new package export, alias or tsconfig path (D-07 prep)
 - [Phase 08-02]: packages/rules/src/hanabi/actions.ts's six AdapterResult<HanabiState> annotations widened to AdapterResult<HanabiState, AdapterError> as a Rule 3 blocking-issue fix once AdapterResult gained its TError parameter — not a file the plan listed, required for the widened generic to typecheck
+- [Phase ?]: [Phase 08-03]: game-registration.ts's activeGame singleton became GAME_REGISTRY, a frozen gameId-keyed Record built via defineGame (type erasure happens only inside that function's return) and read via resolveGame(gameId, games = GAME_REGISTRY); Object.hasOwn guards against prototype-chain keys
+- [Phase ?]: [Phase 08-03]: every game-resolving room-state.ts/seat-projection.ts function takes a trailing games: GameRegistry = GAME_REGISTRY parameter (the injection seam plan 08-07's toy game uses) instead of reading a module-level adapter constant
+- [Phase ?]: [Phase 08-03]: ErrorDetailSchema split into RoomErrorDetailSchema (room-level) and GameErrorDetailSchema (a closed discriminated union keyed on gameId, one member per game with that game's own closed code enum) — zero unconstrained-string channel on the error frame
 
 ### Pending Todos
 
@@ -367,8 +371,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-23T07:27:37.577Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-09-23T08:00:17.659Z
+Stopped at: Completed 08-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

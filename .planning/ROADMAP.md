@@ -64,7 +64,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 08-03-PLAN.md — Per-game namespaced wire errors; gameId-keyed worker registry with injectable games parameter (D-07, D-08, D-09)
+- [x] 08-03-PLAN.md — Per-game namespaced wire errors; gameId-keyed worker registry with injectable games parameter (D-07, D-08, D-09)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -210,7 +210,7 @@ Plans:
 | 6.1. Table Polish | v1.0 | 15/15 | Complete | 2026-09-17 |
 | 6.2. Board Redesign | v1.0 | 20/20 | Complete | 2026-09-18 |
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
-| 8. Multi-Game Rooms | v2.0 | 2/10 | In Progress|  |
+| 8. Multi-Game Rooms | v2.0 | 3/10 | In Progress|  |
 | 9. Expedition Rules Core | v2.0 | 0/? | Not started | - |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 0/? | Not started | - |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
