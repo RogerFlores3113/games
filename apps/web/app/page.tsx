@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { Button } from "../components/Button";
 import { PhotoCredit } from "../components/PhotoCredit";
 import { LANDING_IMAGE_CREDIT } from "../lib/image-credits";
+import { GameIdSchema } from "@games/schema";
 import { writeDisplayName } from "../lib/seat-token";
-import { writePendingVariant } from "../lib/pending-variant";
+import { writePendingConfig, writePendingGame } from "../lib/pending-room";
 
 type VariantOption = "base" | "rainbow" | "black";
 type GameOption = "" | "hanabi" | "innovation";
@@ -69,9 +70,18 @@ export default function HomePage() {
       // message automatically. localStorage, not sessionStorage (WR-06), so
       // it survives into a new tab alongside the seat token.
       writeDisplayName(json.code, displayName.trim());
-      // WR-04: the Durable Object always starts a room on "base"; the host's
-      // client applies this choice with `set_config` after its first join.
-      writePendingVariant(json.code, variant);
+      // D-02: the chosen game rides the first `join` frame as `gameId`,
+      // honoured only on the room's very first join (D-01); an unparseable
+      // selection is simply not carried, and the server's own default game
+      // still applies.
+      const parsedGame = GameIdSchema.safeParse(game);
+      if (parsedGame.success) {
+        writePendingGame(json.code, parsedGame.data);
+      }
+      // WR-04: the Durable Object always starts a room on its default
+      // config; the host's client applies this choice with `set_config`
+      // after its first join.
+      writePendingConfig(json.code, variant);
       router.push(json.path);
     } catch {
       setError("Couldn't create a room — check your connection and try again.");

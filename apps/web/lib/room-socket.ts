@@ -13,6 +13,7 @@ import {
   type DisplayName,
 } from "@games/schema";
 import { clearSeatToken, readJoinSeatToken, writeSeatToken } from "./seat-token";
+import { readPendingGame } from "./pending-room";
 import { isTerminalCloseCode } from "./close-codes";
 import { isPongOverdue, resolveClientHeartbeatTiming, resumeAction } from "./heartbeat";
 import { useRoomStore } from "./room-store";
@@ -159,7 +160,10 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Room
       // One code path for first join AND every automatic reconnect — the
       // seat token is re-read and replayed on every `open`, never only on
       // mount (D-05, RT-03 groundwork). Byte-identical to a fresh join
-      // (D-13) — reconnect never gets a separate frame shape.
+      // (D-13) — reconnect never gets a separate frame shape. `gameId` rides
+      // this same join like `seatToken`/`joinId` (D-01/D-02): the server
+      // honours it only on the room's very first join, so replaying it on
+      // every reconnect is harmless — a later join or a reclaim ignores it.
       joinReplyPendingRef.current = true;
       socket.send(
         JSON.stringify({
@@ -169,6 +173,7 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Room
           // join the server must reject.
           seatToken: readJoinSeatToken(code),
           joinId,
+          gameId: readPendingGame(code),
         }),
       );
     },

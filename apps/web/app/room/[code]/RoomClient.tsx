@@ -5,7 +5,12 @@ import { nanoid } from "nanoid";
 import type { ClientMessage } from "@games/schema";
 import { useRoomSocket } from "../../../lib/room-socket";
 import { useRoomStore } from "../../../lib/room-store";
-import { clearPendingVariant, readPendingVariant, variantToApply } from "../../../lib/pending-variant";
+import {
+  clearPendingConfig,
+  clearPendingGame,
+  configToApply,
+  readPendingConfig,
+} from "../../../lib/pending-room";
 import {
   clearDisplayName,
   readDisplayName,
@@ -16,7 +21,7 @@ import {
 import { RefusalCard, type RefusalCardReason } from "../../../components/RefusalCard";
 import { JoinForm } from "../../../components/JoinForm";
 import { Lobby } from "../../../components/Lobby";
-import { HanabiBoard } from "../../../components/hanabi/HanabiBoard";
+import { BOARD_COMPONENTS } from "../../../components/game-ui";
 import { Button } from "../../../components/Button";
 
 export interface RoomClientProps {
@@ -138,12 +143,16 @@ function ConnectedRoom({
     // D-06: a reconnecting socket's last view is stale — never auto-send
     // against it. The next fresh `joined`/`state` frame re-runs this effect.
     if (status === "reconnecting") return;
-    // WR-04: apply the variant picked on the create screen, once, through
+    // D-01 (client side): the pending game was only ever needed on the
+    // first `join` frame (already sent by room-socket.ts's onOpen) — clear
+    // it once a view has arrived, whether or not this viewer is the host.
+    clearPendingGame(code);
+    // WR-04: apply the config picked on the create screen, once, through
     // the ordinary host-only `set_config` message (D-04). Cleared on the
     // first seated view either way, so it can never fire later or for a
     // joiner.
-    const target = variantToApply(view, readPendingVariant(code));
-    clearPendingVariant(code);
+    const target = configToApply(view, readPendingConfig(code));
+    clearPendingConfig(code);
     if (target !== null) {
       socket.send(JSON.stringify({ type: "set_config", config: target } satisfies ClientMessage));
     }
@@ -245,8 +254,16 @@ function ConnectedRoom({
     );
   }
 
+  // D-11: the board comes from a gameId-keyed map, not an `if`/`else` naming
+  // Hanabi. A view whose gameId has no registered board (an old/unknown
+  // gameId) renders nothing game-specific rather than crashing — the
+  // reconnecting/error states above already cover every other case.
+  const Board = BOARD_COMPONENTS[view.gameId];
+  if (!Board) {
+    return null;
+  }
   return (
-    <HanabiBoard
+    <Board
       view={view}
       onAction={(request) =>
         // D-07: actionId is minted once per user intent (one click). If a

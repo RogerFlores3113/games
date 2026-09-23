@@ -1,8 +1,9 @@
 "use client";
 
-import { VariantSchema, type RoomView, type Variant } from "@games/schema";
+import type { RoomView } from "@games/schema";
 import { TABLE_IMAGE_CREDIT } from "../lib/image-credits";
 import { lobbySlots } from "../lib/lobby-seats";
+import { LOBBY_SETTINGS } from "./game-ui";
 import { Button } from "./Button";
 import { PhotoCredit } from "./PhotoCredit";
 import { ReconnectingBanner } from "./ReconnectingBanner";
@@ -18,12 +19,6 @@ export interface LobbyProps {
    * are disabled, matching HanabiBoard's reconnecting treatment. */
   reconnecting?: boolean;
 }
-
-const VARIANT_OPTIONS: { value: Variant; label: string; blurb: string }[] = [
-  { value: "base", label: "Base", blurb: "5 suits" },
-  { value: "rainbow", label: "Rainbow", blurb: "+ rainbow" },
-  { value: "black", label: "Black", blurb: "+ rainbow & black" },
-];
 
 /**
  * Live seat list, room code + copy link, and host-only variant picker +
@@ -52,12 +47,10 @@ export function Lobby({ view, onSetConfig, onStartGame, reconnecting = false }: 
   const shareUrl =
     typeof window !== "undefined" ? window.location.href : `https://games.rogerflores.dev/room/${view.code}`;
   const slots = lobbySlots(view.seats, view.limits.max);
-  // D-05/UI-SPEC: the segmented picker's markup stays byte-identical; only
-  // its selected value now derives from `view.config` (opaque at the schema
-  // layer) instead of a top-level `variant` field. An unparseable config
-  // (a future non-Hanabi game with a differently-shaped config) selects
-  // nothing rather than throwing.
-  const selectedVariant = VariantSchema.safeParse(view.config);
+  // D-11/MGR-03: per-game lookup, not an `isHanabi`/gameId conditional. A
+  // game with no registered entry (the D-10 toy game, Expedition today)
+  // renders no settings section at all.
+  const Settings = LOBBY_SETTINGS[view.gameId];
 
   return (
     <main className="lobby-backdrop flex min-h-screen w-full flex-col items-center justify-center px-[length:var(--space-md)] py-[length:var(--space-xl)]">
@@ -161,82 +154,18 @@ export function Lobby({ view, onSetConfig, onStartGame, reconnecting = false }: 
 
           {isHost ? (
             <>
+              {Settings && (
+                <>
+                  <div className="h-px w-full" style={{ backgroundColor: "var(--color-border)" }} />
+                  <section className="flex flex-col gap-[length:var(--space-md)] p-[length:var(--space-lg)]">
+                    <Settings config={view.config} onSetConfig={onSetConfig} />
+                  </section>
+                </>
+              )}
+
               <div className="h-px w-full" style={{ backgroundColor: "var(--color-border)" }} />
 
               <section className="flex flex-col gap-[length:var(--space-md)] p-[length:var(--space-lg)]">
-                <fieldset data-testid="variant-picker" className="flex flex-col gap-[length:var(--space-sm)]">
-                  <legend
-                    className="mb-[length:var(--space-xs)] text-[length:var(--text-label)] font-semibold uppercase"
-                    style={{
-                      color: "var(--color-text-muted)",
-                      letterSpacing: "0.12em",
-                      lineHeight: "var(--text-label--line-height)",
-                    }}
-                  >
-                    Variant
-                  </legend>
-                  {/* Segmented control. The radio itself stays a real, focusable
-                      input (visually hidden, never `display: none`) so keyboard
-                      and screen-reader semantics — and the e2e specs'
-                      getByRole("radio") — work exactly as before. */}
-                  <div className="grid grid-cols-3 gap-[length:var(--space-xs)]">
-                    {VARIANT_OPTIONS.map(({ value, label, blurb }) => {
-                      const selected = selectedVariant.success && selectedVariant.data === value;
-                      return (
-                        <label
-                          key={value}
-                          data-selected={selected ? "true" : "false"}
-                          className="relative flex cursor-pointer flex-col items-center gap-[2px] rounded-md border px-[length:var(--space-xs)] py-[length:var(--space-sm)] text-center transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--color-accent)] has-[:disabled]:cursor-not-allowed"
-                          style={{
-                            backgroundColor: selected ? "var(--color-bg)" : "transparent",
-                            borderColor: selected ? "var(--color-accent)" : "var(--color-border)",
-                          }}
-                        >
-                          {/* aria-label pins the accessible name to exactly
-                              "Base"/"Rainbow"/"Black". Without it the wrapping
-                              <label>'s full text content — including the blurb
-                              — becomes the name ("Rainbow + rainbow"), and the
-                              e2e specs' getByRole("radio", { name: "Rainbow" })
-                              then matches both Rainbow and Black by substring. */}
-                          <input
-                            type="radio"
-                            name="variant"
-                            value={value}
-                            aria-label={label}
-                            checked={selected}
-                            disabled={reconnecting}
-                            onChange={() => onSetConfig(value)}
-                            // Transparent but full-size, NOT `sr-only`: the
-                            // e2e specs click the radio itself, and a clipped
-                            // 1x1 sr-only input sits under the label's own text
-                            // spans, so the click lands on them instead and
-                            // Playwright reports an intercepted click.
-                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-                          />
-                          <span
-                            className="text-[length:var(--text-body)] font-semibold"
-                            style={{
-                              color: selected ? "var(--color-accent)" : "var(--color-text)",
-                              lineHeight: "var(--text-body--line-height)",
-                            }}
-                          >
-                            {label}
-                          </span>
-                          <span
-                            className="text-[length:var(--text-label)]"
-                            style={{
-                              color: "var(--color-text-muted)",
-                              lineHeight: "var(--text-label--line-height)",
-                            }}
-                          >
-                            {blurb}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </fieldset>
-
                 <div className="flex flex-col gap-[length:var(--space-xs)]">
                   <Button
                     data-testid="start-game"
