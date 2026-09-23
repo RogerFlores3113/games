@@ -1,6 +1,6 @@
 "use client";
 
-import { MAX_PLAYERS, MIN_PLAYERS, type RoomView, type Variant } from "@games/schema";
+import { VariantSchema, type RoomView, type Variant } from "@games/schema";
 import { TABLE_IMAGE_CREDIT } from "../lib/image-credits";
 import { lobbySlots } from "../lib/lobby-seats";
 import { Button } from "./Button";
@@ -48,10 +48,16 @@ const VARIANT_OPTIONS: { value: Variant; label: string; blurb: string }[] = [
 export function Lobby({ view, onSetVariant, onStartGame, reconnecting = false }: LobbyProps) {
   const isHost = view.youSeatId === view.hostSeatId;
   const seatCount = view.seats.length;
-  const canStart = seatCount >= MIN_PLAYERS && seatCount <= MAX_PLAYERS;
+  const canStart = seatCount >= view.limits.min && seatCount <= view.limits.max;
   const shareUrl =
     typeof window !== "undefined" ? window.location.href : `https://games.rogerflores.dev/room/${view.code}`;
-  const slots = lobbySlots(view.seats, MAX_PLAYERS);
+  const slots = lobbySlots(view.seats, view.limits.max);
+  // D-05/UI-SPEC: the segmented picker's markup stays byte-identical; only
+  // its selected value now derives from `view.config` (opaque at the schema
+  // layer) instead of a top-level `variant` field. An unparseable config
+  // (a future non-Hanabi game with a differently-shaped config) selects
+  // nothing rather than throwing.
+  const selectedVariant = VariantSchema.safeParse(view.config);
 
   return (
     <main className="lobby-backdrop flex min-h-screen w-full flex-col items-center justify-center px-[length:var(--space-md)] py-[length:var(--space-xl)]">
@@ -104,14 +110,14 @@ export function Lobby({ view, onSetVariant, onStartGame, reconnecting = false }:
                     heading IS the "Waiting for players" state (asserted by
                     e2e/host-room-controls.spec.ts after a host restart), so
                     the panel never needs a second competing headline. */}
-                {seatCount < MIN_PLAYERS ? "Waiting for players" : "Players"}
+                {seatCount < view.limits.min ? "Waiting for players" : "Players"}
               </h2>
               <p
                 data-testid="seat-count"
                 className="font-mono text-[length:var(--text-label)]"
                 style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
               >
-                {seatCount} / {MAX_PLAYERS}
+                {seatCount} / {view.limits.max}
               </p>
             </div>
 
@@ -143,12 +149,12 @@ export function Lobby({ view, onSetVariant, onStartGame, reconnecting = false }:
               )}
             </div>
 
-            {seatCount < MIN_PLAYERS && (
+            {seatCount < view.limits.min && (
               <p
                 className="text-[length:var(--text-label)]"
                 style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
               >
-                Hanabi needs {MIN_PLAYERS} to {MAX_PLAYERS} players — share the code above.
+                {view.gameDisplayName} needs {view.limits.min} to {view.limits.max} players — share the code above.
               </p>
             )}
           </section>
@@ -175,7 +181,7 @@ export function Lobby({ view, onSetVariant, onStartGame, reconnecting = false }:
                       getByRole("radio") — work exactly as before. */}
                   <div className="grid grid-cols-3 gap-[length:var(--space-xs)]">
                     {VARIANT_OPTIONS.map(({ value, label, blurb }) => {
-                      const selected = view.variant === value;
+                      const selected = selectedVariant.success && selectedVariant.data === value;
                       return (
                         <label
                           key={value}
@@ -246,7 +252,7 @@ export function Lobby({ view, onSetVariant, onStartGame, reconnecting = false }:
                       className="text-center text-[length:var(--text-label)]"
                       style={{ color: "var(--color-text-muted)", lineHeight: "var(--text-label--line-height)" }}
                     >
-                      Need {MIN_PLAYERS}–{MAX_PLAYERS} players
+                      Need {view.limits.min}–{view.limits.max} players
                     </p>
                   )}
                 </div>
@@ -261,7 +267,7 @@ export function Lobby({ view, onSetVariant, onStartGame, reconnecting = false }:
               >
                 {canStart
                   ? "Waiting for the host to start the game."
-                  : `Waiting for players — the host starts once ${MIN_PLAYERS} are seated.`}
+                  : `Waiting for players — the host starts once ${view.limits.min} are seated.`}
               </p>
             </>
           )}

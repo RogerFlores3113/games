@@ -23,7 +23,10 @@ describe("subpath wiring (D-06, FDN-01)", () => {
   it("RoomViewSchema.game stays z.unknown() — accepts an arbitrary game object", () => {
     const result = RoomViewSchema.safeParse({
       code: "ABCDEF",
-      variant: "base",
+      gameId: "hanabi",
+      gameDisplayName: "Hanabi",
+      config: "base",
+      limits: { min: 2, max: 5 },
       status: "lobby",
       hostSeatId: "s1",
       youSeatId: "s1",

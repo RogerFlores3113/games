@@ -162,9 +162,19 @@ export const PublicSeatSchema = z.object({
 });
 export type PublicSeat = z.infer<typeof PublicSeatSchema>;
 
-export const RoomViewSchema = z.object({
+export const RoomViewSchema = z.strictObject({
   code: RoomCodeSchema,
-  variant: VariantSchema,
+  gameId: GameIdSchema,
+  gameDisplayName: z.string(),
+  /** Opaque to this package — the room's game config, e.g. Hanabi's
+   * `Variant`. Validated per-game by the worker registry's `configSchema`
+   * (D-04) — mirrors the existing `game: z.unknown()` convention below,
+   * where the shape is intentionally unchecked at this layer. */
+  config: z.unknown(),
+  /** D-05: the room's game's seat limits, copied by value from the
+   * registry entry so the web app never duplicates or imports registry
+   * data directly. */
+  limits: z.strictObject({ min: z.number().int().positive(), max: z.number().int().positive() }),
   status: RoomStatusSchema,
   hostSeatId: z.string().nullable(),
   youSeatId: z.string(),

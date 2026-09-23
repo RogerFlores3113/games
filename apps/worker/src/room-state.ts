@@ -472,13 +472,22 @@ export function toSeatView(state: RoomState, seatId: string, games: GameRegistry
     isHost: seat.seatId === state.hostSeatId,
   }));
 
+  const entry = roomGame(state, games);
+
   return {
     code: state.code,
-    variant: state.variant,
+    // D-04: interim — `RoomState` gains its own `gameId` field in plan
+    // 08-05; until then this is always `DEFAULT_GAME_ID` via `roomGame`.
+    gameId: DEFAULT_GAME_ID,
+    gameDisplayName: entry.displayName,
+    // D-04: interim — plan 08-05 switches this to `state.config`, once
+    // `RoomState`'s top-level `variant` field is itself replaced.
+    config: state.variant,
+    limits: { min: entry.limits.min, max: entry.limits.max },
     status: state.status,
     hostSeatId: state.hostSeatId,
     youSeatId: seatId,
     seats,
-    game: state.game === null ? null : roomGame(state, games).adapter.toPlayerView(state.game, seatId),
+    game: state.game === null ? null : entry.adapter.toPlayerView(state.game, seatId),
   };
 }

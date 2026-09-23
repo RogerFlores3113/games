@@ -3,6 +3,7 @@ import {
   GameIdSchema,
   PublicSeatSchema,
   RoomCodeSchema,
+  RoomViewSchema,
   SeatTokenSchema,
   type RoomCode,
   type SeatToken,
@@ -94,5 +95,47 @@ describe("GameIdSchema (D-09)", () => {
 
   it.each(["expedition", "innovation", "__toy__", ""])("rejects %j", (value) => {
     expect(GameIdSchema.safeParse(value).success).toBe(false);
+  });
+});
+
+describe("RoomViewSchema (D-04, D-05, MGR-02)", () => {
+  function baseView(): Record<string, unknown> {
+    return {
+      code: "ABCDEF",
+      gameId: "hanabi",
+      gameDisplayName: "Hanabi",
+      config: "base",
+      limits: { min: 2, max: 5 },
+      status: "lobby",
+      hostSeatId: "s1",
+      youSeatId: "s1",
+      seats: [{ seatId: "s1", displayLabel: "Roger", connected: true, isHost: true }],
+      game: null,
+    };
+  }
+
+  it("accepts the new envelope shape", () => {
+    expect(RoomViewSchema.safeParse(baseView()).success).toBe(true);
+  });
+
+  it("rejects a view carrying a leftover variant key", () => {
+    const view = { ...baseView(), variant: "base" };
+    expect(RoomViewSchema.safeParse(view).success).toBe(false);
+  });
+
+  it("rejects a view missing limits", () => {
+    const view = baseView();
+    delete (view as Record<string, unknown>).limits;
+    expect(RoomViewSchema.safeParse(view).success).toBe(false);
+  });
+
+  it("rejects limits carrying an extra key", () => {
+    const view = { ...baseView(), limits: { min: 2, max: 5, extra: 1 } };
+    expect(RoomViewSchema.safeParse(view).success).toBe(false);
+  });
+
+  it("rejects gameId \"expedition\" (not production-registered)", () => {
+    const view = { ...baseView(), gameId: "expedition" };
+    expect(RoomViewSchema.safeParse(view).success).toBe(false);
   });
 });

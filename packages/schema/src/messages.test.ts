@@ -17,7 +17,10 @@ const ROOM_CODE = "ABCDEF" as RoomCode;
 
 const sampleRoomView = {
   code: ROOM_CODE,
-  variant: "base" as const,
+  gameId: "hanabi" as const,
+  gameDisplayName: "Hanabi",
+  config: "base" as const,
+  limits: { min: 2, max: 5 },
   status: "lobby" as const,
   hostSeatId: "s1",
   youSeatId: "s1",

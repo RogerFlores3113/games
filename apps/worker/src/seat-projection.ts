@@ -11,7 +11,7 @@
 // frame with `detail: "view_unavailable"` — never a `state`/`joined` frame.
 
 import type { RoomState, RoomView, ServerMessage } from "@games/schema";
-import { DEFAULT_GAME_ID, GAME_REGISTRY, resolveGame } from "./game-registration";
+import { GAME_REGISTRY, resolveGame } from "./game-registration";
 import type { GameRegistry } from "./game-registration";
 import { toSeatView } from "./room-state";
 
@@ -49,12 +49,10 @@ export function validateGameView(view: RoomView, games: GameRegistry = GAME_REGI
     return view as ProjectedRoomView;
   }
 
-  // Interim key (D-08): `RoomView` has no `gameId` field until plan 08-04;
-  // plan 08-04 changes this single lookup to `view.gameId`. Resolved FIRST —
-  // an unresolvable entry (itself a defense-in-depth impossibility while
-  // `GAME_REGISTRY` is production-frozen to Hanabi only) fails closed exactly
+  // D-08/MGR-05: resolved from the view's own `gameId`. Resolved FIRST — an
+  // unresolvable entry (e.g. an unregistered gameId) fails closed exactly
   // like a schema mismatch, via the same redacted log and `null` return.
-  const entry = resolveGame(DEFAULT_GAME_ID, games);
+  const entry = resolveGame(view.gameId, games);
   if (entry === undefined) {
     console.error("HIDE-03: projected game view failed — no registry entry for game id", {
       seatId: view.youSeatId,

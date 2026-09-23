@@ -101,8 +101,9 @@ test.describe("start game (ROOM-06 + D-10 + D-13 + D-02/D-03 Hanabi board)", () 
     await expect(hostPage.getByText(/ready/i)).toHaveCount(0);
 
     // Host changes the variant from Base to Black. The radio is a fully
-    // controlled input (`checked={view.variant === value}`) driven by the
-    // server-pushed RoomView, not local state — a plain `.click()` fires
+    // controlled input (`checked={selectedVariant === value}`, derived from
+    // `view.config`) driven by the server-pushed RoomView, not local
+    // state — a plain `.click()` fires
     // the change and the assertion below auto-retries until the socket
     // round-trip lands, rather than `.check()`'s built-in immediate
     // post-click verification, which races the network round-trip.

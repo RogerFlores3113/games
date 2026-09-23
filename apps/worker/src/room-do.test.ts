@@ -538,7 +538,7 @@ describe("RoomDO integration (live wrangler dev)", () => {
 
     send(ws1, { type: "set_variant", variant: "rainbow" });
     const afterVariant = await c1.waitFor(
-      (m) => m.type === "state" && (m.view as { variant: string }).variant === "rainbow",
+      (m) => m.type === "state" && (m.view as { config: unknown }).config === "rainbow",
       5000,
     );
     expect(afterVariant.type).toBe("state");
@@ -560,7 +560,7 @@ describe("RoomDO integration (live wrangler dev)", () => {
 
     send(ws1, { type: "set_variant", variant: "rainbow" });
     const afterVariant = await c1.waitFor(
-      (m) => m.type === "state" && (m.view as { variant: string }).variant === "rainbow",
+      (m) => m.type === "state" && (m.view as { config: unknown }).config === "rainbow",
       5000,
     );
     expect(afterVariant.type).toBe("state");
@@ -582,7 +582,7 @@ describe("RoomDO integration (live wrangler dev)", () => {
 
     send(ws1, { type: "set_variant", variant: "rainbow" });
     const afterVariant = await c1.waitFor(
-      (m) => m.type === "state" && (m.view as { variant: string }).variant === "rainbow",
+      (m) => m.type === "state" && (m.view as { config: unknown }).config === "rainbow",
       5000,
     );
     expect(afterVariant.type).toBe("state");
@@ -895,7 +895,7 @@ describe("RoomDO integration (live wrangler dev)", () => {
     await c1.waitFor((m) => m.type === "state" && (m.view as { seats: unknown[] }).seats.length === 2);
 
     send(ws1, { type: "set_variant", variant: "black" });
-    await c1.waitFor((m) => m.type === "state" && (m.view as { variant: string }).variant === "black", 5000);
+    await c1.waitFor((m) => m.type === "state" && (m.view as { config: unknown }).config === "black", 5000);
 
     ws1.close();
     ws2.close();
@@ -916,11 +916,11 @@ describe("RoomDO integration (live wrangler dev)", () => {
     send(ws3, { type: "join", displayName: "Alice", seatToken: joined1.seatToken });
     const reclaimed = (await c3.waitFor((m) => m.type === "joined", 8000)) as Parsed & {
       seatId: string;
-      view: { seats: unknown[]; variant: string };
+      view: { seats: unknown[]; config: unknown };
     };
     expect(reclaimed.seatId).toBe(joined1.seatId);
     expect(reclaimed.view.seats).toHaveLength(2);
-    expect(reclaimed.view.variant).toBe("black");
+    expect(reclaimed.view.config).toBe("black");
 
     ws3.close();
   }, 40_000);
@@ -1206,7 +1206,7 @@ describe("Phase 5 heartbeat spike (D-02, RESEARCH Open Question 1)", () => {
 
     send(ws1, { type: "set_variant", variant: "rainbow" });
     const afterVariant = await c1.waitFor(
-      (m) => m.type === "state" && (m.view as { variant: string }).variant === "rainbow",
+      (m) => m.type === "state" && (m.view as { config: unknown }).config === "rainbow",
       5000,
     );
     expect(afterVariant.type).toBe("state");

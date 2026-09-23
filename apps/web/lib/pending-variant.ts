@@ -71,6 +71,6 @@ export function variantToApply(view: RoomView, pending: Variant | undefined): Va
   if (pending === undefined) return null;
   if (view.status !== "lobby") return null;
   if (view.youSeatId !== view.hostSeatId) return null;
-  if (view.variant === pending) return null;
+  if (view.config === pending) return null;
   return pending;
 }

@@ -1,4 +1,4 @@
-import { MAX_PLAYERS, type RoomView } from "@games/schema";
+import type { RoomView } from "@games/schema";
 
 /**
  * One rendered row of the lobby's seat list: either a real server-assigned
@@ -24,7 +24,7 @@ export type LobbySlot =
  * real seat still renders (a hidden player is a correctness bug, an extra
  * row is only a layout one).
  */
-export function lobbySlots(seats: RoomView["seats"], max: number = MAX_PLAYERS): LobbySlot[] {
+export function lobbySlots(seats: RoomView["seats"], max: number): LobbySlot[] {
   const filled: LobbySlot[] = seats.map((seat) => ({ kind: "seat", seat }));
   const openCount = Math.max(0, max - filled.length);
   const open: LobbySlot[] = Array.from({ length: openCount }, (_, index) => ({

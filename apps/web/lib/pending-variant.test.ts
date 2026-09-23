@@ -33,7 +33,10 @@ function installFakeLocalStorage(): Map<string, string> {
 function makeView(overrides: Partial<RoomView> = {}): RoomView {
   return {
     code: "ABCDEF" as RoomView["code"],
-    variant: "base",
+    gameId: "hanabi",
+    gameDisplayName: "Hanabi",
+    config: "base",
+    limits: { min: 2, max: 5 },
     status: "lobby",
     hostSeatId: "seat-1",
     youSeatId: "seat-1",
@@ -48,9 +51,9 @@ describe("variantToApply (WR-04)", () => {
     expect(variantToApply(makeView(), "rainbow")).toBe("rainbow");
   });
 
-  it("returns null when nothing is pending, the variant already matches, the viewer is not host, or the game started", () => {
+  it("returns null when nothing is pending, the config already matches, the viewer is not host, or the game started", () => {
     expect(variantToApply(makeView(), undefined)).toBeNull();
-    expect(variantToApply(makeView({ variant: "rainbow" }), "rainbow")).toBeNull();
+    expect(variantToApply(makeView({ config: "rainbow" }), "rainbow")).toBeNull();
     expect(variantToApply(makeView({ youSeatId: "seat-2" }), "rainbow")).toBeNull();
     expect(variantToApply(makeView({ status: "in_progress" }), "rainbow")).toBeNull();
   });

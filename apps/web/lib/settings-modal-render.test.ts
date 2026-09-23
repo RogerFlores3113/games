@@ -137,7 +137,10 @@ const BASE_GAME: HanabiView = {
 
 const BASE_VIEW: RoomView = {
   code: "ABCDEF" as RoomCode,
-  variant: "base",
+  gameId: "hanabi",
+  gameDisplayName: "Hanabi",
+  config: "base",
+  limits: { min: 2, max: 5 },
   status: "in_progress",
   hostSeatId: "seat-1",
   youSeatId: "seat-1",

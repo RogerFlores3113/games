@@ -159,7 +159,10 @@ describe("validateGameView: fails closed on every leak shape", () => {
   function leakyView(game: unknown): RoomView {
     return {
       code: ROOM_CODE,
-      variant: "base",
+      gameId: "hanabi",
+      gameDisplayName: "Hanabi",
+      config: "base",
+      limits: { min: 2, max: 5 },
       status: "in_progress",
       hostSeatId: "s1",
       youSeatId: "s1",
@@ -277,7 +280,10 @@ describe("validateGameView: console.error on failure never leaks secrets", () =>
     };
     const view: RoomView = {
       code: ROOM_CODE,
-      variant: "base",
+      gameId: "hanabi",
+      gameDisplayName: "Hanabi",
+      config: "base",
+      limits: { min: 2, max: 5 },
       status: "in_progress",
       hostSeatId: "s1",
       youSeatId: "s1",
@@ -296,5 +302,49 @@ describe("validateGameView: console.error on failure never leaks secrets", () =>
     expect(serializedArgs).not.toContain(leakedSuit);
     expect(serializedArgs).not.toContain(String(leakedRank));
     expect(serializedArgs).not.toContain(seed);
+  });
+});
+
+describe("validateGameView: MGR-05 per-game dispatch via view.gameId", () => {
+  it("fails closed with null for an unregistered gameId, logging only the redacted shape", () => {
+    const view = {
+      code: ROOM_CODE,
+      // Cast: production `RoomView`/`GameIdSchema` never admit this value —
+      // this proves the runtime dispatch itself fails closed, independent of
+      // the wire schema that would already reject it before this point.
+      gameId: "expedition",
+      gameDisplayName: "Expedition",
+      config: null,
+      limits: { min: 2, max: 5 },
+      status: "lobby",
+      hostSeatId: "s1",
+      youSeatId: "s1",
+      seats: [{ seatId: "s1", displayLabel: "Host", connected: true, isHost: true }],
+      game: { anything: 1 },
+    } as unknown as RoomView;
+
+    const result = validateGameView(view);
+    expect(result).toBeNull();
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+
+    const call = errorSpy.mock.calls[0]!;
+    expect(String(call[0])).toContain("HIDE-03");
+    const serializedArgs = JSON.stringify(call);
+    expect(serializedArgs).not.toContain("anything");
+  });
+
+  it("still projects a valid Hanabi view via its own gameId", () => {
+    const minter = makeMinter();
+    const room = createEmptyRoom(ROOM_CODE, "base", 0);
+    const hostJoin = join(room, "Host", 1, minter);
+    if (!hostJoin.ok) throw new Error("unreachable");
+
+    const view = toSeatView(hostJoin.state, hostJoin.seatId);
+    expect(view.gameId).toBe("hanabi");
+    expect(view.gameDisplayName).toBe("Hanabi");
+    expect(view.limits).toEqual({ min: 2, max: 5 });
+
+    const projected = projectSeatView(hostJoin.state, hostJoin.seatId);
+    expect(projected).not.toBeNull();
   });
 });

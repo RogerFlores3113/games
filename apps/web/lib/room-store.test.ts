@@ -7,7 +7,10 @@ const FAKE_SEAT_TOKEN = "a".repeat(24) as SeatToken;
 function makeView(overrides: Partial<RoomView> = {}): RoomView {
   return {
     code: "ABC123" as RoomView["code"],
-    variant: "base",
+    gameId: "hanabi",
+    gameDisplayName: "Hanabi",
+    config: "base",
+    limits: { min: 2, max: 5 },
     status: "lobby",
     hostSeatId: "seat-1",
     youSeatId: "seat-1",
