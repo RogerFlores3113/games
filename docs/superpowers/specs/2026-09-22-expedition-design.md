@@ -1,7 +1,7 @@
 # Expedition: design spec
 
 **Date:** 2026-09-22
-**Status:** Draft for owner review
+**Status:** Approved by the owner 2026-09-22 (boss twists provisional)
 **Working title:** Expedition (game id `expedition`). The owner may rename it; the id is internal.
 
 A cooperative, roguelite trick-taking game in the spirit of The Crew, for
@@ -54,7 +54,7 @@ Expedition is registered as a second game. The landing page's game picker enable
 
 **Out of scope for v1:**
 - 2-player mode (no dummy hand).
-- Anything persisting across runs except the room's best-run record (no meta-unlocks).
+- Anything persisting across runs (no meta-unlocks; the best-run record is deferred).
 - Audio.
 - Spectators.
 - Mobile-first layout. Desktop/laptop landscape is the target, at a 1280×720
