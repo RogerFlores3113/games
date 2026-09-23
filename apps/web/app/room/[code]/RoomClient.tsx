@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import type { ClientMessage } from "@games/schema";
 import { useRoomSocket } from "../../../lib/room-socket";
 import { useRoomStore } from "../../../lib/room-store";
+import { consumePendingRoomCookie } from "../../../lib/pending-room-cookie";
 import {
   clearPendingConfig,
   clearPendingGame,
@@ -61,6 +62,11 @@ export function RoomClient({ code }: RoomClientProps) {
   const [joinFailed, setJoinFailed] = useState(false);
 
   useEffect(() => {
+    // D-17: a pre-hydration native create POST hands its choices to this
+    // page through a short-lived cookie rather than the URL — consumed
+    // first, in the same tick as the storage read below, so the auto-join
+    // sees the name immediately.
+    consumePendingRoomCookie(code);
     // WR-06: the name lives in localStorage next to the seat token, so a new
     // tab or a released lobby seat rejoins under the player's real name.
     const storedName = readDisplayName(code) ?? readLegacySessionDisplayName(code);
