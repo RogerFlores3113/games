@@ -2,7 +2,7 @@
 phase: 8
 slug: multi-game-rooms
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-09-22
 ---
@@ -58,7 +58,7 @@ Task IDs are filled in by the planner. This is the requirement-level map the pla
 
 - [ ] Root `tsconfig.json` with `references`; `packages/schema` and `packages/rules` gain `composite: true` and `noEmit: false` (MGR-07)
 - [ ] A new D-13 describe block in `apps/worker/src/persistence.test.ts` asserting the version path (`getCalls` never includes the room key) (MGR-06)
-- [ ] A test-only toy-game fixture (D-10), e.g. `apps/worker/src/test-fixtures/toy-game.ts` — not the deleted `forehead-card.ts` name
+- [ ] A test-only toy-game fixture (D-10), at `apps/worker/test/toy-game.ts` (plan 08-07; outside `src` so the source-structure A5 scan is unaffected)
 
 ---
 
@@ -72,11 +72,11 @@ Task IDs are filled in by the planner. This is the requirement-level map the pla
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 120 s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 120 s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-09-23 (plan-checker iteration 2: every task has an automated verify)

@@ -143,4 +143,4 @@ These are carry-forward constraints from the existing shipped components, restat
 - [x] Dimension 5 Spacing: PASS — zero new spacing tokens; existing scale reused as-is
 - [x] Dimension 6 Registry Safety: PASS — no registry in use (Tool: none)
 
-**Approval:** pending
+**Approval:** approved 2026-09-23 (gsd-ui-checker: 6/6 PASS)
