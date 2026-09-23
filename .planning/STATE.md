@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: Hanabi
-status: Awaiting next milestone
-stopped_at: "v1.0 Hanabi archived and tagged 2026-09-22; next: start the Expedition milestone"
-last_updated: "2026-09-23T06:03:23.452Z"
-last_activity: 2026-09-23 — Milestone v1.0 completed and archived
+milestone: v2.0
+milestone_name: Expedition
+status: planning
+last_updated: "2026-09-23T06:09:09.062Z"
+last_activity: 2026-09-23
 progress:
-  total_phases: 9
-  completed_phases: 8
-  total_plans: 92
-  completed_plans: 90
-  percent: 89
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-09-23 — Milestone v1.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-09-23 — Milestone v2.0 started
 
 ## Performance Metrics
 

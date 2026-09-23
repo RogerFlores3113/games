@@ -6,6 +6,20 @@ A games subdomain on Roger Flores' personal domain hosting real-time multiplayer
 
 It is built for the author and their friends: a small group who want to sit on a voice call and play a good co-op card game together without the setup friction of existing options.
 
+## Current Milestone: v2.0 Expedition
+
+**Goal:** Ship Expedition, an original roguelite co-op trick-taking game in the spirit of The Crew, as the site's second link-playable game. Make the room layer genuinely multi-game along the way.
+
+**Source of truth:** `docs/superpowers/specs/2026-09-22-expedition-design.md` (owner-approved 2026-09-22).
+
+**Target features:**
+- Multi-game rooms: a room carries its game id, and each game brings its own config, seat limits, view schema and end result. Hanabi is unchanged.
+- The Expedition rules: a standard 54-card deck with the Sun and Moon jokers as the only trumps, 3–5 players, objectives, the Whisper, and failure the moment an objective becomes impossible.
+- A six-camp roguelite run: supplies, a failed camp is replayed, capacity equals the camp number, one gear drafted at the start and after each cleared camp, public loadouts, and boss camps.
+- A hook-based rules engine with content catalogues (gear, objective kinds, boss twists, interactables), toolkit-only state changes, declarative targeting, and reveals with audiences for all private information.
+- A pixel-art Phaser front end in the style of rogerflores.dev: a jungle expedition camp at night, seats around an oval stump table, a between-camps fireside scene with minimal text, clickable interactables, and swappable per-player card packs (Big Index default, Classic).
+- An art pass (PixelLab plus verified CC0 packs) and a balance pass, both gated on owner review.
+
 ## Core Value
 
 A friend clicks a link and is playing within seconds — and the game does not break, stall, or lose their seat for the rest of the session.
