@@ -356,17 +356,19 @@ Not applicable — this phase introduces zero new external dependencies. All wor
 
 **If this table is empty:** N/A — see above, four items logged.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Exact toy-game fixture location and shape**
    - What we know: CONTEXT.md explicitly leaves this to Claude's Discretion; the prior toy-game precedent (`forehead-card.ts`) was deleted and its exact filename should not be resurrected per `source-structure.test.ts`'s own D-01/D-03 checks.
    - What's unclear: whether the toy game's fixtures should live under `apps/worker/src/` (co-located with the tests that use it) or in a new `packages/rules/src/test-fixtures/` (parallel to the deleted `forehead-card.ts`'s original location).
    - Recommendation: co-locate with `apps/worker/src/room-state.test.ts` (or a small sibling fixture file in `apps/worker/src/`) since D-10's five required test behaviors are all worker-layer (registry dispatch) concerns, not rules-engine concerns — the toy game does not need real game logic, just a minimal `GameAdapter` implementation with distinguishable seat limits/config/error codes.
+   - RESOLVED: plan 08-07 puts the toy game in `apps/worker/test/toy-game.ts` (worker-layer, outside `src/` so no production file can import it, and so a second `toPlayerView(` occurrence never lands in `src/`, which would break source-structure assertion A5); its tests live in `apps/worker/src/registry.test.ts`.
 
 2. **Whether `apps/worker/src/seat-naming.ts`'s `MAX_PLAYERS` usage needs the registry treatment**
    - What we know: it's listed in the grep inventory; not independently read in this session (see Assumption A2).
    - What's unclear: whether it's cosmetic (label suffix ceiling) or load-bearing (a seat-limit gate).
    - Recommendation: planner reads this file directly before writing the task list; likely a one-line change either way, but the task should not be silently dropped from the plan.
+   - RESOLVED: cosmetic — `MAX_PLAYERS` appears only in a doc comment in `seat-naming.ts` (no import; orchestrator-verified). Plan 08-03 Task 2 rewords that comment to "the room's game seat limit (at most 5 for Hanabi)"; no code change.
 
 ## Environment Availability
 
