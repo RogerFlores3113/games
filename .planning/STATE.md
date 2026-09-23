@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: Expedition
 status: executing
 stopped_at: Completed 08-04-PLAN.md
-last_updated: "2026-09-23T08:53:09.286Z"
+last_updated: "2026-09-23T09:08:03.949Z"
 last_activity: 2026-09-23
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 10
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 8 (Multi-Game Rooms) — EXECUTING
-Plan: 8 of 10
+Plan: 9 of 10
 Status: Ready to execute
 Last activity: 2026-09-23
 
@@ -152,6 +152,7 @@ Last activity: 2026-09-23
 | Phase 08 P05 | 45min | 2 tasks | 10 files |
 | Phase 08 P06 | 45min | 2 tasks | 10 files |
 | Phase 08 P07 | 25min | 2 tasks | 3 files |
+| Phase 08 P08 | 40min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -346,6 +347,8 @@ Recent decisions affecting current work:
 - [Phase 08]: 08-06: reclaim branches (seatToken/joinId match) structurally never read input.gameId, matching D-01
 - [Phase 08]: 08-07: D-10 proved with a test-only toy GameAdapter (apps/worker/test/toy-game.ts, 3-4 seat limits) run through the SAME room-state.ts/seat-projection.ts pure functions via the injectable `games` parameter — no new registration mechanism/env-var gate was needed, the 08-03..08-06 dependency-injection seam was already sufficient
 - [Phase 08]: 08-07: source-structure.test.ts gained D-11 assertions banning `gameId === "literal"` branching anywhere (including game-registration.ts) and confining the "hanabi" string literal to game-registration.ts
+- [Phase ?]: [Phase 08]: 08-08: game-ui.tsx is the sole web module naming a game's UI — BOARD_COMPONENTS (Record, compile-time exhaustive) / LOBBY_SETTINGS (Partial) keyed by GameId, replacing Lobby.tsx/RoomClient.tsx's isHanabi conditionals
+- [Phase ?]: [Phase 08]: 08-08: pending-room.ts generalizes pending-variant.ts to carry both the pending game (rides the first join frame as gameId, D-01/D-02) and the pending config; both tasks landed as one commit since Task 1 alone breaks typecheck (mirrors 08-06 precedent)
 
 ### Pending Todos
 
@@ -382,7 +385,7 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-23T08:53:09.279Z
+Last session: 2026-09-23T09:04:53.751Z
 Stopped at: Completed 08-04-PLAN.md
 Resume file: None
 

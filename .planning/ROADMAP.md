@@ -81,7 +81,7 @@ Plans:
 **Wave 7** *(blocked on Wave 6 completion)*
 
 - [x] 08-07-PLAN.md — Test-only toy game proves the registry; production-isolation guards (D-10, D-11)
-- [ ] 08-08-PLAN.md — Web: gameId-keyed board and lobby settings, pending game on the first join (D-02, D-11, MGR-03)
+- [x] 08-08-PLAN.md — Web: gameId-keyed board and lobby settings, pending game on the first join (D-02, D-11, MGR-03)
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
@@ -210,7 +210,7 @@ Plans:
 | 6.1. Table Polish | v1.0 | 15/15 | Complete | 2026-09-17 |
 | 6.2. Board Redesign | v1.0 | 20/20 | Complete | 2026-09-18 |
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
-| 8. Multi-Game Rooms | v2.0 | 7/10 | In Progress|  |
+| 8. Multi-Game Rooms | v2.0 | 8/10 | In Progress|  |
 | 9. Expedition Rules Core | v2.0 | 0/? | Not started | - |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 0/? | Not started | - |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |

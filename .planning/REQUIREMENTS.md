@@ -10,7 +10,7 @@
 
 - [ ] **MGR-01**: The host chooses the game when creating a room, and the room link opens that game's lobby. Proven in Phase 8 with Hanabi plus a test-only second game; the Expedition option stays disabled until Phase 12 makes it playable
 - [ ] **MGR-02**: Each game sets its own seat limits (Hanabi 2–5, Expedition 3–5), and the lobby enforces them
-- [ ] **MGR-03**: Each game brings its own settings. The host sees only the current game's settings (Hanabi: variant; Expedition: none in v2.0)
+- [x] **MGR-03**: Each game brings its own settings. The host sees only the current game's settings (Hanabi: variant; Expedition: none in v2.0)
 - [x] **MGR-04**: Hanabi plays exactly as before. The full existing unit and e2e suites pass, with only fixture renames allowed as diffs
 - [x] **MGR-05**: Every per-seat view is validated against its own game's view schema before it is sent
 - [x] **MGR-06**: Deploying the multi-game change resets saved rooms to empty lobbies (a schema-version bump), and the deploy is timed for when no game is in progress
@@ -129,7 +129,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 |-------------|-------|--------|
 | MGR-01 | Phase 8 | Pending |
 | MGR-02 | Phase 8 | Pending |
-| MGR-03 | Phase 8 | Pending |
+| MGR-03 | Phase 8 | Complete |
 | MGR-04 | Phase 8 | Complete |
 | MGR-05 | Phase 8 | Complete |
 | MGR-06 | Phase 8 | Complete |
