@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { CreateRoomRequestSchema } from "@games/schema";
 import { mintRoomCode } from "../../../lib/room-code";
 import { pendingRoomCookieName } from "../../../lib/pending-room-cookie";
+import { readCreateRoomForm } from "../../../lib/create-room-form";
 
 // Node runtime, explicit rather than relying on the default — this route
 // only mints a string and never touches Durable Object state (see
@@ -15,12 +16,9 @@ export const runtime = "nodejs";
  * page through a short-lived cookie scoped to that room's own path — never
  * a query string, so `window.location.href` (Copy link) can never leak it,
  * even transiently. */
-function handleFormPost(request: Request, formGameId: unknown, formDisplayName: unknown, formConfig: unknown) {
-  const parsed = CreateRoomRequestSchema.safeParse({
-    gameId: formGameId,
-    displayName: formDisplayName,
-    config: formConfig,
-  });
+function handleFormPost(request: Request, formData: FormData) {
+  // WR-02: only the selected game's namespaced config field is read.
+  const parsed = CreateRoomRequestSchema.safeParse(readCreateRoomForm(formData));
 
   if (!parsed.success) {
     return NextResponse.redirect(new URL("/?error=create", request.url), 303);
@@ -71,12 +69,7 @@ export async function POST(request: Request) {
     } catch {
       return NextResponse.redirect(new URL("/?error=create", request.url), 303);
     }
-    return handleFormPost(
-      request,
-      formData.get("gameId") ?? undefined,
-      formData.get("displayName") ?? undefined,
-      formData.get("config") ?? undefined,
-    );
+    return handleFormPost(request, formData);
   }
 
   return NextResponse.json({ error: "bad_request" }, { status: 400 });

@@ -9,6 +9,7 @@ import { CreateRoomRequestSchema } from "@games/schema";
 import { writeDisplayName } from "../lib/seat-token";
 import { writePendingConfig, writePendingGame } from "../lib/pending-room";
 import { LANDING_GAME_OPTIONS, LANDING_SETTINGS } from "../components/game-ui";
+import { configFieldName, readCreateRoomForm } from "../lib/create-room-form";
 
 const CHECK_NAME_ERROR = "Couldn't create a room — check your name and try again.";
 const CHECK_CONNECTION_ERROR = "Couldn't create a room — check your connection and try again.";
@@ -46,11 +47,7 @@ export default function LandingForm({ initialError }: LandingFormProps) {
     setError(null);
 
     const formData = new FormData(event.currentTarget);
-    const parsed = CreateRoomRequestSchema.safeParse({
-      gameId: formData.get("gameId") ?? undefined,
-      displayName: formData.get("displayName") ?? undefined,
-      config: formData.get("config") ?? undefined,
-    });
+    const parsed = CreateRoomRequestSchema.safeParse(readCreateRoomForm(formData));
     if (!parsed.success) {
       setError(CHECK_NAME_ERROR);
       return;
@@ -175,7 +172,7 @@ export default function LandingForm({ initialError }: LandingFormProps) {
 
         {Object.entries(LANDING_SETTINGS).map(([gameId, Settings]) => (
           <div key={gameId} data-game-settings={gameId}>
-            <Settings />
+            <Settings name={configFieldName(gameId)} />
           </div>
         ))}
 

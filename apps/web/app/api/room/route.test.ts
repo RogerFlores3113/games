@@ -84,7 +84,7 @@ describe("POST /api/room — JSON path", () => {
 
 describe("POST /api/room — native form path (D-17)", () => {
   it("303s to /room/{code} with no query string and sets a scoped pending-room cookie", async () => {
-    const res = await POST(formRequest({ gameId: "hanabi", displayName: "Roger", config: "rainbow" }));
+    const res = await POST(formRequest({ gameId: "hanabi", displayName: "Roger", "config.hanabi": "rainbow" }));
     expect(res.status).toBe(303);
     const location = res.headers.get("location")!;
     const locationUrl = new URL(location);
@@ -105,7 +105,7 @@ describe("POST /api/room — native form path (D-17)", () => {
   });
 
   it("303s to /?error=create with no Set-Cookie for a blank display name", async () => {
-    const res = await POST(formRequest({ gameId: "hanabi", displayName: "   ", config: "base" }));
+    const res = await POST(formRequest({ gameId: "hanabi", displayName: "   ", "config.hanabi": "base" }));
     expect(res.status).toBe(303);
     const location = new URL(res.headers.get("location")!);
     expect(location.pathname + location.search).toBe("/?error=create");
@@ -113,10 +113,40 @@ describe("POST /api/room — native form path (D-17)", () => {
   });
 
   it("303s to /?error=create for an unrecognized gameId", async () => {
-    const res = await POST(formRequest({ gameId: "expedition", displayName: "Roger", config: "purple" }));
+    const res = await POST(formRequest({ gameId: "expedition", displayName: "Roger", "config.expedition": "purple" }));
     expect(res.status).toBe(303);
     const location = new URL(res.headers.get("location")!);
     expect(location.pathname + location.search).toBe("/?error=create");
     expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("reads only the selected game's namespaced config when several settings panels submit (WR-02)", async () => {
+    // Every panel on the landing form is submitted, hidden or not; another
+    // game's field (and a legacy un-namespaced one) must never be picked up.
+    const res = await POST(
+      formRequest({
+        gameId: "hanabi",
+        displayName: "Roger",
+        "config.other": "base",
+        config: "base",
+        "config.hanabi": "black",
+      }),
+    );
+    expect(res.status).toBe(303);
+    const code = new URL(res.headers.get("location")!).pathname.split("/").pop()!;
+    const setCookie = res.headers.get("set-cookie")!;
+    const valueMatch = setCookie.match(new RegExp(`${pendingRoomCookieName(code)}=([^;]+)`));
+    expect(JSON.parse(decodeURIComponent(valueMatch![1]!))).toEqual({
+      gameId: "hanabi",
+      displayName: "Roger",
+      config: "black",
+    });
+  });
+
+  it("303s to /?error=create when only another game's config field is present (WR-02)", async () => {
+    const res = await POST(formRequest({ gameId: "hanabi", displayName: "Roger", "config.other": "base" }));
+    expect(res.status).toBe(303);
+    const location = new URL(res.headers.get("location")!);
+    expect(location.pathname + location.search).toBe("/?error=create");
   });
 });

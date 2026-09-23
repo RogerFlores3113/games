@@ -52,9 +52,17 @@ export const LANDING_GAME_OPTIONS: readonly { value: string; label: string; disa
   { value: "expedition", label: "Expedition - coming soon", disabled: true },
 ];
 
+/** `name` is the form-field name the game's config controls must use
+ * (`configFieldName(gameId)`, namespaced per game). Every panel is submitted
+ * even while hidden, so a shared name would let one game's controls leak
+ * into another game's request (WR-02). */
+export interface CreateSettingsProps {
+  name: string;
+}
+
 // Partial: a game with no create-time settings (the test-only toy game,
 // Expedition today) renders no fieldset at all, not an empty one.
-export const LANDING_SETTINGS: Readonly<Partial<Record<GameId, ComponentType>>> = {
+export const LANDING_SETTINGS: Readonly<Partial<Record<GameId, ComponentType<CreateSettingsProps>>>> = {
   hanabi: HanabiCreateSettings,
 };
 
