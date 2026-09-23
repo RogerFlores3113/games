@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import {
   ClientMessageSchema,
-  ErrorDetailSchema,
+  RoomErrorDetailSchema,
+  GameErrorDetailSchema,
   ServerMessageSchema,
   encodeServerMessage,
   parseClientMessage,
@@ -183,8 +184,8 @@ describe("closed unions", () => {
   });
 });
 
-describe("ErrorMessageSchema.detail (D-08 closed enum)", () => {
-  it("encodes an error frame without a detail (detail stays optional)", () => {
+describe("ErrorMessageSchema.detail / gameError (D-07/D-08 closed enums)", () => {
+  it("encodes an error frame with neither detail nor gameError (both stay optional)", () => {
     const msg: ServerMessage = { type: "error", code: "bad_request" };
     expect(() => encodeServerMessage(msg)).not.toThrow();
   });
@@ -195,20 +196,67 @@ describe("ErrorMessageSchema.detail (D-08 closed enum)", () => {
     expect(encoded).toContain("view_unavailable");
   });
 
+  it("encodes an error frame with gameError { gameId: 'hanabi', code: 'not_your_turn' } and the output contains both", () => {
+    const msg: ServerMessage = {
+      type: "error",
+      code: "bad_request",
+      gameError: { gameId: "hanabi", code: "not_your_turn" },
+    };
+    const encoded = encodeServerMessage(msg);
+    expect(encoded).toContain("hanabi");
+    expect(encoded).toContain("not_your_turn");
+  });
+
   it("throws for an error frame with an arbitrary free-text detail", () => {
     const msg = { type: "error", code: "bad_request", detail: "anything else" };
-    // @ts-expect-error — deliberately not a member of the closed ErrorDetailSchema enum
+    // @ts-expect-error — deliberately not a member of the closed RoomErrorDetailSchema enum
+    expect(() => encodeServerMessage(msg)).toThrow();
+  });
+
+  it("throws for a gameError carrying a game-namespaced code in the room-level detail field (game codes no longer live there)", () => {
+    const msg = { type: "error", code: "bad_request", detail: "not_your_turn" };
+    // @ts-expect-error — "not_your_turn" is a Hanabi gameError code, not a RoomErrorDetail
+    expect(() => encodeServerMessage(msg)).toThrow();
+  });
+
+  it("throws for gameError { gameId: 'hanabi', code: 'view_unavailable' } (view_unavailable is room-level, not a Hanabi code)", () => {
+    const msg = { type: "error", code: "bad_request", gameError: { gameId: "hanabi", code: "view_unavailable" } };
+    // @ts-expect-error — "view_unavailable" is not a member of HanabiErrorCodeSchema
+    expect(() => encodeServerMessage(msg)).toThrow();
+  });
+
+  it("throws for gameError { gameId: 'expedition', code: 'x' } (unregistered gameId)", () => {
+    const msg = { type: "error", code: "bad_request", gameError: { gameId: "expedition", code: "x" } };
+    // @ts-expect-error — "expedition" is not a member of the discriminated union
+    expect(() => encodeServerMessage(msg)).toThrow();
+  });
+
+  it("throws for a gameError carrying an extra key", () => {
+    const msg = {
+      type: "error",
+      code: "bad_request",
+      gameError: { gameId: "hanabi", code: "not_your_turn", extra: true },
+    };
+    // @ts-expect-error — deliberately not assignable, strict object rejects the extra key
     expect(() => encodeServerMessage(msg)).toThrow();
   });
 
   it("D-08: rejects free-text detail such as 'you played the red 3' (error frames carry no state)", () => {
-    const result = ErrorDetailSchema.safeParse("you played the red 3");
+    const result = RoomErrorDetailSchema.safeParse("you played the red 3");
     expect(result.success).toBe(false);
   });
 
-  it("accepts every one of the 10 ErrorDetail members", () => {
-    const members = [
-      "view_unavailable",
+  it("D-08: rejects free-text gameError.code such as 'you played the red 3'", () => {
+    const result = GameErrorDetailSchema.safeParse({ gameId: "hanabi", code: "you played the red 3" });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts the single RoomErrorDetail member", () => {
+    expect(RoomErrorDetailSchema.safeParse("view_unavailable").success).toBe(true);
+  });
+
+  it("accepts every one of Hanabi's 9 gameError codes", () => {
+    const codes = [
       "not_your_turn",
       "invalid_action",
       "game_over",
@@ -219,9 +267,9 @@ describe("ErrorMessageSchema.detail (D-08 closed enum)", () => {
       "discard_at_max_clues",
       "clue_color_not_nameable",
     ];
-    expect(members).toHaveLength(10);
-    for (const member of members) {
-      expect(ErrorDetailSchema.safeParse(member).success).toBe(true);
+    expect(codes).toHaveLength(9);
+    for (const code of codes) {
+      expect(GameErrorDetailSchema.safeParse({ gameId: "hanabi", code }).success).toBe(true);
     }
   });
 

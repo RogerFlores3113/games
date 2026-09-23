@@ -882,7 +882,7 @@ describe("D-09: a repeated CLUE actionId is not re-applied", () => {
   });
 });
 
-describe("D-10: every adapter refusal maps 1:1 onto a closed ErrorDetail", () => {
+describe("D-07/D-10: every adapter refusal maps 1:1 onto a closed, gameId-namespaced GameErrorDetail", () => {
   it("an out-of-turn action returns bad_request with detail not_your_turn", () => {
     const { state, hostJoin, guestJoin, thirdJoin } = startedThreeSeatRoom(
       "0123456789abcdef0123456789abcdef",
@@ -895,7 +895,7 @@ describe("D-10: every adapter refusal maps 1:1 onto a closed ErrorDetail", () =>
     const action = legalActionFor(game);
 
     const result = applyGameAction(state, offTurnSeatId, "action-x", action, 5);
-    expect(result).toMatchObject({ ok: false, reason: "bad_request", detail: "not_your_turn" });
+    expect(result).toMatchObject({ ok: false, reason: "bad_request", gameError: { gameId: "hanabi", code: "not_your_turn" } });
   });
 
   it("a malformed payload with an extra asserted key returns detail invalid_action", () => {
@@ -910,7 +910,7 @@ describe("D-10: every adapter refusal maps 1:1 onto a closed ErrorDetail", () =>
     };
 
     const result = applyGameAction(state, activeSeatId, "action-y", malformed, 5);
-    expect(result).toMatchObject({ ok: false, reason: "bad_request", detail: "invalid_action" });
+    expect(result).toMatchObject({ ok: false, reason: "bad_request", gameError: { gameId: "hanabi", code: "invalid_action" } });
   });
 
   it("a discard at 8 clue tokens returns detail discard_at_max_clues", () => {
@@ -930,7 +930,7 @@ describe("D-10: every adapter refusal maps 1:1 onto a closed ErrorDetail", () =>
     expect(result).toMatchObject({
       ok: false,
       reason: "bad_request",
-      detail: "discard_at_max_clues",
+      gameError: { gameId: "hanabi", code: "discard_at_max_clues" },
     });
   });
 
@@ -957,7 +957,7 @@ describe("D-10: every adapter refusal maps 1:1 onto a closed ErrorDetail", () =>
     expect(result).toMatchObject({
       ok: false,
       reason: "bad_request",
-      detail: "clue_touches_nothing",
+      gameError: { gameId: "hanabi", code: "clue_touches_nothing" },
     });
   });
 });
@@ -985,7 +985,7 @@ describe("RULES-14 / T-07-01: a forged non-nameable colour clue frame is refused
     expect(result).toEqual({
       ok: false,
       reason: "bad_request",
-      detail: "clue_color_not_nameable",
+      gameError: { gameId: "hanabi", code: "clue_color_not_nameable" },
     });
     expect((state.game as ActiveGameState).clueTokens).toBe(clueTokensBefore);
   });
@@ -1020,7 +1020,7 @@ describe("RULES-14 / T-07-01: a forged non-nameable colour clue frame is refused
     expect(result).toEqual({
       ok: false,
       reason: "bad_request",
-      detail: "clue_color_not_nameable",
+      gameError: { gameId: "hanabi", code: "clue_color_not_nameable" },
     });
     expect((craftedState.game as ActiveGameState).clueTokens).toBe(clueTokensBefore);
   });
@@ -1129,7 +1129,7 @@ describe("D-22: reorder through the room layer", () => {
     expect(result).toMatchObject({
       ok: false,
       reason: "bad_request",
-      detail: "card_not_in_hand",
+      gameError: { gameId: "hanabi", code: "card_not_in_hand" },
     });
   });
 
@@ -1151,7 +1151,7 @@ describe("D-22: reorder through the room layer", () => {
     expect(result).toMatchObject({
       ok: false,
       reason: "bad_request",
-      detail: "invalid_action",
+      gameError: { gameId: "hanabi", code: "invalid_action" },
     });
   });
 

@@ -11,15 +11,64 @@
 // socket (D-06/D-07).
 
 import { hanabiGame } from "@games/rules";
-import type { HanabiState, HanabiView } from "@games/rules";
+import type { HanabiState, HanabiView, AdapterError } from "@games/rules";
 import { HANABI_GAME_ID, HanabiViewSchema } from "@games/schema/games/hanabi";
-import type { HanabiViewWire } from "@games/schema/games/hanabi";
+import type { HanabiViewWire, HanabiErrorCode } from "@games/schema/games/hanabi";
+import type { GameErrorDetail } from "@games/schema";
+
+/** D-07: Hanabi's own error mapper — an exhaustive switch with a
+ * `never`-typed default, mirroring `room-state.ts`'s (now-deleted)
+ * `mapAdapterError` exactly. Every registry entry supplies its own mapper
+ * like this one; none may fall back to `String(error)` or any other
+ * free-text shortcut (Pitfall 3, D-08). */
+function mapError(error: AdapterError): GameErrorDetail {
+  switch (error) {
+    case "not_your_turn":
+      return { gameId: HANABI_GAME_ID, code: "not_your_turn" };
+    case "invalid_action":
+      return { gameId: HANABI_GAME_ID, code: "invalid_action" };
+    case "game_over":
+      return { gameId: HANABI_GAME_ID, code: "game_over" };
+    case "card_not_in_hand":
+      return { gameId: HANABI_GAME_ID, code: "card_not_in_hand" };
+    case "no_clue_tokens":
+      return { gameId: HANABI_GAME_ID, code: "no_clue_tokens" };
+    case "clue_touches_nothing":
+      return { gameId: HANABI_GAME_ID, code: "clue_touches_nothing" };
+    case "clue_target_invalid":
+      return { gameId: HANABI_GAME_ID, code: "clue_target_invalid" };
+    case "discard_at_max_clues":
+      return { gameId: HANABI_GAME_ID, code: "discard_at_max_clues" };
+    case "clue_color_not_nameable":
+      return { gameId: HANABI_GAME_ID, code: "clue_color_not_nameable" };
+    default: {
+      const exhaustiveCheck: never = error;
+      throw new Error(`Unrecognized AdapterError: ${String(exhaustiveCheck)}`);
+    }
+  }
+}
 
 export const activeGame = {
   adapter: hanabiGame,
   viewSchema: HanabiViewSchema,
   gameId: HANABI_GAME_ID,
+  mapError,
 } as const;
+
+// ---------------------------------------------------------------------------
+// Compile-time contract check (no runtime cost): `AdapterError` (the
+// adapter's own TS error union) and `HanabiErrorCode` (the Zod schema's
+// inferred type) must stay mutually assignable, so `mapError` above can
+// never silently drift from the wire's closed vocabulary.
+// ---------------------------------------------------------------------------
+
+type _AssertErrorMutuallyAssignable = [AdapterError] extends [HanabiErrorCode]
+  ? [HanabiErrorCode] extends [AdapterError]
+    ? true
+    : never
+  : never;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _assertErrorMutuallyAssignable: _AssertErrorMutuallyAssignable = true;
 
 export type ActiveGameState = HanabiState;
 

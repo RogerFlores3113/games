@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { RefusalReasonSchema, RoomViewSchema, DisplayNameSchema, SeatTokenSchema, VariantSchema } from "./room";
+import {
+  RefusalReasonSchema,
+  RoomViewSchema,
+  DisplayNameSchema,
+  SeatTokenSchema,
+  VariantSchema,
+  GameIdSchema,
+} from "./room";
+import { HanabiErrorCodeSchema } from "./games/hanabi-errors";
 
 // ---------------------------------------------------------------------------
 // Client -> Server
@@ -136,32 +144,31 @@ const RoomClosedMessageSchema = z.strictObject({
   reason: z.literal("host_deleted"),
 });
 
-/** D-08/D-10: error frames must never carry state. `detail` is a CLOSED enum,
- * never a free string. `"view_unavailable"` is sent when a projected view
- * fails its strict game schema (D-07 fail-closed). The remaining 8 members
- * mirror `AdapterError` (`packages/rules/src/adapter.ts`) 1:1 by name, so
- * `mapAdapterError` (plan 04-04) can map without a lossy collapse. Widening
- * this to a free-form string would reintroduce the state-bearing channel
- * Phase 2 closed — there is deliberately no way to do that without an
- * explicit code change to this schema. */
-export const ErrorDetailSchema = z.enum([
-  "view_unavailable",
-  "not_your_turn",
-  "invalid_action",
-  "game_over",
-  "card_not_in_hand",
-  "no_clue_tokens",
-  "clue_touches_nothing",
-  "clue_target_invalid",
-  "discard_at_max_clues",
-  "clue_color_not_nameable",
+/** D-07/D-08: error frames must never carry state, and a game-rule refusal's
+ * specific code must never live in a single flat, ever-widening enum shared
+ * by every game. `detail` is the ROOM-level closed vocabulary (currently
+ * just `"view_unavailable"`, sent when a projected view fails its strict
+ * game schema). `gameError` is a CLOSED discriminated union keyed on
+ * `gameId`: each game contributes exactly one member, `{ gameId, code }`,
+ * whose `code` is that game's OWN closed error enum (never a shared/widened
+ * one, and never an unconstrained string schema — Pitfall 3). Adding a second game means
+ * adding one more discriminated-union member here, each with its own closed
+ * code enum supplied by that game's registry entry — never widening an
+ * existing member's `code` type. Widening either field to a free-form string
+ * would reintroduce the state-bearing channel Phase 2's D-08 closed. */
+export const RoomErrorDetailSchema = z.enum(["view_unavailable"]);
+export type RoomErrorDetail = z.infer<typeof RoomErrorDetailSchema>;
+
+export const GameErrorDetailSchema = z.discriminatedUnion("gameId", [
+  z.strictObject({ gameId: z.literal(GameIdSchema.enum.hanabi), code: HanabiErrorCodeSchema }),
 ]);
-export type ErrorDetail = z.infer<typeof ErrorDetailSchema>;
+export type GameErrorDetail = z.infer<typeof GameErrorDetailSchema>;
 
 const ErrorMessageSchema = z.strictObject({
   type: z.literal("error"),
   code: RefusalReasonSchema,
-  detail: ErrorDetailSchema.optional(),
+  detail: RoomErrorDetailSchema.optional(),
+  gameError: GameErrorDetailSchema.optional(),
 });
 
 export const ServerMessageSchema = z.discriminatedUnion("type", [

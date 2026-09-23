@@ -35,6 +35,7 @@
 import { Server, type Connection, type ConnectionContext } from "partyserver";
 import {
   encodeServerMessage,
+  GameErrorDetailSchema,
   HEARTBEAT_PING,
   HEARTBEAT_PONG,
   parseClientMessage,
@@ -223,7 +224,17 @@ export class RoomDO extends Server<Env> {
       if (msg.type === "game_action") {
         const result = applyGameAction(room, actorSeatId, msg.actionId, msg.request, now);
         if (!result.ok) {
-          this.#send(connection, { type: "error", code: result.reason, detail: result.detail });
+          // D-15 fail-closed: an unmappable/malformed gameError must never
+          // make encodeServerMessage throw inside the Durable Object — parse
+          // it here and simply omit the field on failure, rather than
+          // trusting result.gameError's shape.
+          const parsedGameError =
+            result.gameError !== undefined ? GameErrorDetailSchema.safeParse(result.gameError) : undefined;
+          this.#send(connection, {
+            type: "error",
+            code: result.reason,
+            ...(parsedGameError?.success ? { gameError: parsedGameError.data } : {}),
+          });
           return;
         }
         await this.#commit(result.state, now);
