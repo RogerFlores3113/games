@@ -1,12 +1,11 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
-current_plan: Not started
-status: completed
-stopped_at: "Deployed polish batch 2026-09-19; Innovation base-game research complete (.planning/research/innovation/)"
-last_updated: "2026-09-19T19:03:13.393Z"
-last_activity: 2026-09-19
+milestone_name: Hanabi
+status: Awaiting next milestone
+stopped_at: "v1.0 Hanabi archived and tagged 2026-09-22; next: start the Expedition milestone"
+last_updated: "2026-09-23T06:03:23.452Z"
+last_activity: 2026-09-23 — Milestone v1.0 completed and archived
 progress:
   total_phases: 9
   completed_phases: 8
@@ -19,21 +18,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-01)
+See: .planning/PROJECT.md (updated 2026-09-22)
 
-**Core value:** A friend clicks a link and is playing Hanabi within seconds — and the game does not break, stall, or lose their seat for the next 25 minutes.
-**Current focus:** Milestone complete
+**Core value:** A friend clicks a link and is playing within seconds — and the game does not break, stall, or lose their seat for the rest of the session.
+**Current focus:** v1.0 archived; next milestone is Expedition (spec: docs/superpowers/specs/2026-09-22-expedition-design.md)
 
 ## Current Position
 
-Phase: 7
-Plan: 8 of 8
-Current Plan: Not started
-Total Plans in Phase: 8
-Status: Milestone complete
-Last activity: 2026-09-19
-
-Progress: [██████████] 95%
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-09-23 — Milestone v1.0 completed and archived
 
 ## Performance Metrics
 
@@ -343,11 +338,18 @@ Recent decisions affecting current work:
 
 ## Deferred Items
 
-Items acknowledged and carried forward from previous milestone close:
+Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/milestones/v1.0-MILESTONE-AUDIT.md for context):
 
-| Category | Item | Status | Deferred At |
-|----------|------|--------|-------------|
-| *(none)* | | | |
+| Category | Item | Status |
+|----------|------|--------|
+| debug | 06-2-three-e2e-failures | awaiting_human_verify |
+| debug | fixed-geometry-e2e-flake | awaiting_human_verify |
+| debug | rt04-frozen-tab-banner | awaiting_human_verify |
+| uat_gap | phase 05 05-HUMAN-UAT.md | partial (2 open) |
+| uat_gap | phase 06.1 06.1-HUMAN-UAT.md | partial (0 open) |
+| uat_gap | phase 07 07-HUMAN-UAT.md | pending (0 open) |
+| verification_gap | phase 05 | human_needed |
+| verification_gap | phase 06.1 | human_needed |
 
 ## Quick Tasks Completed
 
@@ -359,5 +361,9 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-09-19T19:03:13.386Z
-Stopped at: Lobby redesign + hint retention fix committed (a42f008, 4006f42), not deployed; Innovation research complete, awaiting owner edition decision
+Stopped at: v1.0 Hanabi archived and tagged; next: /gsd-new-milestone for Expedition
 Resume file: None
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
