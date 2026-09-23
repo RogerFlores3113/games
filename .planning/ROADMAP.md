@@ -48,7 +48,16 @@ Phase artifacts: `.planning/milestones/v1.0-phases/`
   3. Deploying the multi-game change resets any saved rooms cleanly to empty lobbies rather than corrupting mid-game state (a schema-version bump), and the deploy is timed for when no game is in progress.
   4. Hanabi's full existing unit and e2e suites pass with only fixture-rename diffs.
   5. `npm run typecheck` works from the repo root via a root `tsconfig.json` with project references, and "Create room" stays usable promptly even under heavy parallel e2e load — both fixed at the cause, not with retries.
-**Plans**: TBD
+**Plans**: 7 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Root tsconfig with project references; `npm run typecheck` works (MGR-07)
+- [ ] 08-02-PLAN.md — Contracts: generic GameAdapter, GameId/CreateRoomRequest schemas, per-game namespaced wire errors (D-06, D-07, D-09)
+- [ ] 08-03-PLAN.md — Envelope cutover: gameId/config via a gameId-keyed registry, set_config, schema v5 reset, all consumers in one commit (MGR-01/02/04/05/06)
+- [ ] 08-04-PLAN.md — Test-only toy game proves the registry; production-isolation guards (D-10, D-11)
+- [ ] 08-05-PLAN.md — Web: gameId-keyed board and lobby settings, pending game on the first join (D-02, D-11, MGR-03)
+- [ ] 08-06-PLAN.md — Landing: pre-hydration native create with cookie hand-off, Expedition "coming soon" (D-12, D-17, MGR-08)
+- [ ] 08-07-PLAN.md — Deploy checklist and phase gate: three consecutive clean e2e runs, no retries (D-14, D-18)
 
 ### Phase 9: Expedition Rules Core
 **Goal**: A pure, framework-free Expedition rules engine exists — deck construction, legal plays, trick winner, the camp state machine, and all four objective kinds — verified by property tests against the spec's rule text, not just hand-written examples.
