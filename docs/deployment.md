@@ -108,6 +108,38 @@ record `games` → `2dd48b707c982d85.vercel-dns-017.com` set to **DNS only
 issuing its certificate. Vercel serves TLS with a Let's Encrypt (YR2)
 certificate. The full record is in `docs/manual-checks/custom-domain.md`.
 
+## Pre-deploy checklist (Phase 8: multi-game schema bump)
+
+Before deploying the Phase 8 multi-game-rooms change, work through this list
+in order:
+
+1. **schema-version bump — confirm with the owner that no game is in progress.** Phase 8 bumped `ROOM_SCHEMA_VERSION`
+   (`packages/schema/src/constants.ts`) 4 -> 5 when rooms gained
+   `gameId`/`config` in place of the old top-level `variant` field. There is
+   no migration for this bump (owner decision 2026-09-22, D-13): every
+   persisted room fails its version check on next load and resets to an
+   empty lobby via the existing reset-on-mismatch path. This is a real,
+   irreversible loss of any room's live game state, so it must only happen
+   when the owner has confirmed nobody is mid-game.
+2. **Deploy order: worker first, then web.** The wire schema itself changed
+   in this bump (`set_variant` -> `set_config`, top-level `variant` ->
+   `gameId` + `config`), so the two halves of the stack must not both be
+   "new" or both be "old" at the same instant relative to each other in the
+   wrong order. Deploy `apps/worker` first (`wrangler deploy` from
+   `apps/worker`), then deploy `apps/web`. During the gap between the two, an
+   old cached web client talking to the new worker (or vice versa) gets a
+   clean refused/error frame from the worker's fail-closed schema validation
+   (D-15) — never a crashed Durable Object or a corrupted room.
+3. **Post-deploy smoke test.** Create a fresh Hanabi room from the live
+   landing page (`https://games.rogerflores.dev`), confirm the game picker
+   shows "Expedition - coming soon" as a disabled option, and play one move
+   (e.g. give a clue) to confirm the room is live end to end.
+4. **Deploying is an explicit owner go-ahead, not an automated step.**
+   Automated executors (including GSD plan execution) never run `wrangler
+   deploy` for real — only `wrangler deploy --dry-run` to prove the bundle
+   builds. The owner triggers the actual deploy by hand once this checklist
+   is satisfied.
+
 ## Running E2E against production
 
 ```
