@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-09-24T05:24:32.375Z"
+stopped_at: Completed 09-03-PLAN.md
+last_updated: "2026-09-24T05:30:30.305Z"
 last_activity: 2026-09-24
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 16
-  completed_plans: 12
+  completed_plans: 13
   percent: 13
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 9 (Expedition Rules Core) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Last activity: 2026-09-24
 
@@ -157,6 +157,7 @@ Last activity: 2026-09-24
 | Phase 08-multi-game-rooms P10 | ~25min | 1 tasks | 0 files |
 | Phase 09 P01 | 15min | 2 tasks | 3 files |
 | Phase 09 P02 | 10min | 2 tasks | 5 files |
+| Phase 09 P03 | 20min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -363,6 +364,7 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 09-02]: legalPlaysFor is the single shared follow-suit resolver; joker branch checked before suit filter
 - [Phase ?]: [Phase 09-02]: trickWinner checks Sun/Moon plays before any rank comparison so a joker is never compared by rank
 - [Phase ?]: [Phase 09-02]: leaderFor written generically (Sun absent falls back to A-spades) so Phase 10's Eclipse twist reuses it unchanged
+- [Phase ?]: [Phase 09-03]: A-TIE/A-LAST/A-END assumptions recorded in objectives.ts header for owner review; orderedKind compares each ordered objective's resolving trick index incrementally against every other, with 'last' as +Infinity (markerValue)
 
 ### Pending Todos
 
@@ -399,8 +401,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-24T05:24:32.368Z
-Stopped at: Completed 09-02-PLAN.md
+Last session: 2026-09-24T05:30:30.298Z
+Stopped at: Completed 09-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

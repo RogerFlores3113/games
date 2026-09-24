@@ -23,9 +23,9 @@
 - [x] **XRULE-02**: A player must follow the led suit if they can, and may play anything if they can't. The Sun or Moon wins the trick (Sun beats Moon); otherwise the highest card of the led suit wins, and the winner leads next
 - [x] **XRULE-03**: When the Sun or Moon is led, whoever holds the other one must play it
 - [x] **XRULE-04**: The holder of the Sun is the expedition leader: they pick the first objective and lead the first trick. The holder of A♠ leads when the Sun is out of play
-- [ ] **XRULE-05**: Objectives are flipped from a second deck and taken one at a time, starting with the leader and going clockwise, until all are taken
-- [ ] **XRULE-06**: Objective kinds are win-card, ordered (①/②/last), no-tricks and exactly-N. Each objective's status (pending, done, failed) is always visible to everyone
-- [ ] **XRULE-07**: A camp succeeds when every objective is done, and fails the moment any objective becomes impossible or a failure check fires. Play stops at that point
+- [x] **XRULE-05**: Objectives are flipped from a second deck and taken one at a time, starting with the leader and going clockwise, until all are taken
+- [x] **XRULE-06**: Objective kinds are win-card, ordered (①/②/last), no-tricks and exactly-N. Each objective's status (pending, done, failed) is always visible to everyone
+- [x] **XRULE-07**: A camp succeeds when every objective is done, and fails the moment any objective becomes impossible or a failure check fires. Play stops at that point
 - [ ] **XRULE-08**: Played cards are final: there is no undo and no auto-play of a queued card
 
 ### Communication and hidden information
@@ -139,9 +139,9 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | XRULE-02 | Phase 9 | Complete |
 | XRULE-03 | Phase 9 | Complete |
 | XRULE-04 | Phase 9 | Complete |
-| XRULE-05 | Phase 9 | Pending |
-| XRULE-06 | Phase 9 | Pending |
-| XRULE-07 | Phase 9 | Pending |
+| XRULE-05 | Phase 9 | Complete |
+| XRULE-06 | Phase 9 | Complete |
+| XRULE-07 | Phase 9 | Complete |
 | XRULE-08 | Phase 9 | Pending |
 | COMM-01 | Phase 10 | Pending |
 | COMM-02 | Phase 10 | Pending |
