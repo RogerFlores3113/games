@@ -111,11 +111,25 @@ Plans:
 **Plans**: 6 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 09-01-PLAN.md — Core type contract (state.ts) and deck per player count, deal, removed cards, objective deck (XRULE-01)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 09-02-PLAN.md — Follow-suit with the Sun/Moon joker suit, trick winner, expedition leader with A♠ fallback (XRULE-02, 03, 04)
 - [ ] 09-03-PLAN.md — Four objective kinds as an ObjectiveKindDef registry, earliest-moment failure, clockwise pick order (XRULE-05, 06, 07)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 09-04-PLAN.md — CoreRules hook seam, createCamp, derived phase/actor/outcome (XRULE-01, 04, 05, 07)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 09-05-PLAN.md — Legality predicates and applyCampAction; no undo, no auto-play (XRULE-08)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 09-06-PLAN.md — Whole-camp fast-check simulations, failure-timing proofs, purity guard (XRULE-07)
 
 ### Phase 10: Run Layer, Gear Engine & Bosses
