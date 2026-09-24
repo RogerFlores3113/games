@@ -117,7 +117,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 09-02-PLAN.md — Follow-suit with the Sun/Moon joker suit, trick winner, expedition leader with A♠ fallback (XRULE-02, 03, 04)
+- [x] 09-02-PLAN.md — Follow-suit with the Sun/Moon joker suit, trick winner, expedition leader with A♠ fallback (XRULE-02, 03, 04)
 - [ ] 09-03-PLAN.md — Four objective kinds as an ObjectiveKindDef registry, earliest-moment failure, clockwise pick order (XRULE-05, 06, 07)
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -233,7 +233,7 @@ Plans:
 | 6.2. Board Redesign | v1.0 | 20/20 | Complete | 2026-09-18 |
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
 | 8. Multi-Game Rooms | v2.0 | 10/10 | Complete   | 2026-09-23 |
-| 9. Expedition Rules Core | v2.0 | 1/6 | In Progress|  |
+| 9. Expedition Rules Core | v2.0 | 2/6 | In Progress|  |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 0/? | Not started | - |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
 | 12. Phaser Shell | v2.0 | 0/? | Not started | - |

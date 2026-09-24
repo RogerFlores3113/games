@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-09-24T05:18:31.372Z"
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-09-24T05:24:32.375Z"
 last_activity: 2026-09-24
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 16
-  completed_plans: 11
+  completed_plans: 12
   percent: 13
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 9 (Expedition Rules Core) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-09-24
 
@@ -156,6 +156,7 @@ Last activity: 2026-09-24
 | Phase 08 P09 | 70min | 3 tasks | 13 files |
 | Phase 08-multi-game-rooms P10 | ~25min | 1 tasks | 0 files |
 | Phase 09 P01 | 15min | 2 tasks | 3 files |
+| Phase 09 P02 | 10min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -359,6 +360,9 @@ Recent decisions affecting current work:
 - [Phase 09-01]: StandardRank numeric 2..14 (14=Ace) so rank comparison is plain >, no ace-high special case
 - [Phase 09-01]: CampState carries no stored phase/outcome/tricks-won fields; always derived from completedTricks
 - [Phase 09-01]: ASSUMPTION A-HOLDER/A-TRICKCOUNT/A-MULTI recorded as comments in state.ts per RESEARCH.md, owner-reviewable
+- [Phase ?]: [Phase 09-02]: legalPlaysFor is the single shared follow-suit resolver; joker branch checked before suit filter
+- [Phase ?]: [Phase 09-02]: trickWinner checks Sun/Moon plays before any rank comparison so a joker is never compared by rank
+- [Phase ?]: [Phase 09-02]: leaderFor written generically (Sun absent falls back to A-spades) so Phase 10's Eclipse twist reuses it unchanged
 
 ### Pending Todos
 
@@ -395,8 +399,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-24T05:18:24.292Z
-Stopped at: Completed 09-01-PLAN.md
+Last session: 2026-09-24T05:24:32.368Z
+Stopped at: Completed 09-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

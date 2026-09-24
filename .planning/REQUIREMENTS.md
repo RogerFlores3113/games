@@ -20,9 +20,9 @@
 ### Expedition rules
 
 - [x] **XRULE-01**: 3–5 players are dealt equal hands from a 54-card deck (A–2 in four suits, plus the Sun and Moon jokers). 4 players remove 2♣ and 2♦; 5 players remove all four 2s. Removed cards are shown to everyone
-- [ ] **XRULE-02**: A player must follow the led suit if they can, and may play anything if they can't. The Sun or Moon wins the trick (Sun beats Moon); otherwise the highest card of the led suit wins, and the winner leads next
-- [ ] **XRULE-03**: When the Sun or Moon is led, whoever holds the other one must play it
-- [ ] **XRULE-04**: The holder of the Sun is the expedition leader: they pick the first objective and lead the first trick. The holder of A♠ leads when the Sun is out of play
+- [x] **XRULE-02**: A player must follow the led suit if they can, and may play anything if they can't. The Sun or Moon wins the trick (Sun beats Moon); otherwise the highest card of the led suit wins, and the winner leads next
+- [x] **XRULE-03**: When the Sun or Moon is led, whoever holds the other one must play it
+- [x] **XRULE-04**: The holder of the Sun is the expedition leader: they pick the first objective and lead the first trick. The holder of A♠ leads when the Sun is out of play
 - [ ] **XRULE-05**: Objectives are flipped from a second deck and taken one at a time, starting with the leader and going clockwise, until all are taken
 - [ ] **XRULE-06**: Objective kinds are win-card, ordered (①/②/last), no-tricks and exactly-N. Each objective's status (pending, done, failed) is always visible to everyone
 - [ ] **XRULE-07**: A camp succeeds when every objective is done, and fails the moment any objective becomes impossible or a failure check fires. Play stops at that point
@@ -136,9 +136,9 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | MGR-07 | Phase 8 | Complete |
 | MGR-08 | Phase 8 | Complete |
 | XRULE-01 | Phase 9 | Complete |
-| XRULE-02 | Phase 9 | Pending |
-| XRULE-03 | Phase 9 | Pending |
-| XRULE-04 | Phase 9 | Pending |
+| XRULE-02 | Phase 9 | Complete |
+| XRULE-03 | Phase 9 | Complete |
+| XRULE-04 | Phase 9 | Complete |
 | XRULE-05 | Phase 9 | Pending |
 | XRULE-06 | Phase 9 | Pending |
 | XRULE-07 | Phase 9 | Pending |
