@@ -32,6 +32,8 @@ import type {
   NoTricksObjective,
   Objective,
   ObjectiveKind,
+  OrderedObjective,
+  OrderMarker,
   ObjectiveStatus,
   StandardIdentity,
   WinCardObjective,
@@ -112,7 +114,121 @@ export const exactlyNKind: ObjectiveKindDef<ExactlyNObjective> = {
   },
 };
 
-// Registry dispatch (OBJECTIVE_KINDS) and the ordered evaluator are added in
-// Task 2 (evaluateObjective, objectiveStatuses, describeObjective,
-// nextObjectivePicker), which needs all four kinds to exist first.
+/** "last" outranks every numbered marker for relative-order comparisons
+ * (spec §5.2's "last" row resolves after every numbered objective). */
+function markerValue(order: OrderMarker): number {
+  return order === "last" ? Number.POSITIVE_INFINITY : order;
+}
+
+const CIRCLED_NUMERALS = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨"];
+
+function orderedPrefix(order: OrderMarker): string {
+  if (order === "last") return "Last:";
+  if (order >= 1 && order <= 9) return CIRCLED_NUMERALS[order - 1]!;
+  return `#${order}`;
+}
+
+/** Ordered evaluation order (spec §5.2 "ordered" row, RESEARCH.md Pitfall 4):
+ * (1) unowned -> pending; (2) base win-card check on its own target (won by
+ * someone else -> failed); (3) relative-order checks against every OTHER
+ * ordered objective in state.objectives, comparing the completed-trick
+ * index each one's card was won at ("last" compares as +Infinity, A-LAST) —
+ * this objective fails the instant a lower-marker objective is unresolved
+ * or resolves later than this one, or a higher-marker objective has already
+ * resolved while this one is still unresolved (checked incrementally, never
+ * only at camp end); same-trick-index counts as in order (A-TIE); (4) the
+ * "last" marker additionally fails if its card is won at any trick index
+ * other than totalTricks - 1 (A-LAST); (5) otherwise done once won, else
+ * pending. */
+export const orderedKind: ObjectiveKindDef<OrderedObjective> = {
+  id: "ordered",
+  describe(objective) {
+    return `${orderedPrefix(objective.order)} Win the trick containing ${cardLabel(objective.target)}`;
+  },
+  evaluate(state, objective) {
+    if (objective.ownerSeatId === null) return "pending";
+
+    const myTrick = trickContaining(state, objective.target);
+    if (myTrick !== undefined && myTrick.winnerSeatId !== objective.ownerSeatId) return "failed";
+    const myTrickIndex = myTrick?.index;
+    const myMarker = markerValue(objective.order);
+
+    for (const other of state.objectives) {
+      if (other.kind !== "ordered" || other.id === objective.id) continue;
+      const otherMarker = markerValue(other.order);
+      const otherTrickIndex = trickContaining(state, other.target)?.index;
+
+      if (myTrickIndex !== undefined) {
+        // My card has resolved: every lower-marker objective must have
+        // resolved at or before my trick index.
+        if (otherMarker < myMarker) {
+          if (otherTrickIndex === undefined || otherTrickIndex > myTrickIndex) return "failed";
+        }
+      } else if (otherMarker > myMarker && otherTrickIndex !== undefined) {
+        // My card is unresolved, but a higher-marker objective already
+        // resolved — I can now only complete out of order.
+        return "failed";
+      }
+    }
+
+    if (objective.order === "last" && myTrickIndex !== undefined && myTrickIndex !== state.totalTricks - 1) {
+      return "failed";
+    }
+
+    return myTrickIndex === undefined ? "pending" : "done";
+  },
+};
+
+/** Every ObjectiveKind maps to a def; a missing kind here is a compile
+ * error, per spec §1's extensibility requirement (Phase 10 wraps this into
+ * the full content catalogue — adding a kind then is one def plus one
+ * registry line). */
+type KindRegistry = {
+  readonly [K in ObjectiveKind]: ObjectiveKindDef<Extract<Objective, { kind: K }>>;
+};
+
+export const OBJECTIVE_KINDS: KindRegistry = {
+  "win-card": winCardKind,
+  ordered: orderedKind,
+  "no-tricks": noTricksKind,
+  "exactly-n": exactlyNKind,
+};
+
+export function evaluateObjective(state: CampState, objective: Objective): ObjectiveStatus {
+  // One narrowing cast: OBJECTIVE_KINDS is keyed by kind so this dispatch is
+  // exhaustive, but TS can't narrow the mapped-type lookup back to the
+  // specific member type from a runtime `objective.kind` read.
+  const def = OBJECTIVE_KINDS[objective.kind] as ObjectiveKindDef<Objective>;
+  return def.evaluate(state, objective);
+}
+
+export function objectiveStatuses(
+  state: CampState,
+): Array<{ objectiveId: string; status: ObjectiveStatus }> {
+  return state.objectives.map((objective) => ({
+    objectiveId: objective.id,
+    status: evaluateObjective(state, objective),
+  }));
+}
+
+export function describeObjective(objective: Objective): string {
+  const def = OBJECTIVE_KINDS[objective.kind] as ObjectiveKindDef<Objective>;
+  return def.describe(objective);
+}
+
+/** Clockwise pick order starting at the leader: seatIds[(indexOf(leader) +
+ * pickedCount) % seatIds.length], wrapping until the objective pool is
+ * exhausted (spec §3, A-MULTI). Throws if leaderSeatId is not in seatIds. */
+export function nextObjectivePicker(
+  seatIds: readonly string[],
+  leaderSeatId: string,
+  pickedCount: number,
+): string {
+  const leaderIndex = seatIds.indexOf(leaderSeatId);
+  if (leaderIndex === -1) {
+    throw new Error(`nextObjectivePicker: leaderSeatId "${leaderSeatId}" is not in seatIds`);
+  }
+  return seatIds[(leaderIndex + pickedCount) % seatIds.length]!;
+}
+
 export type { ObjectiveKind };
