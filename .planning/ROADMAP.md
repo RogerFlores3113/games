@@ -108,7 +108,15 @@ Plans:
   4. A camp fails the instant any objective becomes impossible — including an exactly-N objective becoming mathematically unreachable before its holder's final relevant trick — proven by fast-check property tests on failure timing, not just the late-detectable case.
   5. Played cards are final: there is no undo and no auto-play of a queued card. (Gear and Whisper finality is proven in Phase 10, where they exist.)
 
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — Core type contract (state.ts) and deck per player count, deal, removed cards, objective deck (XRULE-01)
+- [ ] 09-02-PLAN.md — Follow-suit with the Sun/Moon joker suit, trick winner, expedition leader with A♠ fallback (XRULE-02, 03, 04)
+- [ ] 09-03-PLAN.md — Four objective kinds as an ObjectiveKindDef registry, earliest-moment failure, clockwise pick order (XRULE-05, 06, 07)
+- [ ] 09-04-PLAN.md — CoreRules hook seam, createCamp, derived phase/actor/outcome (XRULE-01, 04, 05, 07)
+- [ ] 09-05-PLAN.md — Legality predicates and applyCampAction; no undo, no auto-play (XRULE-08)
+- [ ] 09-06-PLAN.md — Whole-camp fast-check simulations, failure-timing proofs, purity guard (XRULE-07)
 
 ### Phase 10: Run Layer, Gear Engine & Bosses
 
