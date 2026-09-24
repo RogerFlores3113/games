@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
-status: executing
+status: verifying
 stopped_at: Completed 09-04-PLAN.md
-last_updated: "2026-09-24T05:44:49.325Z"
+last_updated: "2026-09-24T05:55:36.768Z"
 last_activity: 2026-09-24
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 16
-  completed_plans: 15
-  percent: 13
+  completed_plans: 16
+  percent: 25
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 
 Phase: 9 (Expedition Rules Core) — EXECUTING
 Plan: 6 of 6
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-24
 
 ## Performance Metrics
@@ -160,6 +160,7 @@ Last activity: 2026-09-24
 | Phase 09 P03 | 20min | 2 tasks | 2 files |
 | Phase 09 P04 | 20min | 2 tasks | 3 files |
 | Phase 09 P05 | 20min | 2 tasks | 4 files |
+| Phase 09 P06 | 35min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -371,6 +372,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 09-04]: objective ids minted via the same mintCardId/seedToRngState machinery as card ids, seeded from every dealt card id up front, so an objective id can never collide with a card id
 - [Phase ?]: [Phase 09-05]: canPickObjective/canPlayCard guard order is camp_over -> wrong_phase -> not_your_turn -> action-specific, differing from hanabi/legality.ts's turn-first order since currentActorSeatId is null once the camp is decided
 - [Phase ?]: [Phase 09-05]: legality.test.ts/actions.test.ts hand-build minimal CampState literals for tests needing exact hand control or a guaranteed objective-failure trick
+- [Phase 09]: Objective-slot generators biased toward hard failure-timing cases so non-vacuity counters are reliably nonzero at numRuns: 200
+- [Phase 09]: Objective failure-timing oracles independently restate spec text from completedTricks, never calling evaluateObjective inside the oracle body
 
 ### Pending Todos
 
@@ -407,7 +410,7 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-24T05:42:31.243Z
+Last session: 2026-09-24T05:52:48.532Z
 Stopped at: Completed 09-04-PLAN.md
 Resume file: None
 

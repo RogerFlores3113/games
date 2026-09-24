@@ -28,7 +28,7 @@ Phase artifacts: `.planning/milestones/v1.0-phases/`
 </details>
 
 - [x] **Phase 8: Multi-Game Rooms** - A room carries its game id; Hanabi keeps working unchanged behind a genuinely generic registry (completed 2026-09-23)
-- [ ] **Phase 9: Expedition Rules Core** - A pure, property-tested deck/trick/objective engine for the Expedition round rules
+- [x] **Phase 9: Expedition Rules Core** - A pure, property-tested deck/trick/objective engine for the Expedition round rules (completed 2026-09-24)
 - [ ] **Phase 10: Run Layer, Gear Engine & Bosses** - The full six-camp run: draft, loadout, replay-on-fail, the hook/toolkit engine, the v1 gear and boss catalogues, and the Whisper
 - [ ] **Phase 11: Adapter, Schemas & Worker Wiring** - Expedition wired into the room actor with a leak-checked per-seat view proven across whole simulated runs
 - [ ] **Phase 12: Phaser Shell** - Expedition renders as a pixel-art camp scene, isolated from the rest of the site, with mount/unmount and test-bridge discipline established
@@ -130,7 +130,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 09-06-PLAN.md — Whole-camp fast-check simulations, failure-timing proofs, purity guard (XRULE-07)
+- [x] 09-06-PLAN.md — Whole-camp fast-check simulations, failure-timing proofs, purity guard (XRULE-07)
 
 ### Phase 10: Run Layer, Gear Engine & Bosses
 
@@ -233,7 +233,7 @@ Plans:
 | 6.2. Board Redesign | v1.0 | 20/20 | Complete | 2026-09-18 |
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
 | 8. Multi-Game Rooms | v2.0 | 10/10 | Complete   | 2026-09-23 |
-| 9. Expedition Rules Core | v2.0 | 5/6 | In Progress|  |
+| 9. Expedition Rules Core | v2.0 | 6/6 | Complete   | 2026-09-24 |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 0/? | Not started | - |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
 | 12. Phaser Shell | v2.0 | 0/? | Not started | - |
