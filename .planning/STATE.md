@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 08-10-PLAN.md — Phase 8 gate closed, all Phase 8 plans done
-last_updated: "2026-09-24T05:08:54.986Z"
-last_activity: 2026-09-24 -- Phase 9 planning complete
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-09-24T05:18:31.372Z"
+last_activity: 2026-09-24
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 16
-  completed_plans: 10
+  completed_plans: 11
   percent: 13
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-22)
 
 **Core value:** A friend clicks a link and is playing within seconds — and the game does not break, stall, or lose their seat for the rest of the session.
-**Current focus:** Phase 8 — Multi-Game Rooms
+**Current focus:** Phase 9 — Expedition Rules Core
 
 ## Current Position
 
-Phase: 8 (Multi-Game Rooms) — EXECUTING
-Plan: 10 of 10
+Phase: 9 (Expedition Rules Core) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
-Last activity: 2026-09-24 -- Phase 9 planning complete
+Last activity: 2026-09-24
 
 ## Performance Metrics
 
@@ -155,6 +155,7 @@ Last activity: 2026-09-24 -- Phase 9 planning complete
 | Phase 08 P08 | 40min | 2 tasks | 10 files |
 | Phase 08 P09 | 70min | 3 tasks | 13 files |
 | Phase 08-multi-game-rooms P10 | ~25min | 1 tasks | 0 files |
+| Phase 09 P01 | 15min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -355,6 +356,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 08]: 08-09: LANDING_GAME_OPTIONS (game-ui.tsx) is deliberately NOT keyed by GameId, unlike BOARD_COMPONENTS/LOBBY_SETTINGS — Expedition isn't a registered GameId until Phase 11, so this is the one place allowed to name a not-yet-real game for the disabled picker option
 - [Phase ?]: No code changes needed to close the Phase 8 gate — Task 2's four static checks plus three consecutive e2e runs all passed on first attempt
 - [Phase ?]: MGR-01 closed on the combination of 08-06 (D-01 first-join gameId lock), 08-07 (D-10 toy-game registry proof), and 08-09 (D-12 landing page game choice)
+- [Phase 09-01]: StandardRank numeric 2..14 (14=Ace) so rank comparison is plain >, no ace-high special case
+- [Phase 09-01]: CampState carries no stored phase/outcome/tricks-won fields; always derived from completedTricks
+- [Phase 09-01]: ASSUMPTION A-HOLDER/A-TRICKCOUNT/A-MULTI recorded as comments in state.ts per RESEARCH.md, owner-reviewable
 
 ### Pending Todos
 
@@ -391,8 +395,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-23T09:32:52.224Z
-Stopped at: Completed 08-10-PLAN.md — Phase 8 gate closed, all Phase 8 plans done
+Last session: 2026-09-24T05:18:24.292Z
+Stopped at: Completed 09-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -19,7 +19,7 @@
 
 ### Expedition rules
 
-- [ ] **XRULE-01**: 3–5 players are dealt equal hands from a 54-card deck (A–2 in four suits, plus the Sun and Moon jokers). 4 players remove 2♣ and 2♦; 5 players remove all four 2s. Removed cards are shown to everyone
+- [x] **XRULE-01**: 3–5 players are dealt equal hands from a 54-card deck (A–2 in four suits, plus the Sun and Moon jokers). 4 players remove 2♣ and 2♦; 5 players remove all four 2s. Removed cards are shown to everyone
 - [ ] **XRULE-02**: A player must follow the led suit if they can, and may play anything if they can't. The Sun or Moon wins the trick (Sun beats Moon); otherwise the highest card of the led suit wins, and the winner leads next
 - [ ] **XRULE-03**: When the Sun or Moon is led, whoever holds the other one must play it
 - [ ] **XRULE-04**: The holder of the Sun is the expedition leader: they pick the first objective and lead the first trick. The holder of A♠ leads when the Sun is out of play
@@ -135,7 +135,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | MGR-06 | Phase 8 | Complete |
 | MGR-07 | Phase 8 | Complete |
 | MGR-08 | Phase 8 | Complete |
-| XRULE-01 | Phase 9 | Pending |
+| XRULE-01 | Phase 9 | Complete |
 | XRULE-02 | Phase 9 | Pending |
 | XRULE-03 | Phase 9 | Pending |
 | XRULE-04 | Phase 9 | Pending |
