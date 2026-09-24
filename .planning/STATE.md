@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: Expedition
 status: executing
 stopped_at: Completed 09-04-PLAN.md
-last_updated: "2026-09-24T05:35:19.135Z"
+last_updated: "2026-09-24T05:44:49.325Z"
 last_activity: 2026-09-24
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 16
-  completed_plans: 14
+  completed_plans: 15
   percent: 13
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 9 (Expedition Rules Core) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Ready to execute
 Last activity: 2026-09-24
 
@@ -159,6 +159,7 @@ Last activity: 2026-09-24
 | Phase 09 P02 | 10min | 2 tasks | 5 files |
 | Phase 09 P03 | 20min | 2 tasks | 2 files |
 | Phase 09 P04 | 20min | 2 tasks | 3 files |
+| Phase 09 P05 | 20min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -368,6 +369,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 09-03]: A-TIE/A-LAST/A-END assumptions recorded in objectives.ts header for owner review; orderedKind compares each ordered objective's resolving trick index incrementally against every other, with 'last' as +Infinity (markerValue)
 - [Phase ?]: [Phase 09-04]: objectiveSlots validated before minting any objective id or slicing the objective deck, so a thrown Error never leaves partial minted-id state
 - [Phase ?]: [Phase 09-04]: objective ids minted via the same mintCardId/seedToRngState machinery as card ids, seeded from every dealt card id up front, so an objective id can never collide with a card id
+- [Phase ?]: [Phase 09-05]: canPickObjective/canPlayCard guard order is camp_over -> wrong_phase -> not_your_turn -> action-specific, differing from hanabi/legality.ts's turn-first order since currentActorSeatId is null once the camp is decided
+- [Phase ?]: [Phase 09-05]: legality.test.ts/actions.test.ts hand-build minimal CampState literals for tests needing exact hand control or a guaranteed objective-failure trick
 
 ### Pending Todos
 
@@ -404,7 +407,7 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-24T05:35:19.128Z
+Last session: 2026-09-24T05:42:31.243Z
 Stopped at: Completed 09-04-PLAN.md
 Resume file: None
 

@@ -26,7 +26,7 @@
 - [x] **XRULE-05**: Objectives are flipped from a second deck and taken one at a time, starting with the leader and going clockwise, until all are taken
 - [x] **XRULE-06**: Objective kinds are win-card, ordered (①/②/last), no-tricks and exactly-N. Each objective's status (pending, done, failed) is always visible to everyone
 - [x] **XRULE-07**: A camp succeeds when every objective is done, and fails the moment any objective becomes impossible or a failure check fires. Play stops at that point
-- [ ] **XRULE-08**: Played cards are final: there is no undo and no auto-play of a queued card
+- [x] **XRULE-08**: Played cards are final: there is no undo and no auto-play of a queued card
 
 ### Communication and hidden information
 
@@ -142,7 +142,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | XRULE-05 | Phase 9 | Complete |
 | XRULE-06 | Phase 9 | Complete |
 | XRULE-07 | Phase 9 | Complete |
-| XRULE-08 | Phase 9 | Pending |
+| XRULE-08 | Phase 9 | Complete |
 | COMM-01 | Phase 10 | Pending |
 | COMM-02 | Phase 10 | Pending |
 | COMM-03 | Phase 11 | Pending |

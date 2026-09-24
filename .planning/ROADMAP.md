@@ -126,7 +126,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 09-05-PLAN.md — Legality predicates and applyCampAction; no undo, no auto-play (XRULE-08)
+- [x] 09-05-PLAN.md — Legality predicates and applyCampAction; no undo, no auto-play (XRULE-08)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -233,7 +233,7 @@ Plans:
 | 6.2. Board Redesign | v1.0 | 20/20 | Complete | 2026-09-18 |
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
 | 8. Multi-Game Rooms | v2.0 | 10/10 | Complete   | 2026-09-23 |
-| 9. Expedition Rules Core | v2.0 | 4/6 | In Progress|  |
+| 9. Expedition Rules Core | v2.0 | 5/6 | In Progress|  |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 0/? | Not started | - |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
 | 12. Phaser Shell | v2.0 | 0/? | Not started | - |
