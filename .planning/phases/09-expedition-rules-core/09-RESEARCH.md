@@ -364,7 +364,9 @@ fc.assert(
 | A3 | An `ordered` objective's card being won in the wrong RELATIVE order (② before ①) fails the camp the instant the earlier-numbered violation is detected, not retroactively | Common Pitfalls 4 | If the intended rule is "check order only once all ordered objectives have resolved," failure would be detected too early, incorrectly ending a camp that should have continued |
 | A4 | `exactly-n`'s "done" status is only assignable once the camp has ended (no more tricks), never mid-camp even if the count currently equals N | Architecture Patterns Pattern 5 | If exactly-n should show "done" as soon as count reaches N (and only fail if later exceeded), the visible per-objective status (XRULE-06) would flicker incorrectly between done/failed states |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All five resolved by the 09-01..06 plans as labeled assumptions (A-HOLDER, A-TIE, A-TRICKCOUNT, A-MULTI, A-LAST, A-END) — see plan must_haves and state.ts/objectives.ts header comments.
 
 1. **What exactly triggers the A♠ leader fallback, mechanically, in Phase 9's scope?**
    - What we know: the spec says "If the Sun is not in play (see Eclipse)" — Eclipse (which removes jokers) is a Phase 10 boss twist, not built in Phase 9.
