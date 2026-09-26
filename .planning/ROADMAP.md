@@ -108,7 +108,7 @@ Plans:
   4. A camp fails the instant any objective becomes impossible — including an exactly-N objective becoming mathematically unreachable before its holder's final relevant trick — proven by fast-check property tests on failure timing, not just the late-detectable case.
   5. Played cards are final: there is no undo and no auto-play of a queued card. (Gear and Whisper finality is proven in Phase 10, where they exist.)
 
-**Plans**: 6 plans
+**Plans**: 8 plans (6 complete + 2 gap closure)
 
 Plans:
 **Wave 1**
@@ -131,6 +131,11 @@ Plans:
 **Wave 5** *(blocked on Wave 4 completion)*
 
 - [x] 09-06-PLAN.md — Whole-camp fast-check simulations, failure-timing proofs, purity guard (XRULE-07)
+
+**Gap closure** *(wave 1, parallel; from 09-REVIEW.md WR-01/WR-02 via 09-HUMAN-UAT.md)*
+
+- [ ] 09-07-PLAN.md — Monotone ordered-objective evaluator (WR-01) + independent pair-based oracle and post-failure prefix monotonicity property (WR-02) (XRULE-06, 07)
+- [ ] 09-08-PLAN.md — Validate leaderFor/nextLeader hook seat ids (WR-04), plus adjacent IN-02/IN-06 hardening (XRULE-02, 04)
 
 ### Phase 10: Run Layer, Gear Engine & Bosses
 
