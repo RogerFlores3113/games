@@ -58,7 +58,7 @@
 
 ### Boss twists
 
-- [ ] **BOSS-01**: Each boss camp applies one twist from the provisional v1 set:
+- [x] **BOSS-01**: Each boss camp applies one twist from the provisional v1 set:
   - Monsoon: no Whispers.
   - Eclipse: no Sun or Moon, its own even deal per player count, and the A♠ holder leads.
   - Thick Fog: objectives dealt face-down, left out of other players' views on the server.
@@ -159,7 +159,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | GEAR-04 | Phase 10 | Complete |
 | GEAR-05 | Phase 10 | Pending |
 | GEAR-06 | Phase 10 | Pending |
-| BOSS-01 | Phase 10 | Pending |
+| BOSS-01 | Phase 10 | Complete |
 | ENG-01 | Phase 10 | Complete |
 | ENG-02 | Phase 10 | Pending |
 | ENG-03 | Phase 11 | Pending |
