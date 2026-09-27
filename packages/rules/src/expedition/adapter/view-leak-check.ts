@@ -103,12 +103,15 @@ export function secretsForExpeditionSeat(
   const seated = state.seatIds.includes(seatId);
   const ownSeat = state.seats.find((s) => s.seatId === seatId);
 
-  const revealedToViewer = new Set<string>();
-  if (seated && state.attempt !== null) {
-    for (const reveal of state.attempt.reveals) {
-      if (reveal.audience.includes(seatId)) revealedToViewer.add(reveal.cardId);
-    }
-  }
+  // A card id set, for the hiddenIds exclusion below (whether this seat may
+  // see this card AT ALL). Kept separate from the reveals LIST below, which
+  // preserves duplicates: a card can legitimately be revealed to the same
+  // seat more than once (e.g. Spyglass, then later a Whisper), and the
+  // view's `reveals` array carries one entry per such reveal, not one per
+  // distinct card — so the allowed COUNT must bump once per matching
+  // reveal, not once per distinct card id.
+  const revealsToViewer = state.attempt !== null && seated ? state.attempt.reveals.filter((r) => r.audience.includes(seatId)) : [];
+  const revealedToViewer = new Set(revealsToViewer.map((r) => r.cardId));
 
   const hiddenIds: string[] = [];
   const counts: Record<string, number> = {};
@@ -131,8 +134,8 @@ export function secretsForExpeditionSeat(
       }
     }
 
-    for (const cardId of revealedToViewer) {
-      const identity = findCardIdentity(camp, cardId);
+    for (const reveal of revealsToViewer) {
+      const identity = findCardIdentity(camp, reveal.cardId);
       if (identity !== null) bump(identity);
     }
 
