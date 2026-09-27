@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
-status: ready_to_plan
-stopped_at: Phase 9 complete (8/8) — ready to discuss Phase 10
-last_updated: 2026-09-27T03:01:21.510Z
+status: planning
+stopped_at: Phase 10 context gathered
+last_updated: "2026-09-27T04:06:19.704Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
@@ -416,9 +416,9 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T02:51:31.759Z
-Stopped at: Completed 09-08-PLAN.md
-Resume file: None
+Last session: 2026-09-27T04:06:19.696Z
+Stopped at: Phase 10 context gathered
+Resume file: .planning/phases/10-run-layer-gear-engine-bosses/10-CONTEXT.md
 
 ## Operator Next Steps
 
