@@ -209,6 +209,47 @@ describe("applyCampAction — play-card", () => {
     }
   });
 
+  it("a bad nextLeader hook result (a seat not in seatIds) returns invalid_rule_hook and leaves state unchanged, once the completing play would build the next trick", () => {
+    let state = driveObjectivePicks(
+      createCamp({
+        seatIds: ["p0", "p1", "p2"],
+        seed: "actions-seed-bad-next-leader",
+        objectiveSlots: [{ kind: "no-tricks" }],
+      }),
+    );
+    const badRules: CoreRules = { ...baseRules, nextLeader: () => "ghost" };
+
+    // Play the first two cards of trick 0 — these do not complete the trick,
+    // so nextLeader is never consulted and both succeed.
+    for (let i = 0; i < 2; i++) {
+      const actor = currentActorSeatId(state, badRules)!;
+      const cardId = badRules.legalPlays(state, actor)[0]!.id;
+      const result = applyCampAction(state, actor, { type: "play-card", cardId }, badRules);
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("unreachable");
+      state = result.state;
+    }
+
+    const before = structuredClone(state);
+    const thirdActor = currentActorSeatId(state, badRules)!;
+    const thirdHandBefore = state.hands.find((h) => h.seatId === thirdActor)!;
+    const thirdCardId = badRules.legalPlays(state, thirdActor)[0]!.id;
+
+    const result = applyCampAction(
+      state,
+      thirdActor,
+      { type: "play-card", cardId: thirdCardId },
+      badRules,
+    );
+
+    expect(result).toEqual({ ok: false, error: "invalid_rule_hook" });
+    expect(state).toEqual(before);
+    expect(state.completedTricks).toHaveLength(0);
+    const thirdHandAfter = state.hands.find((h) => h.seatId === thirdActor)!;
+    expect(thirdHandAfter).toEqual(thirdHandBefore);
+    expect(thirdHandAfter.cards.some((c) => c.id === thirdCardId)).toBe(true);
+  });
+
   it("a full camp driven with a fixed first-legal-play policy always reaches a decided outcome no later than the last trick", () => {
     let state = driveObjectivePicks(
       createCamp({
@@ -244,6 +285,32 @@ describe("applyCampAction — XRULE-08 (no undo, no auto-play)", () => {
       objectiveSlots: [{ kind: "win-card" }],
     });
     const forged = { type: "undo" } as unknown as CampAction;
+
+    const result = applyCampAction(state, state.expeditionLeaderSeatId, forged);
+
+    expect(result).toEqual({ ok: false, error: "invalid_action" });
+  });
+
+  it("a null action returns invalid_action instead of throwing (IN-06)", () => {
+    const state = createCamp({
+      seatIds: ["p0", "p1", "p2"],
+      seed: "actions-seed-null-action",
+      objectiveSlots: [{ kind: "win-card" }],
+    });
+    const forged = null as unknown as CampAction;
+
+    const result = applyCampAction(state, state.expeditionLeaderSeatId, forged);
+
+    expect(result).toEqual({ ok: false, error: "invalid_action" });
+  });
+
+  it("a non-object action such as a bare string returns invalid_action instead of throwing (IN-06)", () => {
+    const state = createCamp({
+      seatIds: ["p0", "p1", "p2"],
+      seed: "actions-seed-string-action",
+      objectiveSlots: [{ kind: "win-card" }],
+    });
+    const forged = "undo" as unknown as CampAction;
 
     const result = applyCampAction(state, state.expeditionLeaderSeatId, forged);
 
