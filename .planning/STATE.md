@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: Expedition
 status: executing
 stopped_at: Completed 10-04-PLAN.md
-last_updated: "2026-09-27T05:31:11.755Z"
+last_updated: "2026-09-27T05:39:18.962Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 35
-  completed_plans: 22
+  completed_plans: 23
   percent: 25
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 10 (Run Layer, Gear Engine & Bosses) — EXECUTING
-Plan: 5 of 17
+Plan: 6 of 17
 Status: Ready to execute
 Last activity: 2026-09-27
 
@@ -168,6 +168,7 @@ Last activity: 2026-09-27
 | Phase 10 P02 | ~25min | 2 tasks | 7 files |
 | Phase 10 P03 | 25min | 2 tasks | 4 files |
 | Phase 10 P04 | 35min | 2 tasks | 2 files |
+| Phase 10 P05 | 50min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -390,6 +391,8 @@ Recent decisions affecting current work:
 - [Phase ?]: compose.ts folds isTrump first and separately (WR-03), then folds every other RunRules hook via a HOOK_NAMES-driven registry dispatch; no cache anywhere (T-10-08)
 - [Phase ?]: [Phase 10]: 10-04: replace-objective treated as ordered-only by construction (throws for win-card/no-tricks/exactly-n, matching Compass-on-ordered framing)
 - [Phase ?]: [Phase 10]: 10-04: applyToolkitOps is the sole executor of every ToolkitOp; card conservation asserted once via campCardIds(before)===campCardIds(after), throwing on any drift (POLICY A3)
+- [Phase ?]: RUN-04's draftOfferFor computes/returns an offer only; storing it privately and the pick-draft action are Plan 10-07's dispatcher concern
+- [Phase ?]: settleIfDecided's failure branch never touches seats, so D-01/D-06 fall out of not writing to seats rather than an explicit reset step
 
 ### Pending Todos
 
@@ -426,7 +429,7 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T05:31:11.748Z
+Last session: 2026-09-27T05:39:15.235Z
 Stopped at: Completed 10-04-PLAN.md
 Resume file: None
 

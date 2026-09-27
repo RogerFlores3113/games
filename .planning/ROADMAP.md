@@ -165,7 +165,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 10-05-PLAN.md — Draft offers and run lifecycle: supplies, replay, capacity, boss draw (D-01..D-04, D-12), face-down dealing
+- [x] 10-05-PLAN.md — Draft offers and run lifecycle: supplies, replay, capacity, boss draw (D-01..D-04, D-12), face-down dealing
 - [ ] 10-06-PLAN.md — The Whisper (COMM-01/02) and the generic use-gear pipeline (GEAR-05 engine side, GEAR-06)
 
 **Wave 4** *(blocked on Wave 3 completion)*
@@ -278,7 +278,7 @@ Plans:
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
 | 8. Multi-Game Rooms | v2.0 | 10/10 | Complete   | 2026-09-23 |
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
-| 10. Run Layer, Gear Engine & Bosses | v2.0 | 4/17 | In Progress|  |
+| 10. Run Layer, Gear Engine & Bosses | v2.0 | 5/17 | In Progress|  |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
 | 12. Phaser Shell | v2.0 | 0/? | Not started | - |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
