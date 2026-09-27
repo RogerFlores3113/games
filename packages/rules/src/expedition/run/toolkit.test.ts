@@ -542,6 +542,26 @@ describe("applyToolkitOps", () => {
     expect(result.attempt!.camp!.objectiveDeck).toEqual(camp.objectiveDeck.slice(1));
   });
 
+  it("replace-objective on a win-card objective keeps id/kind and pulls the next objective-deck card (CR-01)", () => {
+    const camp = createCamp(
+      {
+        seatIds: [...SEAT_IDS],
+        seed: "replace-win-card-seed",
+        objectiveSlots: [{ kind: "win-card" }],
+      },
+      rules,
+    );
+    const run = makeRun({ camp });
+    const objective = camp.objectives[0]!;
+    const nextCard = camp.objectiveDeck[0]!;
+    const result = applyToolkitOps(run, "p0", "compass", [{ op: "replace-objective", objectiveId: objective.id }]);
+    const updated = result.attempt!.camp!.objectives[0]!;
+    expect(updated.id).toBe(objective.id);
+    expect(updated.kind).toBe("win-card");
+    expect((updated as { target: unknown }).target).toEqual(nextCard);
+    expect(result.attempt!.camp!.objectiveDeck).toEqual(camp.objectiveDeck.slice(1));
+  });
+
   it("replace-objective throws on an owned objective", () => {
     const camp = pickAllObjectives(
       createCamp({ seatIds: [...SEAT_IDS], seed: "replace-owned", objectiveSlots: [{ kind: "ordered", order: 1 }] }, rules),

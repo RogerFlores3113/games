@@ -284,7 +284,9 @@ function applyOp(run: RunState, attempt: AttemptState, actorSeatId: string, gear
       if (objective.ownerSeatId !== null) {
         throw new Error("toolkit: replace-objective: objective is already owned");
       }
-      if (objective.kind !== "ordered") {
+      // Must match camp.ts's isCardBearingSlot and reroll.ts's canTarget
+      // (CR-01): win-card and ordered are the only card-bearing kinds.
+      if (objective.kind !== "ordered" && objective.kind !== "win-card") {
         throw new Error("toolkit: replace-objective: objective has no card to replace");
       }
       if (camp.objectiveDeck.length === 0) {
