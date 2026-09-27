@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 11-02-PLAN.md — Expedition wire schemas + subpath wiring (COMM-03)
-last_updated: "2026-09-27T10:30:50.824Z"
+stopped_at: Completed 11-04-PLAN.md
+last_updated: "2026-09-27T10:42:51.662Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 44
-  completed_plans: 40
+  completed_plans: 41
   percent: 38
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 11 (Adapter, Schemas & Worker Wiring) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 Last activity: 2026-09-27
 
@@ -187,6 +187,7 @@ Last activity: 2026-09-27
 | Phase 11 P01 | 45min | 2 tasks | 4 files |
 | Phase 11 P02 | ~25min | 2 tasks | 6 files |
 | Phase 11 P03 | ~40min | 2 tasks | 6 files |
+| Phase 11 P04 | ~35min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -437,6 +438,7 @@ Recent decisions affecting current work:
 - [Phase 11]: [Phase 11]: expedition.ts/expedition-errors.ts header comments reworded to avoid tripping this plan's own acceptance-criteria greps (.omit()-style tokens, @games/rules literal), which hanabi.ts's identical phrasing also trips at count 1
 - [Phase 11]: 11-03: index.ts's Expedition type re-exports split one-type-per-line (not one combined export type {...}) to satisfy a grep -c count of matching lines, not occurrences
 - [Phase 11]: 11-03: adapter.ts's header comment avoids the literal 'try/catch'/'catch (' tokens in prose, since the plan's own acceptance grep for try/catch usage would false-positive on the explanatory comment
+- [Phase 11]: 11-04: secretsForExpeditionSeat bumps allowedIdentityCounts once per reveal entry addressed to the viewer (not once per distinct card id) -- a card can legitimately be revealed to the same seat twice (e.g. Spyglass then a later Whisper); deduping undercounted and produced a false-positive leak, found by the whole-run property's first real run
 
 ### Pending Todos
 
@@ -473,8 +475,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T10:30:38.484Z
-Stopped at: Completed 11-02-PLAN.md — Expedition wire schemas + subpath wiring (COMM-03)
+Last session: 2026-09-27T10:42:51.654Z
+Stopped at: Completed 11-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
