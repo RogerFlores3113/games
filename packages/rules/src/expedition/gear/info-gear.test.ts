@@ -1,6 +1,5 @@
 // Tests for the v1 information gear (Plan 10-08, GEAR-01): Signal Whistle
-// (chatter.ts) and Spyglass (peek.ts). Signal Flare (broadcast.ts, D-08) is
-// added by Task 2's commit.
+// (chatter.ts), Spyglass (peek.ts) and Signal Flare (broadcast.ts, D-08).
 //
 // Fixtures are driven exclusively through applyRunAction (run-actions.ts)
 // and the run-test-support helpers (setupRun/advanceTo), per this plan's own
@@ -17,6 +16,7 @@ import { currentActorSeatId } from "../camp";
 import type { BossDef } from "../boss/boss-def";
 import type { CampState } from "../state";
 import type { Catalog, CampNumber, RunState } from "../run/types";
+import { broadcast } from "./broadcast";
 import { chatter } from "./chatter";
 import { peek } from "./peek";
 
@@ -30,12 +30,13 @@ const FAKE_SILENCE: BossDef = {
 };
 
 function makeCatalog(): Catalog {
-  return { gear: { chatter, peek }, bosses: { "fake-silence": FAKE_SILENCE } };
+  return { gear: { chatter, peek, broadcast }, bosses: { "fake-silence": FAKE_SILENCE } };
 }
 
 /** Fireside -> between-tricks fixture, driven exclusively through
  * applyRunAction (setupRun/advanceTo). `loadouts` defaults to p0 equipping
- * the Whistle and the Spyglass, per this plan's own fixture description. */
+ * the Whistle and the Spyglass, per this plan's own fixture description;
+ * Flare tests pass their own loadouts including "broadcast". */
 function setup(opts?: {
   seed?: string;
   campNumber?: CampNumber;
@@ -231,5 +232,87 @@ describe("Spyglass (peek)", () => {
     const result = checkUseGear(emptiedRun, "p0", "peek", ["p1"], catalog);
 
     expect(result).toEqual({ ok: false, error: "gear_unavailable", reason: "They have no cards" });
+  });
+});
+
+describe("Signal Flare (broadcast, D-08)", () => {
+  const FLARE_LOADOUTS = { p0: ["chatter", "peek", "broadcast"] };
+
+  it("a flared whisper's audience is every seat", () => {
+    const { run, catalog } = setup({ loadouts: FLARE_LOADOUTS });
+    const cardId = firstOwnCardId(run, "p0");
+
+    const flared = applyRunAction(run, "p0", { type: "use-gear", gearId: "broadcast", targets: [] }, catalog);
+    expect(flared.ok).toBe(true);
+    if (!flared.ok) return;
+
+    const whispered = applyRunAction(flared.state, "p0", { type: "whisper", targetSeatId: "p1", cardId }, catalog);
+    expect(whispered.ok).toBe(true);
+    if (!whispered.ok) return;
+
+    expect(whispered.state.attempt!.reveals[0]!.audience).toEqual(["p0", "p1", "p2"]);
+  });
+
+  it("a Whistle-granted second whisper after the flared first is private again", () => {
+    const { run, catalog } = setup({ loadouts: FLARE_LOADOUTS });
+    const cardId = firstOwnCardId(run, "p0");
+
+    const flared = applyRunAction(run, "p0", { type: "use-gear", gearId: "broadcast", targets: [] }, catalog);
+    expect(flared.ok).toBe(true);
+    if (!flared.ok) return;
+
+    const usedWhistle = applyRunAction(flared.state, "p0", { type: "use-gear", gearId: "chatter", targets: [] }, catalog);
+    expect(usedWhistle.ok).toBe(true);
+    if (!usedWhistle.ok) return;
+
+    const first = applyRunAction(usedWhistle.state, "p0", { type: "whisper", targetSeatId: "p1", cardId }, catalog);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(first.state.attempt!.reveals[0]!.audience).toEqual(["p0", "p1", "p2"]);
+
+    const second = applyRunAction(first.state, "p0", { type: "whisper", targetSeatId: "p1", cardId }, catalog);
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(second.state.attempt!.reveals[1]!.audience).toEqual(["p1"]);
+  });
+
+  it("checkUseGear refuses with 'You have already whispered this camp' once the owner has whispered", () => {
+    const { run, catalog } = setup({ loadouts: FLARE_LOADOUTS });
+    const cardId = firstOwnCardId(run, "p0");
+
+    const whispered = applyRunAction(run, "p0", { type: "whisper", targetSeatId: "p1", cardId }, catalog);
+    expect(whispered.ok).toBe(true);
+    if (!whispered.ok) return;
+
+    const result = checkUseGear(whispered.state, "p0", "broadcast", [], catalog);
+
+    expect(result).toEqual({ ok: false, error: "gear_unavailable", reason: "You have already whispered this camp" });
+  });
+
+  it("under a whisper-blocking boss, checkUseGear refuses with 'Whispers are blocked this camp'", () => {
+    const { run, catalog } = setup({
+      campNumber: 3,
+      bossTwists: { 3: "fake-silence", 6: null },
+      loadouts: FLARE_LOADOUTS,
+    });
+
+    const result = checkUseGear(run, "p0", "broadcast", [], catalog);
+
+    expect(result).toEqual({ ok: false, error: "gear_unavailable", reason: "Whispers are blocked this camp" });
+  });
+
+  it("affects only its owner: a teammate's whisper after the Flare is still audience-scoped to the target", () => {
+    const { run, catalog } = setup({ loadouts: FLARE_LOADOUTS });
+
+    const flared = applyRunAction(run, "p0", { type: "use-gear", gearId: "broadcast", targets: [] }, catalog);
+    expect(flared.ok).toBe(true);
+    if (!flared.ok) return;
+
+    const p1CardId = firstOwnCardId(flared.state, "p1");
+    const result = applyRunAction(flared.state, "p1", { type: "whisper", targetSeatId: "p2", cardId: p1CardId }, catalog);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state.attempt!.reveals[0]!.audience).toEqual(["p2"]);
   });
 });
