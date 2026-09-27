@@ -1,0 +1,153 @@
+// Phase 10 run-layer type contract (Plan 02). This is the single type
+// contract every later Phase 10 plan compiles against — do not rename a
+// field without updating those plans.
+//
+// DERIVE, DON'T CACHE: run phase, run status, a seat's capacity, the next
+// attempt number and a seat's remaining whisper count are all computable
+// from RunState and are deliberately NOT stored fields here. This mirrors
+// Phase 9's CampState discipline (no stored phase/outcome/tricks-won).
+//
+// RESET-ON-REPLAY CONTRACT (research A4): everything inside AttemptState
+// (bossCancelled, gearUses, effects, reveals, log, camp) is reset to a fresh
+// attempt on every replay (RUN-06). RunState's top-level fields — seatIds,
+// campNumber, supplies, seats (owned/equipped gear, draft offers),
+// bossTwists, readySeatIds, history — persist across a replay and across
+// camps; only `attempt` is torn down and rebuilt.
+//
+// A1 (labeled deviation from spec §6.5's "carried generator"): RunState
+// carries only the run's `seed` string, never a shuffle.ts-style generator
+// state tuple. Every draw derives a FRESH stream by a unique name via
+// run/rng.ts's STREAMS builder. This removes the "forgot to persist the
+// advanced generator state" bug class entirely — there is no mutable
+// generator state to forget to save.
+//
+// A1 STREAM-NAME TABLE (reproduced here so every later plan draws from the
+// same names; run/rng.ts's STREAMS is the single builder that realizes it):
+//   - draft:              "expedition-draft:camp{N}:seat{seatId}"
+//   - boss:                "expedition-boss:camp{N}"
+//   - attempt deal seed:   "{seed}:camp{N}:attempt{A}"
+//   - trick-count kind:    "expedition-trickcount-kind:camp{N}:attempt{A}"
+//   - trick-count N:       "expedition-trickcount-n:camp{N}:attempt{A}"
+//   - face-down assign:    "expedition-face-down:camp{N}:attempt{A}"
+//   - gear draws:          "expedition-gear:camp{N}:attempt{A}:use{k}:{gearId}:{seatId}:{purpose}"
+//     where k = attempt.gearUses.length at the time of use.
+// The rule: two draws never share a stream name. Draft and boss draws
+// happen AT MOST ONCE per camp number per run (a draft only follows a
+// CLEAR, a boss twist is drawn only on first reaching the camp — D-01/D-02),
+// so their names deliberately omit the attempt number. Every mid-camp draw
+// (gear) carries camp, attempt, use index k, gear id, seat and purpose, so
+// repeated gear use within the same attempt never collides.
+//
+// PRIVACY NOTES (for Phase 11's toPlayerView, not implemented here):
+//   - `seed` must NEVER be projected to any client; it is the root of every
+//     RNG stream and its exposure would let a client predict future draws.
+//   - `SeatRun.draftOffer` is OWNER-ONLY (RUN-04); Phase 11 redaction is a
+//     per-seat field lookup, not a filter over a shared list.
+//   - `Reveal.audience` is the ONLY list of seats allowed to see a reveal's
+//     card identity (COMM-02); a reveal not addressed to a seat must never
+//     appear in that seat's view.
+//
+// USE-GEAR TARGETS RULING: `RunAction`'s "use-gear" targets are a flat
+// `readonly string[]`, order-matched positionally to `GearDef.targets`
+// (orchestrator ruling). `player-pair` was dropped from the v1 target
+// vocabulary entirely because D-10 (Trail Map) removed its only user.
+
+import type { CampError, CampState } from "../state";
+import type { GearDef } from "../gear/gear-def";
+import type { BossDef } from "../boss/boss-def";
+
+export type CampNumber = 1 | 2 | 3 | 4 | 5 | 6;
+export type BossCampNumber = 3 | 6;
+
+export type SeatRun = {
+  readonly seatId: string;
+  readonly ownedGearIds: readonly string[]; // draft order; never shrinks
+  readonly equippedGearIds: readonly string[]; // PUBLIC loadout (RUN-05); persists across camps/replays (D-06)
+  readonly draftOffer: readonly string[] | null; // PRIVATE to seatId (RUN-04); null = no draft due
+};
+
+export type Reveal = {
+  readonly cardId: string;
+  readonly fromSeatId: string; // hand holding the card when revealed
+  readonly audience: readonly string[]; // the ONLY seats Phase 11 may show this card to
+  readonly source: string; // "whisper" or the gear id (e.g. "peek")
+};
+
+// Deliberately NO card id / identity fields: logs never carry card information.
+export type LogEntry = {
+  readonly event: string; // "whisper" | "use-gear" | gear-specific
+  readonly actorSeatId: string;
+  readonly subjectSeatIds: readonly string[];
+  readonly gearId: string | null;
+  readonly audience: "public" | readonly string[];
+};
+
+export type ActiveEffect = { readonly gearId: string; readonly seatId: string; readonly atTrick: number };
+export type GearUse = { readonly seatId: string; readonly gearId: string; readonly kind: "used" | "skipped" };
+
+export type AttemptState = {
+  readonly attemptNumber: number; // 1-based per campNumber
+  readonly bossCancelled: boolean; // Rain Poncho, this attempt only (D-04)
+  readonly gearUses: readonly GearUse[]; // used flags + pre-deal skips; its length is the RNG use-sequence k
+  readonly effects: readonly ActiveEffect[]; // mid-camp modifiers (addModifier), this attempt only
+  readonly reveals: readonly Reveal[]; // COMM-02: cleared with the attempt
+  readonly log: readonly LogEntry[];
+  readonly camp: CampState | null; // null during the pre-deal window
+};
+
+export type CampResult = {
+  readonly campNumber: CampNumber;
+  readonly attemptNumber: number;
+  readonly status: "succeeded" | "failed";
+  readonly suppliesSpent: number;
+};
+
+export type RunState = {
+  readonly seed: string; // A1 root of every RNG stream; Phase 11 must NEVER project it
+  readonly seatIds: readonly string[];
+  readonly campNumber: CampNumber;
+  readonly supplies: number;
+  readonly seats: readonly SeatRun[]; // same order as seatIds
+  readonly bossTwists: { readonly 3: string | null; readonly 6: string | null }; // D-02 fixed per boss camp
+  readonly readySeatIds: readonly string[]; // D-07 (pure data; disconnect handling is Phase 11)
+  readonly attempt: AttemptState | null; // null = fireside (or run over)
+  readonly history: readonly CampResult[];
+};
+
+export type RunStatus = "in_progress" | "won" | "lost";
+export type RunPhase = "fireside" | "pre-deal" | "camp" | "ended";
+
+export type RunAction =
+  | { readonly type: "pick-draft"; readonly gearId: string }
+  | { readonly type: "set-loadout"; readonly gearIds: readonly string[] }
+  | { readonly type: "ready" }
+  | { readonly type: "use-gear"; readonly gearId: string; readonly targets: readonly string[] }
+  | { readonly type: "skip-window" }
+  | { readonly type: "whisper"; readonly targetSeatId: string; readonly cardId: string }
+  | { readonly type: "pick-objective"; readonly objectiveId: string }
+  | { readonly type: "play-card"; readonly cardId: string };
+
+export type RunError =
+  | CampError
+  | "not_a_seat"
+  | "run_over"
+  | "draft_pending"
+  | "no_draft_pending"
+  | "not_offered"
+  | "gear_not_owned"
+  | "duplicate_gear"
+  | "over_capacity"
+  | "already_ready"
+  | "gear_not_equipped"
+  | "gear_already_used"
+  | "wrong_window"
+  | "invalid_target"
+  | "gear_unavailable"
+  | "whisper_blocked"
+  | "no_whispers_left"
+  | "nothing_to_skip";
+
+export type Catalog = {
+  readonly gear: Readonly<Record<string, GearDef>>;
+  readonly bosses: Readonly<Record<string, BossDef>>;
+};
