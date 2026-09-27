@@ -200,14 +200,13 @@ const GearStatusViewSchema = z.strictObject({
 });
 
 const CampResultViewSchema = z.strictObject({
-  campNumber: z.union([
-    z.literal(1),
-    z.literal(2),
-    z.literal(3),
-    z.literal(4),
-    z.literal(5),
-    z.literal(6),
-  ]),
+  // Plain ranged number (not a union of literals), matching the top-level
+  // `campNumber` field's convention below and `ExpeditionCampResultView`'s
+  // `campNumber: number` — a literal-union inferred type here would make
+  // `ExpeditionView` (whose history entries carry plain `number`) fail the
+  // compile-time `[ExpeditionView] extends [ExpeditionViewWire]` assertion
+  // in game-registration.ts (found via that assertion, Plan 11-06).
+  campNumber: z.number().int().min(1).max(6),
   attemptNumber: z.number().int().min(1),
   status: z.enum(["succeeded", "failed"]),
   suppliesSpent: z.number().int().min(0),

@@ -17,11 +17,12 @@ export type Variant = z.infer<typeof VariantSchema>;
 
 /** D-09: the closed set of PRODUCTION-REGISTERED games. Only games with a
  * live registry entry (`apps/worker/src/game-registration.ts`) belong here —
- * Expedition joins this enum alongside its registry entry in Phase 11, not
- * before. A test-only toy game used to prove the registry seam (D-10) is
- * deliberately never added here, so it can never flow through this wire
- * schema. */
-export const GameIdSchema = z.enum(["hanabi"]);
+ * Expedition joined this enum in Phase 11, alongside its registry entry
+ * (D-09 fulfilled). The landing page's Expedition picker option stays
+ * disabled ("coming soon") until Phase 12 mounts its UI (D-12). A test-only
+ * toy game used to prove the registry seam (D-10) is deliberately never
+ * added here, so it can never flow through this wire schema. */
+export const GameIdSchema = z.enum(["hanabi", "expedition"]);
 export type GameId = z.infer<typeof GameIdSchema>;
 
 export const RoomStatusSchema = z.enum(["lobby", "in_progress", "ended"]);

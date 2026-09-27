@@ -4,15 +4,32 @@
 // mapError/displayName solely through `resolveGame`/`GAME_REGISTRY` below,
 // never by importing a game's own package directly.
 //
-// The production registry holds Hanabi only in this phase (D-09) — a second
-// game (the test-only toy game, plan 08-07) is proven through the injectable
-// `games` parameter every registry-reading function in room-state.ts and
-// seat-projection.ts takes, never by widening this file's own registry.
+// The production registry holds Hanabi and Expedition (D-09 fulfilled in
+// Phase 11) — a third game (the test-only toy game, plan 08-07) is proven
+// through the injectable `games` parameter every registry-reading function
+// in room-state.ts and seat-projection.ts takes, never by widening this
+// file's own registry.
 
-import { hanabiGame } from "@games/rules";
-import type { AdapterError, GameAdapter, GameEndResult, HanabiAction, HanabiState, HanabiView, Variant } from "@games/rules";
+import { hanabiGame, expeditionGame } from "@games/rules";
+import type {
+  AdapterError,
+  GameAdapter,
+  GameEndResult,
+  HanabiAction,
+  HanabiState,
+  HanabiView,
+  Variant,
+  ExpeditionConfig,
+  ExpeditionEndResult,
+  ExpeditionView,
+  RunAction,
+  RunError,
+  RunState,
+} from "@games/rules";
 import { HANABI_GAME_ID, HanabiViewSchema } from "@games/schema/games/hanabi";
 import type { HanabiViewWire, HanabiErrorCode } from "@games/schema/games/hanabi";
+import { EXPEDITION_GAME_ID, ExpeditionViewSchema, ExpeditionConfigSchema } from "@games/schema/games/expedition";
+import type { ExpeditionViewWire, ExpeditionErrorCode } from "@games/schema/games/expedition";
 import { VariantSchema, type GameErrorDetail, type GameId } from "@games/schema";
 import type { z } from "zod";
 
@@ -44,6 +61,66 @@ function mapError(error: AdapterError): GameErrorDetail {
     default: {
       const exhaustiveCheck: never = error;
       throw new Error(`Unrecognized AdapterError: ${String(exhaustiveCheck)}`);
+    }
+  }
+}
+
+/** Expedition's own error mapper — an exhaustive switch over all 24
+ * `RunError` members with a `never`-typed default, mirroring Hanabi's
+ * `mapError` above exactly (D-07, D-08). No `String(error)` fallback. */
+function mapExpeditionError(error: RunError): GameErrorDetail {
+  switch (error) {
+    case "not_your_turn":
+      return { gameId: EXPEDITION_GAME_ID, code: "not_your_turn" };
+    case "wrong_phase":
+      return { gameId: EXPEDITION_GAME_ID, code: "wrong_phase" };
+    case "camp_over":
+      return { gameId: EXPEDITION_GAME_ID, code: "camp_over" };
+    case "card_not_in_hand":
+      return { gameId: EXPEDITION_GAME_ID, code: "card_not_in_hand" };
+    case "must_follow_suit":
+      return { gameId: EXPEDITION_GAME_ID, code: "must_follow_suit" };
+    case "objective_not_available":
+      return { gameId: EXPEDITION_GAME_ID, code: "objective_not_available" };
+    case "invalid_action":
+      return { gameId: EXPEDITION_GAME_ID, code: "invalid_action" };
+    case "not_a_seat":
+      return { gameId: EXPEDITION_GAME_ID, code: "not_a_seat" };
+    case "run_over":
+      return { gameId: EXPEDITION_GAME_ID, code: "run_over" };
+    case "draft_pending":
+      return { gameId: EXPEDITION_GAME_ID, code: "draft_pending" };
+    case "no_draft_pending":
+      return { gameId: EXPEDITION_GAME_ID, code: "no_draft_pending" };
+    case "not_offered":
+      return { gameId: EXPEDITION_GAME_ID, code: "not_offered" };
+    case "gear_not_owned":
+      return { gameId: EXPEDITION_GAME_ID, code: "gear_not_owned" };
+    case "duplicate_gear":
+      return { gameId: EXPEDITION_GAME_ID, code: "duplicate_gear" };
+    case "over_capacity":
+      return { gameId: EXPEDITION_GAME_ID, code: "over_capacity" };
+    case "already_ready":
+      return { gameId: EXPEDITION_GAME_ID, code: "already_ready" };
+    case "gear_not_equipped":
+      return { gameId: EXPEDITION_GAME_ID, code: "gear_not_equipped" };
+    case "gear_already_used":
+      return { gameId: EXPEDITION_GAME_ID, code: "gear_already_used" };
+    case "wrong_window":
+      return { gameId: EXPEDITION_GAME_ID, code: "wrong_window" };
+    case "invalid_target":
+      return { gameId: EXPEDITION_GAME_ID, code: "invalid_target" };
+    case "gear_unavailable":
+      return { gameId: EXPEDITION_GAME_ID, code: "gear_unavailable" };
+    case "whisper_blocked":
+      return { gameId: EXPEDITION_GAME_ID, code: "whisper_blocked" };
+    case "no_whispers_left":
+      return { gameId: EXPEDITION_GAME_ID, code: "no_whispers_left" };
+    case "nothing_to_skip":
+      return { gameId: EXPEDITION_GAME_ID, code: "nothing_to_skip" };
+    default: {
+      const exhaustiveCheck: never = error;
+      throw new Error(`Unrecognized RunError: ${String(exhaustiveCheck)}`);
     }
   }
 }
@@ -84,6 +161,36 @@ type _AssertKeysMutuallyAssignable = [keyof HanabiView] extends [keyof HanabiVie
   : never;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _assertKeysMutuallyAssignable: _AssertKeysMutuallyAssignable = true;
+
+// ---------------------------------------------------------------------------
+// Compile-time contract check (no runtime cost), Expedition's counterpart to
+// the three Hanabi assertions above: `RunError` (the adapter's own TS error
+// union) and `ExpeditionErrorCode` (the Zod schema's inferred type) must stay
+// mutually assignable, so `mapExpeditionError` above can never silently
+// drift from the wire's closed vocabulary; `ExpeditionView` (the adapter's TS
+// view type) must stay assignable to `ExpeditionViewWire` (the Zod schema's
+// inferred type), with mutually assignable top-level key sets.
+// ---------------------------------------------------------------------------
+
+type _AssertExpeditionErrorMutuallyAssignable = [RunError] extends [ExpeditionErrorCode]
+  ? [ExpeditionErrorCode] extends [RunError]
+    ? true
+    : never
+  : never;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _assertExpeditionErrorMutuallyAssignable: _AssertExpeditionErrorMutuallyAssignable = true;
+
+type _AssertExpeditionViewAssignable = [ExpeditionView] extends [ExpeditionViewWire] ? true : never;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _assertExpeditionViewAssignable: _AssertExpeditionViewAssignable = true;
+
+type _AssertExpeditionKeysMutuallyAssignable = [keyof ExpeditionView] extends [keyof ExpeditionViewWire]
+  ? [keyof ExpeditionViewWire] extends [keyof ExpeditionView]
+    ? true
+    : never
+  : never;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _assertExpeditionKeysMutuallyAssignable: _AssertExpeditionKeysMutuallyAssignable = true;
 
 // ---------------------------------------------------------------------------
 // The registry (D-08)
@@ -128,8 +235,8 @@ export function defineGame<TState, TAction, TConfig, TEndResult, TError extends 
 
 export type GameRegistry = Readonly<Record<string, GameRegistryEntry>>;
 
-/** D-09: the PRODUCTION registry. Hanabi only in this phase — Expedition
- * joins alongside `GameIdSchema`'s widening in Phase 11. `satisfies
+/** D-09: the PRODUCTION registry. Hanabi and Expedition, as of Phase 11
+ * (D-09 fulfilled alongside `GameIdSchema`'s widening). `satisfies
  * Readonly<Record<GameId, GameRegistryEntry>>` means a future widening of
  * `GameId` without a matching entry here fails to compile. */
 export const GAME_REGISTRY = Object.freeze({
@@ -142,6 +249,16 @@ export const GAME_REGISTRY = Object.freeze({
     defaultConfig: "base",
     limits: { min: 2, max: 5 }, // ROOM-06, D-10
     mapError,
+  }),
+  [EXPEDITION_GAME_ID]: defineGame<RunState, RunAction, ExpeditionConfig, ExpeditionEndResult, RunError>({
+    gameId: EXPEDITION_GAME_ID,
+    displayName: "Expedition",
+    adapter: expeditionGame,
+    viewSchema: ExpeditionViewSchema,
+    configSchema: ExpeditionConfigSchema,
+    defaultConfig: null,
+    limits: { min: 3, max: 5 }, // MGR-02
+    mapError: mapExpeditionError,
   }),
 }) satisfies Readonly<Record<GameId, GameRegistryEntry>>;
 

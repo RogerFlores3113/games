@@ -9,7 +9,39 @@ describe("CreateRoomRequestSchema (D-03)", () => {
   });
 
   it("rejects an unrecognized gameId", () => {
-    expect(CreateRoomRequestSchema.safeParse({ ...valid, gameId: "expedition" }).success).toBe(false);
+    expect(CreateRoomRequestSchema.safeParse({ ...valid, gameId: "innovation" }).success).toBe(false);
+  });
+
+  it("accepts a valid Expedition request", () => {
+    expect(
+      CreateRoomRequestSchema.safeParse({ gameId: "expedition", displayName: "Roger", config: null }).success,
+    ).toBe(true);
+  });
+
+  it("rejects an Expedition request with a non-null config", () => {
+    expect(
+      CreateRoomRequestSchema.safeParse({ gameId: "expedition", displayName: "Roger", config: "base" }).success,
+    ).toBe(false);
+    expect(
+      CreateRoomRequestSchema.safeParse({ gameId: "expedition", displayName: "Roger", config: {} }).success,
+    ).toBe(false);
+  });
+
+  it("rejects an Expedition request missing config", () => {
+    expect(
+      CreateRoomRequestSchema.safeParse({ gameId: "expedition", displayName: "Roger" }).success,
+    ).toBe(false);
+  });
+
+  it("rejects an Expedition request with an extra key", () => {
+    expect(
+      CreateRoomRequestSchema.safeParse({
+        gameId: "expedition",
+        displayName: "Roger",
+        config: null,
+        extra: "nope",
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects a missing config", () => {

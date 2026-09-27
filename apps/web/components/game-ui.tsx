@@ -3,6 +3,7 @@ import type { GameId, RoomView } from "@games/schema";
 import { HanabiBoard, type HanabiActionRequest } from "./hanabi/HanabiBoard";
 import { HanabiLobbySettings } from "./hanabi/HanabiLobbySettings";
 import { HanabiCreateSettings } from "./hanabi/HanabiCreateSettings";
+import { ExpeditionBoard } from "./expedition/ExpeditionBoard";
 
 /**
  * D-11: the ONLY web module permitted to name a specific game's UI
@@ -25,6 +26,7 @@ export interface BoardProps {
 // board.
 export const BOARD_COMPONENTS: Readonly<Record<GameId, ComponentType<BoardProps>>> = {
   hanabi: HanabiBoard as unknown as ComponentType<BoardProps>,
+  expedition: ExpeditionBoard,
 };
 
 export interface LobbySettingsProps {
@@ -42,11 +44,11 @@ export const LOBBY_SETTINGS: Readonly<Partial<Record<GameId, ComponentType<Lobby
   hanabi: HanabiLobbySettings,
 };
 
-// D-12: the landing page's game picker options. Client-side only —
-// Expedition is NOT a registered GameId until Phase 11, so this list
-// (unlike BOARD_COMPONENTS/LOBBY_SETTINGS) is not keyed by GameId and is not
-// exhaustive over it; it is the one place allowed to name a not-yet-real
-// game for the "coming soon" disabled option.
+// D-12: the landing page's game picker options. Expedition is registered as
+// of Phase 11 (GameIdSchema/GAME_REGISTRY both hold it); the option stays
+// disabled here until Phase 12 enables it (D-12). Client-side only — this
+// list (unlike BOARD_COMPONENTS/LOBBY_SETTINGS) is not keyed by GameId and
+// is not required to be exhaustive over it.
 export const LANDING_GAME_OPTIONS: readonly { value: string; label: string; disabled: boolean }[] = [
   { value: "hanabi", label: "Hanabi", disabled: false },
   { value: "expedition", label: "Expedition - coming soon", disabled: true },

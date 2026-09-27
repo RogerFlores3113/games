@@ -121,11 +121,17 @@ describe("ClientMessageSchema", () => {
 
   it("rejects a join carrying an unregistered gameId", () => {
     expect(
-      ClientMessageSchema.safeParse({ type: "join", displayName: "Roger", gameId: "expedition" }).success,
+      ClientMessageSchema.safeParse({ type: "join", displayName: "Roger", gameId: "innovation" }).success,
     ).toBe(false);
     expect(
       ClientMessageSchema.safeParse({ type: "join", displayName: "Roger", gameId: "__toy__" }).success,
     ).toBe(false);
+  });
+
+  it("accepts a join carrying gameId 'expedition'", () => {
+    expect(
+      ClientMessageSchema.safeParse({ type: "join", displayName: "Roger", gameId: "expedition" }).success,
+    ).toBe(true);
   });
 
   it("accepts set_config with a string config and with an arbitrary object config (validated downstream)", () => {
@@ -260,9 +266,30 @@ describe("ErrorMessageSchema.detail / gameError (D-07/D-08 closed enums)", () =>
     expect(() => encodeServerMessage(msg)).toThrow();
   });
 
-  it("throws for gameError { gameId: 'expedition', code: 'x' } (unregistered gameId)", () => {
-    const msg = { type: "error", code: "bad_request", gameError: { gameId: "expedition", code: "x" } };
-    // @ts-expect-error — "expedition" is not a member of the discriminated union
+  it("throws for gameError { gameId: 'innovation', code: 'x' } (unregistered gameId)", () => {
+    const msg = { type: "error", code: "bad_request", gameError: { gameId: "innovation", code: "x" } };
+    // @ts-expect-error — "innovation" is not a member of the discriminated union
+    expect(() => encodeServerMessage(msg)).toThrow();
+  });
+
+  it("encodes a gameError { gameId: 'expedition', code: 'no_whispers_left' }", () => {
+    const msg: ServerMessage = {
+      type: "error",
+      code: "bad_request",
+      gameError: { gameId: "expedition", code: "no_whispers_left" },
+    };
+    const encoded = encodeServerMessage(msg);
+    expect(encoded).toContain("expedition");
+    expect(encoded).toContain("no_whispers_left");
+  });
+
+  it("throws for gameError { gameId: 'expedition', code: 'clue_touches_nothing' } (a Hanabi-only code)", () => {
+    const msg = {
+      type: "error",
+      code: "bad_request",
+      gameError: { gameId: "expedition", code: "clue_touches_nothing" },
+    };
+    // @ts-expect-error — "clue_touches_nothing" is not a member of ExpeditionErrorCodeSchema
     expect(() => encodeServerMessage(msg)).toThrow();
   });
 

@@ -7,6 +7,7 @@ import {
   GameIdSchema,
 } from "./room";
 import { HanabiErrorCodeSchema } from "./games/hanabi-errors";
+import { ExpeditionErrorCodeSchema } from "./games/expedition-errors";
 
 // ---------------------------------------------------------------------------
 // Client -> Server
@@ -170,6 +171,7 @@ export type RoomErrorDetail = z.infer<typeof RoomErrorDetailSchema>;
 
 export const GameErrorDetailSchema = z.discriminatedUnion("gameId", [
   z.strictObject({ gameId: z.literal(GameIdSchema.enum.hanabi), code: HanabiErrorCodeSchema }),
+  z.strictObject({ gameId: z.literal(GameIdSchema.enum.expedition), code: ExpeditionErrorCodeSchema }),
 ]);
 export type GameErrorDetail = z.infer<typeof GameErrorDetailSchema>;
 

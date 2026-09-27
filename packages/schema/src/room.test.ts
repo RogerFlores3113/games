@@ -86,15 +86,19 @@ describe("branded types (compile-time)", () => {
 });
 
 describe("GameIdSchema (D-09)", () => {
-  it("options is exactly [\"hanabi\"]", () => {
-    expect(GameIdSchema.options).toEqual(["hanabi"]);
+  it("options is exactly [\"hanabi\", \"expedition\"]", () => {
+    expect(GameIdSchema.options).toEqual(["hanabi", "expedition"]);
   });
 
   it("accepts \"hanabi\"", () => {
     expect(GameIdSchema.safeParse("hanabi").success).toBe(true);
   });
 
-  it.each(["expedition", "innovation", "__toy__", ""])("rejects %j", (value) => {
+  it("accepts \"expedition\"", () => {
+    expect(GameIdSchema.safeParse("expedition").success).toBe(true);
+  });
+
+  it.each(["innovation", "__toy__", ""])("rejects %j", (value) => {
     expect(GameIdSchema.safeParse(value).success).toBe(false);
   });
 });
@@ -135,9 +139,14 @@ describe("RoomViewSchema (D-04, D-05, MGR-02)", () => {
     expect(RoomViewSchema.safeParse(view).success).toBe(false);
   });
 
-  it("rejects gameId \"expedition\" (not production-registered)", () => {
-    const view = { ...baseView(), gameId: "expedition" };
+  it("rejects gameId \"innovation\" (not production-registered)", () => {
+    const view = { ...baseView(), gameId: "innovation" };
     expect(RoomViewSchema.safeParse(view).success).toBe(false);
+  });
+
+  it("accepts a RoomView with gameId \"expedition\" and config null", () => {
+    const view = { ...baseView(), gameId: "expedition", gameDisplayName: "Expedition", config: null };
+    expect(RoomViewSchema.safeParse(view).success).toBe(true);
   });
 });
 
