@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 09-07-PLAN.md
-last_updated: "2026-09-27T02:43:58.261Z"
+stopped_at: Completed 09-08-PLAN.md
+last_updated: "2026-09-27T02:51:31.767Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 18
-  completed_plans: 17
-  percent: 13
+  completed_plans: 18
+  percent: 25
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 9 (Expedition Rules Core) — EXECUTING
-Plan: 2 of 8
+Plan: 3 of 8
 Status: Ready to execute
 Last activity: 2026-09-27
 
@@ -162,6 +162,7 @@ Last activity: 2026-09-27
 | Phase 09 P05 | 20min | 2 tasks | 4 files |
 | Phase 09 P06 | 35min | 3 tasks | 4 files |
 | Phase 09 P07 | 45min | 2 tasks tasks | 3 files files |
+| Phase 09 P08 | 25min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -377,6 +378,7 @@ Recent decisions affecting current work:
 - [Phase 09]: Objective failure-timing oracles independently restate spec text from completedTricks, never calling evaluateObjective inside the oracle body
 - [Phase 09-07]: orderedKind.evaluate's resolved branch made symmetric (otherTrickIndex < myTrickIndex fails, equal indices stay A-TIE), closing WR-01 -- failed is now provably absorbing for all four objective kinds
 - [Phase 09-07]: objectives.property.test.ts's orderedOracle rewritten as an independent pair-based restatement of spec section 5.2 (markerPrecedes, no Infinity marker mapping), closing WR-02's self-confirming oracle
+- [Phase 09-08]: invalid_rule_hook added as the last CampError member; createCamp throws per its existing malformed-input contract when leaderFor returns an unknown seat; WR-03 (isTrump hook) explicitly excluded, deferred to Phase 10
 
 ### Pending Todos
 
@@ -413,8 +415,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T02:43:58.254Z
-Stopped at: Completed 09-07-PLAN.md
+Last session: 2026-09-27T02:51:31.759Z
+Stopped at: Completed 09-08-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
