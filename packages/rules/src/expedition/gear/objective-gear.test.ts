@@ -1,0 +1,299 @@
+// Tests for the v1 objective gear (Plan 10-09, GEAR-02): Compass
+// (reroll.ts) and Trail Map (reassign.ts, D-10). Camouflage (ghost.ts,
+// D-11) is added by Task 2 of this plan.
+//
+// Fixtures are driven through applyRunAction (run-actions.ts) and the
+// run-test-support helpers (setupRun/advanceTo) wherever the behavior under
+// test is a normal action sequence. Where a test needs a "spread" camp (a
+// completed trick engineered to force an objective done) the plan's own
+// instruction applies: build the CampState by hand and evaluate it with
+// rulesFor/checkUseGear directly — never push a hand-built state through
+// applyRunAction, which would re-validate it as a fresh transition target.
+
+import { describe, expect, it } from "vitest";
+import { currentActorSeatId } from "../camp";
+import { evaluateObjective } from "../objectives";
+import { applyRunAction } from "../run/run-actions";
+import { advanceTo, setupRun } from "../run/run-test-support";
+import { checkUseGear } from "../run/use-gear";
+import { rulesFor } from "../run/compose";
+import type { BossDef } from "../boss/boss-def";
+import type { CampState, CompletedTrick, StandardIdentity } from "../state";
+import type { Catalog, CampNumber, RunState } from "../run/types";
+import { reroll } from "./reroll";
+import { reassign } from "./reassign";
+
+const SEAT_IDS = ["p0", "p1", "p2"] as const;
+const SEED = "objective-gear-seed";
+
+const NO_BOSSES: Record<string, BossDef> = {};
+
+function makeCatalog(): Catalog {
+  return { gear: { reroll, reassign }, bosses: NO_BOSSES };
+}
+
+function setup(opts: {
+  campNumber: CampNumber;
+  loadouts?: Readonly<Record<string, readonly string[]>>;
+  target: "objective-pick" | "between-tricks";
+}): { run: RunState; catalog: Catalog } {
+  const catalog = makeCatalog();
+  const run = advanceTo(
+    setupRun({
+      seatIds: [...SEAT_IDS],
+      seed: SEED,
+      catalog,
+      campNumber: opts.campNumber,
+      loadouts: opts.loadouts ?? {},
+    }),
+    opts.target,
+    catalog,
+  );
+  return { run, catalog };
+}
+
+/** Forces a win-card objective to "done" by appending a synthetic completed
+ * trick whose single play carries the objective's own target identity, won
+ * by the objective's current owner. Only valid for an owned win-card
+ * objective; throws otherwise (a fixture-construction bug, not something a
+ * test should ever hit). */
+function forceWinCardDone(camp: CampState, objectiveId: string, cardId: string): CampState {
+  const objective = camp.objectives.find((o) => o.id === objectiveId);
+  if (objective === undefined || objective.kind !== "win-card" || objective.ownerSeatId === null) {
+    throw new Error(`forceWinCardDone: "${objectiveId}" is not an owned win-card objective`);
+  }
+  const target: StandardIdentity = objective.target;
+  const winnerSeatId = objective.ownerSeatId;
+  const trick: CompletedTrick = {
+    index: camp.completedTricks.length,
+    leaderSeatId: winnerSeatId,
+    plays: [{ seatId: winnerSeatId, card: { id: cardId, identity: target } }],
+    winnerSeatId,
+  };
+  return { ...camp, completedTricks: [...camp.completedTricks, trick] };
+}
+
+function withCamp(run: RunState, camp: CampState): RunState {
+  return { ...run, attempt: { ...run.attempt!, camp } };
+}
+
+describe("Compass (reroll)", () => {
+  /** Camp 4 (an ordered ①② pair plus two win-card slots), with `reroll`
+   * equipped to a seat determined NOT to be the first objective-pick actor
+   * (a probe run, sharing the same seed/campNumber so the deal and leader
+   * are identical, discovers that seat first — dealing never depends on
+   * loadouts). */
+  function setupCompass(): { run: RunState; catalog: Catalog; nonPickerSeatId: string; pickerSeatId: string } {
+    const catalog = makeCatalog();
+    const probe = advanceTo(
+      setupRun({ seatIds: [...SEAT_IDS], seed: SEED, catalog, campNumber: 4 }),
+      "objective-pick",
+      catalog,
+    );
+    const probeRules = rulesFor(probe, catalog);
+    const pickerSeatId = currentActorSeatId(probe.attempt!.camp!, probeRules)!;
+    const nonPickerSeatId = SEAT_IDS.find((id) => id !== pickerSeatId)!;
+
+    const run = advanceTo(
+      setupRun({
+        seatIds: [...SEAT_IDS],
+        seed: SEED,
+        catalog,
+        campNumber: 4,
+        loadouts: { [nonPickerSeatId]: ["reroll"] },
+      }),
+      "objective-pick",
+      catalog,
+    );
+    return { run, catalog, nonPickerSeatId, pickerSeatId };
+  }
+
+  it("rerolls an unowned ordered objective, keeping its id/kind/order and replacing target with the deck's top card", () => {
+    const { run, catalog, nonPickerSeatId, pickerSeatId } = setupCompass();
+    const camp = run.attempt!.camp!;
+    const rules = rulesFor(run, catalog);
+
+    // Demonstrates the gear is usable by a seat that is NOT the current picker.
+    expect(currentActorSeatId(camp, rules)).toBe(pickerSeatId);
+    expect(nonPickerSeatId).not.toBe(pickerSeatId);
+
+    const ordered1 = camp.objectives.find((o) => o.kind === "ordered" && o.order === 1)!;
+    const topOfDeck = camp.objectiveDeck[0]!;
+    const deckLenBefore = camp.objectiveDeck.length;
+
+    const result = applyRunAction(
+      run,
+      nonPickerSeatId,
+      { type: "use-gear", gearId: "reroll", targets: [ordered1.id] },
+      catalog,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const nextCamp = result.state.attempt!.camp!;
+    const rerolled = nextCamp.objectives.find((o) => o.id === ordered1.id)!;
+    expect(rerolled.kind).toBe("ordered");
+    expect(rerolled.kind === "ordered" && rerolled.order).toBe(1);
+    expect(rerolled.kind === "ordered" && rerolled.target).toEqual(topOfDeck);
+    expect(nextCamp.objectiveDeck.length).toBe(deckLenBefore - 1);
+  });
+
+  it("a second use is gear_already_used", () => {
+    const { run, catalog, nonPickerSeatId } = setupCompass();
+    const camp = run.attempt!.camp!;
+    const ordered1 = camp.objectives.find((o) => o.kind === "ordered" && o.order === 1)!;
+    const ordered2 = camp.objectives.find((o) => o.kind === "ordered" && o.order === 2)!;
+
+    const first = applyRunAction(
+      run,
+      nonPickerSeatId,
+      { type: "use-gear", gearId: "reroll", targets: [ordered1.id] },
+      catalog,
+    );
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+
+    const second = applyRunAction(
+      first.state,
+      nonPickerSeatId,
+      { type: "use-gear", gearId: "reroll", targets: [ordered2.id] },
+      catalog,
+    );
+    expect(second.ok).toBe(false);
+    if (second.ok) return;
+    expect(second.error).toBe("gear_already_used");
+  });
+
+  it("targeting an owned objective is invalid_target", () => {
+    const { run, catalog, nonPickerSeatId, pickerSeatId } = setupCompass();
+    const camp = run.attempt!.camp!;
+    const winCard = camp.objectives.find((o) => o.kind === "win-card")!;
+
+    const picked = applyRunAction(
+      run,
+      pickerSeatId,
+      { type: "pick-objective", objectiveId: winCard.id },
+      catalog,
+    );
+    expect(picked.ok).toBe(true);
+    if (!picked.ok) return;
+
+    const result = applyRunAction(
+      picked.state,
+      nonPickerSeatId,
+      { type: "use-gear", gearId: "reroll", targets: [winCard.id] },
+      catalog,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe("invalid_target");
+  });
+
+  it("targeting a no-tricks/exactly-n objective (camp 5) gives 'Only card objectives can be rerolled'", () => {
+    const { run, catalog } = setup({ campNumber: 5, loadouts: { p0: ["reroll"] }, target: "objective-pick" });
+    const camp = run.attempt!.camp!;
+    const cardless = camp.objectives.find((o) => o.kind === "no-tricks" || o.kind === "exactly-n")!;
+
+    const check = checkUseGear(run, "p0", "reroll", [cardless.id], catalog);
+    expect(check.ok).toBe(false);
+    if (check.ok) return;
+    expect(check.reason).toBe("Only card objectives can be rerolled");
+  });
+
+  it("using it between tricks is wrong_window", () => {
+    const catalog = makeCatalog();
+    const run = advanceTo(
+      setupRun({ seatIds: [...SEAT_IDS], seed: SEED, catalog, campNumber: 4, loadouts: { p0: ["reroll"] } }),
+      "between-tricks",
+      catalog,
+    );
+
+    const check = checkUseGear(run, "p0", "reroll", [], catalog);
+    expect(check.ok).toBe(false);
+    if (check.ok) return;
+    expect(check.error).toBe("wrong_window");
+  });
+});
+
+describe("Trail Map (reassign, D-10)", () => {
+  function setupTrailMap(): { run: RunState; catalog: Catalog } {
+    return setup({ campNumber: 2, loadouts: { p0: ["reassign"] }, target: "between-tricks" });
+  }
+
+  it("swaps only the pending objectives between the user and the chosen teammate", () => {
+    const { run, catalog } = setupTrailMap();
+    const camp = run.attempt!.camp!;
+    const beforeP0 = camp.objectives.find((o) => o.ownerSeatId === "p0")!;
+    const beforeP1 = camp.objectives.find((o) => o.ownerSeatId === "p1")!;
+    const beforeP2 = camp.objectives.find((o) => o.ownerSeatId === "p2")!;
+
+    const result = applyRunAction(
+      run,
+      "p0",
+      { type: "use-gear", gearId: "reassign", targets: ["p1"] },
+      catalog,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const nextObjectives = result.state.attempt!.camp!.objectives;
+    expect(nextObjectives.find((o) => o.id === beforeP0.id)!.ownerSeatId).toBe("p1");
+    expect(nextObjectives.find((o) => o.id === beforeP1.id)!.ownerSeatId).toBe("p0");
+    expect(nextObjectives.find((o) => o.id === beforeP2.id)!.ownerSeatId).toBe("p2");
+  });
+
+  it("D-10: a done objective stays with its owner even though it is targeted by the swap", () => {
+    const { run, catalog } = setupTrailMap();
+    const camp = run.attempt!.camp!;
+    const p0Objective = camp.objectives.find((o) => o.ownerSeatId === "p0")!;
+    const p1Objective = camp.objectives.find((o) => o.ownerSeatId === "p1")!;
+
+    const spreadCamp = forceWinCardDone(camp, p0Objective.id, "forced-done-1");
+    expect(evaluateObjective(spreadCamp, spreadCamp.objectives.find((o) => o.id === p0Objective.id)!)).toBe("done");
+
+    const spreadRun = withCamp(run, spreadCamp);
+    const result = applyRunAction(
+      spreadRun,
+      "p0",
+      { type: "use-gear", gearId: "reassign", targets: ["p1"] },
+      catalog,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const nextObjectives = result.state.attempt!.camp!.objectives;
+    // Done, so it stays with p0 despite being targeted by the swap.
+    expect(nextObjectives.find((o) => o.id === p0Objective.id)!.ownerSeatId).toBe("p0");
+    // Still pending, so it moves as usual.
+    expect(nextObjectives.find((o) => o.id === p1Objective.id)!.ownerSeatId).toBe("p0");
+  });
+
+  it("a self target is invalid_target", () => {
+    const { run, catalog } = setupTrailMap();
+    const result = applyRunAction(
+      run,
+      "p0",
+      { type: "use-gear", gearId: "reassign", targets: ["p0"] },
+      catalog,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe("invalid_target");
+  });
+
+  it("gives 'Neither of you has an unresolved objective' when both are already done", () => {
+    const { run, catalog } = setupTrailMap();
+    const camp = run.attempt!.camp!;
+    const p0Objective = camp.objectives.find((o) => o.ownerSeatId === "p0")!;
+    const p1Objective = camp.objectives.find((o) => o.ownerSeatId === "p1")!;
+
+    let spreadCamp = forceWinCardDone(camp, p0Objective.id, "forced-done-p0");
+    spreadCamp = forceWinCardDone(spreadCamp, p1Objective.id, "forced-done-p1");
+    const spreadRun = withCamp(run, spreadCamp);
+
+    const check = checkUseGear(spreadRun, "p0", "reassign", ["p1"], catalog);
+    expect(check.ok).toBe(false);
+    if (check.ok) return;
+    expect(check.reason).toBe("Neither of you has an unresolved objective");
+  });
+});
