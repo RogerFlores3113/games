@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 // Bare specifier resolved via the vitest alias / tsconfig paths entry added
 // in this task; proves the subpath resolves identically in both Vitest and tsc.
 import { HANABI_GAME_ID, HanabiViewSchema } from "@games/schema/games/hanabi";
+import { EXPEDITION_GAME_ID, ExpeditionViewSchema } from "@games/schema/games/expedition";
 import { RoomViewSchema } from "../room";
 
 describe("subpath wiring (D-06, FDN-01)", () => {
@@ -12,12 +13,18 @@ describe("subpath wiring (D-06, FDN-01)", () => {
     expect(HanabiViewSchema.safeParse({}).success).toBe(false);
   });
 
-  it("the generic barrel (index.ts) never mentions games/, ForeheadCard, or Hanabi", () => {
+  it("resolves @games/schema/games/expedition as a bare specifier (proves alias ordering)", () => {
+    expect(EXPEDITION_GAME_ID).toBe("expedition");
+    expect(ExpeditionViewSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("the generic barrel (index.ts) never mentions games/, ForeheadCard, Hanabi, or Expedition", () => {
     const indexPath = fileURLToPath(new URL("../index.ts", import.meta.url));
     const text = readFileSync(indexPath, "utf-8");
     expect(text).not.toContain("games/");
     expect(text).not.toContain("ForeheadCard");
     expect(text).not.toContain("Hanabi");
+    expect(text).not.toContain("Expedition");
   });
 
   it("RoomViewSchema.game stays z.unknown() — accepts an arbitrary game object", () => {
