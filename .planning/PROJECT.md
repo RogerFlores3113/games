@@ -46,6 +46,7 @@ A friend clicks a link and is playing within seconds — and the game does not b
 - ✓ All v1.0 Hanabi requirements (80/80) — *v1.0, audited 2026-09-22; see `.planning/milestones/v1.0-REQUIREMENTS.md`*
 - ✓ A pure, framework-free Expedition rules engine exists (XRULE-01..08) — *Validated in Phase 9: Expedition Rules Core — 54/52/50-card deal with public removed cards, Sun/Moon joker follow-suit and trick winner, Sun/A♠ leader, clockwise objective picking, all four objective kinds with instant failure detection, no undo/auto-play; proven by fast-check whole-camp and failure-timing properties with an independent ordered-objective oracle. Not yet wired to the room layer (Phase 11); hook-robustness warnings WR-03/05/06 deferred to Phase 10.*
 - ✓ The six-camp Expedition run on a layered hook/toolkit engine (COMM-01/02, RUN-01..07, GEAR-01..04, BOSS-01, ENG-01/02; engine side of GEAR-05/06) — *Validated in Phase 10: Run Layer, Gear Engine & Bosses — supplies, replay-on-fail resetting camp-scoped state, capacity, private 1-of-3 draft, public loadouts, the 10-item v1 gear catalogue, 4 provisional boss twists and the Whisper, with whole-run seeded determinism and registry-driven contract tests. Gap closure fixed a Compass crash on win-card objectives and a Trail Map hidden-objective leak under Thick Fog. GEAR-05/06 UI halves are Phase 11; WR-03 (reveal source after Trained Monkey) needs a product decision before Phase 11's per-seat view.*
+- ✓ Expedition is wired to the room layer with a leak-checked per-seat view (COMM-03, ENG-03) — *Validated in Phase 11: Adapter, Schemas & Worker Wiring — `expeditionGame` GameAdapter over the run engine, field-by-field allowlist `toExpeditionPlayerView` (other hands as sizes only; Thick Fog objectives omitted from the payload), strict Zod view/error/config schemas, `"expedition"` registered in GAME_REGISTRY with compile-time view/error ↔ schema assertions, and a per-seat leak checker run at every step of whole-run properties and a room-level end-to-end test. WR-03 ruled: a reveal pins identity only. Landing picker stays disabled (Phase 12); leak-checker hardening items from 11-REVIEW (WR-01..04) carried forward.*
 
 ### Active
 
@@ -137,4 +138,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-27 after Phase 10 (Run Layer, Gear Engine & Bosses)*
+*Last updated: 2026-09-27 after Phase 11 (Adapter, Schemas & Worker Wiring)*
