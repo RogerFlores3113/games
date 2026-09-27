@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: Expedition
 status: executing
 stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-09-27T05:09:02.193Z"
+last_updated: "2026-09-27T05:18:21.495Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 35
-  completed_plans: 20
+  completed_plans: 21
   percent: 25
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 10 (Run Layer, Gear Engine & Bosses) — EXECUTING
-Plan: 3 of 17
+Plan: 4 of 17
 Status: Ready to execute
 Last activity: 2026-09-27
 
@@ -166,6 +166,7 @@ Last activity: 2026-09-27
 | Phase 09 P08 | 25min | 2 tasks | 5 files |
 | Phase 10 P01 | 20min | 2 tasks | 6 files |
 | Phase 10 P02 | ~25min | 2 tasks | 7 files |
+| Phase 10 P03 | 25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -385,6 +386,7 @@ Recent decisions affecting current work:
 - [Phase 10]: identityEquals excludes the led card's own identity from legalPlaysFor's trump-led branch, generalizing Phase 9's 'other joker only' rule to any predicate — Keeps trick.property.test.ts green against its static (non-consuming) hand fixtures without weakening real-gameplay follow-suit semantics
 - [Phase 10]: Composed rule-hook defects (trickWinner, nextLeader) throw a plain Error under POLICY A3 instead of returning invalid_rule_hook — Matches createCamp's leaderFor validation; a rules-composition bug is not a player-recoverable error
 - [Phase 10]: run/types.ts's A1 doc comment rewords 'RngState' to a generator-state-tuple description so the file's own prose does not trip its literal-token acceptance grep
+- [Phase ?]: compose.ts folds isTrump first and separately (WR-03), then folds every other RunRules hook via a HOOK_NAMES-driven registry dispatch; no cache anywhere (T-10-08)
 
 ### Pending Todos
 
@@ -421,7 +423,7 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T05:08:55.124Z
+Last session: 2026-09-27T05:16:01.324Z
 Stopped at: Completed 10-01-PLAN.md
 Resume file: None
 
