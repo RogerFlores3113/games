@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build"
+    "build": "next build",
+    "check:expedition-build": "node scripts/check-expedition-build.mjs"
   },
   "dependencies": {
     "@games/rules": "*",
@@ -14,6 +15,7 @@
     "nanoid": "6.0.1",
     "next": "16.3.4",
     "partysocket": "1.3.0",
+    "phaser": "3.90.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zustand": "5.0.15"
