@@ -6,10 +6,18 @@
 // auto-play action (XRULE-08): one explicit play-card moves exactly one
 // card out of exactly one hand, and trick completion never plays a card on
 // anyone's behalf. Outcome is never computed or stored here — callers
-// derive it fresh via camp.ts's checkCampOutcome. A composed rules.nextLeader
-// hook's result is validated against state.seatIds before it is stored; a
-// seat outside that set returns invalid_rule_hook instead of silently
-// soft-locking the camp (WR-04).
+// derive it fresh via camp.ts's checkCampOutcome.
+//
+// Phase 10, Plan 01 (WR-04/WR-05/WR-06, POLICY A3): composed hook results
+// (trickWinner, nextLeader) are validated. A violation THROWS a plain
+// Error, because it is a rules-composition defect no player can fix — the
+// same policy createCamp's leaderFor check and currentActorSeatId already
+// follow. This reverses 09-08's soft ok:false-with-an-error-code return;
+// nextLeader is skipped entirely after the final trick (WR-06,
+// IN-01): the post-final currentTrick is always { index: totalTricks,
+// leaderSeatId: <final winner>, plays: [] }, so a composed nextLeader
+// cannot block a camp's end no matter what it returns. Phase 11's
+// adapter/actor boundary must catch this throw.
 
 import type { AdapterResult } from "../adapter";
 import { canPickObjective, canPlayCard, findOwnCard } from "./legality";
@@ -59,6 +67,13 @@ function applyPlayCard(
   // The last seat's play completes the trick — resolve the winner and open
   // the next trick, never playing a card for anyone (XRULE-08).
   const winnerSeatId = rules.trickWinner(plays);
+  if (!plays.some((p) => p.seatId === winnerSeatId)) {
+    // WR-05: a composed trickWinner hook named a seat that did not even
+    // play in this trick — a rules-composition defect (POLICY A3).
+    throw new Error(
+      `applyCampAction: trickWinner returned ${winnerSeatId}, which did not play in trick ${state.currentTrick.index}`,
+    );
+  }
   const completed: CompletedTrick = {
     index: state.currentTrick.index,
     leaderSeatId: state.currentTrick.leaderSeatId,
@@ -67,12 +82,26 @@ function applyPlayCard(
   };
   const completedTricks = [...state.completedTricks, completed];
   const intermediate: CampState = { ...state, hands, completedTricks };
+
+  if (completedTricks.length === state.totalTricks) {
+    // WR-06 / IN-01: the final trick just completed. nextLeader is never
+    // called after the final trick, so a composed hook cannot block the
+    // camp's end with a sentinel leader. The post-final currentTrick names
+    // the final winner as a nominal leader with no plays.
+    const currentTrick: CurrentTrick = {
+      index: completed.index + 1,
+      leaderSeatId: completed.winnerSeatId,
+      plays: [],
+    };
+    return { ok: true, state: { ...intermediate, currentTrick } };
+  }
+
   const nextLeaderSeatId = rules.nextLeader(intermediate, completed);
   if (!state.seatIds.includes(nextLeaderSeatId)) {
-    // A composed hook returned a seat outside the camp's domain (WR-04).
-    // Nothing built from `intermediate` is returned, so the caller's state
-    // is untouched.
-    return { ok: false, error: "invalid_rule_hook" };
+    // WR-06 (POLICY A3): a composed nextLeader hook returned a seat outside
+    // the camp's domain. Nothing built from `intermediate` is returned, so
+    // the caller's state is untouched by the throw.
+    throw new Error(`applyCampAction: nextLeader returned unknown seat ${nextLeaderSeatId}`);
   }
   const currentTrick: CurrentTrick = {
     index: completed.index + 1,

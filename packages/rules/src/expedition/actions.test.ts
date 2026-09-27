@@ -209,7 +209,7 @@ describe("applyCampAction — play-card", () => {
     }
   });
 
-  it("a bad nextLeader hook result (a seat not in seatIds) returns invalid_rule_hook and leaves state unchanged, once the completing play would build the next trick", () => {
+  it("a bad nextLeader hook result (a seat not in seatIds) throws (A3, reversal of 09-08), leaving state unchanged, once the completing play would build the next trick", () => {
     let state = driveObjectivePicks(
       createCamp({
         seatIds: ["p0", "p1", "p2"],
@@ -235,19 +235,95 @@ describe("applyCampAction — play-card", () => {
     const thirdHandBefore = state.hands.find((h) => h.seatId === thirdActor)!;
     const thirdCardId = badRules.legalPlays(state, thirdActor)[0]!.id;
 
-    const result = applyCampAction(
-      state,
-      thirdActor,
-      { type: "play-card", cardId: thirdCardId },
-      badRules,
-    );
+    expect(() =>
+      applyCampAction(state, thirdActor, { type: "play-card", cardId: thirdCardId }, badRules),
+    ).toThrow(/nextLeader/);
 
-    expect(result).toEqual({ ok: false, error: "invalid_rule_hook" });
     expect(state).toEqual(before);
     expect(state.completedTricks).toHaveLength(0);
     const thirdHandAfter = state.hands.find((h) => h.seatId === thirdActor)!;
     expect(thirdHandAfter).toEqual(thirdHandBefore);
     expect(thirdHandAfter.cards.some((c) => c.id === thirdCardId)).toBe(true);
+  });
+
+  it("a bad trickWinner hook result (a seat that did not play) throws (WR-05)", () => {
+    let state = driveObjectivePicks(
+      createCamp({
+        seatIds: ["p0", "p1", "p2"],
+        seed: "actions-seed-bad-trick-winner",
+        objectiveSlots: [{ kind: "no-tricks" }],
+      }),
+    );
+    const badRules: CoreRules = { ...baseRules, trickWinner: () => "ghost", nextLeader: () => "p0" };
+
+    for (let i = 0; i < 2; i++) {
+      const actor = currentActorSeatId(state, badRules)!;
+      const cardId = badRules.legalPlays(state, actor)[0]!.id;
+      const result = applyCampAction(state, actor, { type: "play-card", cardId }, badRules);
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("unreachable");
+      state = result.state;
+    }
+
+    const before = structuredClone(state);
+    const thirdActor = currentActorSeatId(state, badRules)!;
+    const thirdCardId = badRules.legalPlays(state, thirdActor)[0]!.id;
+
+    expect(() =>
+      applyCampAction(state, thirdActor, { type: "play-card", cardId: thirdCardId }, badRules),
+    ).toThrow(/trickWinner/);
+
+    expect(state).toEqual(before);
+    expect(state.completedTricks).toHaveLength(0);
+  });
+
+  it("nextLeader is skipped after the final trick (WR-06/IN-01): a sentinel-returning nextLeader never blocks camp end", () => {
+    // A hand-built one-trick camp (mirrors buildAboutToFailState above):
+    // y and z have already played, x's is the completing (and, since
+    // totalTricks === 1, also the FINAL) play. y's 9♠ beats z's 7♠ and
+    // x's 2♠, so y wins — x's no-tricks objective is unaffected either way
+    // since x is not its owner.
+    const x1: ExpeditionCard = { id: "x1", identity: { kind: "standard", suit: "spades", rank: 2 } };
+    const y1: ExpeditionCard = { id: "y1", identity: { kind: "standard", suit: "spades", rank: 9 } };
+    const z1: ExpeditionCard = { id: "z1", identity: { kind: "standard", suit: "spades", rank: 7 } };
+
+    const state: CampState = {
+      seatIds: ["x", "y", "z"],
+      playerCount: 3,
+      removedCards: [],
+      totalTricks: 1,
+      hands: [
+        { seatId: "x", cards: [x1] },
+        { seatId: "y", cards: [] },
+        { seatId: "z", cards: [] },
+      ],
+      expeditionLeaderSeatId: "y",
+      objectives: [{ id: "obj1", kind: "no-tricks", ownerSeatId: "z" }],
+      objectiveDeck: [],
+      completedTricks: [],
+      currentTrick: {
+        index: 0,
+        leaderSeatId: "y",
+        plays: [
+          { seatId: "y", card: y1 },
+          { seatId: "z", card: z1 },
+        ],
+      },
+    };
+    const sentinelRules: CoreRules = {
+      ...baseRules,
+      // Only matters if consulted; a real boss/gear layer might return this
+      // for a real trick index, but the final trick must never call it.
+      nextLeader: (s, trick) => (trick.index === s.totalTricks - 1 ? "ghost" : trick.winnerSeatId),
+    };
+
+    const result = applyCampAction(state, "x", { type: "play-card", cardId: "x1" }, sentinelRules);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+
+    expect(result.state.completedTricks).toHaveLength(1);
+    expect(result.state.completedTricks[0]!.winnerSeatId).toBe("y");
+    expect(result.state.currentTrick).toEqual({ index: 1, leaderSeatId: "y", plays: [] });
   });
 
   it("a full camp driven with a fixed first-legal-play policy always reaches a decided outcome no later than the last trick", () => {

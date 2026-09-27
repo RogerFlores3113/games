@@ -137,11 +137,7 @@ export type CampError =
   | "card_not_in_hand"
   | "must_follow_suit"
   | "objective_not_available"
-  | "invalid_action"
-  /** Returned when a composed CoreRules hook (e.g. nextLeader) returns a
-   * value outside the camp's domain, such as a seat id not in seatIds. This
-   * is a rules-composition defect, not a player error (WR-04). */
-  | "invalid_rule_hook";
+  | "invalid_action";
 
 export type CampOutcome =
   | { readonly status: "in_progress" }
