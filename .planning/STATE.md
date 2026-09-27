@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
-status: executing
-stopped_at: Completed 10-19-PLAN.md — WR-02 closed (Trail Map hidden-objective probe fixed under Thick Fog)
-last_updated: "2026-09-27T09:07:07.811Z"
+status: ready_to_plan
+stopped_at: Phase 10 complete (19/19) — ready to discuss Phase 11
+last_updated: 2026-09-27T09:15:54.328Z
 last_activity: 2026-09-27
 progress:
   total_phases: 8
@@ -21,20 +21,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-22)
 
 **Core value:** A friend clicks a link and is playing within seconds — and the game does not break, stall, or lose their seat for the rest of the session.
-**Current focus:** Phase 10 — run-layer-gear-engine-bosses
+**Current focus:** Phase 11 — adapter, schemas & worker wiring
 
 ## Current Position
 
-Phase: 10 (run-layer-gear-engine-bosses) — EXECUTING
-Plan: 3 of 19
-Status: Ready to execute
+Phase: 11
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-09-27
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 107
+- Total plans completed: 126
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -53,6 +53,7 @@ Last activity: 2026-09-27
 | 06.2 | 18 | - | - |
 | 7 | 13 | - | - |
 | 9 | 8 | - | - |
+| 10 | 19 | - | - |
 
 **Recent Trend:**
 
