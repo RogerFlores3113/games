@@ -150,7 +150,46 @@ Plans:
   4. Each player drafts 1 of 3 private, never-already-owned gear offers at the run's start and after each cleared camp, equips owned gear up to their camp-number capacity, and every loadout is publicly visible; each v1 gear item (info, objective, table, run gear) and the one v1 boss twist per boss camp work exactly as specced, with a confirm step before targeted gear/Whispers take effect, no undo once they resolve, and a visible reason when gear can't be used.
   5. Adding a new gear item, objective kind, boss twist or interactable is a one-file-plus-registry-line change, and every registered entry is checked automatically for a unique id, valid size/window, deterministic effect, card conservation and no view leak.
 
-**Plans**: TBD
+**Plans**: 17 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 10-01-PLAN.md — Core hook hardening: isTrump routed (WR-03), trickWinner validated (WR-05), one throw policy + no nextLeader after the final trick (WR-06, A3)
+- [ ] 10-02-PLAN.md — Type contracts (RunState, RunAction, RunRules/RuleModifier, GearDef, BossDef, ToolkitOp), RNG stream names (A1), recursive purity guard
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 10-03-PLAN.md — Hook composition (base → boss → gear → effects, recomputed per call) and the balance table (RUN-01, D-14/D-15)
+- [ ] 10-04-PLAN.md — Toolkit: timing windows, GearContext, availability reasons (GEAR-06), own-hand-only targets, invariant-checked op executor
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 10-05-PLAN.md — Draft offers and run lifecycle: supplies, replay, capacity, boss draw (D-01..D-04, D-12), face-down dealing
+- [ ] 10-06-PLAN.md — The Whisper (COMM-01/02) and the generic use-gear pipeline (GEAR-05 engine side, GEAR-06)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 10-07-PLAN.md — applyRunAction dispatcher (draft, loadout, ready, skip, camp delegation) and run simulation helpers
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 10-08-PLAN.md — Information gear: Signal Whistle, Spyglass, Signal Flare (GEAR-01, D-08)
+- [ ] 10-09-PLAN.md — Objective gear: Compass, Trail Map (D-10), Camouflage (D-11) (GEAR-02)
+- [ ] 10-10-PLAN.md — Table gear: Trained Monkey, Machete (D-09) (GEAR-03)
+- [ ] 10-11-PLAN.md — Run gear: Rain Poncho (D-04, D-12), Energy Tonic (GEAR-04)
+- [ ] 10-12-PLAN.md — Boss twists: Monsoon, Eclipse with its own deck table (BOSS-01)
+- [ ] 10-13-PLAN.md — Boss twists: Thick Fog, Mutiny (BOSS-01)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 10-14-PLAN.md — BOSS_REGISTRY + boss and objective-kind catalogue contract tests (ENG-01, ENG-02)
+- [ ] 10-15-PLAN.md — GEAR_REGISTRY + gear catalogue contract test (ENG-01, ENG-02)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 10-16-PLAN.md — Production CATALOG, fail-then-replay integration test (RUN-06, COMM-01/02), README recipes (ENG-01)
+- [ ] 10-17-PLAN.md — Whole-run property tests: deterministic replay from seed + action log (RUN-07)
 
 ### Phase 11: Adapter, Schemas & Worker Wiring
 
