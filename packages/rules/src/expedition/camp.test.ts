@@ -107,6 +107,20 @@ describe("createCamp — leader and objectives", () => {
 });
 
 describe("createCamp — determinism", () => {
+  it("stores a copy of the caller's seatIds, not the caller's array (IN-02)", () => {
+    const callerSeatIds = ["a", "b", "c"];
+    const camp = createCamp({
+      seatIds: callerSeatIds,
+      seed: SEED,
+      objectiveSlots: [{ kind: "no-tricks" }],
+    });
+    expect(camp.seatIds).not.toBe(callerSeatIds);
+    const originalLength = camp.seatIds.length;
+    callerSeatIds.push("z");
+    expect(camp.seatIds.length).toBe(originalLength);
+    expect(camp.seatIds).toEqual(["a", "b", "c"]);
+  });
+
   it("same inputs produce a deep-equal camp", () => {
     const objectiveSlots: ObjectiveSlot[] = [{ kind: "no-tricks" }];
     const a = createCamp({ seatIds: SEATS_3, seed: SEED, objectiveSlots });
@@ -197,6 +211,16 @@ describe("createCamp — rejects malformed setup input", () => {
 });
 
 describe("createCamp — hook seam proven overridable", () => {
+  it("a leaderFor hook returning a seat not in seatIds throws a descriptive Error at setup (WR-04)", () => {
+    const ghostLeaderRules: CoreRules = { ...baseRules, leaderFor: () => "ghost" };
+    expect(() =>
+      createCamp(
+        { seatIds: SEATS_3, seed: SEED, objectiveSlots: [{ kind: "no-tricks" }] },
+        ghostLeaderRules,
+      ),
+    ).toThrow(/leaderFor returned/);
+  });
+
   it("with 4 seats, a custom deckFor with no jokers records exactly the Sun and Moon as removed and picks the A of spades holder as leader", () => {
     const noJokerRules: CoreRules = {
       ...baseRules,
@@ -281,6 +305,17 @@ describe("campPhase / currentActorSeatId", () => {
     const leaderIndex = camp.seatIds.indexOf(camp.expeditionLeaderSeatId);
     const expected = camp.seatIds[(leaderIndex + 1) % camp.seatIds.length]!;
     expect(currentActorSeatId(allOwned)).toBe(expected);
+  });
+
+  it("currentActorSeatId throws a descriptive invariant Error when currentTrick.leaderSeatId is not a seat", () => {
+    const camp = baseCamp();
+    const playing: CampState = {
+      ...camp,
+      objectives: camp.objectives.map((o) => ({ ...o, ownerSeatId: camp.seatIds[0]! })),
+      currentTrick: { ...camp.currentTrick, leaderSeatId: "ghost" },
+    };
+    expect(campPhase(playing)).toBe("playing");
+    expect(() => currentActorSeatId(playing)).toThrow(/not in seatIds/);
   });
 
   it("ended, and currentActorSeatId is null, once the outcome is decided", () => {

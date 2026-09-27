@@ -3,7 +3,10 @@
 // every call (mirrors hanabi/endgame.ts: fixed-order independent checks, no
 // else-if chain on partial state, nothing cached). Play stops when the
 // outcome is decided: currentActorSeatId returns null and Plan 05's
-// legality rejects every action with camp_over.
+// legality rejects every action with camp_over. Hook-supplied seat ids
+// (leaderFor) are validated at the point of storage, converting a bad
+// composed hook into a setup-time throw rather than a later soft-lock or
+// exception escaping applyCampAction (WR-04).
 
 import { assertPlayerCount, buildObjectiveDeck, complementOf, dealHands } from "./deck";
 import { objectiveStatuses, nextObjectivePicker } from "./objectives";
@@ -118,9 +121,14 @@ export function createCamp(
   });
 
   const expeditionLeaderSeatId = rules.leaderFor(hands);
+  if (!seatIds.includes(expeditionLeaderSeatId)) {
+    throw new Error(
+      `createCamp: leaderFor returned unknown seat ${expeditionLeaderSeatId}`,
+    );
+  }
 
   return {
-    seatIds,
+    seatIds: [...seatIds],
     playerCount,
     removedCards,
     totalTricks,
@@ -171,5 +179,10 @@ export function currentActorSeatId(state: CampState, rules: CoreRules = baseRule
   }
 
   const leaderIndex = state.seatIds.indexOf(state.currentTrick.leaderSeatId);
+  if (leaderIndex === -1) {
+    throw new Error(
+      `currentActorSeatId: currentTrick.leaderSeatId "${state.currentTrick.leaderSeatId}" is not in seatIds`,
+    );
+  }
   return state.seatIds[(leaderIndex + state.currentTrick.plays.length) % state.seatIds.length]!;
 }
