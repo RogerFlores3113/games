@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 11-01-PLAN.md — ExpeditionView contract + toExpeditionPlayerView allowlist projection (COMM-03, WR-03 resolved)
-last_updated: "2026-09-27T10:13:32.693Z"
+stopped_at: Completed 11-02-PLAN.md — Expedition wire schemas + subpath wiring (COMM-03)
+last_updated: "2026-09-27T10:22:17.396Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 44
-  completed_plans: 38
+  completed_plans: 39
   percent: 38
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 11 (Adapter, Schemas & Worker Wiring) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Status: Ready to execute
 Last activity: 2026-09-27
 
@@ -185,6 +185,7 @@ Last activity: 2026-09-27
 | Phase 10 P18 | 25min | 2 tasks | 7 files |
 | Phase 10 P19 | ~15min | 1 tasks | 2 files |
 | Phase 11 P01 | 45min | 2 tasks | 4 files |
+| Phase 11 P02 | ~25min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -432,6 +433,7 @@ Recent decisions affecting current work:
 - [Phase ?]: Under Thick Fog, Trail Map's canTarget always returns true (WR-02) rather than checking only ctx.self, since a self-only check would still forbid an objective-less seat from taking a teammate's objective; a no-op swap between two objective-less seats is a legal, gear-spending consequence
 - [Phase 11]: adapter/ placed as a new subdirectory of expedition/ (not top-level) so it can import from ../run/ without tripping purity.test.ts's Core-boss/gear-agnostic guard
 - [Phase 11]: WR-03 resolved: a reveal pins identity + fromSeatId at reveal time and is never re-derived after a toolkit move/swap relocates the card
+- [Phase 11]: [Phase 11]: expedition.ts/expedition-errors.ts header comments reworded to avoid tripping this plan's own acceptance-criteria greps (.omit()-style tokens, @games/rules literal), which hanabi.ts's identical phrasing also trips at count 1
 
 ### Pending Todos
 
@@ -468,8 +470,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T10:13:32.685Z
-Stopped at: Completed 11-01-PLAN.md — ExpeditionView contract + toExpeditionPlayerView allowlist projection (COMM-03, WR-03 resolved)
+Last session: 2026-09-27T10:22:17.389Z
+Stopped at: Completed 11-02-PLAN.md — Expedition wire schemas + subpath wiring (COMM-03)
 Resume file: None
 
 ## Operator Next Steps
