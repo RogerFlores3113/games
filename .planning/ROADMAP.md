@@ -223,7 +223,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 11-05-PLAN.md — Replace Phase 10 interim no-leak checks in run property / gear / boss contracts + README (ENG-03, COMM-03)
-- [ ] 11-06-PLAN.md — Production registration: GameId widening, error/create-room members, registry entry + compile-time asserts, web board map (COMM-03)
+- [x] 11-06-PLAN.md — Production registration: GameId widening, error/create-room members, registry entry + compile-time asserts, web board map (COMM-03)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -304,7 +304,7 @@ Plans:
 | 8. Multi-Game Rooms | v2.0 | 10/10 | Complete   | 2026-09-23 |
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 19/19 | Complete    | 2026-09-27 |
-| 11. Adapter, Schemas & Worker Wiring | v2.0 | 5/7 | In Progress|  |
+| 11. Adapter, Schemas & Worker Wiring | v2.0 | 6/7 | In Progress|  |
 | 12. Phaser Shell | v2.0 | 0/? | Not started | - |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
 | 14. Art Pass | v2.0 | 0/? | Not started | - |

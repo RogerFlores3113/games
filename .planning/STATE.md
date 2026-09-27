@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 11-04-PLAN.md
-last_updated: "2026-09-27T10:49:32.587Z"
+stopped_at: Completed 11-06-PLAN.md
+last_updated: "2026-09-27T11:01:33.419Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 44
-  completed_plans: 42
+  completed_plans: 43
   percent: 38
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 11 (Adapter, Schemas & Worker Wiring) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7
 Status: Ready to execute
 Last activity: 2026-09-27
 
@@ -189,6 +189,7 @@ Last activity: 2026-09-27
 | Phase 11 P03 | ~40min | 2 tasks | 6 files |
 | Phase 11 P04 | ~35min | 2 tasks | 3 files |
 | Phase 11 P05 | ~25min | 2 tasks | 4 files |
+| Phase 11 P06 | ~35min | 3 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -443,6 +444,7 @@ Recent decisions affecting current work:
 - [Phase 11-05]: Property D's leak-check loop iterates every state unconditionally (fireside/pre-deal/ended states included, not gated on an open attempt)
 - [Phase 11-05]: gear.contract.test.ts's leak-check loop runs regardless of whether the use settled the camp, since a settling use must not leak at the fireside either
 - [Phase 11-05]: boss.contract.test.ts keeps expect(state.attempt.reveals).toEqual([]) but re-comments it as a real boss property (bosses create no reveals), not a leak check, since the per-seat checker now proves no-leak directly
+- [Phase 11-06]: CampResultViewSchema campNumber widened from a 1-6 literal union to a plain ranged z.number(), matching ExpeditionCampResultView's number type (found by the new compile-time view-assignability assertion)
 
 ### Pending Todos
 
@@ -479,8 +481,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T10:47:42.293Z
-Stopped at: Completed 11-04-PLAN.md
+Last session: 2026-09-27T11:01:33.411Z
+Stopped at: Completed 11-06-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
