@@ -192,3 +192,234 @@ export function validateTargets(ctx: GearContext, specs: readonly TargetSpec[]):
   return true;
 }
 
+/** Every card id currently in play (hands, completed tricks, the
+ * in-progress trick), sorted. Every successful applyToolkitOps call must
+ * leave this list unchanged (T-10-13). */
+export function campCardIds(camp: CampState): string[] {
+  const ids: string[] = [];
+  for (const hand of camp.hands) {
+    for (const card of hand.cards) ids.push(card.id);
+  }
+  for (const trick of camp.completedTricks) {
+    for (const play of trick.plays) ids.push(play.card.id);
+  }
+  for (const play of camp.currentTrick.plays) ids.push(play.card.id);
+  return ids.sort();
+}
+
+function requireCamp(attempt: AttemptState, opName: string): CampState {
+  if (attempt.camp === null) {
+    throw new Error(`toolkit: ${opName}: no camp in progress`);
+  }
+  return attempt.camp;
+}
+
+function applyOp(run: RunState, attempt: AttemptState, actorSeatId: string, gearId: string, op: ToolkitOp): AttemptState {
+  switch (op.op) {
+    case "move-card": {
+      const camp = requireCamp(attempt, "move-card");
+      if (op.fromSeatId === op.toSeatId) {
+        throw new Error("toolkit: move-card: fromSeatId === toSeatId");
+      }
+      const fromHand = camp.hands.find((h) => h.seatId === op.fromSeatId);
+      const toHand = camp.hands.find((h) => h.seatId === op.toSeatId);
+      if (!fromHand || !toHand) {
+        throw new Error("toolkit: move-card: unknown seat");
+      }
+      const card = fromHand.cards.find((c) => c.id === op.cardId);
+      if (!card) {
+        throw new Error(`toolkit: move-card: card ${op.cardId} not in ${op.fromSeatId}'s hand`);
+      }
+      const hands = camp.hands.map((h) => {
+        if (h.seatId === op.fromSeatId) {
+          return { seatId: h.seatId, cards: h.cards.filter((c) => c.id !== op.cardId) };
+        }
+        if (h.seatId === op.toSeatId) {
+          return { seatId: h.seatId, cards: [...h.cards, card] };
+        }
+        return h;
+      });
+      return { ...attempt, camp: { ...camp, hands } };
+    }
+
+    case "swap-cards": {
+      const camp = requireCamp(attempt, "swap-cards");
+      const handA = camp.hands.find((h) => h.seatId === op.seatA);
+      const handB = camp.hands.find((h) => h.seatId === op.seatB);
+      if (!handA || !handB) {
+        throw new Error("toolkit: swap-cards: unknown seat");
+      }
+      const idxA = handA.cards.findIndex((c) => c.id === op.cardIdA);
+      if (idxA === -1) {
+        throw new Error(`toolkit: swap-cards: card ${op.cardIdA} not in ${op.seatA}'s hand`);
+      }
+      const idxB = handB.cards.findIndex((c) => c.id === op.cardIdB);
+      if (idxB === -1) {
+        throw new Error(`toolkit: swap-cards: card ${op.cardIdB} not in ${op.seatB}'s hand`);
+      }
+      const cardA = handA.cards[idxA]!;
+      const cardB = handB.cards[idxB]!;
+      const hands = camp.hands.map((h) => {
+        if (h.seatId === op.seatA) {
+          const cards = h.cards.slice();
+          cards[idxA] = cardB;
+          return { seatId: h.seatId, cards };
+        }
+        if (h.seatId === op.seatB) {
+          const cards = h.cards.slice();
+          cards[idxB] = cardA;
+          return { seatId: h.seatId, cards };
+        }
+        return h;
+      });
+      return { ...attempt, camp: { ...camp, hands } };
+    }
+
+    case "replace-objective": {
+      const camp = requireCamp(attempt, "replace-objective");
+      const objective = camp.objectives.find((o) => o.id === op.objectiveId);
+      if (!objective) {
+        throw new Error(`toolkit: replace-objective: unknown objective ${op.objectiveId}`);
+      }
+      if (objective.ownerSeatId !== null) {
+        throw new Error("toolkit: replace-objective: objective is already owned");
+      }
+      if (objective.kind !== "ordered") {
+        throw new Error("toolkit: replace-objective: objective has no card to replace");
+      }
+      if (camp.objectiveDeck.length === 0) {
+        throw new Error("toolkit: replace-objective: objective deck is empty");
+      }
+      const newTarget = camp.objectiveDeck[0]!;
+      const objectives = camp.objectives.map((o) => (o.id === op.objectiveId ? { ...o, target: newTarget } : o));
+      const objectiveDeck = camp.objectiveDeck.slice(1);
+      return { ...attempt, camp: { ...camp, objectives, objectiveDeck } };
+    }
+
+    case "swap-objectives": {
+      // D-10: only PENDING objectives move; an already-done one stays put.
+      const camp = requireCamp(attempt, "swap-objectives");
+      const objectives = camp.objectives.map((o) => {
+        if (evaluateObjective(camp, o) !== "pending") return o;
+        if (o.ownerSeatId === op.seatA) return { ...o, ownerSeatId: op.seatB };
+        if (o.ownerSeatId === op.seatB) return { ...o, ownerSeatId: op.seatA };
+        return o;
+      });
+      return { ...attempt, camp: { ...camp, objectives } };
+    }
+
+    case "remove-objective": {
+      // D-11: the objective leaves play entirely.
+      const camp = requireCamp(attempt, "remove-objective");
+      if (!camp.objectives.some((o) => o.id === op.objectiveId)) {
+        throw new Error(`toolkit: remove-objective: unknown objective ${op.objectiveId}`);
+      }
+      const objectives = camp.objectives.filter((o) => o.id !== op.objectiveId);
+      return { ...attempt, camp: { ...camp, objectives } };
+    }
+
+    case "reveal": {
+      // T-10-12: the ONLY op that can expose a card to a non-holder; the
+      // audience is the sole grant of visibility.
+      const camp = requireCamp(attempt, "reveal");
+      if (op.audience.length === 0) {
+        throw new Error("toolkit: reveal: audience must not be empty");
+      }
+      if (new Set(op.audience).size !== op.audience.length) {
+        throw new Error("toolkit: reveal: audience contains duplicates");
+      }
+      for (const audienceSeatId of op.audience) {
+        if (!run.seatIds.includes(audienceSeatId)) {
+          throw new Error(`toolkit: reveal: audience contains unknown seat ${audienceSeatId}`);
+        }
+      }
+      const holder = camp.hands.find((h) => h.cards.some((c) => c.id === op.cardId));
+      if (!holder) {
+        throw new Error(`toolkit: reveal: card ${op.cardId} not in any hand`);
+      }
+      const reveal: Reveal = { cardId: op.cardId, fromSeatId: holder.seatId, audience: op.audience, source: gearId };
+      return { ...attempt, reveals: [...attempt.reveals, reveal] };
+    }
+
+    case "add-modifier": {
+      const atTrick = attempt.camp ? attempt.camp.completedTricks.length : 0;
+      const effect: ActiveEffect = { gearId, seatId: actorSeatId, atTrick };
+      return { ...attempt, effects: [...attempt.effects, effect] };
+    }
+
+    case "set-next-leader": {
+      // D-09: allowed in any between-tricks window, including before trick
+      // 1 — the caller (gearAvailability's window check) is what
+      // guarantees "between tricks"; this op itself only guards against a
+      // trick already in progress.
+      const camp = requireCamp(attempt, "set-next-leader");
+      if (camp.currentTrick.plays.length > 0) {
+        throw new Error("toolkit: set-next-leader: trick already in progress");
+      }
+      return { ...attempt, camp: { ...camp, currentTrick: { ...camp.currentTrick, leaderSeatId: op.seatId } } };
+    }
+
+    case "cancel-boss-twist": {
+      // D-04: only before the deal.
+      if (attempt.camp !== null) {
+        throw new Error("toolkit: cancel-boss-twist: camp already dealt");
+      }
+      return { ...attempt, bossCancelled: true };
+    }
+
+    case "log": {
+      if (Array.isArray(op.audience)) {
+        for (const audienceSeatId of op.audience) {
+          if (!run.seatIds.includes(audienceSeatId)) {
+            throw new Error(`toolkit: log: audience contains unknown seat ${audienceSeatId}`);
+          }
+        }
+      }
+      const entry: LogEntry = {
+        event: op.event,
+        actorSeatId,
+        subjectSeatIds: op.subjectSeatIds,
+        gearId,
+        audience: op.audience,
+      };
+      return { ...attempt, log: [...attempt.log, entry] };
+    }
+
+    default: {
+      const exhaustive: never = op;
+      throw new Error(`toolkit: unknown op ${JSON.stringify(exhaustive)}`);
+    }
+  }
+}
+
+/** The sole executor of gear effects (spec §6.3). Folds `ops` in order,
+ * never mutating `run` or any of its nested objects, and asserts card
+ * conservation once the fold completes (T-10-13): a broken gear op is a
+ * content-author defect and THROWS (POLICY A3), never silently corrupting
+ * state. */
+export function applyToolkitOps(run: RunState, actorSeatId: string, gearId: string, ops: readonly ToolkitOp[]): RunState {
+  if (run.attempt === null) {
+    throw new Error("toolkit: applyToolkitOps: no attempt in progress");
+  }
+
+  const beforeCamp = run.attempt.camp;
+  const beforeIds = beforeCamp ? campCardIds(beforeCamp) : null;
+
+  let attempt = run.attempt;
+  for (const op of ops) {
+    attempt = applyOp(run, attempt, actorSeatId, gearId, op);
+  }
+
+  if (attempt.camp !== null) {
+    const afterIds = campCardIds(attempt.camp);
+    const expected = beforeIds ?? [];
+    if (afterIds.length !== expected.length || afterIds.some((id, i) => id !== expected[i])) {
+      throw new Error("toolkit: card conservation violated");
+    }
+    if (new Set(afterIds).size !== afterIds.length) {
+      throw new Error("toolkit: card conservation violated");
+    }
+  }
+
+  return { ...run, attempt };
+}
