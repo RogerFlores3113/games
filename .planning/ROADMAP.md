@@ -188,7 +188,7 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 10-16-PLAN.md — Production CATALOG, fail-then-replay integration test (RUN-06, COMM-01/02), README recipes (ENG-01)
+- [x] 10-16-PLAN.md — Production CATALOG, fail-then-replay integration test (RUN-06, COMM-01/02), README recipes (ENG-01)
 - [ ] 10-17-PLAN.md — Whole-run property tests: deterministic replay from seed + action log (RUN-07)
 
 ### Phase 11: Adapter, Schemas & Worker Wiring

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 10-14-PLAN.md
-last_updated: "2026-09-27T07:15:08.661Z"
+stopped_at: Completed 10-16-PLAN.md
+last_updated: "2026-09-27T07:26:56Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 35
-  completed_plans: 32
+  completed_plans: 34
   percent: 25
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 10 (Run Layer, Gear Engine & Bosses) — EXECUTING
-Plan: 16 of 17
+Plan: 17 of 17
 Status: Ready to execute
 Last activity: 2026-09-27
 
@@ -179,6 +179,7 @@ Last activity: 2026-09-27
 | Phase 10-run-layer-gear-engine-bosses P13 | 20min | 1 tasks | 3 files |
 | Phase 10-run-layer-gear-engine-bosses P14 | ~15min | 2 tasks | 3 files |
 | Phase 10-run-layer-gear-engine-bosses P15 | ~10min | 1 tasks | 2 files |
+| Phase 10-run-layer-gear-engine-bosses P16 | ~30min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -415,6 +416,8 @@ Recent decisions affecting current work:
 - [Phase 10]: Thick Fog is a pure objectiveAssignment hook flip (assignFaceDown logic lives entirely in Plan 10-05's lifecycle.ts); Mutiny is a pure failureChecks override reading expeditionLeaderSeatId/completedTricks[0] — BOSS-01 complete: all four provisional twists exist across 10-12/10-13
 - [Phase ?]: [Phase 10]: 10-14: boss/registry.ts's BOSS_REGISTRY registers all four boss twists (satisfies Readonly<Record<string, BossDef>>); boss.contract.test.ts and objective-kinds.contract.test.ts iterate the two registries only, proven non-vacuous against a deliberately broken fake entry
 - [Phase 10-15]: Gear catalogue contract (ENG-02) covers all 10 v1 gear items via generic per-window fixtures at 3/4/5 players, closing ENG-02 (combined with 10-14's boss/objective contracts); GEAR-05/06 UI is deferred to a later phase
+- [Phase 10-16]: run/catalog.ts's CATALOG wires GEAR_REGISTRY+BOSS_REGISTRY as Phase 11's adapter target; replay-reset.test.ts proves ROADMAP criteria 1/2 on real content — RUN-06's reset contract holds even though Rain Poncho's whole-camp "no Whisper" downside also blocks whisper-checking gear (Signal Whistle), so the fixture proves its two attempt-1 active effects via jam+ghost rather than forcing a third gear's effect through a use jam's own downside correctly refuses
+- [Phase 10-16]: expedition/README.md documents the ENG-01 recipes for gear/objective-kind/boss-twist/hook/toolkit-op against the real registries; interactable/card-pack registries are documented as forward contracts only (they live in apps/web, built in Phase 14/12) — ENG-01's README requirement is now fully met for content authored in this package, with that explicit caveat for the two apps/web registries
 
 ### Pending Todos
 
@@ -451,9 +454,9 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T07:14:58.211Z
-Stopped at: Completed 10-14-PLAN.md
-Resume file: Completed 10-15-PLAN.md
+Last session: 2026-09-27T07:26:56Z
+Stopped at: Completed 10-16-PLAN.md
+Resume file: 10-17-PLAN.md
 
 ## Operator Next Steps
 
