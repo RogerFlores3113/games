@@ -175,7 +175,7 @@ Plans:
 **Wave 5** *(blocked on Wave 4 completion)*
 
 - [x] 10-08-PLAN.md — Information gear: Signal Whistle, Spyglass, Signal Flare (GEAR-01, D-08)
-- [ ] 10-09-PLAN.md — Objective gear: Compass, Trail Map (D-10), Camouflage (D-11) (GEAR-02)
+- [x] 10-09-PLAN.md — Objective gear: Compass, Trail Map (D-10), Camouflage (D-11) (GEAR-02)
 - [ ] 10-10-PLAN.md — Table gear: Trained Monkey, Machete (D-09) (GEAR-03)
 - [ ] 10-11-PLAN.md — Run gear: Rain Poncho (D-04, D-12), Energy Tonic (GEAR-04)
 - [ ] 10-12-PLAN.md — Boss twists: Monsoon, Eclipse with its own deck table (BOSS-01)
@@ -278,7 +278,7 @@ Plans:
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
 | 8. Multi-Game Rooms | v2.0 | 10/10 | Complete   | 2026-09-23 |
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
-| 10. Run Layer, Gear Engine & Bosses | v2.0 | 8/17 | In Progress|  |
+| 10. Run Layer, Gear Engine & Bosses | v2.0 | 9/17 | In Progress|  |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
 | 12. Phaser Shell | v2.0 | 0/? | Not started | - |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
