@@ -46,6 +46,15 @@
 //   - `Reveal.audience` is the ONLY list of seats allowed to see a reveal's
 //     card identity (COMM-02); a reveal not addressed to a seat must never
 //     appear in that seat's view.
+//   - WR-03 RULING (Phase 11, Plan 01): a reveal pins a card's IDENTITY plus
+//     the seat that held it AT REVEAL TIME; it never follows the card. If
+//     Trained Monkey (or any toolkit move/swap op) later relocates the
+//     card, `fromSeatId` stays exactly as recorded and the per-seat view
+//     never re-derives the card's current holder — telling the audience
+//     where the card went would disclose another seat's hand contents that
+//     no reveal addressed to them (COMM-03). Reveals are not invalidated
+//     when their card moves; the audience cannot un-learn an identity it
+//     was already shown.
 //
 // USE-GEAR TARGETS RULING: `RunAction`'s "use-gear" targets are a flat
 // `readonly string[]`, order-matched positionally to `GearDef.targets`
@@ -68,7 +77,7 @@ export type SeatRun = {
 
 export type Reveal = {
   readonly cardId: string;
-  readonly fromSeatId: string; // hand holding the card when revealed
+  readonly fromSeatId: string; // hand holding the card when revealed; pinned forever (WR-03 ruling above — never re-derived after the card moves)
   readonly audience: readonly string[]; // the ONLY seats Phase 11 may show this card to
   readonly source: string; // "whisper" or the gear id (e.g. "peek")
 };
