@@ -1,177 +1,186 @@
 ---
 phase: 09-expedition-rules-core
-reviewed: 2026-09-23T00:00:00Z
+reviewed: 2026-09-26T00:00:00Z
 depth: standard
-files_reviewed: 21
+review_type: re-review (gap closure 09-07, 09-08; diff a5a1bde^..HEAD)
+files_reviewed: 8
 files_reviewed_list:
-  - packages/rules/src/expedition/actions.ts
-  - packages/rules/src/expedition/camp.ts
-  - packages/rules/src/expedition/deck.ts
-  - packages/rules/src/expedition/leader.ts
-  - packages/rules/src/expedition/legality.ts
   - packages/rules/src/expedition/objectives.ts
-  - packages/rules/src/expedition/rules.ts
-  - packages/rules/src/expedition/state.ts
-  - packages/rules/src/expedition/trick.ts
-  - packages/rules/src/expedition/test-support.ts
-  - packages/rules/src/expedition/actions.test.ts
-  - packages/rules/src/expedition/camp.test.ts
-  - packages/rules/src/expedition/camp.property.test.ts
-  - packages/rules/src/expedition/deck.test.ts
-  - packages/rules/src/expedition/leader.test.ts
-  - packages/rules/src/expedition/legality.test.ts
   - packages/rules/src/expedition/objectives.test.ts
   - packages/rules/src/expedition/objectives.property.test.ts
-  - packages/rules/src/expedition/purity.test.ts
-  - packages/rules/src/expedition/trick.test.ts
-  - packages/rules/src/expedition/trick.property.test.ts
+  - packages/rules/src/expedition/state.ts
+  - packages/rules/src/expedition/camp.ts
+  - packages/rules/src/expedition/camp.test.ts
+  - packages/rules/src/expedition/actions.ts
+  - packages/rules/src/expedition/actions.test.ts
 findings:
   critical: 0
-  warning: 4
+  warning: 3
   info: 7
-  total: 11
+  total: 10
+prior_findings:
+  WR-01: resolved
+  WR-02: resolved
+  WR-03: deferred (Phase 10)
+  WR-04: resolved for leaderFor/nextLeader; residual trickWinner gap tracked as WR-05
+  IN-01: open
+  IN-02: resolved
+  IN-03: open
+  IN-04: open
+  IN-05: open
+  IN-06: resolved
+  IN-07: open
 status: issues_found
 ---
 
-# Phase 9: Code Review Report
+# Phase 9: Code Review Report (Re-review after gap closure)
 
-**Reviewed:** 2026-09-23T00:00:00Z
+**Reviewed:** 2026-09-26T00:00:00Z
 **Depth:** standard
-**Files Reviewed:** 21
+**Files Reviewed:** 8
 **Status:** issues_found
 
 ## Narrative Findings (AI reviewer)
 
 ## Summary
 
-I reviewed the Expedition rules core against spec §3, §5.2 and §6.1: the deck, follow-suit, trick winner, leader, objective evaluation, camp setup and derivation, legality, transitions, and the test-support and property tests.
+This is a re-review of gap-closure plans 09-07 and 09-08 (`git diff a5a1bde^..HEAD -- packages/rules/src/expedition`). I checked each targeted finding against spec §3 and §5.2 and the A-TIE/A-LAST/A-END assumptions. I also mutation-tested a scratch copy of the evaluator (outside the repo, now deleted) to see whether the new tests actually catch regressions.
 
-These rules match the spec:
-- Deck removal per player count.
-- Follow-suit, including the forced other joker when a joker is led.
-- Sun > Moon > highest card of the led suit.
-- The Sun holder picks first and leads first, with the A♠ fallback.
-- Clockwise pick order.
-- Failure timing for win-card, no-tricks and exactly-n.
+**Verification performed:**
+- The `rules` project's expedition tests pass: 11 files, 159 tests.
+- `tsc --noEmit -p packages/rules` is clean.
+- **Mutation M1, reverting the WR-01 fix.** Two new unit tests fail, and so does the raw-sequence oracle/monotonicity property.
+- **Mutation M2, making the new higher-marker check non-strict (`<=`).** This breaks A-TIE. The A-TIE unit test, the driveCamp ordered property, and the raw-sequence property all fail.
+- **Mutation M3, making the lower-marker check non-strict (`>=`).** This also breaks A-TIE, and the same three tests fail.
 
-The labeled assumptions A-TIE, A-LAST, A-END, A-TRICKCOUNT, A-MULTI and A-HOLDER are applied consistently with their own text.
+**Conclusions:**
+- **The oracle is independent.** The new ordered oracle is a pair-based restatement: a broken (lo, hi) pair, plus F1/F2. It shares no control flow with `orderedKind.evaluate` and no numeric "last" mapping. It detects every mutation above.
+- **A-TIE is preserved.** Both marker comparisons in the resolved branch are strict, so cards won in the same trick index remain in order.
+- **The fixed evaluator is monotone.** Traced by hand:
+  - A resolved objective cannot later gain a higher marker resolved strictly earlier.
+  - An unresolved objective that already failed on a resolved higher marker can only resolve at a strictly later index, so the new check keeps it failed.
+- **`rawSequenceCampArb` builds states that are valid for the evaluator.** Every seat plays exactly `totalTricks` cards, played cards are removed from hands, and all objectives are owned. The `CompletedTrick` records are not internally consistent, though (see IN-09).
 
-I found no blockers that the base rules can reach. The main defects:
-- **Non-monotone ordered evaluator.** It can move an objective from `failed` back to `done`. I confirmed this with a scratch test, which has been removed.
-- **Self-confirming ordered oracle.** The property test's "independent" ordered oracle is a line-by-line copy of the evaluator, so it could not catch that bug.
-- **`isTrump` hook never called.** The hook is declared but the Core never calls it.
-- **Hook results not validated.** Phase 10 hook outputs (leader seats) are trusted without checks, and a bad seat produces silent soft-locks or thrown exceptions.
+**Remaining defects:**
+- WR-03 is deliberately deferred.
+- WR-04's fix covers `leaderFor` and `nextLeader`, but not the third seat-returning hook, `trickWinner` (WR-05).
+- The `invalid_rule_hook` path turns a silent soft-lock into a loud one, but the camp is still permanently stuck (WR-06).
+
+## Prior Findings Status
+
+| ID | Title | Status | Evidence |
+|----|-------|--------|----------|
+| WR-01 | Ordered evaluator not monotone | **Resolved** | `objectives.ts:188-190` adds the symmetric strict check. The unit tests at `objectives.test.ts:365-403` and the raw-sequence prefix property both fail when the check is reverted (M1). |
+| WR-02 | Self-confirming ordered oracle | **Resolved** | `objectives.property.test.ts:86-158` is pair-based and uses its own `markerPrecedes`. It runs over states built directly (not via `driveCamp`) and caught M1, M2 and M3. |
+| WR-03 | `isTrump` never consulted | **Deferred (Phase 10)** | Untouched by design. `trickWinner`/`legalPlaysFor` still hard-code jokers. Still open for Phase 10. |
+| WR-04 | Hook seat ids not validated | **Resolved for `leaderFor`/`nextLeader`** | `camp.ts:123-128` throws at setup; `actions.ts:70-76` returns `invalid_rule_hook`; `camp.ts:181-186` throws on a bad stored leader. The residual `trickWinner` gap is tracked as WR-05, and the fix's own soft-lock behavior as WR-06. |
+| IN-01 | Phantom `currentTrick` after final trick | **Open** | `actions.ts:77-81` is unchanged. |
+| IN-02 | `createCamp` aliases `seatIds` | **Resolved** | `camp.ts:131` stores `[...seatIds]`; the test is at `camp.test.ts:110-122`. |
+| IN-03 | Duplicated Ace constant | **Open** | Not in the diff (`leader.ts:10`). |
+| IN-04 | Substring purity guard / test-support in `src/` | **Open** | Not in the diff. |
+| IN-05 | No guard against a "finished but in_progress" camp | **Open** | `camp.ts:147-168` is unchanged. |
+| IN-06 | Null action throws | **Resolved** | `actions.ts:97-99`; tests are at `actions.test.ts:294-318`. |
+| IN-07 | Objective resolution assumes unique identities | **Open** | `objectives.ts:81-88` and `createCamp` are unchanged; no duplicate-identity assertion was added. |
 
 ## Warnings
 
-### WR-01: Ordered evaluator is not monotone; a failed objective can later report "done"
+### WR-03: `isTrump` hook is declared as Core-called but no Core code calls it (DEFERRED to Phase 10)
 
-**File:** `packages/rules/src/expedition/objectives.ts:161-171`
-**Issue:** The two branches check different things:
-- While my card is **unresolved**, the loop fails me if any **higher**-marker objective has already resolved (line 167).
-- Once my card **resolves**, it checks only **lower**-marker objectives (line 164). It never re-checks whether a higher-marker objective resolved strictly *before* me.
+**File:** `packages/rules/src/expedition/rules.ts:8-10,24,38`; `packages/rules/src/expedition/trick.ts:43-66`; `packages/rules/src/expedition/actions.ts:61`
+**Issue:** This is unchanged from the prior review. `rules.isTrump` is never called, so a Phase 10 layer that overrides only `isTrump` would be silently ignored. The owner deferred it to Phase 10; it is carried here so it is not lost.
+**Fix:** In Phase 10, route trick ranking through the hook, e.g. `trickWinner(plays, rules)` and `legalPlaysFor(hand, led, rules.isTrump)`. Alternatively, remove `isTrump` from `CoreRules` until a caller exists. Add a test in which an overridden `isTrump` changes the winner.
 
-Result: ② is won at trick 0 → ① evaluates `failed`. Then ① is won by its owner at trick 1 → ① evaluates `done`. I confirmed this with a scratch vitest run (after t0: `failed`, after t1: `done`).
+### WR-05: `trickWinner` hook result is stored unvalidated (residual of WR-04)
 
-Base play stops at the first failure, so `applyCampAction` cannot reach this today. But the evaluator is public and is documented as a pure, stateless recompute from `CampState`. Anything that evaluates later states will under-report `failedObjectiveIds`. That includes a Phase 10 continue-after-fail flow, a replay/log view, the deferred "why we failed" feature, or a failure check that does not stop play.
+**File:** `packages/rules/src/expedition/actions.ts:61-67`
+**Issue:** WR-04 covered "hook-supplied seat ids". The fix validates `leaderFor` and `nextLeader`, but `rules.trickWinner(plays)` is also a composable `CoreRules` hook that returns a seat id. Its result is written straight into `CompletedTrick.winnerSeatId`.
 
-A secondary effect: once ② is won out of order, the state's own statuses disagree about which objective broke the order.
+With `baseRules.nextLeader`, a bad winner happens to be caught indirectly, because `nextLeader` echoes `winnerSeatId` into the new check. A Phase 10 layer that overrides `nextLeader`, such as the Machete gear's `commandeer` effect in spec §5.1, removes that accidental guard. A bad winner is then stored silently:
+- `win-card`/`ordered` objectives whose card is in that trick evaluate `failed`.
+- `no-tricks`/`exactly-n` counts are credited to a phantom seat.
 
-**Fix:** Make the resolved branch symmetric, so an out-of-order resolution fails no matter which side is evaluated:
+The camp fails or passes for reasons no player caused, with no error.
+**Fix:** Validate the winner against the trick's own players, which is stricter than `seatIds`, before building `completed`:
 ```ts
-if (myTrickIndex !== undefined) {
-  if (otherMarker < myMarker && (otherTrickIndex === undefined || otherTrickIndex > myTrickIndex)) return "failed";
-  if (otherMarker > myMarker && otherTrickIndex !== undefined && otherTrickIndex < myTrickIndex) return "failed"; // A-TIE: equal index is fine
-} else if (otherMarker > myMarker && otherTrickIndex !== undefined) {
-  return "failed";
+const winnerSeatId = rules.trickWinner(plays);
+if (!plays.some((p) => p.seatId === winnerSeatId)) {
+  return { ok: false, error: "invalid_rule_hook" };
 }
 ```
-Also add a unit test for "higher marker won strictly earlier, then lower marker won by its owner → still failed", and a monotonicity property over arbitrary trick sequences that does not go through `driveCamp`.
+Add a test that combines a bad `trickWinner` with an overridden, valid `nextLeader`.
 
-### WR-02: The "independent" ordered oracle is a transcription of the implementation (self-confirming test)
+### WR-06: `invalid_rule_hook` still permanently stalls the camp, and hook-failure handling is inconsistent
 
-**File:** `packages/rules/src/expedition/objectives.property.test.ts:85-115`
-**Issue:** The header says the oracles "independently restate spec §5.2". But `orderedOracle` copies `orderedKind.evaluate` branch for branch: the same unresolved/resolved split, the same one-sided marker comparisons, and the same `last` check. Any logic error in the evaluator is reproduced exactly, so the property only proves the file equals itself.
+**File:** `packages/rules/src/expedition/actions.ts:70-76`; `packages/rules/src/expedition/camp.ts:123-128,181-186`
+**Issue:** This is a new issue introduced by the WR-04 fix.
+- **The camp is still stuck.** When `nextLeader` returns an unknown seat, the completing play is rejected and the state is left unchanged. `nextLeader` is a deterministic function of the state and the completed trick, so the same seat's retry gets the same rejection (and, with most hooks, so does any other card). No other seat is the actor. The camp is still permanently stuck, now loudly instead of silently. The actions.ts header ("instead of silently soft-locking the camp") is literally true, but it implies the camp recovers, and it does not.
+- **The error is misattributed.** `invalid_rule_hook` is returned as the result of a player's `play-card`. A Phase 11 adapter mapping `CampError` to player feedback would tell the last player their move failed, when the defect is in rules composition.
+- **Handling is inconsistent.** The same class of defect throws in `createCamp` (leaderFor) and in `currentActorSeatId`, but returns a `CampError` here.
+- **The final trick is affected.** `nextLeader` is also consulted and validated after the final trick (index `totalTricks - 1`), when no next trick exists. A composed hook that returns a sentinel there would block the camp's final play and keep the outcome from being decided.
 
-This is how WR-01 got through. The monotonicity property in `camp.property.test.ts:294-303` cannot catch it either, because `driveCamp` stops at the first failure.
-
-**Fix:** Restate the rule declaratively instead of transcribing the control flow. For example: "the objective is failed iff its card was won by a non-owner, OR there exist two resolved ordered objectives with markerA < markerB and indexA > indexB involving this objective, OR a lower marker is unresolved when this one resolved, OR a higher marker resolved while this one is unresolved, OR (last and index ≠ totalTricks−1)". Then compare that result to the engine on randomly generated `completedTricks` sequences built directly, not via `driveCamp`, so post-failure states are exercised.
-
-### WR-03: `isTrump` hook is declared as Core-called but no Core code calls it
-
-**File:** `packages/rules/src/expedition/rules.ts:8-10,24,38`; `packages/rules/src/expedition/trick.ts:43-66`; `packages/rules/src/expedition/actions.ts:58`
-**Issue:** The `rules.ts` header says CoreRules defines "only the hooks the Core layer itself calls — deckFor, leaderFor, isTrump, ...". `rules.isTrump` is never called anywhere: `trickWinner` and `legalPlaysFor` hard-code `identity.kind === "joker"`. `CoreRules.trickWinner(plays)` also gets no `rules` or state, so it cannot consult a composed `isTrump`.
-
-A Phase 10 twist or gear that overrides only `isTrump` (spec §6.1 lists it for "future trump twists") would be silently ignored. Trick resolution would keep using jokers, with no error.
-
-**Fix:** Either remove `isTrump` from `CoreRules` until something calls it, or route through it. For example, make `trickWinner(plays, rules)` rank trumps via `rules.isTrump`, and have `legalPlaysFor` take an `isTrump` predicate. Add a test in which an overridden `isTrump` changes the winner.
-
-### WR-04: Hook-supplied seat ids are never validated; a bad seat soft-locks the camp or throws out of `applyCampAction`
-
-**File:** `packages/rules/src/expedition/camp.ts:120,173-174`; `packages/rules/src/expedition/actions.ts:67-72`; `packages/rules/src/expedition/objectives.ts:227-230`
-**Issue:** `rules.leaderFor` and `rules.nextLeader` are the extension seams Phase 10 composes (Machete: `setNextLeader`). Their results are stored without checking them against `state.seatIds`, and each bad value fails differently:
-- **Bad `nextLeader` result:** `currentActorSeatId` computes `indexOf(...) === -1` and then `seatIds[(-1 + plays.length) % n]`. With zero plays that is `seatIds[-1]`, i.e. `undefined` cast to `string` by `!`. Every `play-card` is rejected `not_your_turn`, and the camp is permanently stuck in `playing` with no error.
-- **Bad `leaderFor` result:** `nextObjectivePicker` throws. The exception escapes `canPickObjective`/`applyCampAction`, which are documented to return `AdapterResult` errors.
-
-**Fix:** Validate at the point of storage:
+**Fix:** Choose one policy for rules-composition defects. The simplest option is to throw an `Error` everywhere, since this is a programmer error that no player can fix. Document it in the `CoreRules` header. Also skip the `nextLeader` call when `completedTricks.length === state.totalTricks`, so a missing next trick cannot block the camp's end:
 ```ts
-// camp.ts after rules.leaderFor(hands)
-if (!seatIds.includes(expeditionLeaderSeatId)) throw new Error(`createCamp: leaderFor returned unknown seat ${expeditionLeaderSeatId}`);
-// actions.ts after rules.nextLeader(...)
-if (!state.seatIds.includes(nextLeaderSeatId)) throw new Error(`nextLeader returned unknown seat ${nextLeaderSeatId}`);
+if (completedTricks.length === state.totalTricks) {
+  return { ok: true, state: { ...intermediate, currentTrick: { index: completed.index + 1, leaderSeatId: completed.winnerSeatId, plays: [] } } };
+}
 ```
-Also make `currentActorSeatId` throw, rather than returning `undefined`, when `leaderIndex === -1`.
+This also gives IN-01 a natural place to be addressed.
 
 ## Info
 
-### IN-01: A phantom `currentTrick` is opened after the final trick
+### IN-01: A phantom `currentTrick` is opened after the final trick (OPEN, carried forward)
 
-**File:** `packages/rules/src/expedition/actions.ts:68-72`
-**Issue:** When the last trick completes, the state gets `currentTrick.index === totalTricks` and a leader, for a trick that can never exist. Phase 11 views or the scene model could render a "next trick" marker or leader badge after the camp ends.
-**Fix:** Keep the shape but document it. Alternatively, have views key off `isCampFinished`, or leave `currentTrick` at the final index with empty plays.
+**File:** `packages/rules/src/expedition/actions.ts:77-81`
+**Issue:** This is unchanged. After the last trick, the state carries `currentTrick.index === totalTricks` with a leader for a trick that cannot exist. The raw-sequence property also reproduces this shape (`objectives.property.test.ts:345-349`).
+**Fix:** Document the shape and have views key off `isCampFinished`, or stop opening a new trick once the camp is finished (see WR-06).
 
-### IN-02: `createCamp` stores the caller's `seatIds` array by reference
-
-**File:** `packages/rules/src/expedition/camp.ts:122-123`
-**Issue:** `seatIds` is the caller's array, typed `readonly` but not copied. If the caller mutates it (for example, the worker's room seat list), camp state changes too, and actor/picker derivation shifts.
-**Fix:** `seatIds: [...seatIds]`.
-
-### IN-03: Duplicated Ace constant
+### IN-03: Duplicated Ace constant (OPEN, carried forward)
 
 **File:** `packages/rules/src/expedition/leader.ts:10`
-**Issue:** `A_OF_SPADES_RANK = 14` duplicates `RANK_ACE` in `deck.ts:20`.
+**Issue:** `A_OF_SPADES_RANK = 14` duplicates `RANK_ACE` in `deck.ts`.
 **Fix:** Import `RANK_ACE` from `./deck`.
 
-### IN-04: Purity guard is substring-based and ships test code in `src/`
+### IN-04: Purity guard is substring-based and ships test code in `src/` (OPEN, carried forward)
 
 **File:** `packages/rules/src/expedition/purity.test.ts:14-40`; `packages/rules/src/expedition/test-support.ts`
-**Issue:**
-- Any comment that mentions a token (for example "unlike Date.now" or "node:") fails the guard spuriously.
-- Imports outside the directory (`../shuffle`) are not scanned.
-- `test-support.ts` is not a `.test.ts` file, so the package tsconfig (`include: ["src"]`) compiles it into the package's declarations.
+**Issue:** This is unchanged. Mentioning a token in a comment fails the guard spuriously, `../shuffle` is not scanned, and `test-support.ts` is compiled into the package's declarations.
+**Fix:** Match import specifiers and call sites with a regex, scan `../shuffle`, and exclude the test-support file from the build tsconfig.
 
-**Fix:** Match import specifiers and call sites with a regex, not raw substrings. Scan the transitive `../shuffle` import. Consider renaming to `test-support.testutil.ts` or excluding it from the build tsconfig.
+### IN-05: No guard against a "finished but in_progress" camp (OPEN, carried forward)
 
-### IN-05: No guard against a "finished but in_progress" camp
-
-**File:** `packages/rules/src/expedition/camp.ts:155-175`
-**Issue:** With base rules, every objective is decided once all tricks are played. A future objective kind or rule layer that leaves an objective `pending` at `isCampFinished` would still make `campPhase` return `playing`, name a seat with an empty hand, and leave no legal action. The result is a silent soft-lock.
+**File:** `packages/rules/src/expedition/camp.ts:147-168`
+**Issue:** This is unchanged. A future objective kind that leaves an objective `pending` when `isCampFinished` is true would leave the camp in `playing` with no legal action.
 **Fix:** In `checkCampOutcome`, treat `pending` at `isCampFinished(state)` as failed, or throw an invariant error.
 
-### IN-06: `applyCampAction` comment overstates forged-request handling
+### IN-07: Objective resolution assumes identities are unique in the deck (OPEN, carried forward)
 
-**File:** `packages/rules/src/expedition/actions.ts:77-93`
-**Issue:** The doc says any hand-forged request is rejected `invalid_action`. A `null` or non-object action throws `TypeError` on `action.type` instead.
-**Fix:** Add `if (typeof action !== "object" || action === null) return { ok: false, error: "invalid_action" };`, or narrow the comment to "well-formed objects". The Phase 11 schema layer is expected to validate first.
-
-### IN-07: Objective resolution assumes identities are unique in the deck
-
-**File:** `packages/rules/src/expedition/objectives.ts:67-74`; `packages/rules/src/expedition/deck.ts:114-116`
-**Issue:** `trickContaining` matches by identity and returns the first trick. `deckFor` is an overridable hook, and nothing checks that the deck it returns has no duplicate identities. A future deck override with duplicates would silently resolve objectives against the wrong trick.
+**File:** `packages/rules/src/expedition/objectives.ts:81-88`; `packages/rules/src/expedition/camp.ts:87`
+**Issue:** This is unchanged. `trickContaining` returns the first match, and nothing checks that the `deckFor` hook returns distinct identities.
 **Fix:** In `createCamp`, assert that `rules.deckFor(...)` contains no duplicate identities.
+
+### IN-08: `currentActorSeatId`'s new invariant throw escapes `applyCampAction`
+
+**File:** `packages/rules/src/expedition/camp.ts:181-186`; `packages/rules/src/expedition/legality.ts:55,81`
+**Issue:** `canPickObjective`/`canPlayCard` call `currentActorSeatId`. The new throw therefore propagates out of `applyCampAction`, which is documented to return `AdapterResult` errors. With `leaderFor` and `nextLeader` now validated, this is reachable only from a corrupt or hand-edited persisted `CampState`, such as a Phase 11 Durable Object rehydrating bad storage. The worker would then see an exception on every action for that room. That is acceptable as an invariant guard, but the contract is not documented.
+**Fix:** Note in the `applyCampAction`/legality docs that corrupt state throws. Alternatively, have the Phase 11 adapter validate rehydrated state (for example, `seatIds.includes(currentTrick.leaderSeatId)`) before dispatching.
+
+### IN-09: `rawSequenceCampArb` builds internally inconsistent `CompletedTrick` records and hard-codes hand size
+
+**File:** `packages/rules/src/expedition/objectives.property.test.ts:283,316-328,347`
+**Issue:** The generated states are adequate for the evaluator, which reads only `index`, `plays[].card` and `winnerSeatId`. They violate other invariants, though:
+- **Trick 0's leader:** `tricks[0].leaderSeatId` is `seatIds[0]`, but the k=0 prefix's `currentTrick.leaderSeatId` is `initial.expeditionLeaderSeatId`.
+- **Play order:** `plays` is always in `seatIds` order, not starting from `leaderSeatId`.
+- **Hand size:** `totalTricks` comes from the test's own `HAND_SIZE` table instead of `initial.totalTricks`. If the deck changes, `hand.length` reaches 0, `% 0` yields `NaN`, and the test crashes with an opaque `undefined` card error rather than a clear message.
+- **A-TIE coverage is not asserted.** Same-trick coverage depends on chance. Mutations M2 and M3 were caught in this run, but no non-vacuity counter guarantees that a same-index pair was generated.
+
+**Fix:**
+- Use `const totalTricks = initial.totalTricks`.
+- Seed `leaderSeatId` from `initial.expeditionLeaderSeatId`, and rotate `plays` to start at the leader.
+- Add a `sameTrickPairRuns > 0` non-vacuity assertion.
+- Alternatively, document explicitly that these states are only valid for the evaluator.
 
 ---
 
-_Reviewed: 2026-09-23T00:00:00Z_
+_Reviewed: 2026-09-26T00:00:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
