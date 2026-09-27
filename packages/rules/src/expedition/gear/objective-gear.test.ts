@@ -18,12 +18,14 @@ import { applyRunAction } from "../run/run-actions";
 import { advanceTo, setupRun } from "../run/run-test-support";
 import { checkUseGear } from "../run/use-gear";
 import { rulesFor } from "../run/compose";
+import { currentWindow } from "../run/toolkit";
 import type { BossDef } from "../boss/boss-def";
 import type { CampState, CompletedTrick, StandardIdentity } from "../state";
 import type { Catalog, CampNumber, RunState } from "../run/types";
 import { reroll } from "./reroll";
 import { reassign } from "./reassign";
 import { ghost } from "./ghost";
+import { blindOrders } from "../boss/blind-orders";
 
 const SEAT_IDS = ["p0", "p1", "p2"] as const;
 const SEED = "objective-gear-seed";
@@ -366,6 +368,120 @@ describe("Trail Map (reassign, D-10)", () => {
     expect(check.ok).toBe(false);
     if (check.ok) return;
     expect(check.reason).toBe("Neither of you has an unresolved objective");
+  });
+
+  describe("WR-02: under Thick Fog (face-down)", () => {
+    const FOG_SEED = "trail-map-fog-seed";
+    const FOG_SEAT_IDS = ["p0", "p1", "p2", "p3", "p4"];
+
+    function fogCatalog(): Catalog {
+      return { gear: { reassign }, bosses: { "blind-orders": blindOrders } };
+    }
+
+    function setupFogTrailMap(): { run: RunState; catalog: Catalog } {
+      const catalog = fogCatalog();
+      const loadouts = Object.fromEntries(FOG_SEAT_IDS.map((id) => [id, ["reassign"]]));
+      const run = advanceTo(
+        setupRun({
+          seatIds: FOG_SEAT_IDS,
+          seed: FOG_SEED,
+          catalog,
+          campNumber: 3 as CampNumber,
+          bossTwists: { 3: "blind-orders", 6: null },
+          loadouts,
+        }),
+        "objective-pick",
+        catalog,
+      );
+      return { run, catalog };
+    }
+
+    it("WR-02: fixture sanity check — between-tricks window, exactly two seats own no objective", () => {
+      const { run, catalog } = setupFogTrailMap();
+      const rules = rulesFor(run, catalog);
+      expect(currentWindow(run, rules)).toBe("between-tricks");
+
+      const camp = run.attempt!.camp!;
+      const ownerlessSeats = FOG_SEAT_IDS.filter(
+        (seatId) => !camp.objectives.some((o) => o.ownerSeatId === seatId),
+      );
+      expect(ownerlessSeats.length).toBe(2);
+    });
+
+    it("WR-02: checkUseGear(reassign) gives the same result for every teammate, when the user owns no objective", () => {
+      const { run, catalog } = setupFogTrailMap();
+      const camp = run.attempt!.camp!;
+      const ownerlessSeats = FOG_SEAT_IDS.filter(
+        (seatId) => !camp.objectives.some((o) => o.ownerSeatId === seatId),
+      );
+      const self = ownerlessSeats[0]!;
+      const teammates = FOG_SEAT_IDS.filter((id) => id !== self);
+
+      for (const teammate of teammates) {
+        const check = checkUseGear(run, self, "reassign", [teammate], catalog);
+        expect(check.ok).toBe(true);
+      }
+    });
+
+    it("WR-02: a swap between two objective-less seats applies as a legal no-op", () => {
+      const { run, catalog } = setupFogTrailMap();
+      const camp = run.attempt!.camp!;
+      const ownerlessSeats = FOG_SEAT_IDS.filter(
+        (seatId) => !camp.objectives.some((o) => o.ownerSeatId === seatId),
+      );
+      expect(ownerlessSeats.length).toBe(2);
+      const [self, teammate] = ownerlessSeats as [string, string];
+
+      const beforeOwnership = camp.objectives.map((o) => ({ id: o.id, ownerSeatId: o.ownerSeatId }));
+
+      const result = applyRunAction(
+        run,
+        self,
+        { type: "use-gear", gearId: "reassign", targets: [teammate] },
+        catalog,
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const afterOwnership = result.state.attempt!.camp!.objectives.map((o) => ({
+        id: o.id,
+        ownerSeatId: o.ownerSeatId,
+      }));
+      expect(afterOwnership).toEqual(beforeOwnership);
+
+      const secondUse = applyRunAction(
+        result.state,
+        self,
+        { type: "use-gear", gearId: "reassign", targets: [teammate] },
+        catalog,
+      );
+      expect(secondUse.ok).toBe(false);
+      if (secondUse.ok) return;
+      expect(secondUse.error).toBe("gear_already_used");
+    });
+
+    it("WR-02: a swap between an objective-less seat and an objective owner moves the pending objective", () => {
+      const { run, catalog } = setupFogTrailMap();
+      const camp = run.attempt!.camp!;
+      const ownerlessSeats = FOG_SEAT_IDS.filter(
+        (seatId) => !camp.objectives.some((o) => o.ownerSeatId === seatId),
+      );
+      const self = ownerlessSeats[0]!;
+      const owner = FOG_SEAT_IDS.find((id) => camp.objectives.some((o) => o.ownerSeatId === id))!;
+      const ownerObjective = camp.objectives.find((o) => o.ownerSeatId === owner)!;
+
+      const result = applyRunAction(
+        run,
+        self,
+        { type: "use-gear", gearId: "reassign", targets: [owner] },
+        catalog,
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const nextObjectives = result.state.attempt!.camp!.objectives;
+      expect(nextObjectives.find((o) => o.id === ownerObjective.id)!.ownerSeatId).toBe(self);
+    });
   });
 });
 
