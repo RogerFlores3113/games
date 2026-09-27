@@ -196,14 +196,18 @@ for (const [id, def] of Object.entries(GEAR_REGISTRY)) {
     if (def.window === "passive") {
       it("use-gear on passive gear is refused with wrong_window (always active)", () => {
         const catalog = makeCatalog();
-        const run = setupRun({
-          seatIds: ["p0", "p1", "p2"],
-          seed: `contract-${id}-passive`,
+        const run = advanceTo(
+          setupRun({
+            seatIds: ["p0", "p1", "p2"],
+            seed: `contract-${id}-passive`,
+            catalog,
+            campNumber: 6 as CampNumber,
+            loadouts: { p0: [id] },
+            bossTwists: { 3: null, 6: "contract-boss" },
+          }),
+          "between-tricks",
           catalog,
-          campNumber: 6 as CampNumber,
-          loadouts: { p0: [id] },
-          bossTwists: { 3: null, 6: "contract-boss" },
-        });
+        );
         expect(checkUseGear(run, "p0", id, [], catalog)).toEqual({
           ok: false,
           error: "wrong_window",
