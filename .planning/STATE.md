@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 10-06-PLAN.md
+stopped_at: Completed 10-07-PLAN.md
 last_updated: "2026-09-27T05:48:17.446Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 35
-  completed_plans: 24
+  completed_plans: 25
   percent: 25
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 10 (Run Layer, Gear Engine & Bosses) — EXECUTING
-Plan: 7 of 17
+Plan: 8 of 17
 Status: Ready to execute
 Last activity: 2026-09-27
 
@@ -169,6 +169,8 @@ Last activity: 2026-09-27
 | Phase 10 P03 | 25min | 2 tasks | 4 files |
 | Phase 10 P04 | 35min | 2 tasks | 2 files |
 | Phase 10 P05 | 50min | 2 tasks | 4 files |
+| Phase 10 P06 | ~30min | 2 tasks | 4 files |
+| Phase 10 P07 | ~40min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -393,6 +395,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 10]: 10-04: applyToolkitOps is the sole executor of every ToolkitOp; card conservation asserted once via campCardIds(before)===campCardIds(after), throwing on any drift (POLICY A3)
 - [Phase ?]: RUN-04's draftOfferFor computes/returns an offer only; storing it privately and the pick-draft action are Plan 10-07's dispatcher concern
 - [Phase ?]: settleIfDecided's failure branch never touches seats, so D-01/D-06 fall out of not writing to seats rather than an explicit reset step
+- [Phase 10-07]: applyRunAction's set-loadout capacity check builds a candidate RunState with the proposed equippedGearIds already substituted in before computing capacityOf, so a passive gear in the same proposed loadout counts toward its own capacity room (T-10-26)
+- [Phase 10-07]: use-gear/whisper both re-run advanceRun through a small delegated() wrapper after their own transition succeeds, kept uniform with every other accepted-action exit point
+- [Phase 10-07]: RUN-04/RUN-05/COMM-01/COMM-02 marked complete — this plan wired the pick-draft/set-loadout/ready/whisper RunActions that Plans 10-05/10-06 left reachable only at the function level
 
 ### Pending Todos
 
@@ -430,7 +435,7 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 ## Session Continuity
 
 Last session: 2026-09-27T05:48:17.437Z
-Stopped at: Completed 10-06-PLAN.md
+Stopped at: Completed 10-07-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

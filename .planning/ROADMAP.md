@@ -170,7 +170,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 10-07-PLAN.md — applyRunAction dispatcher (draft, loadout, ready, skip, camp delegation) and run simulation helpers
+- [x] 10-07-PLAN.md — applyRunAction dispatcher (draft, loadout, ready, skip, camp delegation) and run simulation helpers
 
 **Wave 5** *(blocked on Wave 4 completion)*
 

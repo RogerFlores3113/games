@@ -30,8 +30,8 @@
 
 ### Communication and hidden information
 
-- [ ] **COMM-01**: Once per camp, after objectives are picked and only between tricks, a player can show one card from their hand to one teammate. Only that teammate sees the card; everyone sees who whispered to whom
-- [ ] **COMM-02**: A private reveal (Whisper, Spyglass) stays visible to its audience for the rest of the camp and clears when the camp ends or is replayed
+- [x] **COMM-01**: Once per camp, after objectives are picked and only between tricks, a player can show one card from their hand to one teammate. Only that teammate sees the card; everyone sees who whispered to whom
+- [x] **COMM-02**: A private reveal (Whisper, Spyglass) stays visible to its audience for the rest of the camp and clears when the camp ends or is replayed
 - [ ] **COMM-03**: No player's view or log ever contains another seat's card, except through a reveal addressed to that player. This is checked at every step of full simulated runs, not only right after a reveal
 
 ### Run structure
@@ -39,8 +39,8 @@
 - [x] **RUN-01**: A run is six camps. Camps 3 and 6 are boss camps, and objective counts and difficulty follow the balance table (ordered pair from camp 4, trick-count objective from camp 5)
 - [x] **RUN-02**: The crew starts with 3 supplies. A failed camp costs 1 supply (plus any Energy Tonic penalty) and is replayed with a fresh deal and fresh objectives. At 0 supplies the run is lost; clearing camp 6 wins it
 - [x] **RUN-03**: Each player's capacity equals the current camp number, whatever the number of attempts
-- [ ] **RUN-04**: Each player drafts 1 of 3 offered gear at the start of the run and after each cleared camp. They are never offered gear they already own, and their offers are private
-- [ ] **RUN-05**: Between camps, each player equips owned gear up to their capacity. Every player's loadout is visible to everyone during play and at the fireside
+- [x] **RUN-04**: Each player drafts 1 of 3 offered gear at the start of the run and after each cleared camp. They are never offered gear they already own, and their offers are private
+- [x] **RUN-05**: Between camps, each player equips owned gear up to their capacity. Every player's loadout is visible to everyone during play and at the fireside
 - [x] **RUN-06**: Each equipped piece of gear can be used once per camp, in its timing window. Used flags, rule modifiers and the leader all reset when a camp is replayed
 - [ ] **RUN-07**: Every run replays deterministically from its seed and action log
 
@@ -143,14 +143,14 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | XRULE-06 | Phase 9 | Complete |
 | XRULE-07 | Phase 9 | Complete |
 | XRULE-08 | Phase 9 | Complete |
-| COMM-01 | Phase 10 | Pending |
-| COMM-02 | Phase 10 | Pending |
+| COMM-01 | Phase 10 | Complete |
+| COMM-02 | Phase 10 | Complete |
 | COMM-03 | Phase 11 | Pending |
 | RUN-01 | Phase 10 | Complete |
 | RUN-02 | Phase 10 | Complete |
 | RUN-03 | Phase 10 | Complete |
-| RUN-04 | Phase 10 | Pending |
-| RUN-05 | Phase 10 | Pending |
+| RUN-04 | Phase 10 | Complete |
+| RUN-05 | Phase 10 | Complete |
 | RUN-06 | Phase 10 | Complete |
 | RUN-07 | Phase 10 | Pending |
 | GEAR-01 | Phase 10 | Pending |
