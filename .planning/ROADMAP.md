@@ -177,7 +177,7 @@ Plans:
 - [x] 10-08-PLAN.md — Information gear: Signal Whistle, Spyglass, Signal Flare (GEAR-01, D-08)
 - [x] 10-09-PLAN.md — Objective gear: Compass, Trail Map (D-10), Camouflage (D-11) (GEAR-02)
 - [x] 10-10-PLAN.md — Table gear: Trained Monkey, Machete (D-09) (GEAR-03)
-- [ ] 10-11-PLAN.md — Run gear: Rain Poncho (D-04, D-12), Energy Tonic (GEAR-04)
+- [x] 10-11-PLAN.md — Run gear: Rain Poncho (D-04, D-12), Energy Tonic (GEAR-04)
 - [ ] 10-12-PLAN.md — Boss twists: Monsoon, Eclipse with its own deck table (BOSS-01)
 - [ ] 10-13-PLAN.md — Boss twists: Thick Fog, Mutiny (BOSS-01)
 
