@@ -45,6 +45,7 @@ A friend clicks a link and is playing within seconds — and the game does not b
 - ✓ Rainbow and the owner's house-rules Black variant (5 colours + Rainbow + reversed Black, 70 tiles, max 35) end to end, with no variant special-casing — *Validated in Phase 7 (owner-approved 2026-09-18)*
 - ✓ All v1.0 Hanabi requirements (80/80) — *v1.0, audited 2026-09-22; see `.planning/milestones/v1.0-REQUIREMENTS.md`*
 - ✓ A pure, framework-free Expedition rules engine exists (XRULE-01..08) — *Validated in Phase 9: Expedition Rules Core — 54/52/50-card deal with public removed cards, Sun/Moon joker follow-suit and trick winner, Sun/A♠ leader, clockwise objective picking, all four objective kinds with instant failure detection, no undo/auto-play; proven by fast-check whole-camp and failure-timing properties with an independent ordered-objective oracle. Not yet wired to the room layer (Phase 11); hook-robustness warnings WR-03/05/06 deferred to Phase 10.*
+- ✓ The six-camp Expedition run on a layered hook/toolkit engine (COMM-01/02, RUN-01..07, GEAR-01..04, BOSS-01, ENG-01/02; engine side of GEAR-05/06) — *Validated in Phase 10: Run Layer, Gear Engine & Bosses — supplies, replay-on-fail resetting camp-scoped state, capacity, private 1-of-3 draft, public loadouts, the 10-item v1 gear catalogue, 4 provisional boss twists and the Whisper, with whole-run seeded determinism and registry-driven contract tests. Gap closure fixed a Compass crash on win-card objectives and a Trail Map hidden-objective leak under Thick Fog. GEAR-05/06 UI halves are Phase 11; WR-03 (reveal source after Trained Monkey) needs a product decision before Phase 11's per-seat view.*
 
 ### Active
 
@@ -136,4 +137,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-26 after Phase 9 (Expedition Rules Core)*
+*Last updated: 2026-09-27 after Phase 10 (Run Layer, Gear Engine & Bosses)*
