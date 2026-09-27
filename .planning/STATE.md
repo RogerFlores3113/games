@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: Expedition
 status: executing
 stopped_at: Completed 10-07-PLAN.md
-last_updated: "2026-09-27T05:48:17.446Z"
+last_updated: "2026-09-27T06:09:36.760Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 35
-  completed_plans: 25
+  completed_plans: 26
   percent: 25
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 10 (Run Layer, Gear Engine & Bosses) — EXECUTING
-Plan: 8 of 17
+Plan: 9 of 17
 Status: Ready to execute
 Last activity: 2026-09-27
 
@@ -171,6 +171,7 @@ Last activity: 2026-09-27
 | Phase 10 P05 | 50min | 2 tasks | 4 files |
 | Phase 10 P06 | ~30min | 2 tasks | 4 files |
 | Phase 10 P07 | ~40min | 2 tasks | 4 files |
+| Phase 10 P08 | 35min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -398,6 +399,7 @@ Recent decisions affecting current work:
 - [Phase 10-07]: applyRunAction's set-loadout capacity check builds a candidate RunState with the proposed equippedGearIds already substituted in before computing capacityOf, so a passive gear in the same proposed loadout counts toward its own capacity room (T-10-26)
 - [Phase 10-07]: use-gear/whisper both re-run advanceRun through a small delegated() wrapper after their own transition succeeds, kept uniform with every other accepted-action exit point
 - [Phase 10-07]: RUN-04/RUN-05/COMM-01/COMM-02 marked complete — this plan wired the pick-draft/set-loadout/ready/whisper RunActions that Plans 10-05/10-06 left reachable only at the function level
+- [Phase 10]: Plan 08: the Whistle and the Flare are modeled as ACTIVATED gear (add-modifier + effectModifier), never passiveModifier — each needs its own once-per-camp isGearSpent gate, independent of the Whisper's own no_whispers_left cap (RUN-06/GEAR-05)
 
 ### Pending Todos
 
@@ -434,7 +436,7 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T05:48:17.437Z
+Last session: 2026-09-27T06:06:57.256Z
 Stopped at: Completed 10-07-PLAN.md
 Resume file: None
 

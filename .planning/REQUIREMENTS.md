@@ -46,7 +46,7 @@
 
 ### Gear (v1 catalogue)
 
-- [ ] **GEAR-01**: Information gear works as specced: Signal Whistle (a second Whisper), Spyglass (see a random card from a chosen teammate), Signal Flare (your Whisper is shown to everyone)
+- [x] **GEAR-01**: Information gear works as specced: Signal Whistle (a second Whisper), Spyglass (see a random card from a chosen teammate), Signal Flare (your Whisper is shown to everyone)
 - [ ] **GEAR-02**: Objective gear works as specced:
   - Compass: rerolls a face-up, untaken objective. An ordered objective's replacement keeps its order marker.
   - Trail Map: swaps unresolved objectives between two players.
@@ -153,7 +153,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | RUN-05 | Phase 10 | Complete |
 | RUN-06 | Phase 10 | Complete |
 | RUN-07 | Phase 10 | Pending |
-| GEAR-01 | Phase 10 | Pending |
+| GEAR-01 | Phase 10 | Complete |
 | GEAR-02 | Phase 10 | Pending |
 | GEAR-03 | Phase 10 | Complete |
 | GEAR-04 | Phase 10 | Pending |
