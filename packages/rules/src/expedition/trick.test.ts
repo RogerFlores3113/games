@@ -4,7 +4,8 @@
 
 import { describe, expect, it } from "vitest";
 import { isTrump, ledIdentity, legalPlaysFor, trickWinner } from "./trick";
-import type { CardIdentity, ExpeditionCard, TrickPlay } from "./state";
+import { baseRulesWith } from "./rules";
+import type { CampState, CardIdentity, ExpeditionCard, TrickPlay } from "./state";
 
 function card(id: string, identity: CardIdentity): ExpeditionCard {
   return { id, identity };
@@ -147,5 +148,99 @@ describe("trickWinner", () => {
       { seatId: "seat-d", card: spadesKing },
     ];
     expect(trickWinner(plays)).toBe("seat-c");
+  });
+});
+
+describe("generic trump predicate (WR-03)", () => {
+  const spadesTrump = (identity: CardIdentity): boolean =>
+    identity.kind === "joker" || identity.suit === "spades";
+
+  it("default predicate: trick.test.ts's other describes prove base semantics are unchanged (no assertion here)", () => {
+    expect(trickWinner([{ seatId: "s", card: sun }])).toBe("s");
+  });
+
+  it("spades-trump: [5♥ led, 2♠, A♥] → the only trump play (2♠) wins", () => {
+    const plays: TrickPlay[] = [
+      { seatId: "p0", card: heartsFive },
+      { seatId: "p1", card: spadesTwo },
+      { seatId: "p2", card: heartsAce },
+    ];
+    expect(trickWinner(plays, spadesTrump)).toBe("p1");
+  });
+
+  it("spades-trump: two trumps played, the higher trump strength wins", () => {
+    const plays: TrickPlay[] = [
+      { seatId: "p0", card: heartsFive },
+      { seatId: "p1", card: spadesTwo },
+      { seatId: "p2", card: spadesKing },
+    ];
+    expect(trickWinner(plays, spadesTrump)).toBe("p2");
+  });
+
+  it("spades-trump: hearts led, hand holds 3♥ and 9♠ — must follow suit with 3♥ only", () => {
+    const nineSpades = card("c12", { kind: "standard", suit: "spades", rank: 9 });
+    const hand = [heartsThree, nineSpades];
+    const led: CardIdentity = { kind: "standard", suit: "hearts", rank: 5 };
+    expect(legalPlaysFor(hand, led, spadesTrump)).toEqual([heartsThree]);
+  });
+
+  it("spades-trump: void of hearts, hand holds only spades and clubs — whole hand legal", () => {
+    const hand = [spadesKing, clubsTwo];
+    const led: CardIdentity = { kind: "standard", suit: "hearts", rank: 5 };
+    expect(legalPlaysFor(hand, led, spadesTrump)).toEqual(hand);
+  });
+
+  it("spades-trump: a trump (9♠) led, hand holds a trump — must follow with a trump", () => {
+    const nineSpades = card("c12", { kind: "standard", suit: "spades", rank: 9 });
+    const hand = [heartsThree, nineSpades];
+    const led: CardIdentity = { kind: "standard", suit: "spades", rank: 4 };
+    expect(legalPlaysFor(hand, led, spadesTrump)).toEqual([nineSpades]);
+  });
+
+  it("spades-trump: a trump led, hand holds no trump — whole hand legal", () => {
+    const hand = [heartsThree, clubsTwo];
+    const led: CardIdentity = { kind: "standard", suit: "spades", rank: 9 };
+    expect(legalPlaysFor(hand, led, spadesTrump)).toEqual(hand);
+  });
+
+  it("default predicate unchanged: a Sun lead still forces the Moon", () => {
+    const hand = [moon, heartsAce];
+    const led: CardIdentity = { kind: "joker", joker: "sun" };
+    expect(legalPlaysFor(hand, led, isTrump)).toEqual([moon]);
+  });
+
+  it("baseRulesWith(spadesTrump).legalPlays honors the predicate", () => {
+    const rules = baseRulesWith(spadesTrump);
+    const nineSpades = card("c12", { kind: "standard", suit: "spades", rank: 9 });
+    const state: CampState = {
+      seatIds: ["p0", "p1"],
+      playerCount: 3,
+      removedCards: [],
+      totalTricks: 1,
+      hands: [
+        { seatId: "p0", cards: [heartsThree, nineSpades] },
+        { seatId: "p1", cards: [] },
+      ],
+      expeditionLeaderSeatId: "p0",
+      objectives: [],
+      objectiveDeck: [],
+      completedTricks: [],
+      currentTrick: {
+        index: 0,
+        leaderSeatId: "p0",
+        plays: [{ seatId: "p1", card: heartsFive }],
+      },
+    };
+    expect(rules.legalPlays(state, "p0")).toEqual([heartsThree]);
+  });
+
+  it("baseRulesWith(spadesTrump).trickWinner matches trickWinner(plays, spadesTrump)", () => {
+    const plays: TrickPlay[] = [
+      { seatId: "p0", card: heartsFive },
+      { seatId: "p1", card: spadesTwo },
+    ];
+    const rules = baseRulesWith(spadesTrump);
+    expect(rules.trickWinner(plays)).toBe(trickWinner(plays, spadesTrump));
+    expect(rules.trickWinner(plays)).toBe("p1");
   });
 });

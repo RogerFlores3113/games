@@ -12,6 +12,17 @@
 // whisper/objectiveAssignment/capacity/failureCost hooks are Phase 10, added
 // additively by extending this type. Core modules must never name a boss or
 // gear id.
+//
+// WR-03 (Phase 10, Plan 01): composition (Plan 10-03) first folds isTrump
+// across the boss/gear layers, then builds the base rules from
+// baseRulesWith(composedIsTrump), so a layer overriding only isTrump is
+// honored by trick ranking and follow-suit legality without touching this
+// file again.
+//
+// POLICY A3 (Phase 10, Plan 01): a composed hook returning an out-of-domain
+// value (a seat not in the camp or trick) is a rules-composition defect,
+// not a player error. The Core throws a plain Error, matching createCamp's
+// leaderFor check and currentActorSeatId — see actions.ts.
 
 import { baseDeckFor } from "./deck";
 import { leaderFor } from "./leader";
@@ -29,25 +40,33 @@ export type CoreRules = {
   failureChecks(state: CampState): readonly string[];
 };
 
-/** The base layer of every §6.1 hook. Delegates to the deck/leader/trick
- * modules already proven by Plans 01-02; adds nothing content-specific. The
- * base game has no failure checks (Mutiny/Camouflage are Phase 10). */
-export const baseRules: CoreRules = {
-  deckFor: baseDeckFor,
-  leaderFor,
-  isTrump,
-  trickWinner,
-  legalPlays(state, seatId) {
-    const hand = state.hands.find((h) => h.seatId === seatId);
-    if (hand === undefined) return [];
-    return legalPlaysFor(hand.cards, ledIdentity(state.currentTrick.plays));
-  },
-  // spec §3: "The trick's winner leads the next trick, unless a rule hook
-  // says otherwise."
-  nextLeader(_state, trick) {
-    return trick.winnerSeatId;
-  },
-  failureChecks() {
-    return [];
-  },
-};
+/** Builds a CoreRules layer whose isTrump, trickWinner and legalPlays all
+ * consult the same `isTrumpFn` (WR-03). This is the base layer's factory:
+ * every other hook is the Phase 9 baseRules body, unchanged. */
+export function baseRulesWith(isTrumpFn: (identity: CardIdentity) => boolean): CoreRules {
+  return {
+    deckFor: baseDeckFor,
+    leaderFor,
+    isTrump: isTrumpFn,
+    trickWinner(plays) {
+      return trickWinner(plays, isTrumpFn);
+    },
+    legalPlays(state, seatId) {
+      const hand = state.hands.find((h) => h.seatId === seatId);
+      if (hand === undefined) return [];
+      return legalPlaysFor(hand.cards, ledIdentity(state.currentTrick.plays), isTrumpFn);
+    },
+    // spec §3: "The trick's winner leads the next trick, unless a rule hook
+    // says otherwise."
+    nextLeader(_state, trick) {
+      return trick.winnerSeatId;
+    },
+    failureChecks() {
+      return [];
+    },
+  };
+}
+
+/** The base layer of every §6.1 hook, using the default Sun/Moon trump
+ * predicate. Behaviorally identical to Phase 9's baseRules. */
+export const baseRules: CoreRules = baseRulesWith(isTrump);
