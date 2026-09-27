@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: Expedition
 status: executing
 stopped_at: Completed 11-04-PLAN.md
-last_updated: "2026-09-27T10:42:51.662Z"
+last_updated: "2026-09-27T10:49:32.587Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 44
-  completed_plans: 41
+  completed_plans: 42
   percent: 38
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 11 (Adapter, Schemas & Worker Wiring) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Status: Ready to execute
 Last activity: 2026-09-27
 
@@ -188,6 +188,7 @@ Last activity: 2026-09-27
 | Phase 11 P02 | ~25min | 2 tasks | 6 files |
 | Phase 11 P03 | ~40min | 2 tasks | 6 files |
 | Phase 11 P04 | ~35min | 2 tasks | 3 files |
+| Phase 11 P05 | ~25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -439,6 +440,9 @@ Recent decisions affecting current work:
 - [Phase 11]: 11-03: index.ts's Expedition type re-exports split one-type-per-line (not one combined export type {...}) to satisfy a grep -c count of matching lines, not occurrences
 - [Phase 11]: 11-03: adapter.ts's header comment avoids the literal 'try/catch'/'catch (' tokens in prose, since the plan's own acceptance grep for try/catch usage would false-positive on the explanatory comment
 - [Phase 11]: 11-04: secretsForExpeditionSeat bumps allowedIdentityCounts once per reveal entry addressed to the viewer (not once per distinct card id) -- a card can legitimately be revealed to the same seat twice (e.g. Spyglass then a later Whisper); deduping undercounted and produced a false-positive leak, found by the whole-run property's first real run
+- [Phase 11-05]: Property D's leak-check loop iterates every state unconditionally (fireside/pre-deal/ended states included, not gated on an open attempt)
+- [Phase 11-05]: gear.contract.test.ts's leak-check loop runs regardless of whether the use settled the camp, since a settling use must not leak at the fireside either
+- [Phase 11-05]: boss.contract.test.ts keeps expect(state.attempt.reveals).toEqual([]) but re-comments it as a real boss property (bosses create no reveals), not a leak check, since the per-seat checker now proves no-leak directly
 
 ### Pending Todos
 
@@ -475,7 +479,7 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T10:42:51.654Z
+Last session: 2026-09-27T10:47:42.293Z
 Stopped at: Completed 11-04-PLAN.md
 Resume file: None
 
