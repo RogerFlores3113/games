@@ -3,12 +3,11 @@
 // registered later (ENG-01: one file plus one registry line) is covered
 // automatically with zero edits to this file.
 //
-// The interim no-leak assertion below (empty reveals, whitelisted log
-// entry keys) is NARROWER than Phase 11's real per-seat leak checker
-// (ENG-03/COMM-03): it only proves a boss twist adds no reveal and no
-// card-carrying log field at the RunState level, not that a per-seat
-// toPlayerView projection never leaks a card (that projection does not
-// exist yet — Phase 11 builds it).
+// The per-seat leak check below (spec §8 "no view leak after apply") calls
+// the real toExpeditionPlayerView/checkExpeditionViewForLeaks
+// (adapter/view-leak-check.ts, Plan 11-04) for every seat plus an unseated
+// "spectator" viewer at every step of the driven camp, proving a registered
+// boss twist never leaks a card through the actual per-seat projection.
 
 import { describe, expect, it } from "vitest";
 import { applyRunAction } from "../run/run-actions";
@@ -16,6 +15,8 @@ import { advanceTo, enumerateLegalRunActions, setupRun } from "../run/run-test-s
 import { campCardIds } from "../run/toolkit";
 import { HOOK_NAMES } from "../run/run-rules";
 import { BOSS_REGISTRY } from "./registry";
+import { toExpeditionPlayerView } from "../adapter/view";
+import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "../adapter/view-leak-check";
 import type { BossDef } from "./boss-def";
 import type { Catalog, CampNumber, RunAction, RunState } from "../run/types";
 
@@ -46,8 +47,6 @@ function checkBossDef(def: BossDef): string[] {
 
   return violations;
 }
-
-const LOG_ENTRY_KEYS = ["actorSeatId", "audience", "event", "gearId", "subjectSeatIds"].sort();
 
 /** Drives `run` (already dealt) through the current actor's first
  * pick-objective or play-card action ONLY — never whisper or gear-use — via
@@ -128,7 +127,7 @@ for (const [id, def] of Object.entries(BOSS_REGISTRY)) {
     });
 
     for (const playerCount of [3, 4, 5] as const) {
-      it(`playerCount=${playerCount}: a driven camp-3 attempt deals, settles, conserves cards, round-trips through JSON, is deterministic, and leaks nothing (interim)`, () => {
+      it(`playerCount=${playerCount}: a driven camp-3 attempt deals, settles, conserves cards, round-trips through JSON, is deterministic, and leaks nothing`, () => {
         const catalog = makeCatalog();
         const seatIds = Array.from({ length: playerCount }, (_, i) => `p${i}`);
         const seed = `boss-contract-${id}-${playerCount}`;
@@ -144,14 +143,19 @@ for (const [id, def] of Object.entries(BOSS_REGISTRY)) {
           // round-trips through JSON at every step
           expect(JSON.parse(JSON.stringify(state))).toEqual(state);
 
-          if (state.attempt !== null) {
-            // bosses reveal nothing (interim no-leak)
-            expect(state.attempt.reveals).toEqual([]);
+          // Real per-seat leak check (spec §8) — every seat plus an
+          // unseated viewer, at every step, regardless of attempt state.
+          for (const seatOrSpectator of [...state.seatIds, "spectator"]) {
+            const view = toExpeditionPlayerView(state, seatOrSpectator, catalog);
+            const secrets = secretsForExpeditionSeat(state, seatOrSpectator, catalog, seed);
+            const reasons = checkExpeditionViewForLeaks({ view, serialized: JSON.stringify(view), secrets });
+            expect(reasons).toEqual([]);
+          }
 
-            // every log entry carries only whitelisted, non-card keys
-            for (const entry of state.attempt.log) {
-              expect(Object.keys(entry).sort()).toEqual(LOG_ENTRY_KEYS);
-            }
+          if (state.attempt !== null) {
+            // bosses create no reveals (a real boss property, not a leak
+            // check — the per-seat checker above already proves no leak).
+            expect(state.attempt.reveals).toEqual([]);
 
             if (state.attempt.camp !== null) {
               // card conservation at every step with a camp

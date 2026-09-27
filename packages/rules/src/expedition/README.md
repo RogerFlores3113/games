@@ -112,8 +112,9 @@ within one `apply` call if it draws more than once.
    covers the new entry with zero edits: shape checks, and — for non-passive
    gear — a driven-camp fixture at 3/4/5 players proving determinism, card
    conservation, a JSON round-trip, attempt-scoping, GEAR-05 finality (a
-   second use is `gear_already_used`), and the interim no-leak check. You
-   may add your own behavior-specific tests alongside it (a new
+   second use is `gear_already_used`), and the per-seat leak check
+   (adapter/view-leak-check.ts, run for every seat and an unseated viewer).
+   You may add your own behavior-specific tests alongside it (a new
    `gear/<id>.test.ts`), but the contract test needs no changes.
 
 **Worked example, in prose (Spyglass, `gear/peek.ts`):** size 1,
@@ -174,8 +175,9 @@ card id from the target's hand via `ctx.randomCardIdFrom(target, "peek")`
    drives a real camp-3 attempt at 3/4/5 players to a decided outcome for
    every registered twist automatically — shape (every `modifiers` key is a
    known `HookName`), card conservation, a JSON round-trip, a full replay
-   producing a byte-identical action log (determinism), and the interim
-   no-leak check.
+   producing a byte-identical action log (determinism), and the per-seat
+   leak check (adapter/view-leak-check.ts, run for every seat and an
+   unseated viewer).
 
 Note again: the four v1 twists (Monsoon/`radio-silence`, Eclipse/`eclipse`,
 Thick Fog/`blind-orders`, Mutiny/`mutiny`) are explicitly **provisional
@@ -264,12 +266,33 @@ ships two: Big Index and Classic, per spec §7.3).
   audience must be non-empty, no duplicates, every seat known) or via that
   seat's own hand. A `LogEntry` never carries a card id, by its own type
   (`run/types.ts`).
-- **The seed and draft offers are private** (Phase 11 must redact them, not
-  implemented in this package): `RunState.seed` must never be projected to
-  any client — it is the root of every RNG stream, and its exposure would
-  let a client predict future draws. `SeatRun.draftOffer` is owner-only.
+- **The seed and draft offers are private.** `RunState.seed` is redacted by
+  `adapter/view.ts`'s explicit allowlist — it is never written into any view
+  literal, at any nesting level — since it is the root of every RNG stream
+  and its exposure would let a client predict future draws. `SeatRun.draftOffer`
+  is likewise redacted to a plain per-seat conditional lookup: a viewer's
+  `yourDraftOffer` is their own offer or `null`, never another seat's. Both
+  are proven redacted by `adapter/view.property.test.ts`'s whole-run
+  per-seat leak property (COMM-03/ENG-03).
+- **A reveal pins identity only (WR-03).** A `Reveal` shows the card's
+  identity and the seat that held it at the moment of the reveal; it never
+  follows the card after a later move/swap, and the view never re-derives a
+  revealed card's CURRENT holder from that reveal. A reveal is a fixed,
+  point-in-time fact, not a live tracker.
 - **Rule-hook defects throw (A3).** A composed hook returning an
   out-of-domain value (an unknown seat, a missing catalogue id) is a
   content-authoring defect, not a player error, and it throws a plain
   `Error` naming the problem — it is never silently corrected or allowed to
   soft-lock a run.
+
+## Adapter
+
+`adapter/adapter.ts` (`expeditionGame`, the `GameAdapter` conformance),
+`adapter/view.ts` (`toExpeditionPlayerView`, the sole per-seat projection),
+`adapter/request-guards.ts` (hostile-input `unknown` → `RunAction` narrowing)
+and `adapter/view-leak-check.ts` (`checkExpeditionViewForLeaks`/
+`secretsForExpeditionSeat`, the real per-seat leak checker) are this
+engine's only seam to the room layer. A new gear or boss registered per the
+recipes above is leak-checked automatically by `gear.contract.test.ts` and
+`boss.contract.test.ts`, which both call the real checker for every
+registered entry with zero test edits required.

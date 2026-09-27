@@ -4,13 +4,12 @@
 // covered automatically with zero edits to this file. Mirrors
 // boss/boss.contract.test.ts's own ENG-02 shape (Plan 10-14, same wave).
 //
-// The interim no-leak assertion below (every reveal's audience is a
-// non-empty subset of seatIds; every log entry carries only whitelisted,
-// non-card keys) is NARROWER than Phase 11's real per-seat leak checker
-// (ENG-03/COMM-03): it only proves a gear use adds no out-of-bounds reveal
-// and no card-carrying log field at the RunState level, not that a per-seat
-// toPlayerView projection never leaks a card (that projection does not
-// exist yet — Phase 11 builds it).
+// The per-seat leak check below (spec §8 "no view leak after apply") calls
+// the real toExpeditionPlayerView/checkExpeditionViewForLeaks
+// (adapter/view-leak-check.ts, Plan 11-04) for every seat plus an unseated
+// "spectator" viewer after every accepted use, proving a registered gear's
+// applied ToolkitOps never leak a card through the actual per-seat
+// projection — not merely a structural RunState-level shape check.
 //
 // The contract catalog's "contract-boss" twist (a no-op BossDef) lets Rain
 // Poncho (jam.ts's canUse checks activeBossId) find an active twist to
@@ -26,6 +25,8 @@ import { HOOK_NAMES } from "../run/run-rules";
 import { evaluateObjective } from "../objectives";
 import { GEAR_REGISTRY } from "./registry";
 import { GEAR_WINDOWS, TARGET_KINDS } from "./gear-def";
+import { toExpeditionPlayerView } from "../adapter/view";
+import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "../adapter/view-leak-check";
 import type { GearDef, TargetSpec } from "./gear-def";
 import type { CampState } from "../state";
 import type { Catalog, CampNumber, RunState } from "../run/types";
@@ -176,16 +177,15 @@ function runScopedSnapshot(run: RunState) {
   };
 }
 
-const LOG_ENTRY_KEYS = ["actorSeatId", "audience", "event", "gearId", "subjectSeatIds"].sort();
-
 /** Applies one accepted (seatId, targets) use of gear `id` against `dealt`
  * and asserts the full per-use contract: applies without throwing or
  * rejecting (WR-01: checkUseGear(...).ok implies the use applies),
  * determinism across JSON-cloned inputs, card conservation, JSON
  * round-tripping, run-scoped-field stability (except a one-entry `history`
  * growth), GEAR-05 finality (gear_already_used on a second use), and the
- * interim no-leak checks (reveal audiences, log entry keys). `dealt` is
- * never mutated — every fixture starts from the same unmodified state. */
+ * real per-seat leak check (spec §8 "no view leak after apply") for every
+ * seat plus an unseated viewer. `dealt` is never mutated — every fixture
+ * starts from the same unmodified state. */
 function assertLegalUseContract(
   dealt: RunState,
   id: string,
@@ -251,27 +251,26 @@ function assertLegalUseContract(
     expect(after).toEqual(before);
   }
 
-  // marks the gear used (GEAR-05 finality) and the interim no-leak check —
-  // both only meaningful while the attempt this use happened in is still
-  // open. A use that itself settles the camp (history grew above) leaves no
-  // attempt to re-check against.
+  // marks the gear used (GEAR-05 finality) — only meaningful while the
+  // attempt this use happened in is still open. A use that itself settles
+  // the camp (history grew above) leaves no attempt to re-check against.
   if (applied.attempt !== null) {
     expect(checkUseGear(applied, seatId, id, targets, catalog)).toEqual({
       ok: false,
       error: "gear_already_used",
       reason: "Already used this camp",
     });
+  }
 
-    for (const reveal of applied.attempt.reveals) {
-      expect(reveal.audience.length).toBeGreaterThan(0);
-      for (const audienceSeatId of reveal.audience) {
-        expect(applied.seatIds).toContain(audienceSeatId);
-      }
-    }
-
-    for (const entry of applied.attempt.log) {
-      expect(Object.keys(entry).sort()).toEqual(LOG_ENTRY_KEYS);
-    }
+  // Real per-seat leak check (spec §8 "no view leak after apply") — runs
+  // for every seat plus an unseated viewer regardless of whether this use
+  // also settled the camp at the fireside (a settling use must not leak
+  // there either).
+  for (const id_ of [...applied.seatIds, "spectator"]) {
+    const view = toExpeditionPlayerView(applied, id_, catalog);
+    const secrets = secretsForExpeditionSeat(applied, id_, catalog, applied.seed);
+    const reasons = checkExpeditionViewForLeaks({ view, serialized: JSON.stringify(view), secrets });
+    expect(reasons).toEqual([]);
   }
 }
 
@@ -324,7 +323,7 @@ for (const [id, def] of Object.entries(GEAR_REGISTRY)) {
       });
     } else {
       for (const playerCount of [3, 4, 5] as const) {
-        it(`playerCount=${playerCount}: every usable target combination applies deterministically, conserves cards, round-trips through JSON, changes only attempt-scoped fields, marks the gear used, and leaks nothing (interim)`, () => {
+        it(`playerCount=${playerCount}: every usable target combination applies deterministically, conserves cards, round-trips through JSON, changes only attempt-scoped fields, marks the gear used, and leaks nothing`, () => {
           const catalog = makeCatalog();
           const dealt = advanceTo(
             fixtureFor(id, playerCount, catalog),
