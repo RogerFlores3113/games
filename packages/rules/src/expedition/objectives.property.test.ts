@@ -1,5 +1,5 @@
 // Failure-timing properties for exactly-n, no-tricks and ordered objectives
-// (Phase 9, Plan 06, XRULE-07). The oracles below independently restate
+// (Phase 9, Plan 06/07, XRULE-07). The oracles below independently restate
 // spec §5.2 plus objectives.ts's A-TIE/A-LAST/A-END assumptions directly
 // from `completedTricks` — they never call `evaluateObjective` or any other
 // objectives.ts helper (countTricksWon, tricksRemaining, trickContaining)
@@ -8,6 +8,20 @@
 // comparison side of assertions, and directly in the camp-stop property
 // (which tests camp.ts's checkCampOutcome against objectives.ts's real
 // evaluator — both real engine functions, not the independent oracle).
+//
+// WR-02 (09-07): `orderedOracle` is a PAIR-BASED restatement of spec §5.2,
+// not a transcription of orderedKind.evaluate's control flow. It shares no
+// unresolved/resolved branch split with the implementation, and its marker
+// comparison (markerPrecedes) never maps "last" to Number.POSITIVE_INFINITY
+// the way objectives.ts's own markerValue does. The prior oracle copied the
+// evaluator branch for branch, so it reproduced the evaluator's own bugs
+// (WR-01) instead of catching them.
+//
+// The "raw trick sequence" property below builds CampState prefixes
+// directly from a hand-rolled trick sequence, NOT via driveCamp or
+// applyCampAction. Those helpers halt play at the first objective failure
+// (XRULE-07/08), so they can never reach the post-failure states this
+// property needs to prove monotonicity (WR-01) over.
 
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
@@ -17,14 +31,19 @@ import { evaluateObjective } from "./objectives";
 import { driveCamp } from "./test-support";
 import type {
   CampState,
+  CompletedTrick,
   ExactlyNObjective,
+  ExpeditionCard,
+  Hand,
   Objective,
+  ObjectiveKind,
   ObjectiveSlot,
   ObjectiveStatus,
   OrderedObjective,
   OrderMarker,
   PlayerCount,
   StandardIdentity,
+  TrickPlay,
 } from "./state";
 
 const HAND_SIZE: Record<PlayerCount, number> = { 3: 18, 4: 13, 5: 10 };
@@ -57,8 +76,18 @@ function trickResolutionFor(
   return undefined;
 }
 
-function markerValue(order: OrderMarker): number {
-  return order === "last" ? Number.POSITIVE_INFINITY : order;
+/** True iff marker `a` must be won no later than marker `b` (spec §5.2's
+ * ordering relation), with NO numeric mapping of "last" (WR-02: the prior
+ * oracle's Number.POSITIVE_INFINITY marker value mirrored the evaluator's
+ * own markerValue helper line for line). Equal markers never precede one
+ * another. "last" never precedes anything (it must resolve after every
+ * numbered marker). Anything other than "last" precedes "last". Two numbered
+ * markers compare with plain `<`. */
+function markerPrecedes(a: OrderMarker, b: OrderMarker): boolean {
+  if (a === b) return false;
+  if (b === "last") return a !== "last";
+  if (a === "last") return false;
+  return a < b;
 }
 
 // --- Independent oracles (spec §5.2 + A-TIE/A-LAST/A-END, restated) ---
@@ -80,6 +109,19 @@ function noTricksOracle(state: CampState, objective: { ownerSeatId: string | nul
   return remainingTricks(state) === 0 ? "done" : "pending";
 }
 
+/** WR-02: a pair-based restatement of spec §5.2's "ordered" row, sharing no
+ * control flow with orderedKind.evaluate's unresolved/resolved branch split.
+ * Failure holds iff any of:
+ *   F1 (base win-card rule) — this objective's own card was resolved by a
+ *      trick whose winner is not this objective's owner;
+ *   F2 (A-LAST) — this objective is marked "last", its own card is resolved,
+ *      and it did not resolve in the camp's actual final trick;
+ *   F3 (a broken pair) — for some OTHER ordered objective with a different
+ *      marker, the pair (lo, hi) ordered by markerPrecedes has its "hi" side
+ *      resolved while its "lo" side is either unresolved or resolved at a
+ *      strictly later trick index (equal indices are in order — A-TIE).
+ * Otherwise: "done" once this objective's own card is resolved, else
+ * "pending" (unowned objectives are "pending" unconditionally). */
 function orderedOracle(
   state: CampState,
   objective: OrderedObjective,
@@ -88,29 +130,31 @@ function orderedOracle(
   if (objective.ownerSeatId === null) return "pending";
 
   const mine = trickResolutionFor(state, objective.target);
+
+  // F1: base win-card rule.
   if (mine !== undefined && mine.winnerSeatId !== objective.ownerSeatId) return "failed";
-  const myIndex = mine?.index;
-  const myMarker = markerValue(objective.order);
 
+  // F2: A-LAST.
+  if (objective.order === "last" && mine !== undefined && mine.index !== state.totalTricks - 1) {
+    return "failed";
+  }
+
+  // F3: a broken pair against every OTHER ordered objective with a
+  // different marker.
   for (const other of allOrdered) {
-    if (other.id === objective.id) continue;
-    const otherMarker = markerValue(other.order);
-    const otherResolution = trickResolutionFor(state, other.target);
+    if (other.id === objective.id || other.order === objective.order) continue;
 
-    if (myIndex !== undefined) {
-      if (otherMarker < myMarker) {
-        if (otherResolution === undefined || otherResolution.index > myIndex) return "failed";
-      }
-    } else if (otherMarker > myMarker && otherResolution !== undefined) {
+    const otherRes = trickResolutionFor(state, other.target);
+    const thisFirst = markerPrecedes(objective.order, other.order);
+    const loRes = thisFirst ? mine : otherRes;
+    const hiRes = thisFirst ? otherRes : mine;
+
+    if (hiRes !== undefined && (loRes === undefined || loRes.index > hiRes.index)) {
       return "failed";
     }
   }
 
-  if (objective.order === "last" && myIndex !== undefined && myIndex !== state.totalTricks - 1) {
-    return "failed";
-  }
-
-  return myIndex === undefined ? "pending" : "done";
+  return mine === undefined ? "pending" : "done";
 }
 
 // --- Generators ---
@@ -201,6 +245,114 @@ const generalCampArb = fc
     }
     return { playerCount, seed, choices, objectiveSlots: slots };
   });
+
+/** Builds every prefix (k = 0..totalTricks) of a CampState directly from a
+ * hand-rolled raw trick sequence — never via driveCamp/applyCampAction,
+ * which halt at the first objective failure (see file header). Winners are
+ * deliberately arbitrary (drawn from winnerPicks, not computed by
+ * trickWinner): the evaluator's documented contract is "correct at ANY
+ * CampState", and a Phase 10 hook (e.g. a holder swap) can produce a
+ * completedTricks sequence no real deterministic trick-taking play would.
+ * Ordered objectives always outnumber 1 (orderedCount in [2,3], optionally
+ * plus "last") so post-failure pair checks are exercised on every run. */
+const rawSequenceCampArb = fc
+  .tuple(
+    playerCountArb,
+    seedArb,
+    fc.integer({ min: 2, max: 3 }),
+    fc.boolean(),
+    fc.boolean(),
+    fc.nat({ max: 18 }),
+    fc.array(fc.nat(), { minLength: 8, maxLength: 8 }),
+    fc.array(fc.nat(), { minLength: 90, maxLength: 90 }),
+    fc.array(fc.nat(), { minLength: 18, maxLength: 18 }),
+  )
+  .map(
+    ([
+      playerCount,
+      seed,
+      orderedCount,
+      includeLast,
+      useNoTricks,
+      nRaw,
+      ownerPicks,
+      playPicks,
+      winnerPicks,
+    ]) => {
+      const seatIds = seatIdsFor(playerCount);
+      const totalTricks = HAND_SIZE[playerCount];
+
+      const orderedSlots: ObjectiveSlot[] = Array.from({ length: orderedCount }, (_, i) => ({
+        kind: "ordered" as const,
+        order: i + 1,
+      }));
+      if (includeLast) orderedSlots.push({ kind: "ordered", order: "last" });
+
+      const trickCountSlot: ObjectiveSlot = useNoTricks
+        ? { kind: "no-tricks" }
+        : { kind: "exactly-n", n: Math.min(nRaw, totalTricks) };
+
+      const objectiveSlots: ObjectiveSlot[] = [...orderedSlots, { kind: "win-card" }, trickCountSlot];
+
+      const initial = createCamp({ seatIds, seed, objectiveSlots });
+
+      // Assign every objective an owner (bypassing the pick flow entirely —
+      // this generator builds states directly, never via applyCampAction).
+      const objectives: Objective[] = initial.objectives.map((objective, i) => ({
+        ...objective,
+        ownerSeatId: seatIds[ownerPicks[i % ownerPicks.length]! % playerCount]!,
+      })) as Objective[];
+
+      // Build all totalTricks CompletedTricks from a mutable working copy
+      // of the dealt hands. Every seat plays in seatIds order every trick
+      // (not real turn rotation — this is a raw sequence, not a played
+      // game); each seat removes one card from its own working hand per
+      // trick.
+      const workingHands = new Map<string, ExpeditionCard[]>(
+        initial.hands.map((hand) => [hand.seatId, [...hand.cards]]),
+      );
+
+      let cursor = 0;
+      let leaderSeatId = seatIds[0]!;
+      const tricks: CompletedTrick[] = [];
+      for (let t = 0; t < totalTricks; t++) {
+        const plays: TrickPlay[] = seatIds.map((seatId) => {
+          const hand = workingHands.get(seatId)!;
+          const idx = playPicks[cursor % playPicks.length]! % hand.length;
+          cursor++;
+          const [playedCard] = hand.splice(idx, 1);
+          return { seatId, card: playedCard! };
+        });
+        const winnerSeatId = seatIds[winnerPicks[t % winnerPicks.length]! % playerCount]!;
+        tricks.push({ index: t, leaderSeatId, plays, winnerSeatId });
+        leaderSeatId = winnerSeatId;
+      }
+
+      // Build every prefix k = 0..totalTricks.
+      const prefixes: CampState[] = [];
+      for (let k = 0; k <= totalTricks; k++) {
+        const completedTricks = tricks.slice(0, k);
+        const playedCardIds = new Set(completedTricks.flatMap((tr) => tr.plays.map((p) => p.card.id)));
+        const hands: Hand[] = initial.hands.map((hand) => ({
+          seatId: hand.seatId,
+          cards: hand.cards.filter((c) => !playedCardIds.has(c.id)),
+        }));
+        prefixes.push({
+          ...initial,
+          objectives,
+          completedTricks,
+          hands,
+          currentTrick: {
+            index: k,
+            leaderSeatId: k === 0 ? initial.expeditionLeaderSeatId : tricks[k - 1]!.winnerSeatId,
+            plays: [],
+          },
+        });
+      }
+
+      return { prefixes, totalTricks };
+    },
+  );
 
 describe("property: objective failure timing", () => {
   it("exactly-n objectives are failed/done/pending exactly per the spec at every state, including unreachable-before-exceeded", () => {
@@ -308,5 +460,80 @@ describe("property: objective failure timing", () => {
       }),
       { numRuns: 200 },
     );
+  });
+
+  it("every objective kind's failed status is absorbing across every prefix of a raw trick sequence that keeps playing past the first failure, and ordered statuses match the independent oracle", () => {
+    let failedThenOwnWonByOwnerRuns = 0;
+    const failedBeforeEnd: Record<ObjectiveKind, number> = {
+      "win-card": 0,
+      ordered: 0,
+      "no-tricks": 0,
+      "exactly-n": 0,
+    };
+
+    fc.assert(
+      fc.property(rawSequenceCampArb, ({ prefixes, totalTricks }) => {
+        const prevStatus: Record<string, ObjectiveStatus> = {};
+        // Objective ids that evaluated "failed" at some prefix while their
+        // own card was NOT yet resolved (the WR-01 shape: non-vacuity A).
+        const failedWhileUnresolved = new Set<string>();
+
+        for (let k = 0; k < prefixes.length; k++) {
+          const state = prefixes[k]!;
+          const allOrdered = state.objectives.filter(
+            (o): o is OrderedObjective => o.kind === "ordered",
+          );
+
+          for (const objective of state.objectives) {
+            const status = evaluateObjective(state, objective);
+
+            if (objective.kind === "ordered") {
+              const expected = orderedOracle(state, objective, allOrdered);
+              expect(status).toBe(expected);
+            }
+
+            // Monotonicity: failed is absorbing for every kind, at every
+            // prefix — including prefixes past the first failure.
+            if (prevStatus[objective.id] === "failed") {
+              expect(status).toBe("failed");
+            }
+
+            if (status === "failed") {
+              if (k < totalTricks) failedBeforeEnd[objective.kind]++;
+
+              if (objective.kind === "ordered" && objective.ownerSeatId !== null) {
+                const mine = trickResolutionFor(state, objective.target);
+                if (mine === undefined) failedWhileUnresolved.add(objective.id);
+              }
+            }
+
+            prevStatus[objective.id] = status;
+          }
+        }
+
+        const finalState = prefixes[prefixes.length - 1]!;
+        for (const objective of finalState.objectives) {
+          if (objective.kind !== "ordered" || objective.ownerSeatId === null) continue;
+          if (!failedWhileUnresolved.has(objective.id)) continue;
+          const resolution = trickResolutionFor(finalState, objective.target);
+          if (resolution !== undefined && resolution.winnerSeatId === objective.ownerSeatId) {
+            failedThenOwnWonByOwnerRuns++;
+          }
+        }
+      }),
+      { numRuns: 300 },
+    );
+
+    // Non-vacuity A (WR-01 shape): the failed-then-own-card-won-by-owner
+    // scenario actually occurred in the generated runs.
+    expect(failedThenOwnWonByOwnerRuns).toBeGreaterThan(0);
+
+    // Non-vacuity B: each of the four kinds failed at some prefix before
+    // the camp's final trick, so later prefixes genuinely exercised the
+    // absorbing check (not just a single failure recorded at the end).
+    expect(failedBeforeEnd["win-card"]).toBeGreaterThan(0);
+    expect(failedBeforeEnd["ordered"]).toBeGreaterThan(0);
+    expect(failedBeforeEnd["no-tricks"]).toBeGreaterThan(0);
+    expect(failedBeforeEnd["exactly-n"]).toBeGreaterThan(0);
   });
 });
