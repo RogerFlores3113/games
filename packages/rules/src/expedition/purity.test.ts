@@ -48,6 +48,10 @@ const MUST_BE_SCANNED = [
   "run/rng.ts",
   "gear/gear-def.ts",
   "boss/boss-def.ts",
+  "adapter/adapter.ts",
+  "adapter/view.ts",
+  "adapter/view-types.ts",
+  "adapter/request-guards.ts",
 ];
 
 /** Recursively walks `dir`, returning every non-test .ts file as a path
