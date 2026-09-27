@@ -470,7 +470,7 @@ second game to an already-versioned envelope.)
 
 **If this table is empty:** N/A — see above.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does Phase 11 need any new disconnect/pause behavior, or does it purely consume
    `readySeatIds` as already-modeled pure data?**
@@ -486,6 +486,7 @@ second game to an already-versioned envelope.)
      mention reconnection at all, and the room layer's existing `connected` flag is already
      game-agnostic per Phase 5 (v1.0)'s reconnect hardening. Flag for discuss-phase if the
      planner disagrees.
+   - RESOLVED: Out of scope. Plan 11-03 adds no pause/disconnect behavior; ready state is exposed read-only as `seats[].ready`.
 
 2. **Exact wire shape for objective/reveal/log view fields (field names, nesting).**
    - What we know: the design spec §6.4 lists the CONTENTS at a conceptual level (own hand,
@@ -500,6 +501,7 @@ second game to an already-versioned envelope.)
      header: "Field-for-field mirror of HanabiView"). This is design work appropriately left to
      planning/implementation, not a research gap — the CONTENTS are fully specified above; only
      naming is open.
+   - RESOLVED: Plan 11-01 defines the exact `ExpeditionView` field list, derived from `RunState`/`CampState`; Plan 11-02 mirrors it field-for-field in Zod.
 
 ## Environment Availability
 

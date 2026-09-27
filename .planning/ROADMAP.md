@@ -207,7 +207,27 @@ Plans:
   2. Thick Fog's face-down objectives are omitted from the server's per-seat view payload itself, never merely hidden by a client-side conditional.
   3. Property-based simulated runs across 3, 4 and 5 players, every boss twist, and random loadouts always end, never throw, conserve cards, and never leak.
 
-**Plans**: TBD
+**Plans**: 7 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 11-01-PLAN.md — ExpeditionView contract + toExpeditionPlayerView allowlist projection, Thick Fog omission, WR-03 reveal ruling (COMM-03)
+- [ ] 11-02-PLAN.md — Expedition Zod wire schemas (view/errors/config) + @games/schema/games/expedition subpath (COMM-03)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 11-03-PLAN.md — expeditionGame adapter + hostile-input request guards + @games/rules exports (COMM-03, ENG-03)
+- [ ] 11-04-PLAN.md — Per-seat leak checker with canaries + whole-run every-step leak property (COMM-03, ENG-03)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 11-05-PLAN.md — Replace Phase 10 interim no-leak checks in run property / gear / boss contracts + README (ENG-03, COMM-03)
+- [ ] 11-06-PLAN.md — Production registration: GameId widening, error/create-room members, registry entry + compile-time asserts, web board map (COMM-03)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 11-07-PLAN.md — Room-level end-to-end wiring test with per-step schema + wire leak checks; structural confinement (COMM-03, ENG-03)
 
 ### Phase 12: Phaser Shell
 
