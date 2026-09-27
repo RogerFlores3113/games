@@ -18,6 +18,7 @@ export default defineConfig({
             // matching is prefix-based in insertion order, so the generic
             // key would otherwise swallow this more-specific one.
             "@games/schema/games/hanabi": alias("./packages/schema/src/games/hanabi.ts"),
+            "@games/schema/games/expedition": alias("./packages/schema/src/games/expedition.ts"),
             "@games/schema": alias("./packages/schema/src/index.ts"),
             "@games/rules": alias("./packages/rules/src/index.ts"),
           },
@@ -32,6 +33,7 @@ export default defineConfig({
         resolve: {
           alias: {
             "@games/schema/games/hanabi": alias("./packages/schema/src/games/hanabi.ts"),
+            "@games/schema/games/expedition": alias("./packages/schema/src/games/expedition.ts"),
             "@games/schema": alias("./packages/schema/src/index.ts"),
             "@games/rules": alias("./packages/rules/src/index.ts"),
           },
@@ -63,6 +65,7 @@ export default defineConfig({
         resolve: {
           alias: {
             "@games/schema/games/hanabi": alias("./packages/schema/src/games/hanabi.ts"),
+            "@games/schema/games/expedition": alias("./packages/schema/src/games/expedition.ts"),
             "@games/schema": alias("./packages/schema/src/index.ts"),
             "@games/rules": alias("./packages/rules/src/index.ts"),
             // "cloudflare:workers" only exists inside workerd; shim it for
@@ -86,6 +89,7 @@ export default defineConfig({
         resolve: {
           alias: {
             "@games/schema/games/hanabi": alias("./packages/schema/src/games/hanabi.ts"),
+            "@games/schema/games/expedition": alias("./packages/schema/src/games/expedition.ts"),
             "@games/schema": alias("./packages/schema/src/index.ts"),
             "@games/rules": alias("./packages/rules/src/index.ts"),
           },

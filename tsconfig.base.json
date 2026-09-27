@@ -15,6 +15,7 @@
     "baseUrl": ".",
     "paths": {
       "@games/schema/games/hanabi": ["packages/schema/src/games/hanabi.ts"],
+      "@games/schema/games/expedition": ["packages/schema/src/games/expedition.ts"],
       "@games/schema": ["packages/schema/src/index.ts"],
       "@games/rules": ["packages/rules/src/index.ts"]
     }
