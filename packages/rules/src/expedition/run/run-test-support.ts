@@ -185,7 +185,9 @@ function targetOptionsFor(
 
 /** Every candidate action for every seat at `run`'s current phase, kept only
  * if `applyRunAction` itself accepts it (T-03-24 discipline: legality is
- * decided ONLY by the real transition, never re-derived here). */
+ * decided ONLY by the real transition, never re-derived here). use-gear is
+ * enumerated in all three windows a camp can be in: pre-deal, objective-pick
+ * and between-tricks. */
 export function enumerateLegalRunActions(
   run: RunState,
   catalog: Catalog,
@@ -244,6 +246,19 @@ export function enumerateLegalRunActions(
       if (ownHand !== undefined) {
         for (const card of ownHand.cards) {
           candidates.push({ seatId: actorSeatId, action: { type: "play-card", cardId: card.id } });
+        }
+      }
+    }
+
+    if (currentWindow(run, rules) === "objective-pick") {
+      for (const seat of run.seats) {
+        for (const gearId of seat.equippedGearIds) {
+          const def = catalog.gear[gearId];
+          if (def === undefined || def.window !== "objective-pick") continue;
+          const pools = targetOptionsFor(def.targets, run, camp, seat.seatId);
+          for (const targets of cartesian(pools)) {
+            candidates.push({ seatId: seat.seatId, action: { type: "use-gear", gearId, targets } });
+          }
         }
       }
     }

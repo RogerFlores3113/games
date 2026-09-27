@@ -123,22 +123,24 @@ function candidateTargetsFor(def: GearDef, run: RunState, selfSeatId: string): s
 }
 
 /** Searches seats in `run.seatIds` order, then target combinations in
- * `candidateTargetsFor` order, for the first (seatId, targets) pair
- * `checkUseGear` accepts. `null` when no legal combination exists in this
- * fixture (a non-vacuity failure the calling test asserts against). */
-function findUsableFixture(
+ * `candidateTargetsFor` order, collecting EVERY (seatId, targets) pair
+ * `checkUseGear` accepts (WR-01: not just the first). `[]` when no legal
+ * combination exists in this fixture (a non-vacuity failure the calling test
+ * asserts against). */
+function findUsableFixtures(
   run: RunState,
   def: GearDef,
   catalog: Catalog,
-): { seatId: string; targets: string[] } | null {
+): Array<{ seatId: string; targets: string[] }> {
+  const fixtures: Array<{ seatId: string; targets: string[] }> = [];
   for (const seatId of run.seatIds) {
     for (const targets of candidateTargetsFor(def, run, seatId)) {
       if (checkUseGear(run, seatId, def.id, targets, catalog).ok) {
-        return { seatId, targets };
+        fixtures.push({ seatId, targets });
       }
     }
   }
-  return null;
+  return fixtures;
 }
 
 /** setupRun with every seat equipped with only `id`, at campNumber 6 (the
@@ -175,6 +177,103 @@ function runScopedSnapshot(run: RunState) {
 }
 
 const LOG_ENTRY_KEYS = ["actorSeatId", "audience", "event", "gearId", "subjectSeatIds"].sort();
+
+/** Applies one accepted (seatId, targets) use of gear `id` against `dealt`
+ * and asserts the full per-use contract: applies without throwing or
+ * rejecting (WR-01: checkUseGear(...).ok implies the use applies),
+ * determinism across JSON-cloned inputs, card conservation, JSON
+ * round-tripping, run-scoped-field stability (except a one-entry `history`
+ * growth), GEAR-05 finality (gear_already_used on a second use), and the
+ * interim no-leak checks (reveal audiences, log entry keys). `dealt` is
+ * never mutated — every fixture starts from the same unmodified state. */
+function assertLegalUseContract(
+  dealt: RunState,
+  id: string,
+  seatId: string,
+  targets: string[],
+  catalog: Catalog,
+): void {
+  const beforeCardIds = dealt.attempt!.camp ? campCardIds(dealt.attempt!.camp) : null;
+  const before = runScopedSnapshot(dealt);
+
+  let result;
+  try {
+    result = applyRunAction(dealt, seatId, { type: "use-gear", gearId: id, targets }, catalog);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `gear.contract: ${id} checkUseGear accepted ${JSON.stringify({ seatId, targets })} but applyRunAction threw: ${message}`,
+    );
+  }
+  if (!result.ok) {
+    throw new Error(
+      `gear.contract: ${id} use-gear rejected for fixture (${JSON.stringify({ seatId, targets })}): ${result.error}`,
+    );
+  }
+  const applied = result.state;
+
+  // determinism: two independent JSON-cloned inputs give deep-equal outputs
+  // (RunState is plain JSON data).
+  const cloneA: RunState = JSON.parse(JSON.stringify(dealt));
+  const cloneB: RunState = JSON.parse(JSON.stringify(dealt));
+  let resultA;
+  let resultB;
+  try {
+    resultA = applyRunAction(cloneA, seatId, { type: "use-gear", gearId: id, targets }, catalog);
+    resultB = applyRunAction(cloneB, seatId, { type: "use-gear", gearId: id, targets }, catalog);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `gear.contract: ${id} checkUseGear accepted ${JSON.stringify({ seatId, targets })} but applyRunAction threw: ${message}`,
+    );
+  }
+  if (!resultA.ok || !resultB.ok) {
+    throw new Error("gear.contract: determinism check: a cloned application was rejected");
+  }
+  expect(resultA).toEqual(resultB);
+
+  // conservation
+  if (beforeCardIds !== null && applied.attempt !== null && applied.attempt.camp !== null) {
+    expect(campCardIds(applied.attempt.camp)).toEqual(beforeCardIds);
+  }
+
+  // round-trips through JSON
+  expect(JSON.parse(JSON.stringify(applied))).toEqual(applied);
+
+  // attempt-scoped-only fields: everything but `history` is untouched;
+  // `history` either holds or grows by exactly one entry (a camp settling
+  // during the action, as Camouflage's remove-objective can, is also
+  // acceptable).
+  const after = runScopedSnapshot(applied);
+  if (after.history.length === before.history.length + 1) {
+    expect({ ...after, history: before.history }).toEqual(before);
+  } else {
+    expect(after).toEqual(before);
+  }
+
+  // marks the gear used (GEAR-05 finality) and the interim no-leak check —
+  // both only meaningful while the attempt this use happened in is still
+  // open. A use that itself settles the camp (history grew above) leaves no
+  // attempt to re-check against.
+  if (applied.attempt !== null) {
+    expect(checkUseGear(applied, seatId, id, targets, catalog)).toEqual({
+      ok: false,
+      error: "gear_already_used",
+      reason: "Already used this camp",
+    });
+
+    for (const reveal of applied.attempt.reveals) {
+      expect(reveal.audience.length).toBeGreaterThan(0);
+      for (const audienceSeatId of reveal.audience) {
+        expect(applied.seatIds).toContain(audienceSeatId);
+      }
+    }
+
+    for (const entry of applied.attempt.log) {
+      expect(Object.keys(entry).sort()).toEqual(LOG_ENTRY_KEYS);
+    }
+  }
+}
 
 describe("GEAR_REGISTRY (ENG-01)", () => {
   it("has exactly the ten v1 ids, each key equal to its def's own id", () => {
@@ -225,7 +324,7 @@ for (const [id, def] of Object.entries(GEAR_REGISTRY)) {
       });
     } else {
       for (const playerCount of [3, 4, 5] as const) {
-        it(`playerCount=${playerCount}: a generic fixture finds a usable target combination, applies deterministically, conserves cards, round-trips through JSON, changes only attempt-scoped fields, marks the gear used, and leaks nothing (interim)`, () => {
+        it(`playerCount=${playerCount}: every usable target combination applies deterministically, conserves cards, round-trips through JSON, changes only attempt-scoped fields, marks the gear used, and leaks nothing (interim)`, () => {
           const catalog = makeCatalog();
           const dealt = advanceTo(
             fixtureFor(id, playerCount, catalog),
@@ -233,72 +332,11 @@ for (const [id, def] of Object.entries(GEAR_REGISTRY)) {
             catalog,
           );
 
-          const fixture = findUsableFixture(dealt, def, catalog);
-          expect(fixture).not.toBeNull();
-          const { seatId, targets } = fixture!;
+          const fixtures = findUsableFixtures(dealt, def, catalog);
+          expect(fixtures.length).toBeGreaterThan(0);
 
-          const beforeCardIds = dealt.attempt!.camp ? campCardIds(dealt.attempt!.camp) : null;
-          const before = runScopedSnapshot(dealt);
-
-          const result = applyRunAction(dealt, seatId, { type: "use-gear", gearId: id, targets }, catalog);
-          if (!result.ok) {
-            throw new Error(
-              `gear.contract: ${id} use-gear rejected for fixture (${JSON.stringify({ seatId, targets })}): ${result.error}`,
-            );
-          }
-          const applied = result.state;
-
-          // determinism: two independent JSON-cloned inputs give
-          // deep-equal outputs (RunState is plain JSON data).
-          const cloneA: RunState = JSON.parse(JSON.stringify(dealt));
-          const cloneB: RunState = JSON.parse(JSON.stringify(dealt));
-          const resultA = applyRunAction(cloneA, seatId, { type: "use-gear", gearId: id, targets }, catalog);
-          const resultB = applyRunAction(cloneB, seatId, { type: "use-gear", gearId: id, targets }, catalog);
-          if (!resultA.ok || !resultB.ok) {
-            throw new Error("gear.contract: determinism check: a cloned application was rejected");
-          }
-          expect(resultA).toEqual(resultB);
-
-          // conservation
-          if (beforeCardIds !== null && applied.attempt !== null && applied.attempt.camp !== null) {
-            expect(campCardIds(applied.attempt.camp)).toEqual(beforeCardIds);
-          }
-
-          // round-trips through JSON
-          expect(JSON.parse(JSON.stringify(applied))).toEqual(applied);
-
-          // attempt-scoped-only fields: everything but `history` is
-          // untouched; `history` either holds or grows by exactly one
-          // entry (a camp settling during the action, as Camouflage's
-          // remove-objective can, is also acceptable).
-          const after = runScopedSnapshot(applied);
-          if (after.history.length === before.history.length + 1) {
-            expect({ ...after, history: before.history }).toEqual(before);
-          } else {
-            expect(after).toEqual(before);
-          }
-
-          // marks the gear used (GEAR-05 finality) and the interim no-leak
-          // check — both only meaningful while the attempt this use
-          // happened in is still open. A use that itself settles the camp
-          // (history grew above) leaves no attempt to re-check against.
-          if (applied.attempt !== null) {
-            expect(checkUseGear(applied, seatId, id, targets, catalog)).toEqual({
-              ok: false,
-              error: "gear_already_used",
-              reason: "Already used this camp",
-            });
-
-            for (const reveal of applied.attempt.reveals) {
-              expect(reveal.audience.length).toBeGreaterThan(0);
-              for (const audienceSeatId of reveal.audience) {
-                expect(applied.seatIds).toContain(audienceSeatId);
-              }
-            }
-
-            for (const entry of applied.attempt.log) {
-              expect(Object.keys(entry).sort()).toEqual(LOG_ENTRY_KEYS);
-            }
+          for (const { seatId, targets } of fixtures) {
+            assertLegalUseContract(dealt, id, seatId, targets, catalog);
           }
         });
       }

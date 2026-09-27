@@ -93,15 +93,17 @@ function withCamp(run: RunState, camp: CampState): RunState {
 }
 
 describe("Compass (reroll)", () => {
-  /** Camp 4 (an ordered ①② pair plus two win-card slots), with `reroll`
-   * equipped to a seat determined NOT to be the first objective-pick actor
-   * (a probe run, sharing the same seed/campNumber so the deal and leader
-   * are identical, discovers that seat first — dealing never depends on
-   * loadouts). */
-  function setupCompass(): { run: RunState; catalog: Catalog; nonPickerSeatId: string; pickerSeatId: string } {
+  /** Camp `campNumber` (defaults to 4: an ordered ①② pair plus two win-card
+   * slots), with `reroll` equipped to a seat determined NOT to be the first
+   * objective-pick actor (a probe run, sharing the same seed/campNumber so
+   * the deal and leader are identical, discovers that seat first — dealing
+   * never depends on loadouts). */
+  function setupCompass(
+    campNumber: CampNumber = 4,
+  ): { run: RunState; catalog: Catalog; nonPickerSeatId: string; pickerSeatId: string } {
     const catalog = makeCatalog();
     const probe = advanceTo(
-      setupRun({ seatIds: [...SEAT_IDS], seed: SEED, catalog, campNumber: 4 }),
+      setupRun({ seatIds: [...SEAT_IDS], seed: SEED, catalog, campNumber }),
       "objective-pick",
       catalog,
     );
@@ -114,7 +116,7 @@ describe("Compass (reroll)", () => {
         seatIds: [...SEAT_IDS],
         seed: SEED,
         catalog,
-        campNumber: 4,
+        campNumber,
         loadouts: { [nonPickerSeatId]: ["reroll"] },
       }),
       "objective-pick",
@@ -151,6 +153,60 @@ describe("Compass (reroll)", () => {
     expect(rerolled.kind === "ordered" && rerolled.order).toBe(1);
     expect(rerolled.kind === "ordered" && rerolled.target).toEqual(topOfDeck);
     expect(nextCamp.objectiveDeck.length).toBe(deckLenBefore - 1);
+  });
+
+  it("CR-01: rerolls an unowned win-card objective at camp 2 (all win-card), keeping id/kind and replacing target with the deck's top card", () => {
+    const { run, catalog, nonPickerSeatId } = setupCompass(2);
+    const camp = run.attempt!.camp!;
+
+    const winCard = camp.objectives.find((o) => o.kind === "win-card" && o.ownerSeatId === null)!;
+    const topOfDeck = camp.objectiveDeck[0]!;
+    const deckBefore = camp.objectiveDeck;
+    const othersBefore = camp.objectives.filter((o) => o.id !== winCard.id);
+
+    const result = applyRunAction(
+      run,
+      nonPickerSeatId,
+      { type: "use-gear", gearId: "reroll", targets: [winCard.id] },
+      catalog,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const nextCamp = result.state.attempt!.camp!;
+    const rerolled = nextCamp.objectives.find((o) => o.id === winCard.id)!;
+    expect(rerolled.kind).toBe("win-card");
+    expect(rerolled.ownerSeatId).toBeNull();
+    expect(rerolled.kind === "win-card" && rerolled.target).toEqual(topOfDeck);
+    expect(nextCamp.objectiveDeck).toEqual(deckBefore.slice(1));
+    expect(nextCamp.objectives.filter((o) => o.id !== winCard.id)).toEqual(othersBefore);
+  });
+
+  it("CR-01: rerolls an unowned win-card objective at camp 4 (mixed)", () => {
+    const { run, catalog, nonPickerSeatId } = setupCompass();
+    const camp = run.attempt!.camp!;
+
+    const winCard = camp.objectives.find((o) => o.kind === "win-card" && o.ownerSeatId === null)!;
+    const topOfDeck = camp.objectiveDeck[0]!;
+    const deckBefore = camp.objectiveDeck;
+    const othersBefore = camp.objectives.filter((o) => o.id !== winCard.id);
+
+    const result = applyRunAction(
+      run,
+      nonPickerSeatId,
+      { type: "use-gear", gearId: "reroll", targets: [winCard.id] },
+      catalog,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const nextCamp = result.state.attempt!.camp!;
+    const rerolled = nextCamp.objectives.find((o) => o.id === winCard.id)!;
+    expect(rerolled.kind).toBe("win-card");
+    expect(rerolled.ownerSeatId).toBeNull();
+    expect(rerolled.kind === "win-card" && rerolled.target).toEqual(topOfDeck);
+    expect(nextCamp.objectiveDeck).toEqual(deckBefore.slice(1));
+    expect(nextCamp.objectives.filter((o) => o.id !== winCard.id)).toEqual(othersBefore);
   });
 
   it("a second use is gear_already_used", () => {

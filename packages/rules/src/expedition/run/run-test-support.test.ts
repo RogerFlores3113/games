@@ -9,7 +9,8 @@ import { applyRunAction } from "./run-actions";
 import { advanceTo, driveRun, enumerateLegalRunActions, replayRun, setupRun } from "./run-test-support";
 import { currentWindow } from "./toolkit";
 import { rulesFor } from "./compose";
-import type { Catalog } from "./types";
+import { reroll } from "../gear/reroll";
+import type { Catalog, CampNumber } from "./types";
 import type { GearDef } from "../gear/gear-def";
 import type { BossDef } from "../boss/boss-def";
 
@@ -148,6 +149,33 @@ describe("enumerateLegalRunActions", () => {
     expect(readySeats).toEqual([]);
     const draftCandidates = candidates.filter((c) => c.action.type === "pick-draft");
     expect(draftCandidates.length).toBeGreaterThan(0);
+  });
+
+  it("WR-01: at objective-pick, offers use-gear reroll targeting a win-card objective", () => {
+    const reelCatalog: Catalog = { gear: { reroll }, bosses: {} };
+    const run = advanceTo(
+      setupRun({
+        seatIds: SEAT_IDS,
+        seed: "enum-objpick-reroll",
+        catalog: reelCatalog,
+        campNumber: 2 as CampNumber,
+        loadouts: Object.fromEntries(SEAT_IDS.map((seatId) => [seatId, ["reroll"]])),
+      }),
+      "objective-pick",
+      reelCatalog,
+    );
+    const candidates = enumerateLegalRunActions(run, reelCatalog);
+    const rerollCandidates = candidates.filter(
+      (c) => c.action.type === "use-gear" && c.action.gearId === "reroll",
+    );
+    expect(rerollCandidates.length).toBeGreaterThan(0);
+    const camp = run.attempt!.camp!;
+    for (const candidate of rerollCandidates) {
+      if (candidate.action.type !== "use-gear") continue;
+      const targetId = candidate.action.targets[0]!;
+      const objective = camp.objectives.find((o) => o.id === targetId)!;
+      expect(objective.kind).toBe("win-card");
+    }
   });
 });
 
