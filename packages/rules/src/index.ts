@@ -41,3 +41,5 @@ export type { ExpeditionView } from "./expedition/adapter/view-types";
 export type { RunState } from "./expedition/run/types";
 export type { RunAction } from "./expedition/run/types";
 export type { RunError } from "./expedition/run/types";
+export { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "./expedition/adapter/view-leak-check";
+export type { ExpeditionSeatSecrets } from "./expedition/adapter/view-leak-check";

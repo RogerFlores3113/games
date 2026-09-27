@@ -313,6 +313,27 @@ describe("HIDE-02/HIDE-03/D-06 structural chokepoint audit (D-09)", () => {
     ]);
   });
 
+  it("A9-expedition (D-06): expeditionGame appears only in game-registration.ts among non-test worker files", () => {
+    const expeditionHits = findFilesWithMatch(/expeditionGame/g);
+    const registrationCount = expeditionHits.find((h) => h.file === "game-registration.ts")?.count ?? 0;
+    // Non-vacuous: a future refactor that removes the identifier entirely
+    // must not make this confinement assertion pass with an empty array.
+    expect(registrationCount, "expected at least 1 expeditionGame occurrence in game-registration.ts").toBeGreaterThanOrEqual(1);
+    expect(
+      expeditionHits,
+      `expected expeditionGame only in game-registration.ts, found in: ${JSON.stringify(expeditionHits)}`,
+    ).toEqual([{ file: "game-registration.ts", count: registrationCount }]);
+  });
+
+  it('D-11-expedition: the string literal "expedition" appears in no non-test src file other than game-registration.ts', () => {
+    const hits = findFilesWithMatch(/["'`]expedition["'`]/g);
+    const otherFiles = hits.filter((h) => h.file !== "game-registration.ts");
+    expect(
+      otherFiles,
+      `expected the "expedition" literal only in game-registration.ts, found elsewhere in: ${JSON.stringify(otherFiles)}`,
+    ).toEqual([]);
+  });
+
   it("A9-sibling (D-08/D-09): resolveGame is defined only in game-registration.ts, and activeGame appears in no non-test worker file", () => {
     const defHits = findFilesWithMatch(/export function resolveGame\(/g);
     expect(
