@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: resolved
 phase: 09-expedition-rules-core
 source: [09-VERIFICATION.md]
 started: 2026-09-24T06:04:01Z
-updated: 2026-09-26T21:07:52Z
+updated: 2026-09-27T03:01:21Z
 ---
 
 ## Current Test
@@ -28,7 +28,7 @@ blocked: 0
 ## Gaps
 
 - truth: "Every objective's status is correct at any CampState (monotone: once failed, stays failed) and ordered-objective failure timing is proven by a genuinely independent property-test oracle"
-  status: failed
+  status: resolved
   reason: "WR-01: orderedKind.evaluate (objectives.ts:161-171) can flip failed -> done once the objective's own card is later won; WR-02: orderedOracle in objectives.property.test.ts:85-115 mirrors the implementation so it cannot catch this"
   severity: major
   test: 1

@@ -44,6 +44,7 @@ A friend clicks a link and is playing within seconds — and the game does not b
 - ✓ Board redesign: clue-coloured hint rings with a keep-hints toggle, number on the tile back, tile colour picker, wooden board, labelled Play/Discard areas with token art, shared rearrangeable discard order — *Validated in Phase 6.2 (owner sign-off)*
 - ✓ Rainbow and the owner's house-rules Black variant (5 colours + Rainbow + reversed Black, 70 tiles, max 35) end to end, with no variant special-casing — *Validated in Phase 7 (owner-approved 2026-09-18)*
 - ✓ All v1.0 Hanabi requirements (80/80) — *v1.0, audited 2026-09-22; see `.planning/milestones/v1.0-REQUIREMENTS.md`*
+- ✓ A pure, framework-free Expedition rules engine exists (XRULE-01..08) — *Validated in Phase 9: Expedition Rules Core — 54/52/50-card deal with public removed cards, Sun/Moon joker follow-suit and trick winner, Sun/A♠ leader, clockwise objective picking, all four objective kinds with instant failure detection, no undo/auto-play; proven by fast-check whole-camp and failure-timing properties with an independent ordered-objective oracle. Not yet wired to the room layer (Phase 11); hook-robustness warnings WR-03/05/06 deferred to Phase 10.*
 
 ### Active
 
@@ -135,4 +136,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-22 after v1.0 milestone (Hanabi) — archived and tagged*
+*Last updated: 2026-09-26 after Phase 9 (Expedition Rules Core)*

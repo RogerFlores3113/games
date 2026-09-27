@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
-status: executing
-stopped_at: Completed 09-08-PLAN.md
-last_updated: "2026-09-27T02:51:31.767Z"
+status: ready_to_plan
+stopped_at: Phase 9 complete (8/8) — ready to discuss Phase 10
+last_updated: 2026-09-27T03:01:21.510Z
 last_activity: 2026-09-27
 progress:
   total_phases: 8
@@ -21,20 +21,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-22)
 
 **Core value:** A friend clicks a link and is playing within seconds — and the game does not break, stall, or lose their seat for the rest of the session.
-**Current focus:** Phase 9 — Expedition Rules Core
+**Current focus:** Phase 10 — run layer, gear engine & bosses
 
 ## Current Position
 
-Phase: 9 (Expedition Rules Core) — EXECUTING
-Plan: 3 of 8
-Status: Ready to execute
+Phase: 10
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-09-27
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 98
+- Total plans completed: 106
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -52,6 +52,7 @@ Last activity: 2026-09-27
 | 06.1 | 15 | - | - |
 | 06.2 | 18 | - | - |
 | 7 | 13 | - | - |
+| 9 | 8 | - | - |
 
 **Recent Trend:**
 
