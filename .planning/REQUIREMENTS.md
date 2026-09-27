@@ -42,7 +42,7 @@
 - [x] **RUN-04**: Each player drafts 1 of 3 offered gear at the start of the run and after each cleared camp. They are never offered gear they already own, and their offers are private
 - [x] **RUN-05**: Between camps, each player equips owned gear up to their capacity. Every player's loadout is visible to everyone during play and at the fireside
 - [x] **RUN-06**: Each equipped piece of gear can be used once per camp, in its timing window. Used flags, rule modifiers and the leader all reset when a camp is replayed
-- [ ] **RUN-07**: Every run replays deterministically from its seed and action log
+- [x] **RUN-07**: Every run replays deterministically from its seed and action log
 
 ### Gear (v1 catalogue)
 
@@ -152,7 +152,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | RUN-04 | Phase 10 | Complete |
 | RUN-05 | Phase 10 | Complete |
 | RUN-06 | Phase 10 | Complete |
-| RUN-07 | Phase 10 | Pending |
+| RUN-07 | Phase 10 | Complete |
 | GEAR-01 | Phase 10 | Complete |
 | GEAR-02 | Phase 10 | Complete |
 | GEAR-03 | Phase 10 | Complete |

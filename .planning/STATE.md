@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 10-16-PLAN.md
-last_updated: "2026-09-27T07:26:56Z"
+stopped_at: Completed 10-17-PLAN.md
+last_updated: "2026-09-27T07:33:39Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 35
-  completed_plans: 34
-  percent: 25
+  completed_plans: 35
+  percent: 38
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-22)
 
 **Core value:** A friend clicks a link and is playing within seconds — and the game does not break, stall, or lose their seat for the rest of the session.
-**Current focus:** Phase 10 — Run Layer, Gear Engine & Bosses
+**Current focus:** Phase 10 complete — Phase 11 (Adapter, Schemas & Worker Wiring) next
 
 ## Current Position
 
-Phase: 10 (Run Layer, Gear Engine & Bosses) — EXECUTING
-Plan: 17 of 17
-Status: Ready to execute
+Phase: 10 (Run Layer, Gear Engine & Bosses) — COMPLETE
+Plan: 17 of 17 (all complete)
+Status: Phase complete; ready for Phase 11 planning
 Last activity: 2026-09-27
 
 ## Performance Metrics
@@ -180,6 +180,7 @@ Last activity: 2026-09-27
 | Phase 10-run-layer-gear-engine-bosses P14 | ~15min | 2 tasks | 3 files |
 | Phase 10-run-layer-gear-engine-bosses P15 | ~10min | 1 tasks | 2 files |
 | Phase 10-run-layer-gear-engine-bosses P16 | ~30min | 2 tasks | 3 files |
+| Phase 10-run-layer-gear-engine-bosses P17 | ~30min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -418,6 +419,9 @@ Recent decisions affecting current work:
 - [Phase 10-15]: Gear catalogue contract (ENG-02) covers all 10 v1 gear items via generic per-window fixtures at 3/4/5 players, closing ENG-02 (combined with 10-14's boss/objective contracts); GEAR-05/06 UI is deferred to a later phase
 - [Phase 10-16]: run/catalog.ts's CATALOG wires GEAR_REGISTRY+BOSS_REGISTRY as Phase 11's adapter target; replay-reset.test.ts proves ROADMAP criteria 1/2 on real content — RUN-06's reset contract holds even though Rain Poncho's whole-camp "no Whisper" downside also blocks whisper-checking gear (Signal Whistle), so the fixture proves its two attempt-1 active effects via jam+ghost rather than forcing a third gear's effect through a use jam's own downside correctly refuses
 - [Phase 10-16]: expedition/README.md documents the ENG-01 recipes for gear/objective-kind/boss-twist/hook/toolkit-op against the real registries; interactable/card-pack registries are documented as forward contracts only (they live in apps/web, built in Phase 14/12) — ENG-01's README requirement is now fully met for content authored in this package, with that explicit caveat for the two apps/web registries
+- [Phase 10-17]: Properties A (RUN-07 replay) and D (whole-run safety) combined into one fc.property/fc.assert per the plan's own runtime instruction, driving each generated run once and checking both, halving the drive count versus two separate assert blocks over the same arbitrary
+- [Phase 10-17]: Per-attempt card conservation checked against the first-seen campCardIds for that (campNumber, attemptNumber) key rather than a hardcoded expected count, correctly covering both a fresh camp-1 deal and any replayed boss-camp deal with no special-casing
+- [Phase 10-17]: RUN-07 closed and Phase 10 (Run Layer, Gear Engine & Bosses) is now fully complete — all 17 plans and all 5 ROADMAP success criteria (Whisper lifecycle, fail-then-replay reset, RUN-07 whole-run replay, draft/loadout/gear/boss behavior, ENG-01/02 extensibility+contract checks) are proven
 
 ### Pending Todos
 
@@ -454,9 +458,9 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T07:26:56Z
-Stopped at: Completed 10-16-PLAN.md
-Resume file: 10-17-PLAN.md
+Last session: 2026-09-27T07:33:39Z
+Stopped at: Completed 10-17-PLAN.md — Phase 10 complete
+Resume file: None - run /gsd:plan-phase 11 to start Phase 11 (Adapter, Schemas & Worker Wiring)
 
 ## Operator Next Steps
 
