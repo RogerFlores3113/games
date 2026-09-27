@@ -183,7 +183,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 10-14-PLAN.md — BOSS_REGISTRY + boss and objective-kind catalogue contract tests (ENG-01, ENG-02)
+- [x] 10-14-PLAN.md — BOSS_REGISTRY + boss and objective-kind catalogue contract tests (ENG-01, ENG-02)
 - [ ] 10-15-PLAN.md — GEAR_REGISTRY + gear catalogue contract test (ENG-01, ENG-02)
 
 **Wave 7** *(blocked on Wave 6 completion)*
@@ -278,7 +278,7 @@ Plans:
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
 | 8. Multi-Game Rooms | v2.0 | 10/10 | Complete   | 2026-09-23 |
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
-| 10. Run Layer, Gear Engine & Bosses | v2.0 | 13/17 | In Progress|  |
+| 10. Run Layer, Gear Engine & Bosses | v2.0 | 14/17 | In Progress|  |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
 | 12. Phaser Shell | v2.0 | 0/? | Not started | - |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 10-13-PLAN.md
-last_updated: "2026-09-27T06:53:20.678Z"
+stopped_at: Completed 10-14-PLAN.md
+last_updated: "2026-09-27T07:01:52.269Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 35
-  completed_plans: 31
+  completed_plans: 32
   percent: 25
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 10 (Run Layer, Gear Engine & Bosses) — EXECUTING
-Plan: 14 of 17
+Plan: 15 of 17
 Status: Ready to execute
 Last activity: 2026-09-27
 
@@ -177,6 +177,7 @@ Last activity: 2026-09-27
 | Phase 10 P11 | 18min | 2 tasks | 3 files |
 | Phase 10-run-layer-gear-engine-bosses P12 | 20min | 1 tasks | 3 files |
 | Phase 10-run-layer-gear-engine-bosses P13 | 20min | 1 tasks | 3 files |
+| Phase 10-run-layer-gear-engine-bosses P14 | ~15min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -411,6 +412,7 @@ Recent decisions affecting current work:
 - [Phase 10]: eclipse.ts avoids the literal string removedCardsFor in comments so the plan's grep gate proves full decoupling from deck.ts's base removal table
 - [Phase 10]: Eclipse's BossDef adds no isTrump or leaderFor override: dropping both jokers from eclipseDeckFor already makes base rules resolve every trick to the highest card of the led suit and A-of-spades to lead
 - [Phase 10]: Thick Fog is a pure objectiveAssignment hook flip (assignFaceDown logic lives entirely in Plan 10-05's lifecycle.ts); Mutiny is a pure failureChecks override reading expeditionLeaderSeatId/completedTricks[0] — BOSS-01 complete: all four provisional twists exist across 10-12/10-13
+- [Phase ?]: [Phase 10]: 10-14: boss/registry.ts's BOSS_REGISTRY registers all four boss twists (satisfies Readonly<Record<string, BossDef>>); boss.contract.test.ts and objective-kinds.contract.test.ts iterate the two registries only, proven non-vacuous against a deliberately broken fake entry
 
 ### Pending Todos
 
@@ -447,8 +449,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T06:53:20.669Z
-Stopped at: Completed 10-13-PLAN.md
+Last session: 2026-09-27T07:01:52.261Z
+Stopped at: Completed 10-14-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
