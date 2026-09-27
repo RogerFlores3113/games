@@ -4,7 +4,7 @@ milestone: v2.0
 milestone_name: Expedition
 status: executing
 stopped_at: Completed 10-14-PLAN.md
-last_updated: "2026-09-27T07:01:52.269Z"
+last_updated: "2026-09-27T07:15:08.661Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 10 (Run Layer, Gear Engine & Bosses) — EXECUTING
-Plan: 15 of 17
+Plan: 16 of 17
 Status: Ready to execute
 Last activity: 2026-09-27
 
@@ -178,6 +178,7 @@ Last activity: 2026-09-27
 | Phase 10-run-layer-gear-engine-bosses P12 | 20min | 1 tasks | 3 files |
 | Phase 10-run-layer-gear-engine-bosses P13 | 20min | 1 tasks | 3 files |
 | Phase 10-run-layer-gear-engine-bosses P14 | ~15min | 2 tasks | 3 files |
+| Phase 10-run-layer-gear-engine-bosses P15 | ~10min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -413,6 +414,7 @@ Recent decisions affecting current work:
 - [Phase 10]: Eclipse's BossDef adds no isTrump or leaderFor override: dropping both jokers from eclipseDeckFor already makes base rules resolve every trick to the highest card of the led suit and A-of-spades to lead
 - [Phase 10]: Thick Fog is a pure objectiveAssignment hook flip (assignFaceDown logic lives entirely in Plan 10-05's lifecycle.ts); Mutiny is a pure failureChecks override reading expeditionLeaderSeatId/completedTricks[0] — BOSS-01 complete: all four provisional twists exist across 10-12/10-13
 - [Phase ?]: [Phase 10]: 10-14: boss/registry.ts's BOSS_REGISTRY registers all four boss twists (satisfies Readonly<Record<string, BossDef>>); boss.contract.test.ts and objective-kinds.contract.test.ts iterate the two registries only, proven non-vacuous against a deliberately broken fake entry
+- [Phase 10-15]: Gear catalogue contract (ENG-02) covers all 10 v1 gear items via generic per-window fixtures at 3/4/5 players, closing ENG-02 (combined with 10-14's boss/objective contracts); GEAR-05/06 UI is deferred to a later phase
 
 ### Pending Todos
 
@@ -449,9 +451,9 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T07:01:52.261Z
+Last session: 2026-09-27T07:14:58.211Z
 Stopped at: Completed 10-14-PLAN.md
-Resume file: None
+Resume file: Completed 10-15-PLAN.md
 
 ## Operator Next Steps
 

@@ -67,7 +67,7 @@
 ### Engine extensibility
 
 - [x] **ENG-01**: Adding a piece of gear, an objective kind, a boss twist, an interactable or a card pack takes one file plus one registry line. The recipes are documented in the package README
-- [ ] **ENG-02**: Every registered catalogue entry is checked automatically: unique id, valid size and window, deterministic effect, card conservation, and no view leak
+- [x] **ENG-02**: Every registered catalogue entry is checked automatically: unique id, valid size and window, deterministic effect, card conservation, and no view leak
 - [ ] **ENG-03**: Property-based simulated runs across 3, 4 and 5 players, every boss twist and random loadouts always end, never throw, conserve cards and never leak
 
 ### Scenes (Phaser)
@@ -161,7 +161,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | GEAR-06 | Phase 10 | Pending |
 | BOSS-01 | Phase 10 | Complete |
 | ENG-01 | Phase 10 | Complete |
-| ENG-02 | Phase 10 | Pending |
+| ENG-02 | Phase 10 | Complete |
 | ENG-03 | Phase 11 | Pending |
 | SCENE-01 | Phase 12 | Pending |
 | SCENE-02 | Phase 12 | Pending |
