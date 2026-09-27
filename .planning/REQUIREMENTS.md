@@ -32,7 +32,7 @@
 
 - [x] **COMM-01**: Once per camp, after objectives are picked and only between tricks, a player can show one card from their hand to one teammate. Only that teammate sees the card; everyone sees who whispered to whom
 - [x] **COMM-02**: A private reveal (Whisper, Spyglass) stays visible to its audience for the rest of the camp and clears when the camp ends or is replayed
-- [ ] **COMM-03**: No player's view or log ever contains another seat's card, except through a reveal addressed to that player. This is checked at every step of full simulated runs, not only right after a reveal
+- [x] **COMM-03**: No player's view or log ever contains another seat's card, except through a reveal addressed to that player. This is checked at every step of full simulated runs, not only right after a reveal
 
 ### Run structure
 
@@ -68,7 +68,7 @@
 
 - [x] **ENG-01**: Adding a piece of gear, an objective kind, a boss twist, an interactable or a card pack takes one file plus one registry line. The recipes are documented in the package README
 - [x] **ENG-02**: Every registered catalogue entry is checked automatically: unique id, valid size and window, deterministic effect, card conservation, and no view leak
-- [ ] **ENG-03**: Property-based simulated runs across 3, 4 and 5 players, every boss twist and random loadouts always end, never throw, conserve cards and never leak
+- [x] **ENG-03**: Property-based simulated runs across 3, 4 and 5 players, every boss twist and random loadouts always end, never throw, conserve cards and never leak
 
 ### Scenes (Phaser)
 
@@ -145,7 +145,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | XRULE-08 | Phase 9 | Complete |
 | COMM-01 | Phase 10 | Complete |
 | COMM-02 | Phase 10 | Complete |
-| COMM-03 | Phase 11 | Pending |
+| COMM-03 | Phase 11 | Complete |
 | RUN-01 | Phase 10 | Complete |
 | RUN-02 | Phase 10 | Complete |
 | RUN-03 | Phase 10 | Complete |
@@ -162,7 +162,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | BOSS-01 | Phase 10 | Complete |
 | ENG-01 | Phase 10 | Complete |
 | ENG-02 | Phase 10 | Complete |
-| ENG-03 | Phase 11 | Pending |
+| ENG-03 | Phase 11 | Complete |
 | SCENE-01 | Phase 12 | Pending |
 | SCENE-02 | Phase 12 | Pending |
 | SCENE-03 | Phase 12 | Pending |

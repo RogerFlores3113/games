@@ -217,7 +217,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 11-03-PLAN.md — expeditionGame adapter + hostile-input request guards + @games/rules exports (COMM-03, ENG-03)
+- [x] 11-03-PLAN.md — expeditionGame adapter + hostile-input request guards + @games/rules exports (COMM-03, ENG-03)
 - [ ] 11-04-PLAN.md — Per-seat leak checker with canaries + whole-run every-step leak property (COMM-03, ENG-03)
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -304,7 +304,7 @@ Plans:
 | 8. Multi-Game Rooms | v2.0 | 10/10 | Complete   | 2026-09-23 |
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 19/19 | Complete    | 2026-09-27 |
-| 11. Adapter, Schemas & Worker Wiring | v2.0 | 2/7 | In Progress|  |
+| 11. Adapter, Schemas & Worker Wiring | v2.0 | 3/7 | In Progress|  |
 | 12. Phaser Shell | v2.0 | 0/? | Not started | - |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
 | 14. Art Pass | v2.0 | 0/? | Not started | - |
