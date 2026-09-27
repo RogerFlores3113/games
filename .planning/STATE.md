@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 10-17-PLAN.md — Phase 10 complete
-last_updated: "2026-09-27T08:46:40.162Z"
-last_activity: 2026-09-27 -- Phase 10 planning complete
+stopped_at: Completed 10-18-PLAN.md — Compass win-card crash fixed, WR-01 harness hardened
+last_updated: "2026-09-27T08:58:14.552Z"
+last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 37
-  completed_plans: 35
+  completed_plans: 36
   percent: 25
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-22)
 
 **Core value:** A friend clicks a link and is playing within seconds — and the game does not break, stall, or lose their seat for the rest of the session.
-**Current focus:** Phase 10 complete — Phase 11 (Adapter, Schemas & Worker Wiring) next
+**Current focus:** Phase 10 — run-layer-gear-engine-bosses
 
 ## Current Position
 
-Phase: 10 (Run Layer, Gear Engine & Bosses) — COMPLETE
-Plan: 17 of 17 (all complete)
+Phase: 10 (run-layer-gear-engine-bosses) — EXECUTING
+Plan: 2 of 19
 Status: Ready to execute
-Last activity: 2026-09-27 -- Phase 10 planning complete
+Last activity: 2026-09-27
 
 ## Performance Metrics
 
@@ -181,6 +181,7 @@ Last activity: 2026-09-27 -- Phase 10 planning complete
 | Phase 10-run-layer-gear-engine-bosses P15 | ~10min | 1 tasks | 2 files |
 | Phase 10-run-layer-gear-engine-bosses P16 | ~30min | 2 tasks | 3 files |
 | Phase 10-run-layer-gear-engine-bosses P17 | ~30min | 1 tasks | 1 files |
+| Phase 10 P18 | 25min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -422,6 +423,9 @@ Recent decisions affecting current work:
 - [Phase 10-17]: Properties A (RUN-07 replay) and D (whole-run safety) combined into one fc.property/fc.assert per the plan's own runtime instruction, driving each generated run once and checking both, halving the drive count versus two separate assert blocks over the same arbitrary
 - [Phase 10-17]: Per-attempt card conservation checked against the first-seen campCardIds for that (campNumber, attemptNumber) key rather than a hardcoded expected count, correctly covering both a fresh camp-1 deal and any replayed boss-camp deal with no special-casing
 - [Phase 10-17]: RUN-07 closed and Phase 10 (Run Layer, Gear Engine & Bosses) is now fully complete — all 17 plans and all 5 ROADMAP success criteria (Whisper lifecycle, fail-then-replay reset, RUN-07 whole-run replay, draft/loadout/gear/boss behavior, ENG-01/02 extensibility+contract checks) are proven
+- [Phase 10]: toolkit.ts's replace-objective kind guard widened to accept both win-card and ordered, matching camp.ts's isCardBearingSlot and reroll.ts's canTarget (CR-01)
+- [Phase 10]: gear.contract.test.ts's findUsableFixture replaced with findUsableFixtures (WR-01): every accepted target combination is applied and asserted, not just the first
+- [Phase 10]: enumerateLegalRunActions now enumerates use-gear candidates in the objective-pick window in addition to pre-deal and between-tricks (WR-01), so run.property.test.ts now drives objective-pick gear
 
 ### Pending Todos
 
@@ -458,9 +462,9 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T07:33:39Z
-Stopped at: Completed 10-17-PLAN.md — Phase 10 complete
-Resume file: None - run /gsd:plan-phase 11 to start Phase 11 (Adapter, Schemas & Worker Wiring)
+Last session: 2026-09-27T08:58:14.541Z
+Stopped at: Completed 10-18-PLAN.md — Compass win-card crash fixed, WR-01 harness hardened
+Resume file: None
 
 ## Operator Next Steps
 

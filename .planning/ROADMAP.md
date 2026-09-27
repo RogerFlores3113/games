@@ -193,7 +193,7 @@ Plans:
 
 **Wave 8 (gap closure)** *(from 10-VERIFICATION.md)*
 
-- [ ] 10-18-PLAN.md — Compass rerolls win-card objectives (CR-01) + harness enumerates objective-pick gear and every accepted target combo (WR-01) (GEAR-02, ENG-02)
+- [x] 10-18-PLAN.md — Compass rerolls win-card objectives (CR-01) + harness enumerates objective-pick gear and every accepted target combo (WR-01) (GEAR-02, ENG-02)
 - [ ] 10-19-PLAN.md — Trail Map legality ignores hidden objectives under Thick Fog (WR-02) (GEAR-06, GEAR-02)
 
 ### Phase 11: Adapter, Schemas & Worker Wiring
@@ -283,7 +283,7 @@ Plans:
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
 | 8. Multi-Game Rooms | v2.0 | 10/10 | Complete   | 2026-09-23 |
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
-| 10. Run Layer, Gear Engine & Bosses | v2.0 | 15/17 | In Progress|  |
+| 10. Run Layer, Gear Engine & Bosses | v2.0 | 18/19 | In Progress|  |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
 | 12. Phaser Shell | v2.0 | 0/? | Not started | - |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
