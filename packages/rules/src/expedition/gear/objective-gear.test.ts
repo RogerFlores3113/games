@@ -1,14 +1,15 @@
 // Tests for the v1 objective gear (Plan 10-09, GEAR-02): Compass
-// (reroll.ts) and Trail Map (reassign.ts, D-10). Camouflage (ghost.ts,
-// D-11) is added by Task 2 of this plan.
+// (reroll.ts), Trail Map (reassign.ts, D-10) and Camouflage (ghost.ts,
+// D-11).
 //
 // Fixtures are driven through applyRunAction (run-actions.ts) and the
 // run-test-support helpers (setupRun/advanceTo) wherever the behavior under
 // test is a normal action sequence. Where a test needs a "spread" camp (a
-// completed trick engineered to force an objective done) the plan's own
-// instruction applies: build the CampState by hand and evaluate it with
-// rulesFor/checkUseGear directly — never push a hand-built state through
-// applyRunAction, which would re-validate it as a fresh transition target.
+// completed trick engineered to force an objective done, or to force a
+// trick win) the plan's own instruction applies: build the CampState by
+// hand and evaluate it with rulesFor/checkUseGear directly — never push a
+// hand-built state through applyRunAction, which would re-validate it as a
+// fresh transition target.
 
 import { describe, expect, it } from "vitest";
 import { currentActorSeatId } from "../camp";
@@ -22,6 +23,7 @@ import type { CampState, CompletedTrick, StandardIdentity } from "../state";
 import type { Catalog, CampNumber, RunState } from "../run/types";
 import { reroll } from "./reroll";
 import { reassign } from "./reassign";
+import { ghost } from "./ghost";
 
 const SEAT_IDS = ["p0", "p1", "p2"] as const;
 const SEED = "objective-gear-seed";
@@ -29,7 +31,7 @@ const SEED = "objective-gear-seed";
 const NO_BOSSES: Record<string, BossDef> = {};
 
 function makeCatalog(): Catalog {
-  return { gear: { reroll, reassign }, bosses: NO_BOSSES };
+  return { gear: { reroll, reassign, ghost }, bosses: NO_BOSSES };
 }
 
 function setup(opts: {
@@ -68,6 +70,19 @@ function forceWinCardDone(camp: CampState, objectiveId: string, cardId: string):
     index: camp.completedTricks.length,
     leaderSeatId: winnerSeatId,
     plays: [{ seatId: winnerSeatId, card: { id: cardId, identity: target } }],
+    winnerSeatId,
+  };
+  return { ...camp, completedTricks: [...camp.completedTricks, trick] };
+}
+
+/** Appends a synthetic completed trick won by `winnerSeatId`, unrelated to
+ * any objective's target — used only to make countTricksWon(state,
+ * winnerSeatId) positive for Camouflage's failure-check tests. */
+function forceTrickWonBy(camp: CampState, winnerSeatId: string, cardId: string): CampState {
+  const trick: CompletedTrick = {
+    index: camp.completedTricks.length,
+    leaderSeatId: winnerSeatId,
+    plays: [{ seatId: winnerSeatId, card: { id: cardId, identity: { kind: "standard", suit: "clubs", rank: 2 } } }],
     winnerSeatId,
   };
   return { ...camp, completedTricks: [...camp.completedTricks, trick] };
@@ -295,5 +310,120 @@ describe("Trail Map (reassign, D-10)", () => {
     expect(check.ok).toBe(false);
     if (check.ok) return;
     expect(check.reason).toBe("Neither of you has an unresolved objective");
+  });
+});
+
+describe("Camouflage (ghost, D-11)", () => {
+  function setupCamouflage(): { run: RunState; catalog: Catalog } {
+    return setup({ campNumber: 2, loadouts: { p0: ["ghost"] }, target: "between-tricks" });
+  }
+
+  it("removes the chosen objective from play and records the activation effect", () => {
+    const { run, catalog } = setupCamouflage();
+    const camp = run.attempt!.camp!;
+    const ownObjective = camp.objectives.find((o) => o.ownerSeatId === "p0")!;
+
+    const result = applyRunAction(
+      run,
+      "p0",
+      { type: "use-gear", gearId: "ghost", targets: [ownObjective.id] },
+      catalog,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const nextCamp = result.state.attempt!.camp!;
+    expect(nextCamp.objectives.some((o) => o.id === ownObjective.id)).toBe(false);
+    expect(result.state.attempt!.effects).toContainEqual({ gearId: "ghost", seatId: "p0", atTrick: 0 });
+  });
+
+  it("failureChecks is empty right after activation, but includes ghost-broke-cover once the owner wins a trick", () => {
+    const { run, catalog } = setupCamouflage();
+    const camp = run.attempt!.camp!;
+    const ownObjective = camp.objectives.find((o) => o.ownerSeatId === "p0")!;
+
+    const used = applyRunAction(
+      run,
+      "p0",
+      { type: "use-gear", gearId: "ghost", targets: [ownObjective.id] },
+      catalog,
+    );
+    expect(used.ok).toBe(true);
+    if (!used.ok) return;
+
+    const usedCamp = used.state.attempt!.camp!;
+    const rules = rulesFor(used.state, catalog);
+    expect(rules.failureChecks(usedCamp)).toEqual([]);
+
+    // D-11: the whole-camp check, evaluated against a spread camp where p0
+    // has since won a trick.
+    const spreadCamp = forceTrickWonBy(usedCamp, "p0", "forced-win");
+    expect(rules.failureChecks(spreadCamp)).toContain("ghost-broke-cover");
+  });
+
+  it("canUse refuses once the owner has already won a trick this camp", () => {
+    const { run, catalog } = setupCamouflage();
+    const camp = run.attempt!.camp!;
+    const ownObjective = camp.objectives.find((o) => o.ownerSeatId === "p0")!;
+
+    const spreadCamp = forceTrickWonBy(camp, "p0", "forced-early-win");
+    const spreadRun = withCamp(run, spreadCamp);
+
+    const check = checkUseGear(spreadRun, "p0", "ghost", [ownObjective.id], catalog);
+    expect(check.ok).toBe(false);
+    if (check.ok) return;
+    expect(check.reason).toBe("You have already won a trick this camp");
+  });
+
+  it("targeting a teammate's objective is invalid_target", () => {
+    const { run, catalog } = setupCamouflage();
+    const camp = run.attempt!.camp!;
+    const p1Objective = camp.objectives.find((o) => o.ownerSeatId === "p1")!;
+
+    const result = applyRunAction(
+      run,
+      "p0",
+      { type: "use-gear", gearId: "ghost", targets: [p1Objective.id] },
+      catalog,
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toBe("invalid_target");
+  });
+
+  it("dropping the last open objective settles the camp as succeeded immediately", () => {
+    const catalog = makeCatalog();
+    const probe = advanceTo(
+      setupRun({ seatIds: [...SEAT_IDS], seed: SEED, catalog, campNumber: 1 }),
+      "objective-pick",
+      catalog,
+    );
+    const probeRules = rulesFor(probe, catalog);
+    const leaderSeatId = currentActorSeatId(probe.attempt!.camp!, probeRules)!;
+
+    const run = advanceTo(
+      setupRun({ seatIds: [...SEAT_IDS], seed: SEED, catalog, campNumber: 1, loadouts: { [leaderSeatId]: ["ghost"] } }),
+      "between-tricks",
+      catalog,
+    );
+    const camp = run.attempt!.camp!;
+    const ownObjective = camp.objectives.find((o) => o.ownerSeatId === leaderSeatId)!;
+    const otherObjective = camp.objectives.find((o) => o.ownerSeatId !== leaderSeatId)!;
+
+    const spreadCamp = forceWinCardDone(camp, otherObjective.id, "forced-other-done");
+    const spreadRun = withCamp(run, spreadCamp);
+
+    const result = applyRunAction(
+      spreadRun,
+      leaderSeatId,
+      { type: "use-gear", gearId: "ghost", targets: [ownObjective.id] },
+      catalog,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.state.attempt).toBe(null);
+    const lastHistory = result.state.history[result.state.history.length - 1]!;
+    expect(lastHistory.status).toBe("succeeded");
   });
 });
