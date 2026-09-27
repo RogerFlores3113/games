@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 10-19-PLAN.md — WR-02 closed (Trail Map hidden-objective probe fixed under Thick Fog)
-last_updated: "2026-09-27T10:05:55.969Z"
-last_activity: 2026-09-27 -- Phase 11 planning complete
+stopped_at: Completed 11-01-PLAN.md — ExpeditionView contract + toExpeditionPlayerView allowlist projection (COMM-03, WR-03 resolved)
+last_updated: "2026-09-27T10:13:32.693Z"
+last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 44
-  completed_plans: 37
+  completed_plans: 38
   percent: 38
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-22)
 
 **Core value:** A friend clicks a link and is playing within seconds — and the game does not break, stall, or lose their seat for the rest of the session.
-**Current focus:** Phase 11 — adapter, schemas & worker wiring
+**Current focus:** Phase 11 — Adapter, Schemas & Worker Wiring
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
+Phase: 11 (Adapter, Schemas & Worker Wiring) — EXECUTING
+Plan: 2 of 7
 Status: Ready to execute
-Last activity: 2026-09-27 -- Phase 11 planning complete
+Last activity: 2026-09-27
 
 ## Performance Metrics
 
@@ -184,6 +184,7 @@ Last activity: 2026-09-27 -- Phase 11 planning complete
 | Phase 10-run-layer-gear-engine-bosses P17 | ~30min | 1 tasks | 1 files |
 | Phase 10 P18 | 25min | 2 tasks | 7 files |
 | Phase 10 P19 | ~15min | 1 tasks | 2 files |
+| Phase 11 P01 | 45min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -429,6 +430,8 @@ Recent decisions affecting current work:
 - [Phase 10]: gear.contract.test.ts's findUsableFixture replaced with findUsableFixtures (WR-01): every accepted target combination is applied and asserted, not just the first
 - [Phase 10]: enumerateLegalRunActions now enumerates use-gear candidates in the objective-pick window in addition to pre-deal and between-tricks (WR-01), so run.property.test.ts now drives objective-pick gear
 - [Phase ?]: Under Thick Fog, Trail Map's canTarget always returns true (WR-02) rather than checking only ctx.self, since a self-only check would still forbid an objective-less seat from taking a teammate's objective; a no-op swap between two objective-less seats is a legal, gear-spending consequence
+- [Phase 11]: adapter/ placed as a new subdirectory of expedition/ (not top-level) so it can import from ../run/ without tripping purity.test.ts's Core-boss/gear-agnostic guard
+- [Phase 11]: WR-03 resolved: a reveal pins identity + fromSeatId at reveal time and is never re-derived after a toolkit move/swap relocates the card
 
 ### Pending Todos
 
@@ -465,8 +468,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T09:07:07.804Z
-Stopped at: Completed 10-19-PLAN.md — WR-02 closed (Trail Map hidden-objective probe fixed under Thick Fog)
+Last session: 2026-09-27T10:13:32.685Z
+Stopped at: Completed 11-01-PLAN.md — ExpeditionView contract + toExpeditionPlayerView allowlist projection (COMM-03, WR-03 resolved)
 Resume file: None
 
 ## Operator Next Steps

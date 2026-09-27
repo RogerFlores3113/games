@@ -212,7 +212,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 11-01-PLAN.md — ExpeditionView contract + toExpeditionPlayerView allowlist projection, Thick Fog omission, WR-03 reveal ruling (COMM-03)
+- [x] 11-01-PLAN.md — ExpeditionView contract + toExpeditionPlayerView allowlist projection, Thick Fog omission, WR-03 reveal ruling (COMM-03)
 - [ ] 11-02-PLAN.md — Expedition Zod wire schemas (view/errors/config) + @games/schema/games/expedition subpath (COMM-03)
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -304,7 +304,7 @@ Plans:
 | 8. Multi-Game Rooms | v2.0 | 10/10 | Complete   | 2026-09-23 |
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 19/19 | Complete    | 2026-09-27 |
-| 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
+| 11. Adapter, Schemas & Worker Wiring | v2.0 | 1/7 | In Progress|  |
 | 12. Phaser Shell | v2.0 | 0/? | Not started | - |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
 | 14. Art Pass | v2.0 | 0/? | Not started | - |
