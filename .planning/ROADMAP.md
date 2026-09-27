@@ -161,7 +161,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 10-03-PLAN.md — Hook composition (base → boss → gear → effects, recomputed per call) and the balance table (RUN-01, D-14/D-15)
-- [ ] 10-04-PLAN.md — Toolkit: timing windows, GearContext, availability reasons (GEAR-06), own-hand-only targets, invariant-checked op executor
+- [x] 10-04-PLAN.md — Toolkit: timing windows, GearContext, availability reasons (GEAR-06), own-hand-only targets, invariant-checked op executor
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -278,7 +278,7 @@ Plans:
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
 | 8. Multi-Game Rooms | v2.0 | 10/10 | Complete   | 2026-09-23 |
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
-| 10. Run Layer, Gear Engine & Bosses | v2.0 | 3/17 | In Progress|  |
+| 10. Run Layer, Gear Engine & Bosses | v2.0 | 4/17 | In Progress|  |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
 | 12. Phaser Shell | v2.0 | 0/? | Not started | - |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
