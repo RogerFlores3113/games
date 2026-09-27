@@ -51,7 +51,7 @@
   - Compass: rerolls a face-up, untaken objective. An ordered objective's replacement keeps its order marker.
   - Trail Map: swaps unresolved objectives between two players.
   - Camouflage: drops one of your objectives. Winning any later trick then fails the camp, and it can't be used after you've already won a trick.
-- [ ] **GEAR-03**: Table gear works as specced: Trained Monkey (swap a chosen card for a random card from a teammate), Machete (lead the next trick yourself)
+- [x] **GEAR-03**: Table gear works as specced: Trained Monkey (swap a chosen card for a random card from a teammate), Machete (lead the next trick yourself)
 - [ ] **GEAR-04**: Run gear works as specced: Rain Poncho (cancel the boss twist, but no Whispers that camp; used before the deal), Energy Tonic (size 0, +2 capacity, and a failed camp costs 1 extra supply per equipped Tonic)
 - [ ] **GEAR-05**: Targeted gear and Whispers show a confirm step before they take effect, and are final once they resolve (no undo)
 - [ ] **GEAR-06**: Gear that can't be used right now shows the reason
@@ -66,7 +66,7 @@
 
 ### Engine extensibility
 
-- [ ] **ENG-01**: Adding a piece of gear, an objective kind, a boss twist, an interactable or a card pack takes one file plus one registry line. The recipes are documented in the package README
+- [x] **ENG-01**: Adding a piece of gear, an objective kind, a boss twist, an interactable or a card pack takes one file plus one registry line. The recipes are documented in the package README
 - [ ] **ENG-02**: Every registered catalogue entry is checked automatically: unique id, valid size and window, deterministic effect, card conservation, and no view leak
 - [ ] **ENG-03**: Property-based simulated runs across 3, 4 and 5 players, every boss twist and random loadouts always end, never throw, conserve cards and never leak
 
@@ -155,12 +155,12 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | RUN-07 | Phase 10 | Pending |
 | GEAR-01 | Phase 10 | Pending |
 | GEAR-02 | Phase 10 | Pending |
-| GEAR-03 | Phase 10 | Pending |
+| GEAR-03 | Phase 10 | Complete |
 | GEAR-04 | Phase 10 | Pending |
 | GEAR-05 | Phase 10 | Pending |
 | GEAR-06 | Phase 10 | Pending |
 | BOSS-01 | Phase 10 | Pending |
-| ENG-01 | Phase 10 | Pending |
+| ENG-01 | Phase 10 | Complete |
 | ENG-02 | Phase 10 | Pending |
 | ENG-03 | Phase 11 | Pending |
 | SCENE-01 | Phase 12 | Pending |

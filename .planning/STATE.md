@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Phase 10 context gathered
-last_updated: "2026-09-27T04:48:13.148Z"
-last_activity: 2026-09-27 -- Phase 10 planning complete
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-09-27T04:59:11.984Z"
+last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 35
-  completed_plans: 18
+  completed_plans: 19
   percent: 25
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-22)
 
 **Core value:** A friend clicks a link and is playing within seconds — and the game does not break, stall, or lose their seat for the rest of the session.
-**Current focus:** Phase 10 — run layer, gear engine & bosses
+**Current focus:** Phase 10 — Run Layer, Gear Engine & Bosses
 
 ## Current Position
 
-Phase: 10
-Plan: Not started
+Phase: 10 (Run Layer, Gear Engine & Bosses) — EXECUTING
+Plan: 2 of 17
 Status: Ready to execute
-Last activity: 2026-09-27 -- Phase 10 planning complete
+Last activity: 2026-09-27
 
 ## Performance Metrics
 
@@ -164,6 +164,7 @@ Last activity: 2026-09-27 -- Phase 10 planning complete
 | Phase 09 P06 | 35min | 3 tasks | 4 files |
 | Phase 09 P07 | 45min | 2 tasks tasks | 3 files files |
 | Phase 09 P08 | 25min | 2 tasks | 5 files |
+| Phase 10 P01 | 20min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -380,6 +381,8 @@ Recent decisions affecting current work:
 - [Phase 09-07]: orderedKind.evaluate's resolved branch made symmetric (otherTrickIndex < myTrickIndex fails, equal indices stay A-TIE), closing WR-01 -- failed is now provably absorbing for all four objective kinds
 - [Phase 09-07]: objectives.property.test.ts's orderedOracle rewritten as an independent pair-based restatement of spec section 5.2 (markerPrecedes, no Infinity marker mapping), closing WR-02's self-confirming oracle
 - [Phase 09-08]: invalid_rule_hook added as the last CampError member; createCamp throws per its existing malformed-input contract when leaderFor returns an unknown seat; WR-03 (isTrump hook) explicitly excluded, deferred to Phase 10
+- [Phase 10]: identityEquals excludes the led card's own identity from legalPlaysFor's trump-led branch, generalizing Phase 9's 'other joker only' rule to any predicate — Keeps trick.property.test.ts green against its static (non-consuming) hand fixtures without weakening real-gameplay follow-suit semantics
+- [Phase 10]: Composed rule-hook defects (trickWinner, nextLeader) throw a plain Error under POLICY A3 instead of returning invalid_rule_hook — Matches createCamp's leaderFor validation; a rules-composition bug is not a player-recoverable error
 
 ### Pending Todos
 
@@ -416,9 +419,9 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T04:06:19.696Z
-Stopped at: Phase 10 context gathered
-Resume file: .planning/phases/10-run-layer-gear-engine-bosses/10-CONTEXT.md
+Last session: 2026-09-27T04:59:11.975Z
+Stopped at: Completed 10-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 
