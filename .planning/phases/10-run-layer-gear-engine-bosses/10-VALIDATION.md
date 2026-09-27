@@ -1,9 +1,9 @@
 ---
 phase: 10
 slug: run-layer-gear-engine-bosses
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: planned
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-09-26
 ---
 
@@ -38,23 +38,25 @@ created: 2026-09-26
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | — | — | COMM-01 | — | Whisper card visible only to its audience | unit + property | `npx vitest run whisper` | ❌ W0 | ⬜ pending |
-| TBD | — | — | COMM-02, RUN-06 | — | Reveals cleared on replay | integration | `npx vitest run replay-reset` | ❌ W0 | ⬜ pending |
-| TBD | — | — | RUN-01 | — | N/A | unit | `npx vitest run balance` | ❌ W0 | ⬜ pending |
-| TBD | — | — | RUN-02, RUN-03 | — | N/A | unit + property | `npx vitest run run-state` | ❌ W0 | ⬜ pending |
-| TBD | — | — | RUN-04 | — | Draft offers private per seat | unit + property | `npx vitest run draft` | ❌ W0 | ⬜ pending |
-| TBD | — | — | RUN-05 | — | N/A | unit | `npx vitest run loadout` | ❌ W0 | ⬜ pending |
-| TBD | — | — | RUN-07 | — | No Math.random | property | `npx vitest run run.property` | ❌ W0 | ⬜ pending |
-| TBD | — | — | GEAR-01..06 | — | Gear acts only through toolkit; conservation | unit ×10 | `npx vitest run gear/` | ❌ W0 | ⬜ pending |
-| TBD | — | — | BOSS-01 | — | N/A | unit ×4 | `npx vitest run boss/` | ❌ W0 | ⬜ pending |
-| TBD | — | — | ENG-02 | — | Interim no-leak over reveals | property (registry) | `npx vitest run contract` | ❌ W0 | ⬜ pending |
-| TBD | — | — | (WR-03/05/06) | — | Hook defects fail loudly | unit | `npx vitest run --project rules` | ❌ W0 | ⬜ pending |
+| see plans | 10-xx | — | COMM-01 | — | Whisper card visible only to its audience | unit + property | `npx vitest run whisper` | created in-task | ⬜ pending |
+| see plans | 10-xx | — | COMM-02, RUN-06 | — | Reveals cleared on replay | integration | `npx vitest run replay-reset` | created in-task | ⬜ pending |
+| see plans | 10-xx | — | RUN-01 | — | N/A | unit | `npx vitest run balance` | created in-task | ⬜ pending |
+| see plans | 10-xx | — | RUN-02, RUN-03 | — | N/A | unit + property | `npx vitest run run-state` | created in-task | ⬜ pending |
+| see plans | 10-xx | — | RUN-04 | — | Draft offers private per seat | unit + property | `npx vitest run draft` | created in-task | ⬜ pending |
+| see plans | 10-xx | — | RUN-05 | — | N/A | unit | `npx vitest run loadout` | created in-task | ⬜ pending |
+| see plans | 10-xx | — | RUN-07 | — | No Math.random | property | `npx vitest run run.property` | created in-task | ⬜ pending |
+| see plans | 10-xx | — | GEAR-01..06 | — | Gear acts only through toolkit; conservation | unit ×10 | `npx vitest run gear/` | created in-task | ⬜ pending |
+| see plans | 10-xx | — | BOSS-01 | — | N/A | unit ×4 | `npx vitest run boss/` | created in-task | ⬜ pending |
+| see plans | 10-xx | — | ENG-02 | — | Interim no-leak over reveals | property (registry) | `npx vitest run contract` | created in-task | ⬜ pending |
+| see plans | 10-xx | — | (WR-03/05/06) | — | Hook defects fail loudly | unit | `npx vitest run --project rules` | created in-task | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
 ---
 
 ## Wave 0 Requirements
+
+All test files below are created inline by `tdd="true"` tasks in the same wave as their feature (plans 10-01..10-17); no separate Wave 0 plan is needed.
 
 - [ ] `run/run-state.test.ts`, `run/draft.test.ts`, `run/loadout.test.ts`, `run/replay-reset.test.ts`, `run/whisper.test.ts`, `run/balance.test.ts`, `run/run.property.test.ts`
 - [ ] `gear/gear.contract.test.ts` + ten `gear/<id>.test.ts`
@@ -76,11 +78,11 @@ Framework install: none — Vitest/fast-check already present.
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 90s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 90s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-09-26 (plan-checker pass; README recipes remain a manual check at verify-work)

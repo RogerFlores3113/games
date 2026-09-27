@@ -649,7 +649,9 @@ export function seedForAttempt(runSeed: string, campNumber: number, attemptNumbe
 
 **If this table is empty:** N/A — six assumptions logged above; all are either low-risk structural choices consistent with established Phase 9 precedent, or explicitly deferred/discretionary per CONTEXT.md.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> Resolved in the plans: Q1 → rules recomputed per call, never cached (10-03 must_haves); Q2 → RunState models only `readySeatIds` + phase gating (10-02); Q3 → flat string-array `use-gear` targets order-matched to `GearDef.targets` (10-02).
 
 1. **Does rule composition happen once per camp attempt, or does it need to be recomposed after every mid-camp `addModifier` call (Camouflage)?**
    - What we know: Camouflage's failure check is added *mid-camp*, after the camp's initial rule composition already happened at camp-attempt start.
