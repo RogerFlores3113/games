@@ -150,7 +150,7 @@ Plans:
   4. Each player drafts 1 of 3 private, never-already-owned gear offers at the run's start and after each cleared camp, equips owned gear up to their camp-number capacity, and every loadout is publicly visible; each v1 gear item (info, objective, table, run gear) and the one v1 boss twist per boss camp work exactly as specced, with a confirm step before targeted gear/Whispers take effect, no undo once they resolve, and a visible reason when gear can't be used.
   5. Adding a new gear item, objective kind, boss twist or interactable is a one-file-plus-registry-line change, and every registered entry is checked automatically for a unique id, valid size/window, deterministic effect, card conservation and no view leak.
 
-**Plans**: 17 plans
+**Plans**: 19 plans
 
 Plans:
 **Wave 1**
@@ -190,6 +190,11 @@ Plans:
 
 - [x] 10-16-PLAN.md — Production CATALOG, fail-then-replay integration test (RUN-06, COMM-01/02), README recipes (ENG-01)
 - [x] 10-17-PLAN.md — Whole-run property tests: deterministic replay from seed + action log (RUN-07)
+
+**Wave 8 (gap closure)** *(from 10-VERIFICATION.md)*
+
+- [ ] 10-18-PLAN.md — Compass rerolls win-card objectives (CR-01) + harness enumerates objective-pick gear and every accepted target combo (WR-01) (GEAR-02, ENG-02)
+- [ ] 10-19-PLAN.md — Trail Map legality ignores hidden objectives under Thick Fog (WR-02) (GEAR-06, GEAR-02)
 
 ### Phase 11: Adapter, Schemas & Worker Wiring
 
