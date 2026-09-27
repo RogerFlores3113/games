@@ -23,6 +23,20 @@
 // every trick of the camp has been played (RESEARCH.md A4) — a holder could
 // still win more tricks before the camp ends, so an early "reached N"/"still
 // zero" state is reported "pending", not "done", until the camp is over.
+//
+// Monotonicity (WR-01): for a fixed ownership assignment, "failed" is
+// absorbing for all four objective kinds as completedTricks grows — at ANY
+// CampState, not only up to the first failure (contrast with base play,
+// which stops at the first failure and so never actually reaches a
+// post-failure state on its own). win-card and no-tricks failures depend on
+// facts (a wrong-seat trick win, a nonzero trick count) that never un-happen
+// once true. exactly-n's `won` never decreases and `won + tricksRemaining`
+// never increases, so once either failure condition holds it holds forever.
+// orderedKind.evaluate's resolved branch below is symmetric for the same
+// reason (see its own doc comment). This is proven by
+// objectives.property.test.ts's raw-trick-sequence prefix property, which
+// builds CampStates directly rather than via driveCamp/applyCampAction
+// (those halt at the first failure).
 
 import { cardLabel, identitiesEqual } from "./deck";
 import type {
@@ -132,14 +146,16 @@ function orderedPrefix(order: OrderMarker): string {
  * (1) unowned -> pending; (2) base win-card check on its own target (won by
  * someone else -> failed); (3) relative-order checks against every OTHER
  * ordered objective in state.objectives, comparing the completed-trick
- * index each one's card was won at ("last" compares as +Infinity, A-LAST) —
- * this objective fails the instant a lower-marker objective is unresolved
- * or resolves later than this one, or a higher-marker objective has already
- * resolved while this one is still unresolved (checked incrementally, never
- * only at camp end); same-trick-index counts as in order (A-TIE); (4) the
- * "last" marker additionally fails if its card is won at any trick index
- * other than totalTricks - 1 (A-LAST); (5) otherwise done once won, else
- * pending. */
+ * index each one's card was won at ("last" compares as +Infinity, A-LAST).
+ * The check is SYMMETRIC (WR-01): this objective fails if EITHER a
+ * lower-marker objective is unresolved or resolves later than this one, OR
+ * a higher-marker objective resolved strictly earlier than this one or
+ * while this one is still unresolved — checked incrementally at every
+ * state, never only at camp end, so a failure recorded once can never flip
+ * back to done as more tricks complete; same-trick-index counts as in order
+ * (A-TIE); (4) the "last" marker additionally fails if its card is won at
+ * any trick index other than totalTricks - 1 (A-LAST); (5) otherwise done
+ * once won, else pending. */
 export const orderedKind: ObjectiveKindDef<OrderedObjective> = {
   id: "ordered",
   describe(objective) {
@@ -163,6 +179,14 @@ export const orderedKind: ObjectiveKindDef<OrderedObjective> = {
         // resolved at or before my trick index.
         if (otherMarker < myMarker) {
           if (otherTrickIndex === undefined || otherTrickIndex > myTrickIndex) return "failed";
+        }
+        // WR-01: symmetric check — a higher-marker objective that resolved
+        // STRICTLY earlier than mine means mine resolved out of order, even
+        // though it eventually resolved. Equal indices stay in order
+        // (A-TIE); this is why the comparison below is strict (<), matching
+        // the lower-marker branch's own strict-> comparison above.
+        if (otherMarker > myMarker && otherTrickIndex !== undefined && otherTrickIndex < myTrickIndex) {
+          return "failed";
         }
       } else if (otherMarker > myMarker && otherTrickIndex !== undefined) {
         // My card is unresolved, but a higher-marker objective already

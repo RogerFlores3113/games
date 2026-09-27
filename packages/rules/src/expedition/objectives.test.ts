@@ -362,6 +362,46 @@ describe("ordered", () => {
     expect(orderedKind.evaluate(state, second)).toBe("done");
   });
 
+  it("WR-01: ① stays failed after ② was won strictly earlier, even once ① is won by its owner (failed is absorbing)", () => {
+    const first = orderedObjective("first", CARD_A, 1, "a");
+    const second = orderedObjective("second", CARD_B, 2, "b");
+    const s1 = makeState({
+      objectives: [first, second],
+      totalTricks: 5,
+      completedTricks: [trick(0, [["b", CARD_B], ["c", CARD_C]], "b")],
+    });
+    expect(orderedKind.evaluate(s1, first)).toBe("failed");
+    expect(orderedKind.evaluate(s1, second)).toBe("failed");
+
+    const s2 = makeState({
+      objectives: [first, second],
+      totalTricks: 5,
+      completedTricks: [
+        trick(0, [["b", CARD_B], ["c", CARD_C]], "b"),
+        trick(1, [["a", CARD_A], ["c", std("clubs", 3)]], "a"),
+      ],
+    });
+    // Before the fix this read "done" once ① was won by its owner — but ②
+    // (a higher marker) resolved strictly earlier, so ① must stay failed.
+    expect(orderedKind.evaluate(s2, first)).toBe("failed");
+    expect(orderedKind.evaluate(s2, second)).toBe("failed");
+  });
+
+  it("WR-01 (other order): a higher marker won strictly earlier, then the lower marker won by its own owner, still fails the lower marker", () => {
+    const first = orderedObjective("first", CARD_A, 1, "a");
+    const second = orderedObjective("second", CARD_B, 2, "b");
+    const state = makeState({
+      objectives: [first, second],
+      totalTricks: 5,
+      completedTricks: [
+        trick(0, [["b", CARD_B]], "b"),
+        trick(1, [["c", CARD_C]], "c"),
+        trick(2, [["a", CARD_A]], "a"),
+      ],
+    });
+    expect(orderedKind.evaluate(state, first)).toBe("failed");
+  });
+
   it("'last' won by owner in the final trick (index totalTricks - 1) is done", () => {
     const last = orderedObjective("last-obj", CARD_A, "last", "a");
     const state = makeState({
