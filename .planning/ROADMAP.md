@@ -242,8 +242,47 @@ Plans:
   4. A player chooses a card pack (Big Index default, Classic), saved per browser and affecting only their own view; the four interactables react to clicks without ever touching game state; a refresh or reconnect mid-camp — including during a draft, a loadout, or an open timing window — resumes the same seat and state.
   5. Playwright drives a full camp (create room, draft, loadout, play, use gear, Whisper, refresh-and-resume) through `window.__expeditionTest`, which is absent from production builds; the owner reviews the placeholder-art camp scene and signs off that it reads correctly before the art pass begins.
 
-**Plans**: TBD
+**Plans**: 14 plans
 **UI hint**: yes
+
+Plans:
+**Wave 1**
+
+- [ ] 12-01-PLAN.md — D-17/WR-06: native landing form yields config null for Expedition (SCENE-01)
+- [ ] 12-02-PLAN.md — Gear/boss display catalogue, D-02 targeting state machine, bridge id scheme
+- [ ] 12-03-PLAN.md — Whole-number zoom, stage layout, canvas palette, font keys, card-pack pref (SCENE-08/10)
+- [ ] 12-04-PLAN.md — Owner-gated phaser install, Phaser import confinement test, production build check (checkpoint)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 12-05-PLAN.md — TDD: buildSceneModel + between-camps model (SCENE-02/03/04)
+- [ ] 12-06-PLAN.md — Bitmap pixel fonts and the Big Index / Classic card packs
+- [ ] 12-07-PLAN.md — Four interactables registry + contract test (SCENE-09)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 12-08-PLAN.md — Scene store, Strict-Mode-safe Phaser mount, test bridge, ExpeditionBoard, camp static layer
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 12-09-PLAN.md — Camp table: seats, hand, trick, last-trick glance, highlight-then-confirm input
+- [ ] 12-11-PLAN.md — Settings button + modal: card pack, mute slot, host delete/restart, Leave (D-05)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 12-10-PLAN.md — Between-camps stub scene (D-01), e2e helpers, mount/scaling e2e
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 12-12-PLAN.md — Enable Expedition on the landing page, bundle-isolation e2e, README
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 12-13-PLAN.md — Full-camp e2e through window.__expeditionTest, resume, packs, interactables
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 12-14-PLAN.md — Phase gate + owner sign-off on the placeholder camp scene (checkpoint)
 
 ### Phase 13: Fireside & Run-End Scenes
 
@@ -305,7 +344,7 @@ Plans:
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 19/19 | Complete    | 2026-09-27 |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 7/7 | Complete    | 2026-09-27 |
-| 12. Phaser Shell | v2.0 | 0/? | Not started | - |
+| 12. Phaser Shell | v2.0 | 0/14 | Planned | - |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
 | 14. Art Pass | v2.0 | 0/? | Not started | - |
 | 15. Balance Pass | v2.0 | 0/? | Not started | - |
