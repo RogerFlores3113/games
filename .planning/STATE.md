@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Phase 12 UI-SPEC approved
-last_updated: "2026-09-27T21:10:14.031Z"
-last_activity: 2026-09-27 -- Phase 12 planning complete
+stopped_at: Completed 12-01-PLAN.md
+last_updated: "2026-09-27T21:19:14.591Z"
+last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 58
-  completed_plans: 44
+  completed_plans: 45
   percent: 50
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-22)
 
 **Core value:** A friend clicks a link and is playing within seconds — and the game does not break, stall, or lose their seat for the rest of the session.
-**Current focus:** Phase 12 — phaser shell
+**Current focus:** Phase 12 — Phaser Shell
 
 ## Current Position
 
-Phase: 12
-Plan: Not started
+Phase: 12 (Phaser Shell) — EXECUTING
+Plan: 2 of 14
 Status: Ready to execute
-Last activity: 2026-09-27 -- Phase 12 planning complete
+Last activity: 2026-09-27
 
 ## Performance Metrics
 
@@ -192,6 +192,7 @@ Last activity: 2026-09-27 -- Phase 12 planning complete
 | Phase 11 P05 | ~25min | 2 tasks | 4 files |
 | Phase 11 P06 | ~35min | 3 tasks | 14 files |
 | Phase 11 P07 | ~20min | 2 tasks | 3 files |
+| Phase 12 P01 | 8min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -449,6 +450,7 @@ Recent decisions affecting current work:
 - [Phase 11-06]: CampResultViewSchema campNumber widened from a 1-6 literal union to a plain ranged z.number(), matching ExpeditionCampResultView's number type (found by the new compile-time view-assignability assertion)
 - [Phase 11]: set-loadout candidates tracked by seatId + view.campNumber + view.history.length (read from the bot's own view, never room.game) so set-loadout is tried at most once per seat per fireside visit, letting ready get a turn
 - [Phase 11]: expedition-wiring.test.ts's action-selection loop iterates seats starting at (step mod seatCount), trying each seat's full candidate list before advancing, avoiding seat starvation across fireside/pre-deal windows
+- [Phase 12-01]: readCreateRoomForm returns config: null (not undefined) for a game with no create-time settings panel, closing D-17/WR-06 without importing LANDING_SETTINGS into the server route — Expedition has no settings panel; its config field must satisfy CreateRoomRequestSchema's z.null() branch
 
 ### Pending Todos
 
@@ -485,9 +487,9 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T20:39:44.079Z
-Stopped at: Phase 12 UI-SPEC approved
-Resume file: .planning/phases/12-phaser-shell/12-UI-SPEC.md
+Last session: 2026-09-27T21:19:14.580Z
+Stopped at: Completed 12-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 

@@ -72,7 +72,7 @@
 
 ### Scenes (Phaser)
 
-- [ ] **SCENE-01**: Expedition renders in Phaser, loaded only on an Expedition game page and never on the landing page or in Hanabi
+- [x] **SCENE-01**: Expedition renders in Phaser, loaded only on an Expedition game page and never on the landing page or in Hanabi
 - [ ] **SCENE-02**: The camp scene seats players around an oval stump table in turn order, with your hand at the bottom and the trick in the middle. Each seat shows its objectives with status and its equipped gear. Supplies, camp number and the boss twist are shown within the scene
 - [ ] **SCENE-03**: Cards you can't legally play are dimmed, and the trick shows which card was led and by whom
 - [ ] **SCENE-04**: A player can glance at the last completed trick: who led, what was played, who won
@@ -163,7 +163,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | ENG-01 | Phase 10 | Complete |
 | ENG-02 | Phase 10 | Complete |
 | ENG-03 | Phase 11 | Complete |
-| SCENE-01 | Phase 12 | Pending |
+| SCENE-01 | Phase 12 | Complete |
 | SCENE-02 | Phase 12 | Pending |
 | SCENE-03 | Phase 12 | Pending |
 | SCENE-04 | Phase 12 | Pending |
