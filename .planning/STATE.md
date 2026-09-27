@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 09-04-PLAN.md
-last_updated: "2026-09-26T21:15:27.746Z"
-last_activity: 2026-09-26 -- Phase 9 planning complete
+stopped_at: Completed 09-07-PLAN.md
+last_updated: "2026-09-27T02:43:58.261Z"
+last_activity: 2026-09-27
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 18
-  completed_plans: 16
+  completed_plans: 17
   percent: 13
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 9 (Expedition Rules Core) — EXECUTING
-Plan: 6 of 6
+Plan: 2 of 8
 Status: Ready to execute
-Last activity: 2026-09-26 -- Phase 9 planning complete
+Last activity: 2026-09-27
 
 ## Performance Metrics
 
@@ -161,6 +161,7 @@ Last activity: 2026-09-26 -- Phase 9 planning complete
 | Phase 09 P04 | 20min | 2 tasks | 3 files |
 | Phase 09 P05 | 20min | 2 tasks | 4 files |
 | Phase 09 P06 | 35min | 3 tasks | 4 files |
+| Phase 09 P07 | 45min | 2 tasks tasks | 3 files files |
 
 ## Accumulated Context
 
@@ -374,6 +375,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 09-05]: legality.test.ts/actions.test.ts hand-build minimal CampState literals for tests needing exact hand control or a guaranteed objective-failure trick
 - [Phase 09]: Objective-slot generators biased toward hard failure-timing cases so non-vacuity counters are reliably nonzero at numRuns: 200
 - [Phase 09]: Objective failure-timing oracles independently restate spec text from completedTricks, never calling evaluateObjective inside the oracle body
+- [Phase 09-07]: orderedKind.evaluate's resolved branch made symmetric (otherTrickIndex < myTrickIndex fails, equal indices stay A-TIE), closing WR-01 -- failed is now provably absorbing for all four objective kinds
+- [Phase 09-07]: objectives.property.test.ts's orderedOracle rewritten as an independent pair-based restatement of spec section 5.2 (markerPrecedes, no Infinity marker mapping), closing WR-02's self-confirming oracle
 
 ### Pending Todos
 
@@ -410,8 +413,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-24T05:52:48.532Z
-Stopped at: Completed 09-04-PLAN.md
+Last session: 2026-09-27T02:43:58.254Z
+Stopped at: Completed 09-07-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

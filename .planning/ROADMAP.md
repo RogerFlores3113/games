@@ -134,7 +134,7 @@ Plans:
 
 **Gap closure** *(wave 1, parallel; from 09-REVIEW.md WR-01/WR-02 via 09-HUMAN-UAT.md)*
 
-- [ ] 09-07-PLAN.md — Monotone ordered-objective evaluator (WR-01) + independent pair-based oracle and post-failure prefix monotonicity property (WR-02) (XRULE-06, 07)
+- [x] 09-07-PLAN.md — Monotone ordered-objective evaluator (WR-01) + independent pair-based oracle and post-failure prefix monotonicity property (WR-02) (XRULE-06, 07)
 - [ ] 09-08-PLAN.md — Validate leaderFor/nextLeader hook seat ids (WR-04), plus adjacent IN-02/IN-06 hardening (XRULE-02, 04)
 
 ### Phase 10: Run Layer, Gear Engine & Bosses
@@ -238,7 +238,7 @@ Plans:
 | 6.2. Board Redesign | v1.0 | 20/20 | Complete | 2026-09-18 |
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
 | 8. Multi-Game Rooms | v2.0 | 10/10 | Complete   | 2026-09-23 |
-| 9. Expedition Rules Core | v2.0 | 6/6 | Complete   | 2026-09-24 |
+| 9. Expedition Rules Core | v2.0 | 7/8 | In Progress|  |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 0/? | Not started | - |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
 | 12. Phaser Shell | v2.0 | 0/? | Not started | - |
