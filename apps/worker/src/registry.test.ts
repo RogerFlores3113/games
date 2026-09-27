@@ -331,13 +331,13 @@ describe("D-10: a Hanabi room and a toy room coexist against the SAME injected r
 // ---------------------------------------------------------------------------
 
 describe("D-09/D-10: the toy game is unreachable in production", () => {
-  it("GameIdSchema is closed to hanabi only, and rejects the toy id", () => {
-    expect(GameIdSchema.options).toEqual(["hanabi"]);
+  it("GameIdSchema is closed to hanabi and expedition, and rejects the toy id", () => {
+    expect(GameIdSchema.options).toEqual(["hanabi", "expedition"]);
     expect(GameIdSchema.safeParse(TOY_GAME_ID).success).toBe(false);
   });
 
-  it("the production GAME_REGISTRY has exactly one key: hanabi", () => {
-    expect(Object.keys(GAME_REGISTRY)).toEqual(["hanabi"]);
+  it("the production GAME_REGISTRY has exactly two keys: hanabi, expedition", () => {
+    expect(Object.keys(GAME_REGISTRY)).toEqual(["hanabi", "expedition"]);
   });
 
   it("a join frame carrying the toy gameId fails ClientMessageSchema parsing, bad_request", () => {

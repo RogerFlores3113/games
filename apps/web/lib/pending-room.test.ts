@@ -62,10 +62,16 @@ describe("pending game storage (D-02)", () => {
 
   it("ignores a stored value that is not a registered GameId", () => {
     const store = installFakeLocalStorage();
-    store.set(pendingGameKey("ABCDEF"), "expedition");
+    store.set(pendingGameKey("ABCDEF"), "innovation");
     expect(readPendingGame("ABCDEF")).toBeUndefined();
     store.set(pendingGameKey("ABCDEF"), "garbage");
     expect(readPendingGame("ABCDEF")).toBeUndefined();
+  });
+
+  it("a stored 'expedition' reads back as 'expedition' (registered as of Phase 11)", () => {
+    const store = installFakeLocalStorage();
+    store.set(pendingGameKey("ABCDEF"), "expedition");
+    expect(readPendingGame("ABCDEF")).toBe("expedition");
   });
 
   it("every function no-ops during SSR (no window)", () => {

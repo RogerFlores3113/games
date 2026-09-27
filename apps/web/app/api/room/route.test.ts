@@ -45,7 +45,7 @@ describe("POST /api/room — JSON path", () => {
   });
 
   it("returns 400 for an unknown gameId", async () => {
-    const res = await POST(jsonRequest({ gameId: "expedition", displayName: "Roger", config: "purple" }));
+    const res = await POST(jsonRequest({ gameId: "innovation", displayName: "Roger", config: "purple" }));
     expect(res.status).toBe(400);
   });
 
@@ -113,7 +113,7 @@ describe("POST /api/room — native form path (D-17)", () => {
   });
 
   it("303s to /?error=create for an unrecognized gameId", async () => {
-    const res = await POST(formRequest({ gameId: "expedition", displayName: "Roger", "config.expedition": "purple" }));
+    const res = await POST(formRequest({ gameId: "innovation", displayName: "Roger", "config.innovation": "purple" }));
     expect(res.status).toBe(303);
     const location = new URL(res.headers.get("location")!);
     expect(location.pathname + location.search).toBe("/?error=create");

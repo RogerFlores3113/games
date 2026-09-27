@@ -313,10 +313,34 @@ describe("validateGameView: MGR-05 per-game dispatch via view.gameId", () => {
       // Cast: production `RoomView`/`GameIdSchema` never admit this value —
       // this proves the runtime dispatch itself fails closed, independent of
       // the wire schema that would already reject it before this point.
+      gameId: "innovation",
+      gameDisplayName: "Innovation",
+      config: null,
+      limits: { min: 2, max: 5 },
+      status: "lobby",
+      hostSeatId: "s1",
+      youSeatId: "s1",
+      seats: [{ seatId: "s1", displayLabel: "Host", connected: true, isHost: true }],
+      game: { anything: 1 },
+    } as unknown as RoomView;
+
+    const result = validateGameView(view);
+    expect(result).toBeNull();
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+
+    const call = errorSpy.mock.calls[0]!;
+    expect(String(call[0])).toContain("HIDE-03");
+    const serializedArgs = JSON.stringify(call);
+    expect(serializedArgs).not.toContain("anything");
+  });
+
+  it("fails closed with null for gameId 'expedition' when the game shape mismatches the strict ExpeditionViewSchema, logging only issue codes/paths", () => {
+    const view = {
+      code: ROOM_CODE,
       gameId: "expedition",
       gameDisplayName: "Expedition",
       config: null,
-      limits: { min: 2, max: 5 },
+      limits: { min: 3, max: 5 },
       status: "lobby",
       hostSeatId: "s1",
       youSeatId: "s1",
