@@ -6,11 +6,15 @@
 // (run-test-support.ts), which applies every step through the real
 // applyRunAction transition (the only dispatcher in the run layer).
 //
-// Phase 11 extends this suite with the real per-seat leak checker for
-// ENG-03/COMM-03 (toPlayerView doesn't exist yet in this phase); Property D
-// below is a STRUCTURAL no-leak check only (reveal audiences are non-empty
-// subsets of seatIds, log entries carry no card fields, draft offers are
-// never the offered seat's own gear) — it is not the full leak proof.
+// Property D now also includes the real per-seat leak checker
+// (COMM-03/ENG-03, Plan 11-04's adapter/view-leak-check.ts): at EVERY
+// recorded state — fireside, pre-deal and ended states included, not only
+// states with an open attempt — every seat's and an unseated viewer's
+// ("spectator") view is checked via checkExpeditionViewForLeaks. This one
+// property now proves all four whole-run guarantees together: always ends,
+// never throws, conserves cards, and never leaks. The dedicated 32-hex-seed
+// suite with the live seed-substring scan and its own non-vacuity counters
+// lives in adapter/view.property.test.ts.
 //
 // Never uses the platform's non-seeded random API: every random choice in
 // this file (seed strings, seatCount, startCamp, boss pairs, loadouts,
@@ -24,12 +28,17 @@ import { BOSS_REGISTRY } from "../boss/registry";
 import { runStatus } from "./lifecycle";
 import { advanceTo, driveRun, replayRun, setupRun } from "./run-test-support";
 import { campCardIds } from "./toolkit";
+import { toExpeditionPlayerView } from "../adapter/view";
+import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "../adapter/view-leak-check";
 import type { Catalog, CampNumber } from "./types";
 
 const CATALOG: Catalog = { gear: GEAR_REGISTRY, bosses: BOSS_REGISTRY };
 const GEAR_IDS = Object.keys(GEAR_REGISTRY);
 const BOSS_IDS = Object.keys(BOSS_REGISTRY);
-const LOG_ENTRY_KEYS = ["event", "actorSeatId", "subjectSeatIds", "gearId", "audience"];
+
+// Non-vacuity: at least one view is checked across the whole suite (T-11-19
+// style discipline, matching adapter/view.property.test.ts's own counters).
+let leakViewsChecked = 0;
 
 function seatIdsFor(seatCount: number): string[] {
   return Array.from({ length: seatCount }, (_, i) => `seat-${i}`);
@@ -123,6 +132,18 @@ describe("property: whole-run simulation (RUN-07)", () => {
             }
           }
 
+          // Property D: no seat's view, nor an unseated viewer's
+          // ("spectator") view, ever leaks another seat's card — checked at
+          // EVERY state, including fireside/pre-deal/ended states with no
+          // open attempt, not only states with an attempt in progress.
+          for (const id of [...state.seatIds, "spectator"]) {
+            const view = toExpeditionPlayerView(state, id, CATALOG);
+            const secrets = secretsForExpeditionSeat(state, id, CATALOG);
+            const reasons = checkExpeditionViewForLeaks({ view, serialized: JSON.stringify(view), secrets });
+            expect(reasons).toEqual([]);
+            leakViewsChecked++;
+          }
+
           if (state.attempt !== null && state.attempt.camp !== null) {
             const camp = state.attempt.camp;
             const ids = campCardIds(camp);
@@ -139,18 +160,6 @@ describe("property: whole-run simulation (RUN-07)", () => {
             } else {
               expect(ids).toEqual(first);
             }
-
-            // Structural no-leak checks (interim; Phase 11 extends this with
-            // the real per-seat leak checker for ENG-03/COMM-03).
-            for (const reveal of state.attempt.reveals) {
-              expect(reveal.audience.length).toBeGreaterThan(0);
-              for (const audienceSeatId of reveal.audience) {
-                expect(seatIds).toContain(audienceSeatId);
-              }
-            }
-            for (const entry of state.attempt.log) {
-              expect(Object.keys(entry).every((k) => LOG_ENTRY_KEYS.includes(k))).toBe(true);
-            }
           }
         }
 
@@ -163,6 +172,8 @@ describe("property: whole-run simulation (RUN-07)", () => {
       }),
       { numRuns: 40 },
     );
+
+    expect(leakViewsChecked).toBeGreaterThan(0);
   });
 
   // Property B: same seed, same seatIds, same action stream -> deep-equal
