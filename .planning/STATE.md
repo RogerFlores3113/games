@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 10-18-PLAN.md — Compass win-card crash fixed, WR-01 harness hardened
-last_updated: "2026-09-27T08:58:14.552Z"
+stopped_at: Completed 10-19-PLAN.md — WR-02 closed (Trail Map hidden-objective probe fixed under Thick Fog)
+last_updated: "2026-09-27T09:07:07.811Z"
 last_activity: 2026-09-27
 progress:
   total_phases: 8
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 37
-  completed_plans: 36
-  percent: 25
+  completed_plans: 37
+  percent: 38
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 10 (run-layer-gear-engine-bosses) — EXECUTING
-Plan: 2 of 19
+Plan: 3 of 19
 Status: Ready to execute
 Last activity: 2026-09-27
 
@@ -182,6 +182,7 @@ Last activity: 2026-09-27
 | Phase 10-run-layer-gear-engine-bosses P16 | ~30min | 2 tasks | 3 files |
 | Phase 10-run-layer-gear-engine-bosses P17 | ~30min | 1 tasks | 1 files |
 | Phase 10 P18 | 25min | 2 tasks | 7 files |
+| Phase 10 P19 | ~15min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -426,6 +427,7 @@ Recent decisions affecting current work:
 - [Phase 10]: toolkit.ts's replace-objective kind guard widened to accept both win-card and ordered, matching camp.ts's isCardBearingSlot and reroll.ts's canTarget (CR-01)
 - [Phase 10]: gear.contract.test.ts's findUsableFixture replaced with findUsableFixtures (WR-01): every accepted target combination is applied and asserted, not just the first
 - [Phase 10]: enumerateLegalRunActions now enumerates use-gear candidates in the objective-pick window in addition to pre-deal and between-tricks (WR-01), so run.property.test.ts now drives objective-pick gear
+- [Phase ?]: Under Thick Fog, Trail Map's canTarget always returns true (WR-02) rather than checking only ctx.self, since a self-only check would still forbid an objective-less seat from taking a teammate's objective; a no-op swap between two objective-less seats is a legal, gear-spending consequence
 
 ### Pending Todos
 
@@ -462,8 +464,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T08:58:14.541Z
-Stopped at: Completed 10-18-PLAN.md — Compass win-card crash fixed, WR-01 harness hardened
+Last session: 2026-09-27T09:07:07.804Z
+Stopped at: Completed 10-19-PLAN.md — WR-02 closed (Trail Map hidden-objective probe fixed under Thick Fog)
 Resume file: None
 
 ## Operator Next Steps

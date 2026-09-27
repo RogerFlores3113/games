@@ -29,7 +29,7 @@ Phase artifacts: `.planning/milestones/v1.0-phases/`
 
 - [x] **Phase 8: Multi-Game Rooms** - A room carries its game id; Hanabi keeps working unchanged behind a genuinely generic registry (completed 2026-09-23)
 - [x] **Phase 9: Expedition Rules Core** - A pure, property-tested deck/trick/objective engine for the Expedition round rules (completed 2026-09-24)
-- [ ] **Phase 10: Run Layer, Gear Engine & Bosses** - The full six-camp run: draft, loadout, replay-on-fail, the hook/toolkit engine, the v1 gear and boss catalogues, and the Whisper
+- [x] **Phase 10: Run Layer, Gear Engine & Bosses** - The full six-camp run: draft, loadout, replay-on-fail, the hook/toolkit engine, the v1 gear and boss catalogues, and the Whisper (completed 2026-09-27)
 - [ ] **Phase 11: Adapter, Schemas & Worker Wiring** - Expedition wired into the room actor with a leak-checked per-seat view proven across whole simulated runs
 - [ ] **Phase 12: Phaser Shell** - Expedition renders as a pixel-art camp scene, isolated from the rest of the site, with mount/unmount and test-bridge discipline established
 - [ ] **Phase 13: Fireside & Run-End Scenes** - The between-camps fireside, the run-end scene, and an in-scene rules reference
@@ -194,7 +194,7 @@ Plans:
 **Wave 8 (gap closure)** *(from 10-VERIFICATION.md)*
 
 - [x] 10-18-PLAN.md — Compass rerolls win-card objectives (CR-01) + harness enumerates objective-pick gear and every accepted target combo (WR-01) (GEAR-02, ENG-02)
-- [ ] 10-19-PLAN.md — Trail Map legality ignores hidden objectives under Thick Fog (WR-02) (GEAR-06, GEAR-02)
+- [x] 10-19-PLAN.md — Trail Map legality ignores hidden objectives under Thick Fog (WR-02) (GEAR-06, GEAR-02)
 
 ### Phase 11: Adapter, Schemas & Worker Wiring
 
@@ -283,7 +283,7 @@ Plans:
 | 7. Variant Support | v1.0 | 13/13 | Complete | 2026-09-19 |
 | 8. Multi-Game Rooms | v2.0 | 10/10 | Complete   | 2026-09-23 |
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
-| 10. Run Layer, Gear Engine & Bosses | v2.0 | 18/19 | In Progress|  |
+| 10. Run Layer, Gear Engine & Bosses | v2.0 | 19/19 | Complete   | 2026-09-27 |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 0/? | Not started | - |
 | 12. Phaser Shell | v2.0 | 0/? | Not started | - |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
