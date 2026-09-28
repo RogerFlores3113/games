@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 12-08-PLAN.md
-last_updated: "2026-09-28T03:10:51.123Z"
+stopped_at: Completed 12-11-PLAN.md
+last_updated: "2026-09-28T03:17:01.319Z"
 last_activity: 2026-09-28
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 58
-  completed_plans: 53
+  completed_plans: 54
   percent: 50
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 12 (Phaser Shell) — EXECUTING
-Plan: 10 of 14
+Plan: 11 of 14
 Status: Ready to execute
 Last activity: 2026-09-28
 
@@ -201,6 +201,7 @@ Last activity: 2026-09-28
 | Phase 12 P07 | 30min | 2 tasks | 7 files |
 | Phase 12 P08 | 9min | 3 tasks | 10 files |
 | Phase 12 P09 | ~25min | 3 tasks | 4 files |
+| Phase 12 P11 | ~20min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -475,6 +476,8 @@ Recent decisions affecting current work:
 - [Phase 12-08]: CampScene.renderModel skips index.clearScene on every store update, deferring dynamic per-frame id bookkeeping to Plan 12-09, so the four static interactables placed once in create() keep their accumulated visual state
 - [Phase 12]: [Phase 12-09]: CampScene keeps a previousModel field to diff trick-play motion across renders, since renderModel destroys and rebuilds every dynamic object on every model change
 - [Phase 12]: [Phase 12-09]: drawControls positions Confirm/Cancel off the source gear/Whisper object's live ObjectIndex bounds rather than threading a position prop through drawSeats/drawControls
+- [Phase 12-11]: Restart control gated on isHost && canRestart (both), matching the plan's interface contract
+- [Phase 12-11]: Expedition mute state is local-only (useState in ExpeditionBoard); no persistence added since D-07 defers real audio to Phase 14
 
 ### Pending Todos
 
@@ -511,8 +514,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-28T03:08:56.024Z
-Stopped at: Completed 12-08-PLAN.md
+Last session: 2026-09-28T03:17:01.311Z
+Stopped at: Completed 12-11-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
