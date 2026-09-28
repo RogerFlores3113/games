@@ -1,28 +1,144 @@
 /**
- * The camp scene (SCENE-02/03/04/09, D-03/D-13/D-15): draws the static
+ * The camp scene (SCENE-02/03/04/09, D-02/D-03/D-13/D-15): draws the static
  * world once, places the four interactables once, then re-renders the HUD
- * (supplies/camp-number/sign/boss-effect) whenever the store's `model` or
- * `cardPackId` changes. `renderTable(model)` is a deliberate no-op extension
- * point — Plan 12-09 fills it with seats/hand/trick drawing; this plan only
- * proves the static layer + HUD + interactables + subscribe/redraw wiring.
+ * (supplies/camp-number/sign/boss-effect) plus the full table — seats,
+ * hand, trick, last-trick glance, and controls — whenever the store's
+ * `model` or `cardPackId` changes. Every click handler below only ever
+ * calls `store.dispatch`/`store.confirmTargeting`/`store.updateLocalUi`
+ * with a fixed request literal or a `local-ui.ts` transition; it never
+ * builds the Whisper's server request itself (that is `confirmTargeting`'s
+ * job, D-02) and never decides an outcome (spec §7.1).
  */
 import Phaser from "phaser";
+import { GEAR_DISPLAY } from "@games/rules";
 import { ensurePixelFonts } from "../font/pixel-font";
 import { ensureCardTextures } from "../card-packs/card-textures";
 import { drawStaticWorld, drawHud, setBossEffect } from "../draw/draw-table";
+import { drawSeats } from "../draw/draw-seats";
+import type { CampHandlers } from "../draw/draw-seats";
+import { drawHand, drawLastTrick, drawTrick } from "../draw/draw-hand-trick";
+import { drawControls } from "../draw/draw-controls";
 import { INTERACTABLE_REGISTRY } from "../interactables/registry";
 import { INTERACTABLE_ANCHORS } from "../layout";
 import { interactableObjectId } from "../../../../lib/expedition/expedition-ids";
 import { ObjectIndex } from "../object-index";
-import type { SceneModel } from "../../../../lib/expedition/build-scene-model";
+import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
+import {
+  beginGearTargeting,
+  beginWhisper,
+  cancelTargeting,
+  nextTargetKind,
+  selectTarget,
+  setHoveredCard,
+  setLastTrickOpen,
+  setTooltipGear,
+} from "../../../../lib/expedition/local-ui";
 import type { SceneDeps } from "./scene-registry";
+
+function findObjective(model: SceneModel | null, objectiveId: string): ObjectiveChip | null {
+  if (model === null) return null;
+  for (const seat of model.seats) {
+    const found = seat.objectives.find((o) => o.objectiveId === objectiveId);
+    if (found) return found;
+  }
+  return model.faceUpObjectives.find((o) => o.objectiveId === objectiveId) ?? null;
+}
+
+function buildHandlers(store: SceneDeps["store"]): CampHandlers {
+  return {
+    onCard(cardId) {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      if (state.localUi.targeting !== null && nextTargetKind(state.localUi) === "own-card") {
+        state.updateLocalUi((ui, view) => selectTarget(ui, view, cardId));
+        return;
+      }
+      const card = state.model?.hand.find((c) => c.id === cardId) ?? null;
+      if (card?.playable) {
+        state.dispatch({ type: "play-card", cardId });
+      }
+    },
+    onCardHover(cardId) {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      state.updateLocalUi((ui) => setHoveredCard(ui, cardId));
+    },
+    onObjective(objectiveId) {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      const kind = nextTargetKind(state.localUi);
+      if (kind === "face-up-objective" || kind === "own-objective") {
+        state.updateLocalUi((ui, view) => selectTarget(ui, view, objectiveId));
+        return;
+      }
+      const chip = findObjective(state.model, objectiveId);
+      if (chip?.pickable) {
+        state.dispatch({ type: "pick-objective", objectiveId });
+      }
+    },
+    onSeat(seatId) {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      if (nextTargetKind(state.localUi) === "teammate") {
+        state.updateLocalUi((ui, view) => selectTarget(ui, view, seatId));
+      }
+    },
+    onGear(gearId) {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      state.updateLocalUi((ui, view) => beginGearTargeting(ui, view, gearId));
+    },
+    onGearHover(gearId) {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      state.updateLocalUi((ui) => setTooltipGear(ui, gearId));
+    },
+    onWhisper() {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      state.updateLocalUi((ui, view) => beginWhisper(ui, view));
+    },
+    onConfirm() {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      state.confirmTargeting();
+    },
+    onCancel() {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      state.updateLocalUi((ui) => cancelTargeting(ui));
+    },
+    onPreDealUse(gearId) {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      const targets = GEAR_DISPLAY[gearId]?.targets ?? [];
+      if (targets.length === 0) {
+        state.dispatch({ type: "use-gear", gearId, targets: [] });
+        return;
+      }
+      state.updateLocalUi((ui, view) => beginGearTargeting(ui, view, gearId));
+    },
+    onPreDealSkip() {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      state.dispatch({ type: "skip-window" });
+    },
+    onLastTrickHover(open) {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      state.updateLocalUi((ui) => setLastTrickOpen(ui, open));
+    },
+  };
+}
 
 export class CampScene extends Phaser.Scene {
   private readonly sceneStore: SceneDeps["store"];
   private readonly index: ObjectIndex;
+  private handlers!: CampHandlers;
   private unsubscribe: (() => void) | null = null;
   private dynamicLayer: Phaser.GameObjects.Container | null = null;
   private lastCardPackId: string | null = null;
+  private previousModel: SceneModel | null = null;
 
   constructor(deps: SceneDeps) {
     super("camp");
@@ -35,6 +151,7 @@ export class CampScene extends Phaser.Scene {
     const glyphs = ensurePixelFonts(this);
     ensureCardTextures(this, state.cardPackId, glyphs);
     this.lastCardPackId = state.cardPackId;
+    this.handlers = buildHandlers(this.sceneStore);
 
     drawStaticWorld(this);
 
@@ -57,6 +174,7 @@ export class CampScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.unsubscribe?.();
       this.unsubscribe = null;
+      this.previousModel = null;
       this.index.clearScene("camp");
     });
   }
@@ -79,11 +197,18 @@ export class CampScene extends Phaser.Scene {
     const effect = model.bossTwist !== null && !model.bossTwist.cancelled ? model.bossTwist.effect : "none";
     setBossEffect(this, effect);
     this.renderTable(model);
+    this.previousModel = model;
   }
 
-  /** Extension point: Plan 12-09 fills this with seats/hand/trick drawing,
-   * registering each dynamic object's id in the shared `ObjectIndex`. */
-  renderTable(_model: SceneModel): void {
-    // Filled by Plan 12-09.
+  /** Seats, hand, trick, last-trick glance and controls — all drawn from
+   * `model` alone (SCENE-02/03/04). */
+  renderTable(model: SceneModel): void {
+    if (this.dynamicLayer === null) return;
+    const layer = this.dynamicLayer;
+    drawSeats(this, layer, model, this.index, this.handlers);
+    drawTrick(this, layer, model, this.index, this.previousModel);
+    drawLastTrick(this, layer, model, this.index, this.handlers);
+    drawHand(this, layer, model, this.index, this.handlers);
+    drawControls(this, layer, model, this.index, this.handlers);
   }
 }
