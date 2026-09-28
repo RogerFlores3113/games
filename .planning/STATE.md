@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: Expedition
 status: executing
 stopped_at: Completed 12-04-PLAN.md
-last_updated: "2026-09-28T01:45:56.604Z"
+last_updated: "2026-09-28T01:54:04.997Z"
 last_activity: 2026-09-28
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 58
-  completed_plans: 46
+  completed_plans: 47
   percent: 50
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 12 (Phaser Shell) — EXECUTING
-Plan: 3 of 14
+Plan: 4 of 14
 Status: Ready to execute
 Last activity: 2026-09-28
 
@@ -194,6 +194,7 @@ Last activity: 2026-09-28
 | Phase 11 P07 | ~20min | 2 tasks | 3 files |
 | Phase 12 P01 | 8min | 2 tasks | 3 files |
 | Phase 12 P04 | 25min | 3 tasks | 4 files |
+| Phase 12 P02 | 35min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -453,6 +454,9 @@ Recent decisions affecting current work:
 - [Phase 11]: expedition-wiring.test.ts's action-selection loop iterates seats starting at (step mod seatCount), trying each seat's full candidate list before advancing, avoiding seat starvation across fireside/pre-deal windows
 - [Phase 12-01]: readCreateRoomForm returns config: null (not undefined) for a game with no create-time settings panel, closing D-17/WR-06 without importing LANDING_SETTINGS into the server route — Expedition has no settings panel; its config field must satisfy CreateRoomRequestSchema's z.null() branch
 - [Phase 12]: phaser@3.90.0 owner-approved and pinned at a blocking package-legitimacy checkpoint — RESEARCH A1 recommendation; owner confirmed at checkpoint reply 'approved 3.90.0'
+- [Phase 12]: ExpeditionTargetKind/ExpeditionGearWindow are re-aliases of gear-def's TargetKind/GearWindow, not duplicated unions (12-02)
+- [Phase 12]: catalog-display.ts lives under adapter/ (not top-level expedition/*.ts) so purity.test.ts's Core fence still holds (12-02)
+- [Phase 12]: reconcileLocalUi truncates a gear targeting's selected array at the first invalidated own-card target, dropping it and everything selected after, to keep positional target-kind alignment (12-02)
 
 ### Pending Todos
 
@@ -489,7 +493,7 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-28T01:45:56.597Z
+Last session: 2026-09-28T01:54:04.990Z
 Stopped at: Completed 12-04-PLAN.md
 Resume file: None
 
