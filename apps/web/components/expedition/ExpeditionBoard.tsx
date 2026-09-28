@@ -15,12 +15,15 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { Settings } from "lucide-react";
 import type { RoomView } from "@games/schema";
 import { ExpeditionViewSchema } from "@games/schema/games/expedition";
 import type { ExpeditionView } from "@games/rules";
 import { createExpeditionSceneStore } from "../../lib/expedition/expedition-scene-store";
-import { readCardPackPref } from "../../lib/expedition/expedition-card-pack-pref";
+import { readCardPackPref, writeCardPackPref } from "../../lib/expedition/expedition-card-pack-pref";
+import type { CardPackId } from "../../lib/expedition/card-pack-ids";
 import { ReconnectingBanner } from "../ReconnectingBanner";
+import { ExpeditionSettingsModal } from "./ExpeditionSettingsModal";
 
 const ExpeditionPhaserMount = dynamic(() => import("./phaser/ExpeditionPhaserMount"), { ssr: false });
 
@@ -36,10 +39,11 @@ export function ExpeditionBoard({
   view,
   onAction,
   reconnecting = false,
-  onDeleteRoom: _onDeleteRoom,
-  onRestartLobby: _onRestartLobby,
+  onDeleteRoom,
+  onRestartLobby,
 }: ExpeditionBoardProps) {
-  // Accepted, unused: Plan 12-11 wires these into the settings modal (D-05).
+  const isHost = view.youSeatId !== null && view.youSeatId === view.hostSeatId;
+
   const onActionRef = useRef(onAction);
   useEffect(() => {
     onActionRef.current = onAction;
@@ -63,6 +67,20 @@ export function ExpeditionBoard({
     }),
   );
 
+  // D-05/SCENE-08: the settings modal, corner gear trigger and a no-op
+  // (D-07) mute toggle. `cardPackId` mirrors the store's own copy so the
+  // modal's radio picker re-renders on change without reading the store
+  // directly (this component never subscribes to the store itself).
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [cardPackId, setCardPackId] = useState<CardPackId>(() => readCardPackPref());
+
+  function handleCardPackChange(id: CardPackId) {
+    writeCardPackPref(id);
+    setCardPackId(id);
+    store.getState().setCardPack(id);
+  }
+
   useEffect(() => {
     if (game === null) return;
     store.getState().setServer({
@@ -76,10 +94,48 @@ export function ExpeditionBoard({
     store.getState().setReconnecting(reconnecting);
   }, [store, reconnecting]);
 
+  const canRestart = isHost && game !== null && game.runStatus !== "in_progress";
+
   return (
     <>
       {reconnecting && <ReconnectingBanner />}
+
+      <span
+        className="fixed z-10"
+        style={{
+          top: "var(--space-sm)",
+          right: "var(--space-sm)",
+          height: 44,
+          width: 44,
+        }}
+      >
+        <button
+          type="button"
+          data-testid="expedition-settings-button"
+          aria-label="Settings"
+          aria-expanded={settingsOpen}
+          onClick={() => setSettingsOpen(true)}
+          className="relative inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:border-[var(--color-text-muted)] hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+          style={{ width: 44, height: 44 }}
+        >
+          <Settings size={20} aria-hidden="true" color="var(--color-text)" />
+        </button>
+      </span>
+
       <ExpeditionPhaserMount store={store} />
+
+      <ExpeditionSettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        cardPackId={cardPackId}
+        onCardPackChange={handleCardPackChange}
+        muted={muted}
+        onToggleMute={() => setMuted((prev) => !prev)}
+        isHost={isHost}
+        onDeleteRoom={onDeleteRoom}
+        canRestart={canRestart}
+        onRestartLobby={onRestartLobby}
+      />
     </>
   );
 }
