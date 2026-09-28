@@ -261,7 +261,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 12-08-PLAN.md — Scene store, Strict-Mode-safe Phaser mount, test bridge, ExpeditionBoard, camp static layer
+- [x] 12-08-PLAN.md — Scene store, Strict-Mode-safe Phaser mount, test bridge, ExpeditionBoard, camp static layer
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -344,7 +344,7 @@ Plans:
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 19/19 | Complete    | 2026-09-27 |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 7/7 | Complete    | 2026-09-27 |
-| 12. Phaser Shell | v2.0 | 7/14 | In Progress|  |
+| 12. Phaser Shell | v2.0 | 8/14 | In Progress|  |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
 | 14. Art Pass | v2.0 | 0/? | Not started | - |
 | 15. Balance Pass | v2.0 | 0/? | Not started | - |
