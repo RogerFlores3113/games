@@ -255,7 +255,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 12-05-PLAN.md — TDD: buildSceneModel + between-camps model (SCENE-02/03/04)
+- [x] 12-05-PLAN.md — TDD: buildSceneModel + between-camps model (SCENE-02/03/04)
 - [ ] 12-06-PLAN.md — Bitmap pixel fonts and the Big Index / Classic card packs
 - [ ] 12-07-PLAN.md — Four interactables registry + contract test (SCENE-09)
 
@@ -344,7 +344,7 @@ Plans:
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 19/19 | Complete    | 2026-09-27 |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 7/7 | Complete    | 2026-09-27 |
-| 12. Phaser Shell | v2.0 | 4/14 | In Progress|  |
+| 12. Phaser Shell | v2.0 | 5/14 | In Progress|  |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
 | 14. Art Pass | v2.0 | 0/? | Not started | - |
 | 15. Balance Pass | v2.0 | 0/? | Not started | - |
