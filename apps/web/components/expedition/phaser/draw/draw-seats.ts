@@ -134,7 +134,18 @@ function drawGear(
   }
 
   layer.add(container);
-  index.register("camp", gearObjectId(chip.gearId), container);
+  if (interactive) {
+    // Only the viewer's own gear is ever clickable — other seats' chips are
+    // display-only. `gearObjectId` keys purely on `gearId` (spec §7.5's
+    // frozen id scheme), so if a teammate happens to hold the same gear
+    // item, registering EVERY seat's chip under that one id would let a
+    // later (non-interactive, teammate) registration silently overwrite
+    // the viewer's own clickable instance in the shared `ObjectIndex` —
+    // found via Plan 12-13's full-camp e2e (`gear:<id>` resolving to a
+    // teammate's non-interactive chip instead of the viewer's own).
+    // Registering only the interactive instance keeps the id unambiguous.
+    index.register("camp", gearObjectId(chip.gearId), container);
+  }
 }
 
 function drawReveal(

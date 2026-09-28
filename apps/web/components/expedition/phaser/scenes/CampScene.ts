@@ -20,7 +20,7 @@ import { drawHand, drawLastTrick, drawTrick } from "../draw/draw-hand-trick";
 import { drawControls } from "../draw/draw-controls";
 import { INTERACTABLE_REGISTRY } from "../interactables/registry";
 import { INTERACTABLE_ANCHORS } from "../layout";
-import { interactableObjectId } from "../../../../lib/expedition/expedition-ids";
+import { interactableObjectId, LAST_TRICK_ID } from "../../../../lib/expedition/expedition-ids";
 import { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
 import {
@@ -211,14 +211,58 @@ export class CampScene extends Phaser.Scene {
   }
 
   /** Seats, hand, trick, last-trick glance and controls — all drawn from
-   * `model` alone (SCENE-02/03/04). */
+   * `model` alone (SCENE-02/03/04).
+   *
+   * `drawHand` runs FIRST (not after seats) so the viewer's own seat (D-13:
+   * seat 0 sits just below the stump, at the bottom of the table, right
+   * where the hand fans out per `layout.ts`'s `seatAnchors`/`HAND_Y`)
+   * renders ON TOP of the hand rather than being covered by it — the
+   * viewer's own gear row (`GEAR_ROW_Y`) and objective row
+   * (`OBJECTIVE_ROW_Y`) both fall inside the hand's vertical span, so with
+   * the hand drawn last (topmost, as it originally was) every hand card
+   * silently swallowed clicks meant for the viewer's own gear/objectives —
+   * discovered via Plan 12-13's full-camp e2e, which found gear use
+   * (D-02/GEAR-05) unusable at the table. `drawControls` (which draws the
+   * Confirm/Cancel pair anchored on the gear/objective just clicked) stays
+   * last so it remains topmost above both. */
   renderTable(model: SceneModel): void {
     if (this.dynamicLayer === null) return;
     const layer = this.dynamicLayer;
+    drawHand(this, layer, model, this.index, this.handlers);
     drawSeats(this, layer, model, this.index, this.handlers);
     drawTrick(this, layer, model, this.index, this.previousModel);
     drawLastTrick(this, layer, model, this.index, this.handlers);
-    drawHand(this, layer, model, this.index, this.handlers);
     drawControls(this, layer, model, this.index, this.handlers);
+  }
+
+  /** D-06 self-heal: opening the last-trick glance (`onLastTrickHover`)
+   * itself triggers a store update, which `renderModel` answers by
+   * destroying and recreating the WHOLE dynamic layer — including the very
+   * pile container the pointer is currently over. Phaser's own hover
+   * bookkeeping (which object the pointer is "currently over", used to
+   * decide whether a future move away should fire `pointerout`) still
+   * points at that now-destroyed instance; a real pointer leaving the
+   * pile's on-screen area afterward never emits a `pointerout` for it, so
+   * the glance can get stuck open even though `pointerover` (entering)
+   * still fires correctly on the fresh instance every time (found via
+   * Plan 12-13's full-camp e2e). Every frame the glance is open, check the
+   * pointer's CURRENT position against the pile's CURRENT registered
+   * bounds directly (not Phaser's event-transition state) and close it the
+   * moment the pointer is no longer over it — self-correcting regardless
+   * of how the object was drawn or redrawn. */
+  update(): void {
+    const state = this.sceneStore.getState();
+    if (!state.localUi.lastTrickOpen) return;
+    const entry = this.index.entries().find((e) => e.id === LAST_TRICK_ID);
+    if (entry === undefined) return;
+    const pointer = this.input.activePointer;
+    const within =
+      pointer.x >= entry.bounds.x &&
+      pointer.x <= entry.bounds.x + entry.bounds.width &&
+      pointer.y >= entry.bounds.y &&
+      pointer.y <= entry.bounds.y + entry.bounds.height;
+    if (!within) {
+      this.handlers.onLastTrickHover(false);
+    }
   }
 }
