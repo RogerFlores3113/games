@@ -38,4 +38,21 @@ test.describe("Expedition room creation (SCENE-01, D-17/WR-06)", () => {
     const location = response.headers()["location"]!;
     expect(location).toContain("error=create");
   });
+
+  test("choosing Expedition on the landing page creates a seated Expedition lobby", async ({ page }) => {
+    await page.goto("/");
+    await page.getByLabel("Game").selectOption("expedition");
+
+    const createButton = page.getByRole("button", { name: "Create room" });
+    await expect(createButton).toBeEnabled();
+    await page.getByLabel("Your name").fill("Roger");
+    await createButton.click();
+    await page.waitForURL(/\/room\/[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/);
+
+    const selfRow = page.getByTestId("seat-row").and(page.locator('[data-self="true"]'));
+    await expect(selfRow).toBeVisible();
+    await expect(selfRow).toContainText("Roger");
+
+    await expect(page.getByRole("radio", { name: "Base" })).toHaveCount(0);
+  });
 });

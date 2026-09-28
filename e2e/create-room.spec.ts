@@ -54,7 +54,7 @@ test.describe("create room (ROOM-01)", () => {
 });
 
 test.describe("landing page game picker (D-12, D-17)", () => {
-  test("title reads 'Board games', Expedition is disabled, Create room is visible before any game is chosen, and the variant fieldset only shows once Hanabi is chosen", async ({
+  test("title reads 'Board games', Expedition is enabled, Create room is visible before any game is chosen, and the variant fieldset only shows once Hanabi is chosen", async ({
     page,
   }) => {
     await page.goto("/");
@@ -63,8 +63,8 @@ test.describe("landing page game picker (D-12, D-17)", () => {
     await expect(page.getByRole("heading", { name: "Board games" })).toBeVisible();
 
     const expeditionOption = page.locator('option[value="expedition"]');
-    await expect(expeditionOption).toBeDisabled();
-    await expect(expeditionOption).toHaveText("Expedition - coming soon");
+    await expect(expeditionOption).toBeEnabled();
+    await expect(expeditionOption).toHaveText("Expedition");
     await expect(page.locator('option[value="innovation"]')).toHaveCount(0);
 
     // UI-SPEC note 3: "Create room"'s visibility is independent of the

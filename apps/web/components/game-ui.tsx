@@ -45,13 +45,13 @@ export const LOBBY_SETTINGS: Readonly<Partial<Record<GameId, ComponentType<Lobby
 };
 
 // D-12: the landing page's game picker options. Expedition is registered as
-// of Phase 11 (GameIdSchema/GAME_REGISTRY both hold it); the option stays
-// disabled here until Phase 12 enables it (D-12). Client-side only — this
-// list (unlike BOARD_COMPONENTS/LOBBY_SETTINGS) is not keyed by GameId and
-// is not required to be exhaustive over it.
+// of Phase 11 (GameIdSchema/GAME_REGISTRY both hold it); Phase 12 enables the
+// option here now that the camp board is playable (SCENE-01). Client-side
+// only — this list (unlike BOARD_COMPONENTS/LOBBY_SETTINGS) is not keyed by
+// GameId and is not required to be exhaustive over it.
 export const LANDING_GAME_OPTIONS: readonly { value: string; label: string; disabled: boolean }[] = [
   { value: "hanabi", label: "Hanabi", disabled: false },
-  { value: "expedition", label: "Expedition - coming soon", disabled: true },
+  { value: "expedition", label: "Expedition", disabled: false },
 ];
 
 /** `name` is the form-field name the game's config controls must use
