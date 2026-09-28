@@ -171,15 +171,25 @@ export class CampScene extends Phaser.Scene {
     });
     this.syncFromStore();
 
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    // Strict Mode's dev-only double mount calls `game.destroy(true)` on the
+    // first `Phaser.Game` directly, without first calling `scene.stop()` —
+    // that only fires DESTROY, never SHUTDOWN, on the scene. Listening to
+    // BOTH events (matching BetweenCampsScene's precedent) guarantees
+    // `this.unsubscribe` is torn down before the store's next `setServer`
+    // can fire `syncFromStore`/`renderModel` on a scene whose `this.add`
+    // has already gone null.
+    const teardown = () => {
       this.unsubscribe?.();
       this.unsubscribe = null;
       this.previousModel = null;
       this.index.clearScene("camp");
-    });
+    };
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, teardown);
+    this.events.once(Phaser.Scenes.Events.DESTROY, teardown);
   }
 
   private syncFromStore(): void {
+    if (this.unsubscribe === null) return;
     const state = this.sceneStore.getState();
     if (state.model === null) return;
     if (state.cardPackId !== this.lastCardPackId) {
@@ -191,7 +201,7 @@ export class CampScene extends Phaser.Scene {
   }
 
   renderModel(model: SceneModel): void {
-    if (this.dynamicLayer === null) return;
+    if (this.dynamicLayer === null || this.unsubscribe === null) return;
     this.dynamicLayer.removeAll(true);
     drawHud(this, this.dynamicLayer, model);
     const effect = model.bossTwist !== null && !model.bossTwist.cancelled ? model.bossTwist.effect : "none";
