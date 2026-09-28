@@ -274,7 +274,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 12-12-PLAN.md — Enable Expedition on the landing page, bundle-isolation e2e, README
+- [x] 12-12-PLAN.md — Enable Expedition on the landing page, bundle-isolation e2e, README
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
@@ -344,7 +344,7 @@ Plans:
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 19/19 | Complete    | 2026-09-27 |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 7/7 | Complete    | 2026-09-27 |
-| 12. Phaser Shell | v2.0 | 11/14 | In Progress|  |
+| 12. Phaser Shell | v2.0 | 12/14 | In Progress|  |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
 | 14. Art Pass | v2.0 | 0/? | Not started | - |
 | 15. Balance Pass | v2.0 | 0/? | Not started | - |
