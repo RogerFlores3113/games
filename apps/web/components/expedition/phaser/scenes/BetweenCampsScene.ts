@@ -71,15 +71,24 @@ export class BetweenCampsScene extends Phaser.Scene {
     });
     this.renderModel();
 
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    // Strict Mode's dev-only double mount calls `game.destroy(true)` on the
+    // first `Phaser.Game` directly, without first calling `scene.stop()` —
+    // that only fires DESTROY, never SHUTDOWN, on the scene. Listening to
+    // BOTH events (matching CampScene's SHUTDOWN-only precedent plus this
+    // scene's own DESTROY safety net) guarantees `this.unsubscribe` is torn
+    // down before the store's next `setServer` can fire `renderModel` on a
+    // scene whose `this.add` has already gone null.
+    const teardown = () => {
       this.unsubscribe?.();
       this.unsubscribe = null;
       this.index.clearScene("between-camps");
-    });
+    };
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, teardown);
+    this.events.once(Phaser.Scenes.Events.DESTROY, teardown);
   }
 
   private renderModel(): void {
-    if (this.layer === null) return;
+    if (this.layer === null || this.unsubscribe === null) return;
     const model = this.sceneStore.getState().betweenModel;
     this.layer.removeAll(true);
     this.index.clearScene("between-camps");
