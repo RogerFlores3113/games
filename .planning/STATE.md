@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 12-06-PLAN.md
-last_updated: "2026-09-28T02:32:03.543Z"
+stopped_at: Completed 12-07-PLAN.md
+last_updated: "2026-09-28T02:41:05.316Z"
 last_activity: 2026-09-28
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 58
-  completed_plans: 50
+  completed_plans: 51
   percent: 50
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 12 (Phaser Shell) — EXECUTING
-Plan: 7 of 14
+Plan: 8 of 14
 Status: Ready to execute
 Last activity: 2026-09-28
 
@@ -198,6 +198,7 @@ Last activity: 2026-09-28
 | Phase 12 P03 | 20min | 3 tasks | 10 files |
 | Phase 12 P05 | 30min | 2 tasks | 4 files |
 | Phase 12 P06 | 45min | 3 tasks | 11 files |
+| Phase 12 P07 | 30min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -464,6 +465,10 @@ Recent decisions affecting current work:
 - [Phase 12-03]: palette.ts: card-art hex values (cardFace/cardBack/cardEdge, suitBigIndex four hues, sun/moon/done) are this plan's own D-13 placeholder choices, recorded per the task's own instruction
 - [Phase 12-05]: targetInfo(ui, view, kind, id) is a single shared helper computing targetable/selected for hand cards, seats and objectives, reusing local-ui.ts's candidateIdsForKind/nextTargetKind rather than three per-kind implementations
 - [Phase 12-06]: GLYPHS_5X7 hand-authored placeholder font (D-13); phaser confined to pixel-font.ts/card-textures.ts only
+- [Phase 12-07]: Container + setSize/setInteractive() (no runtime Phaser value reference) for every interactable root, keeping the type-only phaser import
+- [Phase 12-07]: lantern's damped swing is a hand-rolled recursive tween chain halving amplitude each pass, since Phaser has no built-in amplitude-decay easing
+- [Phase 12-07]: mascot's line-rotation index and active bubble live in per-root WeakMaps, not module-level counters
+- [Phase 12-07]: doc-comment prose reworded to avoid literal forbidden-token substrings that would false-positive the plan's own raw-source acceptance-criteria greps
 
 ### Pending Todos
 
@@ -500,8 +505,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-28T02:32:03.534Z
-Stopped at: Completed 12-06-PLAN.md
+Last session: 2026-09-28T02:41:05.306Z
+Stopped at: Completed 12-07-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -80,7 +80,7 @@
 - [ ] **SCENE-06**: The run-end scene shows whether the expedition reached the temple or turned back, with the camp reached and supplies left
 - [ ] **SCENE-07**: A rules reference can be opened from the scene: the trick rules, what each objective marker means, and the current boss twist
 - [x] **SCENE-08**: Each player chooses a card pack, Big Index (the default) or Classic. The choice is saved per browser and only changes that player's view
-- [ ] **SCENE-09**: Four interactables (campfire, fireflies, lantern, the red panda mascot) react to clicks and never affect game state
+- [x] **SCENE-09**: Four interactables (campfire, fireflies, lantern, the red panda mascot) react to clicks and never affect game state
 - [x] **SCENE-10**: Pixel art stays crisp at any window size from the 1280×720 minimum upward
 - [ ] **SCENE-11**: A refresh or reconnect in the middle of a camp, including during a draft, a loadout or an open timing window, resumes the same seat and state
 - [x] **SCENE-12**: Playwright can drive a full camp through a test-only object bridge that is absent from production builds
@@ -171,7 +171,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | SCENE-06 | Phase 13 | Pending |
 | SCENE-07 | Phase 13 | Pending |
 | SCENE-08 | Phase 12 | Complete |
-| SCENE-09 | Phase 12 | Pending |
+| SCENE-09 | Phase 12 | Complete |
 | SCENE-10 | Phase 12 | Complete |
 | SCENE-11 | Phase 12 | Pending |
 | SCENE-12 | Phase 12 | Complete |
