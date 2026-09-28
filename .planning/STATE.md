@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 12-05-PLAN.md
-last_updated: "2026-09-28T02:15:50.972Z"
+stopped_at: Completed 12-06-PLAN.md
+last_updated: "2026-09-28T02:32:03.543Z"
 last_activity: 2026-09-28
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 58
-  completed_plans: 49
+  completed_plans: 50
   percent: 50
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 12 (Phaser Shell) — EXECUTING
-Plan: 6 of 14
+Plan: 7 of 14
 Status: Ready to execute
 Last activity: 2026-09-28
 
@@ -197,6 +197,7 @@ Last activity: 2026-09-28
 | Phase 12 P02 | 35min | 3 tasks | 6 files |
 | Phase 12 P03 | 20min | 3 tasks | 10 files |
 | Phase 12 P05 | 30min | 2 tasks | 4 files |
+| Phase 12 P06 | 45min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -462,6 +463,7 @@ Recent decisions affecting current work:
 - [Phase 12-03]: layout.ts: seat ellipse sized larger than STUMP so seatAnchors keeps the viewer's y strictly greatest and pairwise distance >=96px for 3-5 seats
 - [Phase 12-03]: palette.ts: card-art hex values (cardFace/cardBack/cardEdge, suitBigIndex four hues, sun/moon/done) are this plan's own D-13 placeholder choices, recorded per the task's own instruction
 - [Phase 12-05]: targetInfo(ui, view, kind, id) is a single shared helper computing targetable/selected for hand cards, seats and objectives, reusing local-ui.ts's candidateIdsForKind/nextTargetKind rather than three per-kind implementations
+- [Phase 12-06]: GLYPHS_5X7 hand-authored placeholder font (D-13); phaser confined to pixel-font.ts/card-textures.ts only
 
 ### Pending Todos
 
@@ -498,8 +500,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-28T02:15:50.965Z
-Stopped at: Completed 12-05-PLAN.md
+Last session: 2026-09-28T02:32:03.534Z
+Stopped at: Completed 12-06-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
