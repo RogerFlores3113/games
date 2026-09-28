@@ -38,8 +38,28 @@ export { expeditionGame } from "./expedition/adapter/adapter";
 export type { ExpeditionConfig } from "./expedition/adapter/adapter";
 export type { ExpeditionEndResult } from "./expedition/adapter/adapter";
 export type { ExpeditionView } from "./expedition/adapter/view-types";
+export type {
+  ExpeditionCardIdentityView,
+  ExpeditionCardView,
+  ExpeditionObjectiveView,
+  ExpeditionSeatView,
+  ExpeditionGearStatusView,
+  ExpeditionCompletedTrickView,
+  ExpeditionCurrentTrickView,
+  ExpeditionRevealView,
+  ExpeditionCampView,
+  ExpeditionAttemptView,
+  ExpeditionLogEntryView,
+} from "./expedition/adapter/view-types";
 export type { RunState } from "./expedition/run/types";
 export type { RunAction } from "./expedition/run/types";
 export type { RunError } from "./expedition/run/types";
 export { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "./expedition/adapter/view-leak-check";
 export type { ExpeditionSeatSecrets } from "./expedition/adapter/view-leak-check";
+export { GEAR_DISPLAY, BOSS_DISPLAY } from "./expedition/adapter/catalog-display";
+export type {
+  GearDisplay,
+  BossDisplay,
+  ExpeditionTargetKind,
+  ExpeditionGearWindow,
+} from "./expedition/adapter/catalog-display";
