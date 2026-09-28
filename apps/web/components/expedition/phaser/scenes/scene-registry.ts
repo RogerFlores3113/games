@@ -7,6 +7,7 @@ import type { ExpeditionSceneStore } from "../../../../lib/expedition/expedition
 import type { SceneKey } from "../../../../lib/expedition/build-scene-model";
 import type { ObjectIndex } from "../object-index";
 import { CampScene } from "./CampScene";
+import { BetweenCampsScene } from "./BetweenCampsScene";
 
 export interface SceneDeps {
   store: ExpeditionSceneStore;
@@ -15,5 +16,5 @@ export interface SceneDeps {
 
 export const SCENE_FACTORIES: Partial<Record<SceneKey, (deps: SceneDeps) => Phaser.Scene>> = {
   camp: (deps) => new CampScene(deps),
-  // Plan 12-10 adds: "between-camps": (deps) => new BetweenCampsScene(deps),
+  "between-camps": (deps) => new BetweenCampsScene(deps),
 };
