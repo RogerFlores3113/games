@@ -251,7 +251,7 @@ Plans:
 - [x] 12-01-PLAN.md — D-17/WR-06: native landing form yields config null for Expedition (SCENE-01)
 - [ ] 12-02-PLAN.md — Gear/boss display catalogue, D-02 targeting state machine, bridge id scheme
 - [ ] 12-03-PLAN.md — Whole-number zoom, stage layout, canvas palette, font keys, card-pack pref (SCENE-08/10)
-- [ ] 12-04-PLAN.md — Owner-gated phaser install, Phaser import confinement test, production build check (checkpoint)
+- [x] 12-04-PLAN.md — Owner-gated phaser install, Phaser import confinement test, production build check (checkpoint)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -344,7 +344,7 @@ Plans:
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 19/19 | Complete    | 2026-09-27 |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 7/7 | Complete    | 2026-09-27 |
-| 12. Phaser Shell | v2.0 | 1/14 | In Progress|  |
+| 12. Phaser Shell | v2.0 | 2/14 | In Progress|  |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
 | 14. Art Pass | v2.0 | 0/? | Not started | - |
 | 15. Balance Pass | v2.0 | 0/? | Not started | - |

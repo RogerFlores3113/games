@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 12-01-PLAN.md
-last_updated: "2026-09-27T21:19:14.591Z"
-last_activity: 2026-09-27
+stopped_at: Completed 12-04-PLAN.md
+last_updated: "2026-09-28T01:45:56.604Z"
+last_activity: 2026-09-28
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 58
-  completed_plans: 45
+  completed_plans: 46
   percent: 50
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 12 (Phaser Shell) — EXECUTING
-Plan: 2 of 14
+Plan: 3 of 14
 Status: Ready to execute
-Last activity: 2026-09-27
+Last activity: 2026-09-28
 
 ## Performance Metrics
 
@@ -193,6 +193,7 @@ Last activity: 2026-09-27
 | Phase 11 P06 | ~35min | 3 tasks | 14 files |
 | Phase 11 P07 | ~20min | 2 tasks | 3 files |
 | Phase 12 P01 | 8min | 2 tasks | 3 files |
+| Phase 12 P04 | 25min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -451,6 +452,7 @@ Recent decisions affecting current work:
 - [Phase 11]: set-loadout candidates tracked by seatId + view.campNumber + view.history.length (read from the bot's own view, never room.game) so set-loadout is tried at most once per seat per fireside visit, letting ready get a turn
 - [Phase 11]: expedition-wiring.test.ts's action-selection loop iterates seats starting at (step mod seatCount), trying each seat's full candidate list before advancing, avoiding seat starvation across fireside/pre-deal windows
 - [Phase 12-01]: readCreateRoomForm returns config: null (not undefined) for a game with no create-time settings panel, closing D-17/WR-06 without importing LANDING_SETTINGS into the server route — Expedition has no settings panel; its config field must satisfy CreateRoomRequestSchema's z.null() branch
+- [Phase 12]: phaser@3.90.0 owner-approved and pinned at a blocking package-legitimacy checkpoint — RESEARCH A1 recommendation; owner confirmed at checkpoint reply 'approved 3.90.0'
 
 ### Pending Todos
 
@@ -487,8 +489,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-27T21:19:14.580Z
-Stopped at: Completed 12-01-PLAN.md
+Last session: 2026-09-28T01:45:56.597Z
+Stopped at: Completed 12-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

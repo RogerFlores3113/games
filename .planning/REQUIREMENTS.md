@@ -83,7 +83,7 @@
 - [ ] **SCENE-09**: Four interactables (campfire, fireflies, lantern, the red panda mascot) react to clicks and never affect game state
 - [ ] **SCENE-10**: Pixel art stays crisp at any window size from the 1280×720 minimum upward
 - [ ] **SCENE-11**: A refresh or reconnect in the middle of a camp, including during a draft, a loadout or an open timing window, resumes the same seat and state
-- [ ] **SCENE-12**: Playwright can drive a full camp through a test-only object bridge that is absent from production builds
+- [x] **SCENE-12**: Playwright can drive a full camp through a test-only object bridge that is absent from production builds
 
 ### Art
 
@@ -174,7 +174,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | SCENE-09 | Phase 12 | Pending |
 | SCENE-10 | Phase 12 | Pending |
 | SCENE-11 | Phase 12 | Pending |
-| SCENE-12 | Phase 12 | Pending |
+| SCENE-12 | Phase 12 | Complete |
 | ARTX-01 | Phase 14 | Pending |
 | ARTX-02 | Phase 14 | Pending |
 | ARTX-03 | Phase 14 | Pending |
