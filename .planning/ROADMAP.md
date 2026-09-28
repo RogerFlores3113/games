@@ -265,7 +265,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 12-09-PLAN.md — Camp table: seats, hand, trick, last-trick glance, highlight-then-confirm input
+- [x] 12-09-PLAN.md — Camp table: seats, hand, trick, last-trick glance, highlight-then-confirm input
 - [ ] 12-11-PLAN.md — Settings button + modal: card pack, mute slot, host delete/restart, Leave (D-05)
 
 **Wave 5** *(blocked on Wave 4 completion)*
@@ -344,7 +344,7 @@ Plans:
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 19/19 | Complete    | 2026-09-27 |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 7/7 | Complete    | 2026-09-27 |
-| 12. Phaser Shell | v2.0 | 8/14 | In Progress|  |
+| 12. Phaser Shell | v2.0 | 9/14 | In Progress|  |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
 | 14. Art Pass | v2.0 | 0/? | Not started | - |
 | 15. Balance Pass | v2.0 | 0/? | Not started | - |

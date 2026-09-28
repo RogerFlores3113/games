@@ -4,13 +4,13 @@ milestone: v2.0
 milestone_name: Expedition
 status: executing
 stopped_at: Completed 12-08-PLAN.md
-last_updated: "2026-09-28T02:59:40.050Z"
+last_updated: "2026-09-28T03:10:51.123Z"
 last_activity: 2026-09-28
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 58
-  completed_plans: 52
+  completed_plans: 53
   percent: 50
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 12 (Phaser Shell) — EXECUTING
-Plan: 9 of 14
+Plan: 10 of 14
 Status: Ready to execute
 Last activity: 2026-09-28
 
@@ -200,6 +200,7 @@ Last activity: 2026-09-28
 | Phase 12 P06 | 45min | 3 tasks | 11 files |
 | Phase 12 P07 | 30min | 2 tasks | 7 files |
 | Phase 12 P08 | 9min | 3 tasks | 10 files |
+| Phase 12 P09 | ~25min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -472,6 +473,8 @@ Recent decisions affecting current work:
 - [Phase 12-07]: doc-comment prose reworded to avoid literal forbidden-token substrings that would false-positive the plan's own raw-source acceptance-criteria greps
 - [Phase 12-08]: expedition-scene-store combines createStore and StoreApi in one zustand/vanilla import line to satisfy the plan's exactly-1-line grep
 - [Phase 12-08]: CampScene.renderModel skips index.clearScene on every store update, deferring dynamic per-frame id bookkeeping to Plan 12-09, so the four static interactables placed once in create() keep their accumulated visual state
+- [Phase 12]: [Phase 12-09]: CampScene keeps a previousModel field to diff trick-play motion across renders, since renderModel destroys and rebuilds every dynamic object on every model change
+- [Phase 12]: [Phase 12-09]: drawControls positions Confirm/Cancel off the source gear/Whisper object's live ObjectIndex bounds rather than threading a position prop through drawSeats/drawControls
 
 ### Pending Todos
 
@@ -508,7 +511,7 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-28T02:59:40.042Z
+Last session: 2026-09-28T03:08:56.024Z
 Stopped at: Completed 12-08-PLAN.md
 Resume file: None
 
