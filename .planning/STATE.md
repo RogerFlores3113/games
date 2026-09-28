@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 12-10-PLAN.md
-last_updated: "2026-09-28T03:36:56.497Z"
+stopped_at: Completed 12-13-PLAN.md
+last_updated: "2026-09-28T04:42:34.886Z"
 last_activity: 2026-09-28
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 58
-  completed_plans: 56
+  completed_plans: 57
   percent: 50
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 12 (Phaser Shell) — EXECUTING
-Plan: 13 of 14
+Plan: 14 of 14
 Status: Ready to execute
 Last activity: 2026-09-28
 
@@ -204,6 +204,7 @@ Last activity: 2026-09-28
 | Phase 12 P11 | ~20min | 2 tasks | 3 files |
 | Phase 12 P10 | 55min | 2 tasks | 4 files |
 | Phase 12 P12 | 45min | 2 tasks | 5 files |
+| Phase 12 P13 | ~3h | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -482,6 +483,7 @@ Recent decisions affecting current work:
 - [Phase 12-11]: Expedition mute state is local-only (useState in ExpeditionBoard); no persistence added since D-07 defers real audio to Phase 14
 - [Phase 12]: BetweenCampsScene unsubscribes on both SHUTDOWN and DESTROY to survive Strict Mode's game.destroy(true) double-mount teardown
 - [Phase 12]: 12-12: PHASER_SIGNATURE in expedition-create.spec.ts is a literal duplicate of check-expedition-build.mjs's, kept in sync via comment (not imported, since the script is Node ESM not built for Playwright's runtime)
+- [Phase 12]: 12-13: CampScene.renderTable draws hand before seats (own gear/objectives were unclickable behind the hand); CampScene.update() self-heals the D-06 last-trick glance close since a hover-triggered full-layer redraw permanently breaks Phaser's own pointerout tracking; drawGear registers a gear chip's test-bridge id only when interactive (gear:<id> collides across seats holding the same item otherwise)
 
 ### Pending Todos
 
@@ -518,8 +520,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-28T03:36:56.488Z
-Stopped at: Completed 12-10-PLAN.md
+Last session: 2026-09-28T04:42:34.878Z
+Stopped at: Completed 12-13-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

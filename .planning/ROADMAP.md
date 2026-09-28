@@ -278,7 +278,7 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 12-13-PLAN.md — Full-camp e2e through window.__expeditionTest, resume, packs, interactables
+- [x] 12-13-PLAN.md — Full-camp e2e through window.__expeditionTest, resume, packs, interactables
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
@@ -344,7 +344,7 @@ Plans:
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 19/19 | Complete    | 2026-09-27 |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 7/7 | Complete    | 2026-09-27 |
-| 12. Phaser Shell | v2.0 | 12/14 | In Progress|  |
+| 12. Phaser Shell | v2.0 | 13/14 | In Progress|  |
 | 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
 | 14. Art Pass | v2.0 | 0/? | Not started | - |
 | 15. Balance Pass | v2.0 | 0/? | Not started | - |
