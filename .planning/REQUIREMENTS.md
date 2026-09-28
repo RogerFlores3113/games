@@ -82,7 +82,7 @@
 - [x] **SCENE-08**: Each player chooses a card pack, Big Index (the default) or Classic. The choice is saved per browser and only changes that player's view
 - [x] **SCENE-09**: Four interactables (campfire, fireflies, lantern, the red panda mascot) react to clicks and never affect game state
 - [x] **SCENE-10**: Pixel art stays crisp at any window size from the 1280×720 minimum upward
-- [ ] **SCENE-11**: A refresh or reconnect in the middle of a camp, including during a draft, a loadout or an open timing window, resumes the same seat and state
+- [x] **SCENE-11**: A refresh or reconnect in the middle of a camp, including during a draft, a loadout or an open timing window, resumes the same seat and state
 - [x] **SCENE-12**: Playwright can drive a full camp through a test-only object bridge that is absent from production builds
 
 ### Art
@@ -173,7 +173,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | SCENE-08 | Phase 12 | Complete |
 | SCENE-09 | Phase 12 | Complete |
 | SCENE-10 | Phase 12 | Complete |
-| SCENE-11 | Phase 12 | Pending |
+| SCENE-11 | Phase 12 | Complete |
 | SCENE-12 | Phase 12 | Complete |
 | ARTX-01 | Phase 14 | Pending |
 | ARTX-02 | Phase 14 | Pending |

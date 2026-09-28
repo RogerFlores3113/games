@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 12-11-PLAN.md
-last_updated: "2026-09-28T03:17:01.319Z"
+stopped_at: Completed 12-10-PLAN.md
+last_updated: "2026-09-28T03:29:53.684Z"
 last_activity: 2026-09-28
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 58
-  completed_plans: 54
+  completed_plans: 55
   percent: 50
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 12 (Phaser Shell) — EXECUTING
-Plan: 11 of 14
+Plan: 12 of 14
 Status: Ready to execute
 Last activity: 2026-09-28
 
@@ -202,6 +202,7 @@ Last activity: 2026-09-28
 | Phase 12 P08 | 9min | 3 tasks | 10 files |
 | Phase 12 P09 | ~25min | 3 tasks | 4 files |
 | Phase 12 P11 | ~20min | 2 tasks | 3 files |
+| Phase 12 P10 | 55min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -478,6 +479,7 @@ Recent decisions affecting current work:
 - [Phase 12]: [Phase 12-09]: drawControls positions Confirm/Cancel off the source gear/Whisper object's live ObjectIndex bounds rather than threading a position prop through drawSeats/drawControls
 - [Phase 12-11]: Restart control gated on isHost && canRestart (both), matching the plan's interface contract
 - [Phase 12-11]: Expedition mute state is local-only (useState in ExpeditionBoard); no persistence added since D-07 defers real audio to Phase 14
+- [Phase 12]: BetweenCampsScene unsubscribes on both SHUTDOWN and DESTROY to survive Strict Mode's game.destroy(true) double-mount teardown
 
 ### Pending Todos
 
@@ -514,8 +516,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-28T03:17:01.311Z
-Stopped at: Completed 12-11-PLAN.md
+Last session: 2026-09-28T03:29:53.676Z
+Stopped at: Completed 12-10-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
