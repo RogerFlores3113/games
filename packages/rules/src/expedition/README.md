@@ -217,25 +217,35 @@ twists later. This recipe is exactly what that replacement will use.
    `applyToolkitOps`'s exhaustiveness check (`const exhaustive: never = op`)
    makes a missing `case` a compile error.
 
-## Add an interactable (Phase 14)
+## Add an interactable
 
 Interactables are clickable world objects, for fun only (spec §5.4): a
 campfire's spark burst, scattering fireflies, a swinging lantern, the camp
-mascot's reactions. **They never change game state and never reach the
-server** — this registry lives entirely in `apps/web`, not in this package,
-and is built in Phase 14. The fixed contract for that future registry: an
-`InteractableDef` is one file plus one registry line, purely client-side
-(a Phaser scene reacting to a click), with no `RunAction`, no toolkit op,
-and no server round-trip of any kind.
+mascot's click bubble. **They never change game state and never reach the
+server** — the registry lives entirely in `apps/web`, not in this package:
+`apps/web/components/expedition/phaser/interactables/registry.ts`'s
+`INTERACTABLE_REGISTRY`, built in Phase 12. The fixed contract: an
+`InteractableDef` is one new file under `interactables/<id>.ts` plus one
+import and one object-literal line in that registry, purely client-side (a
+Phaser scene reacting to a click), with no `RunAction`, no toolkit op, and no
+server round-trip of any kind — enforced automatically for every registered
+entry by `interactables.contract.test.ts`'s source scan. The mascot's
+reactions to game events (hopping on a completed objective, flopping on a
+failed camp) arrive with Phase 14's art pass; only its click bubble exists
+today.
 
-## Add a card pack (Phase 12)
+## Add a card pack
 
 Card packs are the player's chosen card-face art (spec §7.3), stored per
 browser like Hanabi's tile colour — not part of the rules engine's state or
-legality at all. This registry also lives in `apps/web` and is built in
-Phase 12. The fixed contract: `CardPackDef { id, name, face(card), back() }`,
-drawing to Phaser textures, one file plus one registry line per pack (v1
-ships two: Big Index and Classic, per spec §7.3).
+legality at all. This registry also lives in `apps/web`, built in Phase 12:
+`apps/web/components/expedition/phaser/card-packs/registry.ts`'s
+`CARD_PACK_REGISTRY`, typed against `CardPackId`
+(`apps/web/lib/expedition/card-pack-ids.ts`) so a missing or misnamed pack is
+a compile error. The fixed contract: `CardPackDef { id, name, face(card),
+back() }`, drawing to Phaser textures, one file plus one registry line per
+pack (v1 ships two: Big Index and Classic, per spec §7.3) — covered
+automatically by `card-packs.contract.test.ts`.
 
 ## Invariants
 
