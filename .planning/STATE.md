@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Expedition
 status: executing
-stopped_at: Completed 12-04-PLAN.md
-last_updated: "2026-09-28T01:54:04.997Z"
+stopped_at: Completed 12-03-PLAN.md
+last_updated: "2026-09-28T02:03:32.810Z"
 last_activity: 2026-09-28
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 58
-  completed_plans: 47
+  completed_plans: 48
   percent: 50
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-22)
 ## Current Position
 
 Phase: 12 (Phaser Shell) — EXECUTING
-Plan: 4 of 14
+Plan: 5 of 14
 Status: Ready to execute
 Last activity: 2026-09-28
 
@@ -195,6 +195,7 @@ Last activity: 2026-09-28
 | Phase 12 P01 | 8min | 2 tasks | 3 files |
 | Phase 12 P04 | 25min | 3 tasks | 4 files |
 | Phase 12 P02 | 35min | 3 tasks | 6 files |
+| Phase 12 P03 | 20min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -457,6 +458,8 @@ Recent decisions affecting current work:
 - [Phase 12]: ExpeditionTargetKind/ExpeditionGearWindow are re-aliases of gear-def's TargetKind/GearWindow, not duplicated unions (12-02)
 - [Phase 12]: catalog-display.ts lives under adapter/ (not top-level expedition/*.ts) so purity.test.ts's Core fence still holds (12-02)
 - [Phase 12]: reconcileLocalUi truncates a gear targeting's selected array at the first invalidated own-card target, dropping it and everything selected after, to keep positional target-kind alignment (12-02)
+- [Phase 12-03]: layout.ts: seat ellipse sized larger than STUMP so seatAnchors keeps the viewer's y strictly greatest and pairwise distance >=96px for 3-5 seats
+- [Phase 12-03]: palette.ts: card-art hex values (cardFace/cardBack/cardEdge, suitBigIndex four hues, sun/moon/done) are this plan's own D-13 placeholder choices, recorded per the task's own instruction
 
 ### Pending Todos
 
@@ -493,8 +496,8 @@ Items acknowledged and deferred at milestone close on 2026-09-22 (see .planning/
 
 ## Session Continuity
 
-Last session: 2026-09-28T01:54:04.990Z
-Stopped at: Completed 12-04-PLAN.md
+Last session: 2026-09-28T02:03:32.802Z
+Stopped at: Completed 12-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
