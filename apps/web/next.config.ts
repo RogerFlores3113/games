@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   // Type-check production code only: test files import root devDependencies
   // (vitest) that Vercel does not install for this workspace.
   typescript: { tsconfigPath: "tsconfig.build.json" },
+  // Explicit rather than relying on the App Router's default (Plan 12-08):
+  // SCENE-01's Strict-Mode-safe Phaser mount (ExpeditionPhaserMount.tsx) is
+  // verified under Strict Mode's dev-only double mount/unmount/mount.
+  reactStrictMode: true,
 };
 
 export default nextConfig;
