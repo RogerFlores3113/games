@@ -122,11 +122,33 @@ describe("backpack", () => {
       used: 1,
       packed: [{ gearId: "chatter", name: "Signal Whistle", size: 1, firstSlot: 0 }],
       owned: [
-        { gearId: "chatter", objectId: "loadout:chatter", name: "Signal Whistle", size: 1, equipped: true, fits: true },
-        { gearId: "jam", objectId: "loadout:jam", name: "Rain Poncho", size: 2, equipped: false, fits: false },
-        { gearId: "peek", objectId: "loadout:peek", name: "Spyglass", size: 1, equipped: false, fits: true },
+        { gearId: "chatter", objectId: "loadout:chatter", name: "Signal Whistle", size: 1, equipped: true, blocked: null },
+        { gearId: "jam", objectId: "loadout:jam", name: "Rain Poncho", size: 2, equipped: false, blocked: { caption: "too big", reason: "too big to pack: needs 2 free, 1 left" } },
+        { gearId: "peek", objectId: "loadout:peek", name: "Spyglass", size: 1, equipped: false, blocked: null },
       ],
     });
+  });
+
+  it("locks an equipped Energy Tonic while the other packed gear needs its +2", () => {
+    const needed = makeView({
+      yourOwnedGearIds: ["overclock", "jam"],
+      yourCapacity: 3,
+      yourBaseCapacity: 1,
+      seats: seatsWith({ equippedGearIds: ["overclock", "jam"] }),
+    });
+    const owned = buildFiresideModel(server(needed), ui({ tooltipGearId: "overclock" }));
+    expect(owned.backpack?.owned[0]?.blocked).toEqual({ caption: "needed", reason: "Your other gear needs the Tonic's +2" });
+    expect(owned.tooltip?.reason).toBe("Your other gear needs the Tonic's +2");
+
+    const spare = makeView({
+      yourOwnedGearIds: ["overclock", "chatter"],
+      yourCapacity: 3,
+      yourBaseCapacity: 1,
+      seats: seatsWith({ equippedGearIds: ["overclock", "chatter"] }),
+    });
+    const free = buildFiresideModel(server(spare), ui({ tooltipGearId: "overclock" }));
+    expect(free.backpack?.owned[0]?.blocked).toBeNull();
+    expect(free.tooltip?.reason).toBeNull();
   });
 
   it("is null for a spectator", () => {

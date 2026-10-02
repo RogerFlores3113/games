@@ -14,7 +14,7 @@ export type SceneName = "camp" | "fireside" | "run-end";
 export interface FiresideView {
   sceneKey?: string;
   draft?: { kind: "offer"; items: { gearId: string; objectId: string; size: number }[] } | { kind: "taken" | "none" };
-  backpack?: { owned: { gearId: string; objectId: string; size: number; equipped: boolean; fits: boolean }[] } | null;
+  backpack?: { owned: { gearId: string; objectId: string; size: number; equipped: boolean; blocked: { caption: string; reason: string } | null }[] } | null;
   ready?: { state: "blocked" | "open" | "done" } | null;
   lastResult?: { campNumber: number; status: "succeeded" | "failed" } | null;
 }
@@ -23,7 +23,7 @@ export function draftOffer(m: FiresideView): { gearId: string; objectId: string;
   return m.draft?.kind === "offer" ? m.draft.items : null;
 }
 
-export function ownedGear(m: FiresideView): { gearId: string; objectId: string; size: number; equipped: boolean; fits: boolean }[] {
+export function ownedGear(m: FiresideView): { gearId: string; objectId: string; size: number; equipped: boolean; blocked: { caption: string; reason: string } | null }[] {
   return m.backpack?.owned ?? [];
 }
 

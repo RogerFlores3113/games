@@ -234,7 +234,7 @@ async function reachCamp(pages: Page[]): Promise<void> {
     if ((await getScene(page)) === "camp") continue;
     const model = await getModel<FiresideView>(page);
     if (isReady(model)) continue;
-    const fitting = ownedGear(model).find((o) => o.fits && !o.equipped);
+    const fitting = ownedGear(model).find((o) => o.blocked === null && !o.equipped);
     if (fitting) {
       await clickUntilChanged<FiresideView>(
         page,
@@ -539,7 +539,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
       const pick = pickDraftOffer(offer);
       hostFireside = await clickUntilChanged<FiresideView>(page, pick.objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
 
-      const fitting = ownedGear(hostFireside).find((o) => o.fits && !o.equipped);
+      const fitting = ownedGear(hostFireside).find((o) => o.blocked === null && !o.equipped);
       if (fitting) {
         await clickUntilChanged<FiresideView>(
           page,

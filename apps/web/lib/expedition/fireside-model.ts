@@ -42,7 +42,8 @@ export interface OwnedItem {
   name: string;
   size: number;
   equipped: boolean;
-  fits: boolean;
+  /** Why clicking this tile would do nothing: null when it can be toggled. */
+  blocked: { caption: string; reason: string } | null;
 }
 
 export interface PackedItem {
@@ -84,6 +85,8 @@ const WINDOW_LABEL: Readonly<Record<string, string>> = {
   "between-tricks": "between tricks",
   passive: "always on",
 };
+
+const TONIC_ID = "overclock";
 
 function gearName(gearId: string): string {
   return GEAR_DISPLAY[gearId]?.name ?? gearId;
@@ -160,16 +163,18 @@ function buildBackpack(view: ExpeditionView): FiresideModel["backpack"] {
     used += item.size;
     return item;
   });
-  const owned = view.yourOwnedGearIds.map((gearId) => {
+  const baseCapacity = view.yourBaseCapacity ?? capacity;
+  const free = Math.max(0, capacity - used);
+  const owned = view.yourOwnedGearIds.map((gearId): OwnedItem => {
     const equipped = you.equippedGearIds.includes(gearId);
-    return {
-      gearId,
-      objectId: loadoutObjectId(gearId),
-      name: gearName(gearId),
-      size: gearSize(gearId),
-      equipped,
-      fits: equipped || used + gearSize(gearId) <= capacity,
-    };
+    const size = gearSize(gearId);
+    let blocked: OwnedItem["blocked"] = null;
+    if (equipped && gearId === TONIC_ID && used > baseCapacity) {
+      blocked = { caption: "needed", reason: "Your other gear needs the Tonic's +2" };
+    } else if (!equipped && used + size > capacity) {
+      blocked = { caption: "too big", reason: `too big to pack: needs ${size} free, ${free} left` };
+    }
+    return { gearId, objectId: loadoutObjectId(gearId), name: gearName(gearId), size, equipped, blocked };
   });
   return { capacity, used, packed, owned };
 }
@@ -204,9 +209,7 @@ function buildTooltip(ui: LocalUiState, backpack: FiresideModel["backpack"]): To
   const rules = gearRulesText(ui.tooltipGearId);
   if (rules === null) return null;
   const owned = backpack?.owned.find((o) => o.gearId === ui.tooltipGearId);
-  if (owned === undefined || owned.fits || backpack === null) return { ...rules, reason: null };
-  const free = Math.max(0, backpack.capacity - backpack.used);
-  return { ...rules, reason: `too big to pack: needs ${owned.size} free, ${free} left` };
+  return { ...rules, reason: owned?.blocked?.reason ?? null };
 }
 
 export function buildFiresideModel(server: SceneServerInput, ui: LocalUiState, reconnecting = false): FiresideModel {

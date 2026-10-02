@@ -249,12 +249,17 @@ function drawOwnedTile(ctx: Ctx, item: OwnedItem, x: number, y: number, w: numbe
   if (art !== null) container.add(placeArt(scene, art, w / 2, 11));
   const cx = Math.floor(w / 2);
   container.add(centredText(scene, cx, 21, fitLabel(item.name, Math.floor((w - 2) / LABEL_CELL.w))));
-  const caption = item.equipped ? { v: "packed", c: PALETTE.turn } : item.fits ? { v: `size ${item.size}`, c: PALETTE.textDim } : { v: "too big", c: PALETTE.destructive };
+  const caption =
+    item.blocked !== null
+      ? { v: item.blocked.caption, c: PALETTE.destructive }
+      : item.equipped
+        ? { v: "packed", c: PALETTE.turn }
+        : { v: `size ${item.size}`, c: PALETTE.textDim };
   container.add(centredText(scene, cx, 31, caption.v, caption.c));
-  if (!item.fits) container.setAlpha(DIM_ALPHA);
-  bg.setInteractive({ useHandCursor: item.fits });
+  if (item.blocked !== null) container.setAlpha(DIM_ALPHA);
+  bg.setInteractive({ useHandCursor: item.blocked === null });
   bg.on("pointerdown", () => {
-    if (item.fits) handlers.onPack(item.gearId);
+    if (item.blocked === null) handlers.onPack(item.gearId);
   });
   bg.on("pointerover", () => handlers.onGearHover(item.gearId));
   bg.on("pointerout", () => handlers.onGearHover(null));
