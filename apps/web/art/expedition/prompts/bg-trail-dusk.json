@@ -1,0 +1,10 @@
+{
+  "id": "bg-trail-dusk",
+  "tool": "create_image_pixflux",
+  "size": {
+    "w": 640,
+    "h": 360
+  },
+  "description": "an abandoned jungle campsite at dusk, a cold fire pit and a fallen tent, the trail fading into dark trees, wistful mood",
+  "style": "pixel art, night jungle expedition, warm campfire light, limited palette of deep greens, blue-black sky, firelight orange and gold, moss and bark browns, single-pixel dark outline, simple shading, no dithering noise, no people, no text, no watermark"
+}

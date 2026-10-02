@@ -1,0 +1,12 @@
+{
+  "id": "campfire",
+  "tool": "create_map_object",
+  "size": {
+    "w": 32,
+    "h": 32
+  },
+  "description": "a small crackling campfire on a ring of stones, bright orange and gold flames, transparent background",
+  "style": "pixel art, night jungle expedition, warm campfire light, limited palette of deep greens, blue-black sky, firelight orange and gold, moss and bark browns, single-pixel dark outline, simple shading, no dithering noise, no people, no text, no watermark",
+  "frames": 4,
+  "animate": "flames flicker"
+}

@@ -1,0 +1,10 @@
+{
+  "id": "stump-table",
+  "tool": "create_map_object",
+  "size": {
+    "w": 368,
+    "h": 128
+  },
+  "description": "a huge oval tree-stump tabletop seen from above at a low angle, visible growth rings, mossy bark rim, transparent background",
+  "style": "pixel art, night jungle expedition, warm campfire light, limited palette of deep greens, blue-black sky, firelight orange and gold, moss and bark browns, single-pixel dark outline, simple shading, no dithering noise, no people, no text, no watermark"
+}

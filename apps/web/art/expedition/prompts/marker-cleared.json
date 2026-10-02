@@ -1,0 +1,10 @@
+{
+  "id": "marker-cleared",
+  "tool": "create_map_object",
+  "size": {
+    "w": 16,
+    "h": 16
+  },
+  "description": "a tiny tent with a small green flag planted beside it, map marker icon, transparent background",
+  "style": "pixel art, night jungle expedition, warm campfire light, limited palette of deep greens, blue-black sky, firelight orange and gold, moss and bark browns, single-pixel dark outline, simple shading, no dithering noise, no people, no text, no watermark"
+}

@@ -1,0 +1,10 @@
+{
+  "id": "backpack-open",
+  "tool": "create_map_object",
+  "size": {
+    "w": 96,
+    "h": 64
+  },
+  "description": "an open explorer's backpack seen from above with empty compartments, transparent background",
+  "style": "pixel art, night jungle expedition, warm campfire light, limited palette of deep greens, blue-black sky, firelight orange and gold, moss and bark browns, single-pixel dark outline, simple shading, no dithering noise, no people, no text, no watermark"
+}

@@ -1,0 +1,10 @@
+{
+  "id": "bg-jungle-night",
+  "tool": "create_image_pixflux",
+  "size": {
+    "w": 640,
+    "h": 360
+  },
+  "description": "side view backdrop of a dense jungle clearing at night: canopy silhouettes and hanging vines framing the edges, a few stars and a thin moon in a blue-black sky, calm dark mossy ground in the centre with room for a table",
+  "style": "pixel art, night jungle expedition, warm campfire light, limited palette of deep greens, blue-black sky, firelight orange and gold, moss and bark browns, single-pixel dark outline, simple shading, no dithering noise, no people, no text, no watermark"
+}
