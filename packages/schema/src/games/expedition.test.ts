@@ -50,6 +50,7 @@ const firesideView = {
   yourOwnedGearIds: ["compass"],
   yourDraftOffer: ["compass", "map", "lantern"],
   yourCapacity: 1,
+  yourBaseCapacity: 1,
   yourGear: [],
   history: [],
   attempt: null,
@@ -71,6 +72,7 @@ const midCampView = {
   yourOwnedGearIds: ["compass"],
   yourDraftOffer: null,
   yourCapacity: 2,
+  yourBaseCapacity: 2,
   yourGear: [
     { gearId: "compass", spent: false, usableNow: true, reason: null },
     { gearId: "map", spent: true, usableNow: false, reason: "already used this attempt" },

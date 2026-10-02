@@ -19,6 +19,7 @@ import type { GearDef } from "./gear-def";
 import type { BossDef } from "../boss/boss-def";
 import type { Catalog, CampNumber, RunState } from "../run/types";
 import { jam } from "./jam";
+import { toExpeditionPlayerView } from "../adapter/view";
 import { overclock } from "./overclock";
 
 const SEAT_IDS = ["p0", "p1", "p2"] as const;
@@ -240,6 +241,23 @@ describe("Energy Tonic (overclock)", () => {
     if (!withTonic.ok) return;
     expect(capacityOf(withTonic.state, "p0", catalog)).toBe(3);
     expect(capacityOf(withTonic.state, "p1", catalog)).toBe(1);
+  });
+
+  it("projects the capacity without the Tonic as yourBaseCapacity, only for the owner's own seat", () => {
+    const catalog = makeCatalog();
+    const run = setupRun({
+      seatIds: [...SEAT_IDS],
+      seed: SEED,
+      catalog,
+      campNumber: 1 as CampNumber,
+      loadouts: { p0: ["overclock", "fake-size-3"] },
+    });
+
+    const own = toExpeditionPlayerView(run, "p0", catalog);
+    expect(own.yourCapacity).toBe(3);
+    expect(own.yourBaseCapacity).toBe(1);
+    expect(toExpeditionPlayerView(run, "p1", catalog).yourBaseCapacity).toBe(1);
+    expect(toExpeditionPlayerView(run, "ghost", catalog).yourBaseCapacity).toBeNull();
   });
 
   it("stacks failure cost by 1 per equipped Tonic: two owners make a failed camp spend 3 supplies", () => {

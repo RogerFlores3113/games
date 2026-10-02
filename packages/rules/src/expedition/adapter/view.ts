@@ -196,6 +196,14 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
   const yourOwnedGearIds: string[] = seated ? Array.from(ownSeat.ownedGearIds) : [];
   const yourDraftOffer: string[] | null = seated && ownSeat.draftOffer !== null ? Array.from(ownSeat.draftOffer) : null;
   const yourCapacity: number | null = seated ? rules.capacity(state, seatId) : null;
+  // The same hook with this seat's loadout emptied, so no passive (Energy
+  // Tonic) contributes: lets the client tell when unpacking would over-fill.
+  const yourBaseCapacity: number | null = seated
+    ? rulesFor(
+        { ...state, seats: state.seats.map((s) => (s.seatId === seatId ? { ...s, equippedGearIds: [] } : s)) },
+        catalog,
+      ).capacity(state, seatId)
+    : null;
 
   const yourGear: ExpeditionGearStatusView[] = seated
     ? ownSeat.equippedGearIds.map((gearId) => {
@@ -301,6 +309,7 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
     yourOwnedGearIds,
     yourDraftOffer,
     yourCapacity,
+    yourBaseCapacity,
     yourGear,
     history,
     attempt,

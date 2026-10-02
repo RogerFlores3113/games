@@ -168,6 +168,8 @@ export type ExpeditionView = {
   yourOwnedGearIds: string[];
   yourDraftOffer: string[] | null;
   yourCapacity: number | null;
+  /** Capacity with no passive gear equipped. */
+  yourBaseCapacity: number | null;
   yourGear: ExpeditionGearStatusView[];
   history: ExpeditionCampResultView[];
   attempt: ExpeditionAttemptView | null;

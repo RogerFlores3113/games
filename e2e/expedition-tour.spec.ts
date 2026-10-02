@@ -358,6 +358,7 @@ function preDealView(game: Game): Game {
     yourOwnedGearIds: ["jam"],
     yourDraftOffer: null,
     yourCapacity: 3,
+    yourBaseCapacity: 3,
     yourGear: [{ gearId: "jam", spent: false, usableNow: true, reason: null }],
     history: [h(1, 1, "succeeded"), h(2, 1, "succeeded")],
     attempt: {

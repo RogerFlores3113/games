@@ -54,6 +54,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     yourOwnedGearIds: ["peek"],
     yourDraftOffer: null,
     yourCapacity: null,
+    yourBaseCapacity: null,
     yourGear: [{ gearId: "peek", spent: false, usableNow: true, reason: null }],
     history: [],
     attempt: {

@@ -29,6 +29,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     yourOwnedGearIds: ["chatter", "peek"],
     yourDraftOffer: null,
     yourCapacity: 2,
+    yourBaseCapacity: 2,
     yourGear: [],
     history: [{ campNumber: 1, attemptNumber: 1, status: "succeeded", suppliesSpent: 0 }],
     attempt: null,
@@ -113,6 +114,7 @@ describe("backpack", () => {
     const view = makeView({
       yourOwnedGearIds: ["chatter", "jam", "peek"],
       yourCapacity: 2,
+      yourBaseCapacity: 2,
       seats: seatsWith({ equippedGearIds: ["chatter"] }),
     });
     expect(buildFiresideModel(server(view), ui()).backpack).toEqual({

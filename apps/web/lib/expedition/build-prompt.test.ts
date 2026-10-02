@@ -49,6 +49,7 @@ function view(campView: ExpeditionCampView | null, overrides: Partial<Expedition
     yourOwnedGearIds: [],
     yourDraftOffer: null,
     yourCapacity: null,
+    yourBaseCapacity: null,
     yourGear: [],
     history: [],
     attempt: {

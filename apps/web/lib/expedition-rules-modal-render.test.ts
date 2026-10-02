@@ -17,6 +17,7 @@ const game = {
   activeBossTwistId: bossId,
   campNumber: 3,
   yourCapacity: 3,
+  yourBaseCapacity: 3,
 } as ExpeditionView;
 
 const render = (props: { open: boolean; game: ExpeditionView | null }) =>
