@@ -9,7 +9,7 @@
 ### Multi-game rooms
 
 - [x] **MGR-01**: The host chooses the game when creating a room, and the room link opens that game's lobby. Proven in Phase 8 with Hanabi plus a test-only second game; the Expedition option stays disabled until Phase 12 makes it playable
-- [ ] **MGR-02**: Each game sets its own seat limits (Hanabi 2–5, Expedition 3–5), and the lobby enforces them
+- [x] **MGR-02**: Each game sets its own seat limits (Hanabi 2–5, Expedition 3–5), and the lobby enforces them
 - [x] **MGR-03**: Each game brings its own settings. The host sees only the current game's settings (Hanabi: variant; Expedition: none in v2.0)
 - [x] **MGR-04**: Hanabi plays exactly as before. The full existing unit and e2e suites pass, with only fixture renames allowed as diffs
 - [x] **MGR-05**: Every per-seat view is validated against its own game's view schema before it is sent
@@ -76,9 +76,9 @@
 - [x] **SCENE-02**: The camp scene seats players around an oval stump table in turn order, with your hand at the bottom and the trick in the middle. Each seat shows its objectives with status and its equipped gear. Supplies, camp number and the boss twist are shown within the scene
 - [x] **SCENE-03**: Cards you can't legally play are dimmed, and the trick shows which card was led and by whom
 - [x] **SCENE-04**: A player can glance at the last completed trick: who led, what was played, who won
-- [ ] **SCENE-05**: The between-camps fireside scene shows the trail of six camps, the draft of three gear, and loadout packing into capacity slots. Text is minimal, with gear rules shown only on hover
-- [ ] **SCENE-06**: The run-end scene shows whether the expedition reached the temple or turned back, with the camp reached and supplies left
-- [ ] **SCENE-07**: A rules reference can be opened from the scene: the trick rules, what each objective marker means, and the current boss twist
+- [x] **SCENE-05**: The between-camps fireside scene shows the trail of six camps, the draft of three gear, and loadout packing into capacity slots. Text is minimal, with gear rules shown only on hover
+- [x] **SCENE-06**: The run-end scene shows whether the expedition reached the temple or turned back, with the camp reached and supplies left
+- [x] **SCENE-07**: A rules reference can be opened from the scene: the trick rules, what each objective marker means, and the current boss twist
 - [x] **SCENE-08**: Each player chooses a card pack, Big Index (the default) or Classic. The choice is saved per browser and only changes that player's view
 - [x] **SCENE-09**: Four interactables (campfire, fireflies, lantern, the red panda mascot) react to clicks and never affect game state
 - [x] **SCENE-10**: Pixel art stays crisp at any window size from the 1280×720 minimum upward
@@ -88,7 +88,7 @@
 ### Art
 
 - [ ] **ARTX-01**: Scene art comes from PixelLab generations and verified CC0 or permissive packs. Each asset is recorded in CREDITS.md with its source and licence before use, and nothing shows people or watermarks
-- [ ] **ARTX-02**: PixelLab prompt specs are kept in the repo so assets can be regenerated consistently
+- [x] **ARTX-02**: PixelLab prompt specs are kept in the repo so assets can be regenerated consistently
 - [ ] **ARTX-03**: The owner signs off the scene art in a visual review
 
 ### Balance
@@ -128,7 +128,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | MGR-01 | Phase 8 | Complete |
-| MGR-02 | Phase 8 | Pending |
+| MGR-02 | Phase 8 | Complete |
 | MGR-03 | Phase 8 | Complete |
 | MGR-04 | Phase 8 | Complete |
 | MGR-05 | Phase 8 | Complete |
@@ -167,16 +167,16 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | SCENE-02 | Phase 12 | Complete |
 | SCENE-03 | Phase 12 | Complete |
 | SCENE-04 | Phase 12 | Complete |
-| SCENE-05 | Phase 13 | Pending |
-| SCENE-06 | Phase 13 | Pending |
-| SCENE-07 | Phase 13 | Pending |
+| SCENE-05 | Phase 13 | Complete |
+| SCENE-06 | Phase 13 | Complete |
+| SCENE-07 | Phase 13 | Complete |
 | SCENE-08 | Phase 12 | Complete |
 | SCENE-09 | Phase 12 | Complete |
 | SCENE-10 | Phase 12 | Complete |
 | SCENE-11 | Phase 12 | Complete |
 | SCENE-12 | Phase 12 | Complete |
 | ARTX-01 | Phase 14 | Pending |
-| ARTX-02 | Phase 14 | Pending |
+| ARTX-02 | Phase 14 | Complete |
 | ARTX-03 | Phase 14 | Pending |
 | BAL-01 | Phase 15 | Pending |
 

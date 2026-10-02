@@ -282,7 +282,7 @@ Plans:
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
-- [ ] 12-14-PLAN.md — Phase gate + owner sign-off on the placeholder camp scene (checkpoint)
+- [x] 12-14-PLAN.md — Phase gate + owner sign-off on the placeholder camp scene (checkpoint: changes requested 2026-10-02, fixed by the camp layout redesign)
 
 ### Phase 13: Fireside & Run-End Scenes
 
@@ -344,7 +344,7 @@ Plans:
 | 9. Expedition Rules Core | v2.0 | 8/8 | Complete    | 2026-09-27 |
 | 10. Run Layer, Gear Engine & Bosses | v2.0 | 19/19 | Complete    | 2026-09-27 |
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 7/7 | Complete    | 2026-09-27 |
-| 12. Phaser Shell | v2.0 | 13/14 | In Progress|  |
-| 13. Fireside & Run-End Scenes | v2.0 | 0/? | Not started | - |
+| 12. Phaser Shell | v2.0 | 14/14 | Complete (owner re-review pending) | 2026-10-02 |
+| 13. Fireside & Run-End Scenes | v2.0 | built outside GSD | Complete (owner review pending) | 2026-10-02 |
 | 14. Art Pass | v2.0 | 0/? | Not started | - |
 | 15. Balance Pass | v2.0 | 0/? | Not started | - |
