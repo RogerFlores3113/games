@@ -9,7 +9,7 @@
  *
  * Every entry is exactly 7 rows of 5 characters, each character either "#"
  * (opaque pixel) or "." (transparent). Covers every printable ASCII
- * character (code 32..126) plus "…" (used by `truncateLabel`'s ellipsis and
+ * character (code 32..126), the four suit signs and a tick, plus "…" (used by `truncateLabel`'s ellipsis and
  * by `drawText` for any character outside this table).
  */
 
@@ -110,6 +110,11 @@ export const GLYPHS_5X7: Readonly<Record<string, readonly string[]>> = {
   "}": [".#...", "..#..", "..#..", "...#.", "..#..", "..#..", ".#..."],
   "~": [".....", ".....", ".#..#", "#.##.", ".....", ".....", "....."],
   "…": [".....", ".....", ".....", ".....", ".....", ".....", "#.#.#"],
+  "♠": ["..#..", ".###.", "#####", "#####", "..#..", ".###.", "....."],
+  "♥": [".#.#.", "#####", "#####", ".###.", "..#..", ".....", "....."],
+  "♦": ["..#..", ".###.", "#####", ".###.", "..#..", ".....", "....."],
+  "♣": ["..#..", ".###.", "..#..", "#####", "#####", "..#..", ".###."],
+  "✓": [".....", "....#", "...##", "#.##.", "###..", ".#...", "....."],
 };
 
 /** Every char code from 32 (space) to 126 ("~"), as single-character
@@ -118,10 +123,10 @@ const PRINTABLE_ASCII: readonly string[] = Array.from({ length: 126 - 32 + 1 }, 
   String.fromCharCode(32 + i),
 );
 
-/** All char codes 32..126 plus "…" must have a glyph — this is asserted by
+/** Every char code 32..126, the suit signs, the tick and "…" must have a glyph — this is asserted by
  * `glyphs-5x7.test.ts`, not re-checked here at runtime, since GLYPHS_5X7 is
  * a compile-time-authored constant, not computed. */
-export const KNOWN_GLYPH_CHARS: readonly string[] = [...PRINTABLE_ASCII, "…"];
+export const KNOWN_GLYPH_CHARS: readonly string[] = [...PRINTABLE_ASCII, "…", "♠", "♥", "♦", "♣", "✓"];
 
 /**
  * Maps every character of `text` through `GLYPHS_5X7` (any character absent

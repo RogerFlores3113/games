@@ -12,7 +12,8 @@
  * duplicated `Variant` type. `palette.test.ts` reads globals.css directly
  * and asserts these mirrored values stay byte-identical to it.
  *
- * `jungle`, `stump`, and `letterbox` are world-only — they have no HTML-side
+ * `jungle`, `stump`, `letterbox`, `plate`, `plateEdge`, `moss`, `bark` and
+ * `textDim` are world-only — they have no HTML-side
  * equivalent (the site has no jungle/camp theme outside this canvas).
  *
  * No leaf here may ever equal globals.css's `--color-accent` value: the
@@ -25,6 +26,11 @@ export const PALETTE = {
   jungle: "#0F2318",
   stump: "#4A3420",
   letterbox: "#060D08",
+  plate: "#0A1610", // dark HUD plate behind text
+  plateEdge: "#2C4A36",
+  moss: "#2E5A3A",
+  bark: "#6B4A2B",
+  textDim: "#A7B0A9",
 
   // Mirrored from globals.css — keep byte-identical, see palette.test.ts.
   turn: "#9B65F7", // --color-turn
