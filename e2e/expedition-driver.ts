@@ -123,8 +123,8 @@ export async function clickHandCard<T>(
   return clickUntilChanged(page, objectId, isSatisfied, { xOffsetFraction: 0.25, ...opts });
 }
 
-export function pickDraftOffer<T extends { gearId: string; size: number }>(offers: T[]): T {
-  for (const preferred of DRAFT_PREFERENCE) {
+export function pickDraftOffer<T extends { gearId: string; size: number }>(offers: T[], preference: readonly string[] = DRAFT_PREFERENCE): T {
+  for (const preferred of preference) {
     const found = offers.find((o) => o.gearId === preferred);
     if (found) return found;
   }

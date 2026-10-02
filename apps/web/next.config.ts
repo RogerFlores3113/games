@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
   // SCENE-01's Strict-Mode-safe Phaser mount (ExpeditionPhaserMount.tsx) is
   // verified under Strict Mode's dev-only double mount/unmount/mount.
   reactStrictMode: true,
+  // The dev-only route indicator sits over the canvas's bottom-left corner,
+  // covering game labels in screenshots.
+  devIndicators: false,
 };
 
 export default nextConfig;
