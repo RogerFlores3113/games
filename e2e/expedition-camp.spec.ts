@@ -70,9 +70,10 @@ interface CampModel {
   sceneKey: "camp" | "between-camps";
   cardPackId: string;
   youSeatId: string | null;
-  sign: { label: string };
+  prompt: { text: string; tone: "your-move" | "waiting" | "info" | "alert" };
   seats: SeatModel[];
   hand: CardModel[];
+  trick: { plays: TrickPlayModel[] } | null;
   lastTrick: { plays: TrickPlayModel[]; open: boolean } | null;
   faceUpObjectives: ObjectiveChip[];
   whisper: { visible: boolean; active: boolean };
@@ -415,15 +416,15 @@ async function maybeCheckLastTrick(hostPage: Page, state: DriveState): Promise<v
 }
 
 /** Asserts SCENE-03's dimming rule: whenever the viewer's own hand has a
- * dimmed card, the in-world sign reads "Your turn" or "Between tricks" —
- * dimming only ever happens on your own turn. */
+ * dimmed card, the prompt addresses the viewer — dimming only ever happens
+ * on your own turn. */
 async function assertDimmingInvariant(pages: Page[]): Promise<void> {
   for (const page of pages) {
     const model = await getModel<CampModel>(page);
     if (model.sceneKey !== "camp") continue;
     const hasDimmed = model.hand.some((c) => c.dimmed);
     if (hasDimmed) {
-      expect(["Your turn", "Between tricks"]).toContain(model.sign.label);
+      expect(model.prompt.tone).toBe("your-move");
     }
   }
 }
@@ -599,25 +600,27 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
       let openWindow = false;
       for (let i = 0; i < 300 && !openWindow; i++) {
         const model = await getModel<CampModel>(page);
-        if (model.sign.label === "Pick objectives" || model.sign.label === "Between tricks") {
+        const you = model.seats.find((s) => s.isYou);
+        const leading = (model.trick?.plays.length ?? 0) === 0;
+        if (model.faceUpObjectives.some((o) => o.pickable) || (you?.mayAct && leading && model.whisper.visible)) {
           openWindow = true;
           break;
         }
         await stepCamp(pages, state);
       }
-      if (!openWindow) throw new Error("host never reached an open window (Pick objectives / Between tricks)");
+      if (!openWindow) throw new Error("host never reached an open window (objective pick / between tricks)");
 
       const before = await getModel<CampModel>(page);
       const youSeatIdBefore = before.youSeatId;
       const handIdsBefore = before.hand.map((c) => c.objectId).sort();
-      const signBefore = before.sign.label;
+      const promptBefore = before.prompt;
 
       await page.reload();
       await waitForBridge(page);
       const after = await getModel<CampModel>(page);
       expect(after.youSeatId).toBe(youSeatIdBefore);
       expect(after.hand.map((c) => c.objectId).sort()).toEqual(handIdsBefore);
-      expect(after.sign.label).toBe(signBefore);
+      expect(after.prompt).toEqual(promptBefore);
     } finally {
       for (const context of contexts) await context.close();
     }

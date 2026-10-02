@@ -34,7 +34,6 @@ interface Chip { objectId: string; pickable?: boolean; objectiveId?: string; usa
 interface CampModel {
   sceneKey: "camp" | "between-camps";
   campNumber: number;
-  sign: { label: string };
   seats: { isYou: boolean; mayAct: boolean; gear: Chip[] }[];
   hand: Card[];
   trick: { plays: unknown[] } | null;
@@ -122,7 +121,7 @@ async function captureHostState(host: Page, tour: Tour): Promise<void> {
   const m = await getModel<CampModel>(host);
   if (m.sceneKey !== "camp") return;
   if (m.preDeal?.youPending) await tour.shot("predeal-gear");
-  if (m.sign.label === "Pick objectives" && m.faceUpObjectives.some((o) => o.pickable)) await tour.shot("objective-pick");
+  if (m.faceUpObjectives.some((o) => o.pickable)) await tour.shot("objective-pick");
   const plays = m.trick?.plays.length ?? 0;
   if (plays >= 1) await tour.shot("trick-led");
   if (plays >= 2) await tour.shot("mid-trick");

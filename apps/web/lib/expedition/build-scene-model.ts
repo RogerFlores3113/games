@@ -126,7 +126,6 @@ export interface SceneModel {
   campNumber: number;
   supplies: number;
   bossTwist: { id: string; name: string; effect: BossEffect; cancelled: boolean } | null;
-  sign: { label: string; twistName: string | null };
   seats: SeatModel[];
   hand: CardModel[];
   trick: { leaderSeatId: string; plays: TrickPlayModel[] } | null;
@@ -388,45 +387,6 @@ function buildBossTwist(view: ExpeditionView): SceneModel["bossTwist"] {
   };
 }
 
-function nameFor(roomSeats: RoomSeatInfo[], seatId: string | null): string {
-  if (seatId === null) return "?";
-  return roomSeatFor(roomSeats, seatId).displayLabel;
-}
-
-function buildSign(view: ExpeditionView, roomSeats: RoomSeatInfo[], bossTwist: SceneModel["bossTwist"]): SceneModel["sign"] {
-  const twistName = bossTwist !== null && !bossTwist.cancelled ? bossTwist.name : null;
-  let label = "";
-
-  if (view.runPhase === "pre-deal") {
-    const pending = view.attempt?.preDealPendingSeatIds ?? [];
-    if (view.yourSeatId !== null && pending.includes(view.yourSeatId)) {
-      label = "Use or skip gear";
-    } else {
-      label = `Waiting on ${nameFor(roomSeats, pending[0] ?? null)}`;
-    }
-  } else {
-    const camp = view.attempt?.camp ?? null;
-    if (camp !== null) {
-      if (camp.campPhase === "objective-pick") {
-        label = camp.currentActorSeatId === view.yourSeatId ? "Pick objectives" : `Waiting on ${nameFor(roomSeats, camp.currentActorSeatId)}`;
-      } else if (camp.campPhase === "playing") {
-        const isActor = camp.currentActorSeatId === view.yourSeatId;
-        if (isActor && view.attempt?.gearWindow === "between-tricks") {
-          label = "Between tricks";
-        } else if (isActor) {
-          label = "Your turn";
-        } else {
-          label = `Waiting on ${nameFor(roomSeats, camp.currentActorSeatId)}`;
-        }
-      } else {
-        label = "Camp over";
-      }
-    }
-  }
-
-  return { label, twistName };
-}
-
 function buildTooltip(view: ExpeditionView, ui: LocalUiState): SceneModel["tooltip"] {
   if (ui.tooltipGearId === null) return null;
   const display = GEAR_DISPLAY[ui.tooltipGearId];
@@ -451,7 +411,6 @@ export function buildSceneModel(
   const trick = buildTrick(camp);
   const lastTrick = buildLastTrick(camp, ui);
   const bossTwist = buildBossTwist(view);
-  const sign = buildSign(view, roomSeats, bossTwist);
   const faceUpObjectives = objectivesForOwner(camp, null, view, ui);
   const removedCardLabels = (camp?.removedCards ?? []).map((identity) => cardLabel(identity));
 
@@ -486,7 +445,6 @@ export function buildSceneModel(
     campNumber: view.campNumber,
     supplies: view.supplies,
     bossTwist,
-    sign,
     seats,
     hand,
     trick,

@@ -374,7 +374,7 @@ describe("trick and lastTrick", () => {
   });
 });
 
-describe("HUD: supplies, campNumber, bossTwist, sign", () => {
+describe("HUD: supplies, campNumber, bossTwist", () => {
   it("copies supplies and campNumber verbatim", () => {
     const model = buildSceneModel(server(makeView({ supplies: 7, campNumber: 4 })), ui(), "big-index");
     expect(model.supplies).toBe(7);
@@ -394,111 +394,6 @@ describe("HUD: supplies, campNumber, bossTwist, sign", () => {
   it("bossTwist is null when there is no active twist", () => {
     const model = buildSceneModel(server(makeView({ activeBossTwistId: null })), ui(), "big-index");
     expect(model.bossTwist).toBeNull();
-  });
-
-  it("sign shows Your turn/Waiting on for the playing phase", () => {
-    const model = buildSceneModel(server(makeView({ yourSeatId: "s2" })), ui(), "big-index"); // s2 is actor
-    expect(model.sign.label).toBe("Your turn");
-
-    const other = buildSceneModel(server(makeView({ yourSeatId: "s1" })), ui(), "big-index");
-    expect(other.sign.label).toBe("Waiting on Bob");
-  });
-
-  it("sign shows Between tricks when the actor's gearWindow is between-tricks", () => {
-    const view = makeView({
-      attempt: {
-        attemptNumber: 1,
-        bossCancelled: false,
-        gearWindow: "between-tricks",
-        preDealPendingSeatIds: [],
-        gearUses: [],
-        effects: [],
-        reveals: [],
-        log: [],
-        camp: makeCamp(),
-      },
-    });
-    const model = buildSceneModel(server(view), ui(), "big-index");
-    expect(model.sign.label).toBe("Between tricks");
-  });
-
-  it("sign shows Camp over when campPhase is ended", () => {
-    const view = makeView({
-      attempt: {
-        attemptNumber: 1,
-        bossCancelled: false,
-        gearWindow: null,
-        preDealPendingSeatIds: [],
-        gearUses: [],
-        effects: [],
-        reveals: [],
-        log: [],
-        camp: makeCamp({ campPhase: "ended" }),
-      },
-    });
-    const model = buildSceneModel(server(view), ui(), "big-index");
-    expect(model.sign.label).toBe("Camp over");
-  });
-
-  it("sign shows pre-deal labels", () => {
-    const pendingView = makeView({
-      runPhase: "pre-deal",
-      yourSeatId: "s2",
-      attempt: {
-        attemptNumber: 1,
-        bossCancelled: false,
-        gearWindow: "pre-deal",
-        preDealPendingSeatIds: ["s2", "s1"],
-        gearUses: [],
-        effects: [],
-        reveals: [],
-        log: [],
-        camp: null,
-      },
-    });
-    const model = buildSceneModel(server(pendingView), ui(), "big-index");
-    expect(model.sign.label).toBe("Use or skip gear");
-
-    const notPendingView = makeView({
-      runPhase: "pre-deal",
-      yourSeatId: "s3",
-      attempt: {
-        attemptNumber: 1,
-        bossCancelled: false,
-        gearWindow: "pre-deal",
-        preDealPendingSeatIds: ["s1"],
-        gearUses: [],
-        effects: [],
-        reveals: [],
-        log: [],
-        camp: null,
-      },
-    });
-    const model2 = buildSceneModel(server(notPendingView), ui(), "big-index");
-    expect(model2.sign.label).toBe("Waiting on Alice");
-  });
-
-  it("sign twistName is the boss name unless cancelled", () => {
-    const view = makeView({
-      activeBossTwistId: "eclipse",
-      attempt: {
-        attemptNumber: 1,
-        bossCancelled: true,
-        gearWindow: null,
-        preDealPendingSeatIds: [],
-        gearUses: [],
-        effects: [],
-        reveals: [],
-        log: [],
-        camp: makeCamp(),
-      },
-    });
-    const model = buildSceneModel(server(view), ui(), "big-index");
-    expect(model.sign.twistName).toBeNull();
-
-    const active = makeView({ activeBossTwistId: "eclipse" });
-    const activeModel = buildSceneModel(server(active), ui(), "big-index");
-    expect(activeModel.sign.twistName).toBe("Eclipse");
   });
 });
 
