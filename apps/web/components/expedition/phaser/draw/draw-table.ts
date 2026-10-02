@@ -1,79 +1,86 @@
 /**
- * The camp scene's static-world and HUD drawing primitives (D-03, D-13,
- * D-15). Every colour comes from `PALETTE`, every position from `layout.ts`
- * — no hand-typed hex literal or magic coordinate at a draw call site.
- * `phaser` is a type-only import; every Phaser API used here is reached
- * through the injected `scene`, matching `card-textures.ts`'s convention.
+ * The camp's world backdrop, top bar, prompt line, tooltip and boss effect.
+ * Every value drawn comes from `SceneModel`.
  */
 import type Phaser from "phaser";
-import { HUD, STUMP } from "../layout";
+import { STAGE, STUMP_CENTRE, ZONES } from "../layout";
 import { PALETTE, toPhaserColor } from "../palette";
-import { SIGN_CELL, WORLD_LABEL_FONT, WORLD_SIGN_FONT } from "../font/font-keys";
+import { LABEL_CELL, SIGN_CELL, WORLD_SIGN_FONT } from "../font/font-keys";
+import { placeArt } from "../art/place-art";
+import { ART } from "../art/art-registry";
 import type { BossEffect, SceneModel } from "../../../../lib/expedition/build-scene-model";
+import type { PromptTone } from "../../../../lib/expedition/build-prompt";
+import { labelWidth, plate, text, type Layer } from "./ui-kit";
+import { wrapWords } from "./text-fit";
 
-const STAGE_W = 640;
-const STAGE_H = 360;
+const MAX_CRATES = 8;
+const BOSS_CAMPS = new Set([3, 6]);
+const RAIN_DROP_COUNT = 24;
 const SKY_BAND_H = 80;
 
-const SUPPLY_CRATE_W = 10;
-const SUPPLY_CRATE_H = 8;
-const SUPPLY_CRATE_GAP = 2;
-
-const SIGN_W = 140;
-const SIGN_PADDING = 4;
-
-const RAIN_DROP_COUNT = 24;
-
-/** The jungle backdrop, a darker "sky" band across the top, and the oval
- * stump table — drawn once per scene create(), never re-drawn per model
- * update (it never changes). */
+/** Backdrop and stump, drawn once per scene create(). */
 export function drawStaticWorld(scene: Phaser.Scene): void {
-  const graphics = scene.add.graphics();
-  graphics.fillStyle(toPhaserColor(PALETTE.jungle), 1);
-  graphics.fillRect(0, 0, STAGE_W, STAGE_H);
-  graphics.fillStyle(toPhaserColor(PALETTE.letterbox), 1);
-  graphics.fillRect(0, 0, STAGE_W, SKY_BAND_H);
-  graphics.fillStyle(toPhaserColor(PALETTE.stump), 1);
-  graphics.fillEllipse(STUMP.x, STUMP.y, STUMP.rx * 2, STUMP.ry * 2);
+  placeArt(scene, "bg-jungle-night", STAGE.w / 2, STAGE.h / 2);
+  placeArt(scene, "stump-table", STUMP_CENTRE.x, STUMP_CENTRE.y);
 }
 
-/** Supply crates, the camp-number counter, and the wooden sign (window
- * label + boss-twist name), drawn into `layer` — a Container the caller
- * clears and rebuilds on every model change. */
-export function drawHud(scene: Phaser.Scene, layer: Phaser.GameObjects.Container, model: SceneModel): void {
-  for (let i = 0; i < model.supplies; i++) {
-    const crateX = Math.round(HUD.supplies.x + i * (SUPPLY_CRATE_W + SUPPLY_CRATE_GAP) + SUPPLY_CRATE_W / 2);
-    const crateY = Math.round(HUD.supplies.y + SUPPLY_CRATE_H / 2);
-    layer.add(scene.add.rectangle(crateX, crateY, SUPPLY_CRATE_W, SUPPLY_CRATE_H, toPhaserColor(PALETTE.stump)));
+export function drawTopBar(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
+  const zone = ZONES.topBar;
+  const textY = zone.y + Math.floor((zone.h - LABEL_CELL.h) / 2);
+  const crate = ART.crate;
+  const crates = Math.min(model.supplies, MAX_CRATES);
+  let x = zone.x + 6;
+  for (let i = 0; i < crates; i++) {
+    layer.add(placeArt(scene, "crate", x + crate.w / 2, zone.y + zone.h / 2));
+    x += crate.w + 2;
   }
-  layer.add(
-    scene.add.bitmapText(HUD.supplies.x, HUD.supplies.y + SUPPLY_CRATE_H + 2, WORLD_LABEL_FONT, `x${model.supplies}`),
-  );
+  layer.add(text(scene, x + 2, textY, `Supplies ${model.supplies}`));
 
-  layer.add(scene.add.bitmapText(HUD.campNumber.x, HUD.campNumber.y, WORLD_LABEL_FONT, `Camp ${model.campNumber}/6`));
+  const camp = BOSS_CAMPS.has(model.campNumber) ? `Camp ${model.campNumber} of 6 - Boss camp` : `Camp ${model.campNumber} of 6`;
+  const campX = zone.x + Math.floor((zone.w - labelWidth(camp)) / 2);
+  layer.add(text(scene, campX, textY, camp));
 
-  const signHasTwist = model.sign.twistName !== null;
-  const signH = signHasTwist ? SIGN_CELL.h * 2 + SIGN_PADDING * 2 : SIGN_CELL.h + SIGN_PADDING * 2;
-  layer.add(
-    scene.add.rectangle(
-      Math.round(HUD.sign.x + SIGN_W / 2),
-      Math.round(HUD.sign.y + signH / 2),
-      SIGN_W,
-      signH,
-      toPhaserColor(PALETTE.stump),
-    ),
-  );
-  layer.add(scene.add.bitmapText(HUD.sign.x + SIGN_PADDING, HUD.sign.y + SIGN_PADDING, WORLD_SIGN_FONT, model.sign.label));
-  if (model.sign.twistName !== null) {
-    layer.add(
-      scene.add.bitmapText(
-        HUD.sign.x + SIGN_PADDING,
-        HUD.sign.y + SIGN_PADDING + SIGN_CELL.h,
-        WORLD_SIGN_FONT,
-        model.sign.twistName,
-      ),
-    );
+  if (model.bossTwist !== null) {
+    const boss = model.bossTwist.cancelled ? `Boss: ${model.bossTwist.name} (off)` : `Boss: ${model.bossTwist.name}`;
+    const bossX = Math.max(campX + labelWidth(camp) + 16, zone.x + zone.w - labelWidth(boss) - 6);
+    layer.add(text(scene, bossX, textY, boss, model.bossTwist.cancelled ? PALETTE.textDim : PALETTE.destructive));
   }
+}
+
+const TONE_COLOR: Readonly<Record<PromptTone, string>> = {
+  "your-move": PALETTE.text,
+  waiting: PALETTE.textDim,
+  info: PALETTE.text,
+  alert: PALETTE.destructive,
+};
+
+export function drawPrompt(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
+  const zone = ZONES.prompt;
+  const bg = plate(scene, zone.x, zone.y, zone.w, zone.h);
+  if (model.prompt.tone === "your-move") bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn));
+  layer.add(bg);
+  const value = model.prompt.text;
+  const w = Array.from(value).length * SIGN_CELL.w;
+  const line = scene.add
+    .bitmapText(zone.x + Math.floor((zone.w - w) / 2), zone.y + Math.floor((zone.h - SIGN_CELL.h) / 2), WORLD_SIGN_FONT, value)
+    .setTint(toPhaserColor(TONE_COLOR[model.prompt.tone]));
+  layer.add(line);
+}
+
+export function drawTooltip(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
+  const tip = model.tooltip;
+  if (tip === null) return;
+  const zone = ZONES.tooltip;
+  const maxChars = Math.floor((zone.w - 4) / LABEL_CELL.w);
+  const maxLines = Math.floor(zone.h / LABEL_CELL.h);
+  const body = wrapWords(`${tip.title}: ${tip.text}`, maxChars);
+  const reason = tip.reason === null ? [] : wrapWords(`Not now: ${tip.reason}`, maxChars).slice(0, 1);
+  const lines = [...body.slice(0, maxLines - reason.length), ...reason];
+  layer.add(plate(scene, zone.x, zone.y, zone.w, zone.h));
+  lines.forEach((line, i) => {
+    const isReason = i >= lines.length - reason.length;
+    layer.add(text(scene, zone.x + 2, zone.y + i * LABEL_CELL.h, line, isReason ? PALETTE.destructive : PALETTE.text));
+  });
 }
 
 interface BossEffectState {
@@ -83,10 +90,8 @@ interface BossEffectState {
 
 const BOSS_EFFECT_STATE = new WeakMap<Phaser.Scene, BossEffectState>();
 
-/** Manages a persistent boss-twist placeholder effect (D-15): "rain" is a
- * looping downward drop shower, "dark-sky" a translucent tint over the sky
- * band, "none" removes whatever effect was previously active. Idempotent —
- * safe to call on every model update with the same `effect` value. */
+/** A persistent boss-twist effect: "rain" is a looping drop shower,
+ * "dark-sky" a translucent tint over the top of the stage. Idempotent. */
 export function setBossEffect(scene: Phaser.Scene, effect: BossEffect): void {
   const previous = BOSS_EFFECT_STATE.get(scene);
   if (previous) {
@@ -101,26 +106,25 @@ export function setBossEffect(scene: Phaser.Scene, effect: BossEffect): void {
 
   if (effect === "rain") {
     for (let i = 0; i < RAIN_DROP_COUNT; i++) {
-      const x = Math.round(Math.random() * STAGE_W);
-      const startY = Math.round(Math.random() * STAGE_H);
+      const x = Math.round(Math.random() * STAGE.w);
+      const startY = Math.round(Math.random() * STAGE.h);
       const drop = scene.add.rectangle(x, startY, 1, 1, toPhaserColor(PALETTE.rain));
       container.add(drop);
       const duration = 1000 + Math.round(Math.random() * 500);
-      const tween = scene.tweens.add({
-        targets: drop,
-        y: { from: 0, to: STAGE_H },
-        duration,
-        repeat: -1,
-        onUpdate: () => {
-          drop.y = Math.round(drop.y);
-        },
-      });
-      tweens.push(tween);
+      tweens.push(
+        scene.tweens.add({
+          targets: drop,
+          y: { from: 0, to: STAGE.h },
+          duration,
+          repeat: -1,
+          onUpdate: () => {
+            drop.y = Math.round(drop.y);
+          },
+        }),
+      );
     }
   } else if (effect === "dark-sky") {
-    container.add(
-      scene.add.rectangle(STAGE_W / 2, SKY_BAND_H / 2, STAGE_W, SKY_BAND_H, toPhaserColor(PALETTE.letterbox), 0.5),
-    );
+    container.add(scene.add.rectangle(STAGE.w / 2, SKY_BAND_H / 2, STAGE.w, SKY_BAND_H, toPhaserColor(PALETTE.letterbox), 0.5));
   }
 
   BOSS_EFFECT_STATE.set(scene, { container, tweens });

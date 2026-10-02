@@ -1,136 +1,116 @@
 import { describe, expect, it } from "vitest";
 import {
+  CARD_H,
   CARD_W,
-  HAND_MAX_W,
-  HUD,
+  HAND_CARD_Y,
+  HAND_MARKER_H,
+  HOVER_LIFT,
   INTERACTABLE_ANCHORS,
-  STAGE_MARGIN,
-  STUMP,
+  SETTINGS_SAFE_ZONE,
+  STAGE,
+  ZONES,
   handFanXs,
-  seatAnchors,
-  trickSlots,
-  type Point,
+  opponentBlocks,
+  rectContains,
+  rectsIntersect,
+  stumpRowXs,
+  type Rect,
 } from "./layout";
 
-const STAGE_WIDTH = 640;
-const STAGE_HEIGHT = 360;
+const zoneEntries = Object.entries(ZONES) as [string, Rect][];
 
-function distance(a: Point, b: Point): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function expectInMarginBounds(p: Point): void {
-  expect(p.x).toBeGreaterThanOrEqual(STAGE_MARGIN);
-  expect(p.x).toBeLessThanOrEqual(STAGE_WIDTH - STAGE_MARGIN);
-  expect(p.y).toBeGreaterThanOrEqual(STAGE_MARGIN);
-  expect(p.y).toBeLessThanOrEqual(STAGE_HEIGHT - STAGE_MARGIN);
-}
-
-function expectIntegerPoint(p: Point): void {
-  expect(Number.isInteger(p.x)).toBe(true);
-  expect(Number.isInteger(p.y)).toBe(true);
-}
-
-describe("seatAnchors", () => {
-  it.each([3, 4, 5])("count=%i: length, ordering, spacing, bounds", (count) => {
-    const anchors = seatAnchors(count);
-    expect(anchors).toHaveLength(count);
-
-    for (const anchor of anchors) {
-      expectIntegerPoint(anchor);
-      expectInMarginBounds(anchor);
-    }
-
-    // Index 0 has the largest y (the viewer, seated below the stump).
-    const viewer = anchors[0]!;
-    for (let i = 1; i < anchors.length; i++) {
-      expect(viewer.y).toBeGreaterThan(anchors[i]!.y);
-    }
-
-    // Pairwise distance >= 96.
-    for (let i = 0; i < anchors.length; i++) {
-      for (let j = i + 1; j < anchors.length; j++) {
-        expect(distance(anchors[i]!, anchors[j]!)).toBeGreaterThanOrEqual(96);
+describe("ZONES", () => {
+  it("no two zones intersect", () => {
+    const overlapping: string[] = [];
+    for (let i = 0; i < zoneEntries.length; i++) {
+      for (let j = i + 1; j < zoneEntries.length; j++) {
+        if (rectsIntersect(zoneEntries[i]![1], zoneEntries[j]![1])) {
+          overlapping.push(`${zoneEntries[i]![0]} x ${zoneEntries[j]![0]}`);
+        }
       }
     }
+    expect(overlapping).toEqual([]);
+  });
 
-    // Anchors 1..n-1 ordered left-to-right by x.
-    for (let i = 1; i < anchors.length - 1; i++) {
-      expect(anchors[i]!.x).toBeLessThanOrEqual(anchors[i + 1]!.x);
-    }
+  it("every zone is inside the 640x360 stage and outside the settings safe zone", () => {
+    const outside = zoneEntries.filter(([, r]) => !rectContains(STAGE, r)).map(([id]) => id);
+    const unsafe = zoneEntries.filter(([, r]) => rectsIntersect(SETTINGS_SAFE_ZONE, r)).map(([id]) => id);
+    expect(outside).toEqual([]);
+    expect(unsafe).toEqual([]);
+  });
+
+  it("every zone has whole-pixel edges", () => {
+    const fractional = zoneEntries.filter(([, r]) => ![r.x, r.y, r.w, r.h].every(Number.isInteger)).map(([id]) => id);
+    expect(fractional).toEqual([]);
+  });
+});
+
+describe("rect helpers", () => {
+  it("treats touching edges as disjoint and overlap as intersecting", () => {
+    expect(rectsIntersect({ x: 0, y: 0, w: 10, h: 10 }, { x: 10, y: 0, w: 10, h: 10 })).toBe(false);
+    expect(rectsIntersect({ x: 0, y: 0, w: 10, h: 10 }, { x: 9, y: 9, w: 10, h: 10 })).toBe(true);
+    expect(rectContains({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: 2, w: 8, h: 8 })).toBe(true);
+    expect(rectContains({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: 2, w: 9, h: 8 })).toBe(false);
+  });
+});
+
+describe("opponentBlocks", () => {
+  it("lays four 138x70 blocks with 4px gaps across the opponents zone", () => {
+    expect(opponentBlocks(4)).toEqual([
+      { x: 10, y: 42, w: 138, h: 70 },
+      { x: 152, y: 42, w: 138, h: 70 },
+      { x: 294, y: 42, w: 138, h: 70 },
+      { x: 436, y: 42, w: 138, h: 70 },
+    ]);
+  });
+
+  it("centres two blocks", () => {
+    expect(opponentBlocks(2)).toEqual([
+      { x: 152, y: 42, w: 138, h: 70 },
+      { x: 294, y: 42, w: 138, h: 70 },
+    ]);
+  });
+
+  it.each([1, 2, 3, 4, 5])("count=%i: blocks sit inside the zone and never overlap", (count) => {
+    const blocks = opponentBlocks(count);
+    expect(blocks).toHaveLength(count);
+    for (const b of blocks) expect(rectContains(ZONES.opponents, b)).toBe(true);
+    for (let i = 1; i < blocks.length; i++) expect(rectsIntersect(blocks[i - 1]!, blocks[i]!)).toBe(false);
   });
 });
 
 describe("handFanXs", () => {
-  it("handFanXs(17): fits within HAND_MAX_W, integer, non-decreasing step", () => {
-    const xs = handFanXs(17);
-    expect(xs).toHaveLength(17);
-
-    const leftBound = (STAGE_WIDTH - HAND_MAX_W) / 2;
-    const rightBound = (STAGE_WIDTH + HAND_MAX_W) / 2;
-    expect(xs[0]!).toBeGreaterThanOrEqual(leftBound);
-    expect(xs[xs.length - 1]! + CARD_W).toBeLessThanOrEqual(rightBound);
-
-    for (const x of xs) {
-      expect(Number.isInteger(x)).toBe(true);
-    }
-
-    for (let i = 1; i < xs.length; i++) {
-      const step = xs[i]! - xs[i - 1]!;
-      expect(step).toBeGreaterThanOrEqual(12);
-      expect(Number.isInteger(step)).toBe(true);
-      expect(step).toBeLessThanOrEqual(CARD_W + 2);
-    }
+  it("fits 18 cards with a 21px step, centred in the hand zone", () => {
+    const xs = handFanXs(18);
+    expect(xs[0]).toBe(128);
+    expect(xs[1]! - xs[0]!).toBe(21);
+    expect(xs[17]! + CARD_W).toBe(513);
   });
 
-  it("handFanXs(1): centres one card at 320 - CARD_W/2", () => {
-    const xs = handFanXs(1);
-    expect(xs).toEqual([320 - CARD_W / 2]);
-    expect(Number.isInteger(xs[0]!)).toBe(true);
+  it("centres a single card", () => {
+    expect(handFanXs(1)).toEqual([306]);
   });
-});
 
-describe("trickSlots", () => {
-  it("trickSlots(5): 5 integer points within the stump ellipse bounds", () => {
-    const slots = trickSlots(5);
-    expect(slots).toHaveLength(5);
-    for (const slot of slots) {
-      expectIntegerPoint(slot);
-      expect(slot.x).toBeGreaterThanOrEqual(STUMP.x - STUMP.rx);
-      expect(slot.x).toBeLessThanOrEqual(STUMP.x + STUMP.rx);
-      expect(slot.y).toBeGreaterThanOrEqual(STUMP.y - STUMP.ry);
-      expect(slot.y).toBeLessThanOrEqual(STUMP.y + STUMP.ry);
+  it.each([1, 5, 10, 17, 18])("count=%i: every card, lifted or not, stays in the hand zone", (count) => {
+    for (const x of handFanXs(count)) {
+      const lifted = { x, y: HAND_CARD_Y - HOVER_LIFT - HAND_MARKER_H - 1, w: CARD_W, h: CARD_H + HOVER_LIFT + HAND_MARKER_H + 1 };
+      expect(rectContains(ZONES.hand, lifted)).toBe(true);
     }
   });
 });
 
-function expectOutsideSafeZone(p: Point): void {
-  const zone = HUD.settingsSafeZone;
-  const inside = p.x >= zone.x && p.x <= zone.x + zone.w && p.y >= zone.y && p.y <= zone.y + zone.h;
-  expect(inside).toBe(false);
-}
-
-function expectInsideStage(p: Point): void {
-  expect(p.x).toBeGreaterThanOrEqual(0);
-  expect(p.x).toBeLessThanOrEqual(STAGE_WIDTH);
-  expect(p.y).toBeGreaterThanOrEqual(0);
-  expect(p.y).toBeLessThanOrEqual(STAGE_HEIGHT);
-}
-
-describe("HUD and INTERACTABLE_ANCHORS", () => {
-  it("every HUD point (except the safe zone itself) is inside the stage and outside the safe zone", () => {
-    for (const p of [HUD.supplies, HUD.campNumber, HUD.sign, HUD.whisper]) {
-      expectIntegerPoint(p);
-      expectInsideStage(p);
-      expectOutsideSafeZone(p);
-    }
+describe("stumpRowXs", () => {
+  it("centres items on the stump", () => {
+    expect(stumpRowXs(3, 48)).toEqual([272, 320, 368]);
   });
+});
 
-  it("every interactable anchor is inside the stage and outside the safe zone", () => {
-    for (const p of Object.values(INTERACTABLE_ANCHORS)) {
-      expectIntegerPoint(p);
-      expectInsideStage(p);
-      expectOutsideSafeZone(p);
-    }
+describe("INTERACTABLE_ANCHORS", () => {
+  it("places the campfire, fireflies and lantern in the world zone and the mascot in the actions zone", () => {
+    const at = (p: { x: number; y: number }): Rect => ({ x: p.x, y: p.y, w: 1, h: 1 });
+    expect(rectContains(ZONES.world, at(INTERACTABLE_ANCHORS.campfire))).toBe(true);
+    expect(rectContains(ZONES.world, at(INTERACTABLE_ANCHORS.fireflies))).toBe(true);
+    expect(rectContains(ZONES.world, at(INTERACTABLE_ANCHORS.lantern))).toBe(true);
+    expect(rectContains(ZONES.actions, at(INTERACTABLE_ANCHORS.mascot))).toBe(true);
   });
 });

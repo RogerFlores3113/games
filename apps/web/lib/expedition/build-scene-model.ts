@@ -13,6 +13,8 @@ import {
 } from "./expedition-ids";
 import type { LocalUiState } from "./local-ui";
 import { candidateIdsForKind, nextTargetKind } from "./local-ui";
+import type { Prompt } from "./build-prompt";
+import { buildPrompt } from "./build-prompt";
 
 /**
  * D-12 boundary (spec §7.1): `buildSceneModel` renders `view.camp.
@@ -81,7 +83,6 @@ export interface GearChip {
   usable: boolean;
   pulse: boolean;
   reason: string | null;
-  showTooltip: boolean;
 }
 
 export interface MiniCard {
@@ -132,7 +133,12 @@ export interface SceneModel {
   lastTrick: { leaderSeatId: string; winnerSeatId: string; plays: TrickPlayModel[]; open: boolean } | null;
   faceUpObjectives: ObjectiveChip[];
   removedCardLabels: string[];
-  whisper: { visible: boolean; active: boolean };
+  prompt: Prompt;
+  /** Rules text for the hovered gear, plus why it can't be used right now. */
+  tooltip: { title: string; text: string; reason: string | null } | null;
+  /** `visible`: the Whisper can be started now. `used`: you already whispered
+   * this camp. `shown`: the button belongs on screen (camp is being played). */
+  whisper: { shown: boolean; visible: boolean; used: boolean; active: boolean };
   preDeal: { youPending: boolean; gear: GearChip[] } | null;
   targeting: { mode: "gear" | "whisper"; sourceObjectId: string; nextKind: ExpeditionTargetKind | null; canConfirm: boolean } | null;
 }
@@ -206,8 +212,7 @@ function gearChipFor(gearId: string, seatId: string, view: ExpeditionView, ui: L
     spent = (view.attempt?.gearUses ?? []).some((u) => u.seatId === seatId && u.gearId === gearId && u.kind === "used");
   }
   const pulse = isYou && usable && ui.targeting === null;
-  const showTooltip = ui.tooltipGearId === gearId;
-  return { gearId, objectId: gearObjectId(gearId), name, spent, usable, pulse, reason, showTooltip };
+  return { gearId, objectId: gearObjectId(gearId), name, spent, usable, pulse, reason };
 }
 
 function objectiveLabel(o: ExpeditionObjectiveView): { label: string; orderBadge: string | null } {
@@ -422,7 +427,22 @@ function buildSign(view: ExpeditionView, roomSeats: RoomSeatInfo[], bossTwist: S
   return { label, twistName };
 }
 
-export function buildSceneModel(server: SceneServerInput, ui: LocalUiState, cardPackId: CardPackId): SceneModel {
+function buildTooltip(view: ExpeditionView, ui: LocalUiState): SceneModel["tooltip"] {
+  if (ui.tooltipGearId === null) return null;
+  const display = GEAR_DISPLAY[ui.tooltipGearId];
+  if (display === undefined) return null;
+  const status = view.yourGear.find((g) => g.gearId === ui.tooltipGearId);
+  const text = display.downside === null ? display.text : `${display.text} ${display.downside}`;
+  const reason = status !== undefined && !status.usableNow ? (status.reason ?? null) : null;
+  return { title: display.name, text, reason };
+}
+
+export function buildSceneModel(
+  server: SceneServerInput,
+  ui: LocalUiState,
+  cardPackId: CardPackId,
+  reconnecting = false,
+): SceneModel {
   const { game: view, roomSeats } = server;
   const camp = view.attempt?.camp ?? null;
 
@@ -435,14 +455,11 @@ export function buildSceneModel(server: SceneServerInput, ui: LocalUiState, card
   const faceUpObjectives = objectivesForOwner(camp, null, view, ui);
   const removedCardLabels = (camp?.removedCards ?? []).map((identity) => cardLabel(identity));
 
-  const noSelfWhisperYet = !(view.attempt?.log ?? []).some((l) => l.event === "whisper" && l.actorSeatId === view.yourSeatId);
-  const whisperVisible =
-    view.yourSeatId !== null &&
-    camp !== null &&
-    camp.campPhase === "playing" &&
-    view.attempt?.gearWindow === "between-tricks" &&
-    noSelfWhisperYet;
-  const whisper = { visible: whisperVisible, active: ui.targeting?.mode === "whisper" };
+  const whisperUsed = (view.attempt?.log ?? []).some((l) => l.event === "whisper" && l.actorSeatId === view.yourSeatId);
+  const whisperShown = view.yourSeatId !== null && camp !== null && camp.campPhase === "playing";
+  const whisperVisible = whisperShown && view.attempt?.gearWindow === "between-tricks" && !whisperUsed;
+  const whisper = { shown: whisperShown, visible: whisperVisible, used: whisperUsed, active: ui.targeting?.mode === "whisper" };
+  const prompt = buildPrompt(view, roomSeats, ui, { reconnecting, whisperAvailable: whisperVisible });
 
   let preDeal: SceneModel["preDeal"] = null;
   if (view.runPhase === "pre-deal") {
@@ -476,6 +493,8 @@ export function buildSceneModel(server: SceneServerInput, ui: LocalUiState, card
     lastTrick,
     faceUpObjectives,
     removedCardLabels,
+    prompt,
+    tooltip: buildTooltip(view, ui),
     whisper,
     preDeal,
     targeting,

@@ -1,13 +1,15 @@
 /**
- * Campfire interactable (D-16, spec 5.4): a placeholder stacked-rectangle
- * fire. Clicking it spawns 6-10 square spark pixels that tween upward and
- * fade over ~400ms, then destroy themselves (T-12-15: bounded, self-
- * cleaning spawn — never an unbounded object count). Fun only — never
+ * Campfire interactable (D-16, spec 5.4). Clicking it spawns 6-10 square
+ * spark pixels that tween upward and fade over ~400ms, then destroy
+ * themselves (T-12-15: bounded, self-cleaning spawn). Fun only; never
  * touches game state or the server (SCENE-09).
  */
 import type Phaser from "phaser";
 import { PALETTE, toPhaserColor } from "../palette";
+import { ART } from "../art/art-registry";
+import { placeArt } from "../art/place-art";
 import type { InteractableDef } from "./interactable-def";
+import { addHoverLabel } from "./hover-label";
 
 const SPARK_COUNT_MIN = 6;
 const SPARK_COUNT_MAX = 10;
@@ -22,16 +24,11 @@ function place(scene: Phaser.Scene, anchor: { x: number; y: number }): Phaser.Ga
   const y = Math.round(anchor.y);
   const container = scene.add.container(x, y);
 
-  const logColor = toPhaserColor(PALETTE.cardEdge);
-  const flameColor = toPhaserColor(PALETTE.sun);
-
-  const log = scene.add.rectangle(0, 8, 18, 4, logColor);
-  const flameBase = scene.add.rectangle(0, 0, 10, 10, flameColor);
-  const flameTip = scene.add.rectangle(0, -7, 5, 7, flameColor);
-  container.add([log, flameBase, flameTip]);
-
-  container.setSize(20, 24);
+  const art = ART.campfire;
+  container.add(placeArt(scene, "campfire", 0, 0));
+  container.setSize(art.w, art.h);
   container.setInteractive({ useHandCursor: true });
+  addHoverLabel(scene, container, "Campfire", -art.h / 2 - 2);
   return container;
 }
 

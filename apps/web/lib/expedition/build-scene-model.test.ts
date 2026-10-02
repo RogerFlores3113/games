@@ -561,16 +561,21 @@ describe("gear chips", () => {
     expect(targetingModel.seats.find((s) => s.seatId === "s2")!.gear[0]!.pulse).toBe(false);
   });
 
-  it("showTooltip reflects ui.tooltipGearId", () => {
-    const view = makeView({
-      seats: [
-        { seatId: "s1", equippedGearIds: ["peek"], ready: true, draftPending: false },
-        { seatId: "s2", equippedGearIds: [], ready: true, draftPending: false },
-        { seatId: "s3", equippedGearIds: [], ready: true, draftPending: false },
-      ],
+  it("tooltip carries the hovered gear's rules text, and the reason only while it is unusable", () => {
+    const blocked = makeView({ yourGear: [{ gearId: "ghost", spent: false, usableNow: false, reason: "You already won a trick" }] });
+    expect(buildSceneModel(server(blocked), ui({ tooltipGearId: "ghost" }), "big-index").tooltip).toEqual({
+      title: "Camouflage",
+      text: "Drop one of your unresolved objectives. From then on, if you win any trick this camp, the camp fails.",
+      reason: "You already won a trick",
     });
-    const model = buildSceneModel(server(view), ui({ tooltipGearId: "peek" }), "big-index");
-    expect(model.seats.find((s) => s.seatId === "s1")!.gear[0]!.showTooltip).toBe(true);
+
+    const usable = makeView({ yourGear: [{ gearId: "peek", spent: false, usableNow: true, reason: null }] });
+    expect(buildSceneModel(server(usable), ui({ tooltipGearId: "peek" }), "big-index").tooltip).toEqual({
+      title: "Spyglass",
+      text: "See one random card from a chosen teammate's hand.",
+      reason: null,
+    });
+    expect(buildSceneModel(server(usable), ui(), "big-index").tooltip).toBeNull();
   });
 });
 
@@ -655,7 +660,12 @@ describe("whisper visibility", () => {
       },
     });
     const model = buildSceneModel(server(view), ui(), "big-index");
-    expect(model.whisper.visible).toBe(true);
+    expect(model.whisper).toEqual({ shown: true, visible: true, used: false, active: false });
+  });
+
+  it("not shown at all outside the playing phase", () => {
+    const view = makeView({ attempt: { ...makeView().attempt!, camp: makeCamp({ campPhase: "objective-pick" }) } });
+    expect(buildSceneModel(server(view), ui(), "big-index").whisper).toEqual({ shown: false, visible: false, used: false, active: false });
   });
 
   it("not visible once the viewer has already whispered this attempt", () => {
@@ -674,7 +684,7 @@ describe("whisper visibility", () => {
       },
     });
     const model = buildSceneModel(server(view), ui(), "big-index");
-    expect(model.whisper.visible).toBe(false);
+    expect(model.whisper).toEqual({ shown: true, visible: false, used: true, active: false });
   });
 
   it("active reflects ui.targeting.mode === whisper", () => {

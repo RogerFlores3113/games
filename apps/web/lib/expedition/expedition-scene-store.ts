@@ -56,10 +56,11 @@ function rebuild(
   server: SceneServerInput,
   localUi: LocalUiState,
   cardPackId: CardPackId,
+  reconnecting: boolean,
 ): Pick<ExpeditionSceneState, "sceneKey" | "model" | "betweenModel"> {
   const sceneKey = sceneKeyFor(server.game);
   if (sceneKey === "camp") {
-    return { sceneKey, model: buildSceneModel(server, localUi, cardPackId), betweenModel: null };
+    return { sceneKey, model: buildSceneModel(server, localUi, cardPackId, reconnecting), betweenModel: null };
   }
   return { sceneKey, model: null, betweenModel: buildBetweenCampsModel(server) };
 }
@@ -70,12 +71,12 @@ export function createExpeditionSceneStore(opts: {
 }): ExpeditionSceneStore {
   return createStore<ExpeditionSceneState & ExpeditionSceneActions>((set, get) => {
     function applyLocalUi(nextUi: LocalUiState): void {
-      const { server, cardPackId } = get();
+      const { server, cardPackId, reconnecting } = get();
       if (server === null) {
         set({ localUi: nextUi });
         return;
       }
-      set({ localUi: nextUi, ...rebuild(server, nextUi, cardPackId) });
+      set({ localUi: nextUi, ...rebuild(server, nextUi, cardPackId, reconnecting) });
     }
 
     return {
@@ -89,11 +90,16 @@ export function createExpeditionSceneStore(opts: {
 
       setServer(server) {
         const reconciled = reconcileLocalUi(get().localUi, server.game);
-        set({ server, localUi: reconciled, ...rebuild(server, reconciled, get().cardPackId) });
+        set({ server, localUi: reconciled, ...rebuild(server, reconciled, get().cardPackId, get().reconnecting) });
       },
 
       setReconnecting(reconnecting) {
-        set({ reconnecting });
+        const { server, localUi, cardPackId } = get();
+        if (server === null) {
+          set({ reconnecting });
+          return;
+        }
+        set({ reconnecting, ...rebuild(server, localUi, cardPackId, reconnecting) });
       },
 
       updateLocalUi(fn) {
@@ -103,12 +109,12 @@ export function createExpeditionSceneStore(opts: {
       },
 
       setCardPack(id) {
-        const { server, localUi } = get();
+        const { server, localUi, reconnecting } = get();
         if (server === null) {
           set({ cardPackId: id });
           return;
         }
-        set({ cardPackId: id, ...rebuild(server, localUi, id) });
+        set({ cardPackId: id, ...rebuild(server, localUi, id, reconnecting) });
       },
 
       dispatch(request) {

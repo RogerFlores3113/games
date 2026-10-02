@@ -1,26 +1,24 @@
 /**
- * The camp scene (SCENE-02/03/04/09, D-02/D-03/D-13/D-15): draws the static
- * world once, places the four interactables once, then re-renders the HUD
- * (supplies/camp-number/sign/boss-effect) plus the full table — seats,
- * hand, trick, last-trick glance, and controls — whenever the store's
- * `model` or `cardPackId` changes. Every click handler below only ever
- * calls `store.dispatch`/`store.confirmTargeting`/`store.updateLocalUi`
- * with a fixed request literal or a `local-ui.ts` transition; it never
- * builds the Whisper's server request itself (that is `confirmTargeting`'s
- * job, D-02) and never decides an outcome (spec §7.1).
+ * The camp scene: draws the world and the four interactables once, then
+ * redraws every zone (top bar, prompt, seats, hand, trick, last trick,
+ * tooltip, actions) from the store's `model` whenever it changes. Click
+ * handlers only call `store.dispatch`/`store.confirmTargeting`/
+ * `store.updateLocalUi` with a fixed request literal or a `local-ui.ts`
+ * transition; they never decide an outcome.
  */
 import Phaser from "phaser";
 import { GEAR_DISPLAY } from "@games/rules";
 import { ensurePixelFonts } from "../font/pixel-font";
 import { ensureCardTextures } from "../card-packs/card-textures";
-import { drawStaticWorld, drawHud, setBossEffect } from "../draw/draw-table";
+import { drawPrompt, drawStaticWorld, drawTooltip, drawTopBar, setBossEffect } from "../draw/draw-table";
 import { drawSeats } from "../draw/draw-seats";
-import type { CampHandlers } from "../draw/draw-seats";
+import type { CampHandlers } from "../draw/camp-handlers";
+import { preloadArt } from "../art/place-art";
 import { drawHand, drawLastTrick, drawTrick } from "../draw/draw-hand-trick";
 import { drawControls } from "../draw/draw-controls";
 import { INTERACTABLE_REGISTRY } from "../interactables/registry";
 import { INTERACTABLE_ANCHORS } from "../layout";
-import { interactableObjectId, LAST_TRICK_ID } from "../../../../lib/expedition/expedition-ids";
+import { gearObjectId, interactableObjectId, LAST_TRICK_ID } from "../../../../lib/expedition/expedition-ids";
 import { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
 import {
@@ -146,6 +144,10 @@ export class CampScene extends Phaser.Scene {
     this.index = deps.index;
   }
 
+  preload(): void {
+    preloadArt(this);
+  }
+
   create(): void {
     const state = this.sceneStore.getState();
     const glyphs = ensurePixelFonts(this);
@@ -203,66 +205,44 @@ export class CampScene extends Phaser.Scene {
   renderModel(model: SceneModel): void {
     if (this.dynamicLayer === null || this.unsubscribe === null) return;
     this.dynamicLayer.removeAll(true);
-    drawHud(this, this.dynamicLayer, model);
+    drawTopBar(this, this.dynamicLayer, model);
+    drawPrompt(this, this.dynamicLayer, model);
+    drawTooltip(this, this.dynamicLayer, model);
     const effect = model.bossTwist !== null && !model.bossTwist.cancelled ? model.bossTwist.effect : "none";
     setBossEffect(this, effect);
     this.renderTable(model);
     this.previousModel = model;
   }
 
-  /** Seats, hand, trick, last-trick glance and controls — all drawn from
-   * `model` alone (SCENE-02/03/04).
-   *
-   * `drawHand` runs FIRST (not after seats) so the viewer's own seat (D-13:
-   * seat 0 sits just below the stump, at the bottom of the table, right
-   * where the hand fans out per `layout.ts`'s `seatAnchors`/`HAND_Y`)
-   * renders ON TOP of the hand rather than being covered by it — the
-   * viewer's own gear row (`GEAR_ROW_Y`) and objective row
-   * (`OBJECTIVE_ROW_Y`) both fall inside the hand's vertical span, so with
-   * the hand drawn last (topmost, as it originally was) every hand card
-   * silently swallowed clicks meant for the viewer's own gear/objectives —
-   * discovered via Plan 12-13's full-camp e2e, which found gear use
-   * (D-02/GEAR-05) unusable at the table. `drawControls` (which draws the
-   * Confirm/Cancel pair anchored on the gear/objective just clicked) stays
-   * last so it remains topmost above both. */
   renderTable(model: SceneModel): void {
     if (this.dynamicLayer === null) return;
     const layer = this.dynamicLayer;
-    drawHand(this, layer, model, this.index, this.handlers);
     drawSeats(this, layer, model, this.index, this.handlers);
+    drawHand(this, layer, model, this.index, this.handlers);
     drawTrick(this, layer, model, this.index, this.previousModel);
     drawLastTrick(this, layer, model, this.index, this.handlers);
     drawControls(this, layer, model, this.index, this.handlers);
   }
 
-  /** D-06 self-heal: opening the last-trick glance (`onLastTrickHover`)
-   * itself triggers a store update, which `renderModel` answers by
-   * destroying and recreating the WHOLE dynamic layer — including the very
-   * pile container the pointer is currently over. Phaser's own hover
-   * bookkeeping (which object the pointer is "currently over", used to
-   * decide whether a future move away should fire `pointerout`) still
-   * points at that now-destroyed instance; a real pointer leaving the
-   * pile's on-screen area afterward never emits a `pointerout` for it, so
-   * the glance can get stuck open even though `pointerover` (entering)
-   * still fires correctly on the fresh instance every time (found via
-   * Plan 12-13's full-camp e2e). Every frame the glance is open, check the
-   * pointer's CURRENT position against the pile's CURRENT registered
-   * bounds directly (not Phaser's event-transition state) and close it the
-   * moment the pointer is no longer over it — self-correcting regardless
-   * of how the object was drawn or redrawn. */
+  /** Hover state is checked against the pointer every frame because a
+   * redraw replaces the hovered object, and Phaser then never sends the
+   * stale object its `pointerout`: the glance, lift or tooltip would stick. */
   update(): void {
     const state = this.sceneStore.getState();
-    if (!state.localUi.lastTrickOpen) return;
-    const entry = this.index.entries().find((e) => e.id === LAST_TRICK_ID);
-    if (entry === undefined) return;
+    const ui = state.localUi;
+    if (!ui.lastTrickOpen && ui.hoveredCardId === null && ui.tooltipGearId === null) return;
     const pointer = this.input.activePointer;
-    const within =
-      pointer.x >= entry.bounds.x &&
-      pointer.x <= entry.bounds.x + entry.bounds.width &&
-      pointer.y >= entry.bounds.y &&
-      pointer.y <= entry.bounds.y + entry.bounds.height;
-    if (!within) {
-      this.handlers.onLastTrickHover(false);
+    const over = (id: string): boolean => {
+      const entry = this.index.entries().find((e) => e.id === id);
+      if (entry === undefined) return false;
+      const b = entry.bounds;
+      return pointer.x >= b.x && pointer.x <= b.x + b.width && pointer.y >= b.y && pointer.y <= b.y + b.height;
+    };
+    if (ui.lastTrickOpen && !over(LAST_TRICK_ID)) this.handlers.onLastTrickHover(false);
+    if (ui.hoveredCardId !== null) {
+      const card = state.model?.hand.find((c) => c.id === ui.hoveredCardId);
+      if (card === undefined || !over(card.objectId)) this.handlers.onCardHover(null);
     }
+    if (ui.tooltipGearId !== null && !over(gearObjectId(ui.tooltipGearId))) this.handlers.onGearHover(null);
   }
 }

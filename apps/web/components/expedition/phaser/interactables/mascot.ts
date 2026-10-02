@@ -1,15 +1,18 @@
 /**
- * Red panda mascot interactable (D-16, spec 5.4, SCENE-09): a flat
- * placeholder body plus a click bubble showing one of a short static
+ * Red panda mascot interactable (D-16, spec 5.4, SCENE-09): the panda plus
+ * a click bubble showing one of a short static
  * rotation of tip/joke lines (UI-SPEC Copywriting). Reactions to game
  * events (a happy bounce on a completed objective, a sad collapse on a
  * failed camp) are deferred to Phase 14 and are NOT built here. Fun only —
  * never touches game state or the server (SCENE-09).
  */
 import type Phaser from "phaser";
-import { PALETTE, toPhaserColor } from "../palette";
 import { WORLD_LABEL_FONT } from "../font/font-keys";
+import { ART } from "../art/art-registry";
+import { placeArt } from "../art/place-art";
+import { ZONES } from "../layout";
 import type { InteractableDef } from "./interactable-def";
+import { addHoverLabel } from "./hover-label";
 
 const LINES: readonly string[] = [
   "Psst - the Sun always wins.",
@@ -19,7 +22,7 @@ const LINES: readonly string[] = [
 ];
 
 const BUBBLE_LIFETIME_MS = 3000;
-const BUBBLE_OFFSET_Y = -20;
+const BUBBLE_GAP = 2;
 
 /** Next-line index, per placed root — a closure-free Map keyed by the root
  * object (per the plan's own interface note), not a module-level counter. */
@@ -33,12 +36,11 @@ function place(scene: Phaser.Scene, anchor: { x: number; y: number }): Phaser.Ga
   const y = Math.round(anchor.y);
   const container = scene.add.container(x, y);
 
-  const body = scene.add.ellipse(0, 4, 18, 12, toPhaserColor(PALETTE.sun));
-  const label = scene.add.bitmapText(0, -8, WORLD_LABEL_FONT, "Panda").setOrigin(0.5);
-  container.add([body, label]);
-
-  container.setSize(20, 20);
+  const art = ART["mascot-panda"];
+  container.add(placeArt(scene, "mascot-panda", 0, 0));
+  container.setSize(art.w, art.h);
   container.setInteractive({ useHandCursor: true });
+  addHoverLabel(scene, container, "Panda", -art.h / 2 - 2);
   return container;
 }
 
@@ -58,9 +60,13 @@ function onClick(scene: Phaser.Scene, root: Phaser.GameObjects.GameObject): void
   LINE_INDEX.set(root, index + 1);
 
   const container = root as Phaser.GameObjects.Container;
+  // Wrapped and right-aligned inside the actions zone so it never leaves the
+  // stage.
+  const zone = ZONES.actions;
   const bubble = scene.add
-    .bitmapText(container.x, container.y + BUBBLE_OFFSET_Y, WORLD_LABEL_FONT, line)
-    .setOrigin(0.5)
+    .bitmapText(zone.x + zone.w, container.y - ART["mascot-panda"].h / 2 - BUBBLE_GAP, WORLD_LABEL_FONT, line)
+    .setMaxWidth(zone.w)
+    .setOrigin(1, 1)
     .setDepth(1000);
   ACTIVE_BUBBLE.set(root, bubble);
 

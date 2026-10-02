@@ -1,175 +1,159 @@
 /**
- * Draws the viewer's hand fan, the current trick with its led marker, and
- * the last-trick glance (SCENE-02/03/04, D-06, D-10). Every card fact drawn
- * here — `playable`, `dimmed`, `targetable`, `selected`, `lifted`, `isLed` —
- * is read directly off `CardModel`/`TrickPlayModel`; this module never reads
- * the server view's own hand-legality or trick-plays fields directly, and
- * never recomputes legality (spec §7.1).
+ * Your hand (the `hand` zone), the current trick on the stump, and the
+ * last-trick pile with its hover fan (the `lastTrick` zone). Card facts
+ * (`playable`, `dimmed`, `targetable`, `selected`, `lifted`, `isLed`) are
+ * read off the model; nothing here recomputes legality.
  */
-import Phaser from "phaser";
+import type Phaser from "phaser";
 import { PALETTE, toPhaserColor } from "../palette";
-import { WORLD_LABEL_FONT } from "../font/font-keys";
-import { CARD_H, CARD_W, HAND_Y, HOVER_LIFT, MINI_H, MINI_W, handFanXs, seatAnchors, trickSlots } from "../layout";
-import { cardTextureKey } from "../card-packs/card-pack-def";
+import { LABEL_CELL } from "../font/font-keys";
+import {
+  CARD_H,
+  CARD_W,
+  HAND_CARD_Y,
+  HAND_MARKER_H,
+  HOVER_LIFT,
+  MINI_H,
+  MINI_W,
+  TRICK_CARD_TOP,
+  TRICK_STEP,
+  ZONES,
+  centreOf,
+  handFanXs,
+  opponentBlocks,
+  stumpRowXs,
+  type Point,
+} from "../layout";
+import { cardBackTextureKey, cardTextureKey } from "../card-packs/card-pack-def";
 import { LAST_TRICK_ID } from "../../../../lib/expedition/expedition-ids";
 import type { ObjectIndex } from "../object-index";
-import type { SceneModel, TrickPlayModel } from "../../../../lib/expedition/build-scene-model";
-import type { CampHandlers } from "./draw-seats";
+import type { CardModel, SceneModel } from "../../../../lib/expedition/build-scene-model";
+import type { CampHandlers } from "./camp-handlers";
+import { fitLabel } from "./text-fit";
+import { DIM_ALPHA, labelWidth, miniCard, text, type Layer } from "./ui-kit";
 
-const LAST_TRICK_FAN_GAP = 16;
 const DEAL_TWEEN_MS = 150;
+const TRICK_NAME_CHARS = 7;
+const FAN_STEP = 16;
 
-function seatAnchorFor(model: SceneModel, seatId: string): { x: number; y: number } | null {
-  const idx = model.seats.findIndex((s) => s.seatId === seatId);
-  if (idx === -1) return null;
-  const anchors = seatAnchors(model.seats.length);
-  return anchors[idx] ?? null;
+/** Where a seat's played card flies in from: its opponent block, or your hand. */
+function seatOrigin(model: SceneModel, seatId: string): Point {
+  const opponents = model.seats.filter((s) => !s.isYou);
+  const i = opponents.findIndex((s) => s.seatId === seatId);
+  if (i === -1) return centreOf(ZONES.hand);
+  return centreOf(opponentBlocks(opponents.length)[i]!);
 }
 
-export function drawHand(
+function nameOf(model: SceneModel, seatId: string): string {
+  return model.seats.find((s) => s.seatId === seatId)?.displayLabel ?? "?";
+}
+
+export function drawHand(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
+  const xs = handFanXs(model.hand.length);
+  const order = model.hand.map((card, i) => ({ card, i })).sort((a, b) => Number(a.card.lifted) - Number(b.card.lifted));
+
+  for (const { card, i } of order) {
+    const x = xs[i]!;
+    const next = xs[i + 1];
+    const strip = next === undefined || card.lifted ? CARD_W : next - x;
+    drawHandCard(scene, layer, model, index, handlers, card, x, strip);
+  }
+}
+
+function drawHandCard(
   scene: Phaser.Scene,
-  layer: Phaser.GameObjects.Container,
+  layer: Layer,
   model: SceneModel,
   index: ObjectIndex,
   handlers: CampHandlers,
+  card: CardModel,
+  x: number,
+  strip: number,
 ): void {
-  const xs = handFanXs(model.hand.length);
-
-  model.hand.forEach((card, i) => {
-    const x = xs[i];
-    if (x === undefined) return;
-    const y = HAND_Y - (card.lifted ? HOVER_LIFT : 0);
-    const key = cardTextureKey(model.cardPackId, card.label, "full");
-    const image = scene.add.image(Math.round(x + CARD_W / 2), Math.round(y), key).setOrigin(0.5, 0);
-
-    image.setAlpha(1);
-    if (card.dimmed) {
-      image.setAlpha(0.4);
-    }
-
-    if (card.targetable || card.selected) {
-      const outline = scene.add
-        .rectangle(image.x, image.y + CARD_H / 2, CARD_W, CARD_H, 0, 0)
-        .setStrokeStyle(1, toPhaserColor(PALETTE.turn));
-      layer.add(outline);
-    }
-
-    const nextX = xs[i + 1];
-    const stripWidth = nextX !== undefined ? Math.max(1, Math.round(nextX - x)) : CARD_W;
-    const hitWidth = card.lifted ? CARD_W : stripWidth;
-    image.setInteractive(new Phaser.Geom.Rectangle(0, 0, hitWidth, CARD_H), Phaser.Geom.Rectangle.Contains);
-    image.on("pointerdown", () => handlers.onCard(card.id));
-    image.on("pointerover", () => handlers.onCardHover(card.id));
-    image.on("pointerout", () => handlers.onCardHover(null));
-
-    layer.add(image);
-    index.register("camp", card.objectId, image);
-  });
-}
-
-function drawTrickCard(
-  scene: Phaser.Scene,
-  layer: Phaser.GameObjects.Container,
-  index: ObjectIndex,
-  model: SceneModel,
-  play: TrickPlayModel,
-  slot: { x: number; y: number },
-  isNew: boolean,
-): void {
-  const key = cardTextureKey(model.cardPackId, play.card.label, "full");
-  const startPoint = seatAnchorFor(model, play.seatId);
-  const startX = isNew && startPoint !== null ? startPoint.x : slot.x;
-  const startY = isNew && startPoint !== null ? startPoint.y : slot.y;
-  const image = scene.add.image(Math.round(startX), Math.round(startY), key).setOrigin(0.5, 0.5);
-
-  if (isNew && startPoint !== null) {
-    scene.tweens.add({
-      targets: image,
-      x: Math.round(slot.x),
-      y: Math.round(slot.y),
-      duration: DEAL_TWEEN_MS,
-      onUpdate: () => {
-        image.x = Math.round(image.x);
-        image.y = Math.round(image.y);
-      },
-    });
-  }
-
-  if (play.isLed) {
-    const pennant = scene.add
-      .bitmapText(Math.round(slot.x), Math.round(slot.y - CARD_H / 2 - 8), WORLD_LABEL_FONT, "LED")
-      .setOrigin(0.5, 1);
-    pennant.setTint(toPhaserColor(PALETTE.turn));
-    layer.add(pennant);
-  }
-
+  const y = HAND_CARD_Y - (card.lifted ? HOVER_LIFT : 0);
+  const image = scene.add.image(x, y, cardTextureKey(model.cardPackId, card.label, "full")).setOrigin(0, 0);
+  image.setAlpha(card.dimmed ? DIM_ALPHA : 1);
   layer.add(image);
-  index.register("camp", play.card.objectId, image);
+
+  if (card.targetable) {
+    layer.add(scene.add.rectangle(x, y - HAND_MARKER_H - 1, strip - 2, HAND_MARKER_H, toPhaserColor(PALETTE.turn)).setOrigin(0, 0));
+  }
+  if (card.selected) {
+    layer.add(scene.add.rectangle(x, y, CARD_W, CARD_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
+  }
+
+  const hit = scene.add.zone(x, y, strip, CARD_H).setOrigin(0, 0);
+  hit.setInteractive({ useHandCursor: card.playable || card.targetable });
+  hit.on("pointerdown", () => handlers.onCard(card.id));
+  hit.on("pointerover", () => handlers.onCardHover(card.id));
+  hit.on("pointerout", () => handlers.onCardHover(null));
+  layer.add(hit);
+  index.register("camp", card.objectId, hit);
 }
 
-export function drawTrick(
-  scene: Phaser.Scene,
-  layer: Phaser.GameObjects.Container,
-  model: SceneModel,
-  index: ObjectIndex,
-  previous: SceneModel | null,
-): void {
+export function drawTrick(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, previous: SceneModel | null): void {
   const trick = model.trick;
-  if (trick === null) return;
-  const slots = trickSlots(trick.plays.length);
+  if (trick === null || trick.plays.length === 0) return;
+  const xs = stumpRowXs(trick.plays.length, TRICK_STEP);
   const previousPlayCount = previous?.trick?.plays.length ?? 0;
 
   trick.plays.forEach((play, i) => {
-    const slot = slots[i];
-    if (slot === undefined) return;
-    const isNew = i >= previousPlayCount;
-    drawTrickCard(scene, layer, index, model, play, slot, isNew);
+    const x = xs[i]!;
+    const image = scene.add.image(x, TRICK_CARD_TOP, cardTextureKey(model.cardPackId, play.card.label, "full")).setOrigin(0.5, 0);
+    if (i >= previousPlayCount) {
+      const from = seatOrigin(model, play.seatId);
+      image.setPosition(from.x, from.y);
+      scene.tweens.add({
+        targets: image,
+        x,
+        y: TRICK_CARD_TOP,
+        duration: DEAL_TWEEN_MS,
+        onUpdate: () => image.setPosition(Math.round(image.x), Math.round(image.y)),
+      });
+    }
+    layer.add(image);
+    index.register("camp", play.card.objectId, image);
+
+    const name = fitLabel(nameOf(model, play.seatId), TRICK_NAME_CHARS);
+    layer.add(text(scene, x - Math.floor(labelWidth(name) / 2), TRICK_CARD_TOP + CARD_H + 3, name));
+    if (play.isLed) {
+      layer.add(text(scene, x - Math.floor(labelWidth("Led") / 2), TRICK_CARD_TOP - LABEL_CELL.h - 2, "Led", PALETTE.sun));
+    }
   });
 }
 
-export function drawLastTrick(
-  scene: Phaser.Scene,
-  layer: Phaser.GameObjects.Container,
-  model: SceneModel,
-  index: ObjectIndex,
-  handlers: CampHandlers,
-): void {
-  const lastTrick = model.lastTrick;
-  if (lastTrick === null) return;
+export function drawLastTrick(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
+  const last = model.lastTrick;
+  if (last === null) return;
+  const zone = ZONES.lastTrick;
+  const right = zone.x + zone.w - 2;
 
-  const winnerAnchor = seatAnchorFor(model, lastTrick.winnerSeatId);
-  if (winnerAnchor === null) return;
+  layer.add(text(scene, right - labelWidth("Last trick"), zone.y, "Last trick", PALETTE.textDim));
 
-  const pileContainer = scene.add.container(Math.round(winnerAnchor.x), Math.round(winnerAnchor.y - CARD_H));
-  const pileBack = scene.add
-    .rectangle(0, 0, MINI_W, MINI_H, toPhaserColor(PALETTE.cardBack))
-    .setStrokeStyle(1, toPhaserColor(PALETTE.cardEdge));
-  pileContainer.add(pileBack);
-  pileContainer.setSize(MINI_W, MINI_H);
-  pileContainer.setInteractive({ useHandCursor: true });
-  pileContainer.on("pointerover", () => handlers.onLastTrickHover(true));
-  pileContainer.on("pointerout", () => handlers.onLastTrickHover(false));
-  layer.add(pileContainer);
-  index.register("camp", LAST_TRICK_ID, pileContainer);
+  const pileX = right - MINI_W - 4;
+  const pileY = zone.y + 10;
+  const pile = scene.add.container(pileX + MINI_W / 2, pileY + MINI_H / 2);
+  pile.add(scene.add.image(0, 0, cardBackTextureKey(model.cardPackId, "mini")));
+  pile.setSize(MINI_W + 8, MINI_H + 4);
+  pile.setInteractive({ useHandCursor: true });
+  pile.on("pointerover", () => handlers.onLastTrickHover(true));
+  pile.on("pointerout", () => handlers.onLastTrickHover(false));
+  layer.add(pile);
+  index.register("camp", LAST_TRICK_ID, pile);
 
-  if (!lastTrick.open) return;
+  const won = `${fitLabel(nameOf(model, last.winnerSeatId), 12)} won`;
+  layer.add(text(scene, right - labelWidth(won), zone.y + zone.h - LABEL_CELL.h - 2, won));
 
-  lastTrick.plays.forEach((play, i) => {
-    const x = winnerAnchor.x + (i - (lastTrick.plays.length - 1) / 2) * LAST_TRICK_FAN_GAP;
-    const y = winnerAnchor.y - CARD_H - MINI_H;
-    const key = cardTextureKey(model.cardPackId, play.card.label, "mini");
-    const image = scene.add.image(Math.round(x), Math.round(y), key).setOrigin(0.5);
-    layer.add(image);
-
-    if (play.isLed) {
-      const marker = scene.add.bitmapText(Math.round(x), Math.round(y - MINI_H), WORLD_LABEL_FONT, "L").setOrigin(0.5, 1);
-      layer.add(marker);
+  if (!last.open) return;
+  const n = last.plays.length;
+  last.plays.forEach((play, i) => {
+    const x = pileX - 8 - MINI_W - FAN_STEP * (n - 1 - i);
+    layer.add(miniCard(scene, x, pileY, play.card.label, model.cardPackId));
+    if (play.seatId === last.winnerSeatId) {
+      layer.add(scene.add.rectangle(x, pileY, MINI_W, MINI_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
     }
-    if (play.seatId === lastTrick.winnerSeatId) {
-      const outline = scene.add
-        .rectangle(Math.round(x), Math.round(y), MINI_W, MINI_H, 0, 0)
-        .setStrokeStyle(1, toPhaserColor(PALETTE.turn));
-      layer.add(outline);
+    if (play.isLed) {
+      layer.add(text(scene, x + MINI_W / 2 - Math.floor(labelWidth("Led") / 2), pileY + MINI_H + 2, "Led", PALETTE.sun));
     }
   });
 }

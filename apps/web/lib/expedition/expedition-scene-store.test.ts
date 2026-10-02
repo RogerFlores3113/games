@@ -128,6 +128,16 @@ describe("createExpeditionSceneStore", () => {
     expect(onAction).not.toHaveBeenCalled();
   });
 
+  it("setReconnecting rebuilds the model so the prompt says so, and restores it after", () => {
+    const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
+    store.getState().setServer(server(makeView()));
+    const before = store.getState().model!.prompt.text;
+    store.getState().setReconnecting(true);
+    expect(store.getState().model!.prompt).toEqual({ text: "Reconnecting…", tone: "alert" });
+    store.getState().setReconnecting(false);
+    expect(store.getState().model!.prompt.text).toBe(before);
+  });
+
   it("dispatch is a no-op when server is null", () => {
     const onAction = vi.fn();
     const store = createExpeditionSceneStore({ onAction, cardPackId: "big-index" });

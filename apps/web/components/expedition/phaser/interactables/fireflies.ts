@@ -6,8 +6,9 @@
  * never touches game state or the server (SCENE-09).
  */
 import type Phaser from "phaser";
-import { PALETTE, toPhaserColor } from "../palette";
+import { placeArt } from "../art/place-art";
 import type { InteractableDef } from "./interactable-def";
+import { addHoverLabel } from "./hover-label";
 
 const FIREFLY_COUNT = 6;
 const DRIFT_RADIUS = 8;
@@ -17,7 +18,7 @@ const SCATTER_RADIUS = 20;
 const SCATTER_DURATION_MS = 280;
 
 interface FireflyDot {
-  dot: Phaser.GameObjects.Ellipse;
+  dot: Phaser.GameObjects.Sprite;
   homeX: number;
   homeY: number;
 }
@@ -31,7 +32,6 @@ function place(scene: Phaser.Scene, anchor: { x: number; y: number }): Phaser.Ga
   const x = Math.round(anchor.x);
   const y = Math.round(anchor.y);
   const container = scene.add.container(x, y);
-  const color = toPhaserColor(PALETTE.done);
 
   const dots: FireflyDot[] = [];
   for (let i = 0; i < FIREFLY_COUNT; i++) {
@@ -39,7 +39,7 @@ function place(scene: Phaser.Scene, anchor: { x: number; y: number }): Phaser.Ga
     const rad = (angleDeg * Math.PI) / 180;
     const homeX = Math.round(Math.cos(rad) * DRIFT_RADIUS);
     const homeY = Math.round(Math.sin(rad) * DRIFT_RADIUS);
-    const dot = scene.add.ellipse(homeX, homeY, 2, 2, color);
+    const dot = placeArt(scene, "firefly", homeX, homeY);
     container.add(dot);
     dots.push({ dot, homeX, homeY });
 
@@ -58,6 +58,7 @@ function place(scene: Phaser.Scene, anchor: { x: number; y: number }): Phaser.Ga
   const span = (DRIFT_RADIUS + DRIFT_WOBBLE) * 2;
   container.setSize(span, span);
   container.setInteractive({ useHandCursor: true });
+  addHoverLabel(scene, container, "Fireflies", -span / 2 - 2);
   return container;
 }
 
