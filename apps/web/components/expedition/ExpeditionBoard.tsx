@@ -15,7 +15,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Settings } from "lucide-react";
+import { BookOpen, Settings } from "lucide-react";
 import type { RoomView } from "@games/schema";
 import { ExpeditionViewSchema } from "@games/schema/games/expedition";
 import type { ExpeditionView } from "@games/rules";
@@ -23,6 +23,7 @@ import { createExpeditionSceneStore } from "../../lib/expedition/expedition-scen
 import { readCardPackPref, writeCardPackPref } from "../../lib/expedition/expedition-card-pack-pref";
 import type { CardPackId } from "../../lib/expedition/card-pack-ids";
 import { ReconnectingBanner } from "../ReconnectingBanner";
+import { ExpeditionRulesModal } from "./ExpeditionRulesModal";
 import { ExpeditionSettingsModal } from "./ExpeditionSettingsModal";
 
 const ExpeditionPhaserMount = dynamic(() => import("./phaser/ExpeditionPhaserMount"), { ssr: false });
@@ -72,6 +73,7 @@ export function ExpeditionBoard({
   // modal's radio picker re-renders on change without reading the store
   // directly (this component never subscribes to the store itself).
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [muted, setMuted] = useState(false);
   const [cardPackId, setCardPackId] = useState<CardPackId>(() => readCardPackPref());
 
@@ -122,7 +124,31 @@ export function ExpeditionBoard({
         </button>
       </span>
 
+      <span
+        className="fixed z-10"
+        style={{
+          top: "var(--space-sm)",
+          right: "calc(var(--space-sm) + 44px + var(--space-xs))",
+          height: 44,
+          width: 44,
+        }}
+      >
+        <button
+          type="button"
+          data-testid="expedition-rules-button"
+          aria-label="Rules"
+          aria-expanded={rulesOpen}
+          onClick={() => setRulesOpen(true)}
+          className="relative inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:border-[var(--color-text-muted)] hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+          style={{ width: 44, height: 44 }}
+        >
+          <BookOpen size={20} aria-hidden="true" color="var(--color-text)" />
+        </button>
+      </span>
+
       <ExpeditionPhaserMount store={store} />
+
+      <ExpeditionRulesModal open={rulesOpen} onClose={() => setRulesOpen(false)} game={game} />
 
       <ExpeditionSettingsModal
         open={settingsOpen}
