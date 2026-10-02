@@ -19,6 +19,7 @@ import type { ExpeditionSceneStore } from "../../../lib/expedition/expedition-sc
 import type { SceneModel, SceneKey } from "../../../lib/expedition/build-scene-model";
 import type { BetweenCampsModel } from "../../../lib/expedition/between-camps-model";
 import type { ObjectIndex } from "./object-index";
+import type { LayoutEntry } from "../../../lib/expedition/layout-audit";
 import { STAGE_WIDTH } from "../../../lib/expedition/compute-zoom";
 
 export interface ExpeditionTestBridge {
@@ -32,6 +33,9 @@ export interface ExpeditionTestBridge {
   /** `objects()[id]`'s centre, or `null` if `id` is not currently
    * registered/visible. */
   positionOf(id: string): { x: number; y: number } | null;
+  /** Every visible text object and interactive object in the active scene,
+   * in stage px (640x360), for the UI-tour layout audit. */
+  layout(): LayoutEntry[];
 }
 
 declare global {
@@ -50,6 +54,44 @@ const installs: Install[] = [];
 
 function current(): Install | null {
   return installs.length > 0 ? installs[installs.length - 1]! : null;
+}
+
+type DisplayObject = Phaser.GameObjects.GameObject & {
+  visible?: boolean;
+  alpha?: number;
+  list?: Phaser.GameObjects.GameObject[];
+  text?: string;
+  getBounds?: () => Phaser.Geom.Rectangle;
+};
+
+function collectLayout(install: Install): LayoutEntry[] {
+  const rect = install.index.entries();
+  const idByBounds = new Map<string, string>();
+  for (const e of rect) {
+    idByBounds.set(`${e.bounds.x},${e.bounds.y},${e.bounds.width},${e.bounds.height}`, e.id);
+  }
+  const out: LayoutEntry[] = [];
+  const walk = (obj: DisplayObject, parentAlpha: number): void => {
+    if (!obj.active || obj.visible === false) return;
+    const alpha = parentAlpha * (obj.alpha ?? 1);
+    if (alpha <= 0 || typeof obj.getBounds !== "function") return;
+    const b = obj.getBounds();
+    const box = { x: b.x, y: b.y, w: b.width, h: b.height };
+    const typeName = obj.type;
+    if ((typeName === "BitmapText" || typeName === "Text") && typeof obj.text === "string") {
+      out.push({ kind: "text", label: obj.text, ...box });
+    } else if (obj.input?.enabled) {
+      const id = idByBounds.get(`${b.x},${b.y},${b.width},${b.height}`);
+      out.push({ kind: "interactive", label: id ?? (obj.name || typeName), ...box });
+    }
+    if (Array.isArray(obj.list)) {
+      for (const child of obj.list) walk(child as DisplayObject, alpha);
+    }
+  };
+  for (const scene of install.game.scene.getScenes(true)) {
+    for (const obj of scene.children.list) walk(obj as DisplayObject, 1);
+  }
+  return out;
 }
 
 function ensureBridge(): ExpeditionTestBridge {
@@ -83,6 +125,11 @@ function ensureBridge(): ExpeditionTestBridge {
         };
       }
       return out;
+    },
+    layout() {
+      const install = current();
+      if (install === null) return [];
+      return collectLayout(install);
     },
     positionOf(id) {
       const found = bridge.objects()[id];

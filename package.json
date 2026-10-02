@@ -9,6 +9,7 @@
   "scripts": {
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "tour:expedition": "EXPEDITION_TOUR=1 playwright test e2e/expedition-tour.spec.ts",
     "typecheck": "tsc -b",
     "build:worker": "npm run build --workspace apps/worker",
     "build:web": "npm run build --workspace apps/web"
