@@ -229,7 +229,7 @@ export const ExpeditionViewSchema = z.strictObject({
   yourOwnedGearIds: z.array(z.string().min(1)),
   yourDraftOffer: z.array(z.string().min(1)).nullable(),
   yourCapacity: z.number().int().min(0).nullable(),
-  yourBaseCapacity: z.number().int().min(0).nullable(),
+  yourBaseCapacity: z.number().int().min(0).nullable().optional(),
   yourGear: z.array(GearStatusViewSchema),
   history: z.array(CampResultViewSchema),
   attempt: AttemptViewSchema.nullable(),

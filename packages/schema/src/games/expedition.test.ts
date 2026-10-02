@@ -161,6 +161,12 @@ describe("ExpeditionViewSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  // A worker deployed before yourBaseCapacity existed still sends valid views.
+  it("accepts a view without yourBaseCapacity", () => {
+    const { yourBaseCapacity: _omitted, ...olderView } = firesideView;
+    expect(ExpeditionViewSchema.safeParse(olderView).success).toBe(true);
+  });
+
   it.each([
     ["extra top-level key seed", { ...firesideView, seed: "abc123" }],
     [
