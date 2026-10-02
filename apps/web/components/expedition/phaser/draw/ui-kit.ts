@@ -5,7 +5,7 @@
  */
 import type Phaser from "phaser";
 import { PALETTE, toPhaserColor } from "../palette";
-import { LABEL_CELL, WORLD_LABEL_FONT } from "../font/font-keys";
+import { LABEL_CELL, SIGN_CELL, WORLD_LABEL_FONT, WORLD_SIGN_FONT } from "../font/font-keys";
 import { MINI_H, MINI_W } from "../layout";
 import { cardTextureKey } from "../card-packs/card-pack-def";
 import type { CardPackId } from "../../../../lib/expedition/card-pack-ids";
@@ -30,7 +30,8 @@ export function plate(scene: Phaser.Scene, x: number, y: number, w: number, h: n
 }
 
 /** A labelled button centred on (cx, cy). Interactive only when `onClick` is
- * given; a disabled button is dimmed. Returns the container. */
+ * given; a disabled button is dimmed unless `dim: false`. `big` sets the
+ * label in the sign font. Returns the container. */
 export function button(
   scene: Phaser.Scene,
   cx: number,
@@ -38,21 +39,23 @@ export function button(
   w: number,
   h: number,
   label: string,
-  opts: { onClick?: () => void; outline?: boolean; color?: string } = {},
+  opts: { onClick?: () => void; outline?: boolean; color?: string; big?: boolean; dim?: boolean } = {},
 ): Phaser.GameObjects.Container {
   const container = scene.add.container(Math.round(cx), Math.round(cy));
   const bg = scene.add.rectangle(0, 0, w, h, toPhaserColor(opts.color ?? PALETTE.stump));
   if (opts.outline) bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn));
-  const shown = fitLabel(label, Math.floor((w - 2) / LABEL_CELL.w));
+  const cell = opts.big ? SIGN_CELL : LABEL_CELL;
+  const shown = fitLabel(label, Math.floor((w - 2) / cell.w));
+  const shownW = Array.from(shown).length * cell.w;
   const t = scene.add
-    .bitmapText(-Math.floor(labelWidth(shown) / 2), -Math.floor(LABEL_CELL.h / 2), WORLD_LABEL_FONT, shown)
+    .bitmapText(-Math.floor(shownW / 2), -Math.floor(cell.h / 2), opts.big ? WORLD_SIGN_FONT : WORLD_LABEL_FONT, shown)
     .setTint(toPhaserColor(PALETTE.text));
   container.add([bg, t]);
   container.setSize(w, h);
   if (opts.onClick) {
     container.setInteractive({ useHandCursor: true });
     container.on("pointerdown", opts.onClick);
-  } else {
+  } else if (opts.dim !== false) {
     container.setAlpha(DIM_ALPHA);
   }
   return container;

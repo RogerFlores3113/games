@@ -79,7 +79,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
 }
 
 function server(view: ExpeditionView, seats = roomSeats()): SceneServerInput {
-  return { game: view, roomSeats: seats };
+  return { game: view, roomSeats: seats, hostSeatId: "s1" };
 }
 
 function ui(overrides: Partial<LocalUiState> = {}): LocalUiState {
@@ -87,9 +87,9 @@ function ui(overrides: Partial<LocalUiState> = {}): LocalUiState {
 }
 
 describe("sceneKeyFor", () => {
-  it("maps fireside and ended to between-camps", () => {
-    expect(sceneKeyFor(makeView({ runPhase: "fireside" }))).toBe("between-camps");
-    expect(sceneKeyFor(makeView({ runPhase: "ended" }))).toBe("between-camps");
+  it("maps the fireside and the ended run to their own scenes", () => {
+    expect(sceneKeyFor(makeView({ runPhase: "fireside" }))).toBe("fireside");
+    expect(sceneKeyFor(makeView({ runPhase: "ended" }))).toBe("run-end");
   });
   it("maps pre-deal and camp to camp", () => {
     expect(sceneKeyFor(makeView({ runPhase: "pre-deal" }))).toBe("camp");
@@ -389,6 +389,19 @@ describe("HUD: supplies, campNumber, bossTwist", () => {
     const eclipseView = makeView({ activeBossTwistId: "eclipse" });
     const eclipseModel = buildSceneModel(server(eclipseView), ui(), "big-index");
     expect(eclipseModel.bossTwist!.effect).toBe("dark-sky");
+  });
+
+  it("topBar names the camp, flags boss camps and shows the active twist", () => {
+    expect(buildSceneModel(server(makeView({ campNumber: 2, supplies: 2 })), ui(), "big-index").topBar).toEqual({
+      supplies: 2,
+      camp: "Camp 2 of 6",
+      boss: null,
+    });
+    expect(buildSceneModel(server(makeView({ campNumber: 3, activeBossTwistId: "eclipse" })), ui(), "big-index").topBar.boss).toEqual({
+      text: "Boss: Eclipse",
+      dim: false,
+    });
+    expect(buildSceneModel(server(makeView({ campNumber: 3 })), ui(), "big-index").topBar.camp).toBe("Camp 3 of 6 - Boss camp");
   });
 
   it("bossTwist is null when there is no active twist", () => {

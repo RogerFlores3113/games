@@ -109,8 +109,8 @@ export async function getModel<T = unknown>(page: Page): Promise<T> {
 /**
  * Reads `window.__expeditionTest.scene` on `page`.
  */
-export async function getScene(page: Page): Promise<"camp" | "between-camps" | null> {
-  return page.evaluate(() => window.__expeditionTest?.scene ?? null) as Promise<"camp" | "between-camps" | null>;
+export async function getScene(page: Page): Promise<"camp" | "fireside" | "run-end" | null> {
+  return page.evaluate(() => window.__expeditionTest?.scene ?? null) as Promise<"camp" | "fireside" | "run-end" | null>;
 }
 
 /**

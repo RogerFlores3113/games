@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
-import type { RoomSeatInfo, SceneServerInput } from "./build-scene-model";
+import type { RoomSeatInfo, SceneModel, SceneServerInput } from "./build-scene-model";
 import { beginGearTargeting } from "./local-ui";
-import { createExpeditionSceneStore } from "./expedition-scene-store";
+import { createExpeditionSceneStore, type ExpeditionSceneStore } from "./expedition-scene-store";
 
 const AS: ExpeditionCardIdentityView = { kind: "standard", suit: "spades", rank: 14 }; // A♠
 
@@ -76,7 +76,13 @@ function fireside(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
 }
 
 function server(view: ExpeditionView, seats = roomSeats()): SceneServerInput {
-  return { game: view, roomSeats: seats };
+  return { game: view, roomSeats: seats, hostSeatId: "s1" };
+}
+
+function campModel(store: ExpeditionSceneStore): SceneModel {
+  const model = store.getState().model;
+  if (model?.sceneKey !== "camp") throw new Error(`expected the camp model, got ${model?.sceneKey ?? "null"}`);
+  return model;
 }
 
 describe("createExpeditionSceneStore", () => {
@@ -85,29 +91,43 @@ describe("createExpeditionSceneStore", () => {
     const state = store.getState();
     expect(state.server).toBeNull();
     expect(state.model).toBeNull();
-    expect(state.betweenModel).toBeNull();
     expect(state.sceneKey).toBeNull();
     expect(state.cardPackId).toBe("big-index");
     expect(state.reconnecting).toBe(false);
   });
 
-  it("setServer with a camp-phase view sets sceneKey camp, model built, betweenModel null", () => {
+  it("setServer with a camp-phase view builds the camp model", () => {
     const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
     store.getState().setServer(server(makeView()));
-    const state = store.getState();
-    expect(state.sceneKey).toBe("camp");
-    expect(state.model).not.toBeNull();
-    expect(state.model!.cardPackId).toBe("big-index");
-    expect(state.betweenModel).toBeNull();
+    expect(store.getState().sceneKey).toBe("camp");
+    expect(campModel(store).cardPackId).toBe("big-index");
   });
 
-  it("setServer with a fireside view sets sceneKey between-camps, betweenModel set, model null", () => {
+  it("setServer with a fireside view builds the fireside model", () => {
     const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
-    store.getState().setServer(server(fireside()));
+    store.getState().setServer(server(fireside({ yourDraftOffer: ["jam"] })));
     const state = store.getState();
-    expect(state.sceneKey).toBe("between-camps");
-    expect(state.betweenModel).not.toBeNull();
-    expect(state.model).toBeNull();
+    expect(state.sceneKey).toBe("fireside");
+    expect(state.model).toMatchObject({ sceneKey: "fireside", prompt: { text: "Pick one gear to take with you", tone: "your-move" } });
+  });
+
+  it("setServer with an ended run builds the run-end model", () => {
+    const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
+    store.getState().setServer(server(makeView({ runPhase: "ended", runStatus: "lost", attempt: null })));
+    expect(store.getState().sceneKey).toBe("run-end");
+    expect(store.getState().model).toMatchObject({ sceneKey: "run-end", outcome: "lost", isHost: false });
+  });
+
+  it("restartLobby calls onRestartLobby, except while reconnecting", () => {
+    const restarts: string[] = [];
+    const store = createExpeditionSceneStore({ onAction: vi.fn(), onRestartLobby: () => restarts.push("restart"), cardPackId: "big-index" });
+    store.getState().setServer(server(makeView({ runPhase: "ended", runStatus: "lost", attempt: null })));
+    store.getState().setReconnecting(true);
+    store.getState().restartLobby();
+    expect(restarts).toEqual([]);
+    store.getState().setReconnecting(false);
+    store.getState().restartLobby();
+    expect(restarts).toEqual(["restart"]);
   });
 
   it("dispatch calls onAction exactly once with the given request", () => {
@@ -131,11 +151,11 @@ describe("createExpeditionSceneStore", () => {
   it("setReconnecting rebuilds the model so the prompt says so, and restores it after", () => {
     const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
     store.getState().setServer(server(makeView()));
-    const before = store.getState().model!.prompt.text;
+    const before = campModel(store).prompt.text;
     store.getState().setReconnecting(true);
-    expect(store.getState().model!.prompt).toEqual({ text: "Reconnecting…", tone: "alert" });
+    expect(campModel(store).prompt).toEqual({ text: "Reconnecting…", tone: "alert" });
     store.getState().setReconnecting(false);
-    expect(store.getState().model!.prompt.text).toBe(before);
+    expect(campModel(store).prompt.text).toBe(before);
   });
 
   it("dispatch is a no-op when server is null", () => {
@@ -191,7 +211,7 @@ describe("createExpeditionSceneStore", () => {
     store.getState().setServer(server(makeView()));
     store.getState().setCardPack("classic");
     expect(store.getState().cardPackId).toBe("classic");
-    expect(store.getState().model!.cardPackId).toBe("classic");
+    expect(campModel(store).cardPackId).toBe("classic");
   });
 
   it("notifies subscribers on each state change", () => {

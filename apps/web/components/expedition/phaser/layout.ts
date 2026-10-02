@@ -37,6 +37,34 @@ export const ZONES = {
 
 export type ZoneId = keyof typeof ZONES;
 
+/** The fireside between camps. The trail stops short of the settings safe
+ * zone in the top-right corner. */
+export const FIRESIDE_ZONES = {
+  topBar: { x: 0, y: 0, w: 576, h: 22 },
+  prompt: { x: 96, y: 24, w: 448, h: 16 },
+  trail: { x: 16, y: 44, w: 568, h: 64 },
+  draft: { x: 16, y: 116, w: 384, h: 120 },
+  crew: { x: 408, y: 116, w: 216, h: 120 },
+  tooltip: { x: 16, y: 240, w: 608, h: 24 },
+  backpack: { x: 16, y: 268, w: 448, h: 88 },
+  ready: { x: 472, y: 268, w: 152, h: 88 },
+} as const satisfies Record<string, Rect>;
+
+/** The end of the run: the outcome, the per-camp strip, and the restart. */
+export const RUN_END_ZONES = {
+  headline: { x: 32, y: 40, w: 544, h: 44 },
+  strip: { x: 16, y: 104, w: 608, h: 76 },
+  mascot: { x: 296, y: 192, w: 48, h: 44 },
+  actions: { x: 168, y: 248, w: 304, h: 96 },
+} as const satisfies Record<string, Rect>;
+
+/** Every scene's zone table, for the disjointness test. */
+export const SCENE_ZONES: Readonly<Record<string, Readonly<Record<string, Rect>>>> = {
+  camp: ZONES,
+  fireside: FIRESIDE_ZONES,
+  "run-end": RUN_END_ZONES,
+};
+
 export const CARD_W = 28;
 export const CARD_H = 40;
 export const MINI_W = 14;
@@ -134,3 +162,23 @@ export const INTERACTABLE_ANCHORS: {
   lantern: { x: 104, y: 150 },
   mascot: { x: 612, y: 338 },
 };
+
+// ---------------------------------------------------------------------------
+// Fireside
+// ---------------------------------------------------------------------------
+
+/** Trail stops: the six camps then the temple, evenly spaced along the trail
+ * zone. Returns each stop's centre x. */
+export function trailStopXs(count: number): number[] {
+  const zone = FIRESIDE_ZONES.trail;
+  const step = zone.w / count;
+  return Array.from({ length: count }, (_, i) => Math.round(zone.x + step * (i + 0.5)));
+}
+
+/** `count` equal boxes with `gap` between them, filling at most `maxW` px
+ * and never wider than `maxBox` each. Returns each box's left x and width. */
+export function rowBoxes(x: number, maxW: number, count: number, gap: number, maxBox: number): { x: number; w: number }[] {
+  if (count <= 0) return [];
+  const w = Math.min(maxBox, Math.floor((maxW - gap * (count - 1)) / count));
+  return Array.from({ length: count }, (_, i) => ({ x: x + i * (w + gap), w }));
+}

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { draftOffer, type FiresideView } from "./expedition-driver";
 import { getScene, startExpeditionGame, waitForBridge } from "./expedition-helpers";
 
 test.describe("Expedition Phaser mount (SCENE-01, SCENE-10, criterion 3)", () => {
@@ -11,10 +12,9 @@ test.describe("Expedition Phaser mount (SCENE-01, SCENE-10, criterion 3)", () =>
         await expect(p.locator('[data-testid="expedition-canvas-mount"] canvas')).toHaveCount(1);
         const liveGames = await p.evaluate(() => window.__expeditionTest?.liveGames ?? 0);
         expect(liveGames).toBe(1);
-        expect(await getScene(p)).toBe("between-camps");
-        const model = await p.evaluate(() => window.__expeditionTest?.model as { draftOffer: unknown[] | null } | null);
-        expect(model?.draftOffer).not.toBeNull();
-        expect(model?.draftOffer).toHaveLength(3);
+        expect(await getScene(p)).toBe("fireside");
+        const model = await p.evaluate(() => window.__expeditionTest?.model as FiresideView | null);
+        expect(draftOffer(model ?? {})).toHaveLength(3);
       }
     } finally {
       for (const context of contexts) await context.close();

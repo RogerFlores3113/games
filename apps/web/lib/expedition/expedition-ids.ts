@@ -90,3 +90,5 @@ export const CONFIRM_ID = "confirm";
 export const CANCEL_ID = "cancel";
 export const PREDEAL_SKIP_ID = "predeal-skip";
 export const LAST_TRICK_ID = "last-trick";
+export const NEW_EXPEDITION_ID = "run-end:new-expedition";
+export const LEAVE_ID = "run-end:leave";

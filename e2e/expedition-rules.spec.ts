@@ -1,19 +1,15 @@
 import { test, expect } from "@playwright/test";
 import { GEAR_DISPLAY } from "@games/rules";
-import { clickUntilChanged } from "./expedition-driver";
+import { clickUntilChanged, draftOffer, type FiresideView } from "./expedition-driver";
 import { getModel, startExpeditionGame } from "./expedition-helpers";
-
-interface DraftModel {
-  draftOffer: { gearId: string; objectId: string }[] | null;
-}
 
 test("rules modal shows the reference, lists drafted gear, and closes on Escape", async ({ browser, page }) => {
   const { pages, contexts } = await startExpeditionGame(browser, page, ["Hana", "Ivo", "Jun"]);
   try {
     const host = pages[0]!;
-    await expect.poll(async () => (await getModel<DraftModel>(host)).draftOffer !== null).toBe(true);
-    const pick = (await getModel<DraftModel>(host)).draftOffer![0]!;
-    await clickUntilChanged<DraftModel>(host, pick.objectId, (m) => m.draftOffer === null, { perAttemptTimeoutMs: 15_000 });
+    await expect.poll(async () => draftOffer(await getModel<FiresideView>(host)) !== null).toBe(true);
+    const pick = draftOffer(await getModel<FiresideView>(host))![0]!;
+    await clickUntilChanged<FiresideView>(host, pick.objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
 
     await host.getByTestId("expedition-rules-button").click();
     const dialog = host.getByRole("dialog", { name: "Rules" });

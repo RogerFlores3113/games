@@ -45,6 +45,14 @@ export class ObjectIndex {
     }
   }
 
+  /** Whether stage point (x, y) lies inside `id`'s visible bounds. */
+  contains(id: string, x: number, y: number): boolean {
+    const entry = this.byId.get(id);
+    if (entry === undefined || !entry.obj.active || !entry.obj.visible) return false;
+    const b = entry.obj.getBounds();
+    return x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height;
+  }
+
   entries(): ObjectIndexEntry[] {
     const out: ObjectIndexEntry[] = [];
     for (const [id, entry] of this.byId) {

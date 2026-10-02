@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
-import { buildPrompt, PROMPT_MAX_CHARS, type Prompt, type PromptSeat } from "./build-prompt";
+import { buildFiresidePrompt, buildPrompt, PROMPT_MAX_CHARS, type Prompt, type PromptSeat } from "./build-prompt";
 import { initialLocalUi, type LocalUiState } from "./local-ui";
 
 const H7: ExpeditionCardIdentityView = { kind: "standard", suit: "hearts", rank: 7 };
@@ -233,5 +233,53 @@ describe("buildPrompt", () => {
     );
     expect(tooLong).toEqual([]);
     expect(buildPrompt(preDeal(["ana"]), longSeats, ui(), playing).text).toBe("Waiting for Maximilia… to decide on pre-deal gear");
+  });
+});
+
+describe("buildFiresidePrompt", () => {
+  function fireside(overrides: Partial<ExpeditionView> = {}, ready: Record<string, boolean> = {}): ExpeditionView {
+    const base = view(null, { runPhase: "fireside", attempt: null, campNumber: 2, ...overrides });
+    return { ...base, seats: base.seats.map((s) => ({ ...s, ready: ready[s.seatId] ?? false })) };
+  }
+  const cleared = [{ campNumber: 1, attemptNumber: 1, status: "succeeded" as const, suppliesSpent: 0 }];
+  const failed = [{ campNumber: 2, attemptNumber: 1, status: "failed" as const, suppliesSpent: 1 }];
+  const at = (v: ExpeditionView, reconnecting = false): Prompt => buildFiresidePrompt(v, SEATS, { reconnecting });
+
+  it("opens the run with the first draft", () => {
+    expect(at(fireside({ yourDraftOffer: ["peek"] }))).toEqual({ text: "Pick one gear to take with you", tone: "your-move" });
+  });
+
+  it("announces a cleared camp with the draft", () => {
+    expect(at(fireside({ yourDraftOffer: ["peek"], history: cleared }))).toEqual({ text: "Camp 1 cleared! Pick one gear", tone: "your-move" });
+  });
+
+  it("asks you to pack once the pick is made", () => {
+    expect(at(fireside({ history: cleared }))).toEqual({ text: "Pack your backpack, then Ready", tone: "your-move" });
+  });
+
+  it("announces a failed camp and its supply cost", () => {
+    expect(at(fireside({ history: failed }))).toEqual({ text: "Camp 2 failed: -1 supply. Try again: pack, then Ready", tone: "alert" });
+  });
+
+  it("names who the crew is waiting for once you are ready", () => {
+    expect(at(fireside({}, { me: true }))).toEqual({ text: "Waiting for Ana and Bo", tone: "waiting" });
+    expect(at(fireside({}, { me: true, ana: true }))).toEqual({ text: "Waiting for Bo", tone: "waiting" });
+  });
+
+  it("counts teammates when their names overflow the line", () => {
+    const long = [
+      { seatId: "me", displayLabel: "Roger" },
+      { seatId: "ana", displayLabel: "Anastasia" },
+      { seatId: "bo", displayLabel: "Bonaventure" },
+      { seatId: "cy", displayLabel: "Cyprianus" },
+      { seatId: "di", displayLabel: "Dionysia" },
+    ];
+    const base = fireside({}, { me: true });
+    const five = { ...base, seats: long.map((s) => ({ seatId: s.seatId, equippedGearIds: [], ready: s.seatId === "me", draftPending: false })) };
+    expect(buildFiresidePrompt(five, long, { reconnecting: false })).toEqual({ text: "Waiting for 4 teammates", tone: "waiting" });
+  });
+
+  it("says Reconnecting while the socket is down", () => {
+    expect(at(fireside(), true)).toEqual({ text: "Reconnecting…", tone: "alert" });
   });
 });

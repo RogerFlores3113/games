@@ -42,9 +42,28 @@ export interface RoomSeatInfo {
 export interface SceneServerInput {
   game: ExpeditionView;
   roomSeats: RoomSeatInfo[];
+  hostSeatId: string | null;
 }
 
-export type SceneKey = "camp" | "between-camps";
+export type SceneKey = "camp" | "fireside" | "run-end";
+
+/** The top bar's three readouts, shared by the camp and fireside scenes. */
+export interface TopBar {
+  supplies: number;
+  camp: string;
+  boss: { text: string; dim: boolean } | null;
+}
+
+/** Gear rules text for the hovered item, plus why it can't be used or
+ * packed right now. */
+export interface Tooltip {
+  title: string;
+  text: string;
+  reason: string | null;
+}
+
+export const BOSS_CAMP_NUMBERS: readonly number[] = [3, 6];
+export const FINAL_CAMP_NUMBER = 6;
 
 export type BossEffect = "rain" | "dark-sky" | "none";
 
@@ -119,13 +138,14 @@ export interface TrickPlayModel {
 }
 
 export interface SceneModel {
-  sceneKey: SceneKey;
+  sceneKey: "camp";
   cardPackId: CardPackId;
   youSeatId: string | null;
   runPhase: ExpeditionView["runPhase"];
   campNumber: number;
   supplies: number;
   bossTwist: { id: string; name: string; effect: BossEffect; cancelled: boolean } | null;
+  topBar: TopBar;
   seats: SeatModel[];
   hand: CardModel[];
   trick: { leaderSeatId: string; plays: TrickPlayModel[] } | null;
@@ -133,8 +153,7 @@ export interface SceneModel {
   faceUpObjectives: ObjectiveChip[];
   removedCardLabels: string[];
   prompt: Prompt;
-  /** Rules text for the hovered gear, plus why it can't be used right now. */
-  tooltip: { title: string; text: string; reason: string | null } | null;
+  tooltip: Tooltip | null;
   /** `visible`: the Whisper can be started now. `used`: you already whispered
    * this camp. `shown`: the button belongs on screen (camp is being played). */
   whisper: { shown: boolean; visible: boolean; used: boolean; active: boolean };
@@ -143,7 +162,9 @@ export interface SceneModel {
 }
 
 export function sceneKeyFor(game: ExpeditionView): SceneKey {
-  return game.runPhase === "fireside" || game.runPhase === "ended" ? "between-camps" : "camp";
+  if (game.runPhase === "ended") return "run-end";
+  if (game.runPhase === "fireside") return "fireside";
+  return "camp";
 }
 
 // ---------------------------------------------------------------------------
@@ -387,14 +408,31 @@ function buildBossTwist(view: ExpeditionView): SceneModel["bossTwist"] {
   };
 }
 
-function buildTooltip(view: ExpeditionView, ui: LocalUiState): SceneModel["tooltip"] {
-  if (ui.tooltipGearId === null) return null;
-  const display = GEAR_DISPLAY[ui.tooltipGearId];
+function buildTopBar(view: ExpeditionView, bossTwist: SceneModel["bossTwist"]): TopBar {
+  const camp = BOSS_CAMP_NUMBERS.includes(view.campNumber)
+    ? `Camp ${view.campNumber} of ${FINAL_CAMP_NUMBER} - Boss camp`
+    : `Camp ${view.campNumber} of ${FINAL_CAMP_NUMBER}`;
+  const boss =
+    bossTwist === null
+      ? null
+      : { text: bossTwist.cancelled ? `Boss: ${bossTwist.name} (off)` : `Boss: ${bossTwist.name}`, dim: bossTwist.cancelled };
+  return { supplies: view.supplies, camp, boss };
+}
+
+/** Rules text plus downside, the way every tooltip phrases a gear. */
+export function gearRulesText(gearId: string): { title: string; text: string } | null {
+  const display = GEAR_DISPLAY[gearId];
   if (display === undefined) return null;
+  return { title: display.name, text: display.downside === null ? display.text : `${display.text} ${display.downside}` };
+}
+
+function buildTooltip(view: ExpeditionView, ui: LocalUiState): Tooltip | null {
+  if (ui.tooltipGearId === null) return null;
+  const rules = gearRulesText(ui.tooltipGearId);
+  if (rules === null) return null;
   const status = view.yourGear.find((g) => g.gearId === ui.tooltipGearId);
-  const text = display.downside === null ? display.text : `${display.text} ${display.downside}`;
   const reason = status !== undefined && !status.usableNow ? (status.reason ?? null) : null;
-  return { title: display.name, text, reason };
+  return { ...rules, reason };
 }
 
 export function buildSceneModel(
@@ -438,13 +476,14 @@ export function buildSceneModel(
   }
 
   return {
-    sceneKey: sceneKeyFor(view),
+    sceneKey: "camp",
     cardPackId,
     youSeatId: view.yourSeatId,
     runPhase: view.runPhase,
     campNumber: view.campNumber,
     supplies: view.supplies,
     bossTwist,
+    topBar: buildTopBar(view, bossTwist),
     seats,
     hand,
     trick,

@@ -158,3 +158,35 @@ export function buildPrompt(
 
   return playingPrompt(view, camp, opts.whisperAvailable, nameOf);
 }
+
+/** "Ana", "Ana and Bo", "Ana, Bo and Cy". */
+function nameList(names: string[]): string {
+  if (names.length <= 1) return names.join("");
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/** The fireside prompt: the last camp's result on arrival, then draft, pack,
+ * and who the crew is still waiting for. */
+export function buildFiresidePrompt(view: ExpeditionView, seats: readonly PromptSeat[], opts: { reconnecting: boolean }): Prompt {
+  if (opts.reconnecting) return { text: "Reconnecting…", tone: "alert" };
+  const nameOf = (seatId: string): string => shortName(seats.find((s) => s.seatId === seatId)?.displayLabel ?? "Someone");
+  const you = view.seats.find((s) => s.seatId === view.yourSeatId);
+  if (you === undefined) return { text: `The crew is packing for camp ${view.campNumber}`, tone: "waiting" };
+
+  const last = view.history.at(-1);
+  if (view.yourDraftOffer !== null) {
+    if (last?.status === "succeeded") return { text: `Camp ${last.campNumber} cleared! Pick one gear`, tone: "your-move" };
+    return { text: "Pick one gear to take with you", tone: "your-move" };
+  }
+  if (!you.ready) {
+    if (last?.status === "failed") {
+      const spent = `-${last.suppliesSpent} ${last.suppliesSpent === 1 ? "supply" : "supplies"}`;
+      return { text: `Camp ${last.campNumber} failed: ${spent}. Try again: pack, then Ready`, tone: "alert" };
+    }
+    return { text: "Pack your backpack, then Ready", tone: "your-move" };
+  }
+  const waiting = view.seats.filter((s) => !s.ready).map((s) => nameOf(s.seatId));
+  if (waiting.length === 0) return { text: "Setting out…", tone: "waiting" };
+  const text = `Waiting for ${nameList(waiting)}`;
+  return { text: text.length <= PROMPT_MAX_CHARS ? text : `Waiting for ${waiting.length} teammates`, tone: "waiting" };
+}

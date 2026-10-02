@@ -6,6 +6,7 @@ import {
   HAND_MARKER_H,
   HOVER_LIFT,
   INTERACTABLE_ANCHORS,
+  SCENE_ZONES,
   SETTINGS_SAFE_ZONE,
   STAGE,
   ZONES,
@@ -13,13 +14,15 @@ import {
   opponentBlocks,
   rectContains,
   rectsIntersect,
+  rowBoxes,
   stumpRowXs,
+  trailStopXs,
   type Rect,
 } from "./layout";
 
-const zoneEntries = Object.entries(ZONES) as [string, Rect][];
+describe.each(Object.entries(SCENE_ZONES))("%s zones", (_scene, zones) => {
+  const zoneEntries = Object.entries(zones);
 
-describe("ZONES", () => {
   it("no two zones intersect", () => {
     const overlapping: string[] = [];
     for (let i = 0; i < zoneEntries.length; i++) {
@@ -42,6 +45,28 @@ describe("ZONES", () => {
   it("every zone has whole-pixel edges", () => {
     const fractional = zoneEntries.filter(([, r]) => ![r.x, r.y, r.w, r.h].every(Number.isInteger)).map(([id]) => id);
     expect(fractional).toEqual([]);
+  });
+});
+
+describe("trailStopXs", () => {
+  it("spaces seven stops evenly across the trail zone", () => {
+    expect(trailStopXs(7)).toEqual([57, 138, 219, 300, 381, 462, 543]);
+  });
+});
+
+describe("rowBoxes", () => {
+  it("caps the box width, and shrinks boxes so the row fits", () => {
+    expect(rowBoxes(10, 200, 3, 4, 40)).toEqual([
+      { x: 10, w: 40 },
+      { x: 54, w: 40 },
+      { x: 98, w: 40 },
+    ]);
+    expect(rowBoxes(0, 100, 4, 4, 40)).toEqual([
+      { x: 0, w: 22 },
+      { x: 26, w: 22 },
+      { x: 52, w: 22 },
+      { x: 78, w: 22 },
+    ]);
   });
 });
 

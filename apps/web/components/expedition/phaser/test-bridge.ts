@@ -16,8 +16,8 @@
  */
 import type Phaser from "phaser";
 import type { ExpeditionSceneStore } from "../../../lib/expedition/expedition-scene-store";
-import type { SceneModel, SceneKey } from "../../../lib/expedition/build-scene-model";
-import type { BetweenCampsModel } from "../../../lib/expedition/between-camps-model";
+import type { SceneKey } from "../../../lib/expedition/build-scene-model";
+import type { ActiveModel } from "../../../lib/expedition/expedition-scene-store";
 import type { ObjectIndex } from "./object-index";
 import type { LayoutEntry } from "../../../lib/expedition/layout-audit";
 import { STAGE_WIDTH } from "../../../lib/expedition/compute-zoom";
@@ -26,7 +26,7 @@ export interface ExpeditionTestBridge {
   ready: boolean;
   liveGames: number;
   readonly scene: SceneKey | null;
-  readonly model: SceneModel | BetweenCampsModel | null;
+  readonly model: ActiveModel | null;
   /** Every registered object's page-CSS-px CENTRE + scaled size, keyed by
    * its test-bridge id. */
   objects(): Record<string, { x: number; y: number; width: number; height: number }>;
@@ -105,10 +105,7 @@ function ensureBridge(): ExpeditionTestBridge {
       return current()?.store.getState().sceneKey ?? null;
     },
     get model() {
-      const install = current();
-      if (install === null) return null;
-      const state = install.store.getState();
-      return state.model ?? state.betweenModel;
+      return current()?.store.getState().model ?? null;
     },
     objects() {
       const install = current();

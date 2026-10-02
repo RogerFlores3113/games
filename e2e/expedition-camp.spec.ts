@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
+import { draftOffer, isReady, ownedGear, type FiresideView, type SceneName } from "./expedition-driver";
 import { clickObject, getModel, getScene, hoverObject, startExpeditionGame, waitForBridge } from "./expedition-helpers";
 
 /**
@@ -67,7 +68,7 @@ interface Targeting {
 }
 
 interface CampModel {
-  sceneKey: "camp" | "between-camps";
+  sceneKey: SceneName;
   cardPackId: string;
   youSeatId: string | null;
   prompt: { text: string; tone: "your-move" | "waiting" | "info" | "alert" };
@@ -78,26 +79,6 @@ interface CampModel {
   faceUpObjectives: ObjectiveChip[];
   whisper: { visible: boolean; active: boolean };
   targeting: Targeting | null;
-}
-
-interface DraftOfferItem {
-  gearId: string;
-  objectId: string;
-  size: number;
-}
-
-interface OwnedItem {
-  gearId: string;
-  objectId: string;
-  equipped: boolean;
-  fits: boolean;
-}
-
-interface BetweenCampsModel {
-  draftOffer: DraftOfferItem[] | null;
-  owned: OwnedItem[];
-  youReady: boolean;
-  lastResult: { campNumber: number; status: "succeeded" | "failed" } | null;
 }
 
 interface DriveState {
@@ -111,7 +92,7 @@ interface DriveState {
 // ---------------------------------------------------------------------------
 
 /** Waits until the bridge's `scene` (not `model`) reports `expected`. */
-async function waitForScene(page: Page, expected: "camp" | "between-camps", timeout = 60_000): Promise<void> {
+async function waitForScene(page: Page, expected: SceneName, timeout = 60_000): Promise<void> {
   await page.waitForFunction((wanted) => window.__expeditionTest?.scene === wanted, expected, { timeout });
 }
 
@@ -231,22 +212,17 @@ function pickDraftOffer<T extends { gearId: string; size: number }>(offers: T[])
  * waits until every page's scene is "camp". */
 async function reachCamp(pages: Page[]): Promise<void> {
   for (const page of pages) {
-    // The store's model can update to the fireside's BetweenCampsModel
-    // slightly before CampScene's own DESTROY/BetweenCampsScene's own
-    // create() finish the actual Phaser scene switch (they're two separate,
-    // independently-timed reactions to the same server view arriving).
-    // Wait for the SCENE itself, not just a non-null model, so the ids we
-    // are about to click ("draft:<id>", "ready", ...) are actually
+    // The store's model can update to the fireside model slightly before
+    // the camp scene's DESTROY and the fireside scene's create() finish
+    // the Phaser scene switch (two independently-timed reactions to the
+    // same server view). Wait for the SCENE itself, not just the model, so
+    // the ids we are about to click ("draft:<id>", "ready", ...) are
     // registered by the time we look for them.
-    await waitForScene(page, "between-camps", 60_000);
-    const model = await getModel<BetweenCampsModel>(page);
-    if (model.draftOffer === null) continue;
-    const pick = pickDraftOffer(model.draftOffer);
-    await clickUntilChanged<BetweenCampsModel>(page, pick.objectId, (m) => m.draftOffer === null, { perAttemptTimeoutMs: 15_000 });
-  }
-
-  for (const page of pages) {
-    await page.waitForFunction(() => window.__expeditionTest?.model && (window.__expeditionTest.model as BetweenCampsModel).draftOffer === null, undefined, { timeout: 15_000 });
+    await waitForScene(page, "fireside", 60_000);
+    const offer = draftOffer(await getModel<FiresideView>(page));
+    if (offer === null) continue;
+    const pick = pickDraftOffer(offer);
+    await clickUntilChanged<FiresideView>(page, pick.objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
   }
 
   for (const page of pages) {
@@ -256,28 +232,23 @@ async function reachCamp(pages: Page[]): Promise<void> {
     // fireside before we get here. In that case there is nothing left for
     // THIS page to click — it has already arrived at camp.
     if ((await getScene(page)) === "camp") continue;
-    const model = await getModel<BetweenCampsModel>(page);
-    if (model.youReady) continue;
-    const fitting = model.owned.find((o) => o.fits && !o.equipped);
+    const model = await getModel<FiresideView>(page);
+    if (isReady(model)) continue;
+    const fitting = ownedGear(model).find((o) => o.fits && !o.equipped);
     if (fitting) {
-      await clickUntilChanged<BetweenCampsModel>(
+      await clickUntilChanged<FiresideView>(
         page,
         fitting.objectId,
-        (m) => m.owned.find((o) => o.gearId === fitting.gearId)?.equipped === true,
+        (m) => ownedGear(m).find((o) => o.gearId === fitting.gearId)?.equipped === true,
         { perAttemptTimeoutMs: 15_000 },
       );
     }
     // Once every seat is ready the room advances straight past the
     // fireside (possibly from another page's own "ready" click landing a
     // moment after this one), so "ready" itself vanishes — accept either
-    // this page's own `youReady` flipping true, or the scene having
-    // already moved on to "camp", as success.
-    await clickUntilChanged<BetweenCampsModel & { sceneKey?: string }>(
-      page,
-      READY_ID,
-      (m) => m.youReady === true || m.sceneKey === "camp",
-      { perAttemptTimeoutMs: 15_000 },
-    );
+    // this page's own readiness, or the scene having already moved on to
+    // "camp", as success.
+    await clickUntilChanged<FiresideView>(page, READY_ID, (m) => isReady(m) || m.sceneKey === "camp", { perAttemptTimeoutMs: 15_000 });
   }
 
   for (const page of pages) {
@@ -470,7 +441,7 @@ async function stepCamp(pages: Page[], state: DriveState): Promise<void> {
       }
       const playedCardId = playable.id;
       // Playing the trick's final card can end the camp outright (success
-      // or failure), moving the scene straight to "between-camps" — at
+      // or failure), moving the scene straight to the fireside — at
       // which point `hand` no longer exists on the model at all. Accept
       // that scene transition as success too, alongside the ordinary
       // "card left the hand" case.
@@ -508,7 +479,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
         while (passes < 400 && !campOver) {
           passes++;
           const scenes = await Promise.all(pages.map((p) => getScene(p)));
-          if (scenes.every((s) => s === "between-camps")) {
+          if (scenes.every((s) => s !== "camp")) {
             campOver = true;
             break;
           }
@@ -517,7 +488,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
           await assertDimmingInvariant(pages);
         }
         if (!campOver) {
-          throw new Error(`camp ${camps} did not reach "between-camps" within 400 driver passes`);
+          throw new Error(`camp ${camps} did not reach the fireside within 400 driver passes`);
         }
         if (state.whisperDone && state.gearDone) {
           resolved = true;
@@ -534,7 +505,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
       expect(state.whisperDone).toBe(true);
       expect(state.gearDone).toBe(true);
 
-      const finalModels = await Promise.all(pages.map((p) => getModel<BetweenCampsModel>(p)));
+      const finalModels = await Promise.all(pages.map((p) => getModel<FiresideView>(p)));
       for (const m of finalModels) {
         expect(m.lastResult).not.toBeNull();
       }
@@ -555,43 +526,39 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
 
     try {
       // Mid-draft reload.
-      let hostBetween = await getModel<BetweenCampsModel>(page);
-      const draftIdsBefore = (hostBetween.draftOffer ?? []).map((o) => o.gearId).sort();
+      let hostFireside = await getModel<FiresideView>(page);
+      const draftIdsBefore = (draftOffer(hostFireside) ?? []).map((o) => o.gearId).sort();
       await page.reload();
       await waitForBridge(page);
-      hostBetween = await getModel<BetweenCampsModel>(page);
-      expect((hostBetween.draftOffer ?? []).map((o) => o.gearId).sort()).toEqual(draftIdsBefore);
+      hostFireside = await getModel<FiresideView>(page);
+      expect((draftOffer(hostFireside) ?? []).map((o) => o.gearId).sort()).toEqual(draftIdsBefore);
 
       // Pick a draft, then mid-loadout reload.
-      if (hostBetween.draftOffer === null) throw new Error("host has no draft offer after reload");
-      const pick = pickDraftOffer(hostBetween.draftOffer);
-      hostBetween = await clickUntilChanged<BetweenCampsModel>(page, pick.objectId, (m) => m.draftOffer === null, { perAttemptTimeoutMs: 15_000 });
+      const offer = draftOffer(hostFireside);
+      if (offer === null) throw new Error("host has no draft offer after reload");
+      const pick = pickDraftOffer(offer);
+      hostFireside = await clickUntilChanged<FiresideView>(page, pick.objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
 
-      const fitting = hostBetween.owned.find((o) => o.fits && !o.equipped);
+      const fitting = ownedGear(hostFireside).find((o) => o.fits && !o.equipped);
       if (fitting) {
-        await clickUntilChanged<BetweenCampsModel>(
+        await clickUntilChanged<FiresideView>(
           page,
           fitting.objectId,
-          (m) => m.owned.find((o) => o.gearId === fitting.gearId)?.equipped === true,
+          (m) => ownedGear(m).find((o) => o.gearId === fitting.gearId)?.equipped === true,
           { perAttemptTimeoutMs: 15_000 },
         );
       }
 
       await page.reload();
       await waitForBridge(page);
-      const afterLoadoutReload = await getModel<BetweenCampsModel>(page);
-      expect(afterLoadoutReload.draftOffer).toBeNull();
+      const afterLoadoutReload = await getModel<FiresideView>(page);
+      expect(draftOffer(afterLoadoutReload)).toBeNull();
       if (fitting) {
-        expect(afterLoadoutReload.owned.find((o) => o.gearId === fitting.gearId)?.equipped).toBe(true);
+        expect(ownedGear(afterLoadoutReload).find((o) => o.gearId === fitting.gearId)?.equipped).toBe(true);
       }
 
       // Ready the host, drive the other two through the fireside, reach camp.
-      await clickUntilChanged<BetweenCampsModel & { sceneKey?: string }>(
-        page,
-        READY_ID,
-        (m) => m.youReady === true || m.sceneKey === "camp",
-        { perAttemptTimeoutMs: 15_000 },
-      );
+      await clickUntilChanged<FiresideView>(page, READY_ID, (m) => isReady(m) || m.sceneKey === "camp", { perAttemptTimeoutMs: 15_000 });
       await reachCamp(pages.slice(1));
       await waitForScene(page, "camp", 60_000);
 
@@ -600,6 +567,10 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
       let openWindow = false;
       for (let i = 0; i < 300 && !openWindow; i++) {
         const model = await getModel<CampModel>(page);
+        if (model.sceneKey !== "camp") {
+          await reachCamp(pages);
+          continue;
+        }
         const you = model.seats.find((s) => s.isYou);
         const leading = (model.trick?.plays.length ?? 0) === 0;
         if (model.faceUpObjectives.some((o) => o.pickable) || (you?.mayAct && leading && model.whisper.visible)) {

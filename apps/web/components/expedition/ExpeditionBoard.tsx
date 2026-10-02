@@ -46,9 +46,11 @@ export function ExpeditionBoard({
   const isHost = view.youSeatId !== null && view.youSeatId === view.hostSeatId;
 
   const onActionRef = useRef(onAction);
+  const onRestartLobbyRef = useRef(onRestartLobby);
   useEffect(() => {
     onActionRef.current = onAction;
-  }, [onAction]);
+    onRestartLobbyRef.current = onRestartLobby;
+  }, [onAction, onRestartLobby]);
 
   const parsed = useMemo(
     () => (view.game == null ? null : ExpeditionViewSchema.safeParse(view.game)),
@@ -64,6 +66,7 @@ export function ExpeditionBoard({
   const [store] = useState(() =>
     createExpeditionSceneStore({
       onAction: (request) => onActionRef.current(request),
+      onRestartLobby: () => onRestartLobbyRef.current?.(),
       cardPackId: readCardPackPref(),
     }),
   );
@@ -88,9 +91,10 @@ export function ExpeditionBoard({
     store.getState().setServer({
       game,
       roomSeats: view.seats.map(({ seatId, displayLabel, connected }) => ({ seatId, displayLabel, connected })),
+      hostSeatId: view.hostSeatId,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store, game, view.seats]);
+  }, [store, game, view.seats, view.hostSeatId]);
 
   useEffect(() => {
     store.getState().setReconnecting(reconnecting);

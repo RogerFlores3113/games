@@ -3,8 +3,10 @@ import type { RunAction } from "@games/rules";
 import type { CardPackId } from "./card-pack-ids";
 import type { SceneKey, SceneModel, SceneServerInput } from "./build-scene-model";
 import { buildSceneModel, sceneKeyFor } from "./build-scene-model";
-import type { BetweenCampsModel } from "./between-camps-model";
-import { buildBetweenCampsModel } from "./between-camps-model";
+import type { FiresideModel } from "./fireside-model";
+import { buildFiresideModel } from "./fireside-model";
+import type { RunEndModel } from "./run-end-model";
+import { buildRunEndModel } from "./run-end-model";
 import type { LocalUiState } from "./local-ui";
 import { confirmTargeting as confirmTargetingUi, initialLocalUi, reconcileLocalUi } from "./local-ui";
 
@@ -21,19 +23,21 @@ import { confirmTargeting as confirmTargetingUi, initialLocalUi, reconcileLocalU
  * `getState()`/`subscribe()`.
  */
 
+/** What the active scene draws, tagged by its scene key. */
+export type ActiveModel = SceneModel | FiresideModel | RunEndModel;
+
 export interface ExpeditionSceneState {
   server: SceneServerInput | null;
   localUi: LocalUiState;
   cardPackId: CardPackId;
   reconnecting: boolean;
   sceneKey: SceneKey | null;
-  model: SceneModel | null;
-  betweenModel: BetweenCampsModel | null;
+  model: ActiveModel | null;
 }
 
 export interface ExpeditionSceneActions {
   /** Reconciles `localUi` against the fresh view, then rebuilds
-   * `sceneKey`/`model`/`betweenModel` from it. */
+   * `sceneKey`/`model` from it. */
   setServer(server: SceneServerInput): void;
   setReconnecting(reconnecting: boolean): void;
   /** No-op when `server` is null — there is no view to derive from yet. */
@@ -44,6 +48,9 @@ export interface ExpeditionSceneActions {
   /** Forwards `request` to `onAction` exactly once. A no-op while
    * `reconnecting` or before any server view has arrived. */
   dispatch(request: RunAction): void;
+  /** Host only (the worker refuses anyone else): back to the lobby with
+   * seats kept. A no-op while `reconnecting`. */
+  restartLobby(): void;
   /** Runs `local-ui.ts`'s `confirmTargeting`; dispatches the resulting
    * request (if any) and clears `localUi.targeting`. A no-op if targeting
    * is not yet complete. */
@@ -57,16 +64,19 @@ function rebuild(
   localUi: LocalUiState,
   cardPackId: CardPackId,
   reconnecting: boolean,
-): Pick<ExpeditionSceneState, "sceneKey" | "model" | "betweenModel"> {
+): Pick<ExpeditionSceneState, "sceneKey" | "model"> {
   const sceneKey = sceneKeyFor(server.game);
-  if (sceneKey === "camp") {
-    return { sceneKey, model: buildSceneModel(server, localUi, cardPackId, reconnecting), betweenModel: null };
-  }
-  return { sceneKey, model: null, betweenModel: buildBetweenCampsModel(server) };
+  const builders: Record<SceneKey, () => ActiveModel> = {
+    camp: () => buildSceneModel(server, localUi, cardPackId, reconnecting),
+    fireside: () => buildFiresideModel(server, localUi, reconnecting),
+    "run-end": () => buildRunEndModel(server),
+  };
+  return { sceneKey, model: builders[sceneKey]() };
 }
 
 export function createExpeditionSceneStore(opts: {
   onAction: (request: unknown) => void;
+  onRestartLobby?: () => void;
   cardPackId: CardPackId;
 }): ExpeditionSceneStore {
   return createStore<ExpeditionSceneState & ExpeditionSceneActions>((set, get) => {
@@ -86,7 +96,6 @@ export function createExpeditionSceneStore(opts: {
       reconnecting: false,
       sceneKey: null,
       model: null,
-      betweenModel: null,
 
       setServer(server) {
         const reconciled = reconcileLocalUi(get().localUi, server.game);
@@ -121,6 +130,11 @@ export function createExpeditionSceneStore(opts: {
         const { server, reconnecting } = get();
         if (server === null || reconnecting) return;
         opts.onAction(request);
+      },
+
+      restartLobby() {
+        if (get().reconnecting) return;
+        opts.onRestartLobby?.();
       },
 
       confirmTargeting() {

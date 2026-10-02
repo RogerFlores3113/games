@@ -17,7 +17,7 @@ import { preloadArt } from "../art/place-art";
 import { drawHand, drawLastTrick, drawTrick } from "../draw/draw-hand-trick";
 import { drawControls } from "../draw/draw-controls";
 import { INTERACTABLE_REGISTRY } from "../interactables/registry";
-import { INTERACTABLE_ANCHORS } from "../layout";
+import { INTERACTABLE_ANCHORS, ZONES } from "../layout";
 import { gearObjectId, interactableObjectId, LAST_TRICK_ID } from "../../../../lib/expedition/expedition-ids";
 import { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
@@ -32,6 +32,11 @@ import {
   setTooltipGear,
 } from "../../../../lib/expedition/local-ui";
 import type { SceneDeps } from "./scene-registry";
+
+function campModel(store: SceneDeps["store"]): SceneModel | null {
+  const model = store.getState().model;
+  return model?.sceneKey === "camp" ? model : null;
+}
 
 function findObjective(model: SceneModel | null, objectiveId: string): ObjectiveChip | null {
   if (model === null) return null;
@@ -51,7 +56,7 @@ function buildHandlers(store: SceneDeps["store"]): CampHandlers {
         state.updateLocalUi((ui, view) => selectTarget(ui, view, cardId));
         return;
       }
-      const card = state.model?.hand.find((c) => c.id === cardId) ?? null;
+      const card = campModel(store)?.hand.find((c) => c.id === cardId) ?? null;
       if (card?.playable) {
         state.dispatch({ type: "play-card", cardId });
       }
@@ -69,7 +74,7 @@ function buildHandlers(store: SceneDeps["store"]): CampHandlers {
         state.updateLocalUi((ui, view) => selectTarget(ui, view, objectiveId));
         return;
       }
-      const chip = findObjective(state.model, objectiveId);
+      const chip = findObjective(campModel(store), objectiveId);
       if (chip?.pickable) {
         state.dispatch({ type: "pick-objective", objectiveId });
       }
@@ -176,10 +181,9 @@ export class CampScene extends Phaser.Scene {
     // Strict Mode's dev-only double mount calls `game.destroy(true)` on the
     // first `Phaser.Game` directly, without first calling `scene.stop()` —
     // that only fires DESTROY, never SHUTDOWN, on the scene. Listening to
-    // BOTH events (matching BetweenCampsScene's precedent) guarantees
-    // `this.unsubscribe` is torn down before the store's next `setServer`
-    // can fire `syncFromStore`/`renderModel` on a scene whose `this.add`
-    // has already gone null.
+    // BOTH events guarantees `this.unsubscribe` is torn down before the
+    // store's next `setServer` can fire `syncFromStore`/`renderModel` on a
+    // scene whose `this.add` has already gone null.
     const teardown = () => {
       this.unsubscribe?.();
       this.unsubscribe = null;
@@ -193,21 +197,22 @@ export class CampScene extends Phaser.Scene {
   private syncFromStore(): void {
     if (this.unsubscribe === null) return;
     const state = this.sceneStore.getState();
-    if (state.model === null) return;
+    const model = campModel(this.sceneStore);
+    if (model === null) return;
     if (state.cardPackId !== this.lastCardPackId) {
       const glyphs = ensurePixelFonts(this);
       ensureCardTextures(this, state.cardPackId, glyphs);
       this.lastCardPackId = state.cardPackId;
     }
-    this.renderModel(state.model);
+    this.renderModel(model);
   }
 
   renderModel(model: SceneModel): void {
     if (this.dynamicLayer === null || this.unsubscribe === null) return;
     this.dynamicLayer.removeAll(true);
-    drawTopBar(this, this.dynamicLayer, model);
-    drawPrompt(this, this.dynamicLayer, model);
-    drawTooltip(this, this.dynamicLayer, model);
+    drawTopBar(this, this.dynamicLayer, model.topBar);
+    drawPrompt(this, this.dynamicLayer, model.prompt);
+    drawTooltip(this, this.dynamicLayer, model.tooltip, ZONES.tooltip);
     const effect = model.bossTwist !== null && !model.bossTwist.cancelled ? model.bossTwist.effect : "none";
     setBossEffect(this, effect);
     this.renderTable(model);
@@ -228,19 +233,13 @@ export class CampScene extends Phaser.Scene {
    * redraw replaces the hovered object, and Phaser then never sends the
    * stale object its `pointerout`: the glance, lift or tooltip would stick. */
   update(): void {
-    const state = this.sceneStore.getState();
-    const ui = state.localUi;
+    const ui = this.sceneStore.getState().localUi;
     if (!ui.lastTrickOpen && ui.hoveredCardId === null && ui.tooltipGearId === null) return;
-    const pointer = this.input.activePointer;
-    const over = (id: string): boolean => {
-      const entry = this.index.entries().find((e) => e.id === id);
-      if (entry === undefined) return false;
-      const b = entry.bounds;
-      return pointer.x >= b.x && pointer.x <= b.x + b.width && pointer.y >= b.y && pointer.y <= b.y + b.height;
-    };
+    const { x, y } = this.input.activePointer;
+    const over = (id: string): boolean => this.index.contains(id, x, y);
     if (ui.lastTrickOpen && !over(LAST_TRICK_ID)) this.handlers.onLastTrickHover(false);
     if (ui.hoveredCardId !== null) {
-      const card = state.model?.hand.find((c) => c.id === ui.hoveredCardId);
+      const card = campModel(this.sceneStore)?.hand.find((c) => c.id === ui.hoveredCardId);
       if (card === undefined || !over(card.objectId)) this.handlers.onCardHover(null);
     }
     if (ui.tooltipGearId !== null && !over(gearObjectId(ui.tooltipGearId))) this.handlers.onGearHover(null);

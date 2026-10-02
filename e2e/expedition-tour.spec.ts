@@ -3,7 +3,7 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { auditLayout, type LayoutEntry, type Violation } from "../apps/web/lib/expedition/layout-audit";
-import { clickHandCard, clickUntilChanged, pickDraftOffer, waitForScene } from "./expedition-driver";
+import { clickHandCard, clickUntilChanged, draftOffer, isReady, ownedGear, pickDraftOffer, waitForScene, type FiresideView, type SceneName } from "./expedition-driver";
 import { getModel, getScene, hoverObject, startExpeditionGame } from "./expedition-helpers";
 
 /**
@@ -32,7 +32,7 @@ const PREDEAL_SKIP_ID = "predeal-skip";
 interface Card { id: string; objectId: string; playable: boolean }
 interface Chip { objectId: string; pickable?: boolean; objectiveId?: string; usable?: boolean; gearId?: string }
 interface CampModel {
-  sceneKey: "camp" | "between-camps";
+  sceneKey: SceneName;
   campNumber: number;
   seats: { isYou: boolean; mayAct: boolean; gear: Chip[] }[];
   hand: Card[];
@@ -43,15 +43,6 @@ interface CampModel {
   preDeal: { youPending: boolean } | null;
   targeting: { canConfirm: boolean } | null;
 }
-interface FiresideModel {
-  sceneKey?: string;
-  runStatus: string;
-  draftOffer: { gearId: string; objectId: string; size: number }[] | null;
-  owned: { gearId: string; objectId: string; equipped: boolean; fits: boolean }[];
-  youReady: boolean;
-  lastResult: { status: string } | null;
-}
-
 interface PhaseRecord { file: string; entries: number; violations: Violation[] }
 
 class Tour {
@@ -88,25 +79,26 @@ class Tour {
 }
 
 async function fireside(page: Page, tour: Tour | null, names: { draft: string; loadout: string; ready: string }): Promise<void> {
-  await waitForScene(page, "between-camps", 60_000);
-  let model = await getModel<FiresideModel>(page);
-  if (model.draftOffer !== null) {
+  await waitForScene(page, "fireside", 60_000);
+  let model = await getModel<FiresideView>(page);
+  const offer = draftOffer(model);
+  if (offer !== null) {
     await tour?.shot(names.draft);
-    const pick = pickDraftOffer(model.draftOffer);
-    model = await clickUntilChanged<FiresideModel>(page, pick.objectId, (m) => m.draftOffer === null, { perAttemptTimeoutMs: 15_000 });
+    const pick = pickDraftOffer(offer);
+    model = await clickUntilChanged<FiresideView>(page, pick.objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
   }
-  if ((await getScene(page)) === "camp" || model.youReady) return;
+  if ((await getScene(page)) === "camp" || isReady(model)) return;
   await tour?.shot(names.loadout);
-  const fitting = model.owned.find((o) => o.fits && !o.equipped);
+  const fitting = ownedGear(model).find((o) => o.fits && !o.equipped);
   if (fitting) {
-    await clickUntilChanged<FiresideModel>(
+    await clickUntilChanged<FiresideView>(
       page,
       fitting.objectId,
-      (m) => m.owned.find((o) => o.gearId === fitting.gearId)?.equipped === true,
+      (m) => ownedGear(m).find((o) => o.gearId === fitting.gearId)?.equipped === true,
       { perAttemptTimeoutMs: 15_000 },
     );
   }
-  await clickUntilChanged<FiresideModel>(page, READY_ID, (m) => m.youReady === true || m.sceneKey === "camp", { perAttemptTimeoutMs: 15_000 });
+  await clickUntilChanged<FiresideView>(page, READY_ID, (m) => isReady(m) || m.sceneKey === "camp", { perAttemptTimeoutMs: 15_000 });
   await tour?.shot(names.ready);
 }
 
@@ -221,7 +213,7 @@ test.describe("@tour Expedition UI tour", () => {
 
           for (let pass = 0; pass < 400; pass++) {
             const scenes = await Promise.all(pages.map((p) => getScene(p)));
-            if (scenes.every((s) => s === "between-camps")) break;
+            if (scenes.every((s) => s !== "camp")) break;
             if (Date.now() - startedAt > RUN_DEADLINE_MS) {
               note = `deadline hit during camp ${camp}`;
               break;
@@ -233,9 +225,8 @@ test.describe("@tour Expedition UI tour", () => {
           }
           if (note) break;
 
-          await waitForScene(pages[0]!, "between-camps", 30_000);
-          const after = await getModel<FiresideModel>(pages[0]!);
-          if (after.runStatus !== "in_progress") {
+          await page.waitForFunction(() => window.__expeditionTest?.scene !== "camp", undefined, { timeout: 30_000 });
+          if ((await getScene(pages[0]!)) === "run-end") {
             await tour.shot("run-end");
             runEnded = true;
           }

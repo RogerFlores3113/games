@@ -6,8 +6,33 @@ import { getModel } from "./expedition-helpers";
 
 export const DRAFT_PREFERENCE = ["peek", "ghost", "chatter", "broadcast"];
 
+export type SceneName = "camp" | "fireside" | "run-end";
+
+/** The fireside model fields the drivers read (mirrors
+ * apps/web/lib/expedition/fireside-model.ts). Optional because a click can
+ * move the page on to another scene before the predicate runs. */
+export interface FiresideView {
+  sceneKey?: string;
+  draft?: { kind: "offer"; items: { gearId: string; objectId: string; size: number }[] } | { kind: "taken" | "none" };
+  backpack?: { owned: { gearId: string; objectId: string; size: number; equipped: boolean; fits: boolean }[] } | null;
+  ready?: { state: "blocked" | "open" | "done" } | null;
+  lastResult?: { campNumber: number; status: "succeeded" | "failed" } | null;
+}
+
+export function draftOffer(m: FiresideView): { gearId: string; objectId: string; size: number }[] | null {
+  return m.draft?.kind === "offer" ? m.draft.items : null;
+}
+
+export function ownedGear(m: FiresideView): { gearId: string; objectId: string; size: number; equipped: boolean; fits: boolean }[] {
+  return m.backpack?.owned ?? [];
+}
+
+export function isReady(m: FiresideView): boolean {
+  return m.ready?.state === "done";
+}
+
 /** Waits until the bridge's `scene` (not `model`) reports `expected`. */
-export async function waitForScene(page: Page, expected: "camp" | "between-camps", timeout = 60_000): Promise<void> {
+export async function waitForScene(page: Page, expected: SceneName, timeout = 60_000): Promise<void> {
   await page.waitForFunction((wanted) => window.__expeditionTest?.scene === wanted, expected, { timeout });
 }
 
