@@ -18,7 +18,7 @@ import { drawHand, drawLastTrick, drawTrick } from "../draw/draw-hand-trick";
 import { drawControls } from "../draw/draw-controls";
 import { INTERACTABLE_REGISTRY } from "../interactables/registry";
 import { INTERACTABLE_ANCHORS, ZONES } from "../layout";
-import { gearObjectId, interactableObjectId, LAST_TRICK_ID } from "../../../../lib/expedition/expedition-ids";
+import { gearObjectId, interactableObjectId, LAST_TRICK_ID, mateGearObjectId } from "../../../../lib/expedition/expedition-ids";
 import { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
 import {
@@ -30,6 +30,8 @@ import {
   setHoveredCard,
   setLastTrickOpen,
   setTooltipGear,
+  setTooltipMateGear,
+  setTooltipObjective,
 } from "../../../../lib/expedition/local-ui";
 import type { SceneDeps } from "./scene-registry";
 
@@ -95,6 +97,16 @@ function buildHandlers(store: SceneDeps["store"]): CampHandlers {
       const state = store.getState();
       if (state.reconnecting) return;
       state.updateLocalUi((ui) => setTooltipGear(ui, gearId));
+    },
+    onObjectiveHover(objectiveId) {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      state.updateLocalUi((ui) => setTooltipObjective(ui, objectiveId));
+    },
+    onMateGearHover(mate) {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      state.updateLocalUi((ui) => setTooltipMateGear(ui, mate));
     },
     onWhisper() {
       const state = store.getState();
@@ -234,7 +246,7 @@ export class CampScene extends Phaser.Scene {
    * stale object its `pointerout`: the glance, lift or tooltip would stick. */
   update(): void {
     const ui = this.sceneStore.getState().localUi;
-    if (!ui.lastTrickOpen && ui.hoveredCardId === null && ui.tooltipGearId === null) return;
+    if (!ui.lastTrickOpen && ui.hoveredCardId === null && ui.tooltipGearId === null && ui.tooltipObjectiveId === null && ui.tooltipMateGear === null) return;
     const { x, y } = this.input.activePointer;
     const over = (id: string): boolean => this.index.contains(id, x, y);
     if (ui.lastTrickOpen && !over(LAST_TRICK_ID)) this.handlers.onLastTrickHover(false);
@@ -243,5 +255,12 @@ export class CampScene extends Phaser.Scene {
       if (card === undefined || !over(card.objectId)) this.handlers.onCardHover(null);
     }
     if (ui.tooltipGearId !== null && !over(gearObjectId(ui.tooltipGearId))) this.handlers.onGearHover(null);
+    if (ui.tooltipObjectiveId !== null) {
+      const chip = findObjective(campModel(this.sceneStore), ui.tooltipObjectiveId);
+      if (chip === null || !over(chip.objectId)) this.handlers.onObjectiveHover(null);
+    }
+    if (ui.tooltipMateGear !== null && !over(mateGearObjectId(ui.tooltipMateGear.seatId, ui.tooltipMateGear.gearId))) {
+      this.handlers.onMateGearHover(null);
+    }
   }
 }

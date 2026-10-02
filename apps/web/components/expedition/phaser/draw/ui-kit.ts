@@ -88,7 +88,7 @@ export function objectiveItem(
   y: number,
   chip: ObjectiveChip,
   packId: CardPackId,
-  opts: { onClick: () => void; dim: boolean },
+  opts: { onClick: () => void; onHover: (over: boolean) => void; dim: boolean },
 ): Phaser.GameObjects.Container {
   const container = scene.add.container(Math.round(x), Math.round(y));
   const isCard = chip.kind === "win-card" || chip.kind === "ordered";
@@ -109,12 +109,12 @@ export function objectiveItem(
   if (chip.targetable || chip.selected) {
     container.add(scene.add.rectangle(0, 0, bodyW, MINI_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
   }
-  if (chip.targetable) {
-    const hit = scene.add.zone(0, 0, w, MINI_H).setOrigin(0, 0);
-    container.add(hit);
-    hit.setInteractive({ useHandCursor: true });
-    hit.on("pointerdown", opts.onClick);
-  }
+  const hit = scene.add.zone(0, 0, w, MINI_H).setOrigin(0, 0);
+  container.add(hit);
+  hit.setInteractive({ useHandCursor: chip.targetable });
+  hit.on("pointerover", () => opts.onHover(true));
+  hit.on("pointerout", () => opts.onHover(false));
+  if (chip.targetable) hit.on("pointerdown", opts.onClick);
   container.setAlpha(opts.dim && !chip.targetable ? DIM_ALPHA : 1);
   return container;
 }

@@ -51,12 +51,12 @@ function drawObjectivePool(scene: Phaser.Scene, layer: Layer, model: SceneModel,
     if (highlighted || chip.selected) {
       container.add(scene.add.rectangle(bodyX, 0, MINI_W, MINI_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
     }
-    if (highlighted) {
-      const hit = scene.add.zone(0, 0, TILE_W, MINI_H + 3 + LABEL_CELL.h).setOrigin(0, 0);
-      container.add(hit);
-      hit.setInteractive({ useHandCursor: true });
-      hit.on("pointerdown", () => handlers.onObjective(chip.objectiveId));
-    }
+    const hit = scene.add.zone(0, 0, TILE_W, MINI_H + 3 + LABEL_CELL.h).setOrigin(0, 0);
+    container.add(hit);
+    hit.setInteractive({ useHandCursor: highlighted });
+    hit.on("pointerover", () => handlers.onObjectiveHover(chip.objectiveId));
+    hit.on("pointerout", () => handlers.onObjectiveHover(null));
+    if (highlighted) hit.on("pointerdown", () => handlers.onObjective(chip.objectiveId));
     layer.add(container);
     index.register("camp", chip.objectId, container);
   });

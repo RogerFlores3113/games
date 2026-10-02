@@ -25,10 +25,13 @@ export interface LocalUiState {
   hoveredCardId: string | null;
   lastTrickOpen: boolean;
   tooltipGearId: string | null;
+  tooltipObjectiveId: string | null;
+  /** A teammate's gear: read-only, so it never starts targeting. */
+  tooltipMateGear: { seatId: string; gearId: string } | null;
 }
 
 export function initialLocalUi(): LocalUiState {
-  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipGearId: null };
+  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipGearId: null, tooltipObjectiveId: null, tooltipMateGear: null };
 }
 
 function currentHandIds(view: ExpeditionView): string[] {
@@ -196,4 +199,13 @@ export function setLastTrickOpen(ui: LocalUiState, open: boolean): LocalUiState 
 
 export function setTooltipGear(ui: LocalUiState, gearId: string | null): LocalUiState {
   return ui.tooltipGearId === gearId ? ui : { ...ui, tooltipGearId: gearId };
+}
+
+export function setTooltipObjective(ui: LocalUiState, objectiveId: string | null): LocalUiState {
+  return ui.tooltipObjectiveId === objectiveId ? ui : { ...ui, tooltipObjectiveId: objectiveId };
+}
+
+export function setTooltipMateGear(ui: LocalUiState, mate: { seatId: string; gearId: string } | null): LocalUiState {
+  const same = ui.tooltipMateGear?.seatId === mate?.seatId && ui.tooltipMateGear?.gearId === mate?.gearId;
+  return same ? ui : { ...ui, tooltipMateGear: mate };
 }

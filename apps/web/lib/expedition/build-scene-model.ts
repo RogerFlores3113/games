@@ -15,6 +15,8 @@ import type { LocalUiState } from "./local-ui";
 import { candidateIdsForKind, nextTargetKind } from "./local-ui";
 import type { Prompt } from "./build-prompt";
 import { buildPrompt } from "./build-prompt";
+import type { ObjectiveHolder } from "./objective-tooltip";
+import { objectiveTooltip } from "./objective-tooltip";
 
 /**
  * D-12 boundary (spec §7.1): `buildSceneModel` renders `view.camp.
@@ -426,7 +428,23 @@ export function gearRulesText(gearId: string): { title: string; text: string } |
   return { title: display.name, text: display.downside === null ? display.text : `${display.text} ${display.downside}` };
 }
 
-function buildTooltip(view: ExpeditionView, ui: LocalUiState): Tooltip | null {
+function buildTooltip(server: SceneServerInput, ui: LocalUiState): Tooltip | null {
+  const { game: view, roomSeats } = server;
+  if (ui.tooltipObjectiveId !== null) {
+    const o = view.attempt?.camp?.objectives.find((x) => x.id === ui.tooltipObjectiveId);
+    if (o === undefined) return null;
+    const holder: ObjectiveHolder =
+      o.ownerSeatId === null
+        ? { kind: "nobody" }
+        : o.ownerSeatId === view.yourSeatId
+          ? { kind: "you" }
+          : { kind: "seat", name: roomSeatFor(roomSeats, o.ownerSeatId).displayLabel };
+    return objectiveTooltip(o, holder);
+  }
+  if (ui.tooltipMateGear !== null) {
+    const rules = gearRulesText(ui.tooltipMateGear.gearId);
+    return rules === null ? null : { ...rules, reason: null };
+  }
   if (ui.tooltipGearId === null) return null;
   const rules = gearRulesText(ui.tooltipGearId);
   if (rules === null) return null;
@@ -491,7 +509,7 @@ export function buildSceneModel(
     faceUpObjectives,
     removedCardLabels,
     prompt,
-    tooltip: buildTooltip(view, ui),
+    tooltip: buildTooltip(server, ui),
     whisper,
     preDeal,
     targeting,

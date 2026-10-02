@@ -13,6 +13,8 @@ import {
   setHoveredCard,
   setLastTrickOpen,
   setTooltipGear,
+  setTooltipMateGear,
+  setTooltipObjective,
   type LocalUiState,
 } from "./local-ui";
 
@@ -101,6 +103,8 @@ describe("initialLocalUi", () => {
       hoveredCardId: null,
       lastTrickOpen: false,
       tooltipGearId: null,
+      tooltipObjectiveId: null,
+      tooltipMateGear: null,
     });
   });
 });
@@ -339,6 +343,11 @@ describe("setHoveredCard / setLastTrickOpen / setTooltipGear", () => {
     expect(setHoveredCard(ui, "c1")).toEqual({ ...initialLocalUi(), hoveredCardId: "c1" });
     expect(setLastTrickOpen(ui, true)).toEqual({ ...initialLocalUi(), lastTrickOpen: true });
     expect(setTooltipGear(ui, "peek")).toEqual({ ...initialLocalUi(), tooltipGearId: "peek" });
+    expect(setTooltipObjective(ui, "o1")).toEqual({ ...initialLocalUi(), tooltipObjectiveId: "o1" });
+    expect(setTooltipMateGear(ui, { seatId: "s1", gearId: "peek" })).toEqual({
+      ...initialLocalUi(),
+      tooltipMateGear: { seatId: "s1", gearId: "peek" },
+    });
     // original untouched
     expect(ui).toEqual(initialLocalUi());
   });

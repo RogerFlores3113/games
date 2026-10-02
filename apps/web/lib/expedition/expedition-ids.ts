@@ -68,6 +68,11 @@ export function gearObjectId(gearId: string): string {
   return `gear:${gearId}`;
 }
 
+/** A teammate's equipped gear. Gear ids alone are per gear, not per seat. */
+export function mateGearObjectId(seatId: string, gearId: string): string {
+  return `seat-gear:${seatId}:${gearId}`;
+}
+
 export function draftObjectId(gearId: string): string {
   return `draft:${gearId}`;
 }

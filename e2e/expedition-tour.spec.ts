@@ -54,7 +54,7 @@ const PACK_FIRST = ["overclock", "jam"];
 /** Phases scripted play reaches often enough to keep starting new runs for. */
 const WANTED = [
   "draft", "loadout", "ready", "objective-pick", "trick-led", "mid-trick", "gear-targeting", "whisper-targeting",
-  "last-trick-glance", "fireside-after-fail", "between-camps-draft", "between-camps-loadout", "next-camp",
+  "last-trick-glance", "objective-hover", "fireside-after-fail", "between-camps-draft", "between-camps-loadout", "next-camp",
   "run-end-lost", "run-end-guest",
 ];
 /** Phases play rarely reaches; each is also captured from a rewritten view. */
@@ -123,7 +123,7 @@ function firesideNames(m: FiresideView): { draft: string; loadout: string; ready
 }
 
 function nextToPack(m: FiresideView): ReturnType<typeof ownedGear>[number] | undefined {
-  const candidates = ownedGear(m).filter((o) => o.fits && !o.equipped);
+  const candidates = ownedGear(m).filter((o) => o.blocked === null && !o.equipped);
   return PACK_FIRST.map((id) => candidates.find((o) => o.gearId === id)).find((o) => o !== undefined) ?? candidates[0];
 }
 
@@ -221,6 +221,20 @@ async function captureHostState(host: Page, tour: Tour): Promise<void> {
   const plays = m.trick?.plays.length ?? 0;
   if (plays >= 1) await tour.shot("trick-led");
   if (plays >= 2) await tour.shot("mid-trick");
+  if (!tour.has("objective-hover")) {
+    const chip = m.faceUpObjectives[0] ?? m.seats.flatMap((s) => s.objectives)[0];
+    if (chip !== undefined) {
+      await hoverObject(host, chip.objectId);
+      await tour.shot("objective-hover");
+      await host.mouse.move(5, 5);
+    }
+  }
+  const mate = m.seats.find((s) => !s.isYou && s.gear.length > 0);
+  if (mate !== undefined && !tour.has("teammate-gear-hover")) {
+    await hoverObject(host, `seat-gear:${mate.seatId}:${mate.gear[0]!.gearId}`);
+    await tour.shot("teammate-gear-hover");
+    await host.mouse.move(5, 5);
+  }
   if (m.lastTrick !== null && !tour.has("last-trick-glance") && !tour.glanceFailed) {
     let open = false;
     for (let attempt = 0; attempt < 4 && !open; attempt++) {

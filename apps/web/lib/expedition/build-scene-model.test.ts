@@ -486,6 +486,42 @@ describe("gear chips", () => {
     });
     expect(buildSceneModel(server(usable), ui(), "big-index").tooltip).toBeNull();
   });
+
+  it("tooltip explains a hovered objective for a teammate, for you and while face-up", () => {
+    const view = makeView({
+      attempt: {
+        attemptNumber: 1,
+        bossCancelled: false,
+        gearWindow: null,
+        preDealPendingSeatIds: [],
+        gearUses: [],
+        effects: [],
+        reveals: [],
+        log: [],
+        camp: makeCamp({
+          objectives: [
+            { id: "o-mate", kind: "exactly-n", n: 2, ownerSeatId: "s3", status: "pending" },
+            { id: "o-you", kind: "no-tricks", ownerSeatId: "s2", status: "done" },
+            { id: "o-up", kind: "win-card", target: KD, ownerSeatId: null, status: "pending" },
+          ],
+        }),
+      },
+    });
+    const tip = (id: string) => buildSceneModel(server(view), ui({ tooltipObjectiveId: id }), "big-index").tooltip;
+    expect(tip("o-mate")).toEqual({ title: "Exactly 2", text: "Cara must win exactly 2 tricks. Still open.", reason: null });
+    expect(tip("o-you")).toEqual({ title: "No tricks", text: "You must win no tricks. Done.", reason: null });
+    expect(tip("o-up")).toEqual({ title: "K♦", text: "win the trick containing K♦. Still open.", reason: null });
+    expect(tip("gone")).toBeNull();
+  });
+
+  it("tooltip shows a hovered teammate gear's rules, read-only", () => {
+    const view = makeView({ yourGear: [] });
+    expect(buildSceneModel(server(view), ui({ tooltipMateGear: { seatId: "s3", gearId: "peek" } }), "big-index").tooltip).toEqual({
+      title: "Spyglass",
+      text: "See one random card from a chosen teammate's hand.",
+      reason: null,
+    });
+  });
 });
 
 describe("reveals and whisperedTo", () => {

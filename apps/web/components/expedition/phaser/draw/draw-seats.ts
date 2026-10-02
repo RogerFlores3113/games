@@ -9,7 +9,7 @@ import { LABEL_CELL } from "../font/font-keys";
 import { MINI_H, SEAT_BLOCK_PAD, ZONES, opponentBlocks, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
 import { ART } from "../art/art-registry";
-import { gearObjectId, seatObjectId } from "../../../../lib/expedition/expedition-ids";
+import { gearObjectId, mateGearObjectId, seatObjectId } from "../../../../lib/expedition/expedition-ids";
 import type { ObjectIndex } from "../object-index";
 import type { GearChip, ObjectiveChip, SceneModel, SeatModel } from "../../../../lib/expedition/build-scene-model";
 import type { CampHandlers } from "./camp-handlers";
@@ -99,6 +99,7 @@ function objectivesRow(ctx: Ctx, group: Layer, chips: ObjectiveChip[], x: number
   chips.forEach((chip, i) => {
     const item = objectiveItem(ctx.scene, cursor, y, chip, ctx.model.cardPackId, {
       onClick: () => ctx.handlers.onObjective(chip.objectiveId),
+      onHover: (over) => ctx.handlers.onObjectiveHover(over ? chip.objectiveId : null),
       dim: targeting,
     });
     group.add(item);
@@ -107,8 +108,10 @@ function objectivesRow(ctx: Ctx, group: Layer, chips: ObjectiveChip[], x: number
   });
 }
 
-/** Chips in a grid of `cols` columns filling `area`, one row per GEAR_H + 2. */
-function gearGrid(ctx: Ctx, group: Layer, chips: GearChip[], area: Rect, cols: number, interactive: boolean): void {
+/** Chips in a grid of `cols` columns filling `area`, one row per GEAR_H + 2.
+ * `owner` is a teammate's seat id (hover-only chips) or null for your own. */
+function gearGrid(ctx: Ctx, group: Layer, chips: GearChip[], area: Rect, cols: number, owner: string | null): void {
+  const interactive = owner === null;
   if (chips.length === 0) return;
   const w = Math.floor((area.w - CHIP_GAP * (cols - 1)) / cols);
   chips.forEach((chip, i) => {
@@ -133,6 +136,13 @@ function gearGrid(ctx: Ctx, group: Layer, chips: GearChip[], area: Rect, cols: n
       // Only your own chip is registered: gear ids are per gear, not per
       // seat, so a teammate holding the same gear would otherwise shadow it.
       ctx.index.register("camp", gearObjectId(chip.gearId), container);
+    }
+    if (!interactive) {
+      const mate = { seatId: owner, gearId: chip.gearId };
+      container.setInteractive();
+      container.on("pointerover", () => ctx.handlers.onMateGearHover(mate));
+      container.on("pointerout", () => ctx.handlers.onMateGearHover(null));
+      ctx.index.register("camp", mateGearObjectId(owner, chip.gearId), container);
     }
     group.add(container);
   });
@@ -174,7 +184,7 @@ function drawOpponent(ctx: Ctx, layer: Layer, seat: SeatModel, block: Rect): voi
   group.add(text(scene, tricksX + trickIcon.w + 3, countsY + 1, plural(seat.tricksWon, "trick", "tricks")));
 
   objectivesRow(ctx, group, seat.objectives, x0, block.y + 30, leftW);
-  gearGrid(ctx, group, seat.gear, { x: x0, y: block.y + 54, w: leftW, h: GEAR_H }, Math.max(1, seat.gear.length), false);
+  gearGrid(ctx, group, seat.gear, { x: x0, y: block.y + 54, w: leftW, h: GEAR_H }, Math.max(1, seat.gear.length), seat.seatId);
   group.add(placeArt(scene, "seat-pack", x0 + iw - pack.w / 2, block.y + 30 + pack.h / 2));
 
   if (!seat.connected) group.setAlpha(DISCONNECTED_ALPHA);
@@ -213,7 +223,7 @@ function drawYou(ctx: Ctx, layer: Layer, seat: SeatModel): void {
   if (seat.gear.length === 0) {
     group.add(text(scene, gearX, gearY + 2, "none", PALETTE.textDim));
   } else {
-    gearGrid(ctx, group, seat.gear, area, Math.max(1, Math.ceil(seat.gear.length / 2)), true);
+    gearGrid(ctx, group, seat.gear, area, Math.max(1, Math.ceil(seat.gear.length / 2)), null);
   }
 }
 
