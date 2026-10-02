@@ -11,3 +11,4 @@ playwright-report
 
 # Brainstorming companion mockups (superpowers)
 .superpowers/
+.audit/
