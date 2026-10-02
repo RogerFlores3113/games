@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
 import type { RoomSeatInfo, SceneModel, SceneServerInput } from "./build-scene-model";
-import { beginGearTargeting } from "./local-ui";
+import { beginGearTargeting, setTooltipGear } from "./local-ui";
 import { createExpeditionSceneStore, type ExpeditionSceneStore } from "./expedition-scene-store";
 
 const AS: ExpeditionCardIdentityView = { kind: "standard", suit: "spades", rank: 14 }; // A♠
@@ -184,6 +184,17 @@ describe("createExpeditionSceneStore", () => {
     expect(onAction).toHaveBeenCalledTimes(1);
     expect(onAction).toHaveBeenCalledWith({ type: "use-gear", gearId: "peek", targets: ["s1"] });
     expect(store.getState().localUi.targeting).toBeNull();
+  });
+
+  it("updateLocalUi keeps the same model when the UI is unchanged, and rebuilds it when it changes", () => {
+    const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
+    store.getState().setServer(server(fireside({ yourDraftOffer: ["jam"] })));
+    store.getState().updateLocalUi((ui) => setTooltipGear(ui, "jam"));
+    const hovered = store.getState().model;
+    store.getState().updateLocalUi((ui) => setTooltipGear(ui, "jam"));
+    expect(store.getState().model).toBe(hovered);
+    store.getState().updateLocalUi((ui) => setTooltipGear(ui, null));
+    expect(store.getState().model).toMatchObject({ sceneKey: "fireside", tooltip: null });
   });
 
   it("updateLocalUi is a no-op when server is null", () => {

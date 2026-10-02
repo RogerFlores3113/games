@@ -195,5 +195,5 @@ export function setLastTrickOpen(ui: LocalUiState, open: boolean): LocalUiState 
 }
 
 export function setTooltipGear(ui: LocalUiState, gearId: string | null): LocalUiState {
-  return { ...ui, tooltipGearId: gearId };
+  return ui.tooltipGearId === gearId ? ui : { ...ui, tooltipGearId: gearId };
 }

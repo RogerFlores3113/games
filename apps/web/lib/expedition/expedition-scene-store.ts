@@ -81,7 +81,10 @@ export function createExpeditionSceneStore(opts: {
 }): ExpeditionSceneStore {
   return createStore<ExpeditionSceneState & ExpeditionSceneActions>((set, get) => {
     function applyLocalUi(nextUi: LocalUiState): void {
-      const { server, cardPackId, reconnecting } = get();
+      const { server, cardPackId, reconnecting, localUi } = get();
+      // An unchanged UI must not rebuild the model: the scenes redraw on
+      // every new model, and a redraw re-fires the hovered tile's pointerover.
+      if (nextUi === localUi) return;
       if (server === null) {
         set({ localUi: nextUi });
         return;

@@ -286,6 +286,7 @@ function drawBackpack(ctx: Ctx): void {
     layer.add(scene.add.rectangle(slot.x, slotY, slot.w, SLOT_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.plateEdge)));
   }
   for (const item of bag.packed) {
+    if (item.size === 0) continue;
     const first = slots[item.firstSlot];
     const last = slots[item.firstSlot + item.size - 1];
     if (first === undefined || last === undefined) continue;
