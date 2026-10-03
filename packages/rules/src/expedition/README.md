@@ -2,129 +2,174 @@
 
 This package (`packages/rules/src/expedition/`) is the whole Expedition rules
 engine: framework-free TypeScript, zero Node/Worker/browser APIs, imported by
-both the Cloudflare Worker (source of truth) and the Next.js client
-(optimistic UI / legality pre-checks only — never the source of truth). See
-`packages/rules/src/expedition/purity.test.ts` for the enforced import/API
-restrictions.
+both the Cloudflare Worker (source of truth) and the Next.js client (display
+only; the client never decides legality). See `purity.test.ts` for the
+enforced import and API restrictions.
 
-ENG-01's promise: adding a piece of gear, an objective kind, a boss twist, a
-hook or a toolkit op is **one new file plus one registry (or union/list)
-line**, and the existing catalogue contract tests (`gear.contract.test.ts`,
-`boss.contract.test.ts`, `objective-kinds.contract.test.ts`) cover the new
-entry automatically, with zero test-file edits (ENG-02). Every recipe below
-names the exact files and identifiers involved.
+ENG-01's promise: adding an item, a character, an objective kind, a boss
+twist, a hook or a toolkit op is **one new file plus one registry (or union
+or list) line**, and the catalogue contract tests
+(`content/sources.contract.test.ts`, `run/targets.contract.test.ts`,
+`boss/boss.contract.test.ts`, `objective-kinds.contract.test.ts`) cover the
+new entry with no test edits (ENG-02). Every recipe below names the exact
+files and identifiers involved.
 
 ## Layout
 
-- **Core** (this directory's top level): `state.ts` (the type vocabulary —
-  `CampState`, `Objective`/`ObjectiveSlot` unions, `CampAction`/`CampError`),
-  `camp.ts` (`createCamp`, `checkCampOutcome`, `campPhase`,
+- **Core** (this directory's top level): `state.ts` (the type vocabulary:
+  `CampState`, the `Objective`/`ObjectiveSlot` unions, `CampAction`/
+  `CampError`), `camp.ts` (`createCamp`, `checkCampOutcome`, `campPhase`,
   `currentActorSeatId`), `actions.ts` (`applyCampAction`), `objectives.ts`
-  (`OBJECTIVE_KINDS`, `evaluateObjective`), `rules.ts` (`CoreRules`,
-  `baseRules`), `deck.ts`, `trick.ts`, `leader.ts`, `legality.ts`. The Core
-  never imports a boss or gear id — it only ever calls through a `CoreRules`
-  value.
-- **`gear/`**: one file per gear item (a `GearDef`), plus `gear/registry.ts`'s
-  `GEAR_REGISTRY` and `gear/gear-def.ts`'s type contract
-  (`GearWindow`/`TargetKind`/`ToolkitOp`/`GearContext`/`GearDef`).
-- **`boss/`**: one file per boss twist (a `BossDef`), plus
-  `boss/registry.ts`'s `BOSS_REGISTRY` and `boss/boss-def.ts`'s type contract.
-  The four v1 twists are **provisional placeholders** (10-CONTEXT.md, owner
-  review) — too close to The Crew's own boss twists, expected to be replaced.
-  Replacing one touches only its own file plus its one registry line.
-- **`run/`**: the six-camp run layer on top of Core — `run/types.ts`
-  (`RunState`, `RunAction`, `Catalog`), `run/lifecycle.ts` (`createRun`,
-  `runPhase`, `runStatus`, `startAttempt`, `dealAttempt`, `settleIfDecided`,
+  (`OBJECTIVE_KINDS`, `evaluateObjective`), `rules.ts` (`CoreRules` with
+  `isTrump` and `rankOf`, `baseRules`), `deck.ts`, `trick.ts`, `leader.ts`,
+  `legality.ts`. The Core never imports a boss or source id; it only calls
+  through a `CoreRules` value.
+- **`content/`**: the catalogue. `content/source-def.ts` holds the def types
+  (`CharacterDef`, `UpgradeDef`, `ItemDef`, `ActiveAbility`,
+  `PassiveAbility`, `UsageLimit`, `PoolDef`, `AbilityContext`) and the
+  `defineCharacter`/`defineUpgrade`/`defineItem`/`ability` helpers.
+  `content/characters/<id>.ts` is one character with its base power and its
+  two upgrades; `content/items/<id>.ts` is one item. Each folder has a
+  `registry.ts` (`CHARACTERS`, `ITEMS`). `content/helpers.ts` holds shared
+  effect helpers (`winnerExcluding`, `freshObjectiveAvailable`).
+- **`boss/`**: one file per boss twist (a `BossDef`), plus `boss/registry.ts`'s
+  `BOSS_REGISTRY`.
+- **`run/`**: the six-camp run on top of Core. `run/types.ts` (`RunState`,
+  `SeatRun` with its `ledger`, `RunAction`, `Catalog`), `run/lifecycle.ts`
+  (muster, `startAttempt`, `dealAttempt`, rescue-aware `settleIfDecided`,
   `advanceRun`), `run/run-actions.ts` (`applyRunAction`, the single run-level
-  transition), `run/compose.ts` (`rulesFor`, `ruleLayersFor`,
-  `activeBossId`), `run/run-rules.ts` (`RunHooks`, `HOOK_NAMES`,
-  `baseRunHooks`), `run/toolkit.ts` (`applyToolkitOps`, the sole mutation
-  surface for gear), `run/whisper.ts`, `run/use-gear.ts`, `run/balance.ts`
-  (the tunable ramp), `run/rng.ts` (`STREAMS`, `seededIndex`), and
-  `run/catalog.ts`'s `CATALOG` (the production `{ gear: GEAR_REGISTRY,
-  bosses: BOSS_REGISTRY }` value Phase 11's adapter passes to
-  `applyRunAction`/`createRun`).
+  transition), `run/abilities.ts` (`abilityStatus`, `useAbility`,
+  `passWindow`), `run/targets.ts` (`TARGET_KINDS`, `resolveTargets`,
+  `stepsFor`), `run/windows.ts` (`WINDOWS`, `currentWindow`,
+  `gatedPendingSeatIds`), `run/usage.ts` (`remaining`, `poolBalance`,
+  `liveSourceIds`), `run/visibility.ts` (`visibleObjectives`),
+  `run/compose.ts` (`rulesFor`, the rule layers), `run/run-rules.ts`
+  (`RunHooks`, `HOOK_NAMES`), `run/toolkit.ts` (`ToolkitOp`,
+  `applyToolkitOps`, the only mutation surface for abilities),
+  `run/draft.ts`, `run/whisper.ts`, `run/balance.ts` (the tunable ramp),
+  `run/rng.ts` (`STREAMS`, `seededIndex`) and `run/catalog.ts`'s `CATALOG`
+  (`{ characters, items, bosses }` plus the flattened `sources` index).
 
-**Layering order** (spec §6.1, `run/compose.ts`'s `ruleLayersFor` /
-`composeRules`): **base → active boss twist → each seat's equipped passive
-gear (seat order, then loadout order) → active mid-camp effects (in
-`attempt.effects` order)**. Each layer's `RuleModifier` maps the *previous*
-layer's answer to its own, hook by hook — never full replacement. `isTrump`
-is folded first and separately from every other hook (WR-03); every other
-hook in `run/run-rules.ts`'s `HOOK_NAMES` is folded over the base layer built
-from that composed `isTrump`.
+**Layering order** (`run/compose.ts`): **base, then the active boss twist,
+then per seat (seat order) each live source's passive in `[character,
+...kit]` order, then each live effect's layer in `attempt.effects` order.**
+Each layer's `RuleModifier` maps the previous layer's answer to its own, hook
+by hook. The card-reading hooks `isTrump` and `rankOf` fold first (WR-03);
+every other hook folds over the base built from them. A trick-scoped effect
+(`lasts: "trick"`) is live only while `currentTrick.index === atTrick`.
 
 **The toolkit is the only mutation surface** (`run/toolkit.ts`'s
-`applyToolkitOps`): a `GearDef.apply` returns `ToolkitOp` *data*
-(`gear/gear-def.ts`'s `ToolkitOp` union) — it can never mutate `RunState`/
-`CampState` directly. `applyToolkitOps` is the sole executor, and it asserts
-card conservation after every op; a broken op throws (a content-author
-defect, POLICY A3), it never silently corrupts state.
+`applyToolkitOps`): an ability's `apply` returns `ToolkitOp` data and never
+touches `RunState` or `CampState` itself. `applyToolkitOps` asserts card
+conservation after every op; a broken op throws (a content-author defect,
+POLICY A3).
 
-**The RNG stream rule (A1):** `RunState` carries only a `seed` string, never
-a mutable generator. Every draw derives a **fresh, uniquely-named stream**
-via `run/rng.ts`'s `STREAMS` builder — two draws must never share a stream
-name. `run/types.ts`'s header reproduces the full table; the load-bearing
-rows for content authors are:
+**Spending is the engine's job.** `useAbility` appends a `used` ledger entry
+(with its pool cost), takes the supplies of a supplies limit, and removes a
+single-use item from the kit. Authors never count uses.
+
+**The RNG stream rule (A1):** `RunState` carries only a `seed` string. Every
+draw derives a fresh, uniquely named stream via `run/rng.ts`'s `STREAMS`:
 
 | Draw | Stream name |
 |---|---|
-| Draft offer | `expedition-draft:camp{N}:seat{seatId}` |
+| Draft, upgrade slot | `expedition-draft:camp{N}:seat{id}:upgrade` |
+| Draft, item slots | `expedition-draft:camp{N}:seat{id}:items` |
 | Boss selection | `expedition-boss:camp{N}` |
 | Attempt deal seed | `{seed}:camp{N}:attempt{A}` |
 | Face-down assignment (Thick Fog) | `expedition-face-down:camp{N}:attempt{A}` |
-| Gear draw (any `ctx.randomIndex`/`ctx.randomCardIdFrom` call) | `expedition-gear:camp{N}:attempt{A}:use{k}:{gearId}:{seatId}:{purpose}` |
+| Ability draws (`ctx.randomCards`, `ctx.randomIndex`) | `expedition-ability:camp{N}:attempt{A}:seat{id}:use{k}:draw{j}` |
 
-For gear, `k` is `attempt.gearUses.length` at the time of the draw — this is
-built for you by `GearContext`; a `GearDef`'s `apply` never constructs a
-stream name itself, it only picks a `purpose` string, which must be distinct
-within one `apply` call if it draws more than once.
+`k` is the seat's ledger length before the use and `j` counts draws inside
+one `apply`; the context builds both, so an ability never names a stream.
 
-## Add a piece of gear
+## Add an item
 
-1. Create `gear/<id>.ts` exporting a `GearDef` (`gear/gear-def.ts`):
-   `id`, `name`, `size` (an integer ≥ 0, the loadout-capacity cost),
-   `window` (one of `gear/gear-def.ts`'s `GearWindow`:
-   `"pre-deal" | "objective-pick" | "between-tricks" | "passive"`), `text`,
-   an optional `downside`, and `targets` (a list of `TargetSpec`, each a
-   known `TargetKind`: `"teammate" | "own-card" | "face-up-objective" |
-   "own-objective"`).
-   - `canUse?(ctx)` — target-free availability; return `true` or a reason
-     string (GEAR-06).
-   - `canTarget?(ctx)` — checked after the generic per-`TargetSpec`-kind
-     validation every gear gets for free (`run/toolkit.ts`'s
-     `validateTargets`).
-   - `apply?(ctx)` — required unless `window === "passive"`; returns a list
-     of `ToolkitOp` data for `applyToolkitOps` to execute. Never mutate
-     anything directly here.
-   - `passiveModifier?(ownerSeatId)` — only for `window: "passive"` gear:
-     a `RuleModifier` that applies unconditionally while equipped (see
-     Energy Tonic, `gear/overclock.ts`).
-   - `effectModifier?(effect: ActiveEffect)` — only for gear whose `apply`
-     includes an `{ op: "add-modifier" }`: a `RuleModifier` that applies for
-     the rest of the current attempt once activated (see Camouflage/Signal
-     Whistle/Signal Flare/Rain Poncho — `gear/ghost.ts`, `gear/chatter.ts`,
-     `gear/broadcast.ts`, `gear/jam.ts`).
-2. Add one line to `gear/registry.ts`'s `GEAR_REGISTRY` object literal
-   (import the def, add `<id>: <def>`). `GearId` (`keyof typeof
-   GEAR_REGISTRY`) picks up the new id automatically.
-3. `gear/gear.contract.test.ts` iterates `Object.entries(GEAR_REGISTRY)` and
-   covers the new entry with zero edits: shape checks, and — for non-passive
-   gear — a driven-camp fixture at 3/4/5 players proving determinism, card
-   conservation, a JSON round-trip, attempt-scoping, GEAR-05 finality (a
-   second use is `gear_already_used`), and the per-seat leak check
-   (adapter/view-leak-check.ts, run for every seat and an unseated viewer).
-   You may add your own behavior-specific tests alongside it (a new
-   `gear/<id>.test.ts`), but the contract test needs no changes.
+1. Create `content/items/<id>.ts` exporting `defineItem({ id, name, text,
+   active?, passive? })`. `text` is one short sentence about the effect; the
+   window and limit render as badges from the def, so the text never repeats
+   them.
+2. For an active item, `active: ability({ window, limit, targets, apply })`:
+   - `window`: one of `run/windows.ts`'s `ActiveWindow`s (see "Add a
+     window").
+   - `limit`: `{ kind: "per-camp", times }`, `{ kind: "per-run", times }`,
+     `{ kind: "single-use" }` or `{ kind: "supplies", cost }`. A `pool` limit
+     is for characters only.
+   - `targets`: a list of `TargetSpec`s, one picker step each (see "Add a
+     target kind"). `ctx.targets` arrives resolved and typed per kind; you
+     never parse an id or check a choice.
+   - `canUse?(ctx)`: target-free availability, `true` or a player-facing
+     reason. `canTarget?(ctx)`: rules across targets, `true` or a reason.
+   - `apply(ctx)`: returns `ToolkitOp` data. If it emits `add-modifier`,
+     also give `effect(e)`, the `RuleModifier` that op switches on.
+   A passive item gives `passive: { modifier(owner) }` instead.
+3. Add one line to `content/items/registry.ts`'s `ITEMS`.
+4. `content/sources.contract.test.ts` covers it with no edits: shape, one
+   sentence of text, `effect` iff `add-modifier`, determinism, conservation,
+   a JSON round-trip, the per-seat leak check and the usage limits. Add its
+   16x16 icon as `apps/web/public/expedition/sprites/sources/<id>.png` and its
+   id to `SOURCE_ICON_IDS` (`apps/web/components/expedition/phaser/art/
+   art-registry.ts`); `source-icons.test.ts` fails until you do.
 
-**Worked example, in prose (Spyglass, `gear/peek.ts`):** size 1,
-`window: "between-tricks"`, one `teammate` target. `canTarget` refuses "They
-have no cards" when the target's hand is empty. `apply` draws one random
-card id from the target's hand via `ctx.randomCardIdFrom(target, "peek")`
-(the seeded A1 stream — never `Math.random`), then returns a single
-`{ op: "reveal", cardId, audience: [ctx.self] }` — the audience is the
-*user* only, never the target, which is what keeps the reveal private
-(COMM-02). That's the whole file: no other mutation, no other draw.
+**Worked example (Bait, `content/items/bait.ts`):** window `"in-trick"`,
+limit `single-use`, one `{ kind: "card", where: "board" }` target. `apply`
+returns one trick-scoped `add-modifier` whose params name the card, and
+`effect` overrides `trickWinner` with `winnerExcluding(prev, plays, ...)`, so
+that card can't win this one trick.
+
+## Add a character
+
+1. Create `content/characters/<id>.ts` exporting `defineCharacter({ id,
+   name, theme, power, text, pool?, active?, passive?, upgrades })`. `power`
+   names the base power ("Spyglass"); `text` says what it does.
+2. `pool` (optional) is the character's resource: `{ name, start, max,
+   regain }`. Abilities of this character and its upgrades may use
+   `{ kind: "pool", cost }`; the engine regains it after each cleared camp.
+3. `upgrades` is exactly two `defineUpgrade({...})` entries in the same
+   file. `defineCharacter` stamps the character id onto both. An upgrade
+   that tunes the base power has no ability of its own: the base power reads
+   `owner.hasUpgrade("<upgrade id>")` through a `Tuned<T>` value (see
+   Pathfinder in `guide.ts`).
+4. Add one line to `content/characters/registry.ts`'s `CHARACTERS`. The
+   contract tests cover the character and both upgrades with no edits. Add
+   the 64x80 silhouette as `sprites/crew/<id>.png`, the icons for the power
+   and both upgrades under `sprites/sources/`, and the ids to `CREW_IDS` and
+   `SOURCE_ICON_IDS`.
+
+## Add a target kind
+
+1. Add the kind to `run/targets.ts`'s `TargetKind` union, its spec params to
+   `SpecParams`, and what `apply` receives to `TargetOf`.
+2. Add its entry to `TARGET_KINDS` (a mapped type, so a missing entry is a
+   compile error): `describe(spec)` is the prompt line ("Pick a teammate's
+   hand"), and `choices(scope, spec)` returns every legal `{ id, target }`
+   pair the seat may see, in stable table order. The ids ship to the client,
+   so they must name only things the seat can see; hidden things are
+   targeted as wholes. Validation and resolution both come from `choices`.
+3. `run/targets.contract.test.ts` checks every kind at 3, 4 and 5 players
+   (stable choices, each resolves to itself, a foreign id is refused, the
+   leak check passes).
+4. In the web client, map the id prefix to a clickable thing:
+   `apps/web/lib/expedition/local-ui.ts`'s `PickEntity` and
+   `ENTITY_PREFIX`, then highlight it from `choiceFor` in
+   `build-scene-model.ts`, or offer it in the pick tray (`buildTray`) when it
+   has no single place on the table. `describeChoice` in `build-prompt.ts`
+   names it on the confirm line.
+
+## Add a window
+
+1. Add the id to `run/windows.ts`'s `ActiveWindow` and its `WindowDef` to
+   `WINDOWS`: `phrase` (the badge text), `gated` (whether the table waits
+   for every eligible seat to use or pass), `isOpen(run, rules)` and
+   `mayAct(run, rules, seatId)`. The `isOpen` predicates must stay mutually
+   exclusive: `currentWindow` assumes at most one is open.
+2. A gated window needs a hold in `run/lifecycle.ts`'s `advanceRun` (pre-deal
+   holds the deal; rescue holds the settle) and is passed with
+   `skip-window`. `gatedPendingSeatIds` already counts any gated window.
+3. The web client shows a gated window as the banner on the stump
+   (`buildBanner` in `apps/web/lib/expedition/build-scene-model.ts`); an open
+   window needs nothing more, since `yourAbilities` already says what is
+   usable now.
 
 ## Add an objective kind
 
@@ -160,8 +205,8 @@ card id from the target's hand via `ctx.randomCardIdFrom(target, "peek")`
 ## Add a boss twist
 
 1. Create `boss/<id>.ts` exporting a `BossDef` (`boss/boss-def.ts`): `id`,
-   `name`, `text`, and `modifiers` — a plain `RuleModifier`, composed exactly
-   like a gear item's `passiveModifier`/`effectModifier` (see
+   `name`, `text`, and `modifiers`: a plain `RuleModifier`, composed exactly
+   like a source's passive or effect layer (see
    `boss/radio-silence.ts`'s single `whisperAllowed` override, or
    `boss/mutiny.ts`'s single `failureChecks` override). A boss twist has no
    `apply`, no toolkit ops, no targets — it is pure hook data, active for the
@@ -202,11 +247,11 @@ twists later. This recipe is exactly what that replacement will use.
    Core hook is called from `camp.ts`/`actions.ts`; a new run hook is called
    from wherever in `run/` needs its answer (`run/toolkit.ts`,
    `run/whisper.ts`, `run/lifecycle.ts`, etc., following the pattern of
-   `capacityOf`/`whisperAllowed`/`failureCost`'s own single call sites).
+   `whisperAllowed`/`failureCost`'s own single call sites).
 
 ## Add a toolkit op
 
-1. Extend `gear/gear-def.ts`'s `ToolkitOp` union with a new `{ readonly op:
+1. Extend `run/toolkit.ts`'s `ToolkitOp` union with a new `{ readonly op:
    "<name>"; ...fields }` variant.
 2. Implement it as a new `case "<name>":` branch in `run/toolkit.ts`'s
    `applyOp` — state its invariant in a comment (mirroring `move-card`'s
@@ -249,25 +294,26 @@ automatically by `card-packs.contract.test.ts`.
 
 ## Invariants
 
-- **No state mutation outside the toolkit.** A `GearDef.apply` only ever
+- **No state mutation outside the toolkit.** An ability's `apply` only ever
   returns `ToolkitOp` data; `run/toolkit.ts`'s `applyToolkitOps` is the only
-  function that ever writes to a `CampState`/`RunState` on gear's behalf.
+  function that ever writes to a `CampState`/`RunState` on its behalf.
   Every other transition in this package (`applyCampAction`,
   `applyRunAction`, `applyWhisper`) builds and returns a new state, never
   mutates its input.
-- **Derive, don't cache.** Phase, status, the current actor, capacity, the
-  next attempt number, and every seat's remaining Whisper count are all
-  *computed* from `CampState`/`RunState` on every call (`campPhase`,
-  `checkCampOutcome`, `currentActorSeatId`, `runPhase`, `runStatus`,
-  `capacityOf`, `nextAttemptNumber`, `whispersUsedBy`) — none of them is a
-  stored field. A composed `RunRules` value is likewise never cached
+- **Derive, don't cache.** Phase, status, the current actor, the open
+  window, the next attempt number, every seat's remaining Whisper count and
+  every source's remaining uses are *computed* from `CampState`/`RunState`
+  and the seat ledgers on every call (`campPhase`, `checkCampOutcome`,
+  `currentActorSeatId`, `currentWindow`, `runPhase`, `runStatus`,
+  `nextAttemptNumber`, `whispersUsedBy`, `remaining`). None is a stored
+  field; rescue is not a stored mode. A composed `RunRules` value is likewise never cached
   (`run/compose.ts`'s `rulesFor` recomputes fresh every call); this is what
   lets a replay reset every camp-scoped resource structurally, by simply
   building a fresh `AttemptState`, rather than needing to hand-clear
   anything.
 - **No non-seeded randomness or clock.** Every draw goes through
-  `run/rng.ts`'s `seededIndex`/`STREAMS`, exposed to gear only through
-  `GearContext.randomIndex`/`randomCardIdFrom`. `purity.test.ts` scans this
+  `run/rng.ts`'s `seededIndex`/`STREAMS`, exposed to abilities only through
+  `AbilityContext.randomIndex`/`randomCards`. `purity.test.ts` scans this
   whole directory and fails on a stray non-seeded random or clock call, or
   a Node/Worker/browser/Hanabi import — new files are covered automatically,
   with no test edit required.
@@ -302,7 +348,10 @@ automatically by `card-packs.contract.test.ts`.
 `adapter/request-guards.ts` (hostile-input `unknown` → `RunAction` narrowing)
 and `adapter/view-leak-check.ts` (`checkExpeditionViewForLeaks`/
 `secretsForExpeditionSeat`, the real per-seat leak checker) are this
-engine's only seam to the room layer. A new gear or boss registered per the
-recipes above is leak-checked automatically by `gear.contract.test.ts` and
-`boss.contract.test.ts`, which both call the real checker for every
-registered entry with zero test edits required.
+engine's only seam to the room layer. A new source, target kind or boss
+registered per the recipes above is leak-checked automatically by
+`sources.contract.test.ts`, `targets.contract.test.ts` and
+`boss.contract.test.ts`, which call the real checker for every registered
+entry with zero test edits. `adapter/catalog-display.ts` projects the
+catalogue for the client (`SOURCE_DISPLAY`, `CHARACTER_DISPLAY`,
+`BOSS_DISPLAY`): names, text, window and limit badges, never a function.
