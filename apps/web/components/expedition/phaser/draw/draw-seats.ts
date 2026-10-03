@@ -9,9 +9,9 @@ import { LABEL_CELL } from "../font/font-keys";
 import { MINI_H, SEAT_BLOCK_PAD, ZONES, opponentBlocks, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
 import { ART } from "../art/art-registry";
-import { gearObjectId, mateGearObjectId, seatObjectId } from "../../../../lib/expedition/expedition-ids";
+import { mateSourceObjectId, seatObjectId, sourceObjectId } from "../../../../lib/expedition/expedition-ids";
 import type { ObjectIndex } from "../object-index";
-import type { GearChip, ObjectiveChip, SceneModel, SeatModel } from "../../../../lib/expedition/build-scene-model";
+import type { ObjectiveChip, SceneModel, SeatModel, SourceChip } from "../../../../lib/expedition/build-scene-model";
 import type { CampHandlers } from "./camp-handlers";
 import { fitLabel } from "./text-fit";
 import { DIM_ALPHA, PANEL_ALPHA, gearLabel, labelWidth, objectiveItem, objectiveItemWidth, plate, text, type Layer } from "./ui-kit";
@@ -106,7 +106,7 @@ function objectivesRow(ctx: Ctx, group: Layer, chips: ObjectiveChip[], x: number
 
 /** Chips in a grid of `cols` columns filling `area`, one row per GEAR_H + 2.
  * `owner` is a teammate's seat id (hover-only chips) or null for your own. */
-function gearGrid(ctx: Ctx, group: Layer, chips: GearChip[], area: Rect, cols: number, owner: string | null): void {
+function sourceGrid(ctx: Ctx, group: Layer, chips: SourceChip[], area: Rect, cols: number, owner: string | null): void {
   const interactive = owner === null;
   if (chips.length === 0) return;
   const w = Math.floor((area.w - CHIP_GAP * (cols - 1)) / cols);
@@ -116,27 +116,27 @@ function gearGrid(ctx: Ctx, group: Layer, chips: GearChip[], area: Rect, cols: n
     const container = ctx.scene.add.container(Math.round(cx), Math.round(cy));
     const bg = ctx.scene.add.rectangle(0, 0, w, GEAR_H, toPhaserColor(PALETTE.bark));
     if (interactive && chip.usable) bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn));
-    container.add([bg, ...gearLabel(ctx.scene, 0, 0, w - 2, chip.gearId, chip.name)]);
+    container.add([bg, ...gearLabel(ctx.scene, 0, 0, w - 2, chip.sourceId, chip.name)]);
     container.setSize(w, GEAR_H);
     container.setAlpha(chip.spent ? DIM_ALPHA : 1);
     if (interactive) {
       container.setInteractive({ useHandCursor: true });
-      container.on("pointerdown", () => ctx.handlers.onGear(chip.gearId));
-      container.on("pointerover", () => ctx.handlers.onGearHover(chip.gearId));
-      container.on("pointerout", () => ctx.handlers.onGearHover(null));
+      container.on("pointerdown", () => ctx.handlers.onSource(chip.sourceId));
+      container.on("pointerover", () => ctx.handlers.onSourceHover(chip.sourceId));
+      container.on("pointerout", () => ctx.handlers.onSourceHover(null));
       if (chip.pulse) {
         ctx.scene.tweens.add({ targets: container, alpha: { from: 1, to: 0.6 }, duration: PULSE_DURATION_MS, yoyo: true, repeat: -1 });
       }
-      // Only your own chip is registered: gear ids are per gear, not per
-      // seat, so a teammate holding the same gear would otherwise shadow it.
-      ctx.index.register("camp", gearObjectId(chip.gearId), container);
+      // Only your own chip is registered: source ids are per source, not
+      // per seat, so a teammate holding the same item would otherwise shadow it.
+      ctx.index.register("camp", sourceObjectId(chip.sourceId), container);
     }
     if (!interactive) {
-      const mate = { seatId: owner, gearId: chip.gearId };
+      const mate = { seatId: owner, sourceId: chip.sourceId };
       container.setInteractive();
-      container.on("pointerover", () => ctx.handlers.onMateGearHover(mate));
-      container.on("pointerout", () => ctx.handlers.onMateGearHover(null));
-      ctx.index.register("camp", mateGearObjectId(owner, chip.gearId), container);
+      container.on("pointerover", () => ctx.handlers.onMateSourceHover(mate));
+      container.on("pointerout", () => ctx.handlers.onMateSourceHover(null));
+      ctx.index.register("camp", mateSourceObjectId(owner, chip.sourceId), container);
     }
     group.add(container);
   });
@@ -163,7 +163,7 @@ function drawOpponent(ctx: Ctx, layer: Layer, seat: SeatModel, block: Rect): voi
   const badges: { value: string; color: string; id?: string }[] = [];
   if (!seat.connected) badges.push({ value: "away", color: PALETTE.statusDisconnected });
   for (const reveal of seat.reveals) {
-    if (reveal.sourceTag === "gear") badges.push({ value: reveal.label, color: PALETTE.sun, id: reveal.objectId });
+    if (reveal.sourceTag === "ability") badges.push({ value: reveal.label, color: PALETTE.sun, id: reveal.objectId });
   }
   nameRow(ctx, group, seat, { x: x0, y: block.y + SEAT_BLOCK_PAD, w: iw, h: ROW_H }, badges);
 
@@ -177,7 +177,7 @@ function drawOpponent(ctx: Ctx, layer: Layer, seat: SeatModel, block: Rect): voi
   group.add(text(scene, tricksX + trickIcon.w + 3, countsY + 1, plural(seat.tricksWon, "trick", "tricks")));
 
   objectivesRow(ctx, group, seat.objectives, x0, block.y + 30, leftW);
-  gearGrid(ctx, group, seat.gear, { x: x0, y: block.y + 54, w: leftW, h: GEAR_H }, Math.max(1, seat.gear.length), seat.seatId);
+  sourceGrid(ctx, group, seat.sources, { x: x0, y: block.y + 54, w: leftW, h: GEAR_H }, Math.max(1, seat.sources.length), seat.seatId);
   group.add(placeArt(scene, "seat-pack", x0 + iw - pack.w / 2, block.y + 30 + pack.h / 2));
 
   if (!seat.connected) group.setAlpha(DISCONNECTED_ALPHA);
@@ -210,13 +210,13 @@ function drawYou(ctx: Ctx, layer: Layer, seat: SeatModel): void {
   }
 
   const gearY = z.y + 50;
-  group.add(text(scene, x0 + 2, gearY + 2, "Gear", PALETTE.textDim));
+  group.add(text(scene, x0 + 2, gearY + 2, "Kit", PALETTE.textDim));
   const gearX = x0 + 2 + labelWidth("Goals") + 4;
   const area = { x: gearX, y: gearY, w: z.x + z.w - 2 - gearX, h: GEAR_H * 2 + CHIP_GAP };
-  if (seat.gear.length === 0) {
+  if (seat.sources.length === 0) {
     group.add(text(scene, gearX, gearY + 2, "none", PALETTE.textDim));
   } else {
-    gearGrid(ctx, group, seat.gear, area, Math.max(1, Math.ceil(seat.gear.length / 2)), null);
+    sourceGrid(ctx, group, seat.sources, area, Math.max(1, Math.ceil(seat.sources.length / 2)), null);
   }
 }
 

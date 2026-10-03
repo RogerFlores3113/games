@@ -1,20 +1,20 @@
-import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionObjectiveView, ExpeditionTargetKind, ExpeditionView } from "@games/rules";
-import { BOSS_DISPLAY, GEAR_DISPLAY } from "@games/rules";
+import type { ExpeditionActiveWindow, ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionObjectiveView, ExpeditionTargetKind, ExpeditionView } from "@games/rules";
+import { BOSS_DISPLAY, CHARACTER_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
 import type { CardPackId } from "./card-pack-ids";
 import {
   cardLabel,
   SUIT_GLYPH,
-  gearObjectId,
   handObjectId,
   objectiveObjectId,
   revealObjectId,
   seatObjectId,
+  sourceObjectId,
   trickObjectId,
   WHISPER_ID,
 } from "./expedition-ids";
 import { gestureCardId } from "./card-drag";
-import type { LocalUiState } from "./local-ui";
-import { candidateIdsForKind, nextTargetKind } from "./local-ui";
+import type { LocalUiState, PickEntity } from "./local-ui";
+import { choiceFor, currentStep, isPicked } from "./local-ui";
 import type { Prompt } from "./build-prompt";
 import { buildPrompt } from "./build-prompt";
 import type { ObjectiveHolder } from "./objective-tooltip";
@@ -22,8 +22,9 @@ import { objectiveTooltip } from "./objective-tooltip";
 
 /**
  * D-12 boundary (spec §7.1): `buildSceneModel` renders `view.camp.
- * yourLegalCardIds` and `view.yourGear[].usableNow`/`.reason` DIRECTLY and
- * NEVER recomputes legality, gear availability, or objective status. Every
+ * yourLegalCardIds`, `view.yourAbilities[]` and the server's step choices
+ * DIRECTLY and NEVER recomputes legality, ability availability, or
+ * objective status. Every
  * fact this module exposes is either copied verbatim from the already-
  * redacted `ExpeditionView`/`RoomSeatInfo`, or a pure display transform
  * (sorting, id-building, seat rotation) of those fields. Phaser scenes
@@ -58,8 +59,8 @@ export interface TopBar {
   boss: { text: string; dim: boolean } | null;
 }
 
-/** Gear rules text for the hovered item, plus why it can't be used or
- * packed right now. */
+/** Rules text for the hovered source, plus why it can't be used right
+ * now. */
 export interface Tooltip {
   title: string;
   text: string;
@@ -103,8 +104,9 @@ export interface ObjectiveChip {
   selected: boolean;
 }
 
-export interface GearChip {
-  gearId: string;
+/** A character or kit source. `usable`/`reason` are yours only. */
+export interface SourceChip {
+  sourceId: string;
   objectId: string;
   name: string;
   spent: boolean;
@@ -117,7 +119,7 @@ export interface MiniCard {
   objectId: string;
   label: string;
   identity: ExpeditionCardIdentityView;
-  sourceTag: "whisper" | "gear";
+  sourceTag: "whisper" | "ability";
   sourceName: string;
 }
 
@@ -149,7 +151,7 @@ export interface SeatModel {
   handSize: number;
   tricksWon: number;
   objectives: ObjectiveChip[];
-  gear: GearChip[];
+  sources: SourceChip[];
   reveals: MiniCard[];
   targetable: boolean;
   selected: boolean;
@@ -191,16 +193,17 @@ export interface SceneModel {
   /** One line per Whisper this attempt, oldest first. Public: names only,
    * plus the card for a Whisper you sent. */
   whisperLog: string[];
-  preDeal: { youPending: boolean; gear: GearChip[] } | null;
+  /** A gated window (before the deal, or a rescue) the table waits on. */
+  gate: { window: ExpeditionActiveWindow; youPending: boolean; sources: SourceChip[] } | null;
   /** The card being dragged onto the table; `legal` says whether the stump
    * accepts it. Null when no card is held. */
   drag: { cardId: string; legal: boolean } | null;
-  targeting: { mode: "gear" | "whisper"; sourceObjectId: string; nextKind: ExpeditionTargetKind | null; canConfirm: boolean } | null;
+  targeting: { mode: "ability" | "whisper"; sourceObjectId: string; nextKind: ExpeditionTargetKind | null; canConfirm: boolean } | null;
 }
 
 export function sceneKeyFor(game: ExpeditionView): SceneKey {
   if (game.runPhase === "ended") return "run-end";
-  if (game.runPhase === "fireside") return "fireside";
+  if (game.runPhase === "fireside" || game.runPhase === "muster") return "fireside";
   return "camp";
 }
 
@@ -234,42 +237,26 @@ function orderedSeatIds(view: ExpeditionView): string[] {
   return [...ids.slice(idx), ...ids.slice(0, idx)];
 }
 
-function targetInfo(
-  ui: LocalUiState,
-  view: ExpeditionView,
-  kind: ExpeditionTargetKind,
-  id: string,
-): { targetable: boolean; selected: boolean } {
-  const targeting = ui.targeting;
-  if (targeting === null) return { targetable: false, selected: false };
-  const nk = nextTargetKind(ui);
-  const targetable = nk === kind && candidateIdsForKind(kind, view).includes(id);
-  let selected: boolean;
-  if (targeting.mode === "gear") {
-    selected = targeting.selected.includes(id);
-  } else {
-    selected = (kind === "own-card" && targeting.cardId === id) || (kind === "teammate" && targeting.targetSeatId === id);
-  }
-  return { targetable, selected };
+function targetInfo(ui: LocalUiState, view: ExpeditionView, entity: PickEntity, id: string): { targetable: boolean; selected: boolean } {
+  if (ui.targeting === null) return { targetable: false, selected: false };
+  const targetable = choiceFor(ui, view, entity, id) !== null;
+  return { targetable, selected: isPicked(ui, entity, id) };
 }
 
-function gearChipFor(gearId: string, seatId: string, view: ExpeditionView, ui: LocalUiState): GearChip {
-  const display = GEAR_DISPLAY[gearId];
-  const name = display?.name ?? gearId;
+/** The display name of a character, upgrade or item. */
+export function sourceName(sourceId: string): string {
+  return SOURCE_DISPLAY[sourceId]?.name ?? sourceId;
+}
+
+function sourceChipFor(sourceId: string, seatId: string, view: ExpeditionView, ui: LocalUiState): SourceChip {
   const isYou = seatId === view.yourSeatId && view.yourSeatId !== null;
-  let spent: boolean;
-  let usable = false;
-  let reason: string | null = null;
-  if (isYou) {
-    const status = view.yourGear.find((g) => g.gearId === gearId);
-    spent = status?.spent ?? false;
-    usable = status?.usableNow ?? false;
-    reason = status?.reason ?? null;
-  } else {
-    spent = (view.attempt?.gearUses ?? []).some((u) => u.seatId === seatId && u.gearId === gearId && u.kind === "used");
-  }
+  const usage = view.seats.find((s) => s.seatId === seatId)?.usage.find((u) => u.sourceId === sourceId);
+  const spent = usage?.remaining.kind === "uses" && usage.remaining.left === 0;
+  const ability = isYou ? view.yourAbilities.find((a) => a.sourceId === sourceId) : undefined;
+  const usable = ability?.usableNow ?? false;
+  const reason = ability?.reason ?? null;
   const pulse = isYou && usable && ui.targeting === null;
-  return { gearId, objectId: gearObjectId(gearId), name, spent, usable, pulse, reason };
+  return { sourceId, objectId: sourceObjectId(sourceId), name: sourceName(sourceId), spent, usable, pulse, reason };
 }
 
 function objectiveLabel(o: ExpeditionObjectiveView): { label: string; orderBadge: string | null } {
@@ -288,8 +275,7 @@ function objectiveLabel(o: ExpeditionObjectiveView): { label: string; orderBadge
 function buildObjectiveChip(o: ExpeditionObjectiveView, camp: ExpeditionCampView, view: ExpeditionView, ui: LocalUiState): ObjectiveChip {
   const { label, orderBadge } = objectiveLabel(o);
   const isFaceUp = o.ownerSeatId === null;
-  const kind: ExpeditionTargetKind = isFaceUp ? "face-up-objective" : "own-objective";
-  const { targetable, selected } = targetInfo(ui, view, kind, o.id);
+  const { targetable, selected } = targetInfo(ui, view, "objective", o.id);
   const pickable = isFaceUp
     ? camp.campPhase === "objective-pick" && camp.currentActorSeatId === view.yourSeatId && ui.targeting === null
     : false;
@@ -340,15 +326,16 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
   const isExpeditionLeader = camp !== null && camp.expeditionLeaderSeatId === seatId;
 
   let mayAct = false;
-  if (view.runPhase === "pre-deal") {
-    mayAct = (view.attempt?.preDealPendingSeatIds ?? []).includes(seatId);
+  const pending = view.attempt?.pendingSeatIds ?? [];
+  if (pending.length > 0) {
+    mayAct = pending.includes(seatId);
   } else if (camp !== null) {
     mayAct = camp.currentActorSeatId === seatId;
   }
 
   const seatView = view.seats.find((s) => s.seatId === seatId);
-  const equippedGearIds = seatView?.equippedGearIds ?? [];
-  const gear = equippedGearIds.map((gid) => gearChipFor(gid, seatId, view, ui));
+  const liveIds = seatView === undefined || seatView.characterId === null ? (seatView?.kit ?? []) : [seatView.characterId, ...seatView.kit];
+  const sources = liveIds.map((id) => sourceChipFor(id, seatId, view, ui));
   const objectives = objectivesForOwner(camp, seatId, view, ui);
 
   const reveals: MiniCard[] = (view.attempt?.reveals ?? [])
@@ -357,11 +344,11 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
       objectId: revealObjectId(r.identity),
       label: cardLabel(r.identity),
       identity: r.identity,
-      sourceTag: r.source === "whisper" ? "whisper" : "gear",
-      sourceName: r.source === "whisper" ? "Whisper" : (GEAR_DISPLAY[r.source]?.name ?? r.source),
+      sourceTag: r.source === "whisper" ? "whisper" : "ability",
+      sourceName: r.source === "whisper" ? "Whisper" : sourceName(r.source),
     }));
 
-  const { targetable, selected } = targetInfo(ui, view, "teammate", seatId);
+  const { targetable, selected } = targetInfo(ui, view, "seat", seatId);
 
   return {
     seatId,
@@ -375,7 +362,7 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
     handSize,
     tricksWon,
     objectives,
-    gear,
+    sources,
     reveals,
     targetable,
     selected,
@@ -395,15 +382,15 @@ function blockedReasonFor(camp: ExpeditionCampView, view: ExpeditionView): strin
 function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: LocalUiState): CardModel[] {
   if (camp === null) return [];
   const yourTurnToPlay = camp.campPhase === "playing" && camp.currentActorSeatId === view.yourSeatId;
-  const nk = nextTargetKind(ui);
-  const ownCardCandidates = ui.targeting !== null && nk === "own-card" ? candidateIdsForKind("own-card", view) : null;
+  const step = currentStep(ui, view);
+  const cardStep = step !== null && step.kind === "card" ? step : null;
 
   const cards = [...camp.yourHand].sort((a, b) => sortKey(a.identity) - sortKey(b.identity));
   const dragged = gestureCardId(ui.drag);
   return cards.map((c) => {
     const playable = camp.yourLegalCardIds.includes(c.id);
-    const { targetable, selected } = targetInfo(ui, view, "own-card", c.id);
-    const targetingOwnCardDim = ownCardCandidates !== null && !ownCardCandidates.includes(c.id);
+    const { targetable, selected } = targetInfo(ui, view, "card", c.id);
+    const targetingOwnCardDim = cardStep !== null && !targetable;
     const dimmed = (yourTurnToPlay && !playable) || targetingOwnCardDim;
     return {
       id: c.id,
@@ -437,7 +424,7 @@ function whisperStatus(
   } else if (mine.left === 0) {
     state = "used";
     reason = "Used this camp";
-  } else if (view.attempt?.gearWindow !== "between-tricks") {
+  } else if (view.attempt?.window !== "between-tricks") {
     state = "wait-between-tricks";
     reason = "Between tricks";
   }
@@ -520,11 +507,15 @@ function buildTopBar(view: ExpeditionView, bossTwist: SceneModel["bossTwist"]): 
   return { supplies: view.supplies, camp, boss };
 }
 
-/** Rules text plus downside, the way every tooltip phrases a gear. */
-export function gearRulesText(gearId: string): { title: string; text: string } | null {
-  const display = GEAR_DISPLAY[gearId];
+/** Rules text plus window and limit badges, the way every tooltip phrases a
+ * source. A character adds its theme. */
+export function sourceRulesText(sourceId: string): { title: string; text: string } | null {
+  const display = SOURCE_DISPLAY[sourceId];
   if (display === undefined) return null;
-  return { title: display.name, text: display.downside === null ? display.text : `${display.text} ${display.downside}` };
+  const badges = display.active === null ? (display.passive ? ["Always"] : []) : [display.active.windowPhrase, display.active.limitBadge];
+  const theme = display.kind === "character" ? CHARACTER_DISPLAY[sourceId]?.theme : undefined;
+  const parts = [theme === undefined ? null : `${theme}.`, display.text, badges.length > 0 ? `(${badges.join(", ")})` : null];
+  return { title: display.name, text: parts.filter((p): p is string => p !== null).join(" ") };
 }
 
 function buildTooltip(server: SceneServerInput, ui: LocalUiState): Tooltip | null {
@@ -546,15 +537,15 @@ function buildTooltip(server: SceneServerInput, ui: LocalUiState): Tooltip | nul
           : { kind: "seat", name: roomSeatFor(roomSeats, o.ownerSeatId).displayLabel };
     return objectiveTooltip(o, holder);
   }
-  if (ui.tooltipMateGear !== null) {
-    const rules = gearRulesText(ui.tooltipMateGear.gearId);
+  if (ui.tooltipMateSource !== null) {
+    const rules = sourceRulesText(ui.tooltipMateSource.sourceId);
     return rules === null ? null : { ...rules, reason: null };
   }
-  if (ui.tooltipGearId === null) return null;
-  const rules = gearRulesText(ui.tooltipGearId);
+  if (ui.tooltipSourceId === null) return null;
+  const rules = sourceRulesText(ui.tooltipSourceId);
   if (rules === null) return null;
-  const status = view.yourGear.find((g) => g.gearId === ui.tooltipGearId);
-  const reason = status !== undefined && !status.usableNow ? (status.reason ?? null) : null;
+  const ability = view.yourAbilities.find((a) => a.sourceId === ui.tooltipSourceId);
+  const reason = ability !== undefined && !ability.usableNow ? ability.reason : null;
   return { ...rules, reason };
 }
 
@@ -578,14 +569,15 @@ export function buildSceneModel(
   const whisper = whisperStatus(view, bossTwist, ui.targeting?.mode === "whisper");
   const prompt = buildPrompt(view, roomSeats, ui, { reconnecting, whisperAvailable: whisper.visible });
 
-  let preDeal: SceneModel["preDeal"] = null;
-  if (view.runPhase === "pre-deal") {
-    const pending = view.attempt?.preDealPendingSeatIds ?? [];
+  let gate: SceneModel["gate"] = null;
+  const window = view.attempt?.window ?? null;
+  if (window === "pre-deal" || window === "rescue") {
+    const pending = view.attempt?.pendingSeatIds ?? [];
     const youPending = view.yourSeatId !== null && pending.includes(view.yourSeatId);
-    const preDealGear = view.yourGear
-      .filter((g) => GEAR_DISPLAY[g.gearId]?.window === "pre-deal")
-      .map((g) => gearChipFor(g.gearId, view.yourSeatId ?? "", view, ui));
-    preDeal = { youPending, gear: preDealGear };
+    const sources = view.yourAbilities
+      .filter((a) => a.usableNow && SOURCE_DISPLAY[a.sourceId]?.active?.window === window)
+      .map((a) => sourceChipFor(a.sourceId, view.yourSeatId ?? "", view, ui));
+    gate = { window, youPending, sources };
   }
 
   const drag =
@@ -593,9 +585,9 @@ export function buildSceneModel(
 
   let targeting: SceneModel["targeting"] = null;
   if (ui.targeting !== null) {
-    const nk = nextTargetKind(ui);
-    const sourceObjectId = ui.targeting.mode === "gear" ? gearObjectId(ui.targeting.gearId) : WHISPER_ID;
-    targeting = { mode: ui.targeting.mode, sourceObjectId, nextKind: nk, canConfirm: nk === null };
+    const step = currentStep(ui, view);
+    const objectId = ui.targeting.mode === "ability" ? sourceObjectId(ui.targeting.sourceId) : WHISPER_ID;
+    targeting = { mode: ui.targeting.mode, sourceObjectId: objectId, nextKind: step?.kind ?? null, canConfirm: step === null };
   }
 
   return {
@@ -617,7 +609,7 @@ export function buildSceneModel(
     tooltip: buildTooltip(server, ui),
     whisper,
     ...buildWhispers(view, roomSeats),
-    preDeal,
+    gate,
     drag,
     targeting,
   };

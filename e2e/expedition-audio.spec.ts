@@ -5,7 +5,6 @@ import {
   clickUntilChanged,
   draftOffer,
   isReady,
-  ownedGear,
   pickDraftOffer,
   waitForScene,
   type FiresideView,
@@ -23,20 +22,12 @@ async function cues(page: Page): Promise<string[]> {
   return page.evaluate(() => (window.__expeditionTest as unknown as { cues(): string[] }).cues());
 }
 
-async function draftAndReady(page: Page): Promise<void> {
+async function pickAndReady(page: Page): Promise<void> {
   await waitForScene(page, "fireside");
-  let model = await getModel<FiresideView>(page);
+  const model = await getModel<FiresideView>(page);
   const offer = draftOffer(model);
   if (offer !== null) {
     await clickUntilChanged<FiresideView>(page, pickDraftOffer(offer).objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
-  }
-  if ((await getScene(page)) !== "fireside") return;
-  model = await getModel<FiresideView>(page);
-  const fitting = ownedGear(model).find((o) => o.blocked === null && !o.equipped);
-  if (fitting && !isReady(model)) {
-    await clickUntilChanged<FiresideView>(page, fitting.objectId, (m) => m.sceneKey !== "fireside" || ownedGear(m).find((o) => o.gearId === fitting.gearId)?.equipped === true, {
-      perAttemptTimeoutMs: 15_000,
-    });
   }
   if ((await getScene(page)) === "fireside") {
     await clickUntilChanged<FiresideView>(page, "ready", (m) => isReady(m) || m.sceneKey === "camp", { perAttemptTimeoutMs: 15_000 });
@@ -50,7 +41,7 @@ test("state changes ask for sounds, and a refresh mid-game asks for none", async
     const host = pages[0]!;
     expect(await cues(host)).toEqual([]);
 
-    for (const p of pages) await draftAndReady(p);
+    for (const p of pages) await pickAndReady(p);
     expect(await cues(host)).toContain("sfx-equip");
     for (const p of pages) await waitForScene(p, "camp");
     await expect.poll(() => cues(host)).toContain("sfx-card-deal");

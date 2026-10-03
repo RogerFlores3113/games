@@ -141,8 +141,9 @@ export function createExpeditionSceneStore(opts: {
       },
 
       confirmTargeting() {
-        const { localUi } = get();
-        const { ui: nextUi, request } = confirmTargetingUi(localUi);
+        const { localUi, server } = get();
+        if (server === null) return;
+        const { ui: nextUi, request } = confirmTargetingUi(localUi, server.game);
         if (request === null) return;
         applyLocalUi(nextUi);
         get().dispatch(request);

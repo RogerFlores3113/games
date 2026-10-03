@@ -4,27 +4,50 @@ import { getModel } from "./expedition-helpers";
 /** Click-driving helpers shared by the UI tour. Extracted verbatim from
  * expedition-camp.spec.ts (which keeps its own copy until it is migrated). */
 
-export const DRAFT_PREFERENCE = ["peek", "ghost", "chatter", "broadcast"];
+/** Characters and draft picks whose abilities the camp drivers can target
+ * (a seat, a hand card or an objective) and that never hold a gated window
+ * (before the deal, or a rescue). */
+export const DRAFT_PREFERENCE = [
+  "guide",
+  "scout",
+  "cartographer",
+  "signaller",
+  "guide.pathfinder",
+  "scout.keen-eye",
+  "cartographer.detour",
+  "trail-map",
+  "trained-monkey",
+  "smoke-signal",
+  "whetstone",
+];
 
 export type SceneName = "camp" | "fireside" | "run-end";
 
 /** The fireside model fields the drivers read (mirrors
  * apps/web/lib/expedition/fireside-model.ts). Optional because a click can
  * move the page on to another scene before the predicate runs. */
+export interface DraftTile {
+  sourceId: string;
+  objectId: string;
+  name: string;
+}
+
 export interface FiresideView {
   sceneKey?: string;
-  draft?: { kind: "offer"; items: { gearId: string; objectId: string; size: number }[] } | { kind: "taken" | "none" };
-  backpack?: { owned: { gearId: string; objectId: string; size: number; equipped: boolean; blocked: { caption: string; reason: string } | null }[] } | null;
+  /** `pick` is "character" during muster, "draft" after a cleared camp. */
+  draft?: { kind: "offer"; pick: "character" | "draft"; items: DraftTile[] } | { kind: "taken" | "none" };
+  kit?: { sourceId: string; objectId: string; name: string }[] | null;
   ready?: { state: "blocked" | "open" | "done" } | null;
   lastResult?: { campNumber: number; status: "succeeded" | "failed" } | null;
 }
 
-export function draftOffer(m: FiresideView): { gearId: string; objectId: string; size: number }[] | null {
+export function draftOffer(m: FiresideView): DraftTile[] | null {
   return m.draft?.kind === "offer" ? m.draft.items : null;
 }
 
-export function ownedGear(m: FiresideView): { gearId: string; objectId: string; size: number; equipped: boolean; blocked: { caption: string; reason: string } | null }[] {
-  return m.backpack?.owned ?? [];
+/** Your character, then your kit. */
+export function kitIds(m: FiresideView): string[] {
+  return (m.kit ?? []).map((k) => k.sourceId);
 }
 
 export function isReady(m: FiresideView): boolean {
@@ -123,13 +146,11 @@ export async function clickHandCard<T>(
   return clickUntilChanged(page, objectId, isSatisfied, { xOffsetFraction: 0.25, ...opts });
 }
 
-export function pickDraftOffer<T extends { gearId: string; size: number }>(offers: T[], preference: readonly string[] = DRAFT_PREFERENCE): T {
+export function pickDraftOffer<T extends { sourceId: string }>(offers: T[], preference: readonly string[] = DRAFT_PREFERENCE): T {
   for (const preferred of preference) {
-    const found = offers.find((o) => o.gearId === preferred);
+    const found = offers.find((o) => o.sourceId === preferred);
     if (found) return found;
   }
-  const sizeOne = offers.find((o) => o.size <= 1);
-  if (sizeOne) return sizeOne;
   const first = offers[0];
   if (!first) throw new Error("pickDraftOffer: draftOffer was empty");
   return first;

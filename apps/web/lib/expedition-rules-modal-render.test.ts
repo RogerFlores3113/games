@@ -3,21 +3,19 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { BOSS_DISPLAY, GEAR_DISPLAY, type ExpeditionView } from "@games/rules";
+import { BOSS_DISPLAY, SOURCE_DISPLAY, type ExpeditionView } from "@games/rules";
 import { ExpeditionRulesModal } from "../components/expedition/ExpeditionRulesModal";
 
 const source = readFileSync(
   fileURLToPath(new URL("../components/expedition/ExpeditionRulesModal.tsx", import.meta.url)),
   "utf-8",
 );
-const gearId = Object.keys(GEAR_DISPLAY)[0]!;
 const bossId = Object.keys(BOSS_DISPLAY)[0]!;
 const game = {
-  yourOwnedGearIds: [gearId],
+  yourSeatId: "s1",
+  seats: [{ seatId: "s1", characterId: "scout", kit: ["bait"] }],
   activeBossTwistId: bossId,
   campNumber: 3,
-  yourCapacity: 3,
-  yourBaseCapacity: 3,
 } as ExpeditionView;
 
 const render = (props: { open: boolean; game: ExpeditionView | null }) =>
@@ -32,14 +30,15 @@ describe("expedition-rules-modal-render", () => {
     const markup = render({ open: true, game: null });
     expect(markup).toContain('role="dialog"');
     expect(markup).toContain('aria-label="Rules"');
-    for (const h of ["Goal", "Tricks", "Objectives", "The Whisper", "Gear", "This camp"]) {
+    for (const h of ["Goal", "Tricks", "Objectives", "The Whisper", "Your kit", "This camp"]) {
       expect(markup).toContain(`>${h}</h3>`);
     }
   });
 
-  it("renders owned gear and the boss twist from the view", () => {
+  it("renders your character, kit and the boss twist from the view", () => {
     const markup = render({ open: true, game });
-    expect(markup).toContain(GEAR_DISPLAY[gearId]!.name);
+    expect(markup).toContain(SOURCE_DISPLAY.scout!.name);
+    expect(markup).toContain(SOURCE_DISPLAY.bait!.name);
     expect(markup).toContain(BOSS_DISPLAY[bossId]!.name);
   });
 

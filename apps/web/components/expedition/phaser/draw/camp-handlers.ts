@@ -8,13 +8,15 @@ export interface CampHandlers {
   onObjective(objectiveId: string): void;
   onObjectiveHover(objectiveId: string | null): void;
   onSeat(seatId: string): void;
-  onGear(gearId: string): void;
-  onGearHover(gearId: string | null): void;
-  onMateGearHover(mate: { seatId: string; gearId: string } | null): void;
+  /** Your own character or kit source: starts its targeting. */
+  onSource(sourceId: string): void;
+  onSourceHover(sourceId: string | null): void;
+  onMateSourceHover(mate: { seatId: string; sourceId: string } | null): void;
   onWhisper(): void;
   onConfirm(): void;
   onCancel(): void;
-  onPreDealUse(gearId: string): void;
-  onPreDealSkip(): void;
+  /** Use or pass in a gated window: before the deal, or a rescue. */
+  onGateUse(sourceId: string): void;
+  onGateSkip(): void;
   onLastTrickHover(open: boolean): void;
 }

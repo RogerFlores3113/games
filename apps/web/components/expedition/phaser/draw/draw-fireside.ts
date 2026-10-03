@@ -1,5 +1,5 @@
 /**
- * The fireside's trail, draft, crew, backpack and Ready zones. Every value
+ * The fireside's trail, muster or draft, crew, kit and Ready zones. Every value
  * drawn comes from `FiresideModel`; clicks only call the handlers.
  */
 import type Phaser from "phaser";
@@ -9,15 +9,15 @@ import { FIRESIDE_ZONES, rowBoxes, trailStopXs, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
 import { ART, gearArtId, type ArtId } from "../art/art-registry";
 import type { ObjectIndex } from "../object-index";
-import type { CrewRow, DraftItem, FiresideModel, OwnedItem, TrailStop } from "../../../../lib/expedition/fireside-model";
+import type { CrewRow, DraftItem, FiresideModel, KitItem, TrailStop } from "../../../../lib/expedition/fireside-model";
 import { fitLabel } from "./text-fit";
-import { DIM_ALPHA, PANEL_ALPHA, button, gearLabel, labelWidth, plate, text, type Layer } from "./ui-kit";
+import { PANEL_ALPHA, button, labelWidth, plate, text, type Layer } from "./ui-kit";
 
 export interface FiresideHandlers {
-  onDraft(gearId: string): void;
-  onPack(gearId: string): void;
+  /** A muster or draft tile: picks a character or takes a source. */
+  onDraft(sourceId: string): void;
   onReady(): void;
-  onGearHover(gearId: string | null): void;
+  onSourceHover(sourceId: string | null): void;
 }
 
 interface Ctx {
@@ -108,36 +108,23 @@ function drawTrail(ctx: Ctx): void {
 const TILE_GAP = 8;
 const TILE_MAX_W = 116;
 const TILE_H = 100;
-const PIP = 5;
-
-function sizePips(scene: Phaser.Scene, container: Phaser.GameObjects.Container, cx: number, y: number, size: number): void {
-  const caption = `size ${size}`;
-  const pipsW = size * (PIP + 2);
-  const startX = cx - Math.floor((labelWidth(caption) + (size > 0 ? 4 + pipsW : 0)) / 2);
-  container.add(text(scene, startX, y, caption, PALETTE.textDim));
-  for (let i = 0; i < size; i++) {
-    const px = startX + labelWidth(caption) + 4 + i * (PIP + 2);
-    container.add(scene.add.rectangle(px, y + 1, PIP, PIP, toPhaserColor(PALETTE.sun)).setOrigin(0, 0));
-  }
-}
-
 function drawDraftTile(ctx: Ctx, item: DraftItem, x: number, y: number, w: number): void {
   const { scene, layer, index, handlers } = ctx;
   const container = scene.add.container(x, y);
   const bg = scene.add.rectangle(0, 0, w, TILE_H, toPhaserColor(PALETTE.stump)).setOrigin(0, 0);
   bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn));
   container.add(bg);
-  const art = gearArtId(item.gearId);
+  const art = gearArtId(item.sourceId);
   if (art !== null) container.add(placeArt(scene, art, w / 2, 22).setScale(2));
   const cx = Math.floor(w / 2);
-  container.add(centredText(scene, cx, 44, fitLabel(item.name, Math.floor((w - 4) / LABEL_CELL.w))));
-  sizePips(scene, container, cx, 58, item.size);
-  container.add(centredText(scene, cx, 72, item.window, PALETTE.textDim));
+  const cells = Math.floor((w - 4) / LABEL_CELL.w);
+  container.add(centredText(scene, cx, 44, fitLabel(item.name, cells)));
+  container.add(centredText(scene, cx, 62, fitLabel(item.badge, cells), PALETTE.textDim));
   container.add(centredText(scene, cx, 86, "Take it", PALETTE.turn));
   bg.setInteractive({ useHandCursor: true });
-  bg.on("pointerdown", () => handlers.onDraft(item.gearId));
-  bg.on("pointerover", () => handlers.onGearHover(item.gearId));
-  bg.on("pointerout", () => handlers.onGearHover(null));
+  bg.on("pointerdown", () => handlers.onDraft(item.sourceId));
+  bg.on("pointerover", () => handlers.onSourceHover(item.sourceId));
+  bg.on("pointerout", () => handlers.onSourceHover(null));
   layer.add(container);
   index.register("fireside", item.objectId, container);
 }
@@ -148,7 +135,8 @@ function drawDraft(ctx: Ctx): void {
   panel(ctx, zone);
   const draft = model.draft;
   if (draft.kind === "offer") {
-    layer.add(text(scene, zone.x + 6, zone.y + 4, "Gear by the fire: take one", PALETTE.textDim));
+    const title = draft.pick === "character" ? "Muster: pick your character" : "By the fire: take one";
+    layer.add(text(scene, zone.x + 6, zone.y + 4, title, PALETTE.textDim));
     rowBoxes(zone.x + 8, zone.w - 16, draft.items.length, TILE_GAP, TILE_MAX_W).forEach((box, i) => {
       drawDraftTile(ctx, draft.items[i]!, box.x, zone.y + 16, box.w);
     });
@@ -156,10 +144,10 @@ function drawDraft(ctx: Ctx): void {
   }
   const cy = zone.y + zone.h / 2;
   if (draft.kind === "taken") {
-    const art = gearArtId(draft.gearId);
+    const art = gearArtId(draft.sourceId);
     if (art !== null) layer.add(placeArt(scene, art, zone.x + 48, cy).setScale(2));
     layer.add(text(scene, zone.x + 80, cy - 10, `Taken: ${draft.name}`));
-    layer.add(text(scene, zone.x + 80, cy + 2, "Pack it below to bring it along", PALETTE.textDim));
+    layer.add(text(scene, zone.x + 80, cy + 2, "It is in your kit below", PALETTE.textDim));
     return;
   }
   if (draft.text !== "") layer.add(centredText(scene, zone.x + zone.w / 2, cy - 4, draft.text, PALETTE.textDim));
@@ -176,7 +164,8 @@ const CHIP_H = 10;
 const STATUS: Readonly<Record<CrewRow["status"], { label: string; color: string }>> = {
   ready: { label: "ready ✓", color: PALETTE.done },
   drafting: { label: "drafting…", color: PALETTE.sun },
-  packing: { label: "packing…", color: PALETTE.textDim },
+  choosing: { label: "choosing…", color: PALETTE.sun },
+  resting: { label: "resting…", color: PALETTE.textDim },
 };
 
 function drawCrewRow(ctx: Ctx, row: CrewRow, x: number, y: number, w: number): void {
@@ -188,18 +177,18 @@ function drawCrewRow(ctx: Ctx, row: CrewRow, x: number, y: number, w: number): v
   layer.add(text(scene, statusX, y, status.label, status.color));
 
   const chipY = y + LABEL_CELL.h + 2;
-  if (row.gear.length === 0) {
-    layer.add(text(scene, x, chipY + 1, "no gear packed", PALETTE.textDim));
+  if (row.sources.length === 0) {
+    layer.add(text(scene, x, chipY + 1, "no character yet", PALETTE.textDim));
     return;
   }
   let cursor = x;
-  for (let i = 0; i < row.gear.length; i++) {
-    const gear = row.gear[i]!;
-    const rest = row.gear.length - i - 1;
+  for (let i = 0; i < row.sources.length; i++) {
+    const source = row.sources[i]!;
+    const rest = row.sources.length - i - 1;
     const reserve = rest > 0 ? labelWidth(`+${rest}`) + 2 : 0;
-    const art = gearArtId(gear.gearId);
+    const art = gearArtId(source.sourceId);
     const iconW = art === null ? 0 : ART[art].w + 1;
-    const label = fitLabel(gear.name, Math.floor((x + w - reserve - cursor - 4 - iconW) / LABEL_CELL.w));
+    const label = fitLabel(source.name, Math.floor((x + w - reserve - cursor - 4 - iconW) / LABEL_CELL.w));
     if (Array.from(label).length < 3) {
       layer.add(text(scene, cursor, chipY + 1, `+${rest + 1}`, PALETTE.textDim));
       return;
@@ -227,85 +216,54 @@ function drawCrew(ctx: Ctx): void {
 }
 
 // ---------------------------------------------------------------------------
-// Backpack
+// Kit
 // ---------------------------------------------------------------------------
 
-const BAG_X = 124;
-const SLOT_H = 22;
-const SLOT_GAP = 2;
-const SLOT_MAX_W = 72;
-const OWNED_GAP = 4;
-const OWNED_MAX_W = 64;
-const OWNED_H = 42;
+const KIT_X = 124;
+const KIT_GAP = 4;
+const KIT_MAX_W = 96;
+const KIT_H = 42;
 
-function drawOwnedTile(ctx: Ctx, item: OwnedItem, x: number, y: number, w: number): void {
+function drawKitTile(ctx: Ctx, item: KitItem, x: number, y: number, w: number): void {
   const { scene, layer, index, handlers } = ctx;
   const container = scene.add.container(x, y);
-  const bg = scene.add.rectangle(0, 0, w, OWNED_H, toPhaserColor(PALETTE.stump)).setOrigin(0, 0);
-  if (item.equipped) bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn));
+  const bg = scene.add.rectangle(0, 0, w, KIT_H, toPhaserColor(PALETTE.stump)).setOrigin(0, 0);
   container.add(bg);
-  const art = gearArtId(item.gearId);
+  const art = gearArtId(item.sourceId);
   if (art !== null) container.add(placeArt(scene, art, w / 2, 11));
   const cx = Math.floor(w / 2);
-  container.add(centredText(scene, cx, 21, fitLabel(item.name, Math.floor((w - 2) / LABEL_CELL.w))));
-  const caption =
-    item.blocked !== null
-      ? { v: item.blocked.caption, c: PALETTE.destructive }
-      : item.equipped
-        ? { v: "packed", c: PALETTE.turn }
-        : { v: `size ${item.size}`, c: PALETTE.textDim };
-  container.add(centredText(scene, cx, 31, caption.v, caption.c));
-  if (item.blocked !== null) container.setAlpha(DIM_ALPHA);
-  bg.setInteractive({ useHandCursor: item.blocked === null });
-  bg.on("pointerdown", () => {
-    if (item.blocked === null) handlers.onPack(item.gearId);
-  });
-  bg.on("pointerover", () => handlers.onGearHover(item.gearId));
-  bg.on("pointerout", () => handlers.onGearHover(null));
+  const cells = Math.floor((w - 2) / LABEL_CELL.w);
+  container.add(centredText(scene, cx, 21, fitLabel(item.name, cells)));
+  container.add(centredText(scene, cx, 31, fitLabel(item.badge, cells), PALETTE.textDim));
+  bg.setInteractive();
+  bg.on("pointerover", () => handlers.onSourceHover(item.sourceId));
+  bg.on("pointerout", () => handlers.onSourceHover(null));
   layer.add(container);
   index.register("fireside", item.objectId, container);
 }
 
-function drawBackpack(ctx: Ctx): void {
+function drawKit(ctx: Ctx): void {
   const { scene, layer, model } = ctx;
   const zone = FIRESIDE_ZONES.backpack;
-  const bag = model.backpack;
+  const kit = model.kit;
   panel(ctx, zone);
-  if (bag === null) {
-    layer.add(centredText(scene, zone.x + zone.w / 2, zone.y + zone.h / 2 - 4, "Watching the crew pack", PALETTE.textDim));
+  if (kit === null) {
+    layer.add(centredText(scene, zone.x + zone.w / 2, zone.y + zone.h / 2 - 4, "Watching the crew", PALETTE.textDim));
     return;
   }
-  layer.add(text(scene, zone.x + 4, zone.y + 3, "Backpack"));
+  layer.add(text(scene, zone.x + 4, zone.y + 3, "Kit"));
   const art = ART["backpack-open"];
   layer.add(placeArt(scene, "backpack-open", zone.x + 4 + art.w / 2, zone.y + 16 + art.h / 2));
 
-  const x0 = zone.x + BAG_X;
+  const x0 = zone.x + KIT_X;
   const rowW = zone.x + zone.w - 4 - x0;
-  const cap = `Capacity ${bag.capacity}, ${bag.used} used`;
-  layer.add(text(scene, x0 + rowW - labelWidth(cap), zone.y + 3, cap, PALETTE.textDim));
-
-  const slotY = zone.y + 14;
-  const slots = rowBoxes(x0, rowW, bag.capacity, SLOT_GAP, SLOT_MAX_W);
-  for (const slot of slots) {
-    layer.add(plate(scene, slot.x, slotY, slot.w, SLOT_H, PALETTE.letterbox).setAlpha(PANEL_ALPHA).setStrokeStyle(1, toPhaserColor(PALETTE.plateEdge)));
-  }
-  for (const item of bag.packed) {
-    if (item.size === 0) continue;
-    const first = slots[item.firstSlot];
-    const last = slots[item.firstSlot + item.size - 1];
-    if (first === undefined || last === undefined) continue;
-    const w = last.x + last.w - first.x;
-    layer.add(plate(scene, first.x, slotY, w, SLOT_H, PALETTE.bark));
-    layer.add(gearLabel(scene, first.x + w / 2, slotY + SLOT_H / 2, w - 4, item.gearId, item.name));
-  }
-
-  const ownedY = zone.y + zone.h - OWNED_H - 2;
-  if (bag.owned.length === 0) {
-    layer.add(text(scene, x0, ownedY + 16, "Nothing yet: take a gear above", PALETTE.textDim));
+  const kitY = zone.y + zone.h - KIT_H - 2;
+  if (kit.length === 0) {
+    layer.add(text(scene, x0, kitY + 16, "Pick a character above", PALETTE.textDim));
     return;
   }
-  rowBoxes(x0, rowW, bag.owned.length, OWNED_GAP, OWNED_MAX_W).forEach((box, i) => {
-    drawOwnedTile(ctx, bag.owned[i]!, box.x, ownedY, box.w);
+  rowBoxes(x0, rowW, kit.length, KIT_GAP, KIT_MAX_W).forEach((box, i) => {
+    drawKitTile(ctx, kit[i]!, box.x, kitY, box.w);
   });
 }
 
@@ -317,8 +275,8 @@ const READY_W = 136;
 const READY_H = 40;
 
 const READY_CAPTION: Readonly<Record<NonNullable<FiresideModel["ready"]>["state"], string>> = {
-  blocked: "Take a gear first",
-  open: "Set out when packed",
+  blocked: "Pick first",
+  open: "Set out when ready",
   done: "Waiting for the crew",
 };
 
@@ -346,6 +304,6 @@ export function drawFireside(scene: Phaser.Scene, layer: Layer, model: FiresideM
   drawTrail(ctx);
   drawDraft(ctx);
   drawCrew(ctx);
-  drawBackpack(ctx);
+  drawKit(ctx);
   drawReady(ctx);
 }

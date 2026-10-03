@@ -9,7 +9,6 @@ import {
   clickUntilChanged,
   draftOffer,
   isReady,
-  ownedGear,
   pickDraftOffer,
   waitForScene,
   type FiresideView,
@@ -46,35 +45,33 @@ const LAST_TRICK_ID = "last-trick";
 const PREDEAL_SKIP_ID = "predeal-skip";
 const NEW_EXPEDITION_ID = "run-end:new-expedition";
 
-/** Rain Poncho, the only pre-deal gear, opens the pre-deal window at the
- * boss camps 3 and 6; it needs two slots, which camp 2's capacity or Energy
- * Tonic's +2 buys. */
-const TOUR_DRAFT_PREFERENCE = ["jam", "overclock", ...DRAFT_PREFERENCE];
-const PACK_FIRST = ["overclock", "jam"];
+/** Rain Poncho, the only pre-deal item, opens the pre-deal window at the
+ * boss camps 3 and 6. */
+const TOUR_DRAFT_PREFERENCE = ["rain-poncho", ...DRAFT_PREFERENCE];
 
 /** Phases scripted play reaches often enough to keep starting new runs for. */
 const WANTED = [
-  "draft", "loadout", "ready", "objective-pick", "trick-led", "mid-trick", "gear-targeting", "whisper-targeting", "whisper-sent", "whisper-received",
-  "last-trick-glance", "objective-hover", "fireside-after-fail", "between-camps-draft", "between-camps-loadout", "next-camp",
+  "draft", "kit", "ready", "objective-pick", "trick-led", "mid-trick", "ability-targeting", "whisper-targeting", "whisper-sent", "whisper-received",
+  "last-trick-glance", "objective-hover", "fireside-after-fail", "between-camps-draft", "between-camps-kit", "next-camp",
   "run-end-lost", "run-end-guest",
 ];
 /** Phases play rarely reaches; each is also captured from a rewritten view. */
-const RARE = ["predeal-gear", "run-end-won"];
+const RARE = ["predeal-ability", "run-end-won"];
 
 interface Identity { kind: "standard" | "joker"; suit?: string; rank?: number; joker?: "sun" | "moon" }
 interface Card { id: string; objectId: string; label: string; identity: Identity; playable: boolean }
-interface Chip { objectId: string; label?: string; status?: string; pickable?: boolean; objectiveId?: string; usable?: boolean; gearId?: string }
+interface Chip { objectId: string; label?: string; status?: string; pickable?: boolean; objectiveId?: string; usable?: boolean; sourceId?: string }
 interface CampModel {
   sceneKey: SceneName;
   campNumber: number;
-  seats: { seatId: string; objectId: string; isYou: boolean; mayAct: boolean; targetable?: boolean; gear: Chip[]; objectives: Chip[] }[];
+  seats: { seatId: string; objectId: string; isYou: boolean; mayAct: boolean; targetable?: boolean; sources: Chip[]; objectives: Chip[] }[];
   hand: (Card & { targetable?: boolean })[];
   receivedWhispers: unknown[];
   trick: { plays: { seatId: string; card: { label: string; identity: Identity } }[] } | null;
   lastTrick: { open: boolean; plays: unknown[] } | null;
   faceUpObjectives: Chip[];
   whisper: { visible: boolean; active: boolean };
-  preDeal: { youPending: boolean } | null;
+  gate: { youPending: boolean } | null;
   targeting: { canConfirm: boolean } | null;
 }
 interface PhaseRecord { file: string; entries: number; violations: Violation[] }
@@ -116,17 +113,12 @@ class Tour {
 // Fireside
 // ---------------------------------------------------------------------------
 
-function firesideNames(m: FiresideView): { draft: string; loadout: string; ready: string } {
-  if (m.lastResult == null) return { draft: "draft", loadout: "loadout", ready: "ready" };
+function firesideNames(m: FiresideView): { draft: string; kit: string; ready: string } {
+  if (m.lastResult == null) return { draft: "draft", kit: "kit", ready: "ready" };
   if (m.lastResult.status === "succeeded") {
-    return { draft: "between-camps-draft", loadout: "between-camps-loadout", ready: "between-camps-ready" };
+    return { draft: "between-camps-draft", kit: "between-camps-kit", ready: "between-camps-ready" };
   }
-  return { draft: "fireside-after-fail-draft", loadout: "fireside-after-fail", ready: "fireside-after-fail-ready" };
-}
-
-function nextToPack(m: FiresideView): ReturnType<typeof ownedGear>[number] | undefined {
-  const candidates = ownedGear(m).filter((o) => o.blocked === null && !o.equipped);
-  return PACK_FIRST.map((id) => candidates.find((o) => o.gearId === id)).find((o) => o !== undefined) ?? candidates[0];
+  return { draft: "fireside-after-fail-draft", kit: "fireside-after-fail", ready: "fireside-after-fail-ready" };
 }
 
 async function fireside(page: Page, tour: Tour | null): Promise<void> {
@@ -142,17 +134,7 @@ async function fireside(page: Page, tour: Tour | null): Promise<void> {
     model = await clickUntilChanged<FiresideView>(page, pick.objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
   }
   if ((await getScene(page)) !== "fireside" || isReady(model)) return;
-  await tour?.shot(names.loadout);
-  for (let item = nextToPack(model); item !== undefined; item = nextToPack(model)) {
-    const gearId = item.gearId;
-    model = await clickUntilChanged<FiresideView>(
-      page,
-      item.objectId,
-      (m) => m.sceneKey !== "fireside" || ownedGear(m).find((o) => o.gearId === gearId)?.equipped === true,
-      { perAttemptTimeoutMs: 15_000 },
-    );
-    if (model.sceneKey !== "fireside") return;
-  }
+  await tour?.shot(names.kit);
   await clickUntilChanged<FiresideView>(page, READY_ID, (m) => isReady(m) || m.sceneKey === "camp", { perAttemptTimeoutMs: 15_000 });
   await tour?.shot(names.ready);
 }
@@ -229,7 +211,7 @@ async function peekTargeting(page: Page, tour: Tour, openId: string, name: strin
 async function captureHostState(host: Page, tour: Tour): Promise<void> {
   const m = await getModel<CampModel>(host);
   if (m.sceneKey !== "camp") return;
-  if (m.preDeal?.youPending) await tour.shot("predeal-gear");
+  if (m.gate?.youPending) await tour.shot("predeal-ability");
   if (m.faceUpObjectives.some((o) => o.pickable)) await tour.shot("objective-pick");
   const plays = m.trick?.plays.length ?? 0;
   if (plays >= 1) await tour.shot("trick-led");
@@ -242,10 +224,10 @@ async function captureHostState(host: Page, tour: Tour): Promise<void> {
       await host.mouse.move(5, 5);
     }
   }
-  const mate = m.seats.find((s) => !s.isYou && s.gear.length > 0);
-  if (mate !== undefined && !tour.has("teammate-gear-hover")) {
-    await hoverObject(host, `seat-gear:${mate.seatId}:${mate.gear[0]!.gearId}`);
-    await tour.shot("teammate-gear-hover");
+  const mate = m.seats.find((s) => !s.isYou && s.sources.length > 0);
+  if (mate !== undefined && !tour.has("teammate-source-hover")) {
+    await hoverObject(host, `seat-source:${mate.seatId}:${mate.sources[0]!.sourceId}`);
+    await tour.shot("teammate-source-hover");
     await host.mouse.move(5, 5);
   }
   if (m.lastTrick !== null && !tour.has("last-trick-glance") && !tour.glanceFailed) {
@@ -275,9 +257,9 @@ async function stepPage(page: Page, isHost: boolean, tour: Tour): Promise<void> 
   const you = model.seats.find((s) => s.isYou);
   if (!you) return;
 
-  if (model.preDeal?.youPending) {
-    if (isHost) await tour.shot("predeal-gear");
-    await clickUntilChanged<CampModel>(page, PREDEAL_SKIP_ID, (m) => !(m.preDeal?.youPending ?? false));
+  if (model.gate?.youPending) {
+    if (isHost) await tour.shot("predeal-ability");
+    await clickUntilChanged<CampModel>(page, PREDEAL_SKIP_ID, (m) => !(m.gate?.youPending ?? false));
     return;
   }
   if (you.mayAct) {
@@ -296,9 +278,9 @@ async function stepPage(page: Page, isHost: boolean, tour: Tour): Promise<void> 
     await tour.shot("whisper-sent");
     return;
   }
-  const gear = you.gear.find((g) => g.usable);
-  if (isHost && !tour.has("gear-targeting") && gear) {
-    await peekTargeting(page, tour, `gear:${gear.gearId}`, "gear-targeting", (m) => m.targeting !== null);
+  const ability = you.sources.find((g) => g.usable);
+  if (isHost && !tour.has("ability-targeting") && ability) {
+    await peekTargeting(page, tour, `source:${ability.sourceId}`, "ability-targeting", (m) => m.targeting !== null);
     return;
   }
   // A hand card can sit under a seat chip or label and swallow the click, so
@@ -379,6 +361,7 @@ type Game = Record<string, unknown> & { yourSeatId: string; seats: { seatId: str
 
 /** Pre-deal at boss camp 3 with your Rain Poncho waiting on you. */
 function preDealView(game: Game): Game {
+  const poncho = { sourceId: "rain-poncho", remaining: { kind: "uses", left: 1, of: 1 } };
   return {
     ...game,
     runPhase: "pre-deal",
@@ -386,19 +369,16 @@ function preDealView(game: Game): Game {
     supplies: 2,
     activeBossTwistId: "radio-silence",
     bossTwists: { camp3: "radio-silence", camp6: null },
-    seats: game.seats.map((s) => ({ ...s, equippedGearIds: s.seatId === game.yourSeatId ? ["jam"] : [], ready: false, draftPending: false })),
-    yourOwnedGearIds: ["jam"],
+    seats: game.seats.map((s) => ({ ...s, kit: s.seatId === game.yourSeatId ? ["rain-poncho"] : [], usage: s.seatId === game.yourSeatId ? [poncho] : [], ready: false, draftPending: false })),
     yourDraftOffer: null,
-    yourCapacity: 3,
-    yourBaseCapacity: 3,
-    yourGear: [{ gearId: "jam", spent: false, usableNow: true, reason: null }],
+    yourAbilities: [{ sourceId: "rain-poncho", usableNow: true, reason: null, steps: [] }],
     history: [h(1, 1, "succeeded"), h(2, 1, "succeeded")],
     attempt: {
       attemptNumber: 1,
       bossCancelled: false,
-      gearWindow: "pre-deal",
-      preDealPendingSeatIds: [game.yourSeatId],
-      gearUses: [],
+      window: "pre-deal",
+      pendingSeatIds: [game.yourSeatId],
+      rescue: null,
       effects: [],
       reveals: [],
       log: [],
@@ -447,11 +427,11 @@ async function rewriteViews(host: Page): Promise<{ current: (game: Game) => Game
 
 async function captureRare(host: Page, tour: Tour): Promise<void> {
   const rewrite = await rewriteViews(host);
-  if (!tour.has("predeal-gear")) {
+  if (!tour.has("predeal-ability")) {
     rewrite.current = preDealView;
     await host.reload();
-    await host.waitForFunction(() => (window.__expeditionTest?.model as { preDeal?: { youPending: boolean } } | null)?.preDeal?.youPending === true);
-    await tour.shot("predeal-gear-rewritten");
+    await host.waitForFunction(() => (window.__expeditionTest?.model as { gate?: { youPending: boolean } } | null)?.gate?.youPending === true);
+    await tour.shot("predeal-ability-rewritten");
   }
   if (!tour.has("run-end-won")) {
     rewrite.current = wonView;
@@ -486,7 +466,7 @@ test.describe("@tour Expedition UI tour", () => {
       } finally {
         const notes: string[] = [];
         if (!tour.has("between-camps-draft")) notes.push(`no camp was cleared in ${outcomes.length} run(s), so the fireside after a cleared camp was not reached`);
-        if (!tour.has("predeal-gear")) notes.push("no run reached boss camp 3 with Rain Poncho packed; predeal-gear-rewritten shows that window from a rewritten view");
+        if (!tour.has("predeal-ability")) notes.push("no run reached boss camp 3 with Rain Poncho in a kit; predeal-ability-rewritten shows that window from a rewritten view");
         if (!tour.has("run-end-won")) notes.push("no run was won; run-end-won-rewritten shows the won screen from a rewritten view");
         const total = tour.write({
           size: size.name,

@@ -1,8 +1,8 @@
 /**
  * The fireside between camps: redraws every zone from the store's fireside
  * model whenever it changes. Clicks only dispatch a request literal or a
- * `local-ui.ts` hover change; the worker decides whether a pick, loadout or
- * Ready is legal.
+ * `local-ui.ts` hover change; the worker decides whether a character pick,
+ * draft pick or Ready is legal.
  */
 import Phaser from "phaser";
 import { ensurePixelFonts } from "../font/pixel-font";
@@ -10,9 +10,9 @@ import { preloadArt, placeArt } from "../art/place-art";
 import { FIRESIDE_ZONES, STAGE } from "../layout";
 import { drawPrompt, drawTooltip, drawTopBar } from "../draw/draw-table";
 import { drawFireside, type FiresideHandlers } from "../draw/draw-fireside";
-import { draftObjectId, loadoutObjectId } from "../../../../lib/expedition/expedition-ids";
-import { toggledLoadout, type FiresideModel } from "../../../../lib/expedition/fireside-model";
-import { setTooltipGear } from "../../../../lib/expedition/local-ui";
+import { draftObjectId, kitObjectId } from "../../../../lib/expedition/expedition-ids";
+import type { FiresideModel } from "../../../../lib/expedition/fireside-model";
+import { setTooltipSource } from "../../../../lib/expedition/local-ui";
 import type { ObjectIndex } from "../object-index";
 import type { SceneDeps } from "./scene-registry";
 
@@ -23,21 +23,20 @@ function firesideModel(store: SceneDeps["store"]): FiresideModel | null {
 
 function buildHandlers(store: SceneDeps["store"]): FiresideHandlers {
   return {
-    onDraft(gearId) {
-      store.getState().dispatch({ type: "pick-draft", gearId });
-    },
-    onPack(gearId) {
-      const model = firesideModel(store);
-      if (model === null) return;
-      store.getState().dispatch({ type: "set-loadout", gearIds: toggledLoadout(model, gearId) });
+    onDraft(sourceId) {
+      const draft = firesideModel(store)?.draft;
+      if (draft?.kind !== "offer") return;
+      store
+        .getState()
+        .dispatch(draft.pick === "character" ? { type: "pick-character", characterId: sourceId } : { type: "pick-draft", sourceId });
     },
     onReady() {
       store.getState().dispatch({ type: "ready" });
     },
-    onGearHover(gearId) {
+    onSourceHover(sourceId) {
       const state = store.getState();
       if (state.reconnecting) return;
-      state.updateLocalUi((ui) => setTooltipGear(ui, gearId));
+      state.updateLocalUi((ui) => setTooltipSource(ui, sourceId));
     },
   };
 }
@@ -97,10 +96,10 @@ export class FiresideScene extends Phaser.Scene {
   /** A redraw replaces the hovered object and Phaser never sends the stale
    * one its `pointerout`, so the tooltip is checked against the pointer. */
   update(): void {
-    const gearId = this.sceneStore.getState().localUi.tooltipGearId;
-    if (gearId === null) return;
+    const sourceId = this.sceneStore.getState().localUi.tooltipSourceId;
+    if (sourceId === null) return;
     const { x, y } = this.input.activePointer;
-    if (this.index.contains(draftObjectId(gearId), x, y) || this.index.contains(loadoutObjectId(gearId), x, y)) return;
-    this.handlers.onGearHover(null);
+    if (this.index.contains(draftObjectId(sourceId), x, y) || this.index.contains(kitObjectId(sourceId), x, y)) return;
+    this.handlers.onSourceHover(null);
   }
 }

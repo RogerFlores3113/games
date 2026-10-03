@@ -40,19 +40,16 @@ function game(over: Partial<ExpeditionView> = {}, campOver: Partial<Camp> = {}, 
     supplies: 5,
     bossTwists: { camp3: null, camp6: null },
     activeBossTwistId: null,
-    seats: [{ seatId: "a", equippedGearIds: [], ready: true, draftPending: false }],
-    yourOwnedGearIds: [],
+    seats: [{ seatId: "a", characterId: "scout", kit: [], ready: true, draftPending: false, pool: null, usage: [] }],
     yourDraftOffer: null,
-    yourCapacity: 3,
-    yourBaseCapacity: 3,
-    yourGear: [],
+    yourAbilities: [],
     history: [],
     attempt: {
       attemptNumber: 1,
       bossCancelled: false,
-      gearWindow: null,
-      preDealPendingSeatIds: [],
-      gearUses: [],
+      window: null,
+      pendingSeatIds: [],
+      rescue: null,
       effects: [],
       reveals: [],
       log,
@@ -73,14 +70,14 @@ describe("cuesFor", () => {
   });
 
   it("plays card-play when a card joins the current trick", () => {
-    const next = game({}, { currentTrick: { index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: club3 }] } });
+    const next = game({}, { currentTrick: { index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: club3, effectiveRank: null }] } });
     expect(cuesFor(game(), next)).toEqual(["sfx-card-play"]);
   });
 
   it("plays card-play once when the last card closes the trick", () => {
-    const prev = game({}, { currentTrick: { index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: club3 }] } });
+    const prev = game({}, { currentTrick: { index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: club3, effectiveRank: null }] } });
     const next = game({}, {
-      completedTricks: [{ index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: club3 }, { seatId: "b", card: club4 }], winnerSeatId: "b" }],
+      completedTricks: [{ index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: club3, effectiveRank: null }, { seatId: "b", card: club4, effectiveRank: null }], winnerSeatId: "b" }],
       currentTrick: { index: 1, leaderSeatId: "b", plays: [] },
     });
     expect(cuesFor(prev, next)).toEqual(["sfx-card-play"]);
@@ -114,9 +111,9 @@ describe("cuesFor", () => {
   });
 
   it("plays whisper and power for new log entries of those events", () => {
-    const entry = (event: string) => ({ event, actorSeatId: "a", subjectSeatIds: ["b"], gearId: null, private: false });
+    const entry = (event: string, sourceId: string | null = null) => ({ event, actorSeatId: "a", subjectSeatIds: ["b"], sourceId, private: false });
     expect(cuesFor(game(), game({}, {}, [entry("whisper")]))).toEqual(["sfx-whisper"]);
-    expect(cuesFor(game(), game({}, {}, [entry("use-gear")]))).toEqual(["sfx-power"]);
+    expect(cuesFor(game(), game({}, {}, [entry("use-ability", "scout")]))).toEqual(["sfx-power"]);
     const had = game({}, {}, [entry("whisper")]);
     expect(cuesFor(had, game({}, {}, [entry("whisper")]))).toEqual([]);
   });
@@ -130,11 +127,24 @@ describe("cuesFor", () => {
     expect(cuesFor(game(), game({ runStatus: "lost", runPhase: "ended" }))).toEqual(["sfx-run-lost"]);
   });
 
-  it("plays equip when a draft pick adds gear or the own loadout changes at the fireside", () => {
-    const fireside = (owned: string[], equipped: string[]) =>
-      game({ runPhase: "fireside", yourOwnedGearIds: owned, seats: [{ seatId: "a", equippedGearIds: equipped, ready: false, draftPending: false }] });
-    expect(cuesFor(fireside([], []), fireside(["peek"], []))).toEqual(["sfx-equip"]);
-    expect(cuesFor(fireside(["peek"], []), fireside(["peek"], ["peek"]))).toEqual(["sfx-equip"]);
-    expect(cuesFor(fireside(["peek"], []), fireside(["peek"], []))).toEqual([]);
+  it("plays equip when your character or kit changes at the fireside or muster", () => {
+    const fireside = (characterId: string | null, kit: string[]) =>
+      game({ runPhase: "fireside", attempt: null, seats: [{ seatId: "a", characterId, kit, ready: false, draftPending: false, pool: null, usage: [] }] });
+    expect(cuesFor(fireside(null, []), fireside("scout", []))).toEqual(["sfx-equip"]);
+    expect(cuesFor(fireside("scout", []), fireside("scout", ["bait"]))).toEqual(["sfx-equip"]);
+    expect(cuesFor(fireside("scout", ["bait"]), fireside("scout", ["bait"]))).toEqual([]);
+  });
+
+  it("does not play equip for a teammate's kit change", () => {
+    const fireside = (mateKit: string[]) =>
+      game({
+        runPhase: "fireside",
+        attempt: null,
+        seats: [
+          { seatId: "a", characterId: "scout", kit: [], ready: false, draftPending: false, pool: null, usage: [] },
+          { seatId: "b", characterId: "guide", kit: mateKit, ready: false, draftPending: false, pool: null, usage: [] },
+        ],
+      });
+    expect(cuesFor(fireside([]), fireside(["bait"]))).toEqual([]);
   });
 });

@@ -1,16 +1,16 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { draftOffer, isReady, ownedGear, type FiresideView, type SceneName } from "./expedition-driver";
+import { draftOffer, isReady, kitIds, pickDraftOffer, type FiresideView, type SceneName } from "./expedition-driver";
 import { clickObject, getModel, getScene, hoverObject, startExpeditionGame, waitForBridge } from "./expedition-helpers";
 
 /**
  * Full-camp, reconnect, card-pack and interactables e2e (Plan 12-13, spec
- * §8). Drives an entire camp — draft, loadout, play, a gear use, a Whisper,
+ * §8). Drives an entire camp — muster, ready, play, an ability use, a Whisper,
  * the last-trick glance — through `window.__expeditionTest` plus real mouse
  * input, then proves refresh-and-resume, per-browser card packs, and that
  * the four interactables never touch game state. Every id used below
  * mirrors `apps/web/lib/expedition/expedition-ids.ts`'s literal scheme
- * (`draft:<id>`, `loadout:<id>`, `gear:<id>`, `seat:<seatId>`,
+ * (`draft:<id>`, `source:<id>`, `seat:<seatId>`, "predeal-skip",
  * `objective:<label>`, `hand:<label>`, "ready", "whisper", "confirm",
  * "last-trick", `interactable:<id>`) verbatim, per the plan's own
  * `<interfaces>` block — this spec never imports app code.
@@ -20,8 +20,11 @@ const WHISPER_ID = "whisper";
 const CONFIRM_ID = "confirm";
 const READY_ID = "ready";
 const LAST_TRICK_ID = "last-trick";
+const PREDEAL_SKIP_ID = "predeal-skip";
 const NAMES = ["Roger", "Bianca", "Sam"];
-const DRAFT_PREFERENCE = ["peek", "ghost", "chatter", "broadcast"];
+/** Abilities whose every target step is a seat, a hand card or an objective:
+ * the kinds this driver can click. */
+const DRIVABLE_ABILITIES = new Set(["guide", "scout", "cartographer", "cartographer.detour", "trail-map", "trained-monkey"]);
 
 interface CardModel {
   id: string;
@@ -42,8 +45,8 @@ interface ObjectiveChip {
   targetable: boolean;
 }
 
-interface GearChip {
-  gearId: string;
+interface SourceChip {
+  sourceId: string;
   objectId: string;
   spent: boolean;
   usable: boolean;
@@ -54,7 +57,7 @@ interface SeatModel {
   objectId: string;
   isYou: boolean;
   mayAct: boolean;
-  gear: GearChip[];
+  sources: SourceChip[];
   objectives: ObjectiveChip[];
   reveals: { objectId: string }[];
   targetable: boolean;
@@ -67,7 +70,7 @@ interface TrickPlayModel {
 
 interface Targeting {
   sourceObjectId: string;
-  nextKind: "own-card" | "teammate" | "face-up-objective" | "own-objective" | null;
+  nextKind: string | null;
   canConfirm: boolean;
 }
 
@@ -78,7 +81,7 @@ interface CampModel {
   prompt: { text: string; tone: "your-move" | "waiting" | "info" | "alert" };
   seats: SeatModel[];
   hand: CardModel[];
-  trick: { plays: TrickPlayModel[] } | null;
+  trick: { leaderSeatId: string; plays: TrickPlayModel[] } | null;
   lastTrick: { plays: TrickPlayModel[]; open: boolean } | null;
   faceUpObjectives: ObjectiveChip[];
   whisper: { shown: boolean; visible: boolean; active: boolean; state: "ready" | "wait-between-tricks" | "used" | "blocked"; reason: string | null };
@@ -88,11 +91,12 @@ interface CampModel {
   tooltip: { title: string; text: string; reason: string | null } | null;
   drag: { cardId: string; legal: boolean } | null;
   targeting: Targeting | null;
+  gate: { window: string; youPending: boolean } | null;
 }
 
 interface DriveState {
   whisperDone: boolean;
-  gearDone: boolean;
+  abilityDone: boolean;
   lastTrickChecked: boolean;
 }
 
@@ -199,18 +203,6 @@ async function clickHandCard<T>(page: Page, objectId: string, isSatisfied: (mode
   return clickUntilChanged(page, objectId, isSatisfied, { xOffsetFraction: 0.25 });
 }
 
-function pickDraftOffer<T extends { gearId: string; size: number }>(offers: T[]): T {
-  for (const preferred of DRAFT_PREFERENCE) {
-    const found = offers.find((o) => o.gearId === preferred);
-    if (found) return found;
-  }
-  const sizeOne = offers.find((o) => o.size <= 1);
-  if (sizeOne) return sizeOne;
-  const first = offers[0];
-  if (!first) throw new Error("pickDraftOffer: draftOffer was empty");
-  return first;
-}
-
 /** Presses a hand card with the real mouse, drags it over the middle of the
  * stump in small steps and releases it there. */
 async function dragHandCardToStump(page: Page, objectId: string, whileHeld?: () => Promise<void>): Promise<void> {
@@ -232,10 +224,9 @@ async function dragHandCardToStump(page: Page, objectId: string, whileHeld?: () 
 // reachCamp / stepCamp — shared full-camp driver helpers
 // ---------------------------------------------------------------------------
 
-/** Drives every page in `pages` from a fresh (or replayed) fireside
- * draft/loadout/ready screen to the camp scene: picks a draft offer by
- * preference, equips a fitting owned item if one exists, readies up, and
- * waits until every page's scene is "camp". */
+/** Drives every page in `pages` from muster or a fresh (or replayed)
+ * fireside to the camp scene: picks a character or draft offer by
+ * preference, readies up, and waits until every page's scene is "camp". */
 async function reachCamp(pages: Page[]): Promise<void> {
   for (const page of pages) {
     // The store's model can update to the fireside model slightly before
@@ -260,15 +251,6 @@ async function reachCamp(pages: Page[]): Promise<void> {
     if ((await getScene(page)) === "camp") continue;
     const model = await getModel<FiresideView>(page);
     if (isReady(model)) continue;
-    const fitting = ownedGear(model).find((o) => o.blocked === null && !o.equipped);
-    if (fitting) {
-      await clickUntilChanged<FiresideView>(
-        page,
-        fitting.objectId,
-        (m) => ownedGear(m).find((o) => o.gearId === fitting.gearId)?.equipped === true,
-        { perAttemptTimeoutMs: 15_000 },
-      );
-    }
     // Once every seat is ready the room advances straight past the
     // fireside (possibly from another page's own "ready" click landing a
     // moment after this one), so "ready" itself vanishes — accept either
@@ -296,7 +278,7 @@ async function runWhisper(pages: Page[], page: Page): Promise<void> {
 
   const cardTarget = model.hand.find((c) => c.targetable);
   if (!cardTarget) throw new Error("runWhisper: no targetable hand card after opening Whisper");
-  model = await clickHandCard<CampModel>(page, cardTarget.objectId, (m) => m.targeting !== null && m.targeting.nextKind === "teammate");
+  model = await clickHandCard<CampModel>(page, cardTarget.objectId, (m) => m.targeting !== null && m.targeting.nextKind === "player");
 
   const seatTarget = model.seats.find((s) => s.targetable);
   if (!seatTarget) {
@@ -366,50 +348,43 @@ async function runWhisper(pages: Page[], page: Page): Promise<void> {
   }
 }
 
-/** Runs the D-02 highlight-then-confirm gear flow on `page` for `gearId`:
- * click the gear chip, walk `targeting.nextKind` (own-card / teammate /
- * face-up-objective / own-objective) clicking the first targetable object
- * of each kind, then confirm and wait until that chip reports `spent`. */
-async function runGear(page: Page, gearId: string): Promise<void> {
-  let model = await clickUntilChanged<CampModel>(
-    page,
-    `gear:${gearId}`,
-    (m) => m.targeting !== null && m.targeting.sourceObjectId === `gear:${gearId}`,
-  );
+/** Runs the D-02 highlight-then-confirm ability flow on `page` for
+ * `sourceId`: click its chip, walk `targeting.nextKind` clicking the first
+ * targetable hand card, seat or objective the server offers (never the seat
+ * that already leads, which the Machete refuses), then confirm and wait
+ * until that chip reports `spent`. */
+async function runAbility(page: Page, sourceId: string): Promise<void> {
+  const chipId = `source:${sourceId}`;
+  let model = await clickUntilChanged<CampModel>(page, chipId, (m) => m.targeting !== null && m.targeting.sourceObjectId === chipId);
 
   while (model.targeting !== null && model.targeting.nextKind !== null) {
-    const kind = model.targeting.nextKind;
-    const kindBefore = kind;
-    let targetObjectId: string | undefined;
-    let isHandCard = false;
-    if (kind === "own-card") {
-      targetObjectId = model.hand.find((c) => c.targetable)?.objectId;
-      isHandCard = true;
-    } else if (kind === "teammate") {
-      targetObjectId = model.seats.find((s) => s.targetable)?.objectId;
+    const kindBefore = model.targeting.nextKind;
+    const selectedBefore = JSON.stringify(model.targeting);
+    const leader = model.trick?.leaderSeatId;
+    const card = model.hand.find((c) => c.targetable);
+    const seat = model.seats.find((s) => s.targetable && s.seatId !== leader) ?? model.seats.find((s) => s.targetable);
+    const objective = model.faceUpObjectives.find((o) => o.targetable) ?? model.seats.flatMap((s) => s.objectives).find((o) => o.targetable);
+    const progressed = (m: CampModel) => m.targeting === null || m.targeting.nextKind !== kindBefore || JSON.stringify(m.targeting) !== selectedBefore;
+    if (card) {
+      model = await clickHandCard<CampModel>(page, card.objectId, progressed);
+    } else if (seat) {
+      model = await clickUntilChanged<CampModel>(page, seat.objectId, progressed);
+    } else if (objective) {
+      model = await clickUntilChanged<CampModel>(page, objective.objectId, progressed);
     } else {
-      targetObjectId =
-        model.faceUpObjectives.find((o) => o.targetable)?.objectId ??
-        model.seats.flatMap((s) => s.objectives).find((o) => o.targetable)?.objectId;
-    }
-    if (!targetObjectId) throw new Error(`runGear: no targetable object found for kind "${kind}"`);
-    const progressed = (m: CampModel) => m.targeting === null || m.targeting.nextKind !== kindBefore;
-    if (isHandCard) {
-      model = await clickHandCard<CampModel>(page, targetObjectId, progressed);
-    } else {
-      model = await clickUntilChanged<CampModel>(page, targetObjectId, progressed);
+      throw new Error(`runAbility: no targetable object found for kind "${kindBefore}"`);
     }
   }
 
   if (model.targeting === null || !model.targeting.canConfirm) {
-    throw new Error("runGear: targeting never reached a confirmable state");
+    throw new Error("runAbility: targeting never reached a confirmable state");
   }
   await clickUntilChanged<CampModel>(page, CONFIRM_ID, (m) => m.targeting === null);
   await expect
     .poll(
       async () => {
         const after = await getModel<CampModel>(page);
-        return after.seats.find((s) => s.isYou)?.gear.find((g) => g.gearId === gearId)?.spent ?? false;
+        return after.seats.find((s) => s.isYou)?.sources.find((g) => g.sourceId === sourceId)?.spent ?? false;
       },
       { timeout: 15_000 },
     )
@@ -460,16 +435,21 @@ async function assertDimmingInvariant(pages: Page[]): Promise<void> {
   }
 }
 
-/** One driving pass over every page: picks a pickable face-up objective if
- * the viewer may act, otherwise (with a playable card available) runs the
- * Whisper once, the gear flow once, and otherwise plays the first legal
- * card. */
+/** One driving pass over every page: passes a gated window it holds,
+ * picks a pickable face-up objective if the viewer may act, otherwise (with
+ * a playable card available) runs the Whisper once, an ability once, and
+ * otherwise plays the first legal card. */
 async function stepCamp(pages: Page[], state: DriveState): Promise<void> {
   for (const page of pages) {
     const model = await getModel<CampModel>(page);
     if (model.sceneKey !== "camp") continue;
     const you = model.seats.find((s) => s.isYou);
     if (!you) continue;
+
+    if (model.gate?.youPending && model.targeting === null) {
+      await clickUntilChanged<CampModel>(page, PREDEAL_SKIP_ID, (m) => m.sceneKey !== "camp" || !(m.gate?.youPending ?? false));
+      continue;
+    }
 
     if (you.mayAct) {
       const objective = model.faceUpObjectives.find((o) => o.pickable);
@@ -491,11 +471,11 @@ async function stepCamp(pages: Page[], state: DriveState): Promise<void> {
         state.whisperDone = true;
         continue;
       }
-      if (!state.gearDone) {
-        const gear = you.gear.find((g) => g.usable);
-        if (gear) {
-          await runGear(page, gear.gearId);
-          state.gearDone = true;
+      if (!state.abilityDone) {
+        const ability = you.sources.find((g) => g.usable && DRIVABLE_ABILITIES.has(g.sourceId));
+        if (ability) {
+          await runAbility(page, ability.sourceId);
+          state.abilityDone = true;
           continue;
         }
       }
@@ -524,7 +504,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
     test.setTimeout(300_000);
     const { pages, contexts } = await startExpeditionGame(browser, page, NAMES);
     const hostPage = pages[0]!;
-    const state: DriveState = { whisperDone: false, gearDone: false, lastTrickChecked: false };
+    const state: DriveState = { whisperDone: false, abilityDone: false, lastTrickChecked: false };
 
     try {
       let camps = 0;
@@ -550,7 +530,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
         if (!campOver) {
           throw new Error(`camp ${camps} did not reach the fireside within 400 driver passes`);
         }
-        if (state.whisperDone && state.gearDone) {
+        if (state.whisperDone && state.abilityDone) {
           resolved = true;
         }
       }
@@ -558,12 +538,12 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
       if (!resolved) {
         const missing: string[] = [];
         if (!state.whisperDone) missing.push("the Whisper");
-        if (!state.gearDone) missing.push("a gear use");
+        if (!state.abilityDone) missing.push("an ability use");
         throw new Error(`Ran ${camps} camp(s) but never exercised: ${missing.join(", ")}`);
       }
 
       expect(state.whisperDone).toBe(true);
-      expect(state.gearDone).toBe(true);
+      expect(state.abilityDone).toBe(true);
 
       const finalModels = await Promise.all(pages.map((p) => getModel<FiresideView>(p)));
       for (const m of finalModels) {
@@ -583,7 +563,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
   test("a card is played by dragging it onto the stump; an illegal drop snaps back", async ({ page, browser }) => {
     test.setTimeout(240_000);
     const { pages, contexts } = await startExpeditionGame(browser, page, NAMES);
-    const state: DriveState = { whisperDone: true, gearDone: true, lastTrickChecked: false };
+    const state: DriveState = { whisperDone: true, abilityDone: true, lastTrickChecked: false };
 
     try {
       await reachCamp(pages);
@@ -645,42 +625,31 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
   // Task 2: refresh-and-resume, per-browser card pack, inert interactables
   // -------------------------------------------------------------------------
 
-  test("refresh mid-draft, mid-loadout and in an open window resumes the same seat (SCENE-11)", async ({ page, browser }) => {
+  test("refresh mid-muster, after a pick and in an open window resumes the same seat (SCENE-11)", async ({ page, browser }) => {
     test.setTimeout(180_000);
     const { pages, contexts } = await startExpeditionGame(browser, page, NAMES);
 
     try {
-      // Mid-draft reload.
+      // Mid-muster reload.
       let hostFireside = await getModel<FiresideView>(page);
-      const draftIdsBefore = (draftOffer(hostFireside) ?? []).map((o) => o.gearId).sort();
+      const offerIdsBefore = (draftOffer(hostFireside) ?? []).map((o) => o.sourceId).sort();
+      expect(offerIdsBefore).toHaveLength(6);
       await page.reload();
       await waitForBridge(page);
       hostFireside = await getModel<FiresideView>(page);
-      expect((draftOffer(hostFireside) ?? []).map((o) => o.gearId).sort()).toEqual(draftIdsBefore);
+      expect((draftOffer(hostFireside) ?? []).map((o) => o.sourceId).sort()).toEqual(offerIdsBefore);
 
-      // Pick a draft, then mid-loadout reload.
+      // Pick a character, then reload.
       const offer = draftOffer(hostFireside);
-      if (offer === null) throw new Error("host has no draft offer after reload");
+      if (offer === null) throw new Error("host has no character offer after reload");
       const pick = pickDraftOffer(offer);
-      hostFireside = await clickUntilChanged<FiresideView>(page, pick.objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
-
-      const fitting = ownedGear(hostFireside).find((o) => o.blocked === null && !o.equipped);
-      if (fitting) {
-        await clickUntilChanged<FiresideView>(
-          page,
-          fitting.objectId,
-          (m) => ownedGear(m).find((o) => o.gearId === fitting.gearId)?.equipped === true,
-          { perAttemptTimeoutMs: 15_000 },
-        );
-      }
+      await clickUntilChanged<FiresideView>(page, pick.objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
 
       await page.reload();
       await waitForBridge(page);
-      const afterLoadoutReload = await getModel<FiresideView>(page);
-      expect(draftOffer(afterLoadoutReload)).toBeNull();
-      if (fitting) {
-        expect(ownedGear(afterLoadoutReload).find((o) => o.gearId === fitting.gearId)?.equipped).toBe(true);
-      }
+      const afterPickReload = await getModel<FiresideView>(page);
+      expect(draftOffer(afterPickReload)).toBeNull();
+      expect(kitIds(afterPickReload)).toEqual([pick.sourceId]);
 
       // Ready the host, drive the other two through the fireside, reach camp.
       await clickUntilChanged<FiresideView>(page, READY_ID, (m) => isReady(m) || m.sceneKey === "camp", { perAttemptTimeoutMs: 15_000 });
@@ -688,7 +657,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
       await waitForScene(page, "camp", 60_000);
 
       // Drive until the host sees an open window, then reload mid-window.
-      const state: DriveState = { whisperDone: false, gearDone: false, lastTrickChecked: false };
+      const state: DriveState = { whisperDone: false, abilityDone: false, lastTrickChecked: false };
       let openWindow = false;
       for (let i = 0; i < 300 && !openWindow; i++) {
         const model = await getModel<CampModel>(page);

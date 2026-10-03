@@ -42,8 +42,10 @@ function ownedObjectiveIds(g: Game): Set<string> {
   return new Set(g.attempt?.camp?.objectives.filter((o) => o.ownerSeatId !== null).map((o) => o.id) ?? []);
 }
 
-function ownLoadout(g: Game): string {
-  return g.seats.find((s) => s.seatId === g.yourSeatId)?.equippedGearIds.join(",") ?? "";
+/** Your character and kit: a pick at muster or at a draft changes it. */
+function ownKit(g: Game): string {
+  const you = g.seats.find((s) => s.seatId === g.yourSeatId);
+  return you === undefined ? "" : [you.characterId ?? "", ...you.kit].join(",");
 }
 
 function newDeal(prev: Game, next: Game): boolean {
@@ -66,7 +68,7 @@ const RULES: ReadonlyArray<{ cue: SfxId; when: (prev: Game, next: Game) => boole
   { cue: "sfx-objective-done", when: (p, n) => statusChanged(p, n, "done") },
   { cue: "sfx-objective-failed", when: (p, n) => statusChanged(p, n, "failed") },
   { cue: "sfx-whisper", when: (p, n) => sameAttempt(p, n) && logCount(n, (e) => e === "whisper") > logCount(p, (e) => e === "whisper") },
-  { cue: "sfx-power", when: (p, n) => sameAttempt(p, n) && logCount(n, (e) => e === "use-gear") > logCount(p, (e) => e === "use-gear") },
+  { cue: "sfx-power", when: (p, n) => sameAttempt(p, n) && logCount(n, (e) => e === "use-ability") > logCount(p, (e) => e === "use-ability") },
   { cue: "sfx-supply-lost", when: (p, n) => n.supplies < p.supplies },
   {
     cue: "sfx-camp-cleared",
@@ -75,12 +77,7 @@ const RULES: ReadonlyArray<{ cue: SfxId; when: (prev: Game, next: Game) => boole
       (p.runStatus === "in_progress" && n.runStatus === "won"),
   },
   { cue: "sfx-run-lost", when: (p, n) => p.runStatus === "in_progress" && n.runStatus === "lost" },
-  {
-    cue: "sfx-equip",
-    when: (p, n) =>
-      n.yourOwnedGearIds.length > p.yourOwnedGearIds.length ||
-      (p.runPhase === "fireside" && n.runPhase === "fireside" && ownLoadout(p) !== ownLoadout(n)),
-  },
+  { cue: "sfx-equip", when: (p, n) => n.attempt === null && ownKit(p) !== ownKit(n) },
 ];
 
 export function cuesFor(prev: Game | null, next: Game | null): SfxId[] {

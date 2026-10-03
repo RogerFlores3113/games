@@ -1,7 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { GEAR_DISPLAY } from "@games/rules";
 import { ART, fittedFallbackLabel, gearArtId, resolveArt, type ArtId } from "./art-registry";
 import { ART_FILES } from "./art-files.generated";
 
@@ -53,8 +52,9 @@ describe("ART and ART_FILES", () => {
     expect(mismatched).toEqual([]);
   });
 
-  it("every gear has an icon", () => {
-    expect(Object.keys(GEAR_DISPLAY).filter((id) => gearArtId(id) === null)).toEqual([]);
+  it("gearArtId finds the icon for a source that has one and null for one that has none", () => {
+    expect(gearArtId("peek")).toBe("gear-peek");
+    expect(gearArtId("not-a-source")).toBeNull();
   });
 
   it("no two entries share a file", () => {

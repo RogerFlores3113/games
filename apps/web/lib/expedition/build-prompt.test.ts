@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
+import type { ExpeditionAbilityView, ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
 import { buildFiresidePrompt, buildPrompt, PROMPT_MAX_CHARS, type Prompt, type PromptSeat } from "./build-prompt";
 import { initialLocalUi, type LocalUiState } from "./local-ui";
 
@@ -23,8 +23,8 @@ function camp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampView {
     objectiveAssignment: "face-up",
     objectives: [],
     yourHand: [
-      { id: "h7", identity: H7 },
-      { id: "s9", identity: S9 },
+      { id: "h7", identity: H7, effectiveRank: null },
+      { id: "s9", identity: S9, effectiveRank: null },
     ],
     yourLegalCardIds: ["h7", "s9"],
     handSizes: [],
@@ -45,19 +45,16 @@ function view(campView: ExpeditionCampView | null, overrides: Partial<Expedition
     supplies: 3,
     bossTwists: { camp3: null, camp6: null },
     activeBossTwistId: null,
-    seats: SEATS.map((s) => ({ seatId: s.seatId, equippedGearIds: [], ready: true, draftPending: false })),
-    yourOwnedGearIds: [],
+    seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: "scout", kit: [], ready: true, draftPending: false, pool: null, usage: [] })),
     yourDraftOffer: null,
-    yourCapacity: null,
-    yourBaseCapacity: null,
-    yourGear: [],
+    yourAbilities: [],
     history: [],
     attempt: {
       attemptNumber: 1,
       bossCancelled: false,
-      gearWindow: null,
-      preDealPendingSeatIds: [],
-      gearUses: [],
+      window: null,
+      pendingSeatIds: [],
+      rescue: null,
       effects: [],
       reveals: [],
       log: [],
@@ -68,9 +65,32 @@ function view(campView: ExpeditionCampView | null, overrides: Partial<Expedition
   };
 }
 
+const PONCHO: ExpeditionAbilityView = { sourceId: "rain-poncho", usableNow: true, reason: null, steps: [] };
+const MEDIC: ExpeditionAbilityView = { sourceId: "medic", usableNow: true, reason: null, steps: [] };
+const SCOUT: ExpeditionAbilityView = {
+  sourceId: "scout",
+  usableNow: true,
+  reason: null,
+  steps: [{ kind: "hand", prompt: "Pick a teammate's hand", choices: ["hand:ana", "hand:bo"] }],
+};
+const MONKEY: ExpeditionAbilityView = {
+  sourceId: "trained-monkey",
+  usableNow: true,
+  reason: null,
+  steps: [
+    { kind: "card", prompt: "Pick one of your cards", choices: ["card:h7", "card:s9"] },
+    { kind: "player", prompt: "Pick a teammate", choices: ["seat:ana", "seat:bo"] },
+  ],
+};
+
 function preDeal(pending: string[]): ExpeditionView {
-  const base = view(null, { runPhase: "pre-deal", yourGear: [{ gearId: "jam", spent: false, usableNow: true, reason: null }] });
-  return { ...base, attempt: { ...base.attempt!, gearWindow: "pre-deal", preDealPendingSeatIds: pending } };
+  const base = view(null, { runPhase: "pre-deal", yourAbilities: [PONCHO] });
+  return { ...base, attempt: { ...base.attempt!, window: "pre-deal", pendingSeatIds: pending } };
+}
+
+function rescue(pending: string[], abilities: ExpeditionAbilityView[] = [MEDIC]): ExpeditionView {
+  const base = view(camp({ campPhase: "ended", currentActorSeatId: null }), { yourAbilities: abilities });
+  return { ...base, attempt: { ...base.attempt!, window: "rescue", pendingSeatIds: pending, rescue: { failedObjectiveIds: ["o1"] } } };
 }
 
 function ui(overrides: Partial<LocalUiState> = {}): LocalUiState {
@@ -82,8 +102,11 @@ const canWhisper = { reconnecting: false, whisperAvailable: true };
 
 const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   ["reconnecting beats everything", view(camp()), ui(), { reconnecting: true, whisperAvailable: true }, { text: "Reconnecting…", tone: "alert" }],
-  ["pre-deal, your gear pending", preDeal(["me", "ana"]), ui(), playing, { text: "Before the deal: use Rain Poncho or skip", tone: "your-move" }],
-  ["pre-deal, waiting on a teammate", preDeal(["ana"]), ui(), playing, { text: "Waiting for Ana to decide on pre-deal gear", tone: "waiting" }],
+  ["pre-deal, you are pending", preDeal(["me", "ana"]), ui(), playing, { text: "Before the deal: use Rain Poncho or skip", tone: "your-move" }],
+  ["pre-deal, waiting on a teammate", preDeal(["ana"]), ui(), playing, { text: "Before the deal: waiting for Ana", tone: "waiting" }],
+  ["pre-deal, nobody pending", preDeal([]), ui(), playing, { text: "Dealing the cards…", tone: "waiting" }],
+  ["rescue, you are pending", rescue(["me"]), ui(), playing, { text: "An objective failed: use The Medic or skip", tone: "your-move" }],
+  ["rescue, waiting on a teammate", rescue(["bo"]), ui(), playing, { text: "An objective failed: waiting for Bo", tone: "waiting" }],
   [
     "objective pick, your pick",
     view(camp({ campPhase: "objective-pick" })),
@@ -116,7 +139,7 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   ],
   [
     "your turn, must follow",
-    view(camp({ yourLegalCardIds: ["h7"], currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "h2", identity: H2 } }] } })),
+    view(camp({ yourLegalCardIds: ["h7"], currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "h2", identity: H2 }, effectiveRank: null }] } })),
     ui(),
     playing,
     { text: "Your turn: follow ♥ (highlighted cards)", tone: "your-move" },
@@ -125,9 +148,9 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
     "your turn, cannot follow",
     view(
       camp({
-        yourHand: [{ id: "s9", identity: S9 }],
+        yourHand: [{ id: "s9", identity: S9, effectiveRank: null }],
         yourLegalCardIds: ["s9"],
-        currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "h2", identity: H2 } }] },
+        currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "h2", identity: H2 }, effectiveRank: null }] },
       }),
     ),
     ui(),
@@ -136,7 +159,7 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   ],
   [
     "a teammate is playing",
-    view(camp({ currentActorSeatId: "ana", currentTrick: { index: 0, leaderSeatId: "bo", plays: [{ seatId: "bo", card: { id: "c4", identity: C4 } }] } })),
+    view(camp({ currentActorSeatId: "ana", currentTrick: { index: 0, leaderSeatId: "bo", plays: [{ seatId: "bo", card: { id: "c4", identity: C4 }, effectiveRank: null }] } })),
     ui(),
     playing,
     { text: "Ana is playing", tone: "waiting" },
@@ -151,44 +174,51 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   [
     "Whisper, choose a card",
     view(camp()),
-    ui({ targeting: { mode: "whisper", cardId: null, targetSeatId: null } }),
+    ui({ targeting: { mode: "whisper", selected: [] } }),
     canWhisper,
     { text: "Whisper: choose a card to share", tone: "your-move" },
   ],
   [
     "Whisper, choose a teammate",
     view(camp()),
-    ui({ targeting: { mode: "whisper", cardId: "h7", targetSeatId: null } }),
+    ui({ targeting: { mode: "whisper", selected: ["card:h7"] } }),
     canWhisper,
     { text: "Whisper 7♥: choose a teammate", tone: "your-move" },
   ],
   [
     "Whisper, ready to confirm",
     view(camp()),
-    ui({ targeting: { mode: "whisper", cardId: "h7", targetSeatId: "ana" } }),
+    ui({ targeting: { mode: "whisper", selected: ["card:h7", "seat:ana"] } }),
     canWhisper,
     { text: "Whisper 7♥ to Ana? Confirm or Cancel", tone: "your-move" },
   ],
   [
-    "Spyglass, choose a teammate",
-    view(camp()),
-    ui({ targeting: { mode: "gear", gearId: "peek", selected: [] } }),
+    "ability, first step",
+    view(camp(), { yourAbilities: [SCOUT] }),
+    ui({ targeting: { mode: "ability", sourceId: "scout", selected: [] } }),
     playing,
-    { text: "Spyglass: choose a teammate", tone: "your-move" },
+    { text: "The Scout: Pick a teammate's hand", tone: "your-move" },
   ],
   [
-    "Spyglass, ready to confirm",
-    view(camp()),
-    ui({ targeting: { mode: "gear", gearId: "peek", selected: ["bo"] } }),
+    "ability with no steps, ready to confirm",
+    view(camp(), { yourAbilities: [{ sourceId: "bait", usableNow: true, reason: null, steps: [] }] }),
+    ui({ targeting: { mode: "ability", sourceId: "bait", selected: [] } }),
     playing,
-    { text: "Use Spyglass on Bo? Confirm or Cancel", tone: "your-move" },
+    { text: "Use Bait? Confirm or Cancel", tone: "your-move" },
   ],
   [
-    "Trained Monkey, second target",
-    view(camp()),
-    ui({ targeting: { mode: "gear", gearId: "pickpocket", selected: ["ana"] } }),
+    "Trained Monkey, second step",
+    view(camp(), { yourAbilities: [MONKEY] }),
+    ui({ targeting: { mode: "ability", sourceId: "trained-monkey", selected: ["card:h7"] } }),
     playing,
-    { text: "Trained Monkey: choose one of your cards", tone: "your-move" },
+    { text: "Trained Monkey: Pick a teammate", tone: "your-move" },
+  ],
+  [
+    "Trained Monkey, ready to confirm",
+    view(camp(), { yourAbilities: [MONKEY] }),
+    ui({ targeting: { mode: "ability", sourceId: "trained-monkey", selected: ["card:h7", "seat:bo"] } }),
+    playing,
+    { text: "Use Trained Monkey on Bo? Confirm or Cancel", tone: "your-move" },
   ],
   [
     "camp cleared",
@@ -210,8 +240,8 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
             leaderSeatId: "bo",
             winnerSeatId: "bo",
             plays: [
-              { seatId: "bo", card: { id: "s9", identity: S9 } },
-              { seatId: "me", card: { id: "h7", identity: H7 } },
+              { seatId: "bo", card: { id: "s9", identity: S9 }, effectiveRank: null },
+              { seatId: "me", card: { id: "h7", identity: H7 }, effectiveRank: null },
             ],
           },
         ],
@@ -234,7 +264,7 @@ describe("buildPrompt", () => {
       ([, text]) => text.length > PROMPT_MAX_CHARS,
     );
     expect(tooLong).toEqual([]);
-    expect(buildPrompt(preDeal(["ana"]), longSeats, ui(), playing).text).toBe("Waiting for Maximilia… to decide on pre-deal gear");
+    expect(buildPrompt(preDeal(["ana"]), longSeats, ui(), playing).text).toBe("Before the deal: waiting for Maximilia…");
   });
 });
 
@@ -247,20 +277,29 @@ describe("buildFiresidePrompt", () => {
   const failed = [{ campNumber: 2, attemptNumber: 1, status: "failed" as const, suppliesSpent: 1 }];
   const at = (v: ExpeditionView, reconnecting = false): Prompt => buildFiresidePrompt(v, SEATS, { reconnecting });
 
+  const muster = (characterId: string | null, ready: Record<string, boolean> = {}): ExpeditionView => {
+    const base = fireside({ runPhase: "muster" }, ready);
+    return { ...base, seats: base.seats.map((s) => (s.seatId === "me" ? { ...s, characterId } : s)) };
+  };
+
+  it("asks you to pick a character at muster", () => {
+    expect(at(muster(null))).toEqual({ text: "Pick your character", tone: "your-move" });
+  });
+
   it("opens the run with the first draft", () => {
-    expect(at(fireside({ yourDraftOffer: ["peek"] }))).toEqual({ text: "Pick one gear to take with you", tone: "your-move" });
+    expect(at(fireside({ yourDraftOffer: ["trained-monkey"] }))).toEqual({ text: "Take one to bring along", tone: "your-move" });
   });
 
   it("announces a cleared camp with the draft", () => {
-    expect(at(fireside({ yourDraftOffer: ["peek"], history: cleared }))).toEqual({ text: "Camp 1 cleared! Pick one gear", tone: "your-move" });
+    expect(at(fireside({ yourDraftOffer: ["trained-monkey"], history: cleared }))).toEqual({ text: "Camp 1 cleared! Take one", tone: "your-move" });
   });
 
-  it("asks you to pack once the pick is made", () => {
-    expect(at(fireside({ history: cleared }))).toEqual({ text: "Pack your backpack, then Ready", tone: "your-move" });
+  it("tells you to set out once the pick is made", () => {
+    expect(at(fireside({ history: cleared }))).toEqual({ text: "The Scout, set out when Ready", tone: "your-move" });
   });
 
   it("announces a failed camp and its supply cost", () => {
-    expect(at(fireside({ history: failed }))).toEqual({ text: "Camp 2 failed: -1 supply. Try again: pack, then Ready", tone: "alert" });
+    expect(at(fireside({ history: failed }))).toEqual({ text: "Camp 2 failed: -1 supply. Try again: Ready", tone: "alert" });
   });
 
   it("names who the crew is waiting for once you are ready", () => {
@@ -277,7 +316,7 @@ describe("buildFiresidePrompt", () => {
       { seatId: "di", displayLabel: "Dionysia" },
     ];
     const base = fireside({}, { me: true });
-    const five = { ...base, seats: long.map((s) => ({ seatId: s.seatId, equippedGearIds: [], ready: s.seatId === "me", draftPending: false })) };
+    const five = { ...base, seats: long.map((s) => ({ seatId: s.seatId, characterId: "scout", kit: [], ready: s.seatId === "me", draftPending: false, pool: null, usage: [] })) };
     expect(buildFiresidePrompt(five, long, { reconnecting: false })).toEqual({ text: "Waiting for 4 teammates", tone: "waiting" });
   });
 

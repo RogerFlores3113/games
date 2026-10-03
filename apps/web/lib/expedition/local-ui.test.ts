@@ -1,22 +1,46 @@
 import { describe, expect, it } from "vitest";
-import type { ExpeditionView } from "@games/rules";
+import type { ExpeditionAbilityView, ExpeditionView } from "@games/rules";
 import {
-  beginGearTargeting,
+  beginAbilityTargeting,
   beginWhisper,
   cancelTargeting,
-  candidateIdsForKind,
+  choiceFor,
   confirmTargeting,
+  currentStep,
   initialLocalUi,
   nextTargetKind,
   reconcileLocalUi,
   selectTarget,
   setHoveredCard,
   setLastTrickOpen,
-  setTooltipGear,
-  setTooltipMateGear,
+  setTooltipMateSource,
   setTooltipObjective,
+  setTooltipSource,
   type LocalUiState,
 } from "./local-ui";
+
+const SCOUT: ExpeditionAbilityView = {
+  sourceId: "scout",
+  usableNow: true,
+  reason: null,
+  steps: [{ kind: "hand", prompt: "Pick a teammate's hand", choices: ["hand:p1", "hand:p2"] }],
+};
+const MONKEY: ExpeditionAbilityView = {
+  sourceId: "trained-monkey",
+  usableNow: true,
+  reason: null,
+  steps: [
+    { kind: "card", prompt: "Pick one of your cards", choices: ["card:c1", "card:c2"] },
+    { kind: "player", prompt: "Pick a teammate", choices: ["seat:p1"] },
+  ],
+};
+const BAIT: ExpeditionAbilityView = { sourceId: "bait", usableNow: true, reason: null, steps: [] };
+const PARROT: ExpeditionAbilityView = {
+  sourceId: "parrot",
+  usableNow: true,
+  reason: null,
+  steps: [{ kind: "objective", prompt: "Pick an objective", choices: ["objective:o1"] }],
+};
 
 function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
   const base: ExpeditionView = {
@@ -28,26 +52,19 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     bossTwists: { camp3: null, camp6: null },
     activeBossTwistId: null,
     seats: [
-      { seatId: "p0", equippedGearIds: ["peek", "pickpocket"], ready: true, draftPending: false },
-      { seatId: "p1", equippedGearIds: [], ready: true, draftPending: false },
-      { seatId: "p2", equippedGearIds: [], ready: true, draftPending: false },
+      { seatId: "p0", characterId: "scout", kit: ["trained-monkey", "bait"], ready: true, draftPending: false, pool: null, usage: [] },
+      { seatId: "p1", characterId: "guide", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
+      { seatId: "p2", characterId: "medic", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
     ],
-    yourOwnedGearIds: ["peek", "pickpocket", "broadcast"],
     yourDraftOffer: null,
-    yourCapacity: 3,
-    yourBaseCapacity: 3,
-    yourGear: [
-      { gearId: "peek", spent: false, usableNow: true, reason: null },
-      { gearId: "pickpocket", spent: false, usableNow: true, reason: null },
-      { gearId: "broadcast", spent: false, usableNow: true, reason: null },
-    ],
+    yourAbilities: [SCOUT, MONKEY, BAIT, PARROT],
     history: [],
     attempt: {
       attemptNumber: 1,
       bossCancelled: false,
-      gearWindow: "between-tricks",
-      preDealPendingSeatIds: [],
-      gearUses: [],
+      window: "between-tricks",
+      pendingSeatIds: [],
+      rescue: null,
       effects: [],
       reveals: [],
       log: [],
@@ -64,8 +81,8 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
           { id: "o3", kind: "no-tricks", ownerSeatId: "p0", status: "done" },
         ],
         yourHand: [
-          { id: "c1", identity: { kind: "standard", suit: "hearts", rank: 12 } },
-          { id: "c2", identity: { kind: "standard", suit: "spades", rank: 10 } },
+          { id: "c1", identity: { kind: "standard", suit: "hearts", rank: 12 }, effectiveRank: null },
+          { id: "c2", identity: { kind: "standard", suit: "spades", rank: 10 }, effectiveRank: null },
         ],
         yourLegalCardIds: ["c1", "c2"],
         handSizes: [
@@ -82,6 +99,11 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
   };
   return deepFreeze({ ...base, ...overrides });
 }
+
+const handWithoutC1 = (view: ExpeditionView) => ({
+  ...view.attempt!,
+  camp: { ...view.attempt!.camp!, yourHand: [{ id: "c2", identity: { kind: "standard" as const, suit: "spades" as const, rank: 10 as const }, effectiveRank: null }] },
+});
 
 function deepFreeze<T>(value: T): T {
   if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
@@ -103,113 +125,135 @@ describe("initialLocalUi", () => {
       targeting: null,
       hoveredCardId: null,
       lastTrickOpen: false,
-      tooltipGearId: null,
+      tooltipSourceId: null,
       tooltipObjectiveId: null,
-      tooltipMateGear: null,
+      tooltipMateSource: null,
       drag: { phase: "idle" },
     });
   });
 });
 
-describe("beginGearTargeting", () => {
-  it("is a no-op when the gear is unusable", () => {
-    const view = makeView({
-      yourGear: [{ gearId: "peek", spent: false, usableNow: false, reason: "Already used this camp" }],
-    });
+describe("beginAbilityTargeting", () => {
+  it("is a no-op when the ability is not usable now", () => {
+    const view = makeView({ yourAbilities: [{ sourceId: "scout", usableNow: false, reason: "Already used this camp", steps: [] }] });
     const ui = freeze(initialLocalUi());
-    expect(beginGearTargeting(ui, view, "peek")).toBe(ui);
+    expect(beginAbilityTargeting(ui, view, "scout")).toBe(ui);
   });
 
-  it("is a no-op when the gear is absent from yourGear", () => {
-    const view = makeView({ yourGear: [] });
+  it("is a no-op when the source is absent from yourAbilities", () => {
+    const view = makeView({ yourAbilities: [] });
     const ui = freeze(initialLocalUi());
-    expect(beginGearTargeting(ui, view, "peek")).toBe(ui);
+    expect(beginAbilityTargeting(ui, view, "scout")).toBe(ui);
   });
 
-  it("begins targeting peek with an empty selection; next kind is teammate", () => {
+  it("begins targeting the scout with an empty selection; next kind is hand", () => {
     const view = makeView();
-    const ui = freeze(initialLocalUi());
-    const next = beginGearTargeting(ui, view, "peek");
-    expect(next.targeting).toEqual({ mode: "gear", gearId: "peek", selected: [] });
-    expect(nextTargetKind(next)).toBe("teammate");
+    const next = beginAbilityTargeting(freeze(initialLocalUi()), view, "scout");
+    expect(next.targeting).toEqual({ mode: "ability", sourceId: "scout", selected: [] });
+    expect(nextTargetKind(next, view)).toBe("hand");
+    expect(currentStep(next, view)?.prompt).toBe("Pick a teammate's hand");
   });
 
-  it("broadcast (no targets): next kind is null immediately", () => {
+  it("an ability with no steps has no next kind immediately", () => {
     const view = makeView();
-    const ui = freeze(initialLocalUi());
-    const next = beginGearTargeting(ui, view, "broadcast");
-    expect(nextTargetKind(next)).toBeNull();
+    const next = beginAbilityTargeting(freeze(initialLocalUi()), view, "bait");
+    expect(nextTargetKind(next, view)).toBeNull();
   });
 });
 
 describe("selectTarget", () => {
-  it("selecting the viewer's own seat while next kind is teammate is a no-op", () => {
+  it("an id outside the current step's choices is a no-op", () => {
     const view = makeView();
-    const started = beginGearTargeting(freeze(initialLocalUi()), view, "peek");
-    const frozen = freeze(started);
-    const next = selectTarget(frozen, view, "p0");
-    expect(next).toBe(frozen);
+    const started = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "scout"));
+    expect(selectTarget(started, view, "hand:p0")).toBe(started);
+    expect(selectTarget(started, view, "p1")).toBe(started);
   });
 
-  it("selecting another seat sets selected and clears the next kind", () => {
+  it("with nothing targeting it is a no-op", () => {
     const view = makeView();
-    const started = beginGearTargeting(freeze(initialLocalUi()), view, "peek");
-    const next = selectTarget(freeze(started), view, "p1");
-    expect(next.targeting).toEqual({ mode: "gear", gearId: "peek", selected: ["p1"] });
-    expect(nextTargetKind(next)).toBeNull();
+    const ui = freeze(initialLocalUi());
+    expect(selectTarget(ui, view, "hand:p1")).toBe(ui);
   });
 
-  it("pickpocket: first select must be a teammate, second an own-hand card, ordered [seatId, cardId]", () => {
+  it("picking an offered id records it and ends the steps", () => {
     const view = makeView();
-    let ui = freeze(beginGearTargeting(freeze(initialLocalUi()), view, "pickpocket"));
-    expect(nextTargetKind(ui)).toBe("teammate");
+    const started = beginAbilityTargeting(freeze(initialLocalUi()), view, "scout");
+    const next = selectTarget(freeze(started), view, "hand:p1");
+    expect(next.targeting).toEqual({ mode: "ability", sourceId: "scout", selected: ["hand:p1"] });
+    expect(nextTargetKind(next, view)).toBeNull();
+  });
 
-    // a card id is not a legal teammate target: no-op
-    const rejected = selectTarget(ui, view, "c1");
-    expect(rejected).toBe(ui);
+  it("walks a two-step ability in order and rejects a later step's id early", () => {
+    const view = makeView();
+    let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "trained-monkey"));
+    expect(nextTargetKind(ui, view)).toBe("card");
 
-    ui = freeze(selectTarget(ui, view, "p1"));
-    expect(nextTargetKind(ui)).toBe("own-card");
+    expect(selectTarget(ui, view, "seat:p1")).toBe(ui);
 
-    ui = freeze(selectTarget(ui, view, "c1"));
-    expect(ui.targeting).toEqual({ mode: "gear", gearId: "pickpocket", selected: ["p1", "c1"] });
-    expect(nextTargetKind(ui)).toBeNull();
+    ui = freeze(selectTarget(ui, view, "card:c1"));
+    expect(nextTargetKind(ui, view)).toBe("player");
+
+    ui = freeze(selectTarget(ui, view, "seat:p1"));
+    expect(ui.targeting).toEqual({ mode: "ability", sourceId: "trained-monkey", selected: ["card:c1", "seat:p1"] });
+    expect(nextTargetKind(ui, view)).toBeNull();
+  });
+});
+
+describe("choiceFor", () => {
+  it("maps a clicked card, seat, hand or objective to the current step's choice id", () => {
+    const view = makeView();
+    const monkey = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "trained-monkey"));
+    expect(choiceFor(monkey, view, "card", "c2")).toBe("card:c2");
+    expect(choiceFor(monkey, view, "card", "c9")).toBeNull();
+    expect(choiceFor(monkey, view, "seat", "p1")).toBeNull();
+
+    const scout = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "scout"));
+    expect(choiceFor(scout, view, "seat", "p2")).toBe("hand:p2");
+
+    const parrot = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "parrot"));
+    expect(choiceFor(parrot, view, "objective", "o1")).toBe("objective:o1");
+    expect(choiceFor(parrot, view, "objective", "o2")).toBeNull();
+  });
+
+  it("is null when nothing is targeting", () => {
+    expect(choiceFor(freeze(initialLocalUi()), makeView(), "seat", "p1")).toBeNull();
   });
 });
 
 describe("confirmTargeting", () => {
-  it("before all targets selected: request is null, ui is unchanged", () => {
+  it("before all steps are picked: request is null, ui is unchanged", () => {
     const view = makeView();
-    const started = freeze(beginGearTargeting(freeze(initialLocalUi()), view, "peek"));
-    const { ui, request } = confirmTargeting(started);
+    const started = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "scout"));
+    const { ui, request } = confirmTargeting(started, view);
     expect(request).toBeNull();
     expect(ui).toBe(started);
   });
 
-  it("after all targets selected: emits use-gear with exactly type/gearId/targets, clears targeting", () => {
+  it("after all steps are picked: emits use-ability with exactly type/sourceId/targets, clears targeting", () => {
     const view = makeView();
-    let ui = freeze(beginGearTargeting(freeze(initialLocalUi()), view, "peek"));
-    ui = freeze(selectTarget(ui, view, "p1"));
-    const { ui: nextUi, request } = confirmTargeting(ui);
-    expect(request).toEqual({ type: "use-gear", gearId: "peek", targets: ["p1"] });
-    expect(Object.keys(request!).sort()).toEqual(["gearId", "targets", "type"]);
+    let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "trained-monkey"));
+    ui = freeze(selectTarget(ui, view, "card:c1"));
+    ui = freeze(selectTarget(ui, view, "seat:p1"));
+    const { ui: nextUi, request } = confirmTargeting(ui, view);
+    expect(request).toEqual({ type: "use-ability", sourceId: "trained-monkey", targets: ["card:c1", "seat:p1"] });
+    expect(Object.keys(request!).sort()).toEqual(["sourceId", "targets", "type"]);
     expect(nextUi.targeting).toBeNull();
   });
 
-  it("broadcast (no targets): confirms immediately to use-gear with targets: []", () => {
+  it("an ability with no steps confirms immediately with targets: []", () => {
     const view = makeView();
-    const started = freeze(beginGearTargeting(freeze(initialLocalUi()), view, "broadcast"));
-    const { ui, request } = confirmTargeting(started);
-    expect(request).toEqual({ type: "use-gear", gearId: "broadcast", targets: [] });
+    const started = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "bait"));
+    const { ui, request } = confirmTargeting(started, view);
+    expect(request).toEqual({ type: "use-ability", sourceId: "bait", targets: [] });
     expect(ui.targeting).toBeNull();
   });
 
   it("whisper: emits {type, targetSeatId, cardId} with exactly those three keys", () => {
     const view = makeView();
     let ui = freeze(beginWhisper(freeze(initialLocalUi()), view));
-    ui = freeze(selectTarget(ui, view, "c1"));
-    ui = freeze(selectTarget(ui, view, "p1"));
-    const { ui: nextUi, request } = confirmTargeting(ui);
+    ui = freeze(selectTarget(ui, view, "card:c1"));
+    ui = freeze(selectTarget(ui, view, "seat:p1"));
+    const { ui: nextUi, request } = confirmTargeting(ui, view);
     expect(request).toEqual({ type: "whisper", targetSeatId: "p1", cardId: "c1" });
     expect(Object.keys(request!).sort()).toEqual(["cardId", "targetSeatId", "type"]);
     expect(nextUi.targeting).toBeNull();
@@ -217,21 +261,18 @@ describe("confirmTargeting", () => {
 });
 
 describe("beginWhisper", () => {
-  it("next kind is own-card then teammate", () => {
+  it("next kind is card then player, offering your hand then the other seats", () => {
     const view = makeView();
     let ui = freeze(beginWhisper(freeze(initialLocalUi()), view));
-    expect(nextTargetKind(ui)).toBe("own-card");
-    ui = freeze(selectTarget(ui, view, "c1"));
-    expect(nextTargetKind(ui)).toBe("teammate");
+    expect(nextTargetKind(ui, view)).toBe("card");
+    expect(currentStep(ui, view)?.choices).toEqual(["card:c1", "card:c2"]);
+    ui = freeze(selectTarget(ui, view, "card:c1"));
+    expect(nextTargetKind(ui, view)).toBe("player");
+    expect(currentStep(ui, view)?.choices).toEqual(["seat:p1", "seat:p2"]);
   });
 
   it("is a no-op outside the between-tricks window", () => {
-    const view = makeView({
-      attempt: {
-        ...makeView().attempt!,
-        gearWindow: "objective-pick",
-      },
-    });
+    const view = makeView({ attempt: { ...makeView().attempt!, window: "objective-pick" } });
     const ui = freeze(initialLocalUi());
     expect(beginWhisper(ui, view)).toBe(ui);
   });
@@ -243,34 +284,10 @@ describe("beginWhisper", () => {
   });
 });
 
-describe("candidateIdsForKind", () => {
-  it("face-up-objective returns only objectives with ownerSeatId null", () => {
-    const view = makeView();
-    expect(candidateIdsForKind("face-up-objective", view)).toEqual(["o1"]);
-  });
-
-  it("own-objective returns only owned-by-viewer pending objectives", () => {
-    const view = makeView();
-    expect(candidateIdsForKind("own-objective", view)).toEqual(["o2"]);
-  });
-
-  it("teammate reads view.seats even when attempt.camp is null", () => {
-    const view = makeView({ attempt: null });
-    expect(candidateIdsForKind("teammate", view)).toEqual(["p1", "p2"]);
-  });
-
-  it("own-card/face-up-objective/own-objective return [] when attempt.camp is null", () => {
-    const view = makeView({ attempt: null });
-    expect(candidateIdsForKind("own-card", view)).toEqual([]);
-    expect(candidateIdsForKind("face-up-objective", view)).toEqual([]);
-    expect(candidateIdsForKind("own-objective", view)).toEqual([]);
-  });
-});
-
 describe("cancelTargeting", () => {
   it("clears targeting only, leaving hover/lastTrickOpen untouched", () => {
     const view = makeView();
-    let ui = freeze(beginGearTargeting(freeze(initialLocalUi()), view, "peek"));
+    let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "scout"));
     ui = freeze(setHoveredCard(ui, "c1"));
     ui = freeze(setLastTrickOpen(ui, true));
     const next = cancelTargeting(ui);
@@ -281,89 +298,94 @@ describe("cancelTargeting", () => {
 });
 
 describe("reconcileLocalUi", () => {
-  it("clears a gear targeting whose gear is no longer usableNow", () => {
+  it("clears an ability targeting whose ability is no longer usable", () => {
     const view1 = makeView();
-    let ui = freeze(beginGearTargeting(freeze(initialLocalUi()), view1, "peek"));
-    const view2 = makeView({
-      yourGear: [{ gearId: "peek", spent: true, usableNow: false, reason: "Already used this camp" }],
-    });
+    let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view1, "scout"));
+    const view2 = makeView({ yourAbilities: [{ sourceId: "scout", usableNow: false, reason: "Already used this camp", steps: [] }] });
     ui = reconcileLocalUi(ui, view2);
     expect(ui.targeting).toBeNull();
   });
 
-  it("clears a whisper targeting when attempt.gearWindow is no longer between-tricks", () => {
+  it("clears a whisper targeting when the window is no longer between-tricks", () => {
     const view1 = makeView();
     let ui = freeze(beginWhisper(freeze(initialLocalUi()), view1));
-    const view2 = makeView({ attempt: { ...view1.attempt!, gearWindow: "objective-pick" } });
+    const view2 = makeView({ attempt: { ...view1.attempt!, window: "objective-pick" } });
     ui = reconcileLocalUi(ui, view2);
     expect(ui.targeting).toBeNull();
   });
 
-  it("drops a selected own-card id no longer in hand (pickpocket second target)", () => {
+  it("drops a pick the server no longer offers, and the picks after it", () => {
     const view1 = makeView();
-    let ui = freeze(beginGearTargeting(freeze(initialLocalUi()), view1, "pickpocket"));
-    ui = freeze(selectTarget(ui, view1, "p1"));
-    ui = freeze(selectTarget(ui, view1, "c1"));
-    expect(ui.targeting).toEqual({ mode: "gear", gearId: "pickpocket", selected: ["p1", "c1"] });
+    let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view1, "trained-monkey"));
+    ui = freeze(selectTarget(ui, view1, "card:c1"));
+    ui = freeze(selectTarget(ui, view1, "seat:p1"));
 
-    const view2 = makeView({
-      attempt: {
-        ...view1.attempt!,
-        camp: { ...view1.attempt!.camp!, yourHand: [{ id: "c2", identity: { kind: "standard", suit: "spades", rank: 10 } }] },
-      },
-    });
-    const next = reconcileLocalUi(ui, view2);
-    expect(next.targeting).toEqual({ mode: "gear", gearId: "pickpocket", selected: ["p1"] });
+    const narrowed: ExpeditionAbilityView = {
+      ...MONKEY,
+      steps: [{ kind: "card", prompt: "Pick one of your cards", choices: ["card:c2"] }, MONKEY.steps[1]!],
+    };
+    const next = reconcileLocalUi(ui, makeView({ yourAbilities: [narrowed] }));
+    expect(next.targeting).toEqual({ mode: "ability", sourceId: "trained-monkey", selected: [] });
+  });
+
+  it("keeps a still-offered first pick and drops only the later one", () => {
+    const view1 = makeView();
+    let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view1, "trained-monkey"));
+    ui = freeze(selectTarget(ui, view1, "card:c1"));
+    ui = freeze(selectTarget(ui, view1, "seat:p1"));
+
+    const narrowed: ExpeditionAbilityView = {
+      ...MONKEY,
+      steps: [MONKEY.steps[0]!, { kind: "player", prompt: "Pick a teammate", choices: ["seat:p2"] }],
+    };
+    const next = reconcileLocalUi(ui, makeView({ yourAbilities: [narrowed] }));
+    expect(next.targeting).toEqual({ mode: "ability", sourceId: "trained-monkey", selected: ["card:c1"] });
+  });
+
+  it("drops a whisper card pick that left the hand", () => {
+    const view1 = makeView();
+    let ui = freeze(beginWhisper(freeze(initialLocalUi()), view1));
+    ui = freeze(selectTarget(ui, view1, "card:c1"));
+    const next = reconcileLocalUi(ui, makeView({ attempt: handWithoutC1(view1) }));
+    expect(next.targeting).toEqual({ mode: "whisper", selected: [] });
   });
 
   it("clears hoveredCardId if that card left the hand", () => {
     const view1 = makeView();
     let ui = freeze(setHoveredCard(freeze(initialLocalUi()), "c1"));
-    const view2 = makeView({
-      attempt: {
-        ...view1.attempt!,
-        camp: { ...view1.attempt!.camp!, yourHand: [{ id: "c2", identity: { kind: "standard", suit: "spades", rank: 10 } }] },
-      },
-    });
-    ui = reconcileLocalUi(ui, view2);
+    ui = reconcileLocalUi(ui, makeView({ attempt: handWithoutC1(view1) }));
     expect(ui.hoveredCardId).toBeNull();
   });
 
   it("cancels a drag whose card left the hand", () => {
     const view1 = makeView();
     const ui = freeze({ ...initialLocalUi(), drag: { phase: "dragging" as const, cardId: "c1", legal: true, reason: null } });
-    const view2 = makeView({
-      attempt: {
-        ...view1.attempt!,
-        camp: { ...view1.attempt!.camp!, yourHand: [{ id: "c2", identity: { kind: "standard", suit: "spades", rank: 10 } }] },
-      },
-    });
+    const view2 = makeView({ attempt: handWithoutC1(view1) });
     expect(reconcileLocalUi(ui, view2).drag).toEqual({ phase: "idle" });
     expect(reconcileLocalUi(ui, view1).drag).toEqual(ui.drag);
   });
 
   it("leaves valid targeting/hover untouched", () => {
     const view = makeView();
-    let ui = freeze(beginGearTargeting(freeze(initialLocalUi()), view, "peek"));
+    let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "scout"));
     ui = freeze(setHoveredCard(ui, "c1"));
     const next = reconcileLocalUi(ui, view);
-    expect(next.targeting).toEqual({ mode: "gear", gearId: "peek", selected: [] });
+    expect(next.targeting).toEqual({ mode: "ability", sourceId: "scout", selected: [] });
     expect(next.hoveredCardId).toBe("c1");
   });
 });
 
-describe("setHoveredCard / setLastTrickOpen / setTooltipGear", () => {
+describe("setHoveredCard / setLastTrickOpen / tooltip setters", () => {
   it("each sets only its own field, immutably", () => {
     const ui = freeze(initialLocalUi());
     expect(setHoveredCard(ui, "c1")).toEqual({ ...initialLocalUi(), hoveredCardId: "c1" });
     expect(setLastTrickOpen(ui, true)).toEqual({ ...initialLocalUi(), lastTrickOpen: true });
-    expect(setTooltipGear(ui, "peek")).toEqual({ ...initialLocalUi(), tooltipGearId: "peek" });
+    expect(setTooltipSource(ui, "scout")).toEqual({ ...initialLocalUi(), tooltipSourceId: "scout" });
     expect(setTooltipObjective(ui, "o1")).toEqual({ ...initialLocalUi(), tooltipObjectiveId: "o1" });
-    expect(setTooltipMateGear(ui, { seatId: "s1", gearId: "peek" })).toEqual({
+    expect(setTooltipMateSource(ui, { seatId: "s1", sourceId: "bait" })).toEqual({
       ...initialLocalUi(),
-      tooltipMateGear: { seatId: "s1", gearId: "peek" },
+      tooltipMateSource: { seatId: "s1", sourceId: "bait" },
     });
-    // original untouched
     expect(ui).toEqual(initialLocalUi());
   });
 });

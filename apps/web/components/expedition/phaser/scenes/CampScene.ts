@@ -7,7 +7,6 @@
  * transition; they never decide an outcome.
  */
 import Phaser from "phaser";
-import { GEAR_DISPLAY } from "@games/rules";
 import { ensurePixelFonts } from "../font/pixel-font";
 import { ensureCardTextures } from "../card-packs/card-textures";
 import { drawPrompt, drawStaticWorld, drawTooltip, drawTopBar, setBossEffect } from "../draw/draw-table";
@@ -22,21 +21,22 @@ import { CARD_H, CARD_W, HAND_CARD_Y, INTERACTABLE_ANCHORS, ZONES, handFanXs, po
 import { PALETTE, toPhaserColor } from "../palette";
 import { cardTextureKey } from "../card-packs/card-pack-def";
 import { reduceDrag, type DragEffect, type DragEvent } from "../../../../lib/expedition/card-drag";
-import { gearObjectId, interactableObjectId, LAST_TRICK_ID, mateGearObjectId } from "../../../../lib/expedition/expedition-ids";
+import { interactableObjectId, LAST_TRICK_ID, mateSourceObjectId, sourceObjectId } from "../../../../lib/expedition/expedition-ids";
 import { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
 import {
-  beginGearTargeting,
+  beginAbilityTargeting,
   beginWhisper,
   cancelTargeting,
-  nextTargetKind,
+  choiceFor,
   selectTarget,
   setDrag,
   setHoveredCard,
   setLastTrickOpen,
-  setTooltipGear,
-  setTooltipMateGear,
+  setTooltipMateSource,
   setTooltipObjective,
+  setTooltipSource,
+  type PickEntity,
 } from "../../../../lib/expedition/local-ui";
 import type { SceneDeps } from "./scene-registry";
 
@@ -54,15 +54,24 @@ function findObjective(model: SceneModel | null, objectiveId: string): Objective
   return model.faceUpObjectives.find((o) => o.objectiveId === objectiveId) ?? null;
 }
 
+/** Picks the clicked thing for the current target step when the server
+ * offers it as a choice. True when it was picked. */
+function pickForTargeting(store: SceneDeps["store"], entity: PickEntity, rawId: string): boolean {
+  const state = store.getState();
+  const view = state.server?.game;
+  if (view === undefined || state.localUi.targeting === null) return false;
+  const choice = choiceFor(state.localUi, view, entity, rawId);
+  if (choice === null) return false;
+  state.updateLocalUi((ui, v) => selectTarget(ui, v, choice));
+  return true;
+}
+
 function buildHandlers(store: SceneDeps["store"], pointer: () => Point): CampHandlers {
   const handlers: CampHandlers = {
     onCard(cardId) {
       const state = store.getState();
       if (state.reconnecting) return;
-      if (state.localUi.targeting !== null && nextTargetKind(state.localUi) === "own-card") {
-        state.updateLocalUi((ui, view) => selectTarget(ui, view, cardId));
-        return;
-      }
+      if (pickForTargeting(store, "card", cardId)) return;
       const card = campModel(store)?.hand.find((c) => c.id === cardId) ?? null;
       if (card?.playable) {
         state.dispatch({ type: "play-card", cardId });
@@ -88,11 +97,7 @@ function buildHandlers(store: SceneDeps["store"], pointer: () => Point): CampHan
     onObjective(objectiveId) {
       const state = store.getState();
       if (state.reconnecting) return;
-      const kind = nextTargetKind(state.localUi);
-      if (kind === "face-up-objective" || kind === "own-objective") {
-        state.updateLocalUi((ui, view) => selectTarget(ui, view, objectiveId));
-        return;
-      }
+      if (pickForTargeting(store, "objective", objectiveId)) return;
       const chip = findObjective(campModel(store), objectiveId);
       if (chip?.pickable) {
         state.dispatch({ type: "pick-objective", objectiveId });
@@ -101,29 +106,27 @@ function buildHandlers(store: SceneDeps["store"], pointer: () => Point): CampHan
     onSeat(seatId) {
       const state = store.getState();
       if (state.reconnecting) return;
-      if (nextTargetKind(state.localUi) === "teammate") {
-        state.updateLocalUi((ui, view) => selectTarget(ui, view, seatId));
-      }
+      pickForTargeting(store, "seat", seatId);
     },
-    onGear(gearId) {
+    onSource(sourceId) {
       const state = store.getState();
       if (state.reconnecting) return;
-      state.updateLocalUi((ui, view) => beginGearTargeting(ui, view, gearId));
+      state.updateLocalUi((ui, view) => beginAbilityTargeting(ui, view, sourceId));
     },
-    onGearHover(gearId) {
+    onSourceHover(sourceId) {
       const state = store.getState();
       if (state.reconnecting) return;
-      state.updateLocalUi((ui) => setTooltipGear(ui, gearId));
+      state.updateLocalUi((ui) => setTooltipSource(ui, sourceId));
     },
     onObjectiveHover(objectiveId) {
       const state = store.getState();
       if (state.reconnecting) return;
       state.updateLocalUi((ui) => setTooltipObjective(ui, objectiveId));
     },
-    onMateGearHover(mate) {
+    onMateSourceHover(mate) {
       const state = store.getState();
       if (state.reconnecting) return;
-      state.updateLocalUi((ui) => setTooltipMateGear(ui, mate));
+      state.updateLocalUi((ui) => setTooltipMateSource(ui, mate));
     },
     onWhisper() {
       const state = store.getState();
@@ -140,17 +143,17 @@ function buildHandlers(store: SceneDeps["store"], pointer: () => Point): CampHan
       if (state.reconnecting) return;
       state.updateLocalUi((ui) => cancelTargeting(ui));
     },
-    onPreDealUse(gearId) {
+    onGateUse(sourceId) {
       const state = store.getState();
       if (state.reconnecting) return;
-      const targets = GEAR_DISPLAY[gearId]?.targets ?? [];
-      if (targets.length === 0) {
-        state.dispatch({ type: "use-gear", gearId, targets: [] });
+      const steps = state.server?.game.yourAbilities.find((a) => a.sourceId === sourceId)?.steps ?? [];
+      if (steps.length === 0) {
+        state.dispatch({ type: "use-ability", sourceId, targets: [] });
         return;
       }
-      state.updateLocalUi((ui, view) => beginGearTargeting(ui, view, gearId));
+      state.updateLocalUi((ui, view) => beginAbilityTargeting(ui, view, sourceId));
     },
-    onPreDealSkip() {
+    onGateSkip() {
       const state = store.getState();
       if (state.reconnecting) return;
       state.dispatch({ type: "skip-window" });
@@ -409,7 +412,7 @@ export class CampScene extends Phaser.Scene {
   update(): void {
     this.syncDrag();
     const ui = this.sceneStore.getState().localUi;
-    if (!ui.lastTrickOpen && ui.hoveredCardId === null && ui.tooltipGearId === null && ui.tooltipObjectiveId === null && ui.tooltipMateGear === null) return;
+    if (!ui.lastTrickOpen && ui.hoveredCardId === null && ui.tooltipSourceId === null && ui.tooltipObjectiveId === null && ui.tooltipMateSource === null) return;
     const { x, y } = this.input.activePointer;
     const over = (id: string): boolean => this.index.contains(id, x, y);
     if (ui.lastTrickOpen && !over(LAST_TRICK_ID)) this.handlers.onLastTrickHover(false);
@@ -417,13 +420,13 @@ export class CampScene extends Phaser.Scene {
       const card = campModel(this.sceneStore)?.hand.find((c) => c.id === ui.hoveredCardId);
       if (card === undefined || !over(card.objectId)) this.handlers.onCardHover(null);
     }
-    if (ui.tooltipGearId !== null && !over(gearObjectId(ui.tooltipGearId))) this.handlers.onGearHover(null);
+    if (ui.tooltipSourceId !== null && !over(sourceObjectId(ui.tooltipSourceId))) this.handlers.onSourceHover(null);
     if (ui.tooltipObjectiveId !== null) {
       const chip = findObjective(campModel(this.sceneStore), ui.tooltipObjectiveId);
       if (chip === null || !over(chip.objectId)) this.handlers.onObjectiveHover(null);
     }
-    if (ui.tooltipMateGear !== null && !over(mateGearObjectId(ui.tooltipMateGear.seatId, ui.tooltipMateGear.gearId))) {
-      this.handlers.onMateGearHover(null);
+    if (ui.tooltipMateSource !== null && !over(mateSourceObjectId(ui.tooltipMateSource.seatId, ui.tooltipMateSource.sourceId))) {
+      this.handlers.onMateSourceHover(null);
     }
   }
 }

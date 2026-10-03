@@ -1,8 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
+import type { ExpeditionAbilityView, ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
 import type { RoomSeatInfo, SceneModel, SceneServerInput } from "./build-scene-model";
-import { beginGearTargeting, setTooltipGear } from "./local-ui";
+import { beginAbilityTargeting, selectTarget, setTooltipSource } from "./local-ui";
 import { createExpeditionSceneStore, type ExpeditionSceneStore } from "./expedition-scene-store";
+
+const SCOUT: ExpeditionAbilityView = {
+  sourceId: "scout",
+  usableNow: true,
+  reason: null,
+  steps: [{ kind: "hand", prompt: "Pick a teammate's hand", choices: ["hand:s1", "hand:s3"] }],
+};
 
 const AS: ExpeditionCardIdentityView = { kind: "standard", suit: "spades", rank: 14 }; // A♠
 
@@ -22,7 +29,7 @@ function makeCamp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampVi
     removedCards: [],
     objectiveAssignment: "face-up",
     objectives: [],
-    yourHand: [{ id: "c-as", identity: AS }],
+    yourHand: [{ id: "c-as", identity: AS, effectiveRank: null }],
     yourLegalCardIds: ["c-as"],
     handSizes: [
       { seatId: "s1", size: 17 },
@@ -47,22 +54,19 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     bossTwists: { camp3: null, camp6: null },
     activeBossTwistId: null,
     seats: [
-      { seatId: "s1", equippedGearIds: [], ready: true, draftPending: false },
-      { seatId: "s2", equippedGearIds: ["peek"], ready: true, draftPending: false },
-      { seatId: "s3", equippedGearIds: [], ready: true, draftPending: false },
+      { seatId: "s1", characterId: "guide", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
+      { seatId: "s2", characterId: "scout", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
+      { seatId: "s3", characterId: "medic", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
     ],
-    yourOwnedGearIds: ["peek"],
     yourDraftOffer: null,
-    yourCapacity: null,
-    yourBaseCapacity: null,
-    yourGear: [{ gearId: "peek", spent: false, usableNow: true, reason: null }],
+    yourAbilities: [SCOUT],
     history: [],
     attempt: {
       attemptNumber: 1,
       bossCancelled: false,
-      gearWindow: "between-tricks",
-      preDealPendingSeatIds: [],
-      gearUses: [],
+      window: "between-tricks",
+      pendingSeatIds: [],
+      rescue: null,
       effects: [],
       reveals: [],
       log: [],
@@ -107,10 +111,10 @@ describe("createExpeditionSceneStore", () => {
 
   it("setServer with a fireside view builds the fireside model", () => {
     const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
-    store.getState().setServer(server(fireside({ yourDraftOffer: ["jam"] })));
+    store.getState().setServer(server(fireside({ yourDraftOffer: ["trained-monkey"] })));
     const state = store.getState();
     expect(state.sceneKey).toBe("fireside");
-    expect(state.model).toMatchObject({ sceneKey: "fireside", prompt: { text: "Pick one gear to take with you", tone: "your-move" } });
+    expect(state.model).toMatchObject({ sceneKey: "fireside", prompt: { text: "Take one to bring along", tone: "your-move" } });
   });
 
   it("setServer with an ended run builds the run-end model", () => {
@@ -167,35 +171,31 @@ describe("createExpeditionSceneStore", () => {
     expect(onAction).not.toHaveBeenCalled();
   });
 
-  it("gear targeting: confirmTargeting with no target selected sends nothing, then sends exactly one request once a teammate is selected", () => {
+  it("ability targeting: confirmTargeting with no target selected sends nothing, then sends exactly one request once a teammate's hand is picked", () => {
     const onAction = vi.fn();
     const store = createExpeditionSceneStore({ onAction, cardPackId: "big-index" });
-    const view = makeView();
-    store.getState().setServer(server(view));
+    store.getState().setServer(server(makeView()));
 
-    store.getState().updateLocalUi((ui, v) => beginGearTargeting(ui, v, "peek"));
+    store.getState().updateLocalUi((ui, v) => beginAbilityTargeting(ui, v, "scout"));
     store.getState().confirmTargeting();
     expect(onAction).not.toHaveBeenCalled();
 
-    store.getState().updateLocalUi((ui) => ({
-      ...ui,
-      targeting: ui.targeting !== null && ui.targeting.mode === "gear" ? { ...ui.targeting, selected: ["s1"] } : ui.targeting,
-    }));
+    store.getState().updateLocalUi((ui, v) => selectTarget(ui, v, "hand:s1"));
     store.getState().confirmTargeting();
 
     expect(onAction).toHaveBeenCalledTimes(1);
-    expect(onAction).toHaveBeenCalledWith({ type: "use-gear", gearId: "peek", targets: ["s1"] });
+    expect(onAction).toHaveBeenCalledWith({ type: "use-ability", sourceId: "scout", targets: ["hand:s1"] });
     expect(store.getState().localUi.targeting).toBeNull();
   });
 
   it("updateLocalUi keeps the same model when the UI is unchanged, and rebuilds it when it changes", () => {
     const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
-    store.getState().setServer(server(fireside({ yourDraftOffer: ["jam"] })));
-    store.getState().updateLocalUi((ui) => setTooltipGear(ui, "jam"));
+    store.getState().setServer(server(fireside({ yourDraftOffer: ["trained-monkey"] })));
+    store.getState().updateLocalUi((ui) => setTooltipSource(ui, "trained-monkey"));
     const hovered = store.getState().model;
-    store.getState().updateLocalUi((ui) => setTooltipGear(ui, "jam"));
+    store.getState().updateLocalUi((ui) => setTooltipSource(ui, "trained-monkey"));
     expect(store.getState().model).toBe(hovered);
-    store.getState().updateLocalUi((ui) => setTooltipGear(ui, null));
+    store.getState().updateLocalUi((ui) => setTooltipSource(ui, null));
     expect(store.getState().model).toMatchObject({ sceneKey: "fireside", tooltip: null });
   });
 
@@ -206,15 +206,15 @@ describe("createExpeditionSceneStore", () => {
     expect(store.getState().localUi).toBe(before);
   });
 
-  it("setServer clears a gear targeting whose gear is no longer usableNow (reconcileLocalUi)", () => {
+  it("setServer clears an ability targeting that is no longer usable (reconcileLocalUi)", () => {
     const onAction = vi.fn();
     const store = createExpeditionSceneStore({ onAction, cardPackId: "big-index" });
     const view = makeView();
     store.getState().setServer(server(view));
-    store.getState().updateLocalUi((ui, v) => beginGearTargeting(ui, v, "peek"));
+    store.getState().updateLocalUi((ui, v) => beginAbilityTargeting(ui, v, "scout"));
     expect(store.getState().localUi.targeting).not.toBeNull();
 
-    const nextView = makeView({ yourGear: [{ gearId: "peek", spent: true, usableNow: false, reason: "Already used this camp" }] });
+    const nextView = makeView({ yourAbilities: [{ sourceId: "scout", usableNow: false, reason: "Already used this camp", steps: [] }] });
     store.getState().setServer(server(nextView));
     expect(store.getState().localUi.targeting).toBeNull();
   });

@@ -891,3 +891,9 @@ target kind, a window. Green check **`source-icons`**: a new
   `CHARACTER_DISPLAY`.
 - Unit 6: `attempt.pendingSeatIds` reports either gated window, and `attempt.rescue` is set only
   while the rescue window is open.
+- Unit 6 (web, compile level): muster renders in the fireside scene, whose draft panel offers the
+  untaken characters and then the draft; the backpack zone shows the kit with no packing. Camp chips
+  are `source:<id>` (yours) and `seat-source:<seat>:<id>`; targeting reads `steps[].choices`, and a
+  clicked seat, hand card or objective counts only when the current step offers it. The pre-deal
+  panel is a `gate` that also covers rescue (Use or Skip). Pickers for whisper, won-trick,
+  card-value, board and supplies steps, icons and badges on tiles are unit 7 and 8 work.

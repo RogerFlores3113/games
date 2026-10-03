@@ -79,11 +79,11 @@ interface Action {
 
 function actionList(model: SceneModel, handlers: CampHandlers): Action[] {
   const actions: Action[] = [];
-  if (model.preDeal !== null && model.preDeal.youPending) {
-    model.preDeal.gear.forEach((gear, i) => {
-      actions.push({ id: preDealUseObjectId(gear.gearId), label: `Use ${gear.name}`, onClick: () => handlers.onPreDealUse(gear.gearId), row: i });
+  if (model.gate !== null && model.gate.youPending && model.targeting === null) {
+    model.gate.sources.forEach((source, i) => {
+      actions.push({ id: preDealUseObjectId(source.sourceId), label: `Use ${source.name}`, onClick: () => handlers.onGateUse(source.sourceId), row: i });
     });
-    actions.push({ id: PREDEAL_SKIP_ID, label: "Skip", onClick: () => handlers.onPreDealSkip(), row: model.preDeal.gear.length });
+    actions.push({ id: PREDEAL_SKIP_ID, label: "Skip", onClick: () => handlers.onGateSkip(), row: model.gate.sources.length });
     return actions;
   }
   if (model.whisper.shown) {

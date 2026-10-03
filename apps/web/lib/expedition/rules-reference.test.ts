@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_DISPLAY, GEAR_DISPLAY, type ExpeditionView } from "@games/rules";
+import { BOSS_DISPLAY, SOURCE_DISPLAY, type ExpeditionView } from "@games/rules";
 import { buildRulesReference } from "./rules-reference";
 
-const gearId = Object.keys(GEAR_DISPLAY)[0]!;
 const bossId = Object.keys(BOSS_DISPLAY)[0]!;
 
-function viewWith(over: Partial<Pick<ExpeditionView, "yourOwnedGearIds" | "activeBossTwistId" | "campNumber" | "yourCapacity">>) {
-  return { yourOwnedGearIds: [], activeBossTwistId: null, campNumber: 1, yourCapacity: 1, ...over } as ExpeditionView;
+function viewWith(over: { characterId?: string | null; kit?: string[]; activeBossTwistId?: string | null; campNumber?: number }) {
+  return {
+    yourSeatId: "s1",
+    seats: [{ seatId: "s1", characterId: over.characterId === undefined ? "scout" : over.characterId, kit: over.kit ?? [] }],
+    activeBossTwistId: over.activeBossTwistId ?? null,
+    campNumber: over.campNumber ?? 1,
+  } as ExpeditionView;
 }
 
 const byId = (sections: ReturnType<typeof buildRulesReference>, id: string) => sections.find((s) => s.id === id)!;
@@ -18,7 +22,7 @@ describe("buildRulesReference", () => {
       "Tricks",
       "Objectives",
       "The Whisper",
-      "Gear",
+      "Your kit",
       "This camp",
     ]);
   });
@@ -33,31 +37,32 @@ describe("buildRulesReference", () => {
     ]);
   });
 
-  it("with no view or no gear, says you own none and says no boss twist", () => {
+  it("with no view, has an empty kit and no boss twist", () => {
     const sections = buildRulesReference(null);
-    expect(byId(sections, "gear").items).toEqual([]);
-    expect(byId(sections, "gear").paragraphs).toContain("You do not own any gear yet.");
+    expect(byId(sections, "kit").items).toEqual([]);
+    expect(byId(sections, "kit").paragraphs).toContain("You have not picked a character yet.");
     expect(byId(sections, "this-camp").paragraphs).toEqual(["No boss twist this camp."]);
   });
 
-  it("lists owned gear from the display catalogue with name, size, window, text", () => {
-    const g = GEAR_DISPLAY[gearId]!;
-    const gear = byId(buildRulesReference(viewWith({ yourOwnedGearIds: [gearId], campNumber: 3, yourCapacity: 3 })), "gear");
-    expect(gear.paragraphs).toContain("Your capacity this camp: 3.");
-    expect(gear.items).toHaveLength(1);
-    expect(gear.items[0]!.label).toBe(g.name);
-    expect(gear.items[0]!.body).toContain(g.text);
-    expect(gear.items[0]!.body).toContain(`Size ${g.size}`);
+  it("lists your character, then your kit, with window, limit and text", () => {
+    const scout = SOURCE_DISPLAY.scout!;
+    const bait = SOURCE_DISPLAY.bait!;
+    const kit = byId(buildRulesReference(viewWith({ characterId: "scout", kit: ["bait"] })), "kit");
+    expect(kit.items.map((i) => i.label)).toEqual([scout.name, bait.name]);
+    expect(kit.items[0]!.body).toBe(`Between tricks, 1 per camp. ${scout.text}`);
+    expect(kit.items[1]!.body).toContain(bait.text);
+    expect(kit.paragraphs).not.toContain("You have not picked a character yet.");
   });
 
-  it("skips gear ids missing from the catalogue", () => {
-    expect(byId(buildRulesReference(viewWith({ yourOwnedGearIds: ["nope"] })), "gear").items).toEqual([]);
+  it("marks a passive-only source as always on", () => {
+    const kit = byId(buildRulesReference(viewWith({ characterId: "signaller" })), "kit");
+    expect(kit.items[0]!.body).toBe(`Always. ${SOURCE_DISPLAY.signaller!.text}`);
   });
 
-  it("falls back to the camp number when capacity is null", () => {
-    expect(byId(buildRulesReference(viewWith({ campNumber: 4, yourCapacity: null })), "gear").paragraphs).toContain(
-      "Your capacity this camp: 4.",
-    );
+  it("skips kit ids missing from the catalogue and says so when nothing is left", () => {
+    const kit = byId(buildRulesReference(viewWith({ characterId: null, kit: ["nope"] })), "kit");
+    expect(kit.items).toEqual([]);
+    expect(kit.paragraphs).toContain("You have not picked a character yet.");
   });
 
   it("shows the active boss twist name and text", () => {

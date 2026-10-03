@@ -10,10 +10,11 @@ import {
   WHISPER_ID,
   cardLabel,
   draftObjectId,
-  gearObjectId,
   handObjectId,
   interactableObjectId,
-  loadoutObjectId,
+  kitObjectId,
+  mateSourceObjectId,
+  sourceObjectId,
   objectiveObjectId,
   preDealUseObjectId,
   rankLabel,
@@ -109,12 +110,13 @@ describe("objectiveObjectId", () => {
   });
 });
 
-describe("seat/gear/draft/loadout/predeal/interactable object ids", () => {
+describe("seat/source/draft/kit/predeal/interactable object ids", () => {
   it("build the expected prefixed ids", () => {
     expect(seatObjectId("s1")).toBe("seat:s1");
-    expect(gearObjectId("pickpocket")).toBe("gear:pickpocket");
-    expect(draftObjectId("peek")).toBe("draft:peek");
-    expect(loadoutObjectId("peek")).toBe("loadout:peek");
+    expect(sourceObjectId("scout")).toBe("source:scout");
+    expect(mateSourceObjectId("s2", "bait")).toBe("seat-source:s2:bait");
+    expect(draftObjectId("guide")).toBe("draft:guide");
+    expect(kitObjectId("rain-poncho")).toBe("kit:rain-poncho");
     expect(preDealUseObjectId("jam")).toBe("predeal-use:jam");
     expect(interactableObjectId("campfire")).toBe("interactable:campfire");
   });

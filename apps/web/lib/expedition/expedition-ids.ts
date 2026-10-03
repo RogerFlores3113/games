@@ -2,7 +2,7 @@ import type { ExpeditionCardIdentityView, ExpeditionObjectiveView } from "@games
 
 /**
  * The single source of the §7.5 test-bridge id scheme (`hand:Q♥`,
- * `gear:<id>`, `seat:<seatId>`, `objective:K♦`). Scenes and e2e helpers must
+ * `source:<id>`, `seat:<seatId>`, `objective:K♦`). Scenes and e2e helpers must
  * build ids only through the functions exported here — never inline a
  * template literal for one of these prefixes elsewhere.
  */
@@ -64,25 +64,28 @@ export function seatObjectId(seatId: string): string {
   return `seat:${seatId}`;
 }
 
-export function gearObjectId(gearId: string): string {
-  return `gear:${gearId}`;
+/** Your own character or kit source. */
+export function sourceObjectId(sourceId: string): string {
+  return `source:${sourceId}`;
 }
 
-/** A teammate's equipped gear. Gear ids alone are per gear, not per seat. */
-export function mateGearObjectId(seatId: string, gearId: string): string {
-  return `seat-gear:${seatId}:${gearId}`;
+/** A teammate's source. Source ids alone are per source, not per seat. */
+export function mateSourceObjectId(seatId: string, sourceId: string): string {
+  return `seat-source:${seatId}:${sourceId}`;
 }
 
-export function draftObjectId(gearId: string): string {
-  return `draft:${gearId}`;
+/** A draft offer or, during muster, a character to pick. */
+export function draftObjectId(sourceId: string): string {
+  return `draft:${sourceId}`;
 }
 
-export function loadoutObjectId(gearId: string): string {
-  return `loadout:${gearId}`;
+export function kitObjectId(sourceId: string): string {
+  return `kit:${sourceId}`;
 }
 
-export function preDealUseObjectId(gearId: string): string {
-  return `predeal-use:${gearId}`;
+/** Using a source in a gated window (before the deal, or a rescue). */
+export function preDealUseObjectId(sourceId: string): string {
+  return `predeal-use:${sourceId}`;
 }
 
 export function interactableObjectId(id: string): string {

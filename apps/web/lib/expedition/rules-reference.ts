@@ -1,4 +1,4 @@
-import { BOSS_DISPLAY, GEAR_DISPLAY, type ExpeditionView } from "@games/rules";
+import { BOSS_DISPLAY, SOURCE_DISPLAY, type ExpeditionView } from "@games/rules";
 
 export interface RulesItem {
   label: string;
@@ -6,40 +6,27 @@ export interface RulesItem {
 }
 
 export interface RulesSection {
-  id: "goal" | "tricks" | "objectives" | "whisper" | "gear" | "this-camp";
+  id: "goal" | "tricks" | "objectives" | "whisper" | "kit" | "this-camp";
   heading: string;
   paragraphs: string[];
   items: RulesItem[];
 }
 
-const WINDOW_LABELS = {
-  "pre-deal": "before the deal",
-  "objective-pick": "while picking objectives",
-  "between-tricks": "between tricks",
-  passive: "always on",
-} as const;
+type RulesView = Pick<ExpeditionView, "seats" | "yourSeatId" | "activeBossTwistId" | "campNumber">;
 
-type RulesView = Pick<ExpeditionView, "yourOwnedGearIds" | "activeBossTwistId" | "campNumber" | "yourCapacity">;
-
-function gearSection(view: RulesView | null): RulesSection {
-  const owned = view?.yourOwnedGearIds ?? [];
-  const capacity = view === null ? null : (view.yourCapacity ?? view.campNumber);
-  const paragraphs = [
-    "Capacity equals the camp number. Each equipped item can be used once per camp, in its window.",
-  ];
-  if (capacity !== null) paragraphs.push(`Your capacity this camp: ${capacity}.`);
+function kitSection(view: RulesView | null): RulesSection {
+  const you = view?.seats.find((s) => s.seatId === view.yourSeatId);
+  const owned = you === undefined ? [] : [...(you.characterId === null ? [] : [you.characterId]), ...you.kit];
+  const paragraphs = ["Your character's power and everything you draft are always with you. Each says when and how often it works."];
   const items: RulesItem[] = [];
   for (const id of owned) {
-    const gear = GEAR_DISPLAY[id];
-    if (!gear) continue;
-    const meta = `Size ${gear.size}, ${WINDOW_LABELS[gear.window]}.`;
-    items.push({
-      label: gear.name,
-      body: [meta, gear.text, gear.downside ? `Downside: ${gear.downside}` : null].filter(Boolean).join(" "),
-    });
+    const source = SOURCE_DISPLAY[id];
+    if (!source) continue;
+    const meta = source.active === null ? "Always." : `${source.active.windowPhrase}, ${source.active.limitBadge}.`;
+    items.push({ label: source.name, body: `${meta} ${source.text}` });
   }
-  if (items.length === 0) paragraphs.push("You do not own any gear yet.");
-  return { id: "gear", heading: "Gear", paragraphs, items };
+  if (items.length === 0) paragraphs.push("You have not picked a character yet.");
+  return { id: "kit", heading: "Your kit", paragraphs, items };
 }
 
 function campSection(view: RulesView | null): RulesSection {
@@ -93,7 +80,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       ],
       items: [],
     },
-    gearSection(view),
+    kitSection(view),
     campSection(view),
   ];
 }
