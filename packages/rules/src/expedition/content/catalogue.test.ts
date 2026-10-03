@@ -18,7 +18,7 @@ import { advanceTo, setupRun } from "../run/run-test-support";
 import { campCardIds } from "../run/toolkit";
 import type { CampNumber, RunAction, RunState } from "../run/types";
 import { poolBalance, remaining } from "../run/usage";
-import { currentWindow } from "../run/windows";
+import { currentWindow, gatedPendingSeatIds } from "../run/windows";
 
 const SEATS = ["p0", "p1", "p2"] as const;
 const FILLERS = ["scout", "guide", "botanist", "medic", "cartographer"];
@@ -258,6 +258,21 @@ describe("Botanist", () => {
     expect(camp(run).objectiveDeck).toEqual([]);
     expect(balance(run)).toBe(0);
     expect(run.attempt).not.toBeNull();
+  });
+
+  it("Antidote drops the failed objective when no fresh one can be drawn, without asking hidden hands first", () => {
+    const start = table({
+      character: "botanist",
+      kit: ["botanist.antidote"],
+      objectives: [winCard("o1", ident("spades", 14), "p1")],
+      tricks: [WON_BY_P0],
+      deck: [ident("spades", 7)],
+    });
+    expect(gatedPendingSeatIds(start, CATALOG)).toEqual(["p0"]);
+    const run = rescue(start, "p0", "botanist.antidote", ["objective:o1"]);
+    expect(camp(run).objectives).toEqual([]);
+    expect(camp(run).objectiveDeck).toEqual([ident("spades", 7)]);
+    expect(balance(run)).toBe(0);
   });
 });
 

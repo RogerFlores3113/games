@@ -27,8 +27,12 @@ export const botanist = defineCharacter({
         window: "rescue",
         limit: { kind: "pool", cost: 2 },
         targets: [{ kind: "failed-objective" }],
-        canUse: (ctx) => (freshObjectiveAvailable(ctx.camp) ? true : "No fresh objective is left"),
-        apply: (ctx) => [{ op: "replace-objective", objectiveId: ctx.targets[0].objective.id }],
+        // No canUse on the deck: whether a fresh card is still in a hand is
+        // hidden, so with none left the failed objective is dropped instead.
+        apply: (ctx) => {
+          const objectiveId = ctx.targets[0].objective.id;
+          return [freshObjectiveAvailable(ctx.camp) ? { op: "replace-objective", objectiveId } : { op: "remove-objective", objectiveId }];
+        },
       }),
     }),
   ],

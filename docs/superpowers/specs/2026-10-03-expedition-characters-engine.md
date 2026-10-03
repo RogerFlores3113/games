@@ -918,3 +918,8 @@ target kind, a window. Green check **`source-icons`**: a new
 - Review fix: Rally's `canTarget` evaluates the objective as if its card's winner owned it and
   refuses ("It would still fail") when it would, so an ordered objective that also failed on order
   never spends the once-per-run use for nothing.
+- Review fix: Antidote has no `canUse`. Its old check asked whether an objective-deck card was still
+  in a hand, which leaked the hidden deck through its reason and through `pendingSeatIds`. It may
+  now always target a failed objective; when no fresh objective can be drawn, `apply` drops the
+  failed objective instead (`remove-objective`), still a rescue. Its text stays "Swap a failed
+  objective for a fresh one." This supersedes the Antidote `canUse` entry rule above.
