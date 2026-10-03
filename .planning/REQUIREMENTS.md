@@ -87,7 +87,7 @@
 
 ### Art
 
-- [ ] **ARTX-01**: Scene art comes from PixelLab generations and verified CC0 or permissive packs. Each asset is recorded in CREDITS.md with its source and licence before use, and nothing shows people or watermarks
+- [x] **ARTX-01**: Scene art comes from PixelLab generations and verified CC0 or permissive packs. Each asset is recorded in CREDITS.md with its source and licence before use, and nothing shows people or watermarks
 - [x] **ARTX-02**: PixelLab prompt specs are kept in the repo so assets can be regenerated consistently
 - [ ] **ARTX-03**: The owner signs off the scene art in a visual review
 
@@ -175,7 +175,7 @@ Deferred by the owner during v2.0 scoping (2026-09-22):
 | SCENE-10 | Phase 12 | Complete |
 | SCENE-11 | Phase 12 | Complete |
 | SCENE-12 | Phase 12 | Complete |
-| ARTX-01 | Phase 14 | Pending |
+| ARTX-01 | Phase 14 | Complete |
 | ARTX-02 | Phase 14 | Complete |
 | ARTX-03 | Phase 14 | Pending |
 | BAL-01 | Phase 15 | Pending |

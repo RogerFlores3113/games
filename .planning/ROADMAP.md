@@ -346,5 +346,5 @@ Plans:
 | 11. Adapter, Schemas & Worker Wiring | v2.0 | 7/7 | Complete    | 2026-09-27 |
 | 12. Phaser Shell | v2.0 | 14/14 | Complete (owner re-review pending) | 2026-10-02 |
 | 13. Fireside & Run-End Scenes | v2.0 | built outside GSD | Complete (owner review pending) | 2026-10-02 |
-| 14. Art Pass | v2.0 | 0/? | Not started | - |
+| 14. Art Pass | v2.0 | built outside GSD | Complete (owner review pending) | 2026-10-02 |
 | 15. Balance Pass | v2.0 | 0/? | Not started | - |
