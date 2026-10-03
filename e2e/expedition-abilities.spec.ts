@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { clickHandCard, clickUntilChanged, draftOffer, isReady, waitForScene, type FiresideView, type MusterCard } from "./expedition-driver";
+import { clickHandCard, clickUntilChanged, draftOffer, isReady, pickDraftOffer, waitForScene, type FiresideView, type MusterCard } from "./expedition-driver";
 import { getModel, getScene, startExpeditionGame } from "./expedition-helpers";
 import { PICKER_SCENARIOS, rewriteViews, type Game } from "./expedition-scenarios";
 
@@ -44,12 +44,23 @@ async function sentRequests(sent: { request?: unknown }[]): Promise<unknown[]> {
   return sent.map((m) => m.request);
 }
 
-/** Plays the camp from every page until the host is asked to rescue.
- * False when the camp ends first. */
+/** Plays camps from every page until the host is asked to rescue. A cleared
+ * camp drafts and plays on; a failed camp that never asked fails the test.
+ * False only when the run ends first. */
 async function playUntilRescue(host: Page, pages: Page[]): Promise<boolean> {
   for (let step = 0; step < 600; step++) {
     const model = await getModel<CampModel>(host);
-    if (model.sceneKey !== "camp") return false;
+    if (model.sceneKey !== "camp") {
+      if (model.sceneKey !== "fireside") return false;
+      const fm = await getModel<FiresideView>(host);
+      expect(fm.lastResult?.status, "a failed camp always asks the Medic first").toBe("succeeded");
+      for (const p of pages) {
+        const offer = draftOffer(await getModel<FiresideView>(p));
+        if (offer) await clickUntilChanged<FiresideView>(p, pickDraftOffer(offer).objectId, (m) => draftOffer(m) === null);
+      }
+      await readyAll(pages);
+      continue;
+    }
     if (model.banner?.window === "rescue") {
       if (model.banner.youPending) return true;
       for (const p of pages.slice(1)) expect((await getModel<CampModel>(p)).banner?.detail).toMatch(/Waiting on Roger/);
@@ -218,7 +229,12 @@ test.describe("Expedition characters and abilities", () => {
       const failed = (await getModel<CampModel>(page)).seats.flatMap((s) => s.objectives).find((o) => o.targetable)!;
       await clickUntilChanged<CampModel>(page, failed.objectId, (m) => m.targeting?.canConfirm === true);
       await clickUntilChanged<CampModel>(page, "confirm", (m) => m.sceneKey !== "camp" || m.targeting === null);
-      await expect.poll(async () => (await getModel<CampModel>(page)).banner, { timeout: 15_000 }).toBeNull();
+      await expect
+        .poll(async () => {
+          const m = await getModel<CampModel>(page);
+          return m.sceneKey !== "camp" || m.banner === null;
+        }, { timeout: 15_000, message: "the rescue banner clears, or the camp settles into another scene" })
+        .toBe(true);
       await page.screenshot({ path: ".audit/abilities/after-rescue.png" });
       const after = await getModel<CampModel>(page);
       if (after.sceneKey === "camp") {
