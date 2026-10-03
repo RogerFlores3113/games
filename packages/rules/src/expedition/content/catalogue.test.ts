@@ -277,6 +277,19 @@ describe("Medic", () => {
     expect(evaluateObjective(camp(run), objectiveOf(run, "o1"))).toBe("done");
   });
 
+  it("Rally refuses an ordered objective its card's winner would still fail on order", () => {
+    const ordered = (id: string, target: StandardIdentity, order: number, ownerSeatId: string): Objective => ({ id, kind: "ordered", target, order, ownerSeatId });
+    const inOrder = table({ character: "medic", kit: ["medic.rally"], objectives: [ordered("o1", ident("spades", 14), 1, "p1")], tricks: [WON_BY_P0] });
+    expect(objectiveOf(rescue(inOrder, "p0", "medic.rally", ["objective:o1"]), "o1").ownerSeatId).toBe("p0");
+    const outOfOrder = table({
+      character: "medic",
+      kit: ["medic.rally"],
+      objectives: [ordered("o1", ident("spades", 14), 2, "p1"), ordered("o2", ident("hearts", 5), 1, "p2")],
+      tricks: [WON_BY_P0],
+    });
+    expect(refusal(outOfOrder, "p0", "medic.rally", ["objective:o1"])).toBe("invalid_target");
+  });
+
   it("Field Kit restores a supply and is refused at full supplies", () => {
     const run = use(table({ character: "medic", kit: ["medic.field-kit"], supplies: 2 }), "p0", "medic.field-kit", ["supplies"]);
     expect(run.supplies).toBe(3);

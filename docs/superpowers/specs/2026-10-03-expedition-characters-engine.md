@@ -915,3 +915,6 @@ target kind, a window. Green check **`source-icons`**: a new
   awaited disconnected seat and, when it fires, re-derives `seatsToAutoPass` from live state and
   submits the pass through `applyGameAction`. A reconnect inside the grace period drops the timer,
   and a seat gone longer than the grace is passed for as soon as a window starts waiting on it.
+- Review fix: Rally's `canTarget` evaluates the objective as if its card's winner owned it and
+  refuses ("It would still fail") when it would, so an ordered objective that also failed on order
+  never spends the once-per-run use for nothing.

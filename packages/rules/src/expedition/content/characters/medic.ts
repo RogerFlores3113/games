@@ -1,3 +1,4 @@
+import { evaluateObjective } from "../../objectives";
 import { STARTING_SUPPLIES } from "../../run/balance";
 import { ability, defineCharacter, defineUpgrade } from "../source-def";
 
@@ -27,6 +28,7 @@ export const medic = defineCharacter({
           if (objective.kind !== "win-card" && objective.kind !== "ordered") return "Only card objectives can be rallied";
           if (cardWinnerSeatId === null) return "Nobody has won its card";
           if (cardWinnerSeatId === objective.ownerSeatId) return "Its owner already won its card";
+          if (evaluateObjective(ctx.camp!, { ...objective, ownerSeatId: cardWinnerSeatId }) === "failed") return "It would still fail";
           return true;
         },
         apply: (ctx) => [{ op: "reassign-objective", objectiveId: ctx.targets[0].objective.id, toSeatId: ctx.targets[0].cardWinnerSeatId! }],
