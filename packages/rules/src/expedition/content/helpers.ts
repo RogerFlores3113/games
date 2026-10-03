@@ -8,14 +8,16 @@ import type { RuleModifier } from "../run/run-rules";
 import type { RunState } from "../run/types";
 
 /** The previous trickWinner, decided as if the excluded plays were never
- * made. A trick has 3 to 5 plays and an effect excludes one, so `prev`
- * always sees a non-empty trick and names a seat that played (WR-05). */
+ * made. When stacked effects have already excluded every other play, this
+ * exclusion is ignored, so `prev` never sees an empty trick and always names
+ * a seat that played (WR-05). */
 export function winnerExcluding(
   prev: (plays: readonly TrickPlay[]) => string,
   plays: readonly TrickPlay[],
   excluded: (play: TrickPlay) => boolean,
 ): string {
-  return prev(plays.filter((play) => !excluded(play)));
+  const eligible = plays.filter((play) => !excluded(play));
+  return prev(eligible.length > 0 ? eligible : plays);
 }
 
 /** The seat whose card of the led suit has the lowest printed rank. A joker

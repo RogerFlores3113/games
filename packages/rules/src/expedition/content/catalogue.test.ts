@@ -423,6 +423,19 @@ describe("items", () => {
     expect(camp(second).completedTricks[1]!.winnerSeatId).toBe("p0");
   });
 
+  it("Puffballs that exclude every seat leave the trick to the base rules", () => {
+    const hands = {
+      p0: [std("a14", "spades", 14)],
+      p1: [std("b3", "spades", 3)],
+      p2: [std("c4", "spades", 4)],
+    };
+    const start = table({ hands, leader: "p0" });
+    const stocked = { ...start, seats: start.seats.map((seat) => ({ ...seat, kit: ["puffball"] })) };
+    const puffed = SEATS.reduce((run, seatId) => use(run, seatId, "puffball", [`seat:${seatId}`]), stocked);
+    const done = play(play(play(puffed, "p0", "a14"), "p1", "b3"), "p2", "c4");
+    expect(camp(done).completedTricks[0]!.winnerSeatId).toBe("p0");
+  });
+
   it("Bait makes a table card lose this trick only", () => {
     const hands = {
       p0: [std("a9", "spades", 9), std("a8", "spades", 8)],

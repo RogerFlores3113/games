@@ -897,3 +897,7 @@ target kind, a window. Green check **`source-icons`**: a new
   clicked seat, hand card or objective counts only when the current step offers it. The pre-deal
   panel is a `gate` that also covers rescue (Use or Skip). Pickers for whisper, won-trick,
   card-value, board and supplies steps, icons and badges on tiles are unit 7 and 8 work.
+- Review fix: stacked "can't win" effects (Puffball, Bait) ignore the exclusion that would empty
+  the trick. Each layer filters what the outer layers left; when nothing remains it passes its
+  input through, so the trick still has a winner who played. Three Puffballs in a three-seat camp
+  leave the trick to the base rules.
