@@ -139,12 +139,18 @@ function drawSilhouette(ctx: Ctx, layer: Layer, seat: SeatModel, spot: { x: numb
   const { scene, model, handlers } = ctx;
   const art = seat.characterId === null ? null : crewArtId(seat.characterId);
   if (art === null) return;
-  const sprite = placeArt(scene, art, spot.x, spot.bottom - SILHOUETTE_H / 2);
+  const cy = spot.bottom - SILHOUETTE_H / 2;
+  if (seat.targetable || seat.selected) {
+    // A 1px outline in the target colour: the silhouette four times, offset.
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
+      layer.add(placeArt(scene, art, spot.x + dx, cy + dy).setTintFill(toPhaserColor(PALETTE.turn)));
+    }
+  }
+  const sprite = placeArt(scene, art, spot.x, cy);
   if (!seat.connected) sprite.setAlpha(DISCONNECTED_ALPHA);
   else if (model.targeting !== null && !inPlay(seat)) sprite.setAlpha(0.7);
   if (seat.targetable) {
-    sprite.setTint(toPhaserColor(PALETTE.turn));
-    sprite.setInteractive({ useHandCursor: true });
+    sprite.setInteractive({ useHandCursor: true, pixelPerfect: true });
     sprite.on("pointerdown", () => handlers.onPick("seat", seat.seatId));
   }
   layer.add(sprite);

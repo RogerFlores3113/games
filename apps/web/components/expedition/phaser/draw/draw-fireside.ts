@@ -180,7 +180,7 @@ function drawCharacterCard(ctx: Ctx, card: CharacterCard, x: number, y: number, 
 function badgeText(scene: Phaser.Scene, cx: number, y: number, value: string): Phaser.GameObjects.GameObject[] {
   const w = labelWidth(value) + 4;
   const x = cx - Math.floor(w / 2);
-  return [scene.add.rectangle(x, y - 1, w, LABEL_CELL.h + 2, toPhaserColor(PALETTE.stump)).setOrigin(0, 0), text(scene, x + 2, y, value, PALETTE.text)];
+  return [scene.add.rectangle(x, y - 1, w, LABEL_CELL.h + 2, toPhaserColor(PALETTE.plate)).setOrigin(0, 0), text(scene, x + 2, y, value, PALETTE.text)];
 }
 
 function drawMuster(ctx: Ctx, cards: CharacterCard[]): void {
