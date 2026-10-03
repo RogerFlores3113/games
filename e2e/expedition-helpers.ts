@@ -53,10 +53,11 @@ export async function createExpeditionRoom(page: Page, name: string): Promise<st
 }
 
 /**
- * Waits until `window.__expeditionTest.ready === true` on `page`.
+ * Waits until `window.__expeditionTest` is installed on `page` and a scene
+ * is on screen: a scene loads its sprites before it draws anything.
  */
 export async function waitForBridge(page: Page): Promise<void> {
-  await page.waitForFunction(() => window.__expeditionTest?.ready === true);
+  await page.waitForFunction(() => window.__expeditionTest?.ready === true && window.__expeditionTest.scene !== null);
 }
 
 /**
