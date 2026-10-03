@@ -1,4 +1,5 @@
 import { GEAR_DISPLAY } from "@games/rules";
+import { IDLE_DRAG, gestureCardId, type DragState } from "./card-drag";
 import type { ExpeditionTargetKind, ExpeditionView, RunAction } from "@games/rules";
 
 /**
@@ -28,10 +29,13 @@ export interface LocalUiState {
   tooltipObjectiveId: string | null;
   /** A teammate's gear: read-only, so it never starts targeting. */
   tooltipMateGear: { seatId: string; gearId: string } | null;
+  /** The hand-card gesture in flight: press, drag, or the return after a
+   * rejected drop. */
+  drag: DragState;
 }
 
 export function initialLocalUi(): LocalUiState {
-  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipGearId: null, tooltipObjectiveId: null, tooltipMateGear: null };
+  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipGearId: null, tooltipObjectiveId: null, tooltipMateGear: null, drag: IDLE_DRAG };
 }
 
 function currentHandIds(view: ExpeditionView): string[] {
@@ -182,6 +186,11 @@ export function reconcileLocalUi(ui: LocalUiState, view: ExpeditionView): LocalU
     }
   }
 
+  const held = gestureCardId(next.drag);
+  if (held !== null && !handIds.includes(held)) {
+    next = { ...next, drag: IDLE_DRAG };
+  }
+
   if (next.hoveredCardId !== null && !handIds.includes(next.hoveredCardId)) {
     next = { ...next, hoveredCardId: null };
   }
@@ -208,4 +217,8 @@ export function setTooltipObjective(ui: LocalUiState, objectiveId: string | null
 export function setTooltipMateGear(ui: LocalUiState, mate: { seatId: string; gearId: string } | null): LocalUiState {
   const same = ui.tooltipMateGear?.seatId === mate?.seatId && ui.tooltipMateGear?.gearId === mate?.gearId;
   return same ? ui : { ...ui, tooltipMateGear: mate };
+}
+
+export function setDrag(ui: LocalUiState, drag: DragState): LocalUiState {
+  return ui.drag === drag ? ui : { ...ui, drag };
 }

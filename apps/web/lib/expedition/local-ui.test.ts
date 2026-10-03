@@ -105,6 +105,7 @@ describe("initialLocalUi", () => {
       tooltipGearId: null,
       tooltipObjectiveId: null,
       tooltipMateGear: null,
+      drag: { phase: "idle" },
     });
   });
 });
@@ -325,6 +326,19 @@ describe("reconcileLocalUi", () => {
     });
     ui = reconcileLocalUi(ui, view2);
     expect(ui.hoveredCardId).toBeNull();
+  });
+
+  it("cancels a drag whose card left the hand", () => {
+    const view1 = makeView();
+    const ui = freeze({ ...initialLocalUi(), drag: { phase: "dragging" as const, cardId: "c1", legal: true, reason: null } });
+    const view2 = makeView({
+      attempt: {
+        ...view1.attempt!,
+        camp: { ...view1.attempt!.camp!, yourHand: [{ id: "c2", identity: { kind: "standard", suit: "spades", rank: 10 } }] },
+      },
+    });
+    expect(reconcileLocalUi(ui, view2).drag).toEqual({ phase: "idle" });
+    expect(reconcileLocalUi(ui, view1).drag).toEqual(ui.drag);
   });
 
   it("leaves valid targeting/hover untouched", () => {

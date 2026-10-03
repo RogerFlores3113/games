@@ -18,6 +18,7 @@ interface ExpeditionTestBridgeShape {
   model: unknown;
   objects(): Record<string, { x: number; y: number; width: number; height: number }>;
   positionOf(id: string): { x: number; y: number } | null;
+  pagePoint(stage: { x: number; y: number }): { x: number; y: number } | null;
 }
 
 declare global {

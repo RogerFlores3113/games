@@ -83,6 +83,10 @@ export function rectContains(outer: Rect, inner: Rect): boolean {
   );
 }
 
+export function pointInRect(r: Rect, p: Point): boolean {
+  return p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h;
+}
+
 export function centreOf(r: Rect): Point {
   return { x: Math.round(r.x + r.w / 2), y: Math.round(r.y + r.h / 2) };
 }

@@ -25,6 +25,9 @@ const DRAFT_PREFERENCE = ["peek", "ghost", "chatter", "broadcast"];
 interface CardModel {
   id: string;
   objectId: string;
+  label: string;
+  blockedReason: string | null;
+  dragging: boolean;
   playable: boolean;
   dimmed: boolean;
   targetable: boolean;
@@ -78,6 +81,8 @@ interface CampModel {
   lastTrick: { plays: TrickPlayModel[]; open: boolean } | null;
   faceUpObjectives: ObjectiveChip[];
   whisper: { visible: boolean; active: boolean };
+  tooltip: { title: string; text: string; reason: string | null } | null;
+  drag: { cardId: string; legal: boolean } | null;
   targeting: Targeting | null;
 }
 
@@ -200,6 +205,23 @@ function pickDraftOffer<T extends { gearId: string; size: number }>(offers: T[])
   const first = offers[0];
   if (!first) throw new Error("pickDraftOffer: draftOffer was empty");
   return first;
+}
+
+/** Presses a hand card with the real mouse, drags it over the middle of the
+ * stump in small steps and releases it there. */
+async function dragHandCardToStump(page: Page, objectId: string, whileHeld?: () => Promise<void>): Promise<void> {
+  const from = await page.evaluate((id) => window.__expeditionTest?.positionOf(id) ?? null, objectId);
+  const to = await page.evaluate(() => window.__expeditionTest?.pagePoint({ x: 320, y: 180 }) ?? null);
+  if (from === null || to === null) throw new Error(`dragHandCardToStump: "${objectId}" or the stump is not on screen`);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  const steps = 12;
+  for (let i = 1; i <= steps; i++) {
+    await page.mouse.move(from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
+    await page.waitForTimeout(16);
+  }
+  await whileHeld?.();
+  await page.mouse.up();
 }
 
 // ---------------------------------------------------------------------------
@@ -511,6 +533,71 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
       }
       const serialized = finalModels.map((m) => JSON.stringify(m.lastResult));
       expect(serialized.every((s) => s === serialized[0])).toBe(true);
+    } finally {
+      for (const context of contexts) await context.close();
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Drag and drop onto the table
+  // -------------------------------------------------------------------------
+
+  test("a card is played by dragging it onto the stump; an illegal drop snaps back", async ({ page, browser }) => {
+    test.setTimeout(240_000);
+    const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
+    const state: DriveState = { whisperDone: true, gearDone: true, lastTrickChecked: false };
+
+    try {
+      await reachCamp(pages);
+
+      let mover: Page | null = null;
+      let idler: Page | null = null;
+      for (let pass = 0; pass < 200 && mover === null; pass++) {
+        const models = await Promise.all(pages.map((p) => getModel<CampModel>(p)));
+        const turn = models.findIndex((m) => m.sceneKey === "camp" && m.hand.some((c) => c.playable) && !m.faceUpObjectives.some((o) => o.pickable));
+        if (turn !== -1) {
+          mover = pages[turn]!;
+          idler = pages.find((p, i) => i !== turn && models[i]!.sceneKey === "camp" && models[i]!.hand.length > 0) ?? null;
+          break;
+        }
+        await stepCamp(pages, state);
+      }
+      if (mover === null || idler === null) throw new Error("no page ever had a playable card with a teammate waiting");
+
+      // Illegal: the idle seat drags a card onto the stump.
+      const idleBefore = await getModel<CampModel>(idler);
+      const refused = idleBefore.hand[0]!;
+      expect(refused.blockedReason).toBe("Not your turn yet");
+      await dragHandCardToStump(idler, refused.objectId);
+      await expect.poll(async () => (await getModel<CampModel>(idler!)).tooltip).toEqual({
+        title: `Can't play ${refused.label}`,
+        text: "",
+        reason: "Not your turn yet",
+      });
+      const idleAfter = await getModel<CampModel>(idler);
+      expect(idleAfter.hand.map((c) => c.id)).toEqual(idleBefore.hand.map((c) => c.id));
+      expect(idleAfter.trick?.plays.length ?? 0).toBe(idleBefore.trick?.plays.length ?? 0);
+
+      // Legal: the seat on turn drags a playable card onto the stump.
+      const before = await getModel<CampModel>(mover);
+      const played = before.hand.find((c) => c.playable)!;
+      const playsBefore = before.trick?.plays.length ?? 0;
+      await dragHandCardToStump(mover, played.objectId, async () => {
+        await expect.poll(async () => (await getModel<CampModel>(mover!)).drag).toEqual({ cardId: played.id, legal: true });
+        const held = await getModel<CampModel>(mover!);
+        expect(held.hand.find((c) => c.id === played.id)?.dragging).toBe(true);
+        expect(held.trick?.plays.length ?? 0).toBe(playsBefore);
+      });
+      await expect
+        .poll(async () => {
+          const m = await getModel<CampModel>(mover!);
+          return m.sceneKey !== "camp" || !m.hand.some((c) => c.id === played.id);
+        })
+        .toBe(true);
+      const after = await getModel<CampModel>(mover);
+      if (after.sceneKey === "camp") {
+        expect(after.trick?.plays.length ?? 0).toBeGreaterThan(playsBefore);
+      }
     } finally {
       for (const context of contexts) await context.close();
     }

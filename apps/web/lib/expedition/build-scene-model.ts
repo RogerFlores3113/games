@@ -3,6 +3,7 @@ import { BOSS_DISPLAY, GEAR_DISPLAY } from "@games/rules";
 import type { CardPackId } from "./card-pack-ids";
 import {
   cardLabel,
+  SUIT_GLYPH,
   gearObjectId,
   handObjectId,
   objectiveObjectId,
@@ -11,6 +12,7 @@ import {
   trickObjectId,
   WHISPER_ID,
 } from "./expedition-ids";
+import { gestureCardId } from "./card-drag";
 import type { LocalUiState } from "./local-ui";
 import { candidateIdsForKind, nextTargetKind } from "./local-ui";
 import type { Prompt } from "./build-prompt";
@@ -79,6 +81,11 @@ export interface CardModel {
   targetable: boolean;
   selected: boolean;
   lifted: boolean;
+  /** Why this hand card can't be played right now; null when it can, or
+   * for a card that is not in your hand. */
+  blockedReason: string | null;
+  /** Being dragged: the fan keeps an empty slot for it. */
+  dragging: boolean;
 }
 
 export type ObjectiveKind = "win-card" | "ordered" | "no-tricks" | "exactly-n";
@@ -160,6 +167,9 @@ export interface SceneModel {
    * this camp. `shown`: the button belongs on screen (camp is being played). */
   whisper: { shown: boolean; visible: boolean; used: boolean; active: boolean };
   preDeal: { youPending: boolean; gear: GearChip[] } | null;
+  /** The card being dragged onto the table; `legal` says whether the stump
+   * accepts it. Null when no card is held. */
+  drag: { cardId: string; legal: boolean } | null;
   targeting: { mode: "gear" | "whisper"; sourceObjectId: string; nextKind: ExpeditionTargetKind | null; canConfirm: boolean } | null;
 }
 
@@ -291,6 +301,8 @@ function buildTrickPlayModel(play: { seatId: string; card: { id: string; identit
       targetable: false,
       selected: false,
       lifted: false,
+      blockedReason: null,
+      dragging: false,
     },
   };
 }
@@ -350,6 +362,16 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
   };
 }
 
+/** Why a card the server did not list as legal can't be played; phrases
+ * the server's answer and never recomputes it. */
+function blockedReasonFor(camp: ExpeditionCampView, view: ExpeditionView): string {
+  if (camp.campPhase !== "playing") return "Wait for the objectives to be picked";
+  if (camp.currentActorSeatId !== view.yourSeatId) return "Not your turn yet";
+  const led = camp.currentTrick.plays[0]?.card.identity;
+  if (led !== undefined && led.kind === "standard") return `Must follow ${SUIT_GLYPH[led.suit]}`;
+  return "You can't play that card now";
+}
+
 function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: LocalUiState): CardModel[] {
   if (camp === null) return [];
   const yourTurnToPlay = camp.campPhase === "playing" && camp.currentActorSeatId === view.yourSeatId;
@@ -357,6 +379,7 @@ function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: Lo
   const ownCardCandidates = ui.targeting !== null && nk === "own-card" ? candidateIdsForKind("own-card", view) : null;
 
   const cards = [...camp.yourHand].sort((a, b) => sortKey(a.identity) - sortKey(b.identity));
+  const dragged = gestureCardId(ui.drag);
   return cards.map((c) => {
     const playable = camp.yourLegalCardIds.includes(c.id);
     const { targetable, selected } = targetInfo(ui, view, "own-card", c.id);
@@ -371,7 +394,9 @@ function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: Lo
       dimmed,
       targetable,
       selected,
-      lifted: ui.hoveredCardId === c.id,
+      lifted: ui.hoveredCardId === c.id && dragged === null,
+      blockedReason: playable ? null : blockedReasonFor(camp, view),
+      dragging: (ui.drag.phase === "dragging" || ui.drag.phase === "playing") && dragged === c.id,
     };
   });
 }
@@ -430,6 +455,12 @@ export function gearRulesText(gearId: string): { title: string; text: string } |
 
 function buildTooltip(server: SceneServerInput, ui: LocalUiState): Tooltip | null {
   const { game: view, roomSeats } = server;
+  const drag = ui.drag;
+  if (drag.phase === "returning" && drag.reason !== null) {
+    const held = view.attempt?.camp?.yourHand.find((c) => c.id === drag.cardId);
+    const name = held === undefined ? "that card" : cardLabel(held.identity);
+    return { title: `Can't play ${name}`, text: "", reason: drag.reason };
+  }
   if (ui.tooltipObjectiveId !== null) {
     const o = view.attempt?.camp?.objectives.find((x) => x.id === ui.tooltipObjectiveId);
     if (o === undefined) return null;
@@ -486,6 +517,9 @@ export function buildSceneModel(
     preDeal = { youPending, gear: preDealGear };
   }
 
+  const drag =
+    ui.drag.phase === "dragging" && ui.targeting === null ? { cardId: ui.drag.cardId, legal: ui.drag.legal } : null;
+
   let targeting: SceneModel["targeting"] = null;
   if (ui.targeting !== null) {
     const nk = nextTargetKind(ui);
@@ -512,6 +546,7 @@ export function buildSceneModel(
     tooltip: buildTooltip(server, ui),
     whisper,
     preDeal,
+    drag,
     targeting,
   };
 }

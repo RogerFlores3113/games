@@ -38,7 +38,8 @@ const FAN_STEP = 16;
 const TRAY_PAD = 3;
 
 /** Where a seat's played card flies in from: its opponent block, or your hand. */
-function seatOrigin(model: SceneModel, seatId: string): Point {
+function seatOrigin(model: SceneModel, seatId: string, dropOrigin: Point | null): Point {
+  if (seatId === model.youSeatId && dropOrigin !== null) return dropOrigin;
   const opponents = model.seats.filter((s) => !s.isYou);
   const i = opponents.findIndex((s) => s.seatId === seatId);
   if (i === -1) return centreOf(ZONES.hand);
@@ -82,6 +83,10 @@ function drawHandCard(
   strip: number,
 ): void {
   const y = HAND_CARD_Y - (card.lifted ? HOVER_LIFT : 0);
+  if (card.dragging) {
+    layer.add(scene.add.rectangle(x, y, CARD_W, CARD_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.textDim), 0.6));
+    return;
+  }
   const image = scene.add.image(x, y, cardTextureKey(model.cardPackId, card.label, "full")).setOrigin(0, 0);
   image.setAlpha(card.dimmed ? DIM_ALPHA : 1);
   layer.add(image);
@@ -95,14 +100,35 @@ function drawHandCard(
 
   const hit = scene.add.zone(x, y, strip, CARD_H).setOrigin(0, 0);
   hit.setInteractive({ useHandCursor: card.playable || card.targetable });
-  hit.on("pointerdown", () => handlers.onCard(card.id));
+  hit.on("pointerdown", () => handlers.onCardPress(card.id));
   hit.on("pointerover", () => handlers.onCardHover(card.id));
   hit.on("pointerout", () => handlers.onCardHover(null));
   layer.add(hit);
   index.register("camp", card.objectId, hit);
 }
 
-export function drawTrick(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, previous: SceneModel | null): void {
+/** The stump's drop outline while a legal card is held. */
+export function drawDropTarget(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
+  if (model.drag === null || !model.drag.legal) return;
+  const zone = ZONES.stump;
+  layer.add(
+    scene.add
+      .rectangle(zone.x + 2, zone.y + 2, zone.w - 4, zone.h - 4, 0, 0)
+      .setOrigin(0, 0)
+      .setStrokeStyle(2, toPhaserColor(PALETTE.turn)),
+  );
+  const label = "Drop to play";
+  layer.add(platedText(scene, zone.x + Math.floor((zone.w - labelWidth(label)) / 2), zone.y + zone.h - LABEL_CELL.h - 6, label, PALETTE.turn));
+}
+
+export function drawTrick(
+  scene: Phaser.Scene,
+  layer: Layer,
+  model: SceneModel,
+  index: ObjectIndex,
+  previous: SceneModel | null,
+  dropOrigin: Point | null = null,
+): void {
   const trick = model.trick;
   if (trick === null || trick.plays.length === 0) return;
   const xs = stumpRowXs(trick.plays.length, TRICK_STEP);
@@ -112,7 +138,7 @@ export function drawTrick(scene: Phaser.Scene, layer: Layer, model: SceneModel, 
     const x = xs[i]!;
     const image = scene.add.image(x, TRICK_CARD_TOP, cardTextureKey(model.cardPackId, play.card.label, "full")).setOrigin(0.5, 0);
     if (i >= previousPlayCount) {
-      const from = seatOrigin(model, play.seatId);
+      const from = seatOrigin(model, play.seatId, dropOrigin);
       image.setPosition(from.x, from.y);
       scene.tweens.add({
         targets: image,

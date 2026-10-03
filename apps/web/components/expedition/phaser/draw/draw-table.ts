@@ -69,8 +69,9 @@ export function drawTooltip(scene: Phaser.Scene, layer: Layer, tip: Tooltip | nu
   if (tip === null) return;
   const maxChars = Math.floor((zone.w - 4) / LABEL_CELL.w);
   const maxLines = Math.floor(zone.h / LABEL_CELL.h);
-  const body = wrapWords(`${tip.title}: ${tip.text}`, maxChars);
-  const reason = tip.reason === null ? [] : wrapWords(`Not now: ${tip.reason}`, maxChars).slice(0, 1);
+  const body = tip.text === "" ? [] : wrapWords(`${tip.title}: ${tip.text}`, maxChars);
+  const reasonText = tip.text === "" ? `${tip.title}: ${tip.reason}` : `Not now: ${tip.reason}`;
+  const reason = tip.reason === null ? [] : wrapWords(reasonText, maxChars).slice(0, 1);
   const lines = [...body.slice(0, maxLines - reason.length), ...reason];
   layer.add(plate(scene, zone.x, zone.y, zone.w, zone.h));
   lines.forEach((line, i) => {

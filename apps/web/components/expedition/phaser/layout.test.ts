@@ -12,6 +12,7 @@ import {
   ZONES,
   handFanXs,
   opponentBlocks,
+  pointInRect,
   rectContains,
   rectsIntersect,
   rowBoxes,
@@ -137,5 +138,14 @@ describe("INTERACTABLE_ANCHORS", () => {
     expect(rectContains(ZONES.world, at(INTERACTABLE_ANCHORS.fireflies))).toBe(true);
     expect(rectContains(ZONES.world, at(INTERACTABLE_ANCHORS.lantern))).toBe(true);
     expect(rectContains(ZONES.actions, at(INTERACTABLE_ANCHORS.mascot))).toBe(true);
+  });
+});
+
+describe("pointInRect (the drop test)", () => {
+  it("accepts any point inside the stump and rejects the hand and the stump's far edge", () => {
+    expect(pointInRect(ZONES.stump, { x: 320, y: 180 })).toBe(true);
+    expect(pointInRect(ZONES.stump, { x: 136, y: 116 })).toBe(true);
+    expect(pointInRect(ZONES.stump, { x: 504, y: 180 })).toBe(false);
+    expect(pointInRect(ZONES.stump, { x: 320, y: 300 })).toBe(false);
   });
 });

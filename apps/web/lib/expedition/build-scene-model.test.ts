@@ -309,6 +309,56 @@ describe("hand: dimming, sort, lift, targeting", () => {
   });
 });
 
+describe("drag and drop", () => {
+  const cards = [
+    { id: "as", identity: AS },
+    { id: "kd", identity: KD },
+  ];
+  function dragView(patch: Partial<ExpeditionCampView>): ExpeditionView {
+    return makeView({
+      attempt: { ...makeView().attempt!, camp: makeCamp({ yourHand: cards, yourLegalCardIds: ["as"], ...patch }) },
+    });
+  }
+
+  it("names the suit you must follow for a card the server did not list as legal", () => {
+    const led = { seatId: "s1", card: { id: "led", identity: AS } };
+    const model = buildSceneModel(
+      server(dragView({ currentActorSeatId: "s2", currentTrick: { index: 0, leaderSeatId: "s1", plays: [led] }, yourLegalCardIds: ["as"] })),
+      ui(),
+      "big-index",
+    );
+    expect(model.hand.map((c) => c.blockedReason)).toEqual([null, "Must follow ♠"]);
+  });
+
+  it("says it is not your turn off-turn, and nothing for a legal card", () => {
+    const model = buildSceneModel(server(dragView({ currentActorSeatId: "s1", yourLegalCardIds: [] })), ui(), "big-index");
+    expect(model.hand.map((c) => c.blockedReason)).toEqual(["Not your turn yet", "Not your turn yet"]);
+  });
+
+  it("a dragged card leaves its slot, stops lifting, and the model names the held card and its legality", () => {
+    const model = buildSceneModel(
+      server(dragView({ currentActorSeatId: "s2" })),
+      ui({ hoveredCardId: "as", drag: { phase: "dragging", cardId: "as", legal: true, reason: null } }),
+      "big-index",
+    );
+    expect(model.hand.map((c) => ({ id: c.id, dragging: c.dragging, lifted: c.lifted }))).toEqual([
+      { id: "as", dragging: true, lifted: false },
+      { id: "kd", dragging: false, lifted: false },
+    ]);
+    expect(model.drag).toEqual({ cardId: "as", legal: true });
+  });
+
+  it("a rejected drop shows the reason in the tooltip until the card settles", () => {
+    const model = buildSceneModel(
+      server(dragView({ currentActorSeatId: "s2" })),
+      ui({ drag: { phase: "returning", cardId: "kd", reason: "Must follow ♠" } }),
+      "big-index",
+    );
+    expect(model.tooltip).toEqual({ title: "Can't play K♦", text: "", reason: "Must follow ♠" });
+    expect(model.drag).toBeNull();
+  });
+});
+
 describe("trick and lastTrick", () => {
   it("marks the first play as led, trick is null when camp is null", () => {
     const view = makeView({
