@@ -109,6 +109,9 @@ const toyAdapter: GameAdapter<ToyState, ToyAction, ToyConfig, ToyEndResult, ToyE
     }
     return null;
   },
+  autoPassRequest(state, seatId) {
+    return state.seatIds[state.turnIndex] === seatId ? { type: "pass" } : null;
+  },
 };
 
 export const ToyViewSchema = z.strictObject({

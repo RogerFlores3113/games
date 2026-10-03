@@ -909,3 +909,9 @@ target kind, a window. Green check **`source-icons`**: a new
   an ability that fails another objective in the same gap between tricks asks the seat again. An
   objective rescued and then failed again in that same gap stays declined; the seat already passed
   on it.
+- Review fix: a gated window no longer waits forever on a disconnected seat. `GameAdapter` gains an
+  optional `autoPassRequest(state, seatId)`; Expedition answers `skip-window` for a seat in
+  `gatedPendingSeatIds`. The room schedules an `auto_pass` timer at `disconnectedAt + 30s` for each
+  awaited disconnected seat and, when it fires, re-derives `seatsToAutoPass` from live state and
+  submits the pass through `applyGameAction`. A reconnect inside the grace period drops the timer,
+  and a seat gone longer than the grace is passed for as soon as a window starts waiting on it.

@@ -14,6 +14,7 @@ import type { AdapterResult, GameAdapter } from "../../adapter";
 import { createRun, runStatus } from "../run/lifecycle";
 import { applyRunAction } from "../run/run-actions";
 import { CATALOG } from "../run/catalog";
+import { gatedPendingSeatIds } from "../run/windows";
 import { toExpeditionPlayerView } from "./view";
 import { parseRunAction } from "./request-guards";
 import type { RunAction, RunError, RunState } from "../run/types";
@@ -51,5 +52,9 @@ export const expeditionGame: GameAdapter<RunState, RunAction, ExpeditionConfig, 
     const status = runStatus(state);
     if (status === "in_progress") return null;
     return { outcome: status, campReached: state.campNumber, suppliesLeft: state.supplies };
+  },
+
+  autoPassRequest(state, seatId) {
+    return gatedPendingSeatIds(state, CATALOG).includes(seatId) ? { type: "skip-window" } : null;
   },
 };

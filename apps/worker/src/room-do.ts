@@ -57,6 +57,8 @@ import {
   applyGameAction,
   deleteRoom,
   restartLobby,
+  awaitedSeatIds,
+  autoPassAbsentSeats,
 } from "./room-state";
 import {
   mintGameSeed,
@@ -347,6 +349,10 @@ export class RoomDO extends Server<Env> {
           // game start is refused by `releaseSeat` and simply dropped.
           const released = releaseSeat(current, event.seatId, now);
           if (released.ok) current = released.state;
+        } else if (event.type === "auto_pass") {
+          // Re-derived from live state: a seat that reconnected, or a window
+          // that closed, since the timer was stored is simply not due.
+          current = autoPassAbsentSeats(current, now);
         } else if (event.type === "idle_gc") {
           // WR-02: a room with a live, seated socket is not idle. Restart
           // the idle clock instead of deleting it — decided from the actual
@@ -453,7 +459,10 @@ export class RoomDO extends Server<Env> {
    * replaces an overdue pending alarm outside the alarm handler. That guard
    * survives hibernation; the old in-memory memo did not. */
   #timers(room: RoomState, now: number): TimerEvent[] {
-    return computeRoomTimers(room, now, { zombieSweepIntervalMs: this.#timing().zombieSweepIntervalMs });
+    return computeRoomTimers(room, now, {
+      zombieSweepIntervalMs: this.#timing().zombieSweepIntervalMs,
+      awaitedSeatIds: awaitedSeatIds(room),
+    });
   }
 
   /** Shared disconnect logic for both `onClose` and the zombie-sweep branch

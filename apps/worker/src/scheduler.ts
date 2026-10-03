@@ -21,6 +21,7 @@
 
 import type { RoomState } from "@games/schema";
 import {
+  ABSENT_SEAT_PASS_GRACE_MS,
   HOST_TRANSFER_GRACE_MS,
   IDLE_GC_IN_PROGRESS_MS,
   IDLE_GC_LOBBY_MS,
@@ -29,7 +30,7 @@ import {
 } from "@games/schema";
 
 /** The closed set of timer kinds this phase schedules. */
-export type TimerType = "idle_gc" | "host_transfer" | "seat_release" | "zombie_sweep";
+export type TimerType = "idle_gc" | "host_transfer" | "seat_release" | "zombie_sweep" | "auto_pass";
 
 /**
  * A single pending timer event. Timers are keyed by `type` plus `seatId` —
@@ -125,11 +126,15 @@ export function dueTimers(
  *   fact that this alarm fired — a "late" grid tick (because chatty traffic
  *   kept recomputing the table) is still a correct check when it finally
  *   runs, worst case detection = staleMs + intervalMs.
+ * - one `auto_pass` per disconnected seat in `options.awaitedSeatIds` at
+ *   `seat.disconnectedAt + 30s`, ONLY when status is "in_progress". The
+ *   awaited seats come from the game (room-state.ts `awaitedSeatIds`), so
+ *   this module stays game-agnostic.
  */
 export function computeRoomTimers(
   state: RoomState,
   now: number,
-  options: { zombieSweepIntervalMs?: number } = {},
+  options: { zombieSweepIntervalMs?: number; awaitedSeatIds?: readonly string[] } = {},
 ): TimerEvent[] {
   let timers: TimerEvent[] = [];
 
@@ -155,6 +160,18 @@ export function computeRoomTimers(
         timers = upsertTimer(timers, {
           type: "seat_release",
           dueAt: seat.disconnectedAt + LOBBY_SEAT_RELEASE_GRACE_MS,
+          seatId: seat.seatId,
+        });
+      }
+    }
+  }
+
+  if (state.status === "in_progress") {
+    for (const seat of state.seats) {
+      if (!seat.connected && seat.disconnectedAt !== null && options.awaitedSeatIds?.includes(seat.seatId)) {
+        timers = upsertTimer(timers, {
+          type: "auto_pass",
+          dueAt: seat.disconnectedAt + ABSENT_SEAT_PASS_GRACE_MS,
           seatId: seat.seatId,
         });
       }

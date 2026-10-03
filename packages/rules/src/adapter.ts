@@ -46,8 +46,9 @@ export type AdapterResult<TState, TError extends string> =
 export type GameEndResult = { score: number; reason: string; band?: string };
 
 /**
- * The contract a game plugs into the room layer through. Exactly five
- * members, no others — see the file-level invariants above. Generic over
+ * The contract a game plugs into the room layer through. Five required
+ * members and one optional hook, no others — see the file-level invariants
+ * above. Generic over
  * each game's own config (`TConfig`), end-result (`TEndResult`) and error
  * (`TError`) types (D-06) — deliberately no default type arguments, so the
  * seam is never accidentally re-specialized back to Hanabi's shapes.
@@ -84,4 +85,10 @@ export interface GameAdapter<TState, TAction, TConfig, TEndResult, TError extend
 
   /** `null` means the game continues. */
   checkGameEnd(state: TState): TEndResult | null;
+
+  /** Optional. The request the room submits for `seatId` once it has been
+   * disconnected for a grace period, when the game is waiting on that seat
+   * for a decision it may decline. `null` when the game is not waiting on
+   * it. A non-null request must be one `applyAction` accepts. */
+  autoPassRequest?(state: TState, seatId: string): unknown | null;
 }

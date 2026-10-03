@@ -22,6 +22,7 @@ import type {
   Seat,
   SeatToken,
 } from "@games/schema";
+import { ABSENT_SEAT_PASS_GRACE_MS } from "@games/schema";
 import { deriveDisplayLabel } from "./seat-naming";
 
 // ---------------------------------------------------------------------------
@@ -501,6 +502,37 @@ export function applyGameAction(
       lastActivityAt: now,
     },
   };
+}
+
+/** Seats the in-progress game is waiting on for a decision the room may
+ * decline for them (the adapter's optional `autoPassRequest`). */
+export function awaitedSeatIds(state: RoomState, games: GameRegistry = GAME_REGISTRY): string[] {
+  if (state.status !== "in_progress") return [];
+  const { adapter } = roomGame(state, games);
+  return state.seats.filter((seat) => (adapter.autoPassRequest?.(state.game, seat.seatId) ?? null) !== null).map((seat) => seat.seatId);
+}
+
+/** Awaited seats that have been disconnected for `ABSENT_SEAT_PASS_GRACE_MS`. */
+export function seatsToAutoPass(state: RoomState, now: number, games: GameRegistry = GAME_REGISTRY): string[] {
+  const awaited = awaitedSeatIds(state, games);
+  return state.seats
+    .filter((seat) => !seat.connected && seat.disconnectedAt !== null && now - seat.disconnectedAt >= ABSENT_SEAT_PASS_GRACE_MS)
+    .filter((seat) => awaited.includes(seat.seatId))
+    .map((seat) => seat.seatId);
+}
+
+/** Submits the game's pass for every seat `seatsToAutoPass` names, through
+ * the same `applyGameAction` a client's request takes. Returns `state`
+ * itself when nobody is due. Throws when the game refuses its own pass,
+ * which breaks the `autoPassRequest` contract. */
+export function autoPassAbsentSeats(state: RoomState, now: number, games: GameRegistry = GAME_REGISTRY): RoomState {
+  return seatsToAutoPass(state, now, games).reduce((current, seatId) => {
+    const request = roomGame(current, games).adapter.autoPassRequest?.(current.game, seatId) ?? null;
+    if (current.status !== "in_progress" || request === null) return current;
+    const result = applyGameAction(current, seatId, `auto-pass:${now}`, request, now, games);
+    if (!result.ok) throw new Error(`autoPassAbsentSeats: ${current.gameId} refused its own pass for ${seatId}`);
+    return result.state;
+  }, state);
 }
 
 // ---------------------------------------------------------------------------

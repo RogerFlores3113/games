@@ -77,6 +77,11 @@ export const HOST_TRANSFER_GRACE_MS = 20_000;
  * In-progress seats are NEVER auto-released in this phase. */
 export const LOBBY_SEAT_RELEASE_GRACE_MS = 30_000;
 
+/** A disconnected in-progress seat that a game is waiting on (an Expedition
+ * gated window) is passed for after 30s, so the table never waits forever.
+ * A reconnect inside the grace period cancels it. */
+export const ABSENT_SEAT_PASS_GRACE_MS = 30_000;
+
 /** D-08: WebSocket close code used when a newer tab takes over a seat. */
 export const SUPERSEDED_CLOSE_CODE = 4001;
 

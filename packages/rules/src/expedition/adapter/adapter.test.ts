@@ -152,6 +152,23 @@ describe("expeditionGame: toPlayerView", () => {
   });
 });
 
+describe("expeditionGame: autoPassRequest", () => {
+  it("names skip-window for a seat a gated window waits on, and null for anyone else", () => {
+    const { preDeal, betweenTricks } = fixtures();
+    expect(expeditionGame.autoPassRequest!(preDeal!, "p0")).toEqual({ type: "skip-window" });
+    expect(expeditionGame.autoPassRequest!(preDeal!, "p1")).toBeNull();
+    expect(expeditionGame.autoPassRequest!(betweenTricks!, "p0")).toBeNull();
+  });
+
+  it("is a request the game accepts, which moves the window on", () => {
+    const { preDeal } = fixtures();
+    const passed = expeditionGame.applyAction(preDeal!, "p0", expeditionGame.autoPassRequest!(preDeal!, "p0"));
+    if (!passed.ok) throw new Error(passed.error);
+    expect(passed.state.attempt!.camp).not.toBeNull();
+    expect(expeditionGame.autoPassRequest!(passed.state, "p0")).toBeNull();
+  });
+});
+
 describe("expeditionGame: checkGameEnd", () => {
   it("returns null for a fresh run", () => {
     const state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
