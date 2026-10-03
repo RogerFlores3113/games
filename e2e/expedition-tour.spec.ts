@@ -40,6 +40,7 @@ const MAX_RUNS = 8;
 const TOUR_BUDGET_MS = 12 * 60_000;
 const WHISPER_ID = "whisper";
 const CANCEL_ID = "cancel";
+const CONFIRM_ID = "confirm";
 const READY_ID = "ready";
 const LAST_TRICK_ID = "last-trick";
 const PREDEAL_SKIP_ID = "predeal-skip";
@@ -53,7 +54,7 @@ const PACK_FIRST = ["overclock", "jam"];
 
 /** Phases scripted play reaches often enough to keep starting new runs for. */
 const WANTED = [
-  "draft", "loadout", "ready", "objective-pick", "trick-led", "mid-trick", "gear-targeting", "whisper-targeting",
+  "draft", "loadout", "ready", "objective-pick", "trick-led", "mid-trick", "gear-targeting", "whisper-targeting", "whisper-sent", "whisper-received",
   "last-trick-glance", "objective-hover", "fireside-after-fail", "between-camps-draft", "between-camps-loadout", "next-camp",
   "run-end-lost", "run-end-guest",
 ];
@@ -66,8 +67,9 @@ interface Chip { objectId: string; label?: string; status?: string; pickable?: b
 interface CampModel {
   sceneKey: SceneName;
   campNumber: number;
-  seats: { seatId: string; isYou: boolean; mayAct: boolean; gear: Chip[]; objectives: Chip[] }[];
-  hand: Card[];
+  seats: { seatId: string; objectId: string; isYou: boolean; mayAct: boolean; targetable?: boolean; gear: Chip[]; objectives: Chip[] }[];
+  hand: (Card & { targetable?: boolean })[];
+  receivedWhispers: unknown[];
   trick: { plays: { seatId: string; card: { label: string; identity: Identity } }[] } | null;
   lastTrick: { open: boolean; plays: unknown[] } | null;
   faceUpObjectives: Chip[];
@@ -206,6 +208,17 @@ function objectiveToPick(model: CampModel): Chip | undefined {
   return [...pickable].sort((a, b) => (held.get(b.label ?? "") ?? -1) - (held.get(a.label ?? "") ?? -1))[0];
 }
 
+/** Sends a real Whisper: first card, first teammate, confirm. */
+async function sendWhisper(page: Page): Promise<void> {
+  let model = await clickUntilChanged<CampModel>(page, WHISPER_ID, (m) => m.whisper.active);
+  const card = model.hand.find((c) => c.targetable);
+  if (card === undefined) throw new Error("sendWhisper: no targetable card");
+  model = await clickHandCard<CampModel>(page, card.objectId, (m) => m.seats.some((s) => s.targetable));
+  const mate = model.seats.find((s) => s.targetable)!;
+  await clickUntilChanged<CampModel>(page, mate.objectId, (m) => m.targeting?.canConfirm === true);
+  await clickUntilChanged<CampModel>(page, CONFIRM_ID, (m) => m.targeting === null);
+}
+
 /** Opens a targeting flow, captures it, then cancels so the run continues. */
 async function peekTargeting(page: Page, tour: Tour, openId: string, name: string, opened: (m: CampModel) => boolean): Promise<void> {
   await clickUntilChanged<CampModel>(page, openId, opened);
@@ -279,6 +292,8 @@ async function stepPage(page: Page, isHost: boolean, tour: Tour): Promise<void> 
 
   if (isHost && !tour.has("whisper-targeting") && model.whisper.visible) {
     await peekTargeting(page, tour, WHISPER_ID, "whisper-targeting", (m) => m.whisper.active);
+    await sendWhisper(page);
+    await tour.shot("whisper-sent");
     return;
   }
   const gear = you.gear.find((g) => g.usable);
@@ -325,6 +340,9 @@ async function playRun(pages: Page[], tour: Tour, deadline: number): Promise<"wo
       for (const [i, p] of pages.entries()) {
         await stepPage(p, i === 0, tour);
         await captureHostState(host, tour);
+        if (!tour.has("whisper-received") && ((await getModel<CampModel>(p)).receivedWhispers ?? []).length > 0) {
+          await tour.shot("whisper-received", p);
+        }
       }
     }
 
@@ -384,6 +402,7 @@ function preDealView(game: Game): Game {
       effects: [],
       reveals: [],
       log: [],
+      yourWhisper: { allowed: false, left: 1 },
       camp: null,
     },
   };

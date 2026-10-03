@@ -16,6 +16,7 @@ import type { CampHandlers } from "../draw/camp-handlers";
 import { preloadArt } from "../art/place-art";
 import { drawDropTarget, drawHand, drawLastTrick, drawTrick } from "../draw/draw-hand-trick";
 import { drawControls } from "../draw/draw-controls";
+import { drawWhispers } from "../draw/draw-whispers";
 import { INTERACTABLE_REGISTRY } from "../interactables/registry";
 import { CARD_H, CARD_W, HAND_CARD_Y, INTERACTABLE_ANCHORS, ZONES, handFanXs, pointInRect, type Point } from "../layout";
 import { PALETTE, toPhaserColor } from "../palette";
@@ -281,6 +282,7 @@ export class CampScene extends Phaser.Scene {
     drawTrick(this, layer, model, this.index, this.previousModel, this.dropOrigin);
     if (this.sceneStore.getState().localUi.drag.phase === "idle") this.dropOrigin = null;
     drawLastTrick(this, layer, model, this.index, this.handlers);
+    drawWhispers(this, layer, model, this.index);
     drawControls(this, layer, model, this.index, this.handlers);
   }
 

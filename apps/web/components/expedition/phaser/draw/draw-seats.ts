@@ -35,10 +35,6 @@ function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-function nameOf(model: SceneModel, seatId: string): string {
-  return model.seats.find((s) => s.seatId === seatId)?.displayLabel ?? "?";
-}
-
 /** The name row: a plate registered as `seat:<id>`, clickable only while the
  * seat is a target. Badges sit right-aligned on the same row. */
 function nameRow(ctx: Ctx, group: Layer, seat: SeatModel, row: Rect, badges: { value: string; color: string; id?: string }[]): void {
@@ -166,9 +162,8 @@ function drawOpponent(ctx: Ctx, layer: Layer, seat: SeatModel, block: Rect): voi
 
   const badges: { value: string; color: string; id?: string }[] = [];
   if (!seat.connected) badges.push({ value: "away", color: PALETTE.statusDisconnected });
-  if (seat.whisperedTo.length > 0) badges.push({ value: `>${fitLabel(nameOf(model, seat.whisperedTo[0]!), 4)}`, color: PALETTE.turn });
   for (const reveal of seat.reveals) {
-    badges.push({ value: reveal.label, color: reveal.sourceTag === "whisper" ? PALETTE.turn : PALETTE.sun, id: reveal.objectId });
+    if (reveal.sourceTag === "gear") badges.push({ value: reveal.label, color: PALETTE.sun, id: reveal.objectId });
   }
   nameRow(ctx, group, seat, { x: x0, y: block.y + SEAT_BLOCK_PAD, w: iw, h: ROW_H }, badges);
 

@@ -583,7 +583,7 @@ describe("gear chips", () => {
   });
 });
 
-describe("reveals and whisperedTo", () => {
+describe("reveals", () => {
   it("places a reveal only at fromSeatId, never any other seat", () => {
     const view = makeView({
       attempt: {
@@ -628,77 +628,94 @@ describe("reveals and whisperedTo", () => {
     expect(reveal.sourceTag).toBe("gear");
     expect(reveal.sourceName).toBe("Spyglass");
   });
-
-  it("whisperedTo lists subjectSeatIds for the actor's whisper log entries", () => {
-    const view = makeView({
-      attempt: {
-        attemptNumber: 1,
-        bossCancelled: false,
-        gearWindow: null,
-        preDealPendingSeatIds: [],
-        gearUses: [],
-        effects: [],
-        reveals: [],
-        log: [{ event: "whisper", actorSeatId: "s1", subjectSeatIds: ["s3"], gearId: null, private: false }],
-        yourWhisper: { allowed: true, left: 1 },
-        camp: makeCamp(),
-      },
-    });
-    const model = buildSceneModel(server(view), ui(), "big-index");
-    expect(model.seats.find((s) => s.seatId === "s1")!.whisperedTo).toEqual(["s3"]);
-    expect(model.seats.find((s) => s.seatId === "s3")!.whisperedTo).toEqual([]);
-  });
 });
 
-describe("whisper visibility", () => {
-  it("visible when seated, playing, between-tricks, and no self whisper yet this attempt", () => {
-    const view = makeView({
-      yourSeatId: "s2",
-      attempt: {
-        attemptNumber: 1,
-        bossCancelled: false,
-        gearWindow: "between-tricks",
-        preDealPendingSeatIds: [],
-        gearUses: [],
-        effects: [],
-        reveals: [],
-        log: [],
-        yourWhisper: { allowed: true, left: 1 },
-        camp: makeCamp(),
-      },
-    });
-    const model = buildSceneModel(server(view), ui(), "big-index");
-    expect(model.whisper).toEqual({ shown: true, visible: true, used: false, active: false });
+function whisperView(opts: {
+  window?: "between-tricks" | null;
+  yourWhisper?: { allowed: boolean; left: number };
+  reveals?: NonNullable<ExpeditionView["attempt"]>["reveals"];
+  log?: { actor: string; to: string }[];
+  boss?: string | null;
+}): ExpeditionView {
+  return makeView({
+    yourSeatId: "s2",
+    activeBossTwistId: opts.boss ?? null,
+    attempt: {
+      attemptNumber: 1,
+      bossCancelled: false,
+      gearWindow: opts.window === undefined ? "between-tricks" : opts.window,
+      preDealPendingSeatIds: [],
+      gearUses: [],
+      effects: [],
+      reveals: opts.reveals ?? [],
+      log: (opts.log ?? []).map((l) => ({ event: "whisper", actorSeatId: l.actor, subjectSeatIds: [l.to], gearId: null, private: false })),
+      yourWhisper: opts.yourWhisper ?? { allowed: true, left: 1 },
+      camp: makeCamp(),
+    },
+  });
+}
+
+describe("whisper status", () => {
+  it("ready: seated, playing, between tricks, a Whisper left", () => {
+    const model = buildSceneModel(server(whisperView({})), ui(), "big-index");
+    expect(model.whisper).toEqual({ shown: true, visible: true, used: false, active: false, state: "ready", reason: null, left: 1 });
   });
 
   it("not shown at all outside the playing phase", () => {
     const view = makeView({ attempt: { ...makeView().attempt!, camp: makeCamp({ campPhase: "objective-pick" }) } });
-    expect(buildSceneModel(server(view), ui(), "big-index").whisper).toEqual({ shown: false, visible: false, used: false, active: false });
+    expect(buildSceneModel(server(view), ui(), "big-index").whisper.shown).toBe(false);
   });
 
-  it("not visible once the viewer has already whispered this attempt", () => {
-    const view = makeView({
-      yourSeatId: "s2",
-      attempt: {
-        attemptNumber: 1,
-        bossCancelled: false,
-        gearWindow: "between-tricks",
-        preDealPendingSeatIds: [],
-        gearUses: [],
-        effects: [],
-        reveals: [],
-        log: [{ event: "whisper", actorSeatId: "s2", subjectSeatIds: ["s1"], gearId: null, private: false }],
-        yourWhisper: { allowed: true, left: 1 },
-        camp: makeCamp(),
-      },
-    });
-    const model = buildSceneModel(server(view), ui(), "big-index");
-    expect(model.whisper).toEqual({ shown: true, visible: false, used: true, active: false });
+  it("wait-between-tricks: names the reason while a trick is under way", () => {
+    const model = buildSceneModel(server(whisperView({ window: null })), ui(), "big-index");
+    expect(model.whisper).toMatchObject({ shown: true, visible: false, state: "wait-between-tricks", reason: "Between tricks" });
+  });
+
+  it("used: reads the rules' count, not the log", () => {
+    const model = buildSceneModel(server(whisperView({ yourWhisper: { allowed: true, left: 0 } })), ui(), "big-index");
+    expect(model.whisper).toMatchObject({ visible: false, used: true, state: "used", reason: "Used this camp", left: 0 });
+  });
+
+  it("a second Whisper from Chatter keeps the button ready after the first", () => {
+    const view = whisperView({ yourWhisper: { allowed: true, left: 1 }, log: [{ actor: "s2", to: "s1" }] });
+    expect(buildSceneModel(server(view), ui(), "big-index").whisper).toMatchObject({ visible: true, state: "ready", left: 1 });
+  });
+
+  it("blocked: names the boss twist that forbids it", () => {
+    const view = whisperView({ yourWhisper: { allowed: false, left: 1 }, boss: "radio-silence" });
+    expect(buildSceneModel(server(view), ui(), "big-index").whisper).toMatchObject({ visible: false, state: "blocked", reason: "Blocked: Monsoon" });
   });
 
   it("active reflects ui.targeting.mode === whisper", () => {
     const model = buildSceneModel(server(makeView()), ui({ targeting: { mode: "whisper", cardId: null, targetSeatId: null } }), "big-index");
     expect(model.whisper.active).toBe(true);
+  });
+});
+
+describe("whispers on the table", () => {
+  const toYou = { cardId: "c-kd", fromSeatId: "s1", source: "whisper", identity: KD, toSeatId: "s2" };
+  const fromYou = { cardId: "c-as", fromSeatId: "s2", source: "whisper", identity: AS, toSeatId: "s3" };
+
+  it("the recipient keeps the card face up, labelled with who named it, and sees the public line", () => {
+    const model = buildSceneModel(server(whisperView({ reveals: [toYou], log: [{ actor: "s1", to: "s2" }] })), ui(), "big-index");
+    expect(model.receivedWhispers).toEqual([{ fromSeatId: "s1", fromName: "Alice", card: "K♦", objectId: "reveal:K♦" }]);
+    expect(model.sentWhispers).toEqual([]);
+    expect(model.whisperLog).toEqual(["Alice whispered to you"]);
+  });
+
+  it("the sender gets a confirmation with the card and recipient, and nothing in received", () => {
+    const model = buildSceneModel(server(whisperView({ reveals: [fromYou], log: [{ actor: "s2", to: "s3" }] })), ui(), "big-index");
+    expect(model.sentWhispers).toEqual([{ toSeatId: "s3", toName: "Cara", card: "A♠", objectId: "reveal:A♠" }]);
+    expect(model.receivedWhispers).toEqual([]);
+    expect(model.whisperLog).toEqual(["You whispered A♠ to Cara"]);
+  });
+
+  it("a third seat sees only the names: no card anywhere", () => {
+    const view = whisperView({ log: [{ actor: "s1", to: "s3" }] });
+    const model = buildSceneModel(server(view), ui(), "big-index");
+    expect(model.whisperLog).toEqual(["Alice whispered to Cara"]);
+    expect(model.receivedWhispers).toEqual([]);
+    expect(model.sentWhispers).toEqual([]);
   });
 });
 

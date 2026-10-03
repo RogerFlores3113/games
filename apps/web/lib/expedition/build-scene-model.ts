@@ -121,6 +121,22 @@ export interface MiniCard {
   sourceName: string;
 }
 
+export type WhisperState = "ready" | "wait-between-tricks" | "used" | "blocked";
+
+export interface ReceivedWhisper {
+  fromSeatId: string;
+  fromName: string;
+  card: string;
+  objectId: string;
+}
+
+export interface SentWhisper {
+  toSeatId: string;
+  toName: string;
+  card: string;
+  objectId: string;
+}
+
 export interface SeatModel {
   seatId: string;
   objectId: string;
@@ -135,7 +151,6 @@ export interface SeatModel {
   objectives: ObjectiveChip[];
   gear: GearChip[];
   reveals: MiniCard[];
-  whisperedTo: string[];
   targetable: boolean;
   selected: boolean;
 }
@@ -163,9 +178,19 @@ export interface SceneModel {
   removedCardLabels: string[];
   prompt: Prompt;
   tooltip: Tooltip | null;
-  /** `visible`: the Whisper can be started now. `used`: you already whispered
-   * this camp. `shown`: the button belongs on screen (camp is being played). */
-  whisper: { shown: boolean; visible: boolean; used: boolean; active: boolean };
+  /** The Whisper button. `shown`: it belongs on screen (camp is being
+   * played). `state`: why it can or cannot be pressed, with `reason` a short
+   * phrase for the unavailable states. `visible`: it can be started now.
+   * `used`: you have spent every Whisper this camp. `left`: Whispers you may
+   * still send this camp. */
+  whisper: { shown: boolean; visible: boolean; used: boolean; active: boolean; state: WhisperState; reason: string | null; left: number };
+  /** Cards teammates named to you, kept face up for the attempt. */
+  receivedWhispers: ReceivedWhisper[];
+  /** Cards you named to teammates: your confirmation. */
+  sentWhispers: SentWhisper[];
+  /** One line per Whisper this attempt, oldest first. Public: names only,
+   * plus the card for a Whisper you sent. */
+  whisperLog: string[];
   preDeal: { youPending: boolean; gear: GearChip[] } | null;
   /** The card being dragged onto the table; `legal` says whether the stump
    * accepts it. Null when no card is held. */
@@ -336,10 +361,6 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
       sourceName: r.source === "whisper" ? "Whisper" : (GEAR_DISPLAY[r.source]?.name ?? r.source),
     }));
 
-  const whisperedTo = (view.attempt?.log ?? [])
-    .filter((l) => l.event === "whisper" && l.actorSeatId === seatId)
-    .flatMap((l) => l.subjectSeatIds);
-
   const { targetable, selected } = targetInfo(ui, view, "teammate", seatId);
 
   return {
@@ -356,7 +377,6 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
     objectives,
     gear,
     reveals,
-    whisperedTo,
     targetable,
     selected,
   };
@@ -399,6 +419,60 @@ function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: Lo
       dragging: (ui.drag.phase === "dragging" || ui.drag.phase === "playing") && dragged === c.id,
     };
   });
+}
+
+function whisperStatus(
+  view: ExpeditionView,
+  bossTwist: SceneModel["bossTwist"],
+  active: boolean,
+): SceneModel["whisper"] {
+  const camp = view.attempt?.camp ?? null;
+  const shown = view.yourSeatId !== null && camp !== null && camp.campPhase === "playing";
+  const mine = view.attempt?.yourWhisper ?? { allowed: true, left: 1 };
+  let state: WhisperState = "ready";
+  let reason: string | null = null;
+  if (!mine.allowed) {
+    state = "blocked";
+    reason = bossTwist !== null && !bossTwist.cancelled ? `Blocked: ${bossTwist.name}` : "Blocked right now";
+  } else if (mine.left === 0) {
+    state = "used";
+    reason = "Used this camp";
+  } else if (view.attempt?.gearWindow !== "between-tricks") {
+    state = "wait-between-tricks";
+    reason = "Between tricks";
+  }
+  return { shown, visible: shown && state === "ready", used: state === "used", active, state, reason, left: mine.left };
+}
+
+function buildWhispers(
+  view: ExpeditionView,
+  roomSeats: RoomSeatInfo[],
+): Pick<SceneModel, "receivedWhispers" | "sentWhispers" | "whisperLog"> {
+  const you = view.yourSeatId;
+  const nameOf = (seatId: string): string => roomSeatFor(roomSeats, seatId).displayLabel;
+  const whisperReveals = (view.attempt?.reveals ?? []).filter((r) => r.source === "whisper");
+  const mineSent = whisperReveals.filter((r) => r.fromSeatId === you);
+
+  const receivedWhispers = whisperReveals
+    .filter((r) => r.fromSeatId !== you)
+    .map((r) => ({ fromSeatId: r.fromSeatId, fromName: nameOf(r.fromSeatId), card: cardLabel(r.identity), objectId: revealObjectId(r.identity) }));
+  const sentWhispers = mineSent.flatMap((r) =>
+    r.toSeatId === null ? [] : [{ toSeatId: r.toSeatId, toName: nameOf(r.toSeatId), card: cardLabel(r.identity), objectId: revealObjectId(r.identity) }],
+  );
+
+  let sentSoFar = 0;
+  const whisperLog = (view.attempt?.log ?? [])
+    .filter((l) => l.event === "whisper")
+    .map((l) => {
+      const to = l.subjectSeatIds[0] ?? "";
+      if (l.actorSeatId === you) {
+        const card = mineSent[sentSoFar++];
+        return card === undefined ? `You whispered to ${nameOf(to)}` : `You whispered ${cardLabel(card.identity)} to ${nameOf(to)}`;
+      }
+      return `${nameOf(l.actorSeatId)} whispered to ${to === you ? "you" : nameOf(to)}`;
+    });
+
+  return { receivedWhispers, sentWhispers, whisperLog };
 }
 
 function buildTrick(camp: ExpeditionCampView | null): SceneModel["trick"] {
@@ -501,11 +575,8 @@ export function buildSceneModel(
   const faceUpObjectives = objectivesForOwner(camp, null, view, ui);
   const removedCardLabels = (camp?.removedCards ?? []).map((identity) => cardLabel(identity));
 
-  const whisperUsed = (view.attempt?.log ?? []).some((l) => l.event === "whisper" && l.actorSeatId === view.yourSeatId);
-  const whisperShown = view.yourSeatId !== null && camp !== null && camp.campPhase === "playing";
-  const whisperVisible = whisperShown && view.attempt?.gearWindow === "between-tricks" && !whisperUsed;
-  const whisper = { shown: whisperShown, visible: whisperVisible, used: whisperUsed, active: ui.targeting?.mode === "whisper" };
-  const prompt = buildPrompt(view, roomSeats, ui, { reconnecting, whisperAvailable: whisperVisible });
+  const whisper = whisperStatus(view, bossTwist, ui.targeting?.mode === "whisper");
+  const prompt = buildPrompt(view, roomSeats, ui, { reconnecting, whisperAvailable: whisper.visible });
 
   let preDeal: SceneModel["preDeal"] = null;
   if (view.runPhase === "pre-deal") {
@@ -545,6 +616,7 @@ export function buildSceneModel(
     prompt,
     tooltip: buildTooltip(server, ui),
     whisper,
+    ...buildWhispers(view, roomSeats),
     preDeal,
     drag,
     targeting,

@@ -20,6 +20,7 @@ const WHISPER_ID = "whisper";
 const CONFIRM_ID = "confirm";
 const READY_ID = "ready";
 const LAST_TRICK_ID = "last-trick";
+const NAMES = ["Roger", "Bianca", "Sam"];
 const DRAFT_PREFERENCE = ["peek", "ghost", "chatter", "broadcast"];
 
 interface CardModel {
@@ -80,7 +81,10 @@ interface CampModel {
   trick: { plays: TrickPlayModel[] } | null;
   lastTrick: { plays: TrickPlayModel[]; open: boolean } | null;
   faceUpObjectives: ObjectiveChip[];
-  whisper: { visible: boolean; active: boolean };
+  whisper: { shown: boolean; visible: boolean; active: boolean; state: "ready" | "wait-between-tricks" | "used" | "blocked"; reason: string | null };
+  receivedWhispers: { fromSeatId: string; fromName: string; card: string }[];
+  sentWhispers: { toSeatId: string; toName: string; card: string }[];
+  whisperLog: string[];
   tooltip: { title: string; text: string; reason: string | null } | null;
   drag: { cardId: string; legal: boolean } | null;
   targeting: Targeting | null;
@@ -307,6 +311,7 @@ async function runWhisper(pages: Page[], page: Page): Promise<void> {
   }
   await clickUntilChanged<CampModel>(page, CONFIRM_ID, (m) => m.targeting === null);
 
+  const whisperedCard = cardTarget.label;
   const targetSeatId = seatTarget.seatId;
   let targetPage: Page | null = null;
   for (const candidate of pages) {
@@ -329,10 +334,35 @@ async function runWhisper(pages: Page[], page: Page): Promise<void> {
     )
     .toBeGreaterThan(0);
 
+  const nameOfPage = async (p: Page): Promise<string> => NAMES[pages.indexOf(p)]!;
+  const whispererName = await nameOfPage(page);
+  const targetName = await nameOfPage(targetPage);
+
+  // The recipient keeps the card face up, labelled with who named it.
+  await expect
+    .poll(async () => (await getModel<CampModel>(targetPage!)).receivedWhispers.map(({ fromSeatId, fromName, card }) => ({ fromSeatId, fromName, card })))
+    .toEqual([{ fromSeatId: whispererSeatId, fromName: whispererName, card: whisperedCard }]);
+  expect((await getModel<CampModel>(targetPage)).whisperLog).toEqual([`${whispererName} whispered to you`]);
+
+  // The sender is told what they sent and to whom, and the button says it is spent.
+  await expect
+    .poll(async () => (await getModel<CampModel>(page)).sentWhispers.map(({ toSeatId, toName, card }) => ({ toSeatId, toName, card })))
+    .toEqual([{ toSeatId: targetSeatId, toName: targetName, card: whisperedCard }]);
+  const senderAfter = await getModel<CampModel>(page);
+  expect(senderAfter.whisperLog).toEqual([`You whispered ${whisperedCard} to ${targetName}`]);
+  expect(senderAfter.whisper).toMatchObject({ visible: false, state: "used", reason: "Used this camp" });
+
   if (thirdPage !== null) {
     const thirdModel = await getModel<CampModel>(thirdPage);
     const revealCount = thirdModel.seats.find((s) => s.seatId === whispererSeatId)?.reveals.length ?? 0;
     expect(revealCount).toBe(0);
+    // A bystander learns who whispered to whom, never the card.
+    await expect
+      .poll(async () => (await getModel<CampModel>(thirdPage!)).whisperLog)
+      .toEqual([`${whispererName} whispered to ${targetName}`]);
+    const bystander = await getModel<CampModel>(thirdPage);
+    expect(bystander.receivedWhispers).toEqual([]);
+    expect(bystander.sentWhispers).toEqual([]);
   }
 }
 
@@ -419,6 +449,14 @@ async function assertDimmingInvariant(pages: Page[]): Promise<void> {
     if (hasDimmed) {
       expect(model.prompt.tone).toBe("your-move");
     }
+    // The Whisper button always says why it cannot be pressed.
+    if (model.whisper.shown) {
+      expect(model.whisper.visible).toBe(model.whisper.state === "ready");
+      expect(model.whisper.reason === null).toBe(model.whisper.state === "ready");
+      if ((model.trick?.plays.length ?? 0) > 0 && model.whisper.state !== "used") {
+        expect(model.whisper.state).toBe("wait-between-tricks");
+      }
+    }
   }
 }
 
@@ -484,7 +522,7 @@ async function stepCamp(pages: Page[], state: DriveState): Promise<void> {
 test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () => {
   test("a full 3-player camp through the test bridge (criterion 5)", async ({ page, browser }) => {
     test.setTimeout(300_000);
-    const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
+    const { pages, contexts } = await startExpeditionGame(browser, page, NAMES);
     const hostPage = pages[0]!;
     const state: DriveState = { whisperDone: false, gearDone: false, lastTrickChecked: false };
 
@@ -544,7 +582,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
 
   test("a card is played by dragging it onto the stump; an illegal drop snaps back", async ({ page, browser }) => {
     test.setTimeout(240_000);
-    const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
+    const { pages, contexts } = await startExpeditionGame(browser, page, NAMES);
     const state: DriveState = { whisperDone: true, gearDone: true, lastTrickChecked: false };
 
     try {
@@ -609,7 +647,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
 
   test("refresh mid-draft, mid-loadout and in an open window resumes the same seat (SCENE-11)", async ({ page, browser }) => {
     test.setTimeout(180_000);
-    const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
+    const { pages, contexts } = await startExpeditionGame(browser, page, NAMES);
 
     try {
       // Mid-draft reload.
@@ -686,7 +724,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
 
   test("card pack is per browser and persists (SCENE-08)", async ({ page, browser }) => {
     test.setTimeout(180_000);
-    const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
+    const { pages, contexts } = await startExpeditionGame(browser, page, NAMES);
     const guestPage = pages[1]!;
 
     try {
@@ -714,7 +752,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
 
   test("interactables never send game actions (SCENE-09)", async ({ page, browser }) => {
     test.setTimeout(180_000);
-    const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
+    const { pages, contexts } = await startExpeditionGame(browser, page, NAMES);
 
     try {
       await reachCamp(pages);

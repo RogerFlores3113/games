@@ -118,7 +118,7 @@ export function drawDropTarget(scene: Phaser.Scene, layer: Layer, model: SceneMo
       .setStrokeStyle(2, toPhaserColor(PALETTE.turn)),
   );
   const label = "Drop to play";
-  layer.add(platedText(scene, zone.x + Math.floor((zone.w - labelWidth(label)) / 2), zone.y + zone.h - LABEL_CELL.h - 6, label, PALETTE.turn));
+  layer.add(platedText(scene, zone.x + Math.floor((zone.w - labelWidth(label)) / 2), zone.y + zone.h - LABEL_CELL.h - 26, label, PALETTE.turn));
 }
 
 export function drawTrick(

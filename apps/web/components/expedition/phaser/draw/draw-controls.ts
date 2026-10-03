@@ -13,11 +13,14 @@ import type { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
 import type { ArtId } from "../art/art-registry";
 import type { CampHandlers } from "./camp-handlers";
+import { fitLabel } from "./text-fit";
 import { button, labelWidth, miniCard, plate, platedText, text, type Layer } from "./ui-kit";
 
 const TILE_W = OBJECTIVE_POOL_STEP - 2;
 const BUTTON_H = 14;
+const WHISPER_H = 18;
 const ROW_GAP = 4;
+const PULSE_MS = 600;
 
 function tileCaption(chip: ObjectiveChip): { body: string | null; caption: string } {
   if (chip.kind === "no-tricks") return { body: "0", caption: "tricks" };
@@ -71,6 +74,7 @@ interface Action {
   icon?: ArtId;
   /** Row in the actions zone; buttons in one row split its width. */
   row: number;
+  h?: number;
 }
 
 function actionList(model: SceneModel, handlers: CampHandlers): Action[] {
@@ -83,11 +87,10 @@ function actionList(model: SceneModel, handlers: CampHandlers): Action[] {
     return actions;
   }
   if (model.whisper.shown) {
-    const label = model.whisper.used ? "Whisper used" : "Whisper";
     actions.push(
       model.whisper.visible
-        ? { id: WHISPER_ID, label, onClick: () => handlers.onWhisper(), outline: model.whisper.active, icon: "icon-whisper", row: 0 }
-        : { id: WHISPER_ID, label, icon: "icon-whisper", row: 0 },
+        ? { id: WHISPER_ID, label: "Whisper", onClick: () => handlers.onWhisper(), outline: true, icon: "icon-whisper", row: 0, h: WHISPER_H }
+        : { id: WHISPER_ID, label: "Whisper", icon: "icon-whisper", row: 0, h: WHISPER_H },
     );
   }
   if (model.targeting !== null) {
@@ -108,11 +111,16 @@ function drawActions(scene: Phaser.Scene, layer: Layer, model: SceneModel, index
   for (const [row, items] of rows) {
     const gap = 4;
     const w = Math.floor((zone.w - 4 - gap * (items.length - 1)) / items.length);
-    const cy = zone.y + 2 + row * (BUTTON_H + ROW_GAP) + BUTTON_H / 2;
     items.forEach((a, i) => {
+      const h = a.h ?? BUTTON_H;
+      const top = 2 + row * (BUTTON_H + ROW_GAP) + (row >= 1 && model.whisper.shown ? WHISPER_H - BUTTON_H : 0);
+      const cy = zone.y + top + h / 2;
       const cx = zone.x + 2 + i * (w + gap) + w / 2;
-      const b = button(scene, cx, cy, w, BUTTON_H, a.label, { onClick: a.onClick, outline: a.outline, icon: a.icon });
+      const b = button(scene, cx, cy, w, h, a.label, { onClick: a.onClick, outline: a.outline, icon: a.icon });
       layer.add(b);
+      if (a.id === WHISPER_ID && a.onClick !== undefined && !model.whisper.active) {
+        scene.tweens.add({ targets: b, alpha: { from: 1, to: 0.65 }, duration: PULSE_MS, yoyo: true, repeat: -1 });
+      }
       // Only clickable buttons are registered: a registered id is one a
       // player (or a test) can press.
       if (a.onClick !== undefined) index.register("camp", a.id, b);
@@ -120,7 +128,19 @@ function drawActions(scene: Phaser.Scene, layer: Layer, model: SceneModel, index
   }
 }
 
+function drawWhisperCaption(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
+  if (!model.whisper.shown || model.targeting !== null) return;
+  const { visible, reason, left, state } = model.whisper;
+  const caption = visible ? (left > 1 ? `Share a card (${left})` : "Share a card") : (reason ?? "");
+  if (caption === "") return;
+  const zone = ZONES.actions;
+  const color = visible ? PALETTE.turn : state === "blocked" ? PALETTE.destructive : PALETTE.textDim;
+  const shown = fitLabel(caption, Math.floor((zone.w - 4) / LABEL_CELL.w));
+  layer.add(text(scene, zone.x + Math.floor((zone.w - labelWidth(shown)) / 2), zone.y + 2 + WHISPER_H + 3, shown, color));
+}
+
 export function drawControls(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   drawObjectivePool(scene, layer, model, index, handlers);
   drawActions(scene, layer, model, index, handlers);
+  drawWhisperCaption(scene, layer, model);
 }
