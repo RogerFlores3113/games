@@ -2,6 +2,7 @@
   "id": "crew-signaller",
   "tool": "create_image_pixflux",
   "params": {
+    "description": "dark silhouette of a drummer sitting cross-legged facing the viewer with a large hourglass-shaped talking drum in the lap, a curved drumstick raised in one hand, almost black shape with a thin warm orange firelight rim light on one side, isolated sprite on plain background",
     "width": 64,
     "height": 80,
     "view": "side",
@@ -10,8 +11,7 @@
     "no_background": true,
     "seed": 11
   },
-  "prop": "talking drum slung at the hip",
   "job": "e2526109",
   "scale": 1,
-  "note": "the full description text was not recorded; each asked for a seated dark explorer silhouette carrying `prop`. Alpha thresholded and grey halos stripped locally; drawn bottom-centred"
+  "note": "alpha thresholded and grey halos stripped locally; drawn bottom-centred on a 64x80 canvas"
 }

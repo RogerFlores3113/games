@@ -2,12 +2,16 @@
   "id": "stump-table",
   "tool": "create_image_pixflux",
   "params": {
+    "description": "giant ancient jungle tree stump used as a card table, very wide flat oval sawn top taking most of the image with dark concentric growth rings, short thick gnarled dark bark rim, twisting roots at the base, moss patches and tiny glowing orange mushrooms on the roots, isolated object on plain background",
     "width": 384,
     "height": 176,
     "view": "high top-down",
+    "outline": "single color black outline",
+    "shading": "detailed shading",
+    "detail": "highly detailed",
     "no_background": true
   },
   "job": "a030638f-1d4e-4aaf-b2d2-8c4cf2d4bcde",
   "scale": 1,
-  "note": "the description text was not recorded (a tree-stump table with roots and glowing mushrooms). Keyed offline with `fetch-art.mjs ... --matte`; the flat top spans x 78..322, y 12..85"
+  "note": "keyed offline with `fetch-art.mjs ... --matte`; the flat top spans x 78..322, y 12..85"
 }

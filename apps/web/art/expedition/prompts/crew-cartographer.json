@@ -2,6 +2,7 @@
   "id": "crew-cartographer",
   "tool": "create_image_pixflux",
   "params": {
+    "description": "dark silhouette of a cartographer sitting cross-legged facing the viewer, holding a large unrolled map open in both hands, a long map tube slung across the back over one shoulder, almost black shape with a thin warm orange firelight rim light on one side, no glowing eyes, isolated sprite on plain background",
     "width": 64,
     "height": 80,
     "view": "side",
@@ -10,8 +11,7 @@
     "no_background": true,
     "seed": 11
   },
-  "prop": "map tube across the back",
   "job": "b5819dd6",
   "scale": 1,
-  "note": "the full description text was not recorded; each asked for a seated dark explorer silhouette carrying `prop`. Alpha thresholded and grey halos stripped locally; drawn bottom-centred"
+  "note": "alpha thresholded and grey halos stripped locally; drawn bottom-centred on a 64x80 canvas"
 }

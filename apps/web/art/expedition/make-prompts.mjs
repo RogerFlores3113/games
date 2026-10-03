@@ -86,16 +86,17 @@ const SOURCE_FRAMES = [0, 43, 2, 44, 4, 5, 6, 7, 62, 40, ...Array.from({ length:
 
 /** Seated silhouettes behind the stump, one per character. */
 const CREW = [
-  ["scout", "spyglass raised to one eye", 7, "096975a2"],
-  ["guide", "machete held high", 7, "c606e1d6"],
-  ["botanist", "wide straw hat with a flower", 7, "7c44a336"],
-  ["medic", "shoulder satchel with a rolled bandage", 11, "23711889"],
-  ["signaller", "talking drum slung at the hip", 11, "e2526109"],
-  ["cartographer", "map tube across the back", 11, "b5819dd6"],
+  ["scout", "dark silhouette of a jungle scout sitting cross-legged facing the viewer, raising a spyglass to one eye, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "096975a2"],
+  ["guide", "dark silhouette of a jungle guide sitting cross-legged facing the viewer, holding a machete raised high in one hand, bandana, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "c606e1d6"],
+  ["botanist", "dark silhouette of a botanist sitting cross-legged facing the viewer, wearing a very wide straw hat with a flower on it, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "7c44a336"],
+  ["medic", "dark silhouette of a field medic sitting cross-legged facing the viewer, a big satchel bag on the hip with a white cross patch, a pith helmet, almost black shape with a thin warm orange firelight rim light on one side, isolated sprite on plain background", 11, "23711889"],
+  ["signaller", "dark silhouette of a drummer sitting cross-legged facing the viewer with a large hourglass-shaped talking drum in the lap, a curved drumstick raised in one hand, almost black shape with a thin warm orange firelight rim light on one side, isolated sprite on plain background", 11, "e2526109"],
+  ["cartographer", "dark silhouette of a cartographer sitting cross-legged facing the viewer, holding a large unrolled map open in both hands, a long map tube slung across the back over one shoulder, almost black shape with a thin warm orange firelight rim light on one side, no glowing eyes, isolated sprite on plain background", 11, "b5819dd6"],
 ];
-const crewSpec = (prop, seed, job) => ({
+const crewSpec = (description, seed, job) => ({
   tool: "create_image_pixflux",
   params: {
+    description,
     width: 64,
     height: 80,
     view: "side",
@@ -104,10 +105,9 @@ const crewSpec = (prop, seed, job) => ({
     no_background: true,
     seed,
   },
-  prop,
   job,
   scale: 1,
-  note: "the full description text was not recorded; each asked for a seated dark explorer silhouette carrying `prop`. Alpha thresholded and grey halos stripped locally; drawn bottom-centred",
+  note: "alpha thresholded and grey halos stripped locally; drawn bottom-centred on a 64x80 canvas",
 });
 
 const MASCOT = {
@@ -144,14 +144,19 @@ const specs = {
   "stump-table": {
     tool: "create_image_pixflux",
     params: {
+      description:
+        "giant ancient jungle tree stump used as a card table, very wide flat oval sawn top taking most of the image with dark concentric growth rings, short thick gnarled dark bark rim, twisting roots at the base, moss patches and tiny glowing orange mushrooms on the roots, isolated object on plain background",
       width: 384,
       height: 176,
       view: "high top-down",
+      outline: "single color black outline",
+      shading: "detailed shading",
+      detail: "highly detailed",
       no_background: true,
     },
     job: "a030638f-1d4e-4aaf-b2d2-8c4cf2d4bcde",
     scale: 1,
-    note: "the description text was not recorded (a tree-stump table with roots and glowing mushrooms). Keyed offline with `fetch-art.mjs ... --matte`; the flat top spans x 78..322, y 12..85",
+    note: "keyed offline with `fetch-art.mjs ... --matte`; the flat top spans x 78..322, y 12..85",
   },
   "trail-map": {
     tool: "create_image_pixflux",
@@ -204,7 +209,7 @@ const specs = {
   ...Object.fromEntries(
     SOURCE_ICONS.map(([id, item], i) => [`source-${id}`, { ...SOURCE_BATCH, item_description: item, batch_index: SOURCE_FRAMES[i], scale: 1 }]),
   ),
-  ...Object.fromEntries(CREW.map(([id, prop, seed, job]) => [`crew-${id}`, crewSpec(prop, seed, job)])),
+  ...Object.fromEntries(CREW.map(([id, description, seed, job]) => [`crew-${id}`, crewSpec(description, seed, job)])),
   "icon-tricks": {
     tool: "hand-drawn",
     script: "apps/web/art/expedition/draw-icon-tricks.mjs",

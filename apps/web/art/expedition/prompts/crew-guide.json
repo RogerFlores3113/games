@@ -2,6 +2,7 @@
   "id": "crew-guide",
   "tool": "create_image_pixflux",
   "params": {
+    "description": "dark silhouette of a jungle guide sitting cross-legged facing the viewer, holding a machete raised high in one hand, bandana, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background",
     "width": 64,
     "height": 80,
     "view": "side",
@@ -10,8 +11,7 @@
     "no_background": true,
     "seed": 7
   },
-  "prop": "machete held high",
   "job": "c606e1d6",
   "scale": 1,
-  "note": "the full description text was not recorded; each asked for a seated dark explorer silhouette carrying `prop`. Alpha thresholded and grey halos stripped locally; drawn bottom-centred"
+  "note": "alpha thresholded and grey halos stripped locally; drawn bottom-centred on a 64x80 canvas"
 }

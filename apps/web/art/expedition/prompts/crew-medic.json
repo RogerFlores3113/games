@@ -2,6 +2,7 @@
   "id": "crew-medic",
   "tool": "create_image_pixflux",
   "params": {
+    "description": "dark silhouette of a field medic sitting cross-legged facing the viewer, a big satchel bag on the hip with a white cross patch, a pith helmet, almost black shape with a thin warm orange firelight rim light on one side, isolated sprite on plain background",
     "width": 64,
     "height": 80,
     "view": "side",
@@ -10,8 +11,7 @@
     "no_background": true,
     "seed": 11
   },
-  "prop": "shoulder satchel with a rolled bandage",
   "job": "23711889",
   "scale": 1,
-  "note": "the full description text was not recorded; each asked for a seated dark explorer silhouette carrying `prop`. Alpha thresholded and grey halos stripped locally; drawn bottom-centred"
+  "note": "alpha thresholded and grey halos stripped locally; drawn bottom-centred on a 64x80 canvas"
 }

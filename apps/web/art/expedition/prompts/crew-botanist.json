@@ -2,6 +2,7 @@
   "id": "crew-botanist",
   "tool": "create_image_pixflux",
   "params": {
+    "description": "dark silhouette of a botanist sitting cross-legged facing the viewer, wearing a very wide straw hat with a flower on it, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background",
     "width": 64,
     "height": 80,
     "view": "side",
@@ -10,8 +11,7 @@
     "no_background": true,
     "seed": 7
   },
-  "prop": "wide straw hat with a flower",
   "job": "7c44a336",
   "scale": 1,
-  "note": "the full description text was not recorded; each asked for a seated dark explorer silhouette carrying `prop`. Alpha thresholded and grey halos stripped locally; drawn bottom-centred"
+  "note": "alpha thresholded and grey halos stripped locally; drawn bottom-centred on a 64x80 canvas"
 }
