@@ -430,8 +430,8 @@ describe("items", () => {
       p2: [std("c4", "spades", 4)],
     };
     const start = table({ hands, leader: "p0" });
-    const stocked = { ...start, seats: start.seats.map((seat) => ({ ...seat, kit: ["puffball"] })) };
-    const puffed = SEATS.reduce((run, seatId) => use(run, seatId, "puffball", [`seat:${seatId}`]), stocked);
+    const stocked: RunState = { ...start, seats: start.seats.map((seat) => ({ ...seat, kit: ["puffball"] })) };
+    const puffed = SEATS.reduce<RunState>((run, seatId) => use(run, seatId, "puffball", [`seat:${seatId}`]), stocked);
     const done = play(play(play(puffed, "p0", "a14"), "p1", "b3"), "p2", "c4");
     expect(camp(done).completedTricks[0]!.winnerSeatId).toBe("p0");
   });

@@ -8,6 +8,7 @@ import fc from "fast-check";
 import { CATALOG } from "../run/catalog";
 import { composeRules } from "../run/compose";
 import type { ActiveEffect } from "../run/types";
+import type { EffectParams } from "./source-def";
 import type { ExpeditionCard, Suit, TrickPlay } from "../state";
 import { sourceDef } from "../run/usage";
 
@@ -35,7 +36,7 @@ const exclusionsArb = fc.array(
 
 function effectFor(exclusion: Exclusion, plays: readonly TrickPlay[]): ActiveEffect {
   const target = plays[exclusion.index % plays.length]!;
-  const params = exclusion.sourceId === "bait" ? { cardId: target.card.id } : {};
+  const params: EffectParams = exclusion.sourceId === "bait" ? { cardId: target.card.id } : {};
   const seatId = exclusion.sourceId === "puffball" ? target.seatId : "p0";
   return { sourceId: exclusion.sourceId, seatId, atTrick: 0, lasts: "trick", params, audience: "public" };
 }
