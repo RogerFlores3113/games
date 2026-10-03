@@ -7,7 +7,7 @@ import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
 import { FIRESIDE_ZONES, rowBoxes, trailStopXs, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
-import { ART, type ArtId } from "../art/art-registry";
+import { ART, gearArtId, type ArtId } from "../art/art-registry";
 import type { ObjectIndex } from "../object-index";
 import type { CrewRow, DraftItem, FiresideModel, OwnedItem, TrailStop } from "../../../../lib/expedition/fireside-model";
 import { fitLabel } from "./text-fit";
@@ -31,11 +31,6 @@ interface Ctx {
 const PANEL_ALPHA = 0.75;
 const INK = PALETTE.cardEdge;
 const PULSE_MS = 600;
-
-function gearArt(gearId: string): ArtId | null {
-  const id = `gear-${gearId}`;
-  return id in ART ? (id as ArtId) : null;
-}
 
 function centredText(scene: Phaser.Scene, cx: number, y: number, value: string, color: string = PALETTE.text): Phaser.GameObjects.BitmapText {
   return text(scene, cx - Math.floor(labelWidth(value) / 2), y, value, color);
@@ -132,7 +127,7 @@ function drawDraftTile(ctx: Ctx, item: DraftItem, x: number, y: number, w: numbe
   const bg = scene.add.rectangle(0, 0, w, TILE_H, toPhaserColor(PALETTE.stump)).setOrigin(0, 0);
   bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn));
   container.add(bg);
-  const art = gearArt(item.gearId);
+  const art = gearArtId(item.gearId);
   if (art !== null) container.add(placeArt(scene, art, w / 2, 22).setScale(2));
   const cx = Math.floor(w / 2);
   container.add(centredText(scene, cx, 44, fitLabel(item.name, Math.floor((w - 4) / LABEL_CELL.w))));
@@ -161,7 +156,7 @@ function drawDraft(ctx: Ctx): void {
   }
   const cy = zone.y + zone.h / 2;
   if (draft.kind === "taken") {
-    const art = gearArt(draft.gearId);
+    const art = gearArtId(draft.gearId);
     if (art !== null) layer.add(placeArt(scene, art, zone.x + 48, cy).setScale(2));
     layer.add(text(scene, zone.x + 80, cy - 10, `Taken: ${draft.name}`));
     layer.add(text(scene, zone.x + 80, cy + 2, "Pack it below to bring it along", PALETTE.textDim));
@@ -245,7 +240,7 @@ function drawOwnedTile(ctx: Ctx, item: OwnedItem, x: number, y: number, w: numbe
   const bg = scene.add.rectangle(0, 0, w, OWNED_H, toPhaserColor(PALETTE.stump)).setOrigin(0, 0);
   if (item.equipped) bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn));
   container.add(bg);
-  const art = gearArt(item.gearId);
+  const art = gearArtId(item.gearId);
   if (art !== null) container.add(placeArt(scene, art, w / 2, 11));
   const cx = Math.floor(w / 2);
   container.add(centredText(scene, cx, 21, fitLabel(item.name, Math.floor((w - 2) / LABEL_CELL.w))));

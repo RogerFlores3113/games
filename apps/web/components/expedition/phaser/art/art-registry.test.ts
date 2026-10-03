@@ -1,7 +1,8 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ART, fittedFallbackLabel, resolveArt, type ArtId } from "./art-registry";
+import { GEAR_DISPLAY } from "@games/rules";
+import { ART, fittedFallbackLabel, gearArtId, resolveArt, type ArtId } from "./art-registry";
 import { ART_FILES } from "./art-files.generated";
 
 const SPRITES_DIR = fileURLToPath(new URL("../../../../public/expedition/sprites/", import.meta.url));
@@ -30,6 +31,30 @@ describe("ART and ART_FILES", () => {
     const known: ReadonlySet<string> = new Set(Object.values(ART).map((d) => d.file));
     expect(ART_FILES.filter((f) => !known.has(f))).toEqual([]);
     expect(ART_FILES.filter((f) => !existsSync(`${SPRITES_DIR}${f}`))).toEqual([]);
+  });
+
+  it("lists exactly the PNGs on disk (rerun `npm run art:files` after adding one)", () => {
+    const onDisk = readdirSync(SPRITES_DIR, { recursive: true, encoding: "utf8" })
+      .map((f) => f.replaceAll("\\", "/"))
+      .filter((f) => f.endsWith(".png"))
+      .sort();
+    expect([...ART_FILES]).toEqual(onDisk);
+  });
+
+  it("every listed PNG is the size its entry declares, frames side by side", () => {
+    const byFile = new Map(Object.values(ART).map((d) => [d.file as string, d]));
+    const mismatched = ART_FILES.flatMap((file) => {
+      const png = readFileSync(`${SPRITES_DIR}${file}`);
+      const actual = `${png.readUInt32BE(16)}x${png.readUInt32BE(20)}`;
+      const def = byFile.get(file)!;
+      const declared = `${def.w * (("frames" in def ? def.frames : undefined) ?? 1)}x${def.h}`;
+      return actual === declared ? [] : [`${file}: ${actual} on disk, ${declared} declared`];
+    });
+    expect(mismatched).toEqual([]);
+  });
+
+  it("every gear has an icon", () => {
+    expect(Object.keys(GEAR_DISPLAY).filter((id) => gearArtId(id) === null)).toEqual([]);
   });
 
   it("no two entries share a file", () => {

@@ -6,7 +6,7 @@
  * never touches game state or the server (SCENE-09).
  */
 import type Phaser from "phaser";
-import { placeArt } from "../art/place-art";
+import { PALETTE, toPhaserColor } from "../palette";
 import type { InteractableDef } from "./interactable-def";
 import { addHoverLabel } from "./hover-label";
 
@@ -16,11 +16,20 @@ const DRIFT_WOBBLE = 3;
 const DRIFT_DURATION_MS = 1400;
 const SCATTER_RADIUS = 20;
 const SCATTER_DURATION_MS = 280;
+const BLINK_MS = 900;
 
 interface FireflyDot {
-  dot: Phaser.GameObjects.Sprite;
+  dot: Phaser.GameObjects.Container;
   homeX: number;
   homeY: number;
+}
+
+/** A 1px core in a faint 3px halo, blinking. */
+function fireflyDot(scene: Phaser.Scene, x: number, y: number, i: number): Phaser.GameObjects.Container {
+  const glow = toPhaserColor(PALETTE.glow);
+  const dot = scene.add.container(x, y, [scene.add.rectangle(0, 0, 3, 3, glow, 0.3), scene.add.rectangle(0, 0, 1, 1, glow)]);
+  scene.tweens.add({ targets: dot, alpha: { from: 1, to: 0.25 }, duration: BLINK_MS, delay: i * 170, yoyo: true, repeat: -1, ease: "Sine.InOut" });
+  return dot;
 }
 
 /** Keyed by each entry's own container root — never a module-level array —
@@ -39,7 +48,7 @@ function place(scene: Phaser.Scene, anchor: { x: number; y: number }): Phaser.Ga
     const rad = (angleDeg * Math.PI) / 180;
     const homeX = Math.round(Math.cos(rad) * DRIFT_RADIUS);
     const homeY = Math.round(Math.sin(rad) * DRIFT_RADIUS);
-    const dot = placeArt(scene, "firefly", homeX, homeY);
+    const dot = fireflyDot(scene, homeX, homeY, i);
     container.add(dot);
     dots.push({ dot, homeX, homeY });
 

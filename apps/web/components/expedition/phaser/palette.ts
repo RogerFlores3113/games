@@ -59,6 +59,7 @@ export const PALETTE = {
   sun: "#E8792E", // warm orange, deliberately NOT --color-accent's gold
   moon: "#C9CDD6", // pale silver
   done: "#4CAF6D", // green, completed-objective marker
+  glow: "#E2F58C", // firefly light
 } as const;
 
 /** Parses a "#rrggbb" string into Phaser's `0xrrggbb` integer form. */

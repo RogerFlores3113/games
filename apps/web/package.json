@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "art:files": "node art/expedition/gen-art-files.mjs",
     "check:expedition-build": "node scripts/check-expedition-build.mjs"
   },
   "dependencies": {

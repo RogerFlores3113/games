@@ -25,6 +25,7 @@ import { STAGE_WIDTH } from "../../../lib/expedition/compute-zoom";
 export interface ExpeditionTestBridge {
   ready: boolean;
   liveGames: number;
+  /** The store's scene, once its Phaser scene is running. */
   readonly scene: SceneKey | null;
   readonly model: ActiveModel | null;
   /** Every registered object's page-CSS-px CENTRE + scaled size, keyed by
@@ -102,7 +103,11 @@ function ensureBridge(): ExpeditionTestBridge {
     ready: false,
     liveGames: 0,
     get scene() {
-      return current()?.store.getState().sceneKey ?? null;
+      const install = current();
+      const key = install?.store.getState().sceneKey ?? null;
+      // A scene loads its sprites in preload(); it has drawn nothing to
+      // click until it is running.
+      return key !== null && install!.game.scene.isActive(key) ? key : null;
     },
     get model() {
       return current()?.store.getState().model ?? null;

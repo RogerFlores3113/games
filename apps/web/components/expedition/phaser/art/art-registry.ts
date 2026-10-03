@@ -17,24 +17,27 @@ export interface ArtDef {
   fps?: number;
   /** Drawn when the PNG is missing. The label is drawn only if it fits. */
   fallback: { color: number; label: string };
+  /** The PNG came back with a flat backdrop instead of transparency: the
+   * colour of its top-left pixel, where it reaches the border, is keyed out
+   * when the texture loads. Drop it once the sprite is regenerated. */
+  matte?: true;
 }
 
 const c = toPhaserColor;
 
 export const ART = {
   "bg-jungle-night": { file: "camp/bg-jungle-night.png", w: 640, h: 360, fallback: { color: c(PALETTE.jungle), label: "" } },
-  "stump-table": { file: "camp/stump-table.png", w: 368, h: 128, fallback: { color: c(PALETTE.stump), label: "" } },
+  "stump-table": { file: "camp/stump-table.png", w: 368, h: 128, matte: true, fallback: { color: c(PALETTE.stump), label: "" } },
   campfire: { file: "camp/campfire.png", w: 32, h: 32, frames: 4, fps: 6, fallback: { color: c(PALETTE.sun), label: "fire" } },
-  lantern: { file: "camp/lantern.png", w: 16, h: 32, fallback: { color: c(PALETTE.sun), label: "" } },
-  firefly: { file: "camp/firefly.png", w: 4, h: 4, frames: 2, fps: 2, fallback: { color: c(PALETTE.done), label: "" } },
+  lantern: { file: "camp/lantern.png", w: 16, h: 16, fallback: { color: c(PALETTE.sun), label: "" } },
   "mascot-panda": { file: "camp/mascot-panda.png", w: 32, h: 32, frames: 4, fps: 4, fallback: { color: c(PALETTE.sun), label: "panda" } },
   "mascot-cheer": { file: "camp/mascot-cheer.png", w: 32, h: 32, frames: 4, fps: 6, fallback: { color: c(PALETTE.sun), label: "yay" } },
   "mascot-flop": { file: "camp/mascot-flop.png", w: 32, h: 32, frames: 4, fps: 4, fallback: { color: c(PALETTE.sun), label: "oof" } },
-  crate: { file: "camp/crate.png", w: 12, h: 10, fallback: { color: c(PALETTE.bark), label: "" } },
-  "seat-pack": { file: "camp/seat-pack.png", w: 24, h: 24, fallback: { color: c(PALETTE.moss), label: "bag" } },
-  "leader-sun": { file: "camp/leader-sun.png", w: 10, h: 10, fallback: { color: c(PALETTE.sun), label: "*" } },
-  "icon-whisper": { file: "camp/icon-whisper.png", w: 12, h: 12, fallback: { color: c(PALETTE.turn), label: "W" } },
-  "icon-tricks": { file: "camp/icon-tricks.png", w: 10, h: 10, fallback: { color: c(PALETTE.textDim), label: "" } },
+  crate: { file: "camp/crate.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
+  "seat-pack": { file: "camp/seat-pack.png", w: 16, h: 16, fallback: { color: c(PALETTE.moss), label: "bag" } },
+  "leader-sun": { file: "camp/leader-sun.png", w: 16, h: 16, fallback: { color: c(PALETTE.sun), label: "*" } },
+  "icon-whisper": { file: "camp/icon-whisper.png", w: 16, h: 16, fallback: { color: c(PALETTE.turn), label: "W" } },
+  "icon-tricks": { file: "camp/icon-tricks.png", w: 16, h: 16, fallback: { color: c(PALETTE.textDim), label: "" } },
   "gear-chatter": { file: "gear/chatter.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
   "gear-peek": { file: "gear/peek.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
   "gear-broadcast": { file: "gear/broadcast.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
@@ -63,6 +66,12 @@ export const ART_URL_PREFIX = "/expedition/sprites/";
 
 export function artTextureKey(id: ArtId): string {
   return `art:${id}`;
+}
+
+/** The icon for a gear id, or null when it has none. */
+export function gearArtId(gearId: string): ArtId | null {
+  const id = `gear-${gearId}`;
+  return id in ART ? (id as ArtId) : null;
 }
 
 export function artFallbackKey(id: ArtId): string {
