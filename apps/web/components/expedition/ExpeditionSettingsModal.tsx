@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Trash2, X } from "lucide-react";
+import { useStore } from "zustand";
+import { audioPrefsStore, type AudioPrefs } from "../../lib/expedition/audio/audio-prefs";
+import { playCue } from "../../lib/expedition/audio/cue-bus";
 import { CARD_PACK_IDS, CARD_PACK_LABELS, type CardPackId } from "../../lib/expedition/card-pack-ids";
 
 export interface ExpeditionSettingsModalProps {
@@ -9,10 +12,6 @@ export interface ExpeditionSettingsModalProps {
   onClose: () => void;
   cardPackId: CardPackId;
   onCardPackChange: (id: CardPackId) => void;
-  /** D-07: no audio exists in Phase 12 — this toggle only flips local
-   * state. The slot exists so Phase 14's real audio wires straight in. */
-  muted: boolean;
-  onToggleMute: () => void;
   /** Owner pattern (mirrors Hanabi's SettingsModal): hiding this is a UX
    * nicety, not the security boundary — the worker independently re-checks
    * host on every `delete_room`/`restart_lobby` regardless of what any
@@ -34,13 +33,17 @@ export interface ExpeditionSettingsModalProps {
  * toggle (D-07), host-only restart, and a plain Leave link (D-05, closes
  * Phase 11 review WR-05).
  */
+const VOLUME_SLIDERS: { key: Exclude<keyof AudioPrefs, "muted">; label: string }[] = [
+  { key: "music", label: "Music" },
+  { key: "ambience", label: "Ambience" },
+  { key: "sfx", label: "Effects" },
+];
+
 export function ExpeditionSettingsModal({
   open,
   onClose,
   cardPackId,
   onCardPackChange,
-  muted,
-  onToggleMute,
   isHost = false,
   onDeleteRoom,
   canRestart = false,
@@ -50,6 +53,7 @@ export function ExpeditionSettingsModal({
   // "cannot be undone and it ends the game for everyone" — a plain click
   // must not fire it. Two-step disclosure inside the same modal.
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const prefs = useStore(audioPrefsStore);
 
   useEffect(() => {
     if (!open) setConfirmingDelete(false);
@@ -96,7 +100,10 @@ export function ExpeditionSettingsModal({
             type="button"
             data-testid="expedition-settings-close"
             aria-label="Close settings"
-            onClick={onClose}
+            onClick={() => {
+              playCue("sfx-ui-click");
+              onClose();
+            }}
             className="inline-flex cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-[var(--color-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
             style={{
               minHeight: "var(--size-touch-min)",
@@ -127,7 +134,10 @@ export function ExpeditionSettingsModal({
                   name="card-pack"
                   value={id}
                   checked={cardPackId === id}
-                  onChange={() => onCardPackChange(id)}
+                  onChange={() => {
+                    playCue("sfx-ui-click");
+                    onCardPackChange(id);
+                  }}
                 />
                 {CARD_PACK_LABELS[id]}
               </label>
@@ -145,9 +155,12 @@ export function ExpeditionSettingsModal({
           <button
             type="button"
             data-testid="expedition-mute-toggle"
-            aria-label={muted ? "Unmute" : "Mute"}
-            aria-pressed={muted}
-            onClick={onToggleMute}
+            aria-label={prefs.muted ? "Unmute" : "Mute"}
+            aria-pressed={prefs.muted}
+            onClick={() => {
+              playCue("sfx-ui-click");
+              audioPrefsStore.setState((state) => ({ muted: !state.muted }));
+            }}
             className="inline-flex cursor-pointer items-center justify-center self-start rounded-md border transition-colors hover:bg-[var(--color-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
             style={{
               minHeight: "var(--size-touch-min)",
@@ -158,10 +171,25 @@ export function ExpeditionSettingsModal({
               paddingRight: "var(--space-md)",
             }}
           >
-            {/* D-07: no audio exists in Phase 12 — this button flips local
-                state only; the slot exists for Phase 14's real audio. */}
-            Mute
+            {prefs.muted ? "Unmute (M)" : "Mute (M)"}
           </button>
+          {VOLUME_SLIDERS.map(({ key, label }) => (
+            <label key={key} className="flex items-center justify-between gap-[length:var(--space-md)]" style={{ color: "var(--color-text)" }}>
+              {label}
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(prefs[key] * 100)}
+                data-testid={`expedition-volume-${key}`}
+                aria-label={`${label} volume`}
+                disabled={prefs.muted}
+                onChange={(event) => audioPrefsStore.setState({ [key]: Number(event.target.value) / 100 })}
+                onPointerUp={() => key === "sfx" && playCue("sfx-ui-click")}
+                style={{ width: "10rem" }}
+              />
+            </label>
+          ))}
         </div>
 
         {isHost && (canRestart || onDeleteRoom) && (

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
 import type { ExpeditionView } from "@games/rules";
+import { playCue } from "../../lib/expedition/audio/cue-bus";
 import { buildRulesReference } from "../../lib/expedition/rules-reference";
 
 export interface ExpeditionRulesModalProps {
@@ -55,7 +56,10 @@ export function ExpeditionRulesModal({ open, onClose, game }: ExpeditionRulesMod
             type="button"
             data-testid="expedition-rules-close"
             aria-label="Close rules"
-            onClick={onClose}
+            onClick={() => {
+              playCue("sfx-ui-click");
+              onClose();
+            }}
             className="inline-flex cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-[var(--color-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
             style={{
               minHeight: "var(--size-touch-min)",
@@ -102,6 +106,25 @@ export function ExpeditionRulesModal({ open, onClose, game }: ExpeditionRulesMod
               )}
             </section>
           ))}
+          <p
+            data-testid="expedition-audio-credits"
+            style={{ color: "var(--color-text-muted)", fontSize: "var(--text-label)" }}
+          >
+            Audio credits. Ambience:{" "}
+            <a
+              href="https://opengameart.org/content/jc-sounds-nature-ambient-pack-vol-1"
+              target="_blank"
+              rel="noreferrer"
+              style={{ textDecoration: "underline" }}
+            >
+              &quot;Nature Ambient Pack Vol 1&quot;
+            </a>{" "}
+            by JC Sounds,{" "}
+            <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer" style={{ textDecoration: "underline" }}>
+              CC BY 4.0
+            </a>
+            . Music: Etirwer by Kistol (CC0); effects by Kenney (CC0).
+          </p>
         </div>
       </div>
     </div>

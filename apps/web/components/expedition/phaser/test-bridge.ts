@@ -20,6 +20,7 @@ import type { SceneKey } from "../../../lib/expedition/build-scene-model";
 import type { ActiveModel } from "../../../lib/expedition/expedition-scene-store";
 import type { ObjectIndex } from "./object-index";
 import type { LayoutEntry } from "../../../lib/expedition/layout-audit";
+import { recentCues } from "../../../lib/expedition/audio/cue-bus";
 import { STAGE_WIDTH } from "../../../lib/expedition/compute-zoom";
 
 export interface ExpeditionTestBridge {
@@ -34,9 +35,13 @@ export interface ExpeditionTestBridge {
   /** `objects()[id]`'s centre, or `null` if `id` is not currently
    * registered/visible. */
   positionOf(id: string): { x: number; y: number } | null;
+  /** A stage point (640x360) in page CSS px, for driving real mouse drags. */
+  pagePoint(stage: { x: number; y: number }): { x: number; y: number } | null;
   /** Every visible text object and interactive object in the active scene,
    * in stage px (640x360), for the UI-tour layout audit. */
   layout(): LayoutEntry[];
+  /** The last sound cues the game asked for (played or not), oldest first. */
+  cues(): string[];
 }
 
 declare global {
@@ -132,6 +137,16 @@ function ensureBridge(): ExpeditionTestBridge {
       const install = current();
       if (install === null) return [];
       return collectLayout(install);
+    },
+    cues() {
+      return recentCues();
+    },
+    pagePoint(stage) {
+      const install = current();
+      if (install === null) return null;
+      const rect = install.game.canvas.getBoundingClientRect();
+      const scale = rect.width / STAGE_WIDTH;
+      return { x: rect.left + stage.x * scale, y: rect.top + stage.y * scale };
     },
     positionOf(id) {
       const found = bridge.objects()[id];

@@ -21,6 +21,7 @@ import Phaser from "phaser";
 import { PALETTE, toPhaserColor } from "./palette";
 import { SCENE_FACTORIES } from "./scenes/scene-registry";
 import { ObjectIndex } from "./object-index";
+import { createAudioDirector } from "./audio-director";
 import { computeZoom, isBelowComfortSize, STAGE_HEIGHT, STAGE_WIDTH } from "../../../lib/expedition/compute-zoom";
 import type { ExpeditionSceneStore } from "../../../lib/expedition/expedition-scene-store";
 
@@ -79,6 +80,7 @@ export default function ExpeditionPhaserMount({ store }: ExpeditionPhaserMountPr
       if (next.sceneKey !== prev.sceneKey) syncActiveScene(game, store);
     });
     syncActiveScene(game, store);
+    const audio = createAudioDirector(game, store);
 
     if (process.env.NODE_ENV !== "production") {
       void import("./test-bridge").then(({ installTestBridge }) => {
@@ -99,6 +101,7 @@ export default function ExpeditionPhaserMount({ store }: ExpeditionPhaserMountPr
       destroyed = true;
       window.removeEventListener("resize", handleResize);
       unsubscribeScene();
+      audio.destroy();
       uninstallBridge?.();
       game.destroy(true);
       gameRef.current = null;

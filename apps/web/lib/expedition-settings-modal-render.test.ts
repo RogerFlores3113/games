@@ -21,8 +21,6 @@ function baseProps() {
     onClose: () => {},
     cardPackId: "big-index" as CardPackId,
     onCardPackChange: () => {},
-    muted: false,
-    onToggleMute: () => {},
   };
 }
 
@@ -48,11 +46,12 @@ describe("expedition-settings-modal-render", () => {
     expect(markup).toMatch(/checked="?"?[^>]*value="big-index"|value="big-index"[^>]*checked/);
   });
 
-  it("renders a mute toggle with aria-pressed reflecting muted", () => {
-    const mutedMarkup = renderToStaticMarkup(createElement(ExpeditionSettingsModal, { ...baseProps(), muted: true }));
-    expect(mutedMarkup).toContain('aria-pressed="true"');
-    const unmutedMarkup = renderToStaticMarkup(createElement(ExpeditionSettingsModal, { ...baseProps(), muted: false }));
+  it("renders a mute toggle and a slider per channel", () => {
+    const unmutedMarkup = renderToStaticMarkup(createElement(ExpeditionSettingsModal, baseProps()));
     expect(unmutedMarkup).toContain('aria-pressed="false"');
+    expect(unmutedMarkup).toContain("expedition-volume-music");
+    expect(unmutedMarkup).toContain("expedition-volume-ambience");
+    expect(unmutedMarkup).toContain("expedition-volume-sfx");
   });
 
   it("isHost false: no Delete room and no Restart control", () => {
@@ -108,6 +107,6 @@ describe("expedition-settings-modal-render", () => {
   });
 
   it("source contains no Hanabi-only concepts", () => {
-    expect(source).not.toMatch(/keepHints|TileColorPicker|volume/);
+    expect(source).not.toMatch(/keepHints|TileColorPicker/);
   });
 });

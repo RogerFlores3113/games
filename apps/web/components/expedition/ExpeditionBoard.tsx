@@ -22,6 +22,8 @@ import type { ExpeditionView } from "@games/rules";
 import { createExpeditionSceneStore } from "../../lib/expedition/expedition-scene-store";
 import { readCardPackPref, writeCardPackPref } from "../../lib/expedition/expedition-card-pack-pref";
 import type { CardPackId } from "../../lib/expedition/card-pack-ids";
+import { playCue } from "../../lib/expedition/audio/cue-bus";
+import { toggleMute } from "../../lib/expedition/audio/audio-prefs";
 import { ReconnectingBanner } from "../ReconnectingBanner";
 import { ExpeditionRulesModal } from "./ExpeditionRulesModal";
 import { ExpeditionSettingsModal } from "./ExpeditionSettingsModal";
@@ -71,13 +73,11 @@ export function ExpeditionBoard({
     }),
   );
 
-  // D-05/SCENE-08: the settings modal, corner gear trigger and a no-op
-  // (D-07) mute toggle. `cardPackId` mirrors the store's own copy so the
+  // D-05/SCENE-08: the settings modal and corner gear trigger. `cardPackId` mirrors the store's own copy so the
   // modal's radio picker re-renders on change without reading the store
   // directly (this component never subscribes to the store itself).
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
-  const [muted, setMuted] = useState(false);
   const [cardPackId, setCardPackId] = useState<CardPackId>(() => readCardPackPref());
 
   function handleCardPackChange(id: CardPackId) {
@@ -95,6 +95,17 @@ export function ExpeditionBoard({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, game, view.seats, view.hostSeatId]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key.toLowerCase() !== "m" || event.ctrlKey || event.metaKey || event.altKey) return;
+      const el = event.target as HTMLElement | null;
+      if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
+      toggleMute();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     store.getState().setReconnecting(reconnecting);
@@ -120,7 +131,10 @@ export function ExpeditionBoard({
           data-testid="expedition-settings-button"
           aria-label="Settings"
           aria-expanded={settingsOpen}
-          onClick={() => setSettingsOpen(true)}
+          onClick={() => {
+            playCue("sfx-ui-click");
+            setSettingsOpen(true);
+          }}
           className="relative inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:border-[var(--color-text-muted)] hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
           style={{ width: 44, height: 44 }}
         >
@@ -142,7 +156,10 @@ export function ExpeditionBoard({
           data-testid="expedition-rules-button"
           aria-label="Rules"
           aria-expanded={rulesOpen}
-          onClick={() => setRulesOpen(true)}
+          onClick={() => {
+            playCue("sfx-ui-click");
+            setRulesOpen(true);
+          }}
           className="relative inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--color-border)] bg-transparent text-[var(--color-text)] transition-colors hover:border-[var(--color-text-muted)] hover:bg-[var(--color-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
           style={{ width: 44, height: 44 }}
         >
@@ -159,8 +176,6 @@ export function ExpeditionBoard({
         onClose={() => setSettingsOpen(false)}
         cardPackId={cardPackId}
         onCardPackChange={handleCardPackChange}
-        muted={muted}
-        onToggleMute={() => setMuted((prev) => !prev)}
         isHost={isHost}
         onDeleteRoom={onDeleteRoom}
         canRestart={canRestart}
