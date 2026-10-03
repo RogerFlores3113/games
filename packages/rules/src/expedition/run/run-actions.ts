@@ -56,7 +56,7 @@ function handlePickCharacter(run: RunState, actorSeatId: string, characterId: st
   if (runPhase(run) !== "muster") return err("wrong_phase");
   const seat = run.seats.find((s) => s.seatId === actorSeatId)!;
   if (seat.characterId !== null) return err("wrong_phase");
-  if (catalog.characters[characterId] === undefined) return err("unknown_character");
+  if (!Object.hasOwn(catalog.characters, characterId)) return err("unknown_character");
   if (run.seats.some((s) => s.characterId === characterId)) return err("character_taken");
 
   const seats = run.seats.map((s) => (s.seatId === actorSeatId ? { ...s, characterId } : s));

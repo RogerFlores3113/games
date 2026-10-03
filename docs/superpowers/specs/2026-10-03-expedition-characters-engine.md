@@ -901,3 +901,6 @@ target kind, a window. Green check **`source-icons`**: a new
   the trick. Each layer filters what the outer layers left; when nothing remains it passes its
   input through, so the trick still has a winner who played. Three Puffballs in a three-seat camp
   leave the trick to the base rules.
+- Review fix: `pick-character` tests the catalogue with `Object.hasOwn`, so a prototype key such as
+  `constructor` is `unknown_character`; `sourceDef` does the same. Draft picks and ability uses
+  already match against the seat's offer and live sources, so they refuse those keys unchanged.

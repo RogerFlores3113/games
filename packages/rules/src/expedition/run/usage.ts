@@ -18,9 +18,8 @@ export function seatOf(run: RunState, seatId: string): SeatRun {
 }
 
 export function sourceDef(catalog: Catalog, sourceId: SourceId): SourceDef {
-  const def = catalog.sources[sourceId];
-  if (def === undefined) throw new Error(`usage: unknown source id "${sourceId}"`);
-  return def;
+  if (!Object.hasOwn(catalog.sources, sourceId)) throw new Error(`usage: unknown source id "${sourceId}"`);
+  return catalog.sources[sourceId]!;
 }
 
 export function ownerOf(seat: SeatRun): Owner {

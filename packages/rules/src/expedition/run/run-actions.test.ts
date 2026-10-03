@@ -28,6 +28,7 @@ const catalog = testCatalog({
 });
 
 const SEAT_IDS = ["p0", "p1", "p2"];
+const PROTOTYPE_KEYS = ["constructor", "__proto__", "toString", "hasOwnProperty"];
 
 /** Muster: nobody has a character yet. */
 function musterRun(seed = "fixture"): RunState {
@@ -136,6 +137,10 @@ describe("applyRunAction: pick-character (muster)", () => {
     });
   });
 
+  it.each(PROTOTYPE_KEYS)("rejects the prototype key %s as unknown_character", (characterId) => {
+    expect(applyRunAction(musterRun(), "p0", { type: "pick-character", characterId }, catalog)).toEqual({ ok: false, error: "unknown_character" });
+  });
+
   it("rejects a character another seat holds as character_taken", () => {
     const first = ok(applyRunAction(musterRun(), "p0", { type: "pick-character", characterId: "plain-1" }, catalog));
     expect(applyRunAction(first, "p1", { type: "pick-character", characterId: "plain-1" }, catalog)).toEqual({
@@ -182,6 +187,10 @@ describe("applyRunAction: pick-draft (RUN-04)", () => {
 
   it("rejects an id not offered as not_offered", () => {
     expect(applyRunAction(drafting(), "p0", { type: "pick-draft", sourceId: "item-c" }, catalog)).toEqual({ ok: false, error: "not_offered" });
+  });
+
+  it.each(PROTOTYPE_KEYS)("rejects the prototype key %s as not_offered", (sourceId) => {
+    expect(applyRunAction(drafting(), "p0", { type: "pick-draft", sourceId }, catalog)).toEqual({ ok: false, error: "not_offered" });
   });
 
   it("rejects a seat with no offer as no_draft_pending", () => {
@@ -275,6 +284,10 @@ describe("applyRunAction: skip-window and use-ability in pre-deal (D-12)", () =>
     expect(applyRunAction(musterRun(), "p0", { type: "skip-window" }, catalog)).toEqual({ ok: false, error: "wrong_window" });
     expect(applyRunAction(firesideRun(), "p0", { type: "skip-window" }, catalog)).toEqual({ ok: false, error: "wrong_window" });
     expect(applyRunAction(campRun(), "p0", { type: "skip-window" }, catalog)).toEqual({ ok: false, error: "wrong_window" });
+  });
+
+  it.each(PROTOTYPE_KEYS)("rejects using the prototype key %s as not_owned", (sourceId) => {
+    expect(applyRunAction(preDealRun(), "p0", { type: "use-ability", sourceId, targets: [] }, catalog)).toEqual({ ok: false, error: "not_owned" });
   });
 
   it("rejects using a source the seat does not hold as not_owned", () => {
