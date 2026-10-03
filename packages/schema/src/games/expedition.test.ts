@@ -91,12 +91,14 @@ const midCampView = {
         fromSeatId: "seat-2",
         source: "whisper",
         identity: { kind: "standard", suit: "hearts", rank: 10 },
+        toSeatId: "seat-1",
       },
     ],
     log: [
       { event: "whisper", actorSeatId: "seat-1", subjectSeatIds: ["seat-2"], gearId: null, private: false },
       { event: "use-gear", actorSeatId: "seat-2", subjectSeatIds: [], gearId: "compass", private: true },
     ],
+    yourWhisper: { allowed: true, left: 1 },
     camp: {
       playerCount: 3,
       expeditionLeaderSeatId: "seat-1",

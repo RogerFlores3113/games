@@ -107,6 +107,7 @@ export function applyWhisper(
     fromSeatId: actorSeatId,
     audience,
     source: "whisper",
+    targetSeatId: action.targetSeatId,
   };
   const logEntry: LogEntry = {
     event: "whisper",

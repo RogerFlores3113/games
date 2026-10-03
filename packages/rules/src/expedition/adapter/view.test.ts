@@ -97,7 +97,7 @@ describe("toExpeditionPlayerView", () => {
     expect(spectatorView.attempt!.camp!.objectives).toEqual([]);
   });
 
-  it("Whisper: only the addressed seat's view gets the reveal; the public log entry carries no audience key", () => {
+  it("Whisper: only the addressed seat and the sender get the reveal; the public log entry carries no audience key", () => {
     const seed = "dddddddddddddddddddddddddddddddd";
     const setup = advanceTo(setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG }), "between-tricks", CATALOG);
     const camp0 = setup.attempt!.camp!;
@@ -115,7 +115,10 @@ describe("toExpeditionPlayerView", () => {
     expect(viewB.attempt!.reveals).toHaveLength(1);
     expect(viewB.attempt!.reveals[0]!.cardId).toBe(cardId);
     expect(viewB.attempt!.reveals[0]!.fromSeatId).toBe("p0");
-    expect(viewA.attempt!.reveals).toEqual([]);
+    expect(viewB.attempt!.reveals[0]!.toSeatId).toBe("p1");
+    expect(viewA.attempt!.reveals.map((r) => ({ cardId: r.cardId, from: r.fromSeatId, to: r.toSeatId, source: r.source }))).toEqual([
+      { cardId, from: "p0", to: "p1", source: "whisper" },
+    ]);
     expect(viewC.attempt!.reveals).toEqual([]);
 
     for (const view of [viewA, viewB, viewC]) {
@@ -192,6 +195,29 @@ describe("toExpeditionPlayerView", () => {
     const nonActor = SEATS.find((s) => s !== actor)!;
     const otherView = toExpeditionPlayerView(run, nonActor, CATALOG);
     expect(otherView.attempt!.camp!.yourLegalCardIds).toEqual([]);
+  });
+
+  it("yourWhisper: one whisper allowed per camp, spent after sending, null when unseated", () => {
+    const seed = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const setup = advanceTo(setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG }), "between-tricks", CATALOG);
+    const cardId = setup.attempt!.camp!.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
+    expect(toExpeditionPlayerView(setup, "p0", CATALOG).attempt!.yourWhisper).toEqual({ allowed: true, left: 1 });
+
+    const sent = applyRunAction(setup, "p0", { type: "whisper", targetSeatId: "p1", cardId }, CATALOG);
+    if (!sent.ok) throw new Error(sent.error);
+    expect(toExpeditionPlayerView(sent.state, "p0", CATALOG).attempt!.yourWhisper).toEqual({ allowed: true, left: 0 });
+    expect(toExpeditionPlayerView(sent.state, "p1", CATALOG).attempt!.yourWhisper).toEqual({ allowed: true, left: 1 });
+    expect(toExpeditionPlayerView(sent.state, "watcher", CATALOG).attempt!.yourWhisper).toBeNull();
+  });
+
+  it("yourWhisper: Monsoon forbids whispers for every seat", () => {
+    const seed = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const run = advanceTo(
+      setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG, campNumber: 3, bossTwists: { 3: "radio-silence", 6: null } }),
+      "between-tricks",
+      CATALOG,
+    );
+    expect(toExpeditionPlayerView(run, "p0", CATALOG).attempt!.yourWhisper).toEqual({ allowed: false, left: 1 });
   });
 
   it("is pure: two calls return deep-equal views, the input state is unchanged, and the view round-trips through JSON", () => {

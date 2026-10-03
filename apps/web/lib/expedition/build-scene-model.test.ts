@@ -73,6 +73,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
       effects: [],
       reveals: [],
       log: [],
+      yourWhisper: { allowed: true, left: 1 },
       camp: makeCamp(),
     },
     ...overrides,
@@ -131,6 +132,7 @@ describe("seat order and identity", () => {
         effects: [],
         reveals: [],
         log: [],
+        yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp({
           completedTricks: [{ index: 0, leaderSeatId: "s1", plays: [], winnerSeatId: "s3" }],
         }),
@@ -159,6 +161,7 @@ describe("mayAct", () => {
         effects: [],
         reveals: [],
         log: [],
+        yourWhisper: { allowed: true, left: 1 },
         camp: null,
       },
     });
@@ -191,6 +194,7 @@ describe("objectives", () => {
         effects: [],
         reveals: [],
         log: [],
+        yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp({ objectives, ...patch }),
       },
     });
@@ -255,6 +259,7 @@ describe("hand: dimming, sort, lift, targeting", () => {
         effects: [],
         reveals: [],
         log: [],
+        yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp({ yourHand: cards, yourLegalCardIds: legalIds, ...patch }),
       },
     });
@@ -371,6 +376,7 @@ describe("trick and lastTrick", () => {
         effects: [],
         reveals: [],
         log: [],
+        yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp({
           currentTrick: {
             index: 0,
@@ -405,6 +411,7 @@ describe("trick and lastTrick", () => {
         effects: [],
         reveals: [],
         log: [],
+        yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp({
           completedTricks: [
             { index: 0, leaderSeatId: "s1", winnerSeatId: "s3", plays: [{ seatId: "s1", card: { id: "c1", identity: AS } }] },
@@ -493,6 +500,7 @@ describe("gear chips", () => {
         effects: [],
         reveals: [],
         log: [],
+        yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp(),
       },
     });
@@ -548,6 +556,7 @@ describe("gear chips", () => {
         effects: [],
         reveals: [],
         log: [],
+        yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp({
           objectives: [
             { id: "o-mate", kind: "exactly-n", n: 2, ownerSeatId: "s3", status: "pending" },
@@ -584,8 +593,9 @@ describe("reveals and whisperedTo", () => {
         preDealPendingSeatIds: [],
         gearUses: [],
         effects: [],
-        reveals: [{ cardId: "c1", fromSeatId: "s3", source: "whisper", identity: AS }],
+        reveals: [{ cardId: "c1", fromSeatId: "s3", source: "whisper", identity: AS, toSeatId: "s2" }],
         log: [],
+        yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp(),
       },
     });
@@ -607,8 +617,9 @@ describe("reveals and whisperedTo", () => {
         preDealPendingSeatIds: [],
         gearUses: [],
         effects: [],
-        reveals: [{ cardId: "c1", fromSeatId: "s1", source: "peek", identity: KD }],
+        reveals: [{ cardId: "c1", fromSeatId: "s1", source: "peek", identity: KD, toSeatId: null }],
         log: [],
+        yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp(),
       },
     });
@@ -629,6 +640,7 @@ describe("reveals and whisperedTo", () => {
         effects: [],
         reveals: [],
         log: [{ event: "whisper", actorSeatId: "s1", subjectSeatIds: ["s3"], gearId: null, private: false }],
+        yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp(),
       },
     });
@@ -651,6 +663,7 @@ describe("whisper visibility", () => {
         effects: [],
         reveals: [],
         log: [],
+        yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp(),
       },
     });
@@ -675,6 +688,7 @@ describe("whisper visibility", () => {
         effects: [],
         reveals: [],
         log: [{ event: "whisper", actorSeatId: "s2", subjectSeatIds: ["s1"], gearId: null, private: false }],
+        yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp(),
       },
     });
@@ -703,6 +717,7 @@ describe("preDeal", () => {
         effects: [],
         reveals: [],
         log: [],
+        yourWhisper: { allowed: true, left: 1 },
         camp: null,
       },
     });
@@ -758,6 +773,7 @@ describe("removedCardLabels", () => {
         effects: [],
         reveals: [],
         log: [],
+        yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp({ removedCards: [AS, MOON] }),
       },
     });

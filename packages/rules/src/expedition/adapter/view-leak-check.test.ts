@@ -191,6 +191,7 @@ describe("view-leak-check: canary suite", () => {
       fromSeatId: reveal.fromSeatId,
       source: reveal.source,
       identity: card.identity as never,
+      toSeatId: null,
     });
 
     const reasons = checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets });

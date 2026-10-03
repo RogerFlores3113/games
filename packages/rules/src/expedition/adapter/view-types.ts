@@ -98,7 +98,14 @@ export type ExpeditionHandSizeView = { seatId: string; size: number };
 // Deliberately no `audience` key: a reveal's audience-gating already
 // happened before this literal is ever built (only reveals addressed to the
 // viewer are mapped at all).
-export type ExpeditionRevealView = { cardId: string; fromSeatId: string; source: string; identity: ExpeditionCardIdentityView };
+export type ExpeditionRevealView = {
+  cardId: string;
+  fromSeatId: string;
+  source: string;
+  identity: ExpeditionCardIdentityView;
+  /** A whisper's named recipient; null for every other source. */
+  toSeatId: string | null;
+};
 
 // Deliberately no `audience` key: `private` is the only trace of the
 // original audience gate, and only entries already addressed to this viewer
@@ -143,6 +150,8 @@ export type ExpeditionAttemptView = {
   reveals: ExpeditionRevealView[];
   log: ExpeditionLogEntryView[];
   camp: ExpeditionCampView | null;
+  /** The viewer's own Whisper allowance this camp; null when unseated. */
+  yourWhisper: { allowed: boolean; left: number } | null;
 };
 
 // Deliberately no `draftOffer`/`ownedGearIds` keys for any OTHER seat: only

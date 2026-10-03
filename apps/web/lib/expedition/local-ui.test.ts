@@ -51,6 +51,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
       effects: [],
       reveals: [],
       log: [],
+      yourWhisper: { allowed: true, left: 1 },
       camp: {
         playerCount: 3,
         expeditionLeaderSeatId: "p0",

@@ -61,6 +61,7 @@ function view(campView: ExpeditionCampView | null, overrides: Partial<Expedition
       effects: [],
       reveals: [],
       log: [],
+      yourWhisper: { allowed: true, left: 1 },
       camp: campView,
     },
     ...overrides,

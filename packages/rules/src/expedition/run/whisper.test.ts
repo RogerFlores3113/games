@@ -207,7 +207,7 @@ describe("applyWhisper", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.state.attempt!.reveals).toEqual([
-      { cardId, fromSeatId: "p0", audience: ["p1"], source: "whisper" },
+      { cardId, fromSeatId: "p0", audience: ["p1"], source: "whisper", targetSeatId: "p1" },
     ]);
     expect(result.state.attempt!.log).toEqual([
       { event: "whisper", actorSeatId: "p0", subjectSeatIds: ["p1"], gearId: null, audience: "public" },
@@ -282,6 +282,6 @@ describe("applyWhisper", () => {
     const afterTrick = playOneTrick(whispered.state.attempt!.camp!);
     const finalRun: RunState = { ...whispered.state, attempt: { ...whispered.state.attempt!, camp: afterTrick } };
 
-    expect(finalRun.attempt!.reveals).toEqual([{ cardId, fromSeatId: "p0", audience: ["p1"], source: "whisper" }]);
+    expect(finalRun.attempt!.reveals).toEqual([{ cardId, fromSeatId: "p0", audience: ["p1"], source: "whisper", targetSeatId: "p1" }]);
   });
 });

@@ -31,6 +31,7 @@ import { campPhase, currentActorSeatId } from "../camp";
 import { evaluateObjective } from "../objectives";
 import { activeBossId, rulesFor } from "../run/compose";
 import { runPhase, runStatus, preDealPendingSeatIds } from "../run/lifecycle";
+import { whispersUsedBy } from "../run/whisper";
 import { gearAvailability, currentWindow, isGearSpent } from "../run/toolkit";
 import type { Catalog, LogEntry, Reveal, RunState } from "../run/types";
 import type { CampState, CardIdentity, ExpeditionCard, Objective, StandardIdentity } from "../state";
@@ -131,10 +132,22 @@ function findCardIdentity(camp: CampState, cardId: string): CardIdentity | null 
   return null;
 }
 
+/** A reveal is for its audience, and a whisper is also for the seat that
+ * whispered it: you named the card, so you may see what you sent. */
+export function isRevealVisibleTo(reveal: Reveal, seatId: string): boolean {
+  return reveal.audience.includes(seatId) || (reveal.source === "whisper" && reveal.fromSeatId === seatId);
+}
+
 function toRevealView(camp: CampState, reveal: Reveal): ExpeditionRevealView | null {
   const identity = findCardIdentity(camp, reveal.cardId);
   if (identity === null) return null;
-  return { cardId: reveal.cardId, fromSeatId: reveal.fromSeatId, source: reveal.source, identity: toIdentityView(identity) };
+  return {
+    cardId: reveal.cardId,
+    fromSeatId: reveal.fromSeatId,
+    source: reveal.source,
+    identity: toIdentityView(identity),
+    toSeatId: reveal.targetSeatId ?? null,
+  };
 }
 
 function toLogEntryView(entry: LogEntry): ExpeditionLogEntryView {
@@ -227,7 +240,7 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
     if (seated && rawAttempt.camp !== null) {
       const camp = rawAttempt.camp;
       for (const reveal of rawAttempt.reveals) {
-        if (!reveal.audience.includes(seatId)) continue;
+        if (!isRevealVisibleTo(reveal, seatId)) continue;
         const revealView = toRevealView(camp, reveal);
         if (revealView !== null) reveals.push(revealView);
       }
@@ -294,6 +307,12 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
       reveals,
       log,
       camp,
+      yourWhisper: seated
+        ? {
+            allowed: rules.whisperAllowed(state, seatId),
+            left: Math.max(0, rules.whispersPerCamp(state, seatId) - whispersUsedBy(state, seatId)),
+          }
+        : null,
     };
   }
 

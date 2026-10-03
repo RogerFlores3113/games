@@ -128,6 +128,7 @@ const RevealViewSchema = z.strictObject({
   fromSeatId: z.string().min(1),
   source: z.string().min(1),
   identity: CardIdentityViewSchema,
+  toSeatId: z.string().min(1).nullable(),
 });
 
 // Deliberately no `audience` key: `private` is the only trace of the
@@ -180,6 +181,7 @@ const AttemptViewSchema = z.strictObject({
   reveals: z.array(RevealViewSchema),
   log: z.array(LogEntryViewSchema),
   camp: CampViewSchema.nullable(),
+  yourWhisper: z.strictObject({ allowed: z.boolean(), left: z.number().int().min(0) }).nullable(),
 });
 
 // Deliberately no `draftOffer`/`ownedGearIds` keys for any OTHER seat: only

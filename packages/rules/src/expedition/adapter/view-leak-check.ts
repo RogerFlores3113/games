@@ -110,7 +110,7 @@ export function secretsForExpeditionSeat(
   // view's `reveals` array carries one entry per such reveal, not one per
   // distinct card — so the allowed COUNT must bump once per matching
   // reveal, not once per distinct card id.
-  const revealsToViewer = state.attempt !== null && seated ? state.attempt.reveals.filter((r) => r.audience.includes(seatId)) : [];
+  const revealsToViewer = state.attempt !== null && seated ? state.attempt.reveals.filter((r) => r.audience.includes(seatId) || (r.source === "whisper" && r.fromSeatId === seatId)) : [];
   const revealedToViewer = new Set(revealsToViewer.map((r) => r.cardId));
 
   const hiddenIds: string[] = [];

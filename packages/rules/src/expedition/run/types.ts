@@ -80,6 +80,7 @@ export type Reveal = {
   readonly fromSeatId: string; // hand holding the card when revealed; pinned forever (WR-03 ruling above — never re-derived after the card moves)
   readonly audience: readonly string[]; // the ONLY seats Phase 11 may show this card to
   readonly source: string; // "whisper" or the gear id (e.g. "peek")
+  readonly targetSeatId?: string; // whispers only: the seat the whisperer named, public in the log anyway
 };
 
 // Deliberately NO card id / identity fields: logs never carry card information.
