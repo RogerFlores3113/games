@@ -24,11 +24,13 @@ function firesideModel(store: SceneDeps["store"]): FiresideModel | null {
 function buildHandlers(store: SceneDeps["store"]): FiresideHandlers {
   return {
     onDraft(sourceId) {
-      const draft = firesideModel(store)?.draft;
-      if (draft?.kind !== "offer") return;
-      store
-        .getState()
-        .dispatch(draft.pick === "character" ? { type: "pick-character", characterId: sourceId } : { type: "pick-draft", sourceId });
+      const model = firesideModel(store);
+      if (model === null) return;
+      if (model.muster !== null) {
+        if (model.muster.some((c) => c.characterId === sourceId && c.pickable)) store.getState().dispatch({ type: "pick-character", characterId: sourceId });
+        return;
+      }
+      if (model.draft.kind === "offer") store.getState().dispatch({ type: "pick-draft", sourceId });
     },
     onReady() {
       store.getState().dispatch({ type: "ready" });
@@ -90,7 +92,7 @@ export class FiresideScene extends Phaser.Scene {
     drawTopBar(this, this.layer, model.topBar);
     drawPrompt(this, this.layer, model.prompt);
     drawFireside(this, this.layer, model, this.index, this.handlers);
-    drawTooltip(this, this.layer, model.tooltip, FIRESIDE_ZONES.tooltip);
+    if (model.muster === null) drawTooltip(this, this.layer, model.tooltip, FIRESIDE_ZONES.tooltip);
   }
 
   /** A redraw replaces the hovered object and Phaser never sends the stale

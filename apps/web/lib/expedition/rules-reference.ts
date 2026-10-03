@@ -1,4 +1,5 @@
 import { BOSS_DISPLAY, SOURCE_DISPLAY, type ExpeditionView } from "@games/rules";
+import { characterName, sourceBadges, sourceName } from "./source-text";
 
 export interface RulesItem {
   label: string;
@@ -6,7 +7,7 @@ export interface RulesItem {
 }
 
 export interface RulesSection {
-  id: "goal" | "tricks" | "objectives" | "whisper" | "kit" | "this-camp";
+  id: "goal" | "tricks" | "objectives" | "whisper" | "explorers" | "kit" | "this-camp";
   heading: string;
   paragraphs: string[];
   items: RulesItem[];
@@ -17,13 +18,13 @@ type RulesView = Pick<ExpeditionView, "seats" | "yourSeatId" | "activeBossTwistI
 function kitSection(view: RulesView | null): RulesSection {
   const you = view?.seats.find((s) => s.seatId === view.yourSeatId);
   const owned = you === undefined ? [] : [...(you.characterId === null ? [] : [you.characterId]), ...you.kit];
-  const paragraphs = ["Your character's power and everything you draft are always with you. Each says when and how often it works."];
+  const paragraphs = ["Your explorer's power and everything you draft stay with you for the run."];
   const items: RulesItem[] = [];
   for (const id of owned) {
     const source = SOURCE_DISPLAY[id];
     if (!source) continue;
-    const meta = source.active === null ? "Always." : `${source.active.windowPhrase}, ${source.active.limitBadge}.`;
-    items.push({ label: source.name, body: `${meta} ${source.text}` });
+    const label = source.kind === "character" ? `${sourceName(id)} (${characterName(id)})` : source.name;
+    items.push({ label, body: `${sourceBadges(id).join(", ")}. ${source.text}` });
   }
   if (items.length === 0) paragraphs.push("You have not picked a character yet.");
   return { id: "kit", heading: "Your kit", paragraphs, items };
@@ -79,6 +80,22 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
         "Once per camp, between tricks, show one card from your hand to one teammate. Everyone sees that you whispered, but only they see the card.",
       ],
       items: [],
+    },
+    {
+      id: "explorers",
+      heading: "Explorers and gear",
+      paragraphs: [
+        "Each player picks one of six explorers before camp 1. Each explorer has a base power.",
+        "After every cleared camp, take one of three offers: an upgrade to your explorer's power, or an item.",
+        "Every power says when it works and how often. Click it in your kit to use it, then pick its targets and confirm.",
+      ],
+      items: [
+        { label: "1 per camp", body: "Works again in the next camp, or when a camp is replayed." },
+        { label: "Once per run", body: "One use for the whole expedition." },
+        { label: "Single use", body: "The item is used up. You may draft it again later." },
+        { label: "Herbs and supplies", body: "Some powers spend the Botanist's herbs or the crew's supplies. Herbs come back after a cleared camp." },
+        { label: "Rescue", body: "When an objective fails, anyone with a rescue power may save it. The table waits for them to use it or pass; if nobody saves it, the camp fails." },
+      ],
     },
     kitSection(view),
     campSection(view),

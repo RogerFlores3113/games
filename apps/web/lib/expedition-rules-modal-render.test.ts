@@ -30,14 +30,14 @@ describe("expedition-rules-modal-render", () => {
     const markup = render({ open: true, game: null });
     expect(markup).toContain('role="dialog"');
     expect(markup).toContain('aria-label="Rules"');
-    for (const h of ["Goal", "Tricks", "Objectives", "The Whisper", "Your kit", "This camp"]) {
+    for (const h of ["Goal", "Tricks", "Objectives", "The Whisper", "Explorers and gear", "Your kit", "This camp"]) {
       expect(markup).toContain(`>${h}</h3>`);
     }
   });
 
   it("renders your character, kit and the boss twist from the view", () => {
     const markup = render({ open: true, game });
-    expect(markup).toContain(SOURCE_DISPLAY.scout!.name);
+    expect(markup).toContain("Spyglass (The Scout)");
     expect(markup).toContain(SOURCE_DISPLAY.bait!.name);
     expect(markup).toContain(BOSS_DISPLAY[bossId]!.name);
   });

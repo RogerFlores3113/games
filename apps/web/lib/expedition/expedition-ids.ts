@@ -64,6 +64,16 @@ export function seatObjectId(seatId: string): string {
   return `seat:${seatId}`;
 }
 
+/** A seat's hand as one thing, for an ability that picks a hand. */
+export function seatHandObjectId(seatId: string): string {
+  return `seat-hand:${seatId}`;
+}
+
+/** An option in the pick tray, by its choice id: `pick:whisper:0`. */
+export function pickObjectId(choiceId: string): string {
+  return `pick:${choiceId}`;
+}
+
 /** Your own character or kit source. */
 export function sourceObjectId(sourceId: string): string {
   return `source:${sourceId}`;
@@ -93,6 +103,9 @@ export function interactableObjectId(id: string): string {
 }
 
 export const READY_ID = "ready";
+export const BOARD_ID = "board";
+export const TRAY_MORE_ID = "pick:more";
+export const SUPPLIES_ID = "supplies";
 export const WHISPER_ID = "whisper";
 export const CONFIRM_ID = "confirm";
 export const CANCEL_ID = "cancel";

@@ -31,6 +31,7 @@ export const PALETTE = {
   moss: "#2E5A3A",
   bark: "#6B4A2B",
   textDim: "#A7B0A9",
+  night: "#1E3354", // mid-blue jungle night behind the crew silhouettes
 
   // Mirrored from globals.css — keep byte-identical, see palette.test.ts.
   turn: "#9B65F7", // --color-turn

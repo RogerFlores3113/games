@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ExpeditionAbilityView, ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
-import { buildFiresidePrompt, buildPrompt, PROMPT_MAX_CHARS, type Prompt, type PromptSeat } from "./build-prompt";
+import { buildFiresidePrompt, buildPrompt, describeChoice, PROMPT_MAX_CHARS, type Prompt, type PromptSeat } from "./build-prompt";
 import { initialLocalUi, type LocalUiState } from "./local-ui";
 
 const H7: ExpeditionCardIdentityView = { kind: "standard", suit: "hearts", rank: 7 };
@@ -83,6 +83,19 @@ const MONKEY: ExpeditionAbilityView = {
   ],
 };
 
+const TONIC: ExpeditionAbilityView = {
+  sourceId: "botanist",
+  usableNow: true,
+  reason: null,
+  steps: [{ kind: "card-value", prompt: "Pick a card in your hand to recount", choices: ["value:h7:6", "value:h7:8"] }],
+};
+const LONG_STEP: ExpeditionAbilityView = {
+  sourceId: "trained-monkey",
+  usableNow: true,
+  reason: null,
+  steps: [{ kind: "card", prompt: "Pick one of your cards to swap with a teammate now", choices: ["card:h7"] }],
+};
+
 function preDeal(pending: string[]): ExpeditionView {
   const base = view(null, { runPhase: "pre-deal", yourAbilities: [PONCHO] });
   return { ...base, attempt: { ...base.attempt!, window: "pre-deal", pendingSeatIds: pending } };
@@ -105,7 +118,7 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   ["pre-deal, you are pending", preDeal(["me", "ana"]), ui(), playing, { text: "Before the deal: use Rain Poncho or skip", tone: "your-move" }],
   ["pre-deal, waiting on a teammate", preDeal(["ana"]), ui(), playing, { text: "Before the deal: waiting for Ana", tone: "waiting" }],
   ["pre-deal, nobody pending", preDeal([]), ui(), playing, { text: "Dealing the cards…", tone: "waiting" }],
-  ["rescue, you are pending", rescue(["me"]), ui(), playing, { text: "An objective failed: use The Medic or skip", tone: "your-move" }],
+  ["rescue, you are pending", rescue(["me"]), ui(), playing, { text: "An objective failed: rescue it with Triage, or pass", tone: "your-move" }],
   ["rescue, waiting on a teammate", rescue(["bo"]), ui(), playing, { text: "An objective failed: waiting for Bo", tone: "waiting" }],
   [
     "objective pick, your pick",
@@ -195,30 +208,64 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   [
     "ability, first step",
     view(camp(), { yourAbilities: [SCOUT] }),
-    ui({ targeting: { mode: "ability", sourceId: "scout", selected: [] } }),
+    ui({ targeting: { mode: "ability", sourceId: "scout", selected: [], valueCardId: null } }),
     playing,
-    { text: "The Scout: Pick a teammate's hand", tone: "your-move" },
+    { text: "Spyglass: Pick a teammate's hand", tone: "your-move" },
   ],
   [
     "ability with no steps, ready to confirm",
     view(camp(), { yourAbilities: [{ sourceId: "bait", usableNow: true, reason: null, steps: [] }] }),
-    ui({ targeting: { mode: "ability", sourceId: "bait", selected: [] } }),
+    ui({ targeting: { mode: "ability", sourceId: "bait", selected: [], valueCardId: null } }),
     playing,
     { text: "Use Bait? Confirm or Cancel", tone: "your-move" },
   ],
   [
     "Trained Monkey, second step",
     view(camp(), { yourAbilities: [MONKEY] }),
-    ui({ targeting: { mode: "ability", sourceId: "trained-monkey", selected: ["card:h7"] } }),
+    ui({ targeting: { mode: "ability", sourceId: "trained-monkey", selected: ["card:h7"], valueCardId: null } }),
     playing,
     { text: "Trained Monkey: Pick a teammate", tone: "your-move" },
   ],
   [
     "Trained Monkey, ready to confirm",
     view(camp(), { yourAbilities: [MONKEY] }),
-    ui({ targeting: { mode: "ability", sourceId: "trained-monkey", selected: ["card:h7", "seat:bo"] } }),
+    ui({ targeting: { mode: "ability", sourceId: "trained-monkey", selected: ["card:h7", "seat:bo"], valueCardId: null } }),
     playing,
-    { text: "Use Trained Monkey on Bo? Confirm or Cancel", tone: "your-move" },
+    { text: "Use Trained Monkey on your 7♥ and Bo? Confirm or Cancel", tone: "your-move" },
+  ],
+  [
+    "Herb Tonic, a held card waits for its rank",
+    view(camp(), { yourAbilities: [TONIC] }),
+    ui({ targeting: { mode: "ability", sourceId: "botanist", selected: [], valueCardId: "h7" } }),
+    playing,
+    { text: "Herb Tonic: pick the rank 7♥ counts as", tone: "your-move" },
+  ],
+  [
+    "a step prompt too long for the line drops the source name",
+    view(camp(), { yourAbilities: [LONG_STEP] }),
+    ui({ targeting: { mode: "ability", sourceId: "trained-monkey", selected: [], valueCardId: null } }),
+    playing,
+    { text: "Pick one of your cards to swap with a teammate now", tone: "your-move" },
+  ],
+  [
+    "your turn to follow with Bait usable",
+    view(
+      camp({ currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "h2", identity: H2 }, effectiveRank: null }] } }),
+      { yourAbilities: [{ sourceId: "bait", usableNow: true, reason: null, steps: [] }] },
+    ),
+    ui(),
+    playing,
+    { text: "Your turn: play any card, or use Bait first", tone: "your-move" },
+  ],
+  [
+    "your turn to follow with Bait usable, too long to keep the hint",
+    view(
+      camp({ yourLegalCardIds: ["h7"], currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "h2", identity: H2 }, effectiveRank: null }] } }),
+      { yourAbilities: [{ sourceId: "bait", usableNow: true, reason: null, steps: [] }] },
+    ),
+    ui(),
+    playing,
+    { text: "Your turn: play, or use Bait first", tone: "your-move" },
   ],
   [
     "camp cleared",
@@ -268,6 +315,42 @@ describe("buildPrompt", () => {
   });
 });
 
+describe("describeChoice", () => {
+  const nameOf = (id: string | null): string => SEATS.find((s) => s.seatId === id)?.displayLabel ?? "Someone";
+  const v = view(
+    camp({
+      objectives: [{ id: "o1", kind: "win-card", target: S9, ownerSeatId: "ana", status: "failed" }, { id: "o2", kind: "no-tricks", ownerSeatId: null, status: "pending" }],
+      currentTrick: { index: 3, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "c4", identity: C4 }, effectiveRank: null }] },
+    }),
+  );
+  const withLog: ExpeditionView = {
+    ...v,
+    attempt: { ...v.attempt!, log: [{ event: "whisper", actorSeatId: "ana", subjectSeatIds: ["me"], sourceId: null, private: false }] },
+  };
+
+  it.each([
+    ["seat:bo", "Bo"],
+    ["seat:me", "yourself"],
+    ["hand:ana", "Ana's hand"],
+    ["card:h7", "your 7♥"],
+    ["card:c4", "the 4♣"],
+    ["objective:o1", "objective 9♠"],
+    ["objective:o2", "the no-tricks objective"],
+    ["trick:2", "trick 3"],
+    ["value:h7:9", "7♥ as 9"],
+    ["value:h7:11", "7♥ as J"],
+    ["board", "this trick"],
+    ["supplies", "the supplies"],
+  ])("%s reads as %s", (choice, expected) => {
+    expect(describeChoice(v, choice, nameOf)).toBe(expected);
+  });
+
+  it("names a whisper by who sent it to whom, counting only whispers", () => {
+    expect(describeChoice(withLog, "whisper:0", nameOf)).toBe("the whisper Ana to you");
+    expect(describeChoice(withLog, "whisper:1", nameOf)).toBe("a whisper");
+  });
+});
+
 describe("buildFiresidePrompt", () => {
   function fireside(overrides: Partial<ExpeditionView> = {}, ready: Record<string, boolean> = {}): ExpeditionView {
     const base = view(null, { runPhase: "fireside", attempt: null, campNumber: 2, ...overrides });
@@ -283,7 +366,7 @@ describe("buildFiresidePrompt", () => {
   };
 
   it("asks you to pick a character at muster", () => {
-    expect(at(muster(null))).toEqual({ text: "Pick your character", tone: "your-move" });
+    expect(at(muster(null))).toEqual({ text: "Choose your explorer", tone: "your-move" });
   });
 
   it("opens the run with the first draft", () => {

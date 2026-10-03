@@ -8,6 +8,7 @@ import {
   confirmTargeting,
   currentStep,
   initialLocalUi,
+  isPicked,
   nextTargetKind,
   reconcileLocalUi,
   selectTarget,
@@ -16,6 +17,7 @@ import {
   setTooltipMateSource,
   setTooltipObjective,
   setTooltipSource,
+  valueChoices,
   type LocalUiState,
 } from "./local-ui";
 
@@ -129,6 +131,7 @@ describe("initialLocalUi", () => {
       tooltipObjectiveId: null,
       tooltipMateSource: null,
       drag: { phase: "idle" },
+      trayPage: 0,
     });
   });
 });
@@ -149,7 +152,7 @@ describe("beginAbilityTargeting", () => {
   it("begins targeting the scout with an empty selection; next kind is hand", () => {
     const view = makeView();
     const next = beginAbilityTargeting(freeze(initialLocalUi()), view, "scout");
-    expect(next.targeting).toEqual({ mode: "ability", sourceId: "scout", selected: [] });
+    expect(next.targeting).toEqual({ mode: "ability", sourceId: "scout", selected: [], valueCardId: null });
     expect(nextTargetKind(next, view)).toBe("hand");
     expect(currentStep(next, view)?.prompt).toBe("Pick a teammate's hand");
   });
@@ -179,7 +182,7 @@ describe("selectTarget", () => {
     const view = makeView();
     const started = beginAbilityTargeting(freeze(initialLocalUi()), view, "scout");
     const next = selectTarget(freeze(started), view, "hand:p1");
-    expect(next.targeting).toEqual({ mode: "ability", sourceId: "scout", selected: ["hand:p1"] });
+    expect(next.targeting).toEqual({ mode: "ability", sourceId: "scout", selected: ["hand:p1"], valueCardId: null });
     expect(nextTargetKind(next, view)).toBeNull();
   });
 
@@ -194,7 +197,7 @@ describe("selectTarget", () => {
     expect(nextTargetKind(ui, view)).toBe("player");
 
     ui = freeze(selectTarget(ui, view, "seat:p1"));
-    expect(ui.targeting).toEqual({ mode: "ability", sourceId: "trained-monkey", selected: ["card:c1", "seat:p1"] });
+    expect(ui.targeting).toEqual({ mode: "ability", sourceId: "trained-monkey", selected: ["card:c1", "seat:p1"], valueCardId: null });
     expect(nextTargetKind(ui, view)).toBeNull();
   });
 });
@@ -208,7 +211,8 @@ describe("choiceFor", () => {
     expect(choiceFor(monkey, view, "seat", "p1")).toBeNull();
 
     const scout = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "scout"));
-    expect(choiceFor(scout, view, "seat", "p2")).toBe("hand:p2");
+    expect(choiceFor(scout, view, "hand", "p2")).toBe("hand:p2");
+    expect(choiceFor(scout, view, "seat", "p2")).toBeNull();
 
     const parrot = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "parrot"));
     expect(choiceFor(parrot, view, "objective", "o1")).toBe("objective:o1");
@@ -217,6 +221,52 @@ describe("choiceFor", () => {
 
   it("is null when nothing is targeting", () => {
     expect(choiceFor(freeze(initialLocalUi()), makeView(), "seat", "p1")).toBeNull();
+  });
+
+  it("maps the board and the supplies to their single ids", () => {
+    const howler: ExpeditionAbilityView = { sourceId: "guide.howler-call", usableNow: true, reason: null, steps: [{ kind: "board", prompt: "Pick the trick on the table", choices: ["board"] }] };
+    const kit: ExpeditionAbilityView = { sourceId: "medic.field-kit", usableNow: true, reason: null, steps: [{ kind: "supplies", prompt: "Pick the crew's supplies", choices: ["supplies"] }] };
+    const view = makeView({ yourAbilities: [howler, kit] });
+    expect(choiceFor(beginAbilityTargeting(initialLocalUi(), view, "guide.howler-call"), view, "board", "")).toBe("board");
+    expect(choiceFor(beginAbilityTargeting(initialLocalUi(), view, "medic.field-kit"), view, "supplies", "")).toBe("supplies");
+  });
+});
+
+describe("card-value steps", () => {
+  const TONIC: ExpeditionAbilityView = {
+    sourceId: "botanist",
+    usableNow: true,
+    reason: null,
+    steps: [{ kind: "card-value", prompt: "Pick a card in your hand to recount", choices: ["value:c1:4", "value:c1:6", "value:c2:9"] }],
+  };
+
+  it("a hand card holds the card, then a rank completes the step and confirms", () => {
+    const view = makeView({ yourAbilities: [TONIC] });
+    let ui = beginAbilityTargeting(initialLocalUi(), view, "botanist");
+    expect(choiceFor(ui, view, "card", "c1")).toBe("card:c1");
+    expect(choiceFor(ui, view, "card", "c3")).toBeNull();
+    ui = selectTarget(ui, view, "card:c1");
+    expect(valueChoices(ui, view)).toEqual(["value:c1:4", "value:c1:6"]);
+    expect(isPicked(ui, "card", "c1")).toBe(true);
+    ui = selectTarget(ui, view, "value:c1:6");
+    expect(valueChoices(ui, view)).toEqual([]);
+    expect(confirmTargeting(ui, view).request).toEqual({ type: "use-ability", sourceId: "botanist", targets: ["value:c1:6"] });
+  });
+
+  it("a rank for another card than the held one is refused", () => {
+    const view = makeView({ yourAbilities: [TONIC] });
+    const ui = selectTarget(beginAbilityTargeting(initialLocalUi(), view, "botanist"), view, "card:c1");
+    expect(selectTarget(ui, view, "value:c2:9").targeting).toEqual(ui.targeting);
+  });
+});
+
+describe("self steps", () => {
+  it("are picked as soon as targeting begins", () => {
+    const puffball: ExpeditionAbilityView = { sourceId: "puffball", usableNow: true, reason: null, steps: [{ kind: "self", prompt: "Use it on yourself", choices: ["seat:p0"] }] };
+    const view = makeView({ yourAbilities: [puffball] });
+    const ui = beginAbilityTargeting(initialLocalUi(), view, "puffball");
+    expect(currentStep(ui, view)).toBeNull();
+    expect(confirmTargeting(ui, view).request).toEqual({ type: "use-ability", sourceId: "puffball", targets: ["seat:p0"] });
   });
 });
 
@@ -325,7 +375,7 @@ describe("reconcileLocalUi", () => {
       steps: [{ kind: "card", prompt: "Pick one of your cards", choices: ["card:c2"] }, MONKEY.steps[1]!],
     };
     const next = reconcileLocalUi(ui, makeView({ yourAbilities: [narrowed] }));
-    expect(next.targeting).toEqual({ mode: "ability", sourceId: "trained-monkey", selected: [] });
+    expect(next.targeting).toEqual({ mode: "ability", sourceId: "trained-monkey", selected: [], valueCardId: null });
   });
 
   it("keeps a still-offered first pick and drops only the later one", () => {
@@ -339,7 +389,7 @@ describe("reconcileLocalUi", () => {
       steps: [MONKEY.steps[0]!, { kind: "player", prompt: "Pick a teammate", choices: ["seat:p2"] }],
     };
     const next = reconcileLocalUi(ui, makeView({ yourAbilities: [narrowed] }));
-    expect(next.targeting).toEqual({ mode: "ability", sourceId: "trained-monkey", selected: ["card:c1"] });
+    expect(next.targeting).toEqual({ mode: "ability", sourceId: "trained-monkey", selected: ["card:c1"], valueCardId: null });
   });
 
   it("drops a whisper card pick that left the hand", () => {
@@ -370,7 +420,7 @@ describe("reconcileLocalUi", () => {
     let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "scout"));
     ui = freeze(setHoveredCard(ui, "c1"));
     const next = reconcileLocalUi(ui, view);
-    expect(next.targeting).toEqual({ mode: "ability", sourceId: "scout", selected: [] });
+    expect(next.targeting).toEqual({ mode: "ability", sourceId: "scout", selected: [], valueCardId: null });
     expect(next.hoveredCardId).toBe("c1");
   });
 });

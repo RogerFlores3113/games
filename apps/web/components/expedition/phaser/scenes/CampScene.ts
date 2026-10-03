@@ -10,11 +10,11 @@ import Phaser from "phaser";
 import { ensurePixelFonts } from "../font/pixel-font";
 import { ensureCardTextures } from "../card-packs/card-textures";
 import { drawPrompt, drawStaticWorld, drawTooltip, drawTopBar, setBossEffect } from "../draw/draw-table";
-import { drawSeats } from "../draw/draw-seats";
+import { drawCrowdAndStump, drawPlates, drawYouAndKit } from "../draw/draw-seats";
 import type { CampHandlers } from "../draw/camp-handlers";
 import { preloadArt } from "../art/place-art";
-import { drawDropTarget, drawHand, drawLastTrick, drawTrick } from "../draw/draw-hand-trick";
-import { drawControls } from "../draw/draw-controls";
+import { drawBoardPick, drawDropTarget, drawHand, drawLastTrick, drawTrick } from "../draw/draw-hand-trick";
+import { drawControls, drawStumpOverlays } from "../draw/draw-controls";
 import { drawWhispers } from "../draw/draw-whispers";
 import { INTERACTABLE_REGISTRY } from "../interactables/registry";
 import { CARD_H, CARD_W, HAND_CARD_Y, INTERACTABLE_ANCHORS, ZONES, handFanXs, pointInRect, type Point } from "../layout";
@@ -29,6 +29,7 @@ import {
   beginWhisper,
   cancelTargeting,
   choiceFor,
+  nextTrayPage,
   selectTarget,
   setDrag,
   setHoveredCard,
@@ -103,10 +104,20 @@ function buildHandlers(store: SceneDeps["store"], pointer: () => Point): CampHan
         state.dispatch({ type: "pick-objective", objectiveId });
       }
     },
-    onSeat(seatId) {
+    onPick(entity, rawId) {
       const state = store.getState();
       if (state.reconnecting) return;
-      pickForTargeting(store, "seat", seatId);
+      pickForTargeting(store, entity, rawId);
+    },
+    onTrayPick(choiceId) {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      state.updateLocalUi((ui, view) => selectTarget(ui, view, choiceId));
+    },
+    onTrayMore() {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      state.updateLocalUi((ui) => nextTrayPage(ui));
     },
     onSource(sourceId) {
       const state = store.getState();
@@ -221,9 +232,12 @@ export class CampScene extends Phaser.Scene {
     const stump = ZONES.stump;
     this.tableGlow = this.add.rectangle(stump.x, stump.y, stump.w, stump.h, toPhaserColor(PALETTE.turn), 0.22).setOrigin(0, 0).setVisible(false);
     this.dragLayer.add(this.tableGlow);
-    this.input.on("pointerdown", () => {
+    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       this.lastDown = this.pointerAt();
+      if (pointer.rightButtonDown()) this.handlers.onCancel();
     });
+    this.input.mouse?.disableContextMenu();
+    this.input.keyboard?.on("keydown-ESC", () => this.handlers.onCancel());
     this.input.on("pointermove", () => this.onPointerMove());
     this.input.on("pointerup", () => this.onPointerRelease());
     this.input.on("pointerupoutside", () => this.onPointerRelease());
@@ -267,26 +281,30 @@ export class CampScene extends Phaser.Scene {
   renderModel(model: SceneModel): void {
     if (this.dynamicLayer === null || this.unsubscribe === null) return;
     this.dynamicLayer.removeAll(true);
-    drawTopBar(this, this.dynamicLayer, model.topBar);
+    drawCrowdAndStump(this, this.dynamicLayer, model, this.index, this.handlers);
+    drawTopBar(this, this.dynamicLayer, model.topBar, this.index, () => this.handlers.onPick("supplies", ""));
     drawPrompt(this, this.dynamicLayer, model.prompt);
-    drawTooltip(this, this.dynamicLayer, model.tooltip, ZONES.tooltip);
     const effect = model.bossTwist !== null && !model.bossTwist.cancelled ? model.bossTwist.effect : "none";
     setBossEffect(this, effect);
     this.renderTable(model);
+    drawTooltip(this, this.dynamicLayer, model.tooltip, ZONES.tooltip);
     this.previousModel = model;
   }
 
   renderTable(model: SceneModel): void {
     if (this.dynamicLayer === null) return;
     const layer = this.dynamicLayer;
-    drawSeats(this, layer, model, this.index, this.handlers);
+    drawPlates(this, layer, model, this.index, this.handlers);
+    drawYouAndKit(this, layer, model, this.index, this.handlers);
     drawHand(this, layer, model, this.index, this.handlers);
     drawDropTarget(this, layer, model);
-    drawTrick(this, layer, model, this.index, this.previousModel, this.dropOrigin);
+    drawTrick(this, layer, model, this.index, this.handlers, this.previousModel, this.dropOrigin);
     if (this.sceneStore.getState().localUi.drag.phase === "idle") this.dropOrigin = null;
     drawLastTrick(this, layer, model, this.index, this.handlers);
     drawWhispers(this, layer, model, this.index);
     drawControls(this, layer, model, this.index, this.handlers);
+    drawBoardPick(this, layer, model, this.index, this.handlers);
+    drawStumpOverlays(this, layer, model, this.index, this.handlers);
   }
 
   private pointerAt(): Point {

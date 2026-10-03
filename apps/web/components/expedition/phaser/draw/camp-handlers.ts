@@ -1,3 +1,5 @@
+import type { PickEntity } from "../../../../lib/expedition/local-ui";
+
 /** The click and hover callbacks every camp draw module wires to. */
 export interface CampHandlers {
   /** A click on a card: selects it as a target or plays it. */
@@ -7,7 +9,12 @@ export interface CampHandlers {
   onCardHover(cardId: string | null): void;
   onObjective(objectiveId: string): void;
   onObjectiveHover(objectiveId: string | null): void;
-  onSeat(seatId: string): void;
+  /** A click on a seat, a hand, a board card, the trick or the supplies
+   * while targeting: picks it when the current step offers it. */
+  onPick(entity: PickEntity, rawId: string): void;
+  /** An option in the pick tray, by its choice id. */
+  onTrayPick(choiceId: string): void;
+  onTrayMore(): void;
   /** Your own character or kit source: starts its targeting. */
   onSource(sourceId: string): void;
   onSourceHover(sourceId: string | null): void;

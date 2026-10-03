@@ -8,15 +8,15 @@ import type Phaser from "phaser";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
 import { MINI_H, MINI_W, OBJECTIVE_POOL_STEP, ZONES, stumpRowXs } from "../layout";
-import { CANCEL_ID, CONFIRM_ID, PREDEAL_SKIP_ID, WHISPER_ID, preDealUseObjectId } from "../../../../lib/expedition/expedition-ids";
+import { CANCEL_ID, CONFIRM_ID, PREDEAL_SKIP_ID, TRAY_MORE_ID, WHISPER_ID, preDealUseObjectId } from "../../../../lib/expedition/expedition-ids";
 import type { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
 import type { ArtId } from "../art/art-registry";
 import type { CampHandlers } from "./camp-handlers";
-import { fitLabel } from "./text-fit";
+import { fitLabel, wrapWords } from "./text-fit";
 import { button, labelWidth, miniCard, plate, platedText, text, type Layer } from "./ui-kit";
 
-const TILE_W = OBJECTIVE_POOL_STEP - 2;
+const TILE_W = OBJECTIVE_POOL_STEP - 4;
 const BUTTON_H = 14;
 const WHISPER_H = 18;
 const ROW_GAP = 4;
@@ -34,9 +34,9 @@ function drawObjectivePool(scene: Phaser.Scene, layer: Layer, model: SceneModel,
   if (pool.length === 0) return;
   const zone = ZONES.stump;
   const title = "Objectives";
-  layer.add(platedText(scene, zone.x + Math.floor((zone.w - labelWidth(title)) / 2), zone.y + 8, title));
+  layer.add(platedText(scene, zone.x + Math.floor((zone.w - labelWidth(title)) / 2), zone.y + 12, title));
 
-  const bodyY = zone.y + 24;
+  const bodyY = zone.y + 28;
   stumpRowXs(pool.length, OBJECTIVE_POOL_STEP).forEach((cx, i) => {
     const chip = pool[i]!;
     const tileX = cx - TILE_W / 2;
@@ -79,13 +79,6 @@ interface Action {
 
 function actionList(model: SceneModel, handlers: CampHandlers): Action[] {
   const actions: Action[] = [];
-  if (model.gate !== null && model.gate.youPending && model.targeting === null) {
-    model.gate.sources.forEach((source, i) => {
-      actions.push({ id: preDealUseObjectId(source.sourceId), label: `Use ${source.name}`, onClick: () => handlers.onGateUse(source.sourceId), row: i });
-    });
-    actions.push({ id: PREDEAL_SKIP_ID, label: "Skip", onClick: () => handlers.onGateSkip(), row: model.gate.sources.length });
-    return actions;
-  }
   if (model.whisper.shown) {
     actions.push(
       model.whisper.visible
@@ -139,8 +132,122 @@ function drawWhisperCaption(scene: Phaser.Scene, layer: Layer, model: SceneModel
   layer.add(text(scene, zone.x + Math.floor((zone.w - labelWidth(shown)) / 2), zone.y + 2 + WHISPER_H + 3, shown, color));
 }
 
+const BANNER_PAD = 6;
+
+/** A gated window on the stump: what happened, who it waits on, and your
+ * Use and Pass buttons when it waits on you. */
+function drawBanner(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
+  const banner = model.banner;
+  if (banner === null) return;
+  const zone = ZONES.stump;
+  const x = zone.x + 4;
+  const w = zone.w - 8;
+  const chars = Math.floor((w - BANNER_PAD * 2) / LABEL_CELL.w);
+  const titleLines = wrapWords(banner.title, chars).slice(0, 2);
+  const detail = wrapWords(banner.detail, chars).slice(0, 2);
+  const buttons = banner.youPending ? 1 : 0;
+  const lineH = LABEL_CELL.h + 2;
+  const titleH = titleLines.length * lineH + 2;
+  const h = BANNER_PAD * 2 + titleH + detail.length * lineH + buttons * (BUTTON_H + 6);
+  const y = zone.y + Math.floor((zone.h - h) / 2);
+  const bg = plate(scene, x, y, w, h);
+  bg.setStrokeStyle(1, toPhaserColor(banner.window === "rescue" ? PALETTE.destructive : PALETTE.sun));
+  layer.add(bg);
+  const titleColor = banner.window === "rescue" ? PALETTE.destructive : PALETTE.sun;
+  titleLines.forEach((line, i) => {
+    layer.add(text(scene, x + Math.floor((w - labelWidth(line)) / 2), y + BANNER_PAD + i * lineH, line, titleColor));
+  });
+  detail.forEach((line, i) => {
+    layer.add(text(scene, x + Math.floor((w - labelWidth(line)) / 2), y + BANNER_PAD + titleH + i * lineH, line));
+  });
+  if (!banner.youPending) return;
+  const pass = banner.window === "rescue" ? "Pass" : "Skip";
+  const items = [
+    ...banner.uses.map((u) => ({ id: preDealUseObjectId(u.sourceId), label: `Use ${u.name}`, onClick: () => handlers.onGateUse(u.sourceId), outline: true })),
+    { id: PREDEAL_SKIP_ID, label: pass, onClick: () => handlers.onGateSkip(), outline: false },
+  ];
+  const gap = 6;
+  const bw = Math.min(96, Math.floor((w - BANNER_PAD * 2 - gap * (items.length - 1)) / items.length));
+  const total = bw * items.length + gap * (items.length - 1);
+  const by = y + h - BANNER_PAD - BUTTON_H / 2;
+  items.forEach((item, i) => {
+    const cx = x + Math.floor((w - total) / 2) + i * (bw + gap) + bw / 2;
+    const b = button(scene, cx, by, bw, BUTTON_H, item.label, { onClick: item.onClick, outline: item.outline });
+    layer.add(b);
+    index.register("camp", item.id, b);
+  });
+}
+
+const TRAY_OPTION_H_TEXT = 14;
+const TRAY_CARDS_H = MINI_H + 2;
+const TRAY_MINI_STEP = 9;
+
+/** Choices with no single place on the table (whispers, your won tricks,
+ * the ranks for a held card), as buttons on the stump. Pages when they do
+ * not all fit. */
+function drawTray(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
+  const tray = model.tray;
+  if (tray === null) return;
+  const zone = ZONES.stump;
+  layer.add(plate(scene, zone.x, zone.y, zone.w, zone.h).setAlpha(0.92).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
+  const title = fitLabel(tray.title, Math.floor((zone.w - 8) / LABEL_CELL.w));
+  layer.add(text(scene, zone.x + Math.floor((zone.w - labelWidth(title)) / 2), zone.y + 3, title, PALETTE.textDim));
+
+  const withCards = tray.options.some((o) => o.cards.length > 0);
+  const cardsW = (n: number): number => (n === 0 ? 0 : MINI_W + TRAY_MINI_STEP * (n - 1));
+  const optionW = Math.max(28, ...tray.options.map((o) => Math.max(labelWidth(o.label), cardsW(o.cards.length)) + 8));
+  const optionH = TRAY_OPTION_H_TEXT + (withCards ? TRAY_CARDS_H : 0);
+  const gap = 4;
+  const areaY = zone.y + 14;
+  const areaH = zone.h - 16;
+  const cols = Math.max(1, Math.floor((zone.w - 8 + gap) / (optionW + gap)));
+  const rows = Math.max(1, Math.floor((areaH + gap) / (optionH + gap)));
+  const perPage = cols * rows;
+  const paged = tray.options.length > perPage;
+  const slots = paged ? perPage - 1 : perPage;
+  const pages = Math.max(1, Math.ceil(tray.options.length / slots));
+  const page = model.trayPage % pages;
+  const shown = tray.options.slice(page * slots, page * slots + slots);
+  const count = shown.length + (paged ? 1 : 0);
+  const usedCols = Math.min(cols, count);
+  const left = zone.x + Math.floor((zone.w - (usedCols * optionW + (usedCols - 1) * gap)) / 2);
+  const cell = (i: number): { cx: number; y: number } => ({
+    cx: left + (i % cols) * (optionW + gap) + optionW / 2,
+    y: areaY + Math.floor(i / cols) * (optionH + gap),
+  });
+
+  shown.forEach((option, i) => {
+    const { cx, y } = cell(i);
+    const container = scene.add.container(Math.round(cx - optionW / 2), y);
+    const bg = plate(scene, 0, 0, optionW, optionH, PALETTE.stump).setStrokeStyle(1, toPhaserColor(PALETTE.turn));
+    container.add(bg);
+    container.add(text(scene, Math.floor((optionW - labelWidth(option.label)) / 2), 3, option.label));
+    const cx0 = Math.floor((optionW - cardsW(option.cards.length)) / 2);
+    option.cards.forEach((label, j) => container.add(miniCard(scene, cx0 + j * TRAY_MINI_STEP, TRAY_OPTION_H_TEXT, label, model.cardPackId)));
+    container.setSize(optionW, optionH);
+    const hit = scene.add.zone(0, 0, optionW, optionH).setOrigin(0, 0);
+    hit.setInteractive({ useHandCursor: true });
+    hit.on("pointerdown", () => handlers.onTrayPick(option.choiceId));
+    container.add(hit);
+    layer.add(container);
+    index.register("camp", option.objectId, container);
+  });
+  if (paged) {
+    const { cx, y } = cell(shown.length);
+    const more = button(scene, cx, y + optionH / 2, optionW, optionH, `More ${page + 1}/${pages}`, { onClick: () => handlers.onTrayMore() });
+    layer.add(more);
+    index.register("camp", TRAY_MORE_ID, more);
+  }
+}
+
 export function drawControls(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   drawObjectivePool(scene, layer, model, index, handlers);
   drawActions(scene, layer, model, index, handlers);
   drawWhisperCaption(scene, layer, model);
+}
+
+/** Overlays on the stump: drawn last so they cover the trick. */
+export function drawStumpOverlays(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
+  drawBanner(scene, layer, model, index, handlers);
+  drawTray(scene, layer, model, index, handlers);
 }

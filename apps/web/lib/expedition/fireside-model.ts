@@ -3,7 +3,8 @@ import { BOSS_DISPLAY, CHARACTER_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
 import type { Prompt } from "./build-prompt";
 import { buildFiresidePrompt } from "./build-prompt";
 import type { SceneServerInput, Tooltip, TopBar } from "./build-scene-model";
-import { BOSS_CAMP_NUMBERS, FINAL_CAMP_NUMBER, sourceName, sourceRulesText } from "./build-scene-model";
+import { BOSS_CAMP_NUMBERS, FINAL_CAMP_NUMBER } from "./build-scene-model";
+import { characterName, chargeText, sourceBadges, sourceKind, sourceName, sourceRulesText } from "./source-text";
 import { draftObjectId, kitObjectId, READY_ID } from "./expedition-ids";
 import type { LocalUiState } from "./local-ui";
 
@@ -23,18 +24,37 @@ export interface TrailStop {
   caption: string;
 }
 
+/** A draft offer. An upgrade belongs to your character and says which
+ * power it improves; an item is a separate tool. */
 export interface DraftItem {
   sourceId: string;
   objectId: string;
   name: string;
-  /** Badge line: the window and limit, "Always", or a character's theme. */
-  badge: string;
+  kind: "upgrade" | "item";
+  /** "Spyglass upgrade" or "Item". */
+  ribbon: string;
+  text: string;
+  /** When it works and how often: ["Between tricks", "1 per camp"]. */
+  badges: string[];
 }
 
-/** `pick` says which request a tile sends: muster picks a character, a
- * draft takes an upgrade or item. */
+/** One of the six characters at muster. */
+export interface CharacterCard {
+  characterId: string;
+  objectId: string;
+  name: string;
+  theme: string;
+  power: { sourceId: string; name: string; text: string; badges: string[] };
+  /** "Herbs: start 2, max 3"; null without a pool. */
+  pool: string | null;
+  /** The teammate who took it; "You" for your own pick. */
+  takenBy: string | null;
+  yours: boolean;
+  pickable: boolean;
+}
+
 export type DraftPanel =
-  | { kind: "offer"; pick: "character" | "draft"; items: DraftItem[] }
+  | { kind: "offer"; items: DraftItem[] }
   | { kind: "taken"; sourceId: string; name: string }
   | { kind: "none"; text: string };
 
@@ -42,7 +62,9 @@ export interface KitItem {
   sourceId: string;
   objectId: string;
   name: string;
-  badge: string;
+  kind: "character" | "upgrade" | "item";
+  /** What is left: "2/3 herbs", "1 left", "always on". */
+  charge: string;
 }
 
 export interface CrewRow {
@@ -51,6 +73,8 @@ export interface CrewRow {
   isYou: boolean;
   connected: boolean;
   status: "ready" | "drafting" | "choosing" | "resting";
+  /** "The Scout", or null while still choosing. */
+  character: string | null;
   sources: { sourceId: string; name: string }[];
 }
 
@@ -60,6 +84,8 @@ export interface FiresideModel {
   topBar: TopBar;
   prompt: Prompt;
   trail: TrailStop[];
+  /** The six characters while the crew musters; null after. */
+  muster: CharacterCard[] | null;
   draft: DraftPanel;
   /** Your character, then your kit in draft order. Null for a spectator. */
   kit: KitItem[] | null;
@@ -69,14 +95,6 @@ export interface FiresideModel {
   ready: { objectId: string; state: "blocked" | "open" | "done" } | null;
   tooltip: Tooltip | null;
   lastResult: { campNumber: number; status: "succeeded" | "failed" } | null;
-}
-
-function badgeFor(sourceId: string): string {
-  const display = SOURCE_DISPLAY[sourceId];
-  if (display === undefined) return "";
-  if (display.kind === "character") return CHARACTER_DISPLAY[sourceId]?.theme ?? "";
-  if (display.active === null) return "Always";
-  return `${display.active.windowPhrase}, ${display.active.limitBadge}`;
 }
 
 function liveSourceIds(seat: ExpeditionView["seats"][number]): string[] {
@@ -91,10 +109,10 @@ function bossFor(view: ExpeditionView, campNumber: number): string | null {
 
 function buildTopBar(view: ExpeditionView): TopBar {
   const camp = `Camp ${view.campNumber} of ${FINAL_CAMP_NUMBER}`;
-  if (!BOSS_CAMP_NUMBERS.includes(view.campNumber)) return { supplies: view.supplies, camp, boss: null };
+  if (!BOSS_CAMP_NUMBERS.includes(view.campNumber)) return { supplies: view.supplies, camp, boss: null, suppliesPick: null };
   const bossId = bossFor(view, view.campNumber);
   const text = bossId === null ? "Boss camp ahead" : `Boss ahead: ${BOSS_DISPLAY[bossId]?.name ?? bossId}`;
-  return { supplies: view.supplies, camp, boss: { text, dim: false } };
+  return { supplies: view.supplies, camp, boss: { text, dim: false }, suppliesPick: null };
 }
 
 function buildTrail(view: ExpeditionView): TrailStop[] {
@@ -118,19 +136,40 @@ function draftDealtThisFireside(view: ExpeditionView): boolean {
   return view.history.at(-1)?.status === "succeeded";
 }
 
-function itemFor(sourceId: string): DraftItem {
-  return { sourceId, objectId: draftObjectId(sourceId), name: sourceName(sourceId), badge: badgeFor(sourceId) };
+function itemFor(view: ExpeditionView, sourceId: string): DraftItem {
+  const display = SOURCE_DISPLAY[sourceId];
+  const kind = sourceKind(sourceId) === "upgrade" ? "upgrade" : "item";
+  const ribbon = kind === "upgrade" && display?.characterId != null ? `${sourceName(display.characterId)} upgrade` : "Item";
+  return { sourceId, objectId: draftObjectId(sourceId), name: sourceName(sourceId), kind, ribbon, text: display?.text ?? "", badges: sourceBadges(sourceId) };
+}
+
+function buildMuster(server: SceneServerInput): CharacterCard[] | null {
+  const { game: view, roomSeats } = server;
+  if (view.runPhase !== "muster") return null;
+  const you = view.seats.find((s) => s.seatId === view.yourSeatId);
+  return Object.values(CHARACTER_DISPLAY).map((c) => {
+    const holder = view.seats.find((s) => s.characterId === c.id);
+    const yours = holder !== undefined && holder.seatId === view.yourSeatId;
+    const takenBy = holder === undefined ? null : yours ? "You" : (roomSeats.find((r) => r.seatId === holder.seatId)?.displayLabel ?? "?");
+    const power = SOURCE_DISPLAY[c.id];
+    return {
+      characterId: c.id,
+      objectId: draftObjectId(c.id),
+      name: c.name,
+      theme: c.theme,
+      power: { sourceId: c.id, name: c.power, text: power?.text ?? "", badges: sourceBadges(c.id) },
+      pool: c.pool === null ? null : `${c.pool.name}: start ${c.pool.start}, max ${c.pool.max}`,
+      takenBy,
+      yours,
+      pickable: holder === undefined && you !== undefined && you.characterId === null,
+    };
+  });
 }
 
 function buildDraft(view: ExpeditionView): DraftPanel {
   const you = view.seats.find((s) => s.seatId === view.yourSeatId);
-  if (you === undefined) return { kind: "none", text: "" };
-  if (view.runPhase === "muster") {
-    if (you.characterId !== null) return { kind: "taken", sourceId: you.characterId, name: sourceName(you.characterId) };
-    const taken = new Set(view.seats.map((s) => s.characterId));
-    return { kind: "offer", pick: "character", items: Object.keys(CHARACTER_DISPLAY).filter((id) => !taken.has(id)).map(itemFor) };
-  }
-  if (view.yourDraftOffer !== null) return { kind: "offer", pick: "draft", items: view.yourDraftOffer.map(itemFor) };
+  if (you === undefined || view.runPhase === "muster") return { kind: "none", text: "" };
+  if (view.yourDraftOffer !== null) return { kind: "offer", items: view.yourDraftOffer.map((id) => itemFor(view, id)) };
   // A pick appends to the kit, so its last source is the one just taken.
   const taken = you.kit.at(-1);
   if (draftDealtThisFireside(view) && taken !== undefined) return { kind: "taken", sourceId: taken, name: sourceName(taken) };
@@ -140,7 +179,13 @@ function buildDraft(view: ExpeditionView): DraftPanel {
 function buildKit(view: ExpeditionView): KitItem[] | null {
   const you = view.seats.find((s) => s.seatId === view.yourSeatId);
   if (you === undefined) return null;
-  return liveSourceIds(you).map((sourceId) => ({ sourceId, objectId: kitObjectId(sourceId), name: sourceName(sourceId), badge: badgeFor(sourceId) }));
+  return liveSourceIds(you).map((sourceId) => ({
+    sourceId,
+    objectId: kitObjectId(sourceId),
+    name: sourceName(sourceId),
+    kind: sourceKind(sourceId),
+    charge: chargeText(sourceId, you.usage.find((u) => u.sourceId === sourceId)?.remaining ?? null),
+  }));
 }
 
 function buildCrew(server: SceneServerInput): CrewRow[] {
@@ -156,6 +201,7 @@ function buildCrew(server: SceneServerInput): CrewRow[] {
       isYou: seat.seatId === view.yourSeatId,
       connected: room?.connected ?? false,
       status: seat.characterId === null ? "choosing" : seat.draftPending ? "drafting" : seat.ready ? "ready" : "resting",
+      character: seat.characterId === null ? null : characterName(seat.characterId),
       sources: liveSourceIds(seat).map((sourceId) => ({ sourceId, name: sourceName(sourceId) })),
     };
   });
@@ -183,6 +229,7 @@ export function buildFiresideModel(server: SceneServerInput, ui: LocalUiState, r
     topBar: buildTopBar(view),
     prompt: buildFiresidePrompt(view, roomSeats, { reconnecting }),
     trail: buildTrail(view),
+    muster: buildMuster(server),
     draft: buildDraft(view),
     kit: buildKit(view),
     crew: buildCrew(server),

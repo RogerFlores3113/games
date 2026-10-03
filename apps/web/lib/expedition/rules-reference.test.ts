@@ -22,9 +22,16 @@ describe("buildRulesReference", () => {
       "Tricks",
       "Objectives",
       "The Whisper",
+      "Explorers and gear",
       "Your kit",
       "This camp",
     ]);
+  });
+
+  it("explains explorers, drafting, usage limits and rescue", () => {
+    const explorers = byId(buildRulesReference(null), "explorers");
+    expect(explorers.items.map((i) => i.label)).toEqual(["1 per camp", "Once per run", "Single use", "Herbs and supplies", "Rescue"]);
+    expect(explorers.paragraphs[1]).toBe("After every cleared camp, take one of three offers: an upgrade to your explorer's power, or an item.");
   });
 
   it("lists objective markers", () => {
@@ -48,15 +55,15 @@ describe("buildRulesReference", () => {
     const scout = SOURCE_DISPLAY.scout!;
     const bait = SOURCE_DISPLAY.bait!;
     const kit = byId(buildRulesReference(viewWith({ characterId: "scout", kit: ["bait"] })), "kit");
-    expect(kit.items.map((i) => i.label)).toEqual([scout.name, bait.name]);
-    expect(kit.items[0]!.body).toBe(`Between tricks, 1 per camp. ${scout.text}`);
+    expect(kit.items.map((i) => i.label)).toEqual(["Spyglass (The Scout)", bait.name]);
+    expect(kit.items[0]!.body).toBe("Between tricks, 1 per camp. See a random card in a teammate's hand.");
     expect(kit.items[1]!.body).toContain(bait.text);
     expect(kit.paragraphs).not.toContain("You have not picked a character yet.");
   });
 
   it("marks a passive-only source as always on", () => {
     const kit = byId(buildRulesReference(viewWith({ characterId: "signaller" })), "kit");
-    expect(kit.items[0]!.body).toBe(`Always. ${SOURCE_DISPLAY.signaller!.text}`);
+    expect(kit.items[0]!.body).toBe("Always. You may whisper twice each camp.");
   });
 
   it("skips kit ids missing from the catalogue and says so when nothing is left", () => {

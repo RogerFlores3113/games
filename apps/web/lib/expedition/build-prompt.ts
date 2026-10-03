@@ -1,8 +1,9 @@
 import { CHARACTER_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
 import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
-import { cardLabel, SUIT_GLYPH } from "./expedition-ids";
+import { cardLabel, rankLabel, SUIT_GLYPH } from "./expedition-ids";
 import type { LocalUiState } from "./local-ui";
 import { currentStep } from "./local-ui";
+import { sourceName } from "./source-text";
 
 /**
  * The one line that always says what to do next. Reads only fields the view
@@ -30,12 +31,64 @@ function shortName(name: string): string {
   return name.length <= NAME_MAX_CHARS ? name : `${name.slice(0, NAME_MAX_CHARS - 1)}…`;
 }
 
-function sourceName(sourceId: string): string {
-  return SOURCE_DISPLAY[sourceId]?.name ?? sourceId;
-}
-
 function identityOf(view: ExpeditionView, cardId: string): ExpeditionCardIdentityView | null {
   return view.attempt?.camp?.yourHand.find((c) => c.id === cardId)?.identity ?? null;
+}
+
+function objectivePhrase(view: ExpeditionView, objectiveId: string): string {
+  const o = view.attempt?.camp?.objectives.find((x) => x.id === objectiveId);
+  if (o === undefined) return "an objective";
+  if (o.kind === "win-card" || o.kind === "ordered") return `objective ${cardLabel(o.target)}`;
+  return o.kind === "no-tricks" ? "the no-tricks objective" : `the exactly-${o.n} objective`;
+}
+
+function cardPhrase(view: ExpeditionView, cardId: string): string {
+  const camp = view.attempt?.camp;
+  const own = camp?.yourHand.find((c) => c.id === cardId);
+  if (own !== undefined) return `your ${cardLabel(own.identity)}`;
+  const played = camp?.currentTrick.plays.find((p) => p.card.id === cardId);
+  return played === undefined ? "a card" : `the ${cardLabel(played.card.identity)}`;
+}
+
+/** Names one picked target for the confirm line: "Bo", "Bo's hand", "your
+ * 7♥", "trick 3", "7♥ as 9", "this trick", "the supplies". */
+export function describeChoice(view: ExpeditionView, choiceId: string, nameOf: (seatId: string | null) => string): string {
+  const [kind, ...rest] = choiceId.split(":");
+  const raw = rest.join(":");
+  switch (kind) {
+    case "seat":
+      return raw === view.yourSeatId ? "yourself" : nameOf(raw);
+    case "hand":
+      return `${nameOf(raw)}'s hand`;
+    case "card":
+      return cardPhrase(view, raw);
+    case "objective":
+      return objectivePhrase(view, raw);
+    case "whisper": {
+      const entry = (view.attempt?.log ?? []).filter((l) => l.event === "whisper")[Number(raw)];
+      if (entry === undefined) return "a whisper";
+      const to = entry.subjectSeatIds[0] ?? null;
+      const who = (id: string | null): string => (id === view.yourSeatId ? "you" : nameOf(id));
+      return `the whisper ${who(entry.actorSeatId)} to ${who(to)}`;
+    }
+    case "trick":
+      return `trick ${Number(raw) + 1}`;
+    case "value": {
+      const [cardId, rank] = [rest[0] ?? "", Number(rest[1])];
+      return `${cardPhrase(view, cardId).replace(/^your /, "")} as ${rankLabel(rank)}`;
+    }
+    case "board":
+      return "this trick";
+    case "supplies":
+      return "the supplies";
+    default:
+      return choiceId;
+  }
+}
+
+function joinTargets(parts: string[]): string {
+  if (parts.length <= 1) return parts.join("");
+  return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
 
 function targetingPrompt(view: ExpeditionView, ui: LocalUiState, nameOf: (seatId: string | null) => string): Prompt | null {
@@ -57,9 +110,16 @@ function targetingPrompt(view: ExpeditionView, ui: LocalUiState, nameOf: (seatId
   }
 
   const name = sourceName(targeting.sourceId);
-  if (step !== null) return { text: `${name}: ${step.prompt}`, tone: "your-move" };
-  const seat = picked("seat");
-  return { text: seat === null ? `Use ${name}? Confirm or Cancel` : `Use ${name} on ${nameOf(seat)}? Confirm or Cancel`, tone: "your-move" };
+  if (step !== null) {
+    const held = targeting.valueCardId === null ? null : identityOf(view, targeting.valueCardId);
+    if (held !== null) return { text: `${name}: pick the rank ${cardLabel(held)} counts as`, tone: "your-move" };
+    const full = `${name}: ${step.prompt}`;
+    return { text: full.length <= PROMPT_MAX_CHARS ? full : step.prompt, tone: "your-move" };
+  }
+  const targets = targeting.selected.map((id) => describeChoice(view, id, nameOf));
+  const ask = targets.length === 0 ? `Use ${name}?` : `Use ${name} on ${joinTargets(targets)}?`;
+  const full = `${ask} Confirm or Cancel`;
+  return { text: full.length <= PROMPT_MAX_CHARS ? full : ask, tone: "your-move" };
 }
 
 /** Before the deal or during a rescue: the table waits on these seats. */
@@ -71,7 +131,7 @@ function gatePrompt(view: ExpeditionView, nameOf: (seatId: string | null) => str
   if (view.yourSeatId !== null && pending.includes(view.yourSeatId)) {
     const ability = view.yourAbilities.find((a) => a.usableNow && SOURCE_DISPLAY[a.sourceId]?.active?.window === window);
     const name = ability === undefined ? "an ability" : sourceName(ability.sourceId);
-    return { text: `${when}: use ${name} or skip`, tone: "your-move" };
+    return { text: window === "pre-deal" ? `${when}: use ${name} or skip` : `${when}: rescue it with ${name}, or pass`, tone: "your-move" };
   }
   if (pending.length === 0) return window === "pre-deal" ? { text: "Dealing the cards…", tone: "waiting" } : null;
   return { text: `${when}: waiting for ${nameOf(pending[0]!)}`, tone: "waiting" };
@@ -97,6 +157,19 @@ function campOverPrompt(camp: ExpeditionCampView, nameOf: (seatId: string | null
   return { text: "Camp failed", tone: "alert" };
 }
 
+/** "Bait" or "Bait or Howler Call": your abilities usable on your turn,
+ * before you play. */
+function onYourTurnNames(view: ExpeditionView): string | null {
+  const names = view.yourAbilities.filter((a) => a.usableNow && SOURCE_DISPLAY[a.sourceId]?.active?.window === "in-trick").map((a) => sourceName(a.sourceId));
+  return names.length === 0 ? null : names.join(" or ");
+}
+
+function withTurnAbility(prompt: Prompt, names: string | null): Prompt {
+  if (names === null) return prompt;
+  const text = `${prompt.text}, or use ${names} first`;
+  return text.length <= PROMPT_MAX_CHARS ? { ...prompt, text } : { ...prompt, text: `Your turn: play, or use ${names} first` };
+}
+
 function followPrompt(camp: ExpeditionCampView): Prompt {
   const legal = new Set(camp.yourLegalCardIds);
   const everyCardLegal = camp.yourHand.every((c) => legal.has(c.id));
@@ -116,7 +189,7 @@ function playingPrompt(view: ExpeditionView, camp: ExpeditionCampView, whisperAv
   const firstTrick = leading && camp.completedTricks.length === 0;
 
   if (actor !== null && actor === view.yourSeatId) {
-    if (!leading) return followPrompt(camp);
+    if (!leading) return withTurnAbility(followPrompt(camp), onYourTurnNames(view));
     const anyCard = camp.yourHand.every((c) => camp.yourLegalCardIds.includes(c.id));
     const play = anyCard ? "play any card" : "play a highlighted card";
     return { text: whisperAvailable ? `Your lead: ${play}, or Whisper first` : `Your lead: ${play}`, tone: "your-move" };
@@ -176,7 +249,7 @@ export function buildFiresidePrompt(view: ExpeditionView, seats: readonly Prompt
   if (you === undefined) return { text: `The crew is getting ready for camp ${view.campNumber}`, tone: "waiting" };
 
   const last = view.history.at(-1);
-  if (you.characterId === null) return { text: "Pick your character", tone: "your-move" };
+  if (you.characterId === null) return { text: "Choose your explorer", tone: "your-move" };
   if (view.yourDraftOffer !== null) {
     if (last?.status === "succeeded") return { text: `Camp ${last.campNumber} cleared! Take one`, tone: "your-move" };
     return { text: "Take one to bring along", tone: "your-move" };

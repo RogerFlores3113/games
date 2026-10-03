@@ -157,7 +157,7 @@ export function objectiveItem(
   hit.on("pointerover", () => opts.onHover(true));
   hit.on("pointerout", () => opts.onHover(false));
   if (chip.targetable) hit.on("pointerdown", opts.onClick);
-  container.setAlpha(opts.dim && !chip.targetable ? DIM_ALPHA : 1);
+  container.setAlpha(opts.dim && !chip.targetable && !chip.selected ? DIM_ALPHA : 1);
   return container;
 }
 

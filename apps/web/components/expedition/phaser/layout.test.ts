@@ -11,7 +11,11 @@ import {
   STAGE,
   ZONES,
   handFanXs,
-  opponentBlocks,
+  plateRect,
+  seatSpots,
+  SILHOUETTE_H,
+  SILHOUETTE_W,
+  YOUR_CARD_AT,
   pointInRect,
   rectContains,
   rectsIntersect,
@@ -19,6 +23,7 @@ import {
   stumpRowXs,
   trailStopXs,
   type Rect,
+  type SeatSpot,
 } from "./layout";
 
 describe.each(Object.entries(SCENE_ZONES))("%s zones", (_scene, zones) => {
@@ -80,28 +85,37 @@ describe("rect helpers", () => {
   });
 });
 
-describe("opponentBlocks", () => {
-  it("lays four 138x70 blocks with 4px gaps across the opponents zone", () => {
-    expect(opponentBlocks(4)).toEqual([
-      { x: 10, y: 42, w: 138, h: 70 },
-      { x: 152, y: 42, w: 138, h: 70 },
-      { x: 294, y: 42, w: 138, h: 70 },
-      { x: 436, y: 42, w: 138, h: 70 },
+describe("seats around the stump", () => {
+  const silhouette = (spot: SeatSpot): Rect => ({ x: spot.x - SILHOUETTE_W / 2, y: spot.bottom - SILHOUETTE_H, w: SILHOUETTE_W, h: SILHOUETTE_H });
+  const card = (at: { x: number; y: number }): Rect => ({ x: at.x, y: at.y, w: CARD_W, h: CARD_H });
+
+  it("three teammates sit left, behind and right, each plate above its head", () => {
+    const spots = seatSpots(3);
+    expect(spots.map((s) => s.x)).toEqual([160, 320, 480]);
+    expect(spots.map((_, i) => plateRect(spots, i))).toEqual([
+      { x: 104, y: 92, w: 112, h: 48 },
+      { x: 256, y: 42, w: 128, h: 48 },
+      { x: 424, y: 92, w: 112, h: 48 },
     ]);
   });
 
-  it("centres two blocks", () => {
-    expect(opponentBlocks(2)).toEqual([
-      { x: 152, y: 42, w: 138, h: 70 },
-      { x: 294, y: 42, w: 138, h: 70 },
-    ]);
+  it.each([2, 3, 4, 5])("count=%i: plates stay in the crowd zone and clear of each other and every silhouette", (count) => {
+    const spots = seatSpots(count);
+    expect(spots).toHaveLength(count);
+    const plates = spots.map((_, i) => plateRect(spots, i));
+    for (const p of plates) expect(rectContains(ZONES.crowd, p)).toBe(true);
+    for (let i = 0; i < plates.length; i++) {
+      for (let j = i + 1; j < plates.length; j++) expect(rectsIntersect(plates[i]!, plates[j]!)).toBe(false);
+      for (const s of spots) expect(rectsIntersect(plates[i]!, silhouette(s))).toBe(false);
+    }
   });
 
-  it.each([1, 2, 3, 4, 5])("count=%i: blocks sit inside the zone and never overlap", (count) => {
-    const blocks = opponentBlocks(count);
-    expect(blocks).toHaveLength(count);
-    for (const b of blocks) expect(rectContains(ZONES.opponents, b)).toBe(true);
-    for (let i = 1; i < blocks.length; i++) expect(rectsIntersect(blocks[i - 1]!, blocks[i]!)).toBe(false);
+  it.each([2, 3, 4, 5])("count=%i: every played card lands on the stump, clear of the others and of yours", (count) => {
+    const cards = [...seatSpots(count).map((s) => card(s.card)), card(YOUR_CARD_AT)];
+    for (const c of cards) expect(rectContains(ZONES.stump, c)).toBe(true);
+    for (let i = 0; i < cards.length; i++) {
+      for (let j = i + 1; j < cards.length; j++) expect(rectsIntersect(cards[i]!, cards[j]!)).toBe(false);
+    }
   });
 });
 
@@ -144,8 +158,8 @@ describe("INTERACTABLE_ANCHORS", () => {
 describe("pointInRect (the drop test)", () => {
   it("accepts any point inside the stump and rejects the hand and the stump's far edge", () => {
     expect(pointInRect(ZONES.stump, { x: 320, y: 180 })).toBe(true);
-    expect(pointInRect(ZONES.stump, { x: 136, y: 116 })).toBe(true);
-    expect(pointInRect(ZONES.stump, { x: 504, y: 180 })).toBe(false);
+    expect(pointInRect(ZONES.stump, { x: 192, y: 148 })).toBe(true);
+    expect(pointInRect(ZONES.stump, { x: 448, y: 180 })).toBe(false);
     expect(pointInRect(ZONES.stump, { x: 320, y: 300 })).toBe(false);
   });
 });

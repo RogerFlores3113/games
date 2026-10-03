@@ -25,12 +25,14 @@ export const SETTINGS_SAFE_ZONE: Rect = { x: 584, y: 0, w: 56, h: 56 };
 export const ZONES = {
   topBar: { x: 0, y: 0, w: 576, h: 22 },
   prompt: { x: 96, y: 24, w: 448, h: 16 },
-  opponents: { x: 8, y: 42, w: 568, h: 70 },
-  stump: { x: 136, y: 116, w: 368, h: 128 },
-  whispers: { x: 512, y: 116, w: 120, h: 56 },
-  lastTrick: { x: 512, y: 176, w: 120, h: 68 },
-  world: { x: 8, y: 116, w: 120, h: 128 },
-  tooltip: { x: 120, y: 248, w: 400, h: 24 },
+  world: { x: 8, y: 42, w: 92, h: 100 },
+  crowd: { x: 104, y: 42, w: 432, h: 104 },
+  whispers: { x: 540, y: 58, w: 92, h: 112 },
+  kit: { x: 8, y: 146, w: 92, h: 126 },
+  stump: { x: 192, y: 148, w: 256, h: 82 },
+  lastTrick: { x: 540, y: 174, w: 92, h: 58 },
+  ticker: { x: 136, y: 232, w: 368, h: 18 },
+  tooltip: { x: 104, y: 252, w: 432, h: 24 },
   you: { x: 8, y: 276, w: 108, h: 80 },
   hand: { x: 120, y: 276, w: 400, h: 80 },
   actions: { x: 524, y: 276, w: 108, h: 80 },
@@ -44,11 +46,20 @@ export const FIRESIDE_ZONES = {
   topBar: { x: 0, y: 0, w: 576, h: 22 },
   prompt: { x: 96, y: 24, w: 448, h: 16 },
   trail: { x: 16, y: 44, w: 568, h: 64 },
-  draft: { x: 16, y: 116, w: 384, h: 120 },
-  crew: { x: 408, y: 116, w: 216, h: 120 },
-  tooltip: { x: 16, y: 240, w: 608, h: 24 },
-  backpack: { x: 16, y: 268, w: 448, h: 88 },
-  ready: { x: 472, y: 268, w: 152, h: 88 },
+  draft: { x: 16, y: 112, w: 400, h: 144 },
+  crew: { x: 424, y: 112, w: 200, h: 144 },
+  tooltip: { x: 16, y: 258, w: 608, h: 24 },
+  backpack: { x: 16, y: 284, w: 448, h: 72 },
+  ready: { x: 472, y: 284, w: 152, h: 72 },
+} as const satisfies Record<string, Rect>;
+
+/** The muster before camp 1: six character cards, the crew and Ready. */
+export const MUSTER_ZONES = {
+  topBar: { x: 0, y: 0, w: 576, h: 22 },
+  prompt: { x: 96, y: 24, w: 448, h: 16 },
+  cards: { x: 8, y: 58, w: 624, h: 244 },
+  crew: { x: 8, y: 306, w: 456, h: 50 },
+  ready: { x: 472, y: 306, w: 152, h: 50 },
 } as const satisfies Record<string, Rect>;
 
 /** The end of the run: the outcome, the per-camp strip, and the restart. */
@@ -63,6 +74,7 @@ export const RUN_END_ZONES = {
 export const SCENE_ZONES: Readonly<Record<string, Readonly<Record<string, Rect>>>> = {
   camp: ZONES,
   fireside: FIRESIDE_ZONES,
+  muster: MUSTER_ZONES,
   "run-end": RUN_END_ZONES,
 };
 
@@ -93,23 +105,60 @@ export function centreOf(r: Rect): Point {
 }
 
 // ---------------------------------------------------------------------------
-// Opponent seat blocks
+// Seats around the stump
 // ---------------------------------------------------------------------------
 
-export const SEAT_BLOCK_W = 138;
-export const SEAT_BLOCK_GAP = 4;
-export const SEAT_BLOCK_PAD = 4;
+/** The stump sprite's top-left; its flat top spans x 206..450, y 150..223. */
+export const STUMP_ART_AT: Point = { x: 128, y: 138 };
+export const SILHOUETTE_W = 64;
+export const SILHOUETTE_H = 80;
+export const PLATE_H = 48;
+const PLATE_GAP = 2;
 
-/** One block per opponent, left to right in turn order, centred in the
- * `opponents` zone. Four blocks fill the zone at full width; a fifth (only
- * possible for an unseated spectator of a 5-player game) shrinks them all. */
-export function opponentBlocks(count: number): Rect[] {
-  if (count <= 0) return [];
-  const zone = ZONES.opponents;
-  const w = Math.min(SEAT_BLOCK_W, Math.floor((zone.w - SEAT_BLOCK_GAP * (count - 1)) / count));
-  const total = w * count + SEAT_BLOCK_GAP * (count - 1);
-  const startX = zone.x + Math.floor((zone.w - total) / 2);
-  return Array.from({ length: count }, (_, i) => ({ x: startX + i * (w + SEAT_BLOCK_GAP), y: zone.y, w, h: zone.h }));
+/** Where a teammate sits: the silhouette's bottom-centre (its legs hidden
+ * behind the stump's rim), and the top-left of the card they play, on the
+ * stump in front of them. */
+export interface SeatSpot {
+  x: number;
+  bottom: number;
+  card: Point;
+}
+
+const SIDE_LEFT: SeatSpot = { x: 160, bottom: 222, card: { x: 226, y: 170 } };
+const BACK_LEFT: SeatSpot = { x: 262, bottom: 174, card: { x: 268, y: 151 } };
+const BACK: SeatSpot = { x: 320, bottom: 172, card: { x: 306, y: 150 } };
+const BACK_RIGHT: SeatSpot = { x: 378, bottom: 174, card: { x: 344, y: 151 } };
+const SIDE_RIGHT: SeatSpot = { x: 480, bottom: 222, card: { x: 386, y: 170 } };
+const BACK_LEFT_5: SeatSpot = { x: 248, bottom: 174, card: { x: 262, y: 151 } };
+const BACK_RIGHT_5: SeatSpot = { x: 392, bottom: 174, card: { x: 350, y: 151 } };
+
+/** Your own card, at the front of the stump. */
+export const YOUR_CARD_AT: Point = { x: 306, y: 190 };
+
+/** Teammates left to right in turn order: with two they flank the stump,
+ * with three one sits behind it. Five is a spectator's view. */
+const SPOTS: Readonly<Record<number, readonly SeatSpot[]>> = {
+  1: [BACK],
+  2: [SIDE_LEFT, SIDE_RIGHT],
+  3: [SIDE_LEFT, BACK, SIDE_RIGHT],
+  4: [SIDE_LEFT, BACK_LEFT, BACK_RIGHT, SIDE_RIGHT],
+  5: [SIDE_LEFT, BACK_LEFT_5, BACK, BACK_RIGHT_5, SIDE_RIGHT],
+};
+
+export function seatSpots(count: number): readonly SeatSpot[] {
+  return SPOTS[count] ?? [];
+}
+
+/** The name plate above a seat's head: as wide as fits between its
+ * neighbours on the same row, and never outside the crowd zone. */
+export function plateRect(spots: readonly SeatSpot[], i: number): Rect {
+  const spot = spots[i]!;
+  const y = spot.bottom - SILHOUETTE_H - PLATE_GAP - PLATE_H;
+  const sameRow = spots.filter((s) => s !== spot && Math.abs(s.bottom - spot.bottom) < PLATE_H + PLATE_GAP * 2);
+  const gap = Math.min(...sameRow.map((s) => Math.abs(s.x - spot.x) - 4), 128);
+  const zone = ZONES.crowd;
+  const w = Math.min(gap, 2 * (spot.x - zone.x), 2 * (zone.x + zone.w - spot.x));
+  return { x: Math.round(spot.x - w / 2), y, w, h: PLATE_H };
 }
 
 // ---------------------------------------------------------------------------
@@ -141,9 +190,7 @@ export function handFanXs(count: number): number[] {
 // ---------------------------------------------------------------------------
 
 export const STUMP_CENTRE: Point = centreOf(ZONES.stump);
-export const TRICK_STEP = 48;
-export const TRICK_CARD_TOP = STUMP_CENTRE.y - 24;
-export const OBJECTIVE_POOL_STEP = 52;
+export const OBJECTIVE_POOL_STEP = 50;
 
 /** Centre x of each of `count` items spaced `step` apart, centred on the
  * stump. */
@@ -162,9 +209,9 @@ export const INTERACTABLE_ANCHORS: {
   lantern: Point;
   mascot: Point;
 } = {
-  campfire: { x: 48, y: 214 },
-  fireflies: { x: 40, y: 140 },
-  lantern: { x: 104, y: 150 },
+  campfire: { x: 50, y: 120 },
+  fireflies: { x: 30, y: 64 },
+  lantern: { x: 84, y: 70 },
   mascot: { x: 612, y: 338 },
 };
 

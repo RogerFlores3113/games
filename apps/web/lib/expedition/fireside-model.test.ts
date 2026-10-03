@@ -48,7 +48,7 @@ function seatsWith(you: Partial<ExpeditionView["seats"][number]>): ExpeditionVie
 
 describe("topBar", () => {
   it("names the camp about to start", () => {
-    expect(buildFiresideModel(server(makeView()), ui()).topBar).toEqual({ supplies: 3, camp: "Camp 2 of 6", boss: null });
+    expect(buildFiresideModel(server(makeView()), ui()).topBar).toEqual({ supplies: 3, camp: "Camp 2 of 6", boss: null, suppliesPick: null });
   });
 
   it("previews a boss camp, by name once the twist is revealed", () => {
@@ -85,14 +85,29 @@ describe("trail", () => {
 });
 
 describe("draft", () => {
-  it("offers the drafted sources with name and window badge", () => {
-    const model = buildFiresideModel(server(makeView({ yourDraftOffer: ["trained-monkey", "rain-poncho"] })), ui());
+  it("offers an upgrade for your character and items, each with its text and badges", () => {
+    const model = buildFiresideModel(server(makeView({ yourDraftOffer: ["guide.howler-call", "rain-poncho"] })), ui());
     expect(model.draft).toEqual({
       kind: "offer",
-      pick: "draft",
       items: [
-        { sourceId: "trained-monkey", objectId: "draft:trained-monkey", name: "Trained Monkey", badge: "Between tricks, 1 per camp" },
-        { sourceId: "rain-poncho", objectId: "draft:rain-poncho", name: "Rain Poncho", badge: "Before the deal, Once per run" },
+        {
+          sourceId: "guide.howler-call",
+          objectId: "draft:guide.howler-call",
+          name: "Howler Call",
+          kind: "upgrade",
+          ribbon: "Machete upgrade",
+          text: "The lowest card of the led suit wins this trick.",
+          badges: ["On your turn", "Once per run"],
+        },
+        {
+          sourceId: "rain-poncho",
+          objectId: "draft:rain-poncho",
+          name: "Rain Poncho",
+          kind: "item",
+          ribbon: "Item",
+          text: "Cancel this camp's boss twist, and nobody may whisper this camp.",
+          badges: ["Before the deal", "Once per run"],
+        },
       ],
     });
   });
@@ -106,42 +121,74 @@ describe("draft", () => {
     expect(buildFiresideModel(server(view), ui()).draft).toEqual({ kind: "none", text: "Nothing new after a failed camp" });
   });
 
-  it("at muster offers only the characters nobody has taken", () => {
-    const view = makeView({
-      runPhase: "muster",
-      history: [],
-      seats: makeView().seats.map((s) => (s.seatId === "s2" ? { ...s, characterId: null, kit: [] } : s)),
-    });
-    expect(buildFiresideModel(server(view), ui()).draft).toEqual({
-      kind: "offer",
-      pick: "character",
-      items: [
-        { sourceId: "guide", objectId: "draft:guide", name: "The Guide", badge: "Cuts the trail" },
-        { sourceId: "botanist", objectId: "draft:botanist", name: "The Botanist", badge: "Brews jungle herbs" },
-        { sourceId: "signaller", objectId: "draft:signaller", name: "The Signaller", badge: "Talks in drums" },
-        { sourceId: "cartographer", objectId: "draft:cartographer", name: "The Cartographer", badge: "Redraws the route" },
-      ],
+  it("is empty at muster: the character cards take its place", () => {
+    const view = makeView({ runPhase: "muster", history: [] });
+    expect(buildFiresideModel(server(view), ui()).draft).toEqual({ kind: "none", text: "" });
+  });
+});
+
+describe("muster", () => {
+  const mustering = (you: Partial<ExpeditionView["seats"][number]>): ExpeditionView =>
+    makeView({ runPhase: "muster", history: [], seats: seatsWith({ kit: [], ...you }) });
+
+  it("shows all six characters, marking the ones teammates took, all pickable for you until you pick", () => {
+    const cards = buildFiresideModel(server(mustering({ characterId: null })), ui()).muster!;
+    expect(cards.map((c) => [c.characterId, c.takenBy, c.pickable])).toEqual([
+      ["scout", "Alice", false],
+      ["guide", null, true],
+      ["botanist", null, true],
+      ["medic", "Cara", false],
+      ["signaller", null, true],
+      ["cartographer", null, true],
+    ]);
+  });
+
+  it("describes a character by name, theme, base power and pool", () => {
+    const botanist = buildFiresideModel(server(mustering({ characterId: null })), ui()).muster!.find((c) => c.characterId === "botanist");
+    expect(botanist).toEqual({
+      characterId: "botanist",
+      objectId: "draft:botanist",
+      name: "The Botanist",
+      theme: "Brews jungle herbs",
+      power: { sourceId: "botanist", name: "Herb Tonic", text: "A card in your hand counts one rank higher or lower this camp.", badges: ["Between tricks", "1 herb"] },
+      pool: "Herbs: start 2, max 3",
+      takenBy: null,
+      yours: false,
+      pickable: true,
     });
   });
 
-  it("at muster shows your character once picked", () => {
-    const view = makeView({ runPhase: "muster", history: [] });
-    expect(buildFiresideModel(server(view), ui()).draft).toEqual({ kind: "taken", sourceId: "guide", name: "The Guide" });
+  it("marks your pick as yours and leaves nothing pickable after it", () => {
+    const cards = buildFiresideModel(server(mustering({ characterId: "guide" })), ui()).muster!;
+    expect(cards.find((c) => c.characterId === "guide")).toMatchObject({ takenBy: "You", yours: true, pickable: false });
+    expect(cards.filter((c) => c.pickable)).toEqual([]);
+  });
+
+  it("is null once the crew has left the muster", () => {
+    expect(buildFiresideModel(server(makeView()), ui()).muster).toBeNull();
   });
 });
 
 describe("kit", () => {
-  it("lists your character, then your kit, with badges", () => {
-    expect(buildFiresideModel(server(makeView()), ui()).kit).toEqual([
-      { sourceId: "guide", objectId: "kit:guide", name: "The Guide", badge: "Cuts the trail" },
-      { sourceId: "trained-monkey", objectId: "kit:trained-monkey", name: "Trained Monkey", badge: "Between tricks, 1 per camp" },
+  it("lists your character's power, then your kit, with what is left of each", () => {
+    const view = makeView({
+      seats: seatsWith({
+        usage: [
+          { sourceId: "guide", remaining: { kind: "uses", left: 0, of: 1 } },
+          { sourceId: "trained-monkey", remaining: { kind: "uses", left: 1, of: 1 } },
+        ],
+      }),
+    });
+    expect(buildFiresideModel(server(view), ui()).kit).toEqual([
+      { sourceId: "guide", objectId: "kit:guide", name: "Machete", kind: "character", charge: "used" },
+      { sourceId: "trained-monkey", objectId: "kit:trained-monkey", name: "Trained Monkey", kind: "item", charge: "1 left" },
     ]);
   });
 
-  it("marks a passive-only character as Always", () => {
+  it("marks a passive-only character as always on", () => {
     const view = makeView({ seats: seatsWith({ characterId: "signaller", kit: [] }) });
     expect(buildFiresideModel(server(view), ui()).kit).toEqual([
-      { sourceId: "signaller", objectId: "kit:signaller", name: "The Signaller", badge: "Talks in drums" },
+      { sourceId: "signaller", objectId: "kit:signaller", name: "Talking Drum", kind: "character", charge: "always on" },
     ]);
   });
 
@@ -151,17 +198,25 @@ describe("kit", () => {
 });
 
 describe("crew", () => {
-  it("lists you first, then the table order, with status and public sources", () => {
+  it("lists you first, then the table order, with status, character and public sources", () => {
     expect(buildFiresideModel(server(makeView()), ui()).crew).toEqual([
-      { seatId: "s2", displayLabel: "Bob", isYou: true, connected: true, status: "resting", sources: [{ sourceId: "guide", name: "The Guide" }, { sourceId: "trained-monkey", name: "Trained Monkey" }] },
-      { seatId: "s3", displayLabel: "Cara", isYou: false, connected: false, status: "drafting", sources: [{ sourceId: "medic", name: "The Medic" }, { sourceId: "bait", name: "Bait" }] },
-      { seatId: "s1", displayLabel: "Alice", isYou: false, connected: true, status: "ready", sources: [{ sourceId: "scout", name: "The Scout" }] },
+      {
+        seatId: "s2",
+        displayLabel: "Bob",
+        isYou: true,
+        connected: true,
+        status: "resting",
+        character: "The Guide",
+        sources: [{ sourceId: "guide", name: "Machete" }, { sourceId: "trained-monkey", name: "Trained Monkey" }],
+      },
+      { seatId: "s3", displayLabel: "Cara", isYou: false, connected: false, status: "drafting", character: "The Medic", sources: [{ sourceId: "medic", name: "Triage" }, { sourceId: "bait", name: "Bait" }] },
+      { seatId: "s1", displayLabel: "Alice", isYou: false, connected: true, status: "ready", character: "The Scout", sources: [{ sourceId: "scout", name: "Spyglass" }] },
     ]);
   });
 
   it("shows a seat with no character yet as choosing", () => {
     const view = makeView({ runPhase: "muster", seats: seatsWith({ characterId: null, kit: [] }) });
-    expect(buildFiresideModel(server(view), ui()).crew[0]).toMatchObject({ seatId: "s2", status: "choosing", sources: [] });
+    expect(buildFiresideModel(server(view), ui()).crew[0]).toMatchObject({ seatId: "s2", status: "choosing", character: null, sources: [] });
   });
 });
 
@@ -180,19 +235,20 @@ describe("ready", () => {
 });
 
 describe("tooltip", () => {
-  it("shows the hovered source's rules with its window and limit", () => {
+  it("shows the hovered source's rules, with its window and limit as badges", () => {
     const poncho = buildFiresideModel(server(makeView({ yourDraftOffer: ["rain-poncho"] })), ui({ tooltipSourceId: "rain-poncho" })).tooltip;
     expect(poncho).toEqual({
       title: "Rain Poncho",
-      text: "Cancel this camp's boss twist, and nobody may whisper this camp. (Before the deal, Once per run)",
+      text: "Cancel this camp's boss twist, and nobody may whisper this camp.",
+      badges: ["Before the deal", "Once per run"],
       reason: null,
     });
     expect(buildFiresideModel(server(makeView()), ui()).tooltip).toBeNull();
   });
 
-  it("adds a character's theme", () => {
+  it("titles a character by its power", () => {
     const scout = buildFiresideModel(server(makeView()), ui({ tooltipSourceId: "scout" })).tooltip;
-    expect(scout?.text).toBe("Eyes in the canopy. See a random card in a teammate's hand. (Between tricks, 1 per camp)");
+    expect(scout).toEqual({ title: "Spyglass", text: "See a random card in a teammate's hand.", badges: ["Between tricks", "1 per camp"], reason: null });
   });
 });
 
@@ -206,7 +262,7 @@ describe("prompt", () => {
 
   it("asks you to pick a character at muster", () => {
     const view = makeView({ runPhase: "muster", history: [], seats: seatsWith({ characterId: null, kit: [] }) });
-    expect(buildFiresideModel(server(view), ui()).prompt).toEqual({ text: "Pick your character", tone: "your-move" });
+    expect(buildFiresideModel(server(view), ui()).prompt).toEqual({ text: "Choose your explorer", tone: "your-move" });
   });
 });
 

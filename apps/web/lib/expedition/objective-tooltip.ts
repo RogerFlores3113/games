@@ -33,5 +33,5 @@ export function objectiveTooltip(o: ExpeditionObjectiveView, holder: ObjectiveHo
     title = `Exactly ${o.n}`;
     body = `${who} must win exactly ${o.n} ${o.n === 1 ? "trick" : "tricks"}`;
   }
-  return { title, text: `${body}. ${status[0]!.toUpperCase()}${status.slice(1)}.`, reason: null };
+  return { title, text: `${body[0]!.toUpperCase()}${body.slice(1)}.`, badges: [`${status[0]!.toUpperCase()}${status.slice(1)}`], reason: null };
 }

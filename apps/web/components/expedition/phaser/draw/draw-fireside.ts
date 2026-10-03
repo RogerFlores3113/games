@@ -5,12 +5,12 @@
 import type Phaser from "phaser";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
-import { FIRESIDE_ZONES, rowBoxes, trailStopXs, type Rect } from "../layout";
+import { FIRESIDE_ZONES, MUSTER_ZONES, rowBoxes, trailStopXs, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
-import { ART, sourceArtId, type ArtId } from "../art/art-registry";
+import { ART, crewArtId, sourceArtId, type ArtId } from "../art/art-registry";
 import type { ObjectIndex } from "../object-index";
-import type { CrewRow, DraftItem, FiresideModel, KitItem, TrailStop } from "../../../../lib/expedition/fireside-model";
-import { fitLabel } from "./text-fit";
+import type { CharacterCard, CrewRow, DraftItem, FiresideModel, KitItem, TrailStop } from "../../../../lib/expedition/fireside-model";
+import { fitLabel, wrapWords } from "./text-fit";
 import { PANEL_ALPHA, button, labelWidth, plate, text, type Layer } from "./ui-kit";
 
 export interface FiresideHandlers {
@@ -102,29 +102,138 @@ function drawTrail(ctx: Ctx): void {
 }
 
 // ---------------------------------------------------------------------------
+// Muster
+// ---------------------------------------------------------------------------
+
+const MUSTER_GAP = 4;
+const PORTRAIT_H = 84;
+const LINE = LABEL_CELL.h + 2;
+
+/** Lines of `value` wrapped to the card width, at most `max`. */
+function wrapped(value: string, chars: number, max: number): string[] {
+  return wrapWords(value, chars).slice(0, max);
+}
+
+function drawCharacterCard(ctx: Ctx, card: CharacterCard, x: number, y: number, w: number, h: number): void {
+  const { scene, layer, index, handlers } = ctx;
+  const container = scene.add.container(x, y);
+  const bg = scene.add.rectangle(0, 0, w, h, toPhaserColor(PALETTE.plate)).setOrigin(0, 0);
+  const edge = card.yours ? PALETTE.turn : card.pickable ? PALETTE.sun : PALETTE.plateEdge;
+  bg.setStrokeStyle(card.yours ? 2 : 1, toPhaserColor(edge));
+  container.add(bg);
+  container.add(scene.add.rectangle(2, 2, w - 4, PORTRAIT_H, toPhaserColor(PALETTE.night)).setOrigin(0, 0));
+  const art = crewArtId(card.characterId);
+  if (art !== null) container.add(placeArt(scene, art, w / 2, 2 + PORTRAIT_H - 40));
+
+  const chars = Math.floor((w - 4) / LABEL_CELL.w);
+  const cx = Math.floor(w / 2);
+  let cy = PORTRAIT_H + 6;
+  container.add(centredText(scene, cx, cy, fitLabel(card.name, chars), PALETTE.sun));
+  cy += LINE;
+  for (const line of wrapped(card.theme, chars, 2)) {
+    container.add(centredText(scene, cx, cy, line, PALETTE.textDim));
+    cy += LINE;
+  }
+  cy += 3;
+  container.add(scene.add.rectangle(4, cy - 2, w - 8, 1, toPhaserColor(PALETTE.plateEdge)).setOrigin(0, 0));
+  const icon = sourceArtId(card.power.sourceId);
+  const powerW = (icon === null ? 0 : 18) + labelWidth(card.power.name);
+  const px = Math.floor((w - powerW) / 2);
+  if (icon !== null) container.add(placeArt(scene, icon, px + 8, cy + 6));
+  container.add(text(scene, px + (icon === null ? 0 : 18), cy + 2, card.power.name));
+  cy += 16;
+  for (const line of wrapped(card.power.text, chars, 4)) {
+    container.add(centredText(scene, cx, cy, line));
+    cy += LINE;
+  }
+  cy += 2;
+  for (const badge of card.power.badges) {
+    for (const line of wrapped(badge, chars - 1, 2)) {
+      container.add(badgeText(scene, cx, cy, line));
+      cy += LINE + 1;
+    }
+  }
+  if (card.pool !== null) {
+    for (const line of wrapped(card.pool, chars, 2)) {
+      container.add(centredText(scene, cx, cy, line, PALETTE.done));
+      cy += LINE;
+    }
+  }
+
+  const footer = card.yours ? "Your explorer" : card.takenBy !== null ? `Taken: ${card.takenBy}` : card.pickable ? "Choose" : "Free";
+  const footerColor = card.yours ? PALETTE.turn : card.takenBy !== null ? PALETTE.textDim : PALETTE.sun;
+  container.add(centredText(scene, cx, h - LABEL_CELL.h - 4, fitLabel(footer, chars), footerColor));
+  if (card.takenBy !== null && !card.yours) container.setAlpha(0.55);
+
+  container.setSize(w, h);
+  const hit = scene.add.zone(0, 0, w, h).setOrigin(0, 0);
+  hit.setInteractive({ useHandCursor: card.pickable });
+  if (card.pickable) hit.on("pointerdown", () => handlers.onDraft(card.characterId));
+  container.add(hit);
+  if (card.pickable) {
+    scene.tweens.add({ targets: bg, alpha: { from: 1, to: 0.8 }, duration: PULSE_MS, yoyo: true, repeat: -1 });
+  }
+  layer.add(container);
+  index.register("fireside", card.objectId, container);
+}
+
+function badgeText(scene: Phaser.Scene, cx: number, y: number, value: string): Phaser.GameObjects.GameObject[] {
+  const w = labelWidth(value) + 4;
+  const x = cx - Math.floor(w / 2);
+  return [scene.add.rectangle(x, y - 1, w, LABEL_CELL.h + 2, toPhaserColor(PALETTE.stump)).setOrigin(0, 0), text(scene, x + 2, y, value, PALETTE.text)];
+}
+
+function drawMuster(ctx: Ctx, cards: CharacterCard[]): void {
+  const { scene, layer } = ctx;
+  const zone = MUSTER_ZONES.cards;
+  const title = "Choose your explorer";
+  layer.add(plate(scene, zone.x + Math.floor((zone.w - labelWidth(title)) / 2) - 4, zone.y - 13, labelWidth(title) + 8, 12).setAlpha(PANEL_ALPHA));
+  layer.add(centredText(scene, zone.x + zone.w / 2, zone.y - 11, title, PALETTE.sun));
+  rowBoxes(zone.x + 2, zone.w - 4, cards.length, MUSTER_GAP, 120).forEach((box, i) => {
+    drawCharacterCard(ctx, cards[i]!, box.x, zone.y, box.w, zone.h);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Draft
 // ---------------------------------------------------------------------------
 
-const TILE_GAP = 8;
-const TILE_MAX_W = 116;
-const TILE_H = 100;
-function drawDraftTile(ctx: Ctx, item: DraftItem, x: number, y: number, w: number): void {
+const TILE_GAP = 6;
+const TILE_MAX_W = 128;
+
+function drawDraftTile(ctx: Ctx, item: DraftItem, x: number, y: number, w: number, h: number): void {
   const { scene, layer, index, handlers } = ctx;
   const container = scene.add.container(x, y);
-  const bg = scene.add.rectangle(0, 0, w, TILE_H, toPhaserColor(PALETTE.stump)).setOrigin(0, 0);
+  const upgrade = item.kind === "upgrade";
+  const bg = scene.add.rectangle(0, 0, w, h, toPhaserColor(upgrade ? PALETTE.stump : PALETTE.bark)).setOrigin(0, 0);
   bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn));
   container.add(bg);
-  const art = sourceArtId(item.sourceId);
-  if (art !== null) container.add(placeArt(scene, art, w / 2, 22).setScale(2));
+  const chars = Math.floor((w - 6) / LABEL_CELL.w);
   const cx = Math.floor(w / 2);
-  const cells = Math.floor((w - 4) / LABEL_CELL.w);
-  container.add(centredText(scene, cx, 44, fitLabel(item.name, cells)));
-  container.add(centredText(scene, cx, 62, fitLabel(item.badge, cells), PALETTE.textDim));
-  container.add(centredText(scene, cx, 86, "Take it", PALETTE.turn));
-  bg.setInteractive({ useHandCursor: true });
-  bg.on("pointerdown", () => handlers.onDraft(item.sourceId));
-  bg.on("pointerover", () => handlers.onSourceHover(item.sourceId));
-  bg.on("pointerout", () => handlers.onSourceHover(null));
+  container.add(scene.add.rectangle(0, 0, w, 11, toPhaserColor(upgrade ? PALETTE.turn : PALETTE.moss)).setOrigin(0, 0));
+  container.add(centredText(scene, cx, 2, fitLabel(item.ribbon, chars)));
+  const art = sourceArtId(item.sourceId);
+  if (art !== null) container.add(placeArt(scene, art, cx, 30).setScale(2));
+  let cy = 48;
+  container.add(centredText(scene, cx, cy, fitLabel(item.name, chars), PALETTE.sun));
+  cy += LINE + 2;
+  for (const line of wrapped(item.text, chars, 3)) {
+    container.add(centredText(scene, cx, cy, line));
+    cy += LINE;
+  }
+  cy += 2;
+  for (const badge of item.badges) {
+    for (const line of wrapped(badge, chars - 1, 2)) {
+      container.add(badgeText(scene, cx, cy, line));
+      cy += LINE + 1;
+    }
+  }
+  container.add(centredText(scene, cx, h - LABEL_CELL.h - 4, "Take it", PALETTE.turn));
+  container.setSize(w, h);
+  const hit = scene.add.zone(0, 0, w, h).setOrigin(0, 0);
+  hit.setInteractive({ useHandCursor: true });
+  hit.on("pointerdown", () => handlers.onDraft(item.sourceId));
+  container.add(hit);
   layer.add(container);
   index.register("fireside", item.objectId, container);
 }
@@ -135,10 +244,9 @@ function drawDraft(ctx: Ctx): void {
   panel(ctx, zone);
   const draft = model.draft;
   if (draft.kind === "offer") {
-    const title = draft.pick === "character" ? "Muster: pick your character" : "By the fire: take one";
-    layer.add(text(scene, zone.x + 6, zone.y + 4, title, PALETTE.textDim));
-    rowBoxes(zone.x + 8, zone.w - 16, draft.items.length, TILE_GAP, TILE_MAX_W).forEach((box, i) => {
-      drawDraftTile(ctx, draft.items[i]!, box.x, zone.y + 16, box.w);
+    layer.add(text(scene, zone.x + 6, zone.y + 3, "Camp cleared! Take one to bring along", PALETTE.textDim));
+    rowBoxes(zone.x + 6, zone.w - 12, draft.items.length, TILE_GAP, TILE_MAX_W).forEach((box, i) => {
+      drawDraftTile(ctx, draft.items[i]!, box.x, zone.y + 14, box.w, zone.h - 18);
     });
     return;
   }
@@ -158,16 +266,16 @@ function drawDraft(ctx: Ctx): void {
 // ---------------------------------------------------------------------------
 
 const CREW_TITLE_H = 13;
-const CREW_ROW_MAX = 26;
-const CHIP_H = 10;
+const CREW_ROW_MAX = 30;
 
 const STATUS: Readonly<Record<CrewRow["status"], { label: string; color: string }>> = {
   ready: { label: "ready ✓", color: PALETTE.done },
   drafting: { label: "drafting…", color: PALETTE.sun },
   choosing: { label: "choosing…", color: PALETTE.sun },
-  resting: { label: "resting…", color: PALETTE.textDim },
+  resting: { label: "not ready", color: PALETTE.textDim },
 };
 
+/** Name and status, then the character and kit as icons. */
 function drawCrewRow(ctx: Ctx, row: CrewRow, x: number, y: number, w: number): void {
   const { scene, layer } = ctx;
   const status = row.connected ? STATUS[row.status] : { label: "away", color: PALETTE.statusDisconnected };
@@ -176,34 +284,24 @@ function drawCrewRow(ctx: Ctx, row: CrewRow, x: number, y: number, w: number): v
   layer.add(text(scene, x, y, fitLabel(row.isYou ? `${row.displayLabel} (you)` : row.displayLabel, nameChars), row.isYou ? PALETTE.turn : PALETTE.text));
   layer.add(text(scene, statusX, y, status.label, status.color));
 
-  const chipY = y + LABEL_CELL.h + 2;
-  if (row.sources.length === 0) {
-    layer.add(text(scene, x, chipY + 1, "no character yet", PALETTE.textDim));
+  const iconY = y + LABEL_CELL.h + 10;
+  if (row.character === null) {
+    layer.add(text(scene, x, iconY - 4, "no explorer yet", PALETTE.textDim));
     return;
   }
   let cursor = x;
-  for (let i = 0; i < row.sources.length; i++) {
-    const source = row.sources[i]!;
-    const rest = row.sources.length - i - 1;
-    const reserve = rest > 0 ? labelWidth(`+${rest}`) + 2 : 0;
+  for (const source of row.sources) {
     const art = sourceArtId(source.sourceId);
-    const iconW = art === null ? 0 : ART[art].w + 1;
-    const label = fitLabel(source.name, Math.floor((x + w - reserve - cursor - 4 - iconW) / LABEL_CELL.w));
-    if (Array.from(label).length < 3) {
-      layer.add(text(scene, cursor, chipY + 1, `+${rest + 1}`, PALETTE.textDim));
-      return;
-    }
-    const chipW = iconW + labelWidth(label) + 4;
-    layer.add(plate(scene, cursor, chipY, chipW, CHIP_H, PALETTE.bark));
-    if (art !== null) layer.add(placeArt(scene, art, cursor + 1 + ART[art].w / 2, chipY + CHIP_H / 2));
-    layer.add(text(scene, cursor + 2 + iconW, chipY + 1, label));
-    cursor += chipW + 2;
+    if (art === null) continue;
+    if (cursor + ART[art].w > x + w - labelWidth(row.character) - 6) break;
+    layer.add(placeArt(scene, art, cursor + ART[art].w / 2, iconY));
+    cursor += ART[art].w + 1;
   }
+  layer.add(text(scene, x + w - labelWidth(row.character), iconY - 4, row.character, PALETTE.textDim));
 }
 
-function drawCrew(ctx: Ctx): void {
+function drawCrewIn(ctx: Ctx, zone: Rect): void {
   const { scene, layer, model } = ctx;
-  const zone = FIRESIDE_ZONES.crew;
   panel(ctx, zone);
   layer.add(text(scene, zone.x + 4, zone.y + 3, "Crew", PALETTE.textDim));
   const rowH = Math.min(CREW_ROW_MAX, Math.floor((zone.h - CREW_TITLE_H) / Math.max(1, model.crew.length)));
@@ -215,26 +313,45 @@ function drawCrew(ctx: Ctx): void {
   });
 }
 
+/** At muster the crew is a row of name and pick, one column per seat. */
+function drawMusterCrew(ctx: Ctx): void {
+  const { scene, layer, model } = ctx;
+  const zone = MUSTER_ZONES.crew;
+  panel(ctx, zone);
+  layer.add(text(scene, zone.x + 4, zone.y + 3, "Crew", PALETTE.textDim));
+  rowBoxes(zone.x + 4, zone.w - 8, model.crew.length, 6, 150).forEach((box, i) => {
+    const row = model.crew[i]!;
+    const chars = Math.floor(box.w / LABEL_CELL.w);
+    const y = zone.y + 14;
+    const group = scene.add.container(0, 0);
+    group.add(text(scene, box.x, y, fitLabel(row.isYou ? `${row.displayLabel} (you)` : row.displayLabel, chars), row.isYou ? PALETTE.turn : PALETTE.text));
+    const status = row.connected ? STATUS[row.status] : { label: "away", color: PALETTE.statusDisconnected };
+    group.add(text(scene, box.x, y + 11, fitLabel(row.character ?? "choosing…", chars), row.character === null ? PALETTE.sun : PALETTE.textDim));
+    if (row.character !== null) group.add(text(scene, box.x, y + 22, status.label, status.color));
+    if (!row.connected) group.setAlpha(0.6);
+    layer.add(group);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Kit
 // ---------------------------------------------------------------------------
 
-const KIT_X = 124;
-const KIT_GAP = 4;
-const KIT_MAX_W = 96;
-const KIT_H = 42;
+const KIT_X = 112;
+const KIT_GAP = 3;
+const KIT_ROW_H = 20;
 
 function drawKitTile(ctx: Ctx, item: KitItem, x: number, y: number, w: number): void {
   const { scene, layer, index, handlers } = ctx;
   const container = scene.add.container(x, y);
-  const bg = scene.add.rectangle(0, 0, w, KIT_H, toPhaserColor(PALETTE.stump)).setOrigin(0, 0);
+  const bg = scene.add.rectangle(0, 0, w, KIT_ROW_H, toPhaserColor(item.kind === "item" ? PALETTE.bark : PALETTE.stump)).setOrigin(0, 0);
   container.add(bg);
   const art = sourceArtId(item.sourceId);
-  if (art !== null) container.add(placeArt(scene, art, w / 2, 11));
-  const cx = Math.floor(w / 2);
-  const cells = Math.floor((w - 2) / LABEL_CELL.w);
-  container.add(centredText(scene, cx, 21, fitLabel(item.name, cells)));
-  container.add(centredText(scene, cx, 31, fitLabel(item.badge, cells), PALETTE.textDim));
+  if (art !== null) container.add(placeArt(scene, art, 10, KIT_ROW_H / 2));
+  const chars = Math.floor((w - 22) / LABEL_CELL.w);
+  container.add(text(scene, 20, 1, fitLabel(item.name, chars)));
+  container.add(text(scene, 20, KIT_ROW_H - LABEL_CELL.h - 1, fitLabel(item.charge, chars), PALETTE.textDim));
+  container.setSize(w, KIT_ROW_H);
   bg.setInteractive();
   bg.on("pointerover", () => handlers.onSourceHover(item.sourceId));
   bg.on("pointerout", () => handlers.onSourceHover(null));
@@ -251,19 +368,14 @@ function drawKit(ctx: Ctx): void {
     layer.add(centredText(scene, zone.x + zone.w / 2, zone.y + zone.h / 2 - 4, "Watching the crew", PALETTE.textDim));
     return;
   }
-  layer.add(text(scene, zone.x + 4, zone.y + 3, "Kit"));
+  layer.add(text(scene, zone.x + 4, zone.y + 3, "Your kit"));
   const art = ART["backpack-open"];
-  layer.add(placeArt(scene, "backpack-open", zone.x + 4 + art.w / 2, zone.y + 16 + art.h / 2));
-
+  layer.add(placeArt(scene, "backpack-open", zone.x + 4 + art.w / 2, zone.y + zone.h - art.h / 2 - 2));
   const x0 = zone.x + KIT_X;
-  const rowW = zone.x + zone.w - 4 - x0;
-  const kitY = zone.y + zone.h - KIT_H - 2;
-  if (kit.length === 0) {
-    layer.add(text(scene, x0, kitY + 16, "Pick a character above", PALETTE.textDim));
-    return;
-  }
-  rowBoxes(x0, rowW, kit.length, KIT_GAP, KIT_MAX_W).forEach((box, i) => {
-    drawKitTile(ctx, kit[i]!, box.x, kitY, box.w);
+  const cols = 3;
+  const w = Math.floor((zone.x + zone.w - 4 - x0 - KIT_GAP * (cols - 1)) / cols);
+  kit.forEach((item, i) => {
+    drawKitTile(ctx, item, x0 + (i % cols) * (w + KIT_GAP), zone.y + 14 + Math.floor(i / cols) * (KIT_ROW_H + KIT_GAP), w);
   });
 }
 
@@ -272,7 +384,7 @@ function drawKit(ctx: Ctx): void {
 // ---------------------------------------------------------------------------
 
 const READY_W = 136;
-const READY_H = 40;
+const READY_H = 30;
 
 const READY_CAPTION: Readonly<Record<NonNullable<FiresideModel["ready"]>["state"], string>> = {
   blocked: "Pick first",
@@ -280,13 +392,12 @@ const READY_CAPTION: Readonly<Record<NonNullable<FiresideModel["ready"]>["state"
   done: "Waiting for the crew",
 };
 
-function drawReady(ctx: Ctx): void {
+function drawReady(ctx: Ctx, zone: Rect): void {
   const { scene, layer, model, index, handlers } = ctx;
   const ready = model.ready;
   if (ready === null) return;
-  const zone = FIRESIDE_ZONES.ready;
   const cx = zone.x + zone.w / 2;
-  const cy = zone.y + 6 + READY_H / 2;
+  const cy = zone.y + 4 + READY_H / 2;
   if (ready.state === "open") {
     const b = button(scene, cx, cy, READY_W, READY_H, "Ready", { onClick: () => handlers.onReady(), outline: true, big: true });
     layer.add(b);
@@ -295,15 +406,21 @@ function drawReady(ctx: Ctx): void {
     const done = ready.state === "done";
     layer.add(button(scene, cx, cy, READY_W, READY_H, done ? "Ready ✓" : "Ready", { big: true, dim: !done, color: done ? PALETTE.moss : PALETTE.stump }));
   }
-  layer.add(plate(scene, zone.x + 4, zone.y + 54, zone.w - 8, 14).setAlpha(PANEL_ALPHA));
-  layer.add(centredText(scene, cx, zone.y + 57, READY_CAPTION[ready.state], ready.state === "open" ? PALETTE.text : PALETTE.textDim));
+  layer.add(plate(scene, zone.x + 4, zone.y + READY_H + 6, zone.w - 8, 12).setAlpha(PANEL_ALPHA));
+  layer.add(centredText(scene, cx, zone.y + READY_H + 8, READY_CAPTION[ready.state], ready.state === "open" ? PALETTE.text : PALETTE.textDim));
 }
 
 export function drawFireside(scene: Phaser.Scene, layer: Layer, model: FiresideModel, index: ObjectIndex, handlers: FiresideHandlers): void {
   const ctx: Ctx = { scene, layer, model, index, handlers };
+  if (model.muster !== null) {
+    drawMuster(ctx, model.muster);
+    drawMusterCrew(ctx);
+    drawReady(ctx, MUSTER_ZONES.ready);
+    return;
+  }
   drawTrail(ctx);
   drawDraft(ctx);
-  drawCrew(ctx);
+  drawCrewIn(ctx, FIRESIDE_ZONES.crew);
   drawKit(ctx);
-  drawReady(ctx);
+  drawReady(ctx, FIRESIDE_ZONES.ready);
 }

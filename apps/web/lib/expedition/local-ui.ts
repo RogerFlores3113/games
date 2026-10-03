@@ -13,12 +13,33 @@ import type { ExpeditionAbilityStepView, ExpeditionTargetKind, ExpeditionView, R
  * server request (D-02).
  */
 
+/** `valueCardId`: the hand card a rank pick is for, chosen first on a
+ * card-value step; the rank tray then offers that card's ranks. */
 export type Targeting =
-  | { mode: "ability"; sourceId: string; selected: string[] }
+  | { mode: "ability"; sourceId: string; selected: string[]; valueCardId: string | null }
   | { mode: "whisper"; selected: string[] };
 
-/** What a picked thing on the table is, for matching it to a choice id. */
-export type PickEntity = "card" | "seat" | "objective";
+/** What a clicked thing on the table is, for matching it to a choice id.
+ * Each maps to one id prefix; the board and the supplies are single ids. */
+export type PickEntity = "card" | "seat" | "hand" | "objective" | "whisper" | "trick" | "value" | "board" | "supplies";
+
+const ENTITY_PREFIX: Readonly<Record<PickEntity, string | null>> = {
+  card: "card",
+  seat: "seat",
+  hand: "hand",
+  objective: "objective",
+  whisper: "whisper",
+  trick: "trick",
+  value: "value",
+  board: null,
+  supplies: null,
+};
+
+/** The choice id a clicked entity stands for (`card:<id>`, `board`). */
+export function choiceIdOf(entity: PickEntity, rawId: string): string {
+  const prefix = ENTITY_PREFIX[entity];
+  return prefix === null ? entity : `${prefix}:${rawId}`;
+}
 
 export interface LocalUiState {
   targeting: Targeting | null;
@@ -31,10 +52,12 @@ export interface LocalUiState {
   /** The hand-card gesture in flight: press, drag, or the return after a
    * rejected drop. */
   drag: DragState;
+  /** Which page of the pick tray is showing. */
+  trayPage: number;
 }
 
 export function initialLocalUi(): LocalUiState {
-  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipSourceId: null, tooltipObjectiveId: null, tooltipMateSource: null, drag: IDLE_DRAG };
+  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipSourceId: null, tooltipObjectiveId: null, tooltipMateSource: null, drag: IDLE_DRAG, trayPage: 0 };
 }
 
 function currentHandIds(view: ExpeditionView): string[] {
@@ -68,26 +91,44 @@ export function nextTargetKind(ui: LocalUiState, view: ExpeditionView): Expediti
   return currentStep(ui, view)?.kind ?? null;
 }
 
-const ENTITY_PREFIXES: Readonly<Record<PickEntity, readonly string[]>> = {
-  card: ["card"],
-  seat: ["seat", "hand"],
-  objective: ["objective"],
-};
-
-/** The current step's choice id for a clicked card, seat or objective, or
- * null when that thing is not a choice right now. */
+/** The current step's choice id for a clicked entity, or null when it is
+ * not a choice right now. On a card-value step a hand card is a choice when
+ * any of its ranks is: the click picks the card, then a rank. */
 export function choiceFor(ui: LocalUiState, view: ExpeditionView, entity: PickEntity, rawId: string): string | null {
   const step = currentStep(ui, view);
   if (step === null) return null;
-  return ENTITY_PREFIXES[entity].map((prefix) => `${prefix}:${rawId}`).find((id) => step.choices.includes(id)) ?? null;
+  if (step.kind === "card-value" && entity === "card") {
+    return step.choices.some((id) => id.startsWith(`value:${rawId}:`)) ? `card:${rawId}` : null;
+  }
+  const id = choiceIdOf(entity, rawId);
+  return step.choices.includes(id) ? id : null;
 }
 
-/** Whether the current targeting already picked this card, seat or
- * objective. */
+/** Whether the current targeting already picked this entity, or holds this
+ * card for a rank pick. */
 export function isPicked(ui: LocalUiState, entity: PickEntity, rawId: string): boolean {
-  if (ui.targeting === null) return false;
-  const picked = ui.targeting.selected;
-  return ENTITY_PREFIXES[entity].some((prefix) => picked.includes(`${prefix}:${rawId}`));
+  const targeting = ui.targeting;
+  if (targeting === null) return false;
+  if (entity === "card" && targeting.mode === "ability" && targeting.valueCardId === rawId) return true;
+  if (entity === "card" && targeting.selected.some((id) => id.startsWith(`value:${rawId}:`))) return true;
+  return targeting.selected.includes(choiceIdOf(entity, rawId));
+}
+
+/** The rank choices for the card held on a card-value step. */
+export function valueChoices(ui: LocalUiState, view: ExpeditionView): string[] {
+  const targeting = ui.targeting;
+  const step = currentStep(ui, view);
+  if (targeting?.mode !== "ability" || targeting.valueCardId === null || step?.kind !== "card-value") return [];
+  return step.choices.filter((id) => id.startsWith(`value:${targeting.valueCardId}:`));
+}
+
+/** Picks every leading `self` step: it has exactly one choice. */
+function autoPick(ui: LocalUiState, view: ExpeditionView): LocalUiState {
+  let next = ui;
+  for (let step = currentStep(next, view); step?.kind === "self" && step.choices.length === 1; step = currentStep(next, view)) {
+    next = { ...next, targeting: { ...next.targeting!, selected: [...next.targeting!.selected, step.choices[0]!] } };
+  }
+  return next;
 }
 
 /** Begins targeting for `sourceId`. A no-op unless the server says the
@@ -95,7 +136,7 @@ export function isPicked(ui: LocalUiState, entity: PickEntity, rawId: string): b
 export function beginAbilityTargeting(ui: LocalUiState, view: ExpeditionView, sourceId: string): LocalUiState {
   const ability = view.yourAbilities.find((a) => a.sourceId === sourceId);
   if (!ability || !ability.usableNow) return ui;
-  return { ...ui, targeting: { mode: "ability", sourceId, selected: [] } };
+  return autoPick({ ...ui, trayPage: 0, targeting: { mode: "ability", sourceId, selected: [], valueCardId: null } }, view);
 }
 
 /** Begins Whisper targeting (a card, then a teammate). A no-op unless it is
@@ -106,12 +147,23 @@ export function beginWhisper(ui: LocalUiState, view: ExpeditionView): LocalUiSta
 }
 
 /** Picks `choiceId` for the current step. A no-op unless it is one of that
- * step's choices. */
+ * step's choices. On a card-value step, `card:<id>` holds that card for the
+ * rank pick instead. */
 export function selectTarget(ui: LocalUiState, view: ExpeditionView, choiceId: string): LocalUiState {
-  if (ui.targeting === null) return ui;
+  const targeting = ui.targeting;
+  if (targeting === null) return ui;
   const step = currentStep(ui, view);
-  if (step === null || !step.choices.includes(choiceId)) return ui;
-  return { ...ui, targeting: { ...ui.targeting, selected: [...ui.targeting.selected, choiceId] } };
+  if (step === null) return ui;
+  if (step.kind === "card-value" && targeting.mode === "ability" && choiceId.startsWith("card:")) {
+    const cardId = choiceId.slice("card:".length);
+    if (!step.choices.some((id) => id.startsWith(`value:${cardId}:`))) return ui;
+    return { ...ui, targeting: { ...targeting, valueCardId: cardId } };
+  }
+  if (!step.choices.includes(choiceId)) return ui;
+  const held = targeting.mode === "ability" ? targeting.valueCardId : null;
+  if (held !== null && !choiceId.startsWith(`value:${held}:`)) return ui;
+  const picked = { ...targeting, selected: [...targeting.selected, choiceId] };
+  return autoPick({ ...ui, trayPage: 0, targeting: picked.mode === "ability" ? { ...picked, valueCardId: null } : picked }, view);
 }
 
 /** Clears the current targeting only. Hover and last-trick state are
@@ -160,6 +212,10 @@ export function reconcileLocalUi(ui: LocalUiState, view: ExpeditionView): LocalU
       const steps = targetingSteps(next, view);
       const kept = targeting.selected.findIndex((id, i) => !(steps[i]?.choices.includes(id) ?? false));
       if (kept !== -1) next = { ...next, targeting: { ...targeting, selected: targeting.selected.slice(0, kept) } };
+      const held = next.targeting;
+      if (held?.mode === "ability" && held.valueCardId !== null && valueChoices(next, view).length === 0) {
+        next = { ...next, targeting: { ...held, valueCardId: null } };
+      }
     }
   }
 
@@ -194,6 +250,10 @@ export function setTooltipObjective(ui: LocalUiState, objectiveId: string | null
 export function setTooltipMateSource(ui: LocalUiState, mate: { seatId: string; sourceId: string } | null): LocalUiState {
   const same = ui.tooltipMateSource?.seatId === mate?.seatId && ui.tooltipMateSource?.sourceId === mate?.sourceId;
   return same ? ui : { ...ui, tooltipMateSource: mate };
+}
+
+export function nextTrayPage(ui: LocalUiState): LocalUiState {
+  return { ...ui, trayPage: ui.trayPage + 1 };
 }
 
 export function setDrag(ui: LocalUiState, drag: DragState): LocalUiState {
