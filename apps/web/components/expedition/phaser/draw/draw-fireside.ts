@@ -186,9 +186,6 @@ function badgeText(scene: Phaser.Scene, cx: number, y: number, value: string): P
 function drawMuster(ctx: Ctx, cards: CharacterCard[]): void {
   const { scene, layer } = ctx;
   const zone = MUSTER_ZONES.cards;
-  const title = "Choose your explorer";
-  layer.add(plate(scene, zone.x + Math.floor((zone.w - labelWidth(title)) / 2) - 4, zone.y - 13, labelWidth(title) + 8, 12).setAlpha(PANEL_ALPHA));
-  layer.add(centredText(scene, zone.x + zone.w / 2, zone.y - 11, title, PALETTE.sun));
   rowBoxes(zone.x + 2, zone.w - 4, cards.length, MUSTER_GAP, 120).forEach((box, i) => {
     drawCharacterCard(ctx, cards[i]!, box.x, zone.y, box.w, zone.h);
   });
@@ -244,7 +241,6 @@ function drawDraft(ctx: Ctx): void {
   panel(ctx, zone);
   const draft = model.draft;
   if (draft.kind === "offer") {
-    layer.add(text(scene, zone.x + 6, zone.y + 3, "Camp cleared! Take one to bring along", PALETTE.textDim));
     rowBoxes(zone.x + 6, zone.w - 12, draft.items.length, TILE_GAP, TILE_MAX_W).forEach((box, i) => {
       drawDraftTile(ctx, draft.items[i]!, box.x, zone.y + 14, box.w, zone.h - 18);
     });
@@ -368,7 +364,7 @@ function drawKit(ctx: Ctx): void {
     layer.add(centredText(scene, zone.x + zone.w / 2, zone.y + zone.h / 2 - 4, "Watching the crew", PALETTE.textDim));
     return;
   }
-  layer.add(text(scene, zone.x + 4, zone.y + 3, "Your kit"));
+  layer.add(text(scene, zone.x + KIT_X, zone.y + 3, "Your kit"));
   const art = ART["backpack-open"];
   layer.add(placeArt(scene, "backpack-open", zone.x + 4 + art.w / 2, zone.y + zone.h - art.h / 2 - 2));
   const x0 = zone.x + KIT_X;
