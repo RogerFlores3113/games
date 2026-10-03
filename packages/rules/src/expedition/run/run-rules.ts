@@ -46,6 +46,7 @@ const HOOK_NAME_SET: Record<HookName, true> = {
   deckFor: true,
   leaderFor: true,
   isTrump: true,
+  rankOf: true,
   trickWinner: true,
   legalPlays: true,
   nextLeader: true,

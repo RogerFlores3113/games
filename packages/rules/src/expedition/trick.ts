@@ -29,10 +29,12 @@ export function isTrump(identity: CardIdentity): boolean {
   return identity.kind === "joker";
 }
 
-/** Ranks trump cards against one another: Sun beats Moon beats every
- * standard card (ranked by its own rank). Identities are unique within a
- * trick, so there are no ties to break. */
-function trumpStrength(identity: CardIdentity): number {
+/** The DEFAULT rank of a card for the §6.1 rankOf hook: Sun beats Moon
+ * beats every standard card (ranked by its own rank). A composed rankOf may
+ * shift a card's rank, so two plays can tie; a tie goes to the earliest
+ * play. */
+export function rankOf(card: ExpeditionCard): number {
+  const identity = card.identity;
   if (identity.kind === "joker") {
     return identity.joker === "sun" ? 16 : 15;
   }
@@ -87,20 +89,21 @@ export function legalPlaysFor(
   return sameSuit.length > 0 ? sameSuit : [...hand];
 }
 
-/** The winning seatId of a completed trick, under `isTrumpFn` (defaults to
- * the base Sun/Moon predicate).
+/** The winning seatId of a completed trick, under `isTrumpFn` and
+ * `rankOfFn` (defaulting to the base Sun/Moon predicate and `rankOf`).
  *
- * - If any play is trump, the trump play with the highest trumpStrength
- *   wins (Sun beats Moon beats a trump standard card, by the default
- *   predicate; under a custom predicate, the highest-ranked trump wins).
+ * - If any play is trump, the trump play with the highest rankOfFn wins
+ *   (Sun beats Moon beats a trump standard card, by the default ranks).
  * - Otherwise, among plays whose followKey matches the led card's, the
- *   highest trumpStrength (i.e. rank, for non-trump plays) wins.
+ *   highest rankOfFn wins.
+ * - Equal ranks go to the earliest play.
  *
  * Throws on empty plays, or when the trick is malformed (nothing follows
  * the led card and no trump was played). */
 export function trickWinner(
   plays: readonly TrickPlay[],
   isTrumpFn: (identity: CardIdentity) => boolean = isTrump,
+  rankOfFn: (card: ExpeditionCard) => number = rankOf,
 ): string {
   if (plays.length === 0) {
     throw new Error("trickWinner: plays must not be empty");
@@ -109,9 +112,9 @@ export function trickWinner(
   const trumpPlays = plays.filter((p) => isTrumpFn(p.card.identity));
   if (trumpPlays.length > 0) {
     let winner = trumpPlays[0]!;
-    let bestStrength = trumpStrength(winner.card.identity);
+    let bestStrength = rankOfFn(winner.card);
     for (const play of trumpPlays.slice(1)) {
-      const strength = trumpStrength(play.card.identity);
+      const strength = rankOfFn(play.card);
       if (strength > bestStrength) {
         bestStrength = strength;
         winner = play;
@@ -124,11 +127,10 @@ export function trickWinner(
   const ledKey = followKey(led);
 
   let winner: TrickPlay | null = null;
-  let bestStrength = -1;
+  let bestStrength = -Infinity;
   for (const play of plays) {
-    const identity = play.card.identity;
-    if (followKey(identity) === ledKey) {
-      const strength = trumpStrength(identity);
+    if (followKey(play.card.identity) === ledKey) {
+      const strength = rankOfFn(play.card);
       if (strength > bestStrength) {
         bestStrength = strength;
         winner = play;

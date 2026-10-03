@@ -3,7 +3,7 @@
 // block; fast-check property coverage lives in trick.property.test.ts.
 
 import { describe, expect, it } from "vitest";
-import { isTrump, ledIdentity, legalPlaysFor, trickWinner } from "./trick";
+import { isTrump, ledIdentity, legalPlaysFor, rankOf, trickWinner } from "./trick";
 import { baseRulesWith } from "./rules";
 import type { CampState, CardIdentity, ExpeditionCard, TrickPlay } from "./state";
 
@@ -242,5 +242,35 @@ describe("generic trump predicate (WR-03)", () => {
     const rules = baseRulesWith(spadesTrump);
     expect(rules.trickWinner(plays)).toBe(trickWinner(plays, spadesTrump));
     expect(rules.trickWinner(plays)).toBe("p1");
+  });
+});
+
+describe("rankOf hook", () => {
+  const plays: TrickPlay[] = [
+    { seatId: "p0", card: heartsFive },
+    { seatId: "p1", card: heartsKing },
+    { seatId: "p2", card: heartsThree },
+  ];
+
+  it("a shifted rank changes the trick winner", () => {
+    const threeIsAce = (c: ExpeditionCard) => (c.id === heartsThree.id ? 14 : rankOf(c));
+    expect(trickWinner(plays)).toBe("p1");
+    expect(trickWinner(plays, isTrump, threeIsAce)).toBe("p2");
+    expect(baseRulesWith(isTrump, threeIsAce).trickWinner(plays)).toBe("p2");
+  });
+
+  it("a rank tie goes to the earliest play", () => {
+    const threeIsKing = (c: ExpeditionCard) => (c.id === heartsThree.id ? 13 : rankOf(c));
+    const kingLast: TrickPlay[] = [
+      { seatId: "p0", card: heartsFive },
+      { seatId: "p1", card: heartsThree },
+      { seatId: "p2", card: heartsKing },
+    ];
+    expect(trickWinner(plays, isTrump, threeIsKing)).toBe("p1");
+    expect(trickWinner(kingLast, isTrump, threeIsKing)).toBe("p1");
+  });
+
+  it("the default ranks Sun over Moon over the Ace", () => {
+    expect([rankOf(sun), rankOf(moon), rankOf(heartsAce), rankOf(clubsTwo)]).toEqual([16, 15, 14, 2]);
   });
 });

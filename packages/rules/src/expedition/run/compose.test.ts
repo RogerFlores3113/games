@@ -134,6 +134,19 @@ describe("composeRules layer folding", () => {
     expect(composeRules([spadesAlsoTrump]).trickWinner(plays)).toBe("p1");
   });
 
+  it("a rankOf layer changes the composed trickWinner, folded in layer order", () => {
+    const plays: TrickPlay[] = [
+      { seatId: "p0", card: card("c0", HEARTS_5) },
+      { seatId: "p1", card: card("c1", HEARTS_9) },
+      { seatId: "p2", card: card("c2", HEARTS_2) },
+    ];
+    const twoUpFive: RuleModifier = { rankOf: (prev) => (c) => (c.id === "c2" ? prev(c) + 5 : prev(c)) };
+    const twoUpThree: RuleModifier = { rankOf: (prev) => (c) => (c.id === "c2" ? prev(c) + 3 : prev(c)) };
+    expect(composeRules([]).trickWinner(plays)).toBe("p1");
+    expect(composeRules([twoUpFive]).trickWinner(plays)).toBe("p1"); // 7 < 9
+    expect(composeRules([twoUpFive, twoUpThree]).trickWinner(plays)).toBe("p2"); // 10 > 9
+  });
+
   it("an isTrump-only layer changes the composed legalPlays (WR-03)", () => {
     const hands: Hand[] = [{ seatId: "p0", cards: [card("c0", HEARTS_9), card("c1", MOON)] }];
     const currentTrickPlays: TrickPlay[] = [{ seatId: "p9", card: card("led", SPADES_7) }];

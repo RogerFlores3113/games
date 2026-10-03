@@ -26,13 +26,15 @@
 
 import { baseDeckFor } from "./deck";
 import { leaderFor } from "./leader";
-import { isTrump, ledIdentity, legalPlaysFor, trickWinner } from "./trick";
+import { isTrump, ledIdentity, legalPlaysFor, rankOf, trickWinner } from "./trick";
 import type { CampState, CardIdentity, CompletedTrick, ExpeditionCard, Hand, PlayerCount, TrickPlay } from "./state";
 
 export type CoreRules = {
   deckFor(playerCount: PlayerCount): readonly CardIdentity[];
   leaderFor(hands: readonly Hand[]): string;
   isTrump(identity: CardIdentity): boolean;
+  /** A card's strength within a trick. Folded first beside isTrump (WR-03). */
+  rankOf(card: ExpeditionCard): number;
   trickWinner(plays: readonly TrickPlay[]): string;
   legalPlays(state: CampState, seatId: string): readonly ExpeditionCard[];
   nextLeader(state: CampState, trick: CompletedTrick): string;
@@ -40,16 +42,21 @@ export type CoreRules = {
   failureChecks(state: CampState): readonly string[];
 };
 
-/** Builds a CoreRules layer whose isTrump, trickWinner and legalPlays all
- * consult the same `isTrumpFn` (WR-03). This is the base layer's factory:
- * every other hook is the Phase 9 baseRules body, unchanged. */
-export function baseRulesWith(isTrumpFn: (identity: CardIdentity) => boolean): CoreRules {
+/** Builds a CoreRules layer whose trickWinner and legalPlays consult the
+ * same card-reading hooks it exposes (WR-03): `isTrumpFn` for both, and
+ * `rankOfFn` for trickWinner. This is the base layer's factory: every other
+ * hook is the Phase 9 baseRules body, unchanged. */
+export function baseRulesWith(
+  isTrumpFn: (identity: CardIdentity) => boolean,
+  rankOfFn: (card: ExpeditionCard) => number = rankOf,
+): CoreRules {
   return {
     deckFor: baseDeckFor,
     leaderFor,
     isTrump: isTrumpFn,
+    rankOf: rankOfFn,
     trickWinner(plays) {
-      return trickWinner(plays, isTrumpFn);
+      return trickWinner(plays, isTrumpFn, rankOfFn);
     },
     legalPlays(state, seatId) {
       const hand = state.hands.find((h) => h.seatId === seatId);
