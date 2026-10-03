@@ -31,7 +31,11 @@ export type TargetSpec = { readonly kind: TargetKind };
 export type ToolkitOp<P extends EffectParams = EffectParams> =
   | { readonly op: "move-card"; readonly cardId: string; readonly fromSeatId: string; readonly toSeatId: string }
   | { readonly op: "swap-cards"; readonly seatA: string; readonly cardIdA: string; readonly seatB: string; readonly cardIdB: string }
-  | { readonly op: "replace-objective"; readonly objectiveId: string }
+  | { readonly op: "replace-objective"; readonly objectiveId: string } // unowned, or owned and failed
+  | { readonly op: "reassign-objective"; readonly objectiveId: string; readonly toSeatId: string }
+  | { readonly op: "reassign-trick"; readonly trickIndex: number; readonly toSeatId: string } // winner change; cards untouched
+  | { readonly op: "share-reveal"; readonly whisperOrdinal: number; readonly audience: readonly string[] }
+  | { readonly op: "adjust-supplies"; readonly delta: number }
   | { readonly op: "swap-objectives"; readonly seatA: string; readonly seatB: string }
   | { readonly op: "remove-objective"; readonly objectiveId: string }
   | { readonly op: "reveal"; readonly cardId: string; readonly audience: readonly string[] }

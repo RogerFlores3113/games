@@ -4,7 +4,10 @@
 // of the pick-order rule — mirrors test-support.ts's own discipline).
 
 import { describe, expect, it } from "vitest";
+import fc from "fast-check";
 import { applyCampAction } from "../actions";
+import { cardLabel } from "../deck";
+import { evaluateObjective } from "../objectives";
 import { campPhase, createCamp, currentActorSeatId } from "../camp";
 import { baseRules } from "../rules";
 import type { CampState, WinCardObjective } from "../state";
@@ -752,5 +755,182 @@ describe("applyToolkitOps", () => {
         { op: "log", event: "used-gear", subjectSeatIds: [], audience: ["not-a-seat"] },
       ]),
     ).toThrow();
+  });
+});
+
+describe("applyToolkitOps: rescue and sharing ops", () => {
+  /** One trick played, plus p0's whisper of its first card to p1. */
+  function afterOneTrick(): { run: RunState; camp: CampState; winner: string; loser: string } {
+    const camp = playOneTrick(pickAllObjectives(freshCamp()));
+    const winner = camp.completedTricks[0]!.winnerSeatId;
+    const loser = SEAT_IDS.find((id) => id !== winner)!;
+    const whispered = camp.hands.find((h) => h.seatId === "p0")!.cards[0]!;
+    const base = makeRun({ camp });
+    const run: RunState = {
+      ...base,
+      supplies: 2,
+      attempt: {
+        ...base.attempt!,
+        reveals: [
+          { cardId: whispered.id, fromSeatId: "p0", audience: ["p1"], source: "whisper", targetSeatId: "p1" },
+          { cardId: whispered.id, fromSeatId: "p0", audience: ["p2"], source: "spyglass" },
+        ],
+      },
+    };
+    return { run, camp, winner, loser };
+  }
+
+  /** The camp with its objectives replaced by one failed win-card owned by
+   * `owner` (trick 0's card, won by someone else). */
+  function withFailedObjective(camp: CampState, owner: string): { camp: CampState; failed: WinCardObjective } {
+    const play = camp.completedTricks[0]!.plays.find((p) => p.card.identity.kind === "standard" && p.seatId !== owner)!;
+    const failed: WinCardObjective = {
+      id: "obj-failed",
+      kind: "win-card",
+      target: play.card.identity as WinCardObjective["target"],
+      ownerSeatId: owner,
+    };
+    return { camp: { ...camp, objectives: [failed] }, failed };
+  }
+
+  it("replace-objective turns an owned failed objective into a win-card on a card still in a hand", () => {
+    const { run, camp, loser } = afterOneTrick();
+    const { camp: failing } = withFailedObjective(camp, loser);
+    const inHand = new Set(failing.hands.flatMap((h) => h.cards.map((c) => cardLabel(c.identity))));
+    const freshIndex = failing.objectiveDeck.findIndex((identity) => inHand.has(cardLabel(identity)));
+    const deck = [{ kind: "standard", suit: "hearts", rank: 99 } as never, ...failing.objectiveDeck];
+    const result = applyToolkitOps({ ...run, attempt: { ...run.attempt!, camp: { ...failing, objectiveDeck: deck } } }, loser, "antidote", [
+      { op: "replace-objective", objectiveId: "obj-failed" },
+    ]);
+    const after = result.attempt!.camp!;
+    expect(after.objectives).toEqual([
+      { id: "obj-failed", kind: "win-card", target: failing.objectiveDeck[freshIndex], ownerSeatId: loser },
+    ]);
+    expect(after.objectiveDeck).toHaveLength(deck.length - 1);
+    expect(after.objectiveDeck[0]).toEqual(deck[0]);
+  });
+
+  it("replace-objective throws on an owned objective that has not failed, or with no deck card in a hand", () => {
+    const { run, camp, loser } = afterOneTrick();
+    const { camp: failing } = withFailedObjective(camp, loser);
+    const pending: CampState = { ...failing, objectives: [{ id: "obj-open", kind: "no-tricks", ownerSeatId: loser }] };
+    const noFresh: CampState = { ...failing, objectiveDeck: [] };
+    for (const c of [pending, noFresh]) {
+      const objectiveId = c.objectives[0]!.id;
+      expect(() =>
+        applyToolkitOps({ ...run, attempt: { ...run.attempt!, camp: c } }, loser, "antidote", [{ op: "replace-objective", objectiveId }]),
+      ).toThrow(/replace-objective/);
+    }
+  });
+
+  it("reassign-objective gives an owned objective to another seat", () => {
+    const { run, camp, loser, winner } = afterOneTrick();
+    const { camp: failing } = withFailedObjective(camp, loser);
+    const result = applyToolkitOps({ ...run, attempt: { ...run.attempt!, camp: failing } }, loser, "rally", [
+      { op: "reassign-objective", objectiveId: "obj-failed", toSeatId: winner },
+    ]);
+    const objective = result.attempt!.camp!.objectives[0]!;
+    expect(objective.ownerSeatId).toBe(winner);
+    expect(evaluateObjective(result.attempt!.camp!, objective)).toBe("done");
+  });
+
+  it("reassign-objective throws for an unowned objective, an unknown seat, or the current owner", () => {
+    const { run, camp, loser } = afterOneTrick();
+    const { camp: failing } = withFailedObjective(camp, loser);
+    const unowned: CampState = { ...failing, objectives: [{ id: "obj-free", kind: "no-tricks", ownerSeatId: null }] };
+    const cases: Array<[CampState, string, string]> = [
+      [unowned, "obj-free", "p1"],
+      [failing, "obj-failed", "not-a-seat"],
+      [failing, "obj-failed", loser],
+      [failing, "obj-missing", "p1"],
+    ];
+    for (const [c, objectiveId, toSeatId] of cases) {
+      expect(() =>
+        applyToolkitOps({ ...run, attempt: { ...run.attempt!, camp: c } }, "p0", "detour", [{ op: "reassign-objective", objectiveId, toSeatId }]),
+      ).toThrow(/reassign-objective/);
+    }
+  });
+
+  it("reassign-trick changes a completed trick's winner and moves no card", () => {
+    const { run, camp, winner, loser } = afterOneTrick();
+    const result = applyToolkitOps(run, winner, "pack-mule", [{ op: "reassign-trick", trickIndex: 0, toSeatId: loser }]);
+    const after = result.attempt!.camp!;
+    expect(after.completedTricks[0]).toEqual({ ...camp.completedTricks[0]!, winnerSeatId: loser });
+    expect(campCardIds(after)).toEqual(campCardIds(camp));
+  });
+
+  it("reassign-trick throws for a trick not yet completed or the current winner", () => {
+    const { run, winner, loser } = afterOneTrick();
+    expect(() => applyToolkitOps(run, winner, "pack-mule", [{ op: "reassign-trick", trickIndex: 1, toSeatId: loser }])).toThrow(/reassign-trick/);
+    expect(() => applyToolkitOps(run, winner, "pack-mule", [{ op: "reassign-trick", trickIndex: 0, toSeatId: winner }])).toThrow(/reassign-trick/);
+  });
+
+  it("share-reveal copies the nth whisper's card and pinned holder to a new audience", () => {
+    const { run } = afterOneTrick();
+    const whisper = run.attempt!.reveals[0]!;
+    const result = applyToolkitOps(run, "p0", "loud-call", [{ op: "share-reveal", whisperOrdinal: 0, audience: ["p1", "p2"] }]);
+    expect(result.attempt!.reveals[2]).toEqual({ cardId: whisper.cardId, fromSeatId: "p0", audience: ["p1", "p2"], source: "loud-call" });
+  });
+
+  it("share-reveal counts whispers only and throws past the last one or for a bad audience", () => {
+    const { run } = afterOneTrick();
+    expect(() => applyToolkitOps(run, "p0", "loud-call", [{ op: "share-reveal", whisperOrdinal: 1, audience: ["p2"] }])).toThrow(/share-reveal/);
+    expect(() => applyToolkitOps(run, "p0", "loud-call", [{ op: "share-reveal", whisperOrdinal: 0, audience: [] }])).toThrow(/share-reveal/);
+    expect(() => applyToolkitOps(run, "p0", "loud-call", [{ op: "share-reveal", whisperOrdinal: 0, audience: ["p2", "p2"] }])).toThrow(/share-reveal/);
+  });
+
+  it("adjust-supplies changes the crew's supplies within [1, STARTING_SUPPLIES]", () => {
+    const { run } = afterOneTrick();
+    expect(applyToolkitOps(run, "p0", "field-kit", [{ op: "adjust-supplies", delta: 1 }]).supplies).toBe(3);
+    expect(applyToolkitOps(run, "p0", "triage", [{ op: "adjust-supplies", delta: -1 }]).supplies).toBe(1);
+  });
+
+  it("adjust-supplies throws when the result would spend the last supply or pass the start", () => {
+    const { run } = afterOneTrick();
+    expect(() => applyToolkitOps(run, "p0", "triage", [{ op: "adjust-supplies", delta: -2 }])).toThrow(/adjust-supplies/);
+    expect(() => applyToolkitOps(run, "p0", "field-kit", [{ op: "adjust-supplies", delta: 2 }])).toThrow(/adjust-supplies/);
+    expect(() => applyToolkitOps(run, "p0", "field-kit", [{ op: "adjust-supplies", delta: 0.5 }])).toThrow(/adjust-supplies/);
+  });
+
+  it("property: a random op batch either throws its own op's invariant or conserves every card and keeps supplies in range", () => {
+    const { run, camp } = afterOneTrick();
+    const handCards = camp.hands.flatMap((h) => h.cards.map((c) => ({ seatId: h.seatId, cardId: c.id })));
+    const seat = fc.constantFrom<string>(...SEAT_IDS, "not-a-seat");
+    const handCard = fc.constantFrom(...handCards);
+    const objectiveId = fc.constantFrom(...camp.objectives.map((o) => o.id), "obj-missing");
+    const audience = fc.subarray([...SEAT_IDS] as string[]);
+    const op: fc.Arbitrary<ToolkitOp> = fc.oneof(
+      fc.record({ a: handCard, to: seat }).map(({ a, to }) => ({ op: "move-card" as const, cardId: a.cardId, fromSeatId: a.seatId, toSeatId: to })),
+      fc.record({ a: handCard, b: handCard }).map(({ a, b }) => ({ op: "swap-cards" as const, seatA: a.seatId, cardIdA: a.cardId, seatB: b.seatId, cardIdB: b.cardId })),
+      objectiveId.map((id) => ({ op: "replace-objective" as const, objectiveId: id })),
+      objectiveId.map((id) => ({ op: "remove-objective" as const, objectiveId: id })),
+      fc.record({ id: objectiveId, to: seat }).map(({ id, to }) => ({ op: "reassign-objective" as const, objectiveId: id, toSeatId: to })),
+      fc.record({ i: fc.integer({ min: -1, max: 2 }), to: seat }).map(({ i, to }) => ({ op: "reassign-trick" as const, trickIndex: i, toSeatId: to })),
+      fc.record({ n: fc.integer({ min: 0, max: 2 }), who: audience }).map(({ n, who }) => ({ op: "share-reveal" as const, whisperOrdinal: n, audience: who })),
+      fc.record({ a: handCard, who: audience }).map(({ a, who }) => ({ op: "reveal" as const, cardId: a.cardId, audience: who })),
+      fc.integer({ min: -3, max: 3 }).map((delta) => ({ op: "adjust-supplies" as const, delta })),
+      fc.record({ a: seat, b: seat }).map(({ a, b }) => ({ op: "swap-objectives" as const, seatA: a, seatB: b })),
+      fc.constant<ToolkitOp>({ op: "add-modifier", lasts: "trick", params: {}, audience: "public" }),
+    );
+
+    fc.assert(
+      fc.property(fc.array(op, { minLength: 1, maxLength: 6 }), (ops) => {
+        const before = structuredClone(run);
+        let after: RunState;
+        try {
+          after = applyToolkitOps(run, "p0", "batch", ops);
+        } catch (error) {
+          expect((error as Error).message).toMatch(/^toolkit: /);
+          expect((error as Error).message).not.toMatch(/conservation/);
+          expect(run).toEqual(before);
+          return;
+        }
+        expect(campCardIds(after.attempt!.camp!)).toEqual(campCardIds(camp));
+        expect(after.supplies).toBeGreaterThanOrEqual(1);
+        expect(after.supplies).toBeLessThanOrEqual(3);
+        expect(run).toEqual(before);
+      }),
+      { numRuns: 300 },
+    );
   });
 });

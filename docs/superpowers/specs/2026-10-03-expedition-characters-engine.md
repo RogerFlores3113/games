@@ -851,3 +851,8 @@ target kind, a window. Green check **`source-icons`**: a new
   registry spec and prefixes the id before `resolveTargets`; both go in unit 6.
 - Unit 3: `card-value` offers ranks around the printed rank, not the composed `rankOf`, so a
   second tonic on the same card replaces the first instead of stacking.
+- Unit 4: the random-batch property found `swap-cards` with `seatA === seatB` duplicating a card,
+  caught only by the conservation backstop. It now throws on its own invariant, like `move-card`.
+- Unit 4: `reassign-objective` and `reassign-trick` throw when the new seat is the current one, and
+  `reassign-objective` refuses an unowned objective (taking one is a pick). Rally's `canTarget`
+  must refuse an ordered objective whose card its owner won.

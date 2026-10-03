@@ -25,8 +25,10 @@
 // RunRules in, keeping this plan parallel with Plan 10-03.
 
 import { campPhase } from "../camp";
+import { identitiesEqual } from "../deck";
 import { evaluateObjective } from "../objectives";
-import type { CampState } from "../state";
+import type { CampState, Objective } from "../state";
+import { STARTING_SUPPLIES } from "./balance";
 import type { GearContext, GearWindow, TargetKind as GearTargetKind, TargetSpec, ToolkitOp } from "../gear/gear-def";
 import { STREAMS, seededIndex } from "./rng";
 import { resolveTargets, type TargetSpec as RegistrySpec } from "./targets";
@@ -191,7 +193,41 @@ function requireCamp(attempt: AttemptState, opName: string): CampState {
   return attempt.camp;
 }
 
-function applyOp(run: RunState, attempt: AttemptState, actorSeatId: string, gearId: string, op: ToolkitOp): AttemptState {
+/** A reveal's audience: non-empty, no duplicates, every seat known. */
+function assertAudience(run: RunState, audience: readonly string[], opName: string): void {
+  if (audience.length === 0) {
+    throw new Error(`toolkit: ${opName}: audience must not be empty`);
+  }
+  if (new Set(audience).size !== audience.length) {
+    throw new Error(`toolkit: ${opName}: audience contains duplicates`);
+  }
+  for (const audienceSeatId of audience) {
+    if (!run.seatIds.includes(audienceSeatId)) {
+      throw new Error(`toolkit: ${opName}: audience contains unknown seat ${audienceSeatId}`);
+    }
+  }
+}
+
+/** Supplies are run-level; every other op changes only the attempt. */
+function applyOp(run: RunState, actorSeatId: string, gearId: string, op: ToolkitOp): RunState {
+  if (op.op === "adjust-supplies") {
+    // The crew keeps at least one supply and never exceeds the start.
+    const supplies = run.supplies + op.delta;
+    if (!Number.isInteger(op.delta) || supplies < 1 || supplies > STARTING_SUPPLIES) {
+      throw new Error(`toolkit: adjust-supplies: ${run.supplies} + ${op.delta} leaves [1, ${STARTING_SUPPLIES}]`);
+    }
+    return { ...run, supplies };
+  }
+  return { ...run, attempt: applyAttemptOp(run, run.attempt!, actorSeatId, gearId, op) };
+}
+
+function applyAttemptOp(
+  run: RunState,
+  attempt: AttemptState,
+  actorSeatId: string,
+  gearId: string,
+  op: Exclude<ToolkitOp, { readonly op: "adjust-supplies" }>,
+): AttemptState {
   switch (op.op) {
     case "move-card": {
       const camp = requireCamp(attempt, "move-card");
@@ -221,6 +257,9 @@ function applyOp(run: RunState, attempt: AttemptState, actorSeatId: string, gear
 
     case "swap-cards": {
       const camp = requireCamp(attempt, "swap-cards");
+      if (op.seatA === op.seatB) {
+        throw new Error("toolkit: swap-cards: seatA === seatB");
+      }
       const handA = camp.hands.find((h) => h.seatId === op.seatA);
       const handB = camp.hands.find((h) => h.seatId === op.seatB);
       if (!handA || !handB) {
@@ -259,7 +298,21 @@ function applyOp(run: RunState, attempt: AttemptState, actorSeatId: string, gear
         throw new Error(`toolkit: replace-objective: unknown objective ${op.objectiveId}`);
       }
       if (objective.ownerSeatId !== null) {
-        throw new Error("toolkit: replace-objective: objective is already owned");
+        // An owned objective is replaceable only once failed: it becomes a
+        // plain win-card for the same owner on a card still in some hand.
+        if (evaluateObjective(camp, objective) !== "failed") {
+          throw new Error("toolkit: replace-objective: an owned objective must have failed");
+        }
+        const deckIndex = camp.objectiveDeck.findIndex((identity) =>
+          camp.hands.some((h) => h.cards.some((c) => identitiesEqual(c.identity, identity))),
+        );
+        if (deckIndex === -1) {
+          throw new Error("toolkit: replace-objective: no objective-deck card is still in a hand");
+        }
+        const fresh: Objective = { id: objective.id, kind: "win-card", target: camp.objectiveDeck[deckIndex]!, ownerSeatId: objective.ownerSeatId };
+        const objectives = camp.objectives.map((o) => (o.id === op.objectiveId ? fresh : o));
+        const objectiveDeck = camp.objectiveDeck.filter((_, i) => i !== deckIndex);
+        return { ...attempt, camp: { ...camp, objectives, objectiveDeck } };
       }
       // Must match camp.ts's isCardBearingSlot and reroll.ts's canTarget
       // (CR-01): win-card and ordered are the only card-bearing kinds.
@@ -273,6 +326,51 @@ function applyOp(run: RunState, attempt: AttemptState, actorSeatId: string, gear
       const objectives = camp.objectives.map((o) => (o.id === op.objectiveId ? { ...o, target: newTarget } : o));
       const objectiveDeck = camp.objectiveDeck.slice(1);
       return { ...attempt, camp: { ...camp, objectives, objectiveDeck } };
+    }
+
+    case "reassign-objective": {
+      // An owner change. The objective must already be owned: taking an
+      // unowned one is a pick, which only the Core performs.
+      const camp = requireCamp(attempt, "reassign-objective");
+      const objective = camp.objectives.find((o) => o.id === op.objectiveId);
+      if (!objective) {
+        throw new Error(`toolkit: reassign-objective: unknown objective ${op.objectiveId}`);
+      }
+      if (objective.ownerSeatId === null) {
+        throw new Error("toolkit: reassign-objective: objective is unowned");
+      }
+      if (!run.seatIds.includes(op.toSeatId) || objective.ownerSeatId === op.toSeatId) {
+        throw new Error(`toolkit: reassign-objective: ${op.toSeatId} is not another seat`);
+      }
+      const objectives = camp.objectives.map((o) => (o.id === op.objectiveId ? { ...o, ownerSeatId: op.toSeatId } : o));
+      return { ...attempt, camp: { ...camp, objectives } };
+    }
+
+    case "reassign-trick": {
+      // A completed trick's winner changes; its cards stay where they are.
+      const camp = requireCamp(attempt, "reassign-trick");
+      const trick = camp.completedTricks.find((t) => t.index === op.trickIndex);
+      if (!trick) {
+        throw new Error(`toolkit: reassign-trick: no completed trick ${op.trickIndex}`);
+      }
+      if (!run.seatIds.includes(op.toSeatId) || trick.winnerSeatId === op.toSeatId) {
+        throw new Error(`toolkit: reassign-trick: ${op.toSeatId} is not another seat`);
+      }
+      const completedTricks = camp.completedTricks.map((t) => (t.index === op.trickIndex ? { ...t, winnerSeatId: op.toSeatId } : t));
+      return { ...attempt, camp: { ...camp, completedTricks } };
+    }
+
+    case "share-reveal": {
+      // Copies a whisper's identity and its pinned holder (WR-03) to a new
+      // audience. The ordinal counts whispers only, as the public log does.
+      requireCamp(attempt, "share-reveal");
+      const whisper = attempt.reveals.filter((r) => r.source === "whisper")[op.whisperOrdinal];
+      if (!whisper) {
+        throw new Error(`toolkit: share-reveal: no whisper ${op.whisperOrdinal}`);
+      }
+      assertAudience(run, op.audience, "share-reveal");
+      const reveal: Reveal = { cardId: whisper.cardId, fromSeatId: whisper.fromSeatId, audience: op.audience, source: gearId };
+      return { ...attempt, reveals: [...attempt.reveals, reveal] };
     }
 
     case "swap-objectives": {
@@ -301,17 +399,7 @@ function applyOp(run: RunState, attempt: AttemptState, actorSeatId: string, gear
       // T-10-12: the ONLY op that can expose a card to a non-holder; the
       // audience is the sole grant of visibility.
       const camp = requireCamp(attempt, "reveal");
-      if (op.audience.length === 0) {
-        throw new Error("toolkit: reveal: audience must not be empty");
-      }
-      if (new Set(op.audience).size !== op.audience.length) {
-        throw new Error("toolkit: reveal: audience contains duplicates");
-      }
-      for (const audienceSeatId of op.audience) {
-        if (!run.seatIds.includes(audienceSeatId)) {
-          throw new Error(`toolkit: reveal: audience contains unknown seat ${audienceSeatId}`);
-        }
-      }
+      assertAudience(run, op.audience, "reveal");
       const holder = camp.hands.find((h) => h.cards.some((c) => c.id === op.cardId));
       if (!holder) {
         throw new Error(`toolkit: reveal: card ${op.cardId} not in any hand`);
@@ -371,11 +459,11 @@ function applyOp(run: RunState, attempt: AttemptState, actorSeatId: string, gear
   }
 }
 
-/** The sole executor of gear effects (spec §6.3). Folds `ops` in order,
- * never mutating `run` or any of its nested objects, and asserts card
- * conservation once the fold completes (T-10-13): a broken gear op is a
- * content-author defect and THROWS (POLICY A3), never silently corrupting
- * state. */
+/** The sole executor of gear effects (spec §6.3). Folds `ops` over the
+ * RunState in order, never mutating `run` or any of its nested objects, and
+ * asserts card conservation once the fold completes (T-10-13): a broken op
+ * is a content-author defect and THROWS (POLICY A3), never silently
+ * corrupting state. */
 export function applyToolkitOps(run: RunState, actorSeatId: string, gearId: string, ops: readonly ToolkitOp[]): RunState {
   if (run.attempt === null) {
     throw new Error("toolkit: applyToolkitOps: no attempt in progress");
@@ -384,13 +472,14 @@ export function applyToolkitOps(run: RunState, actorSeatId: string, gearId: stri
   const beforeCamp = run.attempt.camp;
   const beforeIds = beforeCamp ? campCardIds(beforeCamp) : null;
 
-  let attempt = run.attempt;
+  let next = run;
   for (const op of ops) {
-    attempt = applyOp(run, attempt, actorSeatId, gearId, op);
+    next = applyOp(next, actorSeatId, gearId, op);
   }
 
-  if (attempt.camp !== null) {
-    const afterIds = campCardIds(attempt.camp);
+  const afterCamp = next.attempt!.camp;
+  if (afterCamp !== null) {
+    const afterIds = campCardIds(afterCamp);
     const expected = beforeIds ?? [];
     if (afterIds.length !== expected.length || afterIds.some((id, i) => id !== expected[i])) {
       throw new Error("toolkit: card conservation violated");
@@ -400,5 +489,5 @@ export function applyToolkitOps(run: RunState, actorSeatId: string, gearId: stri
     }
   }
 
-  return { ...run, attempt };
+  return next;
 }
