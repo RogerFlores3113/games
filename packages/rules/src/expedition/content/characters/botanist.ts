@@ -15,7 +15,7 @@ export const botanist = defineCharacter({
     apply: (ctx) => [
       { op: "add-modifier", lasts: "attempt", audience: "owner", params: { cardId: ctx.targets[0].cardId, rank: ctx.targets[0].rank } },
     ],
-    effect: (effect) => shiftedRank(effect.params.cardId, effect.params.rank),
+    effect: (effect, run) => shiftedRank(run, effect.seatId, effect.params.cardId, effect.params.rank),
   }),
   upgrades: [
     defineUpgrade({ id: "botanist.greenhouse", name: "Greenhouse", text: "Regain 2 herbs after each cleared camp." }),

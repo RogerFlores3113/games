@@ -923,3 +923,7 @@ target kind, a window. Green check **`source-icons`**: a new
   now always target a failed objective; when no fresh objective can be drawn, `apply` drops the
   failed objective instead (`remove-objective`), still a rescue. Its text stays "Swap a failed
   objective for a fresh one." This supersedes the Antidote `canUse` entry rule above.
+- Review fix: `active.effect(effect, run)` now receives the run, and a private rank change (Herb
+  Tonic, Whetstone) lasts only while its owner holds the card or after the owner played it. Trained
+  Monkey moving the card to a teammate ends the change, so the new holder sees and plays the printed
+  rank and learns nothing of the tonic. Moving it back restores the change.

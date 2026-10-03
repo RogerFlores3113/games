@@ -382,6 +382,18 @@ describe("items", () => {
     expect(campCardIds(camp(run))).toEqual(campCardIds(camp(start)));
   });
 
+  it("a Whetstone rank ends when Trained Monkey moves the card to a teammate", () => {
+    const sharpened = std("a5", "spades", 5);
+    const hands = { p0: [sharpened, std("a2", "hearts", 6)], p1: [std("b1", "diamonds", 9)] };
+    const honed = use(table({ kit: ["whetstone", "trained-monkey"], hands }), "p0", "whetstone", ["value:a5:7"]);
+    expect(rules(honed).rankOf(sharpened)).toBe(7);
+    const swapped = use(honed, "p0", "trained-monkey", ["card:a5", "hand:p1"]);
+    expect(handIds(swapped, "p1")).toEqual(["a5"]);
+    expect(rules(swapped).rankOf(sharpened)).toBe(5);
+    const p1Hand = toExpeditionPlayerView(swapped, "p1", CATALOG).attempt!.camp!.yourHand;
+    expect(p1Hand.map((card) => [card.id, card.effectiveRank])).toEqual([["a5", null]]);
+  });
+
   it("Pack Mule moves a won trick's winner and is refused for a trick that settles a card objective", () => {
     const run = use(table({ kit: ["pack-mule"], tricks: [WON_BY_P0] }), "p0", "pack-mule", ["trick:0", "seat:p1"]);
     expect(camp(run).completedTricks[0]!.winnerSeatId).toBe("p1");

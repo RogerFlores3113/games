@@ -57,7 +57,17 @@ export function extraWhisper(seatId: string | null): RuleModifier {
   };
 }
 
-/** A layer that makes one card count as `rank`. */
-export function shiftedRank(cardId: string, rank: number): RuleModifier {
+/** A layer that makes one card count as `rank` while `seatId` holds it or
+ * after `seatId` played it. A card that moves to another hand reads its
+ * printed rank there, so the private change neither follows nor leaks. */
+export function shiftedRank(run: RunState, seatId: string, cardId: string, rank: number): RuleModifier {
+  const camp = run.attempt?.camp ?? null;
+  if (camp === null || !heldOrPlayedBy(camp, seatId, cardId)) return {};
   return { rankOf: (prev) => (card) => (card.id === cardId ? rank : prev(card)) };
+}
+
+function heldOrPlayedBy(camp: CampState, seatId: string, cardId: string): boolean {
+  const held = camp.hands.some((hand) => hand.seatId === seatId && hand.cards.some((card) => card.id === cardId));
+  const plays = [...camp.completedTricks.flatMap((trick) => trick.plays), ...camp.currentTrick.plays];
+  return held || plays.some((play) => play.seatId === seatId && play.card.id === cardId);
 }

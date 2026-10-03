@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { CATALOG } from "../run/catalog";
 import { composeRules } from "../run/compose";
+import { createRun } from "../run/lifecycle";
 import type { ActiveEffect } from "../run/types";
 import type { EffectParams } from "./source-def";
 import type { ExpeditionCard, Suit, TrickPlay } from "../state";
@@ -46,7 +47,8 @@ describe("property: stacked can't-win effects", () => {
     fc.assert(
       fc.property(trickArb, exclusionsArb, (plays, exclusions) => {
         const effects = exclusions.map((exclusion) => effectFor(exclusion, plays));
-        const rules = composeRules(effects.map((effect) => sourceDef(CATALOG, effect.sourceId).active!.effect!(effect)));
+        const run = createRun({ seatIds: plays.map((play) => play.seatId), seed: "exclusions" });
+        const rules = composeRules(effects.map((effect) => sourceDef(CATALOG, effect.sourceId).active!.effect!(effect, run)));
         const excluded = new Set(exclusions.map((exclusion) => plays[exclusion.index % plays.length]!.seatId));
 
         const winner = rules.trickWinner(plays);

@@ -56,8 +56,8 @@ export type ActiveAbility<S extends readonly TargetSpec[] = readonly TargetSpec[
   /** Rules that span targets or are specific to the entry, after every target resolved through its kind. */
   canTarget?(ctx: AbilityContext<S>): true | string;
   apply(ctx: AbilityContext<S>): readonly ToolkitOp<P>[];
-  /** Required if and only if apply can emit add-modifier: the rule layer that op activates. */
-  effect?(effect: ActiveEffect<P>): RuleModifier;
+  /** Required if and only if apply can emit add-modifier: the rule layer that op activates, for this run. */
+  effect?(effect: ActiveEffect<P>, run: RunState): RuleModifier;
 };
 
 export type PassiveAbility = { modifier(owner: Owner): RuleModifier };

@@ -122,7 +122,7 @@ export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
       if (toLayer === undefined) {
         throw new Error(`ruleLayersFor: effect from "${effect.sourceId}" has no active.effect`);
       }
-      layers.push(toLayer(effect));
+      layers.push(toLayer(effect, run));
     }
   }
 
