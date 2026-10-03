@@ -42,6 +42,9 @@ export default defineConfig({
   testDir: "./e2e",
   reporter: "list",
   retries: 0,
+  // Each spec drives 3-5 browser pages against one local worker and Next dev
+  // server. Past about 8 parallel workers they contend and timing specs flake.
+  workers: 8,
   timeout: 30_000,
   expect: {
     timeout: 10_000,
