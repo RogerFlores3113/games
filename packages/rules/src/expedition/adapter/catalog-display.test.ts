@@ -1,42 +1,85 @@
-// Phase 12, Plan 02: proves GEAR_DISPLAY/BOSS_DISPLAY are faithful,
-// function-free projections of GEAR_REGISTRY/BOSS_REGISTRY. Iterates the
-// registries directly (never a hand list) so a future 11th gear item or 5th
-// boss twist is covered automatically with zero test edits.
+// Phase 12, Plan 02: SOURCE_DISPLAY, CHARACTER_DISPLAY and BOSS_DISPLAY are
+// function-free projections of the production catalogue. Key coverage
+// iterates CATALOG so a new source is covered with no edit here; the
+// per-entry values are literal, so a drift in what the client shows fails.
 
 import { describe, expect, it } from "vitest";
-import { GEAR_REGISTRY } from "../gear/registry";
+import { CATALOG } from "../run/catalog";
 import { BOSS_REGISTRY } from "../boss/registry";
-import { GEAR_DISPLAY, BOSS_DISPLAY } from "./catalog-display";
+import { BOSS_DISPLAY, CHARACTER_DISPLAY, SOURCE_DISPLAY } from "./catalog-display";
 
-describe("GEAR_DISPLAY", () => {
-  it("has exactly the same keys as GEAR_REGISTRY, in the same order", () => {
-    expect(Object.keys(GEAR_DISPLAY)).toEqual(Object.keys(GEAR_REGISTRY));
+describe("SOURCE_DISPLAY", () => {
+  it("has exactly one entry per source in the catalogue", () => {
+    expect(Object.keys(SOURCE_DISPLAY).sort()).toEqual(Object.keys(CATALOG.sources).sort());
   });
 
-  for (const [id, def] of Object.entries(GEAR_REGISTRY)) {
-    it(`${id}: display fields mirror the registry def`, () => {
-      const display = GEAR_DISPLAY[id];
-      expect(display).toBeDefined();
-      if (!display) throw new Error("unreachable");
-      expect(display.id).toBe(def.id);
-      expect(display.name).toBe(def.name);
-      expect(display.size).toBe(def.size);
-      expect(display.window).toBe(def.window);
-      expect(display.text).toBe(def.text);
-      expect(display.downside).toBe(def.downside ?? null);
-      expect(display.targets).toEqual(def.targets.map((t) => t.kind));
+  it("carries a character's name, text, kind, window phrase, limit badge and target kinds", () => {
+    expect(SOURCE_DISPLAY.scout).toEqual({
+      id: "scout",
+      name: "The Scout",
+      text: "See a random card in a teammate's hand.",
+      kind: "character",
+      characterId: "scout",
+      active: { window: "between-tricks", windowPhrase: "Between tricks", limitBadge: "1 per camp", targets: ["hand"] },
+      passive: false,
     });
-  }
+  });
 
-  it("no GEAR_DISPLAY value has any function-valued property (JSON round-trip is lossless)", () => {
-    for (const display of Object.values(GEAR_DISPLAY)) {
+  it("carries an upgrade's characterId and an upgrade with no active as active: null", () => {
+    expect(SOURCE_DISPLAY["scout.keen-eye"]).toMatchObject({ kind: "upgrade", characterId: "scout", active: null, passive: false });
+    expect(SOURCE_DISPLAY["scout.eavesdrop"]).toMatchObject({
+      kind: "upgrade",
+      characterId: "scout",
+      active: { windowPhrase: "Between tricks", limitBadge: "1 per camp", targets: ["whisper"] },
+    });
+  });
+
+  it("carries an item with a null characterId, and flags passive-only sources", () => {
+    expect(SOURCE_DISPLAY["trained-monkey"]).toMatchObject({ kind: "item", characterId: null, active: { targets: ["card", "hand"] } });
+    expect(SOURCE_DISPLAY["heavy-pack"]).toMatchObject({ kind: "item", characterId: null, active: null, passive: true });
+    expect(SOURCE_DISPLAY.signaller).toMatchObject({ kind: "character", active: null, passive: true });
+  });
+
+  it("phrases each limit kind", () => {
+    expect(SOURCE_DISPLAY.scout!.active!.limitBadge).toBe("1 per camp");
+    expect(SOURCE_DISPLAY["rain-poncho"]!.active!.limitBadge).toBe("Once per run");
+    expect(SOURCE_DISPLAY.whetstone!.active!.limitBadge).toBe("Single use");
+    expect(SOURCE_DISPLAY.botanist!.active!.limitBadge).toBe("1 herb");
+    expect(SOURCE_DISPLAY["botanist.antidote"]!.active!.limitBadge).toBe("2 herbs");
+    expect(SOURCE_DISPLAY.medic!.active!.limitBadge).toBe("1 supply");
+  });
+
+  it("phrases each window", () => {
+    expect(SOURCE_DISPLAY["rain-poncho"]!.active!.windowPhrase).toBe("Before the deal");
+    expect(SOURCE_DISPLAY.cartographer!.active!.windowPhrase).toBe("While picking objectives");
+    expect(SOURCE_DISPLAY["guide.howler-call"]!.active!.windowPhrase).toBe("On your turn");
+    expect(SOURCE_DISPLAY.medic!.active!.windowPhrase).toBe("When an objective fails");
+  });
+
+  it("lists target kinds in step order", () => {
+    expect(SOURCE_DISPLAY["pack-mule"]!.active!.targets).toEqual(["won-trick", "player"]);
+    expect(SOURCE_DISPLAY["cartographer.detour"]!.active!.targets).toEqual(["objective", "player"]);
+    expect(SOURCE_DISPLAY["rain-poncho"]!.active!.targets).toEqual([]);
+  });
+
+  it("is JSON round-trippable (no function-valued property survives)", () => {
+    for (const display of Object.values(SOURCE_DISPLAY)) {
       expect(JSON.parse(JSON.stringify(display))).toEqual(display);
     }
   });
+});
 
-  it("peek.targets is [teammate]; pickpocket.targets is [teammate, own-card]", () => {
-    expect(GEAR_DISPLAY.peek?.targets).toEqual(["teammate"]);
-    expect(GEAR_DISPLAY.pickpocket?.targets).toEqual(["teammate", "own-card"]);
+describe("CHARACTER_DISPLAY", () => {
+  it("has one entry per character, listing its two upgrades and its pool", () => {
+    expect(Object.keys(CHARACTER_DISPLAY).sort()).toEqual(Object.keys(CATALOG.characters).sort());
+    expect(CHARACTER_DISPLAY.scout).toMatchObject({ id: "scout", pool: null, upgradeIds: ["scout.keen-eye", "scout.eavesdrop"] });
+    expect(CHARACTER_DISPLAY.botanist!.pool).toEqual({ name: "Herbs", start: 2, max: 3 });
+  });
+
+  it("is JSON round-trippable", () => {
+    for (const display of Object.values(CHARACTER_DISPLAY)) {
+      expect(JSON.parse(JSON.stringify(display))).toEqual(display);
+    }
   });
 });
 
@@ -55,7 +98,7 @@ describe("BOSS_DISPLAY", () => {
     }
   });
 
-  it("no BOSS_DISPLAY value has any function-valued property (JSON round-trip is lossless)", () => {
+  it("is JSON round-trippable", () => {
     for (const display of Object.values(BOSS_DISPLAY)) {
       expect(JSON.parse(JSON.stringify(display))).toEqual(display);
     }

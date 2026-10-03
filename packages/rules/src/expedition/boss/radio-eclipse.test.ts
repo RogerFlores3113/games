@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { applyRunAction } from "../run/run-actions";
-import { advanceTo, setupRun } from "../run/run-test-support";
+import { advanceTo, setupRun, testCatalog } from "../run/run-test-support";
 import { rulesFor } from "../run/compose";
 import { currentActorSeatId } from "../camp";
 import type { Catalog, CampNumber } from "../run/types";
@@ -19,10 +19,7 @@ import type { CardIdentity, PlayerCount, TrickPlay } from "../state";
 const SEED = "radio-eclipse-seed";
 
 function makeCatalog(): Catalog {
-  return {
-    gear: {},
-    bosses: { "radio-silence": radioSilence, eclipse },
-  };
+  return testCatalog({ bosses: { "radio-silence": radioSilence, eclipse } });
 }
 
 describe("Monsoon (radio-silence)", () => {

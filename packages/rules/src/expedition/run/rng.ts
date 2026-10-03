@@ -9,11 +9,10 @@
 // STREAMS is the SINGLE builder for every run-level draw-site name (the
 // table is reproduced in run/types.ts's header so both files stay in
 // sync). Two draws must never share a stream name; rng.test.ts proves this
-// pairwise-distinct over the full camp/attempt/seat/use-index/gear-id/
-// purpose grid.
+// pairwise-distinct over the full camp/attempt/seat/use-index/draw grid.
 //
 // seededIndex is the single seeded-draw primitive every later plan uses for
-// a 0..n-1 pick (Spyglass, Trained Monkey, Thick Fog's face-down assignment,
+// a 0..n-1 pick (ability draws, Thick Fog's face-down assignment,
 // camp 5's trick-count kind/N draws). It never falls back to Math.random.
 
 import { nextRandom, seedToRngState } from "../../shuffle";
@@ -23,8 +22,11 @@ export function attemptSeed(seed: string, campNumber: number, attemptNumber: num
 }
 
 export const STREAMS = {
-  draft(campNumber: number, seatId: string): string {
-    return `expedition-draft:camp${campNumber}:seat${seatId}`;
+  draftUpgrade(campNumber: number, seatId: string): string {
+    return `expedition-draft:camp${campNumber}:seat${seatId}:upgrade`;
+  },
+  draftItems(campNumber: number, seatId: string): string {
+    return `expedition-draft:camp${campNumber}:seat${seatId}:items`;
   },
   boss(campNumber: number): string {
     return `expedition-boss:camp${campNumber}`;
@@ -38,15 +40,8 @@ export const STREAMS = {
   faceDown(campNumber: number, attemptNumber: number): string {
     return `expedition-face-down:camp${campNumber}:attempt${attemptNumber}`;
   },
-  gear(
-    campNumber: number,
-    attemptNumber: number,
-    useIndex: number,
-    gearId: string,
-    seatId: string,
-    purpose: string,
-  ): string {
-    return `expedition-gear:camp${campNumber}:attempt${attemptNumber}:use${useIndex}:${gearId}:${seatId}:${purpose}`;
+  ability(campNumber: number, attemptNumber: number, seatId: string, useIndex: number, draw: number): string {
+    return `expedition-ability:camp${campNumber}:attempt${attemptNumber}:seat${seatId}:use${useIndex}:draw${draw}`;
   },
 };
 

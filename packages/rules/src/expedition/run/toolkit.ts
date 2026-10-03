@@ -1,163 +1,36 @@
-// The Phase 10 toolkit (Plan 04, spec §6.3): the ONLY mutation surface for
-// gear. A GearDef's `apply` returns a list of ToolkitOp data (gear-def.ts);
-// this file is the sole executor of that data, and every op preserves
-// invariants BY CONSTRUCTION — card conservation, audience-scoped reveals,
-// pending-only objective swaps (D-10), window-bound leader/boss changes
-// (D-09/D-04). A violation is a content-author defect and THROWS (POLICY
-// A3), matching actions.ts's composed-hook throw policy.
+// The toolkit (spec §6.3): the ONLY mutation surface for abilities. An
+// ability's `apply` returns a list of ToolkitOp data; this file is the sole
+// executor of that data, and every op preserves invariants BY CONSTRUCTION:
+// card conservation, audience-scoped reveals, pending-only objective swaps
+// (D-10), window-bound leader/boss changes (D-09/D-04). A violation is a
+// content-author defect and THROWS (POLICY A3), matching actions.ts's
+// composed-hook throw policy.
 //
-// A1: every gear draw goes through STREAMS.gear(campNumber, attemptNumber,
-// useIndex, gearId, seatId, purpose), where useIndex = k =
-// attempt.gearUses.length AT THE TIME OF USE — never a stored/carried PRNG
-// state. Purposes must be distinct within a single `apply` call, or two
-// draws in the same call would collide on the same stream name.
-//
-// OWN-HAND-ONLY TARGET RULE (T-10-11): an "own-card" target resolves only
-// among the actor's own hand choices (run/targets.ts). Probing a teammate's
-// card id returns the same plain reason as any other invalid target; it
-// never reveals whether that id exists in someone else's hand.
-//
-// This file must never import from ./compose — callers pass the composed
-// RunRules in, keeping this plan parallel with Plan 10-03.
+// Ops fold over RunState: supplies are run-level, every other op changes
+// only the attempt.
 
 import { identitiesEqual } from "../deck";
 import { evaluateObjective } from "../objectives";
 import type { CampState, Objective } from "../state";
 import { STARTING_SUPPLIES } from "./balance";
-import type { GearContext, GearDef, GearWindow, TargetKind as GearTargetKind, TargetSpec, ToolkitOp } from "../gear/gear-def";
-import { STREAMS, seededIndex } from "./rng";
-import { choicesFor, resolveTargets, type TargetSpec as RegistrySpec } from "./targets";
-import { WINDOWS, currentWindow } from "./windows";
-import type { RunRules } from "./run-rules";
-import type { ActiveEffect, AttemptState, Catalog, LogEntry, Reveal, RunError, RunState } from "./types";
+import type { EffectParams, SourceId } from "../content/source-def";
+import type { ActiveEffect, AttemptState, LogEntry, Reveal, RunState } from "./types";
 
-/** True whether the seat used OR skipped this gear already this camp. */
-export function isGearSpent(attempt: AttemptState, seatId: string, gearId: string): boolean {
-  return attempt.gearUses.some((use) => use.seatId === seatId && use.gearId === gearId);
-}
-
-/** Builds the GearContext handed to a GearDef's canUse/canTarget/apply.
- * Throws if there is no in-progress attempt (nothing to build a context
- * for). `camp` is null during the pre-deal window. */
-export function buildGearContext(
-  run: RunState,
-  self: string,
-  gearId: string,
-  targets: readonly string[],
-  rules: RunRules,
-): GearContext {
-  if (run.attempt === null) {
-    throw new Error("toolkit: buildGearContext: no attempt in progress");
-  }
-  const attempt = run.attempt;
-  const camp = attempt.camp;
-
-  return {
-    self,
-    gearId,
-    run,
-    camp,
-    rules,
-    targets,
-    handSize(seatId) {
-      const hand = camp?.hands.find((h) => h.seatId === seatId);
-      return hand ? hand.cards.length : 0;
-    },
-    ownHand() {
-      const hand = camp?.hands.find((h) => h.seatId === self);
-      return hand ? hand.cards : [];
-    },
-    // A1: k = attempt.gearUses.length at the time of the draw. Purposes
-    // must be distinct within one `apply` call.
-    randomCardIdFrom(seatId, purpose) {
-      const hand = camp?.hands.find((h) => h.seatId === seatId);
-      if (!hand || hand.cards.length === 0) return null;
-      const stream = STREAMS.gear(run.campNumber, attempt.attemptNumber, attempt.gearUses.length, gearId, self, purpose);
-      const index = seededIndex(run.seed, stream, hand.cards.length);
-      return hand.cards[index]!.id;
-    },
-    randomIndex(n, purpose) {
-      const stream = STREAMS.gear(run.campNumber, attempt.attemptNumber, attempt.gearUses.length, gearId, self, purpose);
-      return seededIndex(run.seed, stream, n);
-    },
-  };
-}
-
-const WINDOW_PHRASES: Record<GearWindow, string> = {
-  "pre-deal": "before the deal",
-  "objective-pick": "while objectives are picked",
-  "between-tricks": "between tricks",
-  "in-trick": "on your turn in a trick",
-  rescue: "when an objective fails",
-  passive: "always",
-};
-
-/** GEAR-06: availability with a human-readable reason for every blocked
- * case. Check order: attempt -> equipped -> catalog lookup (throws if
- * missing — an equipped-but-uncataloged id is a content defect, POLICY A3)
- * -> spent -> passive -> window -> def.canUse. */
-export function gearAvailability(
-  run: RunState,
-  seatId: string,
-  gearId: string,
-  catalog: Catalog,
-  rules: RunRules,
-): { ok: true } | { ok: false; error: RunError; reason: string } {
-  if (run.attempt === null) {
-    return { ok: false, error: "wrong_phase", reason: "No camp in progress" };
-  }
-  const seat = run.seats.find((s) => s.seatId === seatId);
-  if (!seat || !seat.equippedGearIds.includes(gearId)) {
-    return { ok: false, error: "gear_not_equipped", reason: "Not equipped" };
-  }
-  const def = catalog.gear[gearId];
-  if (!def) {
-    throw new Error(`toolkit: gearAvailability: unknown gear id ${gearId}`);
-  }
-  if (isGearSpent(run.attempt, seatId, gearId)) {
-    return { ok: false, error: "gear_already_used", reason: "Already used this camp" };
-  }
-  if (def.window === "passive") {
-    return { ok: false, error: "wrong_window", reason: "Passive gear is always active" };
-  }
-  const window = currentWindow(run, rules);
-  if (window === null || def.window !== window || !WINDOWS[window].mayAct(run, rules, seatId)) {
-    return { ok: false, error: "wrong_window", reason: `Can only be used ${WINDOW_PHRASES[def.window]}` };
-  }
-  const ctx = buildGearContext(run, seatId, gearId, [], rules);
-  const canUse = def.canUse ? def.canUse(ctx) : true;
-  if (canUse !== true) {
-    return { ok: false, error: "gear_unavailable", reason: canUse };
-  }
-  return { ok: true };
-}
-
-/** Each gear target kind as a registry spec, plus the prefix that turns a
- * gear's bare id into that kind's choice id. Lives until gear is replaced. */
-const GEAR_TARGET_SPECS: Readonly<Record<GearTargetKind, { readonly spec: RegistrySpec; readonly prefix: string }>> = {
-  teammate: { spec: { kind: "player", who: "teammate" }, prefix: "seat:" },
-  "own-card": { spec: { kind: "card", where: "my-hand" }, prefix: "card:" },
-  "face-up-objective": { spec: { kind: "objective", whose: "unclaimed" }, prefix: "objective:" },
-  "own-objective": { spec: { kind: "objective", whose: "mine" }, prefix: "objective:" },
-};
-
-/** True when every target step of `def` has at least one choice for the
- * seat right now. */
-export function gearTargetsHaveChoices(run: RunState, seatId: string, def: GearDef, rules: RunRules): boolean {
-  const scope = { run, seatId, camp: run.attempt?.camp ?? null, rules };
-  return def.targets.every((spec) => choicesFor(scope, GEAR_TARGET_SPECS[spec.kind].spec).length > 0);
-}
-
-/** Generic target-kind validation, shared by every gear, through the
- * target-kind registry: a target is legal only if it is among the seat's
- * choices, so an own-card target never matches a teammate's card (T-10-11). */
-export function validateTargets(ctx: GearContext, specs: readonly TargetSpec[]): true | string {
-  const mapped = specs.map((spec) => GEAR_TARGET_SPECS[spec.kind]);
-  const ids = ctx.targets.length === specs.length ? ctx.targets.map((target, i) => `${mapped[i]!.prefix}${target}`) : ctx.targets;
-  const scope = { run: ctx.run, seatId: ctx.self, camp: ctx.camp, rules: ctx.rules };
-  const resolved = resolveTargets(scope, mapped.map((m) => m.spec), ids);
-  return resolved.ok ? true : resolved.reason;
-}
+export type ToolkitOp<P extends EffectParams = EffectParams> =
+  | { readonly op: "move-card"; readonly cardId: string; readonly fromSeatId: string; readonly toSeatId: string }
+  | { readonly op: "swap-cards"; readonly seatA: string; readonly cardIdA: string; readonly seatB: string; readonly cardIdB: string }
+  | { readonly op: "replace-objective"; readonly objectiveId: string } // unowned, or owned and failed
+  | { readonly op: "reassign-objective"; readonly objectiveId: string; readonly toSeatId: string }
+  | { readonly op: "reassign-trick"; readonly trickIndex: number; readonly toSeatId: string } // winner change; cards untouched
+  | { readonly op: "share-reveal"; readonly whisperOrdinal: number; readonly audience: readonly string[] }
+  | { readonly op: "adjust-supplies"; readonly delta: number }
+  | { readonly op: "swap-objectives"; readonly seatA: string; readonly seatB: string }
+  | { readonly op: "remove-objective"; readonly objectiveId: string }
+  | { readonly op: "reveal"; readonly cardId: string; readonly audience: readonly string[] }
+  | { readonly op: "add-modifier"; readonly lasts: "attempt" | "trick"; readonly params: P; readonly audience: "public" | "owner" }
+  | { readonly op: "set-next-leader"; readonly seatId: string }
+  | { readonly op: "cancel-boss-twist" }
+  | { readonly op: "log"; readonly event: string; readonly subjectSeatIds: readonly string[]; readonly audience: "public" | readonly string[] };
 
 /** Every card id currently in play (hands, completed tricks, the
  * in-progress trick), sorted. Every successful applyToolkitOps call must
@@ -197,7 +70,7 @@ function assertAudience(run: RunState, audience: readonly string[], opName: stri
 }
 
 /** Supplies are run-level; every other op changes only the attempt. */
-function applyOp(run: RunState, actorSeatId: string, gearId: string, op: ToolkitOp): RunState {
+function applyOp(run: RunState, actorSeatId: string, sourceId: SourceId, op: ToolkitOp): RunState {
   if (op.op === "adjust-supplies") {
     // The crew keeps at least one supply and never exceeds the start.
     const supplies = run.supplies + op.delta;
@@ -206,14 +79,14 @@ function applyOp(run: RunState, actorSeatId: string, gearId: string, op: Toolkit
     }
     return { ...run, supplies };
   }
-  return { ...run, attempt: applyAttemptOp(run, run.attempt!, actorSeatId, gearId, op) };
+  return { ...run, attempt: applyAttemptOp(run, run.attempt!, actorSeatId, sourceId, op) };
 }
 
 function applyAttemptOp(
   run: RunState,
   attempt: AttemptState,
   actorSeatId: string,
-  gearId: string,
+  sourceId: SourceId,
   op: Exclude<ToolkitOp, { readonly op: "adjust-supplies" }>,
 ): AttemptState {
   switch (op.op) {
@@ -302,7 +175,7 @@ function applyAttemptOp(
         const objectiveDeck = camp.objectiveDeck.filter((_, i) => i !== deckIndex);
         return { ...attempt, camp: { ...camp, objectives, objectiveDeck } };
       }
-      // Must match camp.ts's isCardBearingSlot and reroll.ts's canTarget
+      // Must match camp.ts's isCardBearingSlot and Redraw's canTarget
       // (CR-01): win-card and ordered are the only card-bearing kinds.
       if (objective.kind !== "ordered" && objective.kind !== "win-card") {
         throw new Error("toolkit: replace-objective: objective has no card to replace");
@@ -357,7 +230,7 @@ function applyAttemptOp(
         throw new Error(`toolkit: share-reveal: no whisper ${op.whisperOrdinal}`);
       }
       assertAudience(run, op.audience, "share-reveal");
-      const reveal: Reveal = { cardId: whisper.cardId, fromSeatId: whisper.fromSeatId, audience: op.audience, source: gearId };
+      const reveal: Reveal = { cardId: whisper.cardId, fromSeatId: whisper.fromSeatId, audience: op.audience, source: sourceId };
       return { ...attempt, reveals: [...attempt.reveals, reveal] };
     }
 
@@ -392,21 +265,20 @@ function applyAttemptOp(
       if (!holder) {
         throw new Error(`toolkit: reveal: card ${op.cardId} not in any hand`);
       }
-      const reveal: Reveal = { cardId: op.cardId, fromSeatId: holder.seatId, audience: op.audience, source: gearId };
+      const reveal: Reveal = { cardId: op.cardId, fromSeatId: holder.seatId, audience: op.audience, source: sourceId };
       return { ...attempt, reveals: [...attempt.reveals, reveal] };
     }
 
     case "add-modifier": {
       const atTrick = attempt.camp ? attempt.camp.currentTrick.index : 0;
-      const effect: ActiveEffect = { gearId, seatId: actorSeatId, atTrick, lasts: op.lasts, params: op.params, audience: op.audience };
+      const effect: ActiveEffect = { sourceId, seatId: actorSeatId, atTrick, lasts: op.lasts, params: op.params, audience: op.audience };
       return { ...attempt, effects: [...attempt.effects, effect] };
     }
 
     case "set-next-leader": {
       // D-09: allowed in any between-tricks window, including before trick
-      // 1 — the caller (gearAvailability's window check) is what
-      // guarantees "between tricks"; this op itself only guards against a
-      // trick already in progress.
+      // 1. The ability's window guarantees "between tricks"; this op itself
+      // only guards against a trick already in progress.
       const camp = requireCamp(attempt, "set-next-leader");
       if (camp.currentTrick.plays.length > 0) {
         throw new Error("toolkit: set-next-leader: trick already in progress");
@@ -434,7 +306,7 @@ function applyAttemptOp(
         event: op.event,
         actorSeatId,
         subjectSeatIds: op.subjectSeatIds,
-        gearId,
+        sourceId,
         audience: op.audience,
       };
       return { ...attempt, log: [...attempt.log, entry] };
@@ -447,12 +319,12 @@ function applyAttemptOp(
   }
 }
 
-/** The sole executor of gear effects (spec §6.3). Folds `ops` over the
+/** The sole executor of ability effects (spec §6.3). Folds `ops` over the
  * RunState in order, never mutating `run` or any of its nested objects, and
  * asserts card conservation once the fold completes (T-10-13): a broken op
  * is a content-author defect and THROWS (POLICY A3), never silently
  * corrupting state. */
-export function applyToolkitOps(run: RunState, actorSeatId: string, gearId: string, ops: readonly ToolkitOp[]): RunState {
+export function applyToolkitOps(run: RunState, actorSeatId: string, sourceId: SourceId, ops: readonly ToolkitOp[]): RunState {
   if (run.attempt === null) {
     throw new Error("toolkit: applyToolkitOps: no attempt in progress");
   }
@@ -462,7 +334,7 @@ export function applyToolkitOps(run: RunState, actorSeatId: string, gearId: stri
 
   let next = run;
   for (const op of ops) {
-    next = applyOp(next, actorSeatId, gearId, op);
+    next = applyOp(next, actorSeatId, sourceId, op);
   }
 
   const afterCamp = next.attempt!.camp;

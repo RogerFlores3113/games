@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import { CATALOG } from "../run/catalog";
+import { draftOfferFor } from "../run/draft";
 import { createRun } from "../run/lifecycle";
 import { applyRunAction } from "../run/run-actions";
 import { advanceTo, setupRun } from "../run/run-test-support";
@@ -56,17 +57,35 @@ function freshFireside(): RunState {
   return setupRun({ seatIds: SEAT_IDS, seed: SEED, catalog: CATALOG });
 }
 
-/** Unlike setupRun (which always clears every seat's draftOffer to null),
- * createRun leaves camp-1's real per-seat draft offers in place — needed for
- * Canary F, which proves a cross-seat draft-offer swap is detected. */
+/** setupRun clears every seat's draftOffer to null, so this gives each seat
+ * its real private offer for camp 2 — needed for Canary F, which proves a
+ * cross-seat draft-offer swap is detected. */
 function realFireside(): RunState {
-  return createRun({ seatIds: SEAT_IDS, seed: SEED }, CATALOG);
+  const base = setupRun({ seatIds: SEAT_IDS, seed: SEED, catalog: CATALOG, campNumber: 2 });
+  return { ...base, seats: base.seats.map((seat) => ({ ...seat, draftOffer: draftOfferFor(SEED, 2, seat, CATALOG) })) };
+}
+
+function musterRun(): RunState {
+  return createRun({ seatIds: SEAT_IDS, seed: SEED });
+}
+
+/** p0 has used a Whetstone: an owner-audience effect naming one of p0's cards. */
+function afterWhetstone(): RunState {
+  const start = advanceTo(
+    setupRun({ seatIds: SEAT_IDS, seed: SEED, catalog: CATALOG, kits: { p0: ["whetstone"] } }),
+    "between-tricks",
+    CATALOG,
+  );
+  const step = toExpeditionPlayerView(start, "p0", CATALOG).yourAbilities.find((a) => a.sourceId === "whetstone")!.steps[0]!;
+  const result = applyRunAction(start, "p0", { type: "use-ability", sourceId: "whetstone", targets: [step.choices[0]!] }, CATALOG);
+  if (!result.ok) throw new Error(`afterWhetstone: ${result.error}`);
+  return result.state;
 }
 
 describe("view-leak-check: clean baseline", () => {
   it("reports no leaks for a real toExpeditionPlayerView on every seat and an unseated viewer, across several run shapes", () => {
     let checked = 0;
-    const states: RunState[] = [dealtFaceUpCamp(), thickFogCamp(), postWhisperState(), freshFireside()];
+    const states: RunState[] = [musterRun(), dealtFaceUpCamp(), thickFogCamp(), postWhisperState(), afterWhetstone(), freshFireside(), realFireside()];
 
     for (const state of states) {
       for (const seatId of [...state.seatIds, "unseated-viewer"]) {
@@ -92,7 +111,7 @@ describe("view-leak-check: canary suite", () => {
     const otherCard = otherHand.cards[0]!;
 
     const leaky = structuredClone(view);
-    leaky.attempt!.camp!.yourHand.push({ id: otherCard.id, identity: otherCard.identity as never });
+    leaky.attempt!.camp!.yourHand.push({ id: otherCard.id, identity: otherCard.identity as never, effectiveRank: null });
 
     const reasons = checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets });
     expect(reasons).toContain(`structural:hidden-id:${otherCard.id}`);
@@ -134,6 +153,18 @@ describe("view-leak-check: canary suite", () => {
         secrets: whisperSecrets,
       }),
     ).toContain("structural:forbidden-key:audience");
+  });
+
+  it("Canary B2: a ledger key on a seat is flagged as a forbidden key", () => {
+    const state = dealtFaceUpCamp();
+    const view = toExpeditionPlayerView(state, "p0", CATALOG);
+    const secrets = secretsForExpeditionSeat(state, "p0", CATALOG, SEED);
+
+    const leaky = structuredClone(view);
+    (leaky.seats[1] as unknown as Record<string, unknown>).ledger = [{ kind: "used", sourceId: "scout" }];
+
+    const reasons = checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets });
+    expect(reasons).toContain("structural:forbidden-key:ledger");
   });
 
   it("Canary C: the 32-hex seed embedded inside a log entry's event string", () => {
@@ -224,7 +255,7 @@ describe("view-leak-check: canary suite", () => {
       event: "secret-event",
       actorSeatId: "p1",
       subjectSeatIds: ["p2"],
-      gearId: null,
+      sourceId: null,
       private: true,
     });
 

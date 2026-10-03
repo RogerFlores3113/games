@@ -1,8 +1,8 @@
 // Phase 10 hook-composition engine (Plan 03, spec §6.1).
 //
-// COMPOSITION ORDER: base -> active boss twist -> each seat's equipped
-// passives (seat order, then loadout order) -> active effects (in the order
-// stored on attempt.effects). Every layer's RuleModifier maps the PREVIOUS
+// COMPOSITION ORDER: base -> active boss twist -> each seat's live passives
+// (seat order, then [character, ...kit] order) -> active effects (in the
+// order stored on attempt.effects). Every layer's RuleModifier maps the PREVIOUS
 // layer's answer to its own, per hook (run-rules.ts's own header repeats
 // this contract; this file is what actually folds it).
 //
@@ -20,7 +20,7 @@
 // recomposes to the same RunRules, and a changed RunState (e.g. a new
 // attempt.effects entry) always recomposes to a new one.
 //
-// POLICY A3 (content-defect throw): an equipped/effect-referencing gear id
+// POLICY A3 (content-defect throw): a live or effect-referencing source id
 // or a stored boss id absent from the Catalog is a content bug, not a player
 // error — ruleLayersFor throws a plain Error naming the missing id, matching
 // the Plan 10-01 policy for composed rule-hook defects.
@@ -40,6 +40,7 @@ import { baseRulesWith } from "../rules";
 import { isTrump, rankOf } from "../trick";
 import { HOOK_NAMES, baseRunHooks, type HookName, type RuleModifier, type RunRules } from "./run-rules";
 import type { Catalog, RunState } from "./types";
+import { liveSourceIds, ownerOf, sourceDef } from "./usage";
 
 /** Folds one card-reading hook across every layer, in order, over its
  * Core default. Layers with no entry pass the previous answer through. */
@@ -86,9 +87,10 @@ export function activeBossId(run: RunState): string | null {
 }
 
 /** Builds the ordered layer list for `run` under `catalog`: active boss ->
- * each seat's equipped passives (seat order, then loadout order) -> each
- * attempt effect's effectModifier, in attempt.effects order. Throws a named
- * Error for any gear/boss id missing from the catalog (POLICY A3). */
+ * each seat's live passives (seat order, then [character, ...kit] order) ->
+ * each live attempt effect's `active.effect`, in attempt.effects order.
+ * Throws a named Error for any source or boss id missing from the catalog
+ * (POLICY A3). */
 export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
   const layers: RuleModifier[] = [];
 
@@ -102,14 +104,10 @@ export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
   }
 
   for (const seat of run.seats) {
-    for (const gearId of seat.equippedGearIds) {
-      const gearDef = catalog.gear[gearId];
-      if (gearDef === undefined) {
-        throw new Error(`ruleLayersFor: seat "${seat.seatId}" has unknown equipped gear id "${gearId}"`);
-      }
-      if (gearDef.passiveModifier !== undefined) {
-        layers.push(gearDef.passiveModifier(seat.seatId));
-      }
+    const owner = ownerOf(seat);
+    for (const sourceId of liveSourceIds(seat)) {
+      const passive = sourceDef(catalog, sourceId).passive;
+      if (passive !== undefined) layers.push(passive.modifier(owner));
     }
   }
 
@@ -120,13 +118,11 @@ export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
       // applyCampAction resolves trickWinner while currentTrick.index still
       // equals atTrick, and the next trick's index drops the layer.
       if (effect.lasts === "trick" && effect.atTrick !== trickIndex) continue;
-      const gearDef = catalog.gear[effect.gearId];
-      if (gearDef === undefined) {
-        throw new Error(`ruleLayersFor: active effect names unknown gear id "${effect.gearId}"`);
+      const toLayer = sourceDef(catalog, effect.sourceId).active?.effect;
+      if (toLayer === undefined) {
+        throw new Error(`ruleLayersFor: effect from "${effect.sourceId}" has no active.effect`);
       }
-      if (gearDef.effectModifier !== undefined) {
-        layers.push(gearDef.effectModifier(effect));
-      }
+      layers.push(toLayer(effect));
     }
   }
 

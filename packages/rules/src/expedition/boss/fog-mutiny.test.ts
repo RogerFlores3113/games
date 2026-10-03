@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import { applyRunAction } from "../run/run-actions";
-import { advanceTo, setupRun } from "../run/run-test-support";
+import { advanceTo, setupRun, testCatalog } from "../run/run-test-support";
 import { rulesFor } from "../run/compose";
 import { currentWindow } from "../run/windows";
 import { assignFaceDown } from "../run/lifecycle";
@@ -20,10 +20,7 @@ import { mutiny } from "./mutiny";
 import type { CampState } from "../state";
 
 function makeCatalog(): Catalog {
-  return {
-    gear: {},
-    bosses: { "blind-orders": blindOrders, mutiny },
-  };
+  return testCatalog({ bosses: { "blind-orders": blindOrders, mutiny } });
 }
 
 describe("Thick Fog (blind-orders)", () => {

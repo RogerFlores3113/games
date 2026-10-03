@@ -871,3 +871,23 @@ target kind, a window. Green check **`source-icons`**: a new
 - Unit 5: the test-only defs (`WINDOW_TEST_GEAR`: a rescue rope and an in-trick duck) live in
   `run/run-test-support.ts`. `run.property.test.ts` adds them to its catalogue and gains a property
   that guarantees them on alternate seats and asserts rescue was reached.
+- Unit 6: `abilityStatus` takes a live source of the seat and throws otherwise; `useAbility` answers
+  `not_owned` for a non-live source before asking it, and `ability_unavailable` for a passive-only
+  one. `canTarget` refusals are `invalid_target`, as the spec says.
+- Unit 6: a seat's second `pick-character` is `wrong_phase` (its muster is done), and `skip-window`
+  with no gated window open is `wrong_window`.
+- Unit 6: `createRun({ seatIds, seed })` and `liveSourceIds(seat)` take no catalogue; muster needs
+  none and `[characterId, ...kit]` reads only the seat.
+- Unit 6: when no upgrade of the seat's character remains, all three draft slots are items.
+- Unit 6: the leak check treats ids named in an effect the viewer may read as known, like a reveal.
+  A Herb Tonic'd card later swapped away keeps its id in its owner's effect params.
+- Unit 6: Howler Call compares printed ranks; a `RuleModifier` layer has no handle on the composed
+  `rankOf`, so a tonic does not move a card inside that one trick.
+- Unit 6: Pack Mule's `canTarget` reads every objective, so under Thick Fog a refusal hints that a
+  hidden objective's card is in that trick (the WR-02 oracle). Open; the alternative lets a mule
+  settle a hidden objective.
+- Unit 6: `CHARACTER_DISPLAY` sits beside `SOURCE_DISPLAY` (theme, pool, upgrade ids); badges show
+  the untuned limit. The view has no list of characters, so muster pickers read
+  `CHARACTER_DISPLAY`.
+- Unit 6: `attempt.pendingSeatIds` reports either gated window, and `attempt.rescue` is set only
+  while the rescue window is open.

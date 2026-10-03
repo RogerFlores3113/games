@@ -11,15 +11,15 @@ import { currentActorSeatId } from "../camp";
 import { winnerExcluding } from "../content/helpers";
 import { activeBossId, composeRules, ruleLayersFor, rulesFor } from "./compose";
 import { applyRunAction } from "./run-actions";
-import { advanceTo, setupRun } from "./run-test-support";
+import { advanceTo, setupRun, testCatalog } from "./run-test-support";
 import type { RuleModifier } from "./run-rules";
 import type { AttemptState, Catalog, RunState, SeatRun } from "./types";
 import type { CampState, CardIdentity, ExpeditionCard, Hand, TrickPlay } from "../state";
-import type { GearDef } from "../gear/gear-def";
+import { ability, defineCharacter, defineItem, defineUpgrade } from "../content/source-def";
 import type { BossDef } from "../boss/boss-def";
 
 function seat(seatId: string, overrides: Partial<SeatRun> = {}): SeatRun {
-  return { seatId, ownedGearIds: [], equippedGearIds: [], draftOffer: null, ...overrides };
+  return { seatId, characterId: null, kit: [], draftOffer: null, ledger: [], ...overrides };
 }
 
 function makeRun(overrides: Partial<RunState> = {}): RunState {
@@ -42,7 +42,6 @@ function makeAttempt(overrides: Partial<AttemptState> = {}): AttemptState {
   return {
     attemptNumber: 1,
     bossCancelled: false,
-    gearUses: [],
     effects: [],
     reveals: [],
     log: [],
@@ -194,31 +193,30 @@ describe("activeBossId", () => {
 
 describe("rulesFor / ruleLayersFor", () => {
   const bossX: BossDef = { id: "boss-x", name: "X", text: "", modifiers: { whisperAllowed: () => () => false } };
-  const capacityGear: GearDef = {
-    id: "gear-cap2",
-    name: "Cap+2",
-    size: 1,
-    window: "passive",
+  const passiveItem = defineItem({
+    id: "whisper-plus-2",
+    name: "Whisper+2",
     text: "",
-    targets: [],
-    passiveModifier(ownerSeatId) {
-      return {
-        capacity: (prev) => (run, seatId) => (seatId === ownerSeatId ? prev(run, seatId) + 2 : prev(run, seatId)),
-      };
+    passive: {
+      modifier: (owner) => ({
+        whispersPerCamp: (prev) => (run, seatId) => (seatId === owner.seatId ? prev(run, seatId) + 2 : prev(run, seatId)),
+      }),
     },
-  };
-  const effectGear: GearDef = {
-    id: "gear-effect",
+  });
+  const effectItem = defineItem({
+    id: "effect-item",
     name: "Effect+1",
-    size: 1,
-    window: "passive",
     text: "",
-    targets: [],
-    effectModifier() {
-      return { whispersPerCamp: (prev) => (run, seatId) => prev(run, seatId) + 1 };
-    },
-  };
-  const catalog: Catalog = { gear: { "gear-cap2": capacityGear, "gear-effect": effectGear }, bosses: { "boss-x": bossX } };
+    active: ability({
+      window: "between-tricks",
+      limit: { kind: "per-camp", times: 1 },
+      targets: [],
+      apply: () => [],
+      effect: () => ({ whispersPerCamp: (prev) => (run, seatId) => prev(run, seatId) + 1 }),
+    }),
+  });
+  const catalog = testCatalog({ items: { "whisper-plus-2": passiveItem, "effect-item": effectItem }, bosses: { "boss-x": bossX } });
+  const effect = { sourceId: "effect-item", seatId: "p0", atTrick: 0, lasts: "attempt", params: {}, audience: "public" } as const;
 
   it("applies the boss layer only while active", () => {
     const runBoss = makeRun({ campNumber: 3, bossTwists: { 3: "boss-x", 6: null }, attempt: makeAttempt() });
@@ -228,50 +226,153 @@ describe("rulesFor / ruleLayersFor", () => {
     expect(rulesFor(runFireside, catalog).whisperAllowed(runFireside, "p0")).toBe(true);
   });
 
-  it("applies an equipped passive gear only for its owner", () => {
+  it("applies a kit passive only for its owner", () => {
     const run = makeRun({
       campNumber: 4,
-      seats: [seat("p0", { equippedGearIds: [] }), seat("p1", { equippedGearIds: ["gear-cap2"] }), seat("p2")],
+      seats: [seat("p0"), seat("p1", { kit: ["whisper-plus-2"] }), seat("p2")],
       attempt: makeAttempt(),
     });
     const rules = rulesFor(run, catalog);
-    expect(rules.capacity(run, "p1")).toBe(6); // campNumber(4) + 2
-    expect(rules.capacity(run, "p0")).toBe(4);
+    expect(rules.whispersPerCamp(run, "p1")).toBe(3);
+    expect(rules.whispersPerCamp(run, "p0")).toBe(1);
   });
 
-  it("applies effectModifier for attempt.effects", () => {
-    const run = makeRun({
-      campNumber: 2,
-      attempt: makeAttempt({ effects: [{ gearId: "gear-effect", seatId: "p0", atTrick: 1, lasts: "attempt", params: {}, audience: "public" }] }),
+  it("applies a character's passive, and tunes it by the owner's upgrades", () => {
+    const tuned = defineCharacter({
+      id: "tuned",
+      name: "Tuned",
+      theme: "t",
+      text: "",
+      passive: {
+        modifier: (owner) => ({
+          whispersPerCamp: (prev) => (run, seatId) => (seatId === owner.seatId ? (owner.hasUpgrade("tuned.a") ? 4 : 2) : prev(run, seatId)),
+        }),
+      },
+      upgrades: [defineUpgrade({ id: "tuned.a", name: "A", text: "" }), defineUpgrade({ id: "tuned.b", name: "B", text: "" })],
     });
+    const tunedCatalog = testCatalog({ characters: { tuned } });
+    const plain = makeRun({ seats: [seat("p0", { characterId: "tuned" }), seat("p1"), seat("p2")], attempt: makeAttempt() });
+    const upgraded = makeRun({ seats: [seat("p0", { characterId: "tuned", kit: ["tuned.a"] }), seat("p1"), seat("p2")], attempt: makeAttempt() });
+    expect(rulesFor(plain, tunedCatalog).whispersPerCamp(plain, "p0")).toBe(2);
+    expect(rulesFor(upgraded, tunedCatalog).whispersPerCamp(upgraded, "p0")).toBe(4);
+    expect(rulesFor(upgraded, tunedCatalog).whispersPerCamp(upgraded, "p1")).toBe(1);
+  });
+
+  it("applies an attempt effect through its source's active.effect", () => {
+    const run = makeRun({ campNumber: 2, attempt: makeAttempt({ effects: [effect] }) });
     expect(rulesFor(run, catalog).whispersPerCamp(run, "p0")).toBe(2);
   });
 
-  it("capacity equals campNumber regardless of attemptNumber (RUN-03)", () => {
-    const run1 = makeRun({ campNumber: 3, attempt: makeAttempt({ attemptNumber: 1 }) });
-    const run3 = makeRun({ campNumber: 3, attempt: makeAttempt({ attemptNumber: 3 }) });
-    expect(rulesFor(run1, catalog).capacity(run1, "p0")).toBe(3);
-    expect(rulesFor(run3, catalog).capacity(run3, "p0")).toBe(3);
-  });
-
-  it("recomputes on every call — no cache (T-10-08)", () => {
+  it("recomputes on every call, with no cache (T-10-08)", () => {
     const withoutEffect = makeRun({ campNumber: 2, attempt: makeAttempt({ effects: [] }) });
-    const withEffect = makeRun({
-      campNumber: 2,
-      attempt: makeAttempt({ effects: [{ gearId: "gear-effect", seatId: "p0", atTrick: 1, lasts: "attempt", params: {}, audience: "public" }] }),
-    });
+    const withEffect = makeRun({ campNumber: 2, attempt: makeAttempt({ effects: [effect] }) });
     expect(rulesFor(withoutEffect, catalog).whispersPerCamp(withoutEffect, "p0")).toBe(1);
     expect(rulesFor(withEffect, catalog).whispersPerCamp(withEffect, "p0")).toBe(2);
   });
 
-  it("throws naming an equipped gear id missing from the catalog (POLICY A3)", () => {
-    const run = makeRun({ seats: [seat("p0", { equippedGearIds: ["ghost-gear"] }), seat("p1"), seat("p2")] });
-    expect(() => ruleLayersFor(run, catalog)).toThrow(/ghost-gear/);
+  it("throws naming a kit source id missing from the catalogue (POLICY A3)", () => {
+    const run = makeRun({ seats: [seat("p0", { kit: ["ghost-source"] }), seat("p1"), seat("p2")] });
+    expect(() => ruleLayersFor(run, catalog)).toThrow(/ghost-source/);
+  });
+
+  it("throws naming a character id missing from the catalogue (POLICY A3)", () => {
+    const run = makeRun({ seats: [seat("p0", { characterId: "ghost-character" }), seat("p1"), seat("p2")] });
+    expect(() => ruleLayersFor(run, catalog)).toThrow(/ghost-character/);
   });
 
   it("throws naming an unknown boss id (POLICY A3)", () => {
     const run = makeRun({ campNumber: 3, bossTwists: { 3: "no-such-boss", 6: null }, attempt: makeAttempt() });
     expect(() => ruleLayersFor(run, catalog)).toThrow(/no-such-boss/);
+  });
+
+  it("throws when an effect's source has no active.effect", () => {
+    const passiveOnly = { ...effect, sourceId: "whisper-plus-2" };
+    const run = makeRun({ attempt: makeAttempt({ effects: [passiveOnly] }) });
+    expect(() => ruleLayersFor(run, catalog)).toThrow(/whisper-plus-2.*no active\.effect/);
+  });
+
+  it("throws when an effect's source has an active ability but no effect function", () => {
+    const noEffect = defineItem({
+      id: "no-effect",
+      name: "No effect",
+      text: "",
+      active: ability({ window: "between-tricks", limit: { kind: "per-camp", times: 1 }, targets: [], apply: () => [] }),
+    });
+    const bare = testCatalog({ items: { "no-effect": noEffect } });
+    const run = makeRun({ attempt: makeAttempt({ effects: [{ ...effect, sourceId: "no-effect" }] }) });
+    expect(() => ruleLayersFor(run, bare)).toThrow(/no-effect.*no active\.effect/);
+  });
+});
+
+describe("layer order", () => {
+  // Each layer appends its label to whisperAudience, so the answer lists the
+  // layers in the order they were folded, after the base's [target].
+  const tag = (label: string) => ({
+    whisperAudience: (prev: (run: RunState, seatId: string, targetSeatId: string) => readonly string[]) => (run: RunState, seatId: string, targetSeatId: string) =>
+      [...prev(run, seatId, targetSeatId), label],
+  });
+  const passive = (label: string) => ({ modifier: () => tag(label) });
+  const boss: BossDef = { id: "boss-x", name: "X", text: "", modifiers: tag("boss") };
+  const char0 = defineCharacter({
+    id: "char-0",
+    name: "C0",
+    theme: "t",
+    text: "",
+    passive: passive("char-0"),
+    upgrades: [defineUpgrade({ id: "char-0.a", name: "A", text: "", passive: passive("char-0.a") }), defineUpgrade({ id: "char-0.b", name: "B", text: "" })],
+  });
+  const char1 = defineCharacter({
+    id: "char-1",
+    name: "C1",
+    theme: "t",
+    text: "",
+    passive: passive("char-1"),
+    upgrades: [defineUpgrade({ id: "char-1.a", name: "A", text: "" }), defineUpgrade({ id: "char-1.b", name: "B", text: "" })],
+  });
+  const itemA = defineItem({ id: "item-a", name: "A", text: "", passive: passive("item-a") });
+  const itemB = defineItem({ id: "item-b", name: "B", text: "", passive: passive("item-b") });
+  const fx = defineItem({
+    id: "fx",
+    name: "Fx",
+    text: "",
+    active: ability({ window: "between-tricks", limit: { kind: "per-camp", times: 1 }, targets: [], apply: () => [], effect: () => tag("effect") }),
+  });
+  const catalog = testCatalog({ characters: { "char-0": char0, "char-1": char1 }, items: { "item-a": itemA, "item-b": itemB, fx }, bosses: { "boss-x": boss } });
+
+  const run = makeRun({
+    campNumber: 3,
+    bossTwists: { 3: "boss-x", 6: null },
+    seats: [
+      seat("p0", { characterId: "char-0", kit: ["char-0.a", "item-b", "item-a"] }),
+      seat("p1", { characterId: "char-1", kit: ["item-a"] }),
+      seat("p2"),
+    ],
+    attempt: makeAttempt({
+      effects: [
+        { sourceId: "fx", seatId: "p2", atTrick: 0, lasts: "attempt", params: {}, audience: "public" },
+        { sourceId: "fx", seatId: "p1", atTrick: 0, lasts: "attempt", params: {}, audience: "public" },
+      ],
+    }),
+  });
+
+  it("folds the boss, then passives in seat order and [character, ...kit] order, then effects", () => {
+    expect(rulesFor(run, catalog).whisperAudience(run, "p0", "p9")).toEqual([
+      "p9",
+      "boss",
+      "char-0",
+      "char-0.a",
+      "item-b",
+      "item-a",
+      "char-1",
+      "item-a",
+      "effect",
+      "effect",
+    ]);
+  });
+
+  it("drops the boss layer when its twist is cancelled for the attempt", () => {
+    const cancelled = { ...run, attempt: { ...run.attempt!, bossCancelled: true } };
+    expect(rulesFor(cancelled, catalog).whisperAudience(cancelled, "p0", "p9")[1]).toBe("char-0");
   });
 });
 
@@ -284,37 +385,36 @@ describe("composeRules([]) end-to-end against a createCamp fixture", () => {
 });
 
 describe("trick-scoped effects", () => {
-  function sitOutGear(id: string, lasts: "attempt" | "trick"): GearDef {
-    return {
+  function sitOutItem(id: string, lasts: "attempt" | "trick") {
+    return defineItem({
       id,
       name: id,
-      size: 0,
-      window: "between-tricks",
       text: "",
-      targets: [],
-      apply: () => [{ op: "add-modifier", lasts, params: {}, audience: "public" }],
-      effectModifier: (effect) => ({
-        trickWinner: (prev) => (plays) => winnerExcluding(prev, plays, (play) => play.seatId === effect.seatId),
+      active: ability({
+        window: "between-tricks",
+        limit: { kind: "per-camp", times: 1 },
+        targets: [],
+        apply: () => [{ op: "add-modifier", lasts, params: {}, audience: "public" }],
+        effect: (effect) => ({
+          trickWinner: (prev) => (plays) => winnerExcluding(prev, plays, (play) => play.seatId === effect.seatId),
+        }),
       }),
-    };
+    });
   }
-  const catalog: Catalog = {
-    gear: { "sit-out-trick": sitOutGear("sit-out-trick", "trick"), "sit-out-camp": sitOutGear("sit-out-camp", "attempt") },
-    bosses: {},
-  };
+  const catalog = testCatalog({ items: { "sit-out-trick": sitOutItem("sit-out-trick", "trick"), "sit-out-camp": sitOutItem("sit-out-camp", "attempt") } });
   const probe: TrickPlay[] = [
     { seatId: "p0", card: card("x0", { kind: "standard", suit: "hearts", rank: 14 }) },
     { seatId: "p1", card: card("x1", HEARTS_2) },
     { seatId: "p2", card: card("x2", HEARTS_5) },
   ];
 
-  function useThenPlayOneTrick(gearId: string): { afterUse: RunState; afterTrick: RunState } {
+  function useThenPlayOneTrick(sourceId: string): { afterUse: RunState; afterTrick: RunState } {
     const start = advanceTo(
-      setupRun({ seatIds: ["p0", "p1", "p2"], seed: "trick-scope", catalog, loadouts: { p0: [gearId] } }),
+      setupRun({ seatIds: ["p0", "p1", "p2"], seed: "trick-scope", catalog, kits: { p0: [sourceId] } }),
       "between-tricks",
       catalog,
     );
-    const used = applyRunAction(start, "p0", { type: "use-gear", gearId, targets: [] }, catalog);
+    const used = applyRunAction(start, "p0", { type: "use-ability", sourceId, targets: [] }, catalog);
     if (!used.ok) throw new Error(used.error);
     let run = used.state;
     for (let i = 0; i < 3; i++) {

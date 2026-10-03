@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 import { applyRunAction } from "../run/run-actions";
-import { advanceTo, enumerateLegalRunActions, setupRun } from "../run/run-test-support";
+import { advanceTo, enumerateLegalRunActions, setupRun, testCatalog } from "../run/run-test-support";
 import { campCardIds } from "../run/toolkit";
 import { HOOK_NAMES } from "../run/run-rules";
 import { BOSS_REGISTRY } from "./registry";
@@ -21,7 +21,7 @@ import type { BossDef } from "./boss-def";
 import type { Catalog, CampNumber, RunAction, RunState } from "../run/types";
 
 function makeCatalog(): Catalog {
-  return { gear: {}, bosses: BOSS_REGISTRY };
+  return testCatalog({ bosses: BOSS_REGISTRY });
 }
 
 /** Pure shape checks for a BossDef: non-empty name/text, and every
@@ -49,7 +49,7 @@ function checkBossDef(def: BossDef): string[] {
 }
 
 /** Drives `run` (already dealt) through the current actor's first
- * pick-objective or play-card action ONLY — never whisper or gear-use — via
+ * pick-objective or play-card action ONLY — never whisper or ability use — via
  * applyRunAction alone, until run.history grows past
  * `startingHistoryLength` (the camp settles, succeeded or failed). */
 function driveOneCamp(

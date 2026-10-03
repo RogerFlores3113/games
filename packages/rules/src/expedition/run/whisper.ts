@@ -16,21 +16,17 @@
 // this: a fresh AttemptState always starts with reveals: []).
 //
 // AUDIENCE IS COMPUTED PRE-APPEND: whisperAudience(run, ...) is evaluated
-// against the RunState as it stood BEFORE this whisper is recorded. Signal
-// Flare's D-08 effect hook reads "have I whispered yet this camp" via
-// whispersUsedBy, and that count must reflect prior whispers only, never the
-// one currently being applied — so audience is always computed first, and
-// the log/reveal append happens only after.
+// against the RunState as it stood BEFORE this whisper is recorded, so a
+// layer reading whispersUsedBy sees prior whispers only.
 //
 // whispersUsedBy is DERIVED from the attempt's log (no counter field is ever
 // stored — matches types.ts's own "derive, don't cache" discipline): it is
 // the count of "whisper" log entries whose actorSeatId is the seat in
 // question.
 //
-// Monsoon, Rain Poncho, Whistle and Flare (the gear/boss content that
-// modifies whisper legality/audience/count) act ONLY through the composed
-// RunHooks (whisperAllowed/whisperAudience/whispersPerCamp) — this file
-// never names any of them.
+// Bosses and sources that change whisper legality, audience or count act
+// ONLY through the composed RunHooks (whisperAllowed/whisperAudience/
+// whispersPerCamp); this file never names any of them.
 
 import { findOwnCard } from "../legality";
 import { currentWindow } from "./windows";
@@ -48,7 +44,7 @@ export function whispersUsedBy(run: RunState, seatId: string): number {
 
 /** Guard order (COMM-01): wrong_phase (no attempt, or the camp hasn't been
  * dealt yet) -> wrong_window (must be between tricks, D-13: no grace period)
- * -> whisper_blocked (a boss/gear layer forbids it) -> no_whispers_left
+ * -> whisper_blocked (a boss or source layer forbids it) -> no_whispers_left
  * (per-camp cap, composed) -> invalid_target (self or a non-seat) ->
  * card_not_in_hand (own-hand-only, T-10-20). */
 export function whisperLegality(
@@ -80,8 +76,8 @@ export function whisperLegality(
   return { legal: true };
 }
 
-/** Applies a legal Whisper: computes the audience BEFORE appending anything
- * (Signal Flare's D-08 hook relies on this ordering), then appends the
+/** Applies a legal Whisper: computes the audience BEFORE appending anything,
+ * then appends the
  * Reveal and the public LogEntry immutably. Never mutates `run`. */
 export function applyWhisper(
   run: RunState,
@@ -113,7 +109,7 @@ export function applyWhisper(
     event: "whisper",
     actorSeatId,
     subjectSeatIds: [action.targetSeatId],
-    gearId: null,
+    sourceId: null,
     audience: "public",
   };
 

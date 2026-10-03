@@ -102,7 +102,7 @@ export function removedCardsFor(playerCount: PlayerCount): CardIdentity[] {
 
 /** buildFullDeck() filtered to exclude removedCardsFor(playerCount). This is
  * the base-layer implementation of the §6.1 deckFor hook; it must never
- * reference a boss or gear id. */
+ * reference a boss or source id. */
 export function baseDeckFor(playerCount: PlayerCount): CardIdentity[] {
   const removed = removedCardsFor(playerCount);
   return buildFullDeck().filter((card) => !removed.some((r) => identitiesEqual(r, card)));

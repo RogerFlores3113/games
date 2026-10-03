@@ -14,7 +14,7 @@
 //
 // Per-seat trick counts and objective statuses are always DERIVED from
 // completedTricks, never stored as their own field. This is deliberate: a
-// Phase 10 holder swap (e.g. a "Trail Map" gear/boss twist that reassigns an
+// Phase 10 holder swap (e.g. a "Trail Map" item or boss twist that reassigns an
 // objective's owner mid-camp) recomputes correctly from completedTricks with
 // no new field to keep in sync, and CampState carries no stale "tricks won"
 // counter that could drift from the trick log.

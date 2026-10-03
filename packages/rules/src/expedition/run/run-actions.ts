@@ -1,43 +1,35 @@
-// The run-level dispatcher (Plan 10-07, spec §6.6/§4). `applyRunAction` is
-// the ONE entry point Phase 11's adapter wraps: every fireside action
-// (pick-draft, set-loadout, ready), the pre-deal skip, use-gear, whisper, and
-// the two camp actions (pick-objective, play-card) all flow through this
-// single function, and `advanceRun` (lifecycle.ts) runs after every accepted
-// action — this is what settles a camp decided mid-action (a play, or a gear
-// effect like Camouflage removing the last open objective) and deals once
-// the pre-deal wait clears, all in the SAME call.
+// The run-level dispatcher (spec §6.6/§4). `applyRunAction` is the ONE entry
+// point the adapter wraps: muster (pick-character), the fireside (pick-draft,
+// ready), abilities and window passes, whisper, and the two camp actions
+// (pick-objective, play-card) all flow through this single function, and
+// `advanceRun` (lifecycle.ts) runs after every accepted action. That is what
+// settles a camp decided mid-action (a play, or an ability like Camouflage
+// removing the last open objective) and deals once the pre-deal wait
+// clears, all in the SAME call.
 //
 // GUARD ORDER (T-10-24): typeof action !== "object" or null, or an unknown
-// `type` (including any hand-forged "undo" — GEAR-05/XRULE-08: there is no
-// undo action anywhere in this engine) -> invalid_action; actor not a seat in
-// this run -> not_a_seat; runStatus(run) !== "in_progress" -> run_over; only
-// THEN does the per-type handler run, and every per-type handler re-checks
-// its own required runPhase before touching anything else.
+// `type` (including any hand-forged "undo": there is no undo action anywhere
+// in this engine) -> invalid_action; actor not a seat in this run ->
+// not_a_seat; runStatus(run) !== "in_progress" -> run_over; only THEN does
+// the per-type handler run, and every per-type handler re-checks its own
+// required runPhase before touching anything else.
 //
 // D-07 (pure data): `ready`/readySeatIds is nothing but a data flag here.
-// Whether a disconnected seat's un-readied state pauses the table, and any
-// notion of a host "force start", is entirely Phase 11's concern — there is
-// no such action in RunAction, by design, and none is added here.
+// Whether a disconnected seat's un-readied state pauses the table is the
+// room layer's concern.
 //
 // D-13: actions are processed strictly in the order they arrive at this
 // function — there is no queue, no batching, no reordering by type or actor.
 //
-// Never mutates `run`; every handler builds and returns a new RunState (or
-// the eventual applyCampAction/applyWhisper/applyUseGear delegate's own new
-// state), consistent with every other Phase 9/10 transition in this package.
+// Never mutates `run`; every handler builds and returns a new RunState.
 
 import { applyCampAction } from "../actions";
 import { rulesFor } from "./compose";
-import { advanceRun, capacityOf, loadoutSize, runPhase, runStatus, startAttempt } from "./lifecycle";
-import { WINDOWS, currentWindow, gatedPendingSeatIds, pendingGearIds } from "./windows";
-import { applyUseGear } from "./use-gear";
+import { passWindow, useAbility } from "./abilities";
+import { advanceRun, runPhase, runStatus, startAttempt } from "./lifecycle";
 import { applyWhisper } from "./whisper";
 import type { AdapterResult } from "../../adapter";
-import type { Catalog, GearUse, RunAction, RunError, RunState } from "./types";
-
-function isStringArray(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
+import type { Catalog, RunAction, RunError, RunState } from "./types";
 
 function err(error: RunError): AdapterResult<RunState, RunError> {
   return { ok: false, error };
@@ -50,60 +42,44 @@ function accept(next: RunState, catalog: Catalog): AdapterResult<RunState, RunEr
   return { ok: true, state: advanceRun(next, catalog) };
 }
 
-/** Re-wraps a delegate's own AdapterResult (applyWhisper/applyUseGear)
- * through the same advanceRun pass every other accepted action gets — a
- * gear effect can decide a camp (e.g. Camouflage removing the last open
- * objective) just as a play can. */
+/** Re-wraps a delegate's own AdapterResult (abilities, whisper) through the
+ * same advanceRun pass every other accepted action gets — an ability can
+ * decide a camp (e.g. Camouflage removing the last open objective) just as
+ * a play can. */
 function delegated(result: AdapterResult<RunState, RunError>, catalog: Catalog): AdapterResult<RunState, RunError> {
   if (!result.ok) return result;
   return accept(result.state, catalog);
 }
 
-function handlePickDraft(
-  run: RunState,
-  actorSeatId: string,
-  gearId: string,
-  catalog: Catalog,
-): AdapterResult<RunState, RunError> {
-  if (runPhase(run) !== "fireside") return err("wrong_phase");
+/** Muster: public, final, and unique within the crew. */
+function handlePickCharacter(run: RunState, actorSeatId: string, characterId: string, catalog: Catalog): AdapterResult<RunState, RunError> {
+  if (runPhase(run) !== "muster") return err("wrong_phase");
   const seat = run.seats.find((s) => s.seatId === actorSeatId)!;
-  if (seat.draftOffer === null) return err("no_draft_pending");
-  if (!seat.draftOffer.includes(gearId)) return err("not_offered");
+  if (seat.characterId !== null) return err("wrong_phase");
+  if (catalog.characters[characterId] === undefined) return err("unknown_character");
+  if (run.seats.some((s) => s.characterId === characterId)) return err("character_taken");
 
-  const seats = run.seats.map((s) =>
-    s.seatId === actorSeatId ? { ...s, ownedGearIds: [...s.ownedGearIds, gearId], draftOffer: null } : s,
-  );
+  const seats = run.seats.map((s) => (s.seatId === actorSeatId ? { ...s, characterId } : s));
   return accept({ ...run, seats }, catalog);
 }
 
-function handleSetLoadout(
-  run: RunState,
-  actorSeatId: string,
-  gearIds: unknown,
-  catalog: Catalog,
-): AdapterResult<RunState, RunError> {
+function handlePickDraft(run: RunState, actorSeatId: string, sourceId: string, catalog: Catalog): AdapterResult<RunState, RunError> {
   if (runPhase(run) !== "fireside") return err("wrong_phase");
-  if (!isStringArray(gearIds)) return err("invalid_action");
-
-  if (new Set(gearIds).size !== gearIds.length) return err("duplicate_gear");
   const seat = run.seats.find((s) => s.seatId === actorSeatId)!;
-  if (!gearIds.every((id) => seat.ownedGearIds.includes(id))) return err("gear_not_owned");
+  if (seat.draftOffer === null) return err("no_draft_pending");
+  if (!seat.draftOffer.includes(sourceId)) return err("not_offered");
 
-  const seats = run.seats.map((s) => (s.seatId === actorSeatId ? { ...s, equippedGearIds: gearIds } : s));
-  const candidate: RunState = { ...run, seats };
-  // T-10-26: capacity is computed WITH the proposed loadout in place, so a
-  // passive gear inside the same proposed set (Energy Tonic's own +2) counts
-  // toward its own room.
-  const capacity = capacityOf(candidate, actorSeatId, catalog);
-  if (loadoutSize(gearIds, catalog) > capacity) return err("over_capacity");
-
-  const readySeatIds = run.readySeatIds.filter((id) => id !== actorSeatId);
-  return accept({ ...candidate, readySeatIds }, catalog);
+  const seats = run.seats.map((s) => (s.seatId === actorSeatId ? { ...s, kit: [...s.kit, sourceId], draftOffer: null } : s));
+  return accept({ ...run, seats }, catalog);
 }
 
+/** Muster and fireside: a seat readies once it has a character and no
+ * pending draft. The last ready starts the attempt. */
 function handleReady(run: RunState, actorSeatId: string, catalog: Catalog): AdapterResult<RunState, RunError> {
-  if (runPhase(run) !== "fireside") return err("wrong_phase");
+  const phase = runPhase(run);
+  if (phase !== "fireside" && phase !== "muster") return err("wrong_phase");
   const seat = run.seats.find((s) => s.seatId === actorSeatId)!;
+  if (seat.characterId === null) return err("character_pending");
   if (seat.draftOffer !== null) return err("draft_pending");
   if (run.readySeatIds.includes(actorSeatId)) return err("already_ready");
 
@@ -116,27 +92,6 @@ function handleReady(run: RunState, actorSeatId: string, catalog: Catalog): Adap
     return { ok: true, state: startAttempt(next, catalog) };
   }
   return accept(next, catalog);
-}
-
-/** Passes the open gated window (pre-deal or rescue): every gear the seat
- * could still fire in it is marked skipped. */
-function handleSkipWindow(run: RunState, actorSeatId: string, catalog: Catalog): AdapterResult<RunState, RunError> {
-  const rules = rulesFor(run, catalog);
-  const window = currentWindow(run, rules);
-  if (window === null || !WINDOWS[window].gated) return err("wrong_phase");
-  if (!gatedPendingSeatIds(run, catalog).includes(actorSeatId)) return err("nothing_to_skip");
-
-  const attempt = run.attempt!; // a gated window is only open during an attempt
-  const newUses: GearUse[] = pendingGearIds(run, actorSeatId, window, catalog, rules).map((gearId) => ({
-    seatId: actorSeatId,
-    gearId,
-    kind: "skipped" as const,
-  }));
-
-  return accept(
-    { ...run, attempt: { ...attempt, gearUses: [...attempt.gearUses, ...newUses] } },
-    catalog,
-  );
 }
 
 function handleCampAction(
@@ -156,7 +111,7 @@ function handleCampAction(
   return accept({ ...run, attempt: { ...attempt, camp: result.state } }, catalog);
 }
 
-/** The single run-level transition. Dispatches all 8 `RunAction` types after
+/** The single run-level transition. Dispatches every `RunAction` type after
  * three guards (invalid_action, not_a_seat, run_over); calls `advanceRun`
  * after every accepted action; never mutates `run`. */
 export function applyRunAction(
@@ -176,16 +131,16 @@ export function applyRunAction(
   }
 
   switch (action.type) {
+    case "pick-character":
+      return handlePickCharacter(run, actorSeatId, action.characterId, catalog);
     case "pick-draft":
-      return handlePickDraft(run, actorSeatId, action.gearId, catalog);
-    case "set-loadout":
-      return handleSetLoadout(run, actorSeatId, action.gearIds, catalog);
+      return handlePickDraft(run, actorSeatId, action.sourceId, catalog);
     case "ready":
       return handleReady(run, actorSeatId, catalog);
-    case "use-gear":
-      return delegated(applyUseGear(run, actorSeatId, action, catalog), catalog);
+    case "use-ability":
+      return delegated(useAbility(run, actorSeatId, action.sourceId, action.targets, catalog), catalog);
     case "skip-window":
-      return handleSkipWindow(run, actorSeatId, catalog);
+      return delegated(passWindow(run, actorSeatId, catalog), catalog);
     case "whisper":
       return delegated(applyWhisper(run, actorSeatId, action, catalog), catalog);
     case "pick-objective":

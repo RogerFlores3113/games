@@ -14,24 +14,22 @@ describe("STREAMS distinctness (A1)", () => {
     const attempts = [1, 2, 3];
     const seats = ["p0", "p1", "p2", "p3", "p4"];
     const useIndices = [0, 1, 2, 3];
-    const gearIds = ["gear-a", "gear-b"];
-    const purposes = ["reveal", "index"];
+    const draws = [0, 1, 2];
 
     for (const camp of camps) {
       names.push(STREAMS.boss(camp));
       for (const seat of seats) {
-        names.push(STREAMS.draft(camp, seat));
+        names.push(STREAMS.draftUpgrade(camp, seat));
+        names.push(STREAMS.draftItems(camp, seat));
       }
       for (const attempt of attempts) {
         names.push(STREAMS.trickCountKind(camp, attempt));
         names.push(STREAMS.trickCountN(camp, attempt));
         names.push(STREAMS.faceDown(camp, attempt));
         for (const useIndex of useIndices) {
-          for (const gearId of gearIds) {
-            for (const seat of seats) {
-              for (const purpose of purposes) {
-                names.push(STREAMS.gear(camp, attempt, useIndex, gearId, seat, purpose));
-              }
+          for (const seat of seats) {
+            for (const draw of draws) {
+              names.push(STREAMS.ability(camp, attempt, seat, useIndex, draw));
             }
           }
         }
@@ -39,6 +37,14 @@ describe("STREAMS distinctness (A1)", () => {
     }
 
     expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+describe("STREAMS names", () => {
+  it("builds the documented stream names", () => {
+    expect(STREAMS.draftUpgrade(2, "p1")).toBe("expedition-draft:camp2:seatp1:upgrade");
+    expect(STREAMS.draftItems(2, "p1")).toBe("expedition-draft:camp2:seatp1:items");
+    expect(STREAMS.ability(3, 2, "p0", 1, 0)).toBe("expedition-ability:camp3:attempt2:seatp0:use1:draw0");
   });
 });
 

@@ -52,7 +52,7 @@ export const FORBIDDEN_VIEW_KEYS = [
   "draftOffer",
   "hands",
   "audience",
-  "ownedGearIds",
+  "ledger",
   "readySeatIds",
 ] as const;
 
@@ -114,6 +114,14 @@ export function secretsForExpeditionSeat(
   // reveal, not once per distinct card id.
   const revealsToViewer = state.attempt !== null && seated ? state.attempt.reveals.filter((r) => r.audience.includes(seatId) || (r.source === "whisper" && r.fromSeatId === seatId)) : [];
   const revealedToViewer = new Set(revealsToViewer.map((r) => r.cardId));
+  // An effect the viewer may read names only ids its owner picked from their
+  // own hand or the table; the owner keeps knowing that id after the card
+  // moves (a Herb Tonic'd card swapped away), as with a reveal.
+  const namedByVisibleEffects = new Set(
+    (state.attempt?.effects ?? [])
+      .filter((effect) => effect.audience === "public" || (seated && effect.seatId === seatId))
+      .flatMap((effect) => Object.values(effect.params).filter((value): value is string => typeof value === "string")),
+  );
 
   const hiddenIds: string[] = [];
   const counts: Record<string, number> = {};
@@ -132,7 +140,7 @@ export function secretsForExpeditionSeat(
         continue;
       }
       for (const card of hand.cards) {
-        if (!revealedToViewer.has(card.id)) hiddenIds.push(card.id);
+        if (!revealedToViewer.has(card.id) && !namedByVisibleEffects.has(card.id)) hiddenIds.push(card.id);
       }
     }
 

@@ -1,56 +1,88 @@
-// Test-only run-level simulation helpers (Plan 10-07). Test-only support
-// placed in src, like Phase 9's test-support.ts, so it is covered
-// automatically by purity.test.ts's directory scan (no Node/Worker imports,
-// no Math.random/Date.now, no Hanabi imports).
+// Test-only run-level simulation helpers. Test-only support placed in src,
+// like Phase 9's test-support.ts, so it is covered automatically by
+// purity.test.ts's directory scan (no Node/Worker imports, no
+// Math.random/Date.now, no Hanabi imports).
 //
-// CONSTRAINT (T-03-24, restated for the run layer, mirrors test-support.ts's
-// own header): enumerateLegalRunActions builds CANDIDATE actions and filters
-// them through applyRunAction ITSELF ONLY. It never re-derives a rule
-// locally — no follow-suit comparison, no trick-winner logic, no capacity
-// arithmetic duplicated outside of what setupRun/enumerateLegalRunActions
-// need to build a CANDIDATE (the actual legality call is always the real
-// dispatcher). If a rule in the real engine is wrong, this helper must
-// reproduce that same wrongness, not silently correct it.
+// CONSTRAINT (T-03-24, restated for the run layer): enumerateLegalRunActions
+// builds CANDIDATE actions and filters them through applyRunAction ITSELF
+// ONLY. Ability targets come from the engine's own step choices; legality is
+// always the real dispatcher's call. If a rule in the real engine is wrong,
+// this helper must reproduce that same wrongness, not silently correct it.
 //
-// setupRun is a deliberate TEST SEAM: it assigns owned===equipped===the
-// caller's loadouts directly, bypassing every capacity/ownership check
-// set-loadout would otherwise enforce. This is intentional — it lets
-// content/contract/property tests start a fixture already equipped, without
-// re-deriving a legal draft-then-loadout sequence for every test.
+// setupRun is a deliberate TEST SEAM: it assigns characters and kits
+// directly, skipping muster and drafts, so content/contract/property tests
+// can start a fixture already built.
 
 import { currentActorSeatId } from "../camp";
-import { evaluateObjective } from "../objectives";
 import { rulesFor } from "./compose";
-import { winnerExcluding } from "../content/helpers";
-import { capacityOf, createRun, loadoutSize, runPhase, runStatus } from "./lifecycle";
+import { buildCatalog } from "./catalog";
+import { abilityStatus } from "./abilities";
+import { createRun, runPhase, runStatus } from "./lifecycle";
 import { applyRunAction } from "./run-actions";
-import { visibleObjectives } from "./visibility";
+import { liveSourceIds } from "./usage";
 import { currentWindow, gatedPendingSeatIds, WINDOWS } from "./windows";
-import type { CampState } from "../state";
-import type { GearContext, GearDef, TargetSpec } from "../gear/gear-def";
+import { defineCharacter, defineUpgrade, type CharacterDef, type ItemDef, type SourceId } from "../content/source-def";
+import type { BossDef } from "../boss/boss-def";
 import type { Catalog, CampNumber, RunAction, RunState } from "./types";
 
-/** Builds a fireside RunState with every seat's owned/equipped gear set
- * directly from `loadouts` (bypassing capacity/ownership checks by design —
- * see file header) and every draftOffer cleared to null, so a test can call
- * `ready` immediately without resolving a draft first. `campNumber`/
- * `supplies`/`bossTwists` default to createRun's fresh-camp-1 values, then
- * are overridden if provided. */
+function plainCharacter(n: number): CharacterDef {
+  return defineCharacter({
+    id: `plain-${n}`,
+    name: `Plain ${n}`,
+    theme: "No powers",
+    text: "Nothing happens.",
+    upgrades: [
+      defineUpgrade({ id: `plain-${n}.a`, name: `Plain ${n} A`, text: "Nothing happens." }),
+      defineUpgrade({ id: `plain-${n}.b`, name: `Plain ${n} B`, text: "Nothing happens." }),
+    ],
+  });
+}
+
+/** Five characters with no abilities, so a fixture's crew changes no rule
+ * unless the test gives it a source. */
+export const PLAIN_CHARACTERS: Readonly<Record<string, CharacterDef>> = Object.fromEntries(
+  [1, 2, 3, 4, 5].map((n) => {
+    const def = plainCharacter(n);
+    return [def.id, def];
+  }),
+);
+
+/** A catalogue of plain characters (unless given) plus the given items,
+ * extra characters and bosses. */
+export function testCatalog(parts: {
+  readonly characters?: Readonly<Record<string, CharacterDef>>;
+  readonly items?: Readonly<Record<string, ItemDef>>;
+  readonly bosses?: Readonly<Record<string, BossDef>>;
+} = {}): Catalog {
+  return buildCatalog({
+    characters: { ...PLAIN_CHARACTERS, ...parts.characters },
+    items: parts.items ?? {},
+    bosses: parts.bosses ?? {},
+  });
+}
+
+/** Builds a fireside RunState past muster: each seat gets `characters[seat]`
+ * or the catalogue's next unclaimed plain character, and `kits[seat]` as its
+ * kit, with drafts cleared so a test can call `ready` at once.
+ * `campNumber`/`supplies`/`bossTwists` default to createRun's values. */
 export function setupRun(opts: {
   seatIds: readonly string[];
   seed: string;
   catalog: Catalog;
   campNumber?: CampNumber;
   supplies?: number;
-  loadouts?: Readonly<Record<string, readonly string[]>>;
+  characters?: Readonly<Record<string, string>>;
+  kits?: Readonly<Record<string, readonly SourceId[]>>;
   bossTwists?: { readonly 3: string | null; readonly 6: string | null };
 }): RunState {
-  const run = createRun({ seatIds: opts.seatIds, seed: opts.seed }, opts.catalog);
-  const loadouts = opts.loadouts ?? {};
+  const run = createRun({ seatIds: opts.seatIds, seed: opts.seed });
+  const chosen = Object.values(opts.characters ?? {});
+  const spare = Object.keys(opts.catalog.characters).filter((id) => !chosen.includes(id));
 
   const seats = run.seats.map((seat) => {
-    const owned = [...(loadouts[seat.seatId] ?? [])];
-    return { ...seat, ownedGearIds: owned, equippedGearIds: owned, draftOffer: null };
+    const characterId = opts.characters?.[seat.seatId] ?? spare.shift();
+    if (characterId === undefined) throw new Error("setupRun: not enough characters in the catalogue");
+    return { ...seat, characterId, kit: [...(opts.kits?.[seat.seatId] ?? [])], draftOffer: null };
   });
 
   return {
@@ -67,7 +99,7 @@ export function setupRun(opts: {
  * callers must resolve drafts first, or use setupRun which clears them),
  * then — for "pre-deal" — returns as soon as the attempt starts in the
  * pre-deal window (throws if the deal happened immediately because no seat
- * had pre-deal gear equipped); otherwise resolves every pending pre-deal
+ * had a pre-deal ability); otherwise resolves every pending pre-deal
  * seat by skipping, and — for "between-tricks" — additionally has the
  * current actor pick their first unowned objective, repeatedly, until the
  * window opens. Throws on any rejected action or if the run ends first. */
@@ -89,7 +121,7 @@ export function advanceTo(
 
   if (target === "pre-deal") {
     if (runPhase(next) !== "pre-deal") {
-      throw new Error("advanceTo: expected pre-deal, but the deal already happened (no seat had pre-deal gear)");
+      throw new Error("advanceTo: expected pre-deal, but the deal already happened (no seat had a pre-deal ability)");
     }
     return next;
   }
@@ -143,7 +175,7 @@ export function advanceTo(
 }
 
 /** The cartesian product of `pools`, preserving pool order. `[]` in ->
- * `[[]]` out (one empty combination), matching a zero-target GearDef. */
+ * `[[]]` out (one empty combination), matching a target-free ability. */
 function cartesian(pools: readonly (readonly string[])[]): string[][] {
   return pools.reduce<string[][]>(
     (acc, pool) => acc.flatMap((prefix) => pool.map((item) => [...prefix, item])),
@@ -151,38 +183,24 @@ function cartesian(pools: readonly (readonly string[])[]): string[][] {
   );
 }
 
-/** Per-TargetSpec candidate pools for `specs`, in declaration order: every
- * teammate (self excluded); the actor's first 3 own cards; every face-up
- * objective; the actor's own pending objectives. */
-function targetOptionsFor(
-  specs: readonly TargetSpec[],
-  run: RunState,
-  camp: CampState,
-  selfSeatId: string,
-): string[][] {
-  return specs.map((spec) => {
-    if (spec.kind === "teammate") {
-      return run.seatIds.filter((id) => id !== selfSeatId);
-    }
-    if (spec.kind === "own-card") {
-      const hand = camp.hands.find((h) => h.seatId === selfSeatId);
-      return hand ? hand.cards.slice(0, 3).map((c) => c.id) : [];
-    }
-    if (spec.kind === "face-up-objective") {
-      return camp.objectives.filter((o) => o.ownerSeatId === null).map((o) => o.id);
-    }
-    // own-objective
-    return camp.objectives
-      .filter((o) => o.ownerSeatId === selfSeatId && evaluateObjective(camp, o) === "pending")
-      .map((o) => o.id);
-  });
+/** Candidate use-ability actions for every seat's live sources usable now,
+ * built from the engine's own step choices (the first few per step). */
+function abilityCandidates(run: RunState, catalog: Catalog): Array<{ seatId: string; action: RunAction }> {
+  return run.seats.flatMap((seat) =>
+    liveSourceIds(seat).flatMap((sourceId) => {
+      const status = abilityStatus(run, seat.seatId, sourceId, catalog);
+      if (status === null || !status.usable) return [];
+      return cartesian(status.steps.map((step) => step.choices.slice(0, 4))).map((targets) => ({
+        seatId: seat.seatId,
+        action: { type: "use-ability" as const, sourceId, targets },
+      }));
+    }),
+  );
 }
 
 /** Every candidate action for every seat at `run`'s current phase, kept only
  * if `applyRunAction` itself accepts it (T-03-24 discipline: legality is
- * decided ONLY by the real transition, never re-derived here). use-gear is
- * enumerated in all three windows a camp can be in: pre-deal, objective-pick
- * and between-tricks. */
+ * decided ONLY by the real transition, never re-derived here). */
 export function enumerateLegalRunActions(
   run: RunState,
   catalog: Catalog,
@@ -190,42 +208,25 @@ export function enumerateLegalRunActions(
   const phase = runPhase(run);
   const candidates: Array<{ seatId: string; action: RunAction }> = [];
 
-  if (phase === "fireside") {
+  if (phase === "muster") {
     for (const seat of run.seats) {
-      if (seat.draftOffer !== null) {
-        for (const gearId of seat.draftOffer) {
-          candidates.push({ seatId: seat.seatId, action: { type: "pick-draft", gearId } });
-        }
+      for (const characterId of Object.keys(catalog.characters)) {
+        candidates.push({ seatId: seat.seatId, action: { type: "pick-character", characterId } });
       }
-
-      const loadoutCandidates: string[][] = [[...seat.equippedGearIds], []];
-      const greedy: string[] = [];
-      for (const gearId of seat.ownedGearIds) {
-        const proposed = [...greedy, gearId];
-        const candidateRun: RunState = {
-          ...run,
-          seats: run.seats.map((s) => (s.seatId === seat.seatId ? { ...s, equippedGearIds: proposed } : s)),
-        };
-        if (loadoutSize(proposed, catalog) <= capacityOf(candidateRun, seat.seatId, catalog)) {
-          greedy.push(gearId);
-        }
-      }
-      loadoutCandidates.push(greedy);
-
-      for (const gearIds of loadoutCandidates) {
-        candidates.push({ seatId: seat.seatId, action: { type: "set-loadout", gearIds } });
+      candidates.push({ seatId: seat.seatId, action: { type: "ready" } });
+    }
+  } else if (phase === "fireside") {
+    for (const seat of run.seats) {
+      for (const sourceId of seat.draftOffer ?? []) {
+        candidates.push({ seatId: seat.seatId, action: { type: "pick-draft", sourceId } });
       }
       candidates.push({ seatId: seat.seatId, action: { type: "ready" } });
     }
   } else if (phase === "pre-deal") {
     for (const seat of run.seats) {
       candidates.push({ seatId: seat.seatId, action: { type: "skip-window" } });
-      for (const gearId of seat.equippedGearIds) {
-        const def = catalog.gear[gearId];
-        if (def === undefined || def.window !== "pre-deal") continue;
-        candidates.push({ seatId: seat.seatId, action: { type: "use-gear", gearId, targets: [] } });
-      }
     }
+    candidates.push(...abilityCandidates(run, catalog));
   } else if (phase === "camp" && run.attempt !== null && run.attempt.camp !== null) {
     const camp = run.attempt.camp;
     const rules = rulesFor(run, catalog);
@@ -238,65 +239,29 @@ export function enumerateLegalRunActions(
         }
       }
       const ownHand = camp.hands.find((h) => h.seatId === actorSeatId);
-      if (ownHand !== undefined) {
-        for (const card of ownHand.cards) {
-          candidates.push({ seatId: actorSeatId, action: { type: "play-card", cardId: card.id } });
-        }
+      for (const card of ownHand?.cards ?? []) {
+        candidates.push({ seatId: actorSeatId, action: { type: "play-card", cardId: card.id } });
       }
     }
 
     const window = currentWindow(run, rules);
-    if (window === "in-trick" || window === "rescue") {
-      for (const seat of run.seats) {
-        if (WINDOWS[window].gated) candidates.push({ seatId: seat.seatId, action: { type: "skip-window" } });
-        for (const gearId of seat.equippedGearIds) {
-          const def = catalog.gear[gearId];
-          if (def === undefined || def.window !== window) continue;
-          const pools = targetOptionsFor(def.targets, run, camp, seat.seatId);
-          for (const targets of cartesian(pools)) {
-            candidates.push({ seatId: seat.seatId, action: { type: "use-gear", gearId, targets } });
-          }
-        }
-      }
+    if (window !== null && WINDOWS[window].gated) {
+      for (const seat of run.seats) candidates.push({ seatId: seat.seatId, action: { type: "skip-window" } });
     }
 
-    if (currentWindow(run, rules) === "objective-pick") {
+    if (window === "between-tricks") {
       for (const seat of run.seats) {
-        for (const gearId of seat.equippedGearIds) {
-          const def = catalog.gear[gearId];
-          if (def === undefined || def.window !== "objective-pick") continue;
-          const pools = targetOptionsFor(def.targets, run, camp, seat.seatId);
-          for (const targets of cartesian(pools)) {
-            candidates.push({ seatId: seat.seatId, action: { type: "use-gear", gearId, targets } });
-          }
-        }
-      }
-    }
-
-    if (currentWindow(run, rules) === "between-tricks") {
-      for (const seat of run.seats) {
-        const ownHand = camp.hands.find((h) => h.seatId === seat.seatId);
-        const ownCards = ownHand ? ownHand.cards.slice(0, 2) : [];
+        const ownCards = camp.hands.find((h) => h.seatId === seat.seatId)?.cards.slice(0, 2) ?? [];
         for (const teammateId of run.seatIds) {
           if (teammateId === seat.seatId) continue;
           for (const card of ownCards) {
-            candidates.push({
-              seatId: seat.seatId,
-              action: { type: "whisper", targetSeatId: teammateId, cardId: card.id },
-            });
-          }
-        }
-
-        for (const gearId of seat.equippedGearIds) {
-          const def = catalog.gear[gearId];
-          if (def === undefined) continue;
-          const pools = targetOptionsFor(def.targets, run, camp, seat.seatId);
-          for (const targets of cartesian(pools)) {
-            candidates.push({ seatId: seat.seatId, action: { type: "use-gear", gearId, targets } });
+            candidates.push({ seatId: seat.seatId, action: { type: "whisper", targetSeatId: teammateId, cardId: card.id } });
           }
         }
       }
     }
+
+    candidates.push(...abilityCandidates(run, catalog));
   }
 
   return candidates.filter((candidate) => applyRunAction(run, candidate.seatId, candidate.action, catalog).ok);
@@ -305,11 +270,9 @@ export function enumerateLegalRunActions(
 /** Drives `initial` forward by repeatedly enumerating legal actions and
  * applying `legal[choices[step % choices.length] % legal.length]` through
  * the real applyRunAction, until no legal action remains or runStatus leaves
- * "in_progress". To guarantee fireside progress, a seat that already ran
- * set-loadout during the CURRENT fireside visit is excluded from
- * candidates until the phase leaves fireside (cleared on every re-entry).
- * Throws past `maxSteps`, and throws if an enumerated action is rejected —
- * the enumerator and the transition disagreeing is a bug in one of them. */
+ * "in_progress". Throws past `maxSteps`, and throws if an enumerated action
+ * is rejected — the enumerator and the transition disagreeing is a bug in
+ * one of them. */
 export function driveRun(
   initial: RunState,
   choices: readonly number[],
@@ -318,7 +281,6 @@ export function driveRun(
 ): { states: RunState[]; log: Array<{ seatId: string; action: RunAction }> } {
   const states: RunState[] = [initial];
   const log: Array<{ seatId: string; action: RunAction }> = [];
-  const firesideSetLoadoutDone = new Set<string>();
 
   let state = initial;
   let step = 0;
@@ -326,17 +288,7 @@ export function driveRun(
   for (;;) {
     if (runStatus(state) !== "in_progress") break;
 
-    const phase = runPhase(state);
-    if (phase !== "fireside") {
-      firesideSetLoadoutDone.clear();
-    }
-
-    let legal = enumerateLegalRunActions(state, catalog);
-    if (phase === "fireside") {
-      legal = legal.filter(
-        (candidate) => !(candidate.action.type === "set-loadout" && firesideSetLoadoutDone.has(candidate.seatId)),
-      );
-    }
+    const legal = enumerateLegalRunActions(state, catalog);
 
     if (legal.length === 0) break;
     if (step >= maxSteps) {
@@ -351,10 +303,6 @@ export function driveRun(
       throw new Error(
         `driveRun: enumerated action rejected by applyRunAction (${JSON.stringify(picked)}): ${result.error}`,
       );
-    }
-
-    if (phase === "fireside" && picked.action.type === "set-loadout") {
-      firesideSetLoadoutDone.add(picked.seatId);
     }
 
     state = result.state;
@@ -389,43 +337,3 @@ export function replayRun(
 
   return states;
 }
-
-function failedVisibleObjectiveIds(ctx: GearContext): string[] {
-  const camp = ctx.camp;
-  if (camp === null) return [];
-  return visibleObjectives(ctx.run, camp, ctx.rules, ctx.self)
-    .filter((o) => evaluateObjective(camp, o) === "failed")
-    .map((o) => o.id);
-}
-
-/** Test-only rescue gear: drops the first failed objective it can see. */
-export const RESCUE_TEST_GEAR: GearDef = {
-  id: "test-rope",
-  name: "Test Rope",
-  size: 1,
-  window: "rescue",
-  text: "Drop a failed objective.",
-  targets: [],
-  canUse: (ctx) => (failedVisibleObjectiveIds(ctx).length > 0 ? true : "No failed objective"),
-  apply: (ctx) => [{ op: "remove-objective", objectiveId: failedVisibleObjectiveIds(ctx)[0]! }],
-};
-
-/** Test-only in-trick gear: the user's own play can't win this trick. */
-export const IN_TRICK_TEST_GEAR: GearDef = {
-  id: "test-duck",
-  name: "Test Duck",
-  size: 1,
-  window: "in-trick",
-  text: "Your card can't win this trick.",
-  targets: [],
-  apply: () => [{ op: "add-modifier", lasts: "trick", params: {}, audience: "public" }],
-  effectModifier: (effect) => ({
-    trickWinner: (prev) => (plays) => winnerExcluding(prev, plays, (play) => play.seatId === effect.seatId),
-  }),
-};
-
-/** The windows no production gear uses, each driven by one test def. */
-export const WINDOW_TEST_GEAR: Readonly<Record<string, GearDef>> = {
-  [RESCUE_TEST_GEAR.id]: RESCUE_TEST_GEAR,
-  [IN_TRICK_TEST_GEAR.id]: IN_TRICK_TEST_GEAR,
-};

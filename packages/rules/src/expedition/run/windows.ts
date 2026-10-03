@@ -4,9 +4,9 @@
 // rescue holds the settle of a camp failed only by failed objectives.
 
 import { campPhase, checkCampOutcome, currentActorSeatId } from "../camp";
+import { pendingSourceIds } from "./abilities";
 import { rulesFor } from "./compose";
 import type { RunRules } from "./run-rules";
-import { gearAvailability, gearTargetsHaveChoices } from "./toolkit";
 import type { Catalog, RunState } from "./types";
 
 export type ActiveWindow = "pre-deal" | "objective-pick" | "between-tricks" | "in-trick" | "rescue";
@@ -81,26 +81,12 @@ export function currentWindow(run: RunState, rules: RunRules): ActiveWindow | nu
   return WINDOW_ORDER.find((id) => WINDOWS[id].isOpen(run, rules)) ?? null;
 }
 
-/** The seat's equipped gear it could fire in `window` right now: available,
- * and with a choice for every target step. */
-export function pendingGearIds(run: RunState, seatId: string, window: ActiveWindow, catalog: Catalog, rules: RunRules): string[] {
-  const seat = run.seats.find((s) => s.seatId === seatId);
-  return (seat?.equippedGearIds ?? []).filter((gearId) => {
-    const def = catalog.gear[gearId];
-    if (def === undefined) {
-      throw new Error(`pendingGearIds: unknown gear id "${gearId}"`);
-    }
-    if (def.window !== window) return false;
-    return gearAvailability(run, seatId, gearId, catalog, rules).ok && gearTargetsHaveChoices(run, seatId, def, rules);
-  });
-}
-
-/** Seats an open gated window waits on: each holds gear for this window it
- * could fire right now and has neither used nor passed it. [] when no gated
- * window is open. */
+/** Seats an open gated window waits on: each owns a live active ability for
+ * this window whose abilityStatus is usable, and has no `passed` ledger
+ * entry for it at the current stamp. [] when no gated window is open. */
 export function gatedPendingSeatIds(run: RunState, catalog: Catalog): readonly string[] {
   const rules = rulesFor(run, catalog);
   const window = currentWindow(run, rules);
   if (window === null || !WINDOWS[window].gated) return [];
-  return run.seatIds.filter((seatId) => pendingGearIds(run, seatId, window, catalog, rules).length > 0);
+  return run.seatIds.filter((seatId) => pendingSourceIds(run, seatId, window, catalog, rules).length > 0);
 }

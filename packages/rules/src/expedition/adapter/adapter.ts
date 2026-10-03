@@ -34,7 +34,7 @@ export const expeditionGame: GameAdapter<RunState, RunAction, ExpeditionConfig, 
   id: "expedition",
 
   createInitialState({ seatIds, seed }): RunState {
-    return createRun({ seatIds, seed }, CATALOG);
+    return createRun({ seatIds, seed });
   },
 
   applyAction(state, actorSeatId, request): AdapterResult<RunState, RunError> {

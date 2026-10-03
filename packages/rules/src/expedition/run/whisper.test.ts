@@ -2,7 +2,7 @@
 // toolkit.test.ts's own discipline: a hand-built 3-seat RunState whose
 // attempt.camp is createCamp(...), with objectives picked and tricks played
 // via the real currentActorSeatId + applyCampAction path — never a
-// hand-rolled copy of pick-order/follow-suit rules. Fake BossDef/GearDef
+// hand-rolled copy of pick-order/follow-suit rules. Fake BossDef/item
 // objects are declared inline in a local Catalog; the catalog is empty
 // unless a test says otherwise.
 
@@ -12,8 +12,9 @@ import { campPhase, createCamp, currentActorSeatId } from "../camp";
 import { baseRules } from "../rules";
 import type { CampState } from "../state";
 import type { BossDef } from "../boss/boss-def";
-import type { GearDef } from "../gear/gear-def";
+import { ability, defineItem } from "../content/source-def";
 import { baseRunHooks, type RunRules } from "./run-rules";
+import { testCatalog } from "./run-test-support";
 import type { ActiveEffect, AttemptState, Catalog, RunState, SeatRun } from "./types";
 import { applyWhisper, whisperLegality, whispersUsedBy } from "./whisper";
 
@@ -67,19 +68,13 @@ function betweenTricksCamp(seed?: string): CampState {
   return pickAllObjectives(freshCamp(seed));
 }
 
-function makeSeats(equipped: Readonly<Record<string, readonly string[]>> = {}): readonly SeatRun[] {
-  return SEAT_IDS.map((seatId) => ({
-    seatId,
-    ownedGearIds: equipped[seatId] ?? [],
-    equippedGearIds: equipped[seatId] ?? [],
-    draftOffer: null,
-  }));
+function makeSeats(): readonly SeatRun[] {
+  return SEAT_IDS.map((seatId) => ({ seatId, characterId: "plain-1", kit: [], draftOffer: null, ledger: [] }));
 }
 
 function makeRun(input: {
   camp: CampState | null;
   attempt?: AttemptState | null;
-  equipped?: Readonly<Record<string, readonly string[]>>;
   effects?: readonly ActiveEffect[];
   campNumber?: 1 | 2 | 3 | 4 | 5 | 6;
   bossTwists?: { readonly 3: string | null; readonly 6: string | null };
@@ -92,7 +87,6 @@ function makeRun(input: {
       : {
           attemptNumber: 1,
           bossCancelled: false,
-          gearUses: [],
           effects: input.effects ?? [],
           reveals: [],
           log: input.log ?? [],
@@ -104,7 +98,7 @@ function makeRun(input: {
     seatIds: [...SEAT_IDS],
     campNumber: input.campNumber ?? 2,
     supplies: 10,
-    seats: makeSeats(input.equipped),
+    seats: makeSeats(),
     bossTwists: input.bossTwists ?? { 3: null, 6: null },
     readySeatIds: [],
     attempt,
@@ -113,7 +107,7 @@ function makeRun(input: {
 }
 
 function emptyCatalog(): Catalog {
-  return { gear: {}, bosses: {} };
+  return testCatalog();
 }
 
 describe("whisperLegality", () => {
@@ -152,7 +146,7 @@ describe("whisperLegality", () => {
         whisperAllowed: () => () => false,
       },
     };
-    const catalog: Catalog = { gear: {}, bosses: { "boss-block": bossDef } };
+    const catalog: Catalog = testCatalog({ bosses: { "boss-block": bossDef } });
     const run = makeRun({ camp, campNumber: 3, bossTwists: { 3: "boss-block", 6: null } });
     const cardId = camp.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
     const result = whisperLegality(run, "p0", "p1", cardId, catalog);
@@ -163,7 +157,7 @@ describe("whisperLegality", () => {
     const camp = betweenTricksCamp();
     const run = makeRun({
       camp,
-      log: [{ event: "whisper", actorSeatId: "p0", subjectSeatIds: ["p1"], gearId: null, audience: "public" }],
+      log: [{ event: "whisper", actorSeatId: "p0", subjectSeatIds: ["p1"], sourceId: null, audience: "public" }],
     });
     const cardId = camp.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
     const result = whisperLegality(run, "p0", "p2", cardId, emptyCatalog());
@@ -210,7 +204,7 @@ describe("applyWhisper", () => {
       { cardId, fromSeatId: "p0", audience: ["p1"], source: "whisper", targetSeatId: "p1" },
     ]);
     expect(result.state.attempt!.log).toEqual([
-      { event: "whisper", actorSeatId: "p0", subjectSeatIds: ["p1"], gearId: null, audience: "public" },
+      { event: "whisper", actorSeatId: "p0", subjectSeatIds: ["p1"], sourceId: null, audience: "public" },
     ]);
     expect(whispersUsedBy(result.state, "p0")).toBe(1);
     expect(run).toEqual(before); // input state not mutated
@@ -218,24 +212,25 @@ describe("applyWhisper", () => {
 
   it("a fake effect layer raising whispersPerCamp to 2 for p0 allows a second whisper", () => {
     const camp = betweenTricksCamp();
-    const boostGear: GearDef = {
+    const boost = defineItem({
       id: "boost",
       name: "Boost",
-      size: 1,
-      window: "passive",
       text: "",
-      targets: [],
-      effectModifier(effect: ActiveEffect) {
-        return {
+      active: ability({
+        window: "between-tricks",
+        limit: { kind: "per-camp", times: 1 },
+        targets: [],
+        apply: () => [],
+        effect: (effect: ActiveEffect) => ({
           whispersPerCamp: (prev) => (r, seatId) => (seatId === effect.seatId ? 2 : prev(r, seatId)),
-        };
-      },
-    };
-    const catalog: Catalog = { gear: { boost: boostGear }, bosses: {} };
+        }),
+      }),
+    });
+    const catalog = testCatalog({ items: { boost } });
     const run = makeRun({
       camp,
-      effects: [{ gearId: "boost", seatId: "p0", atTrick: 0, lasts: "attempt", params: {}, audience: "public" }],
-      log: [{ event: "whisper", actorSeatId: "p0", subjectSeatIds: ["p1"], gearId: null, audience: "public" }],
+      effects: [{ sourceId: "boost", seatId: "p0", atTrick: 0, lasts: "attempt", params: {}, audience: "public" }],
+      log: [{ event: "whisper", actorSeatId: "p0", subjectSeatIds: ["p1"], sourceId: null, audience: "public" }],
     });
     const cardId = camp.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
 
@@ -246,21 +241,20 @@ describe("applyWhisper", () => {
 
   it("a fake whisperAudience layer returning all seats produces an audience of all seats", () => {
     const camp = betweenTricksCamp();
-    const broadcastGear: GearDef = {
+    const broadcast = defineItem({
       id: "broadcast",
       name: "Broadcast",
-      size: 1,
-      window: "passive",
       text: "",
-      targets: [],
-      effectModifier() {
-        return {
-          whisperAudience: () => (r) => [...r.seatIds],
-        };
-      },
-    };
-    const catalog: Catalog = { gear: { broadcast: broadcastGear }, bosses: {} };
-    const run = makeRun({ camp, effects: [{ gearId: "broadcast", seatId: "p0", atTrick: 0, lasts: "attempt", params: {}, audience: "public" }] });
+      active: ability({
+        window: "between-tricks",
+        limit: { kind: "per-camp", times: 1 },
+        targets: [],
+        apply: () => [],
+        effect: () => ({ whisperAudience: () => (r) => [...r.seatIds] }),
+      }),
+    });
+    const catalog = testCatalog({ items: { broadcast } });
+    const run = makeRun({ camp, effects: [{ sourceId: "broadcast", seatId: "p0", atTrick: 0, lasts: "attempt", params: {}, audience: "public" }] });
     const cardId = camp.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
 
     const result = applyWhisper(run, "p0", { targetSeatId: "p1", cardId }, catalog);

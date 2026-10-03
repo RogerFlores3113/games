@@ -5,14 +5,14 @@
 // a list here.
 //
 // Phase 10, Plan 02 extensions:
-//   - The scan now RECURSES into run/, gear/ and boss/ (Pitfall 2), so
+//   - The scan now RECURSES into run/, content/ and boss/ (Pitfall 2), so
 //     later Phase 10 plans need not touch this file to be covered.
 //   - Comments are STRIPPED before scanning for forbidden tokens (IN-04,
 //     Pitfall 1), so a forbidden token appearing only in prose (e.g. this
 //     header explaining what the guard forbids) no longer trips the guard.
 //   - A third check fences Core: a top-level (non-nested) expedition/ file
-//     may never import from ./run/, ./gear/ or ./boss/, keeping Core
-//     boss/gear-agnostic per rules.ts's own header contract.
+//     may never import from ./run/, ./content/ or ./boss/, keeping Core
+//     boss- and source-agnostic per rules.ts's own header contract.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -46,7 +46,8 @@ const MUST_BE_SCANNED = [
   "run/types.ts",
   "run/run-rules.ts",
   "run/rng.ts",
-  "gear/gear-def.ts",
+  "content/source-def.ts",
+  "run/abilities.ts",
   "boss/boss-def.ts",
   "adapter/adapter.ts",
   "adapter/view.ts",
@@ -101,13 +102,13 @@ describe("expedition package purity", () => {
     }
   });
 
-  it("Core files never import run/gear/boss content", () => {
+  it("Core files never import run/content/boss modules", () => {
     const files = sourceFiles().filter((file) => !file.includes("/"));
     expect(files.length).toBeGreaterThan(0);
 
     for (const file of files) {
       const source = stripComments(readFileSync(join(HERE, file), "utf-8"));
-      expect(source).not.toMatch(/from\s+["']\.\/(run|gear|boss)\//);
+      expect(source).not.toMatch(/from\s+["']\.\/(run|content|boss)\//);
     }
   });
 });

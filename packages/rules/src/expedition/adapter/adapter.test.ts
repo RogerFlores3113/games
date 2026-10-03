@@ -15,7 +15,7 @@ import type { RunAction, RunState } from "../run/types";
 const SEED = "cccccccccccccccccccccccccccccccc";
 
 function fixtures(): Record<string, RunState> {
-  const fresh = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED }, CATALOG);
+  const fresh = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
   const preDeal = advanceTo(
     setupRun({
       seatIds: ["p0", "p1", "p2"],
@@ -23,7 +23,7 @@ function fixtures(): Record<string, RunState> {
       catalog: CATALOG,
       campNumber: 3,
       bossTwists: { 3: "eclipse", 6: null },
-      loadouts: { p0: ["jam"] },
+      kits: { p0: ["rain-poncho"] },
     }),
     "pre-deal",
     CATALOG,
@@ -42,12 +42,12 @@ function fixtures(): Record<string, RunState> {
 }
 
 const WELL_SHAPED_NONSENSE_ARB = fc.oneof(
-  fc.record({ type: fc.constant("pick-draft" as const), gearId: fc.string() }),
-  fc.record({ type: fc.constant("set-loadout" as const), gearIds: fc.array(fc.string(), { maxLength: 5 }) }),
+  fc.record({ type: fc.constant("pick-character" as const), characterId: fc.string() }),
+  fc.record({ type: fc.constant("pick-draft" as const), sourceId: fc.string() }),
   fc.record({ type: fc.constant("ready" as const) }),
   fc.record({
-    type: fc.constant("use-gear" as const),
-    gearId: fc.string(),
+    type: fc.constant("use-ability" as const),
+    sourceId: fc.string(),
     targets: fc.array(fc.string(), { maxLength: 5 }),
   }),
   fc.record({ type: fc.constant("skip-window" as const) }),
@@ -85,23 +85,22 @@ describe("expeditionGame: identity and createInitialState", () => {
     const input = { seatIds: ["p0", "p1", "p2"], config: null, seed: SEED };
     const a = expeditionGame.createInitialState(input);
     const b = expeditionGame.createInitialState(input);
-    expect(a).toEqual(createRun({ seatIds: input.seatIds, seed: input.seed }, CATALOG));
+    expect(a).toEqual(createRun({ seatIds: input.seatIds, seed: input.seed }));
     expect(a).toEqual(b);
   });
 });
 
 describe("expeditionGame: applyAction accepts valid actions and never mutates state", () => {
-  it("a valid ready from every seat is accepted and starts an attempt", () => {
-    let state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED }, CATALOG);
-    // Resolve every seat's camp-1 draft first so ready is legal.
-    for (const seat of state.seats) {
-      const result = expeditionGame.applyAction(state, seat.seatId, {
-        type: "pick-draft",
-        gearId: seat.draftOffer![0]!,
-      });
+  it("picking a character then readying from every seat is accepted and starts an attempt", () => {
+    let state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
+    expect(state.attempt).toBeNull();
+    const characterIds = Object.keys(CATALOG.characters);
+    state.seatIds.forEach((seatId, i) => {
+      const result = expeditionGame.applyAction(state, seatId, { type: "pick-character", characterId: characterIds[i] });
       expect(result.ok).toBe(true);
       if (result.ok) state = result.state;
-    }
+    });
+    expect(state.seats.map((s) => s.characterId)).toEqual(characterIds.slice(0, 3));
     for (const seatId of state.seatIds) {
       const snapshotBefore = structuredClone(state);
       const result = expeditionGame.applyAction(state, seatId, { type: "ready" });
@@ -112,8 +111,19 @@ describe("expeditionGame: applyAction accepts valid actions and never mutates st
     expect(state.attempt).not.toBeNull();
   });
 
+  it("readying before a character is picked is rejected with character_pending", () => {
+    const state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
+    expect(expeditionGame.applyAction(state, "p0", { type: "ready" })).toEqual({ ok: false, error: "character_pending" });
+  });
+
+  it("a removed action shape is rejected as invalid_action", () => {
+    const state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
+    expect(expeditionGame.applyAction(state, "p0", { type: "set-loadout", gearIds: [] })).toEqual({ ok: false, error: "invalid_action" });
+    expect(expeditionGame.applyAction(state, "p0", { type: "pick-draft", gearId: "x" })).toEqual({ ok: false, error: "invalid_action" });
+  });
+
   it("a non-seat actor gets not_a_seat for a well-formed ready", () => {
-    const state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED }, CATALOG);
+    const state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
     const before = structuredClone(state);
     const result = expeditionGame.applyAction(state, "intruder", { type: "ready" });
     expect(result).toEqual({ ok: false, error: "not_a_seat" });
@@ -133,7 +143,7 @@ describe("expeditionGame: hostile-input safety across every run phase", () => {
 
 describe("expeditionGame: toPlayerView", () => {
   it("delegates to toExpeditionPlayerView for every seat and an unseated id, never returning state itself", () => {
-    const state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED }, CATALOG);
+    const state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
     for (const seatId of [...state.seatIds, "unseated-viewer"]) {
       const view = expeditionGame.toPlayerView(state, seatId);
       expect(view).toEqual(toExpeditionPlayerView(state, seatId, CATALOG));
@@ -144,7 +154,7 @@ describe("expeditionGame: toPlayerView", () => {
 
 describe("expeditionGame: checkGameEnd", () => {
   it("returns null for a fresh run", () => {
-    const state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED }, CATALOG);
+    const state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
     expect(expeditionGame.checkGameEnd(state)).toBeNull();
   });
 

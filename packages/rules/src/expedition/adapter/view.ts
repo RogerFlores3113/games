@@ -20,8 +20,8 @@
 // Three-part structure (mirrors hanabi/projection.ts):
 //   1. Compute the public top-level fields ONCE, before any branch — they
 //      are identical for every seat.
-//   2. Viewer-scoped top-level fields (own draft offer, owned gear,
-//      capacity, gear availability) are computed once, defaulting to the
+//   2. Viewer-scoped top-level fields (own draft offer, own abilities with
+//      their step choices) are computed once, defaulting to the
 //      least-privileged value when the seat is not found.
 //   3. `attempt`/`camp` construction reads `rules` (computed ONCE at the
 //      top via `rulesFor`) and gates every reveal/log/objective by audience
@@ -32,10 +32,13 @@ import { evaluateObjective } from "../objectives";
 import { activeBossId, rulesFor } from "../run/compose";
 import { runPhase, runStatus } from "../run/lifecycle";
 import { whispersUsedBy } from "../run/whisper";
-import { gearAvailability, isGearSpent } from "../run/toolkit";
+import { abilityStatus } from "../run/abilities";
+import { liveSourceIds, poolBalance, remaining, type Remaining } from "../run/usage";
 import { currentWindow, gatedPendingSeatIds } from "../run/windows";
 import { visibleObjectives } from "../run/visibility";
-import type { Catalog, LogEntry, Reveal, RunState } from "../run/types";
+import type { RunRules } from "../run/run-rules";
+import type { ActiveEffect, Catalog, LogEntry, Reveal, RunState, SeatRun } from "../run/types";
+import { rankOf } from "../trick";
 import type { CampState, CardIdentity, ExpeditionCard, Objective, StandardIdentity } from "../state";
 import type {
   ExpeditionAttemptView,
@@ -45,12 +48,13 @@ import type {
   ExpeditionCardView,
   ExpeditionCompletedTrickView,
   ExpeditionCurrentTrickView,
+  ExpeditionAbilityView,
   ExpeditionEffectView,
-  ExpeditionGearStatusView,
-  ExpeditionGearUseView,
   ExpeditionHandSizeView,
   ExpeditionLogEntryView,
   ExpeditionObjectiveView,
+  ExpeditionRankedCardView,
+  ExpeditionRemainingView,
   ExpeditionRevealView,
   ExpeditionSeatView,
   ExpeditionTrickPlayView,
@@ -99,21 +103,31 @@ function toObjectiveView(camp: CampState, objective: Objective): ExpeditionObjec
   return { id: objective.id, kind: "exactly-n", n: objective.n, ownerSeatId: objective.ownerSeatId, status };
 }
 
-function toTrickPlayView(play: { seatId: string; card: ExpeditionCard }): ExpeditionTrickPlayView {
-  return { seatId: play.seatId, card: toCardView(play.card) };
+/** The composed rank when it differs from the printed one, else null. */
+function effectiveRank(card: ExpeditionCard, rules: RunRules): number | null {
+  const composed = rules.rankOf(card);
+  return composed === rankOf(card) ? null : composed;
 }
 
-function toCompletedTrickView(trick: CampState["completedTricks"][number]): ExpeditionCompletedTrickView {
+function toRankedCardView(card: ExpeditionCard, rules: RunRules): ExpeditionRankedCardView {
+  return { id: card.id, identity: toIdentityView(card.identity), effectiveRank: effectiveRank(card, rules) };
+}
+
+function toTrickPlayView(play: { seatId: string; card: ExpeditionCard }, rules: RunRules): ExpeditionTrickPlayView {
+  return { seatId: play.seatId, card: toCardView(play.card), effectiveRank: effectiveRank(play.card, rules) };
+}
+
+function toCompletedTrickView(trick: CampState["completedTricks"][number], rules: RunRules): ExpeditionCompletedTrickView {
   return {
     index: trick.index,
     leaderSeatId: trick.leaderSeatId,
-    plays: trick.plays.map(toTrickPlayView),
+    plays: trick.plays.map((play) => toTrickPlayView(play, rules)),
     winnerSeatId: trick.winnerSeatId,
   };
 }
 
-function toCurrentTrickView(trick: CampState["currentTrick"]): ExpeditionCurrentTrickView {
-  return { index: trick.index, leaderSeatId: trick.leaderSeatId, plays: trick.plays.map(toTrickPlayView) };
+function toCurrentTrickView(trick: CampState["currentTrick"], rules: RunRules): ExpeditionCurrentTrickView {
+  return { index: trick.index, leaderSeatId: trick.leaderSeatId, plays: trick.plays.map((play) => toTrickPlayView(play, rules)) };
 }
 
 /** Looks up a card's identity by id across a camp's hands, completed
@@ -157,7 +171,7 @@ function toLogEntryView(entry: LogEntry): ExpeditionLogEntryView {
     event: entry.event,
     actorSeatId: entry.actorSeatId,
     subjectSeatIds: Array.from(entry.subjectSeatIds),
-    gearId: entry.gearId,
+    sourceId: entry.sourceId,
     private: entry.audience !== "public",
   };
 }
@@ -167,12 +181,61 @@ function logVisibleTo(entry: LogEntry, seatId: string | null): boolean {
   return seatId !== null && entry.audience.includes(seatId);
 }
 
-function toGearUseView(use: { seatId: string; gearId: string; kind: "used" | "skipped" }): ExpeditionGearUseView {
-  return { seatId: use.seatId, gearId: use.gearId, kind: use.kind };
+function toEffectView(effect: ActiveEffect, viewerSeatId: string | null): ExpeditionEffectView {
+  const shown = effect.audience === "public" || effect.seatId === viewerSeatId;
+  return {
+    sourceId: effect.sourceId,
+    seatId: effect.seatId,
+    atTrick: effect.atTrick,
+    lasts: effect.lasts,
+    params: shown ? Object.fromEntries(Object.entries(effect.params)) : null,
+  };
 }
 
-function toEffectView(effect: { gearId: string; seatId: string; atTrick: number }): ExpeditionEffectView {
-  return { gearId: effect.gearId, seatId: effect.seatId, atTrick: effect.atTrick };
+function toRemainingView(left: Remaining): ExpeditionRemainingView {
+  switch (left.kind) {
+    case "uses":
+      return { kind: "uses", left: left.left, of: left.of };
+    case "single-use":
+      return { kind: "single-use" };
+    case "pool":
+      return { kind: "pool", balance: left.balance, max: left.max, cost: left.cost };
+    case "supplies":
+      return { kind: "supplies", cost: left.cost };
+  }
+}
+
+function toSeatView(state: RunState, seat: SeatRun, catalog: Catalog): ExpeditionSeatView {
+  const balance = poolBalance(seat, catalog);
+  const pool = seat.characterId === null ? undefined : catalog.characters[seat.characterId]?.pool;
+  return {
+    seatId: seat.seatId,
+    characterId: seat.characterId,
+    kit: Array.from(seat.kit),
+    ready: state.readySeatIds.includes(seat.seatId),
+    draftPending: seat.draftOffer !== null,
+    pool: balance !== null && pool !== undefined ? { balance, max: pool.max } : null,
+    usage: liveSourceIds(seat)
+      .filter((sourceId) => catalog.sources[sourceId]?.active !== undefined)
+      .map((sourceId) => ({ sourceId, remaining: toRemainingView(remaining(state, seat.seatId, sourceId, catalog)) })),
+  };
+}
+
+function toAbilityViews(state: RunState, seat: SeatRun, catalog: Catalog): ExpeditionAbilityView[] {
+  return liveSourceIds(seat).flatMap((sourceId) => {
+    const status = abilityStatus(state, seat.seatId, sourceId, catalog);
+    if (status === null) return [];
+    return [
+      status.usable
+        ? {
+            sourceId,
+            usableNow: true,
+            reason: null,
+            steps: status.steps.map((step) => ({ kind: step.kind, prompt: step.prompt, choices: Array.from(step.choices) })),
+          }
+        : { sourceId, usableNow: false, reason: status.reason, steps: [] },
+    ];
+  });
 }
 
 function toCampResultView(result: {
@@ -198,45 +261,18 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
   const ownSeat = state.seats.find((s) => s.seatId === seatId);
   const seated = ownSeat !== undefined;
 
-  const seats: ExpeditionSeatView[] = state.seats.map((seat) => ({
-    seatId: seat.seatId,
-    equippedGearIds: Array.from(seat.equippedGearIds),
-    ready: state.readySeatIds.includes(seat.seatId),
-    draftPending: seat.draftOffer !== null,
-  }));
+  const seats: ExpeditionSeatView[] = state.seats.map((seat) => toSeatView(state, seat, catalog));
 
   const history: ExpeditionCampResultView[] = state.history.map(toCampResultView);
 
   const yourSeatId = seated ? seatId : null;
-  const yourOwnedGearIds: string[] = seated ? Array.from(ownSeat.ownedGearIds) : [];
   const yourDraftOffer: string[] | null = seated && ownSeat.draftOffer !== null ? Array.from(ownSeat.draftOffer) : null;
-  const yourCapacity: number | null = seated ? rules.capacity(state, seatId) : null;
-  // The same hook with this seat's loadout emptied, so no passive (Energy
-  // Tonic) contributes: lets the client tell when unpacking would over-fill.
-  const yourBaseCapacity: number | null = seated
-    ? rulesFor(
-        { ...state, seats: state.seats.map((s) => (s.seatId === seatId ? { ...s, equippedGearIds: [] } : s)) },
-        catalog,
-      ).capacity(state, seatId)
-    : null;
-
-  const yourGear: ExpeditionGearStatusView[] = seated
-    ? ownSeat.equippedGearIds.map((gearId) => {
-        const availability = gearAvailability(state, seatId, gearId, catalog, rules);
-        return {
-          gearId,
-          spent: state.attempt !== null && isGearSpent(state.attempt, seatId, gearId),
-          usableNow: availability.ok,
-          reason: availability.ok ? null : availability.reason,
-        };
-      })
-    : [];
+  const yourAbilities: ExpeditionAbilityView[] = seated ? toAbilityViews(state, ownSeat, catalog) : [];
 
   let attempt: ExpeditionAttemptView | null = null;
   if (state.attempt !== null) {
     const rawAttempt = state.attempt;
-    const rawWindow = currentWindow(state, rules);
-    const gearWindow: ExpeditionAttemptView["gearWindow"] = rawWindow === "in-trick" || rawWindow === "rescue" ? null : rawWindow;
+    const window = currentWindow(state, rules);
 
     const reveals: ExpeditionRevealView[] = [];
     if (seated && rawAttempt.camp !== null) {
@@ -252,14 +288,20 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
       .filter((entry) => logVisibleTo(entry, seated ? seatId : null))
       .map(toLogEntryView);
 
+    let rescue: ExpeditionAttemptView["rescue"] = null;
     let camp: ExpeditionCampView | null = null;
     if (rawAttempt.camp !== null) {
       const campState = rawAttempt.camp;
       const assignment = rules.objectiveAssignment(state);
       const shownObjectives = visibleObjectives(state, campState, rules, seatId);
+      if (window === "rescue") {
+        rescue = {
+          failedObjectiveIds: shownObjectives.filter((o) => evaluateObjective(campState, o) === "failed").map((o) => o.id),
+        };
+      }
 
       const yourHandRaw = seated ? campState.hands.find((h) => h.seatId === seatId) : undefined;
-      const yourHand: ExpeditionCardView[] = yourHandRaw !== undefined ? yourHandRaw.cards.map(toCardView) : [];
+      const yourHand: ExpeditionRankedCardView[] = yourHandRaw !== undefined ? yourHandRaw.cards.map((card) => toRankedCardView(card, rules)) : [];
 
       const handSizes: ExpeditionHandSizeView[] = campState.hands.map((hand) => ({
         seatId: hand.seatId,
@@ -287,8 +329,8 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
         yourHand,
         yourLegalCardIds,
         handSizes,
-        completedTricks: campState.completedTricks.map(toCompletedTrickView),
-        currentTrick: toCurrentTrickView(campState.currentTrick),
+        completedTricks: campState.completedTricks.map((trick) => toCompletedTrickView(trick, rules)),
+        currentTrick: toCurrentTrickView(campState.currentTrick, rules),
         campPhase: derivedCampPhase,
         currentActorSeatId: derivedCurrentActorSeatId,
       };
@@ -297,10 +339,10 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
     attempt = {
       attemptNumber: rawAttempt.attemptNumber,
       bossCancelled: rawAttempt.bossCancelled,
-      gearWindow,
-      preDealPendingSeatIds: rawWindow === "pre-deal" ? Array.from(gatedPendingSeatIds(state, catalog)) : [],
-      gearUses: rawAttempt.gearUses.map(toGearUseView),
-      effects: rawAttempt.effects.map(toEffectView),
+      window,
+      pendingSeatIds: Array.from(gatedPendingSeatIds(state, catalog)),
+      rescue,
+      effects: rawAttempt.effects.map((effect) => toEffectView(effect, yourSeatId)),
       reveals,
       log,
       camp,
@@ -322,11 +364,8 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
     bossTwists: { camp3: state.bossTwists[3], camp6: state.bossTwists[6] },
     activeBossTwistId: activeBossId(state),
     seats,
-    yourOwnedGearIds,
     yourDraftOffer,
-    yourCapacity,
-    yourBaseCapacity,
-    yourGear,
+    yourAbilities,
     history,
     attempt,
   };

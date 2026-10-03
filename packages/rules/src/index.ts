@@ -43,7 +43,11 @@ export type {
   ExpeditionCardView,
   ExpeditionObjectiveView,
   ExpeditionSeatView,
-  ExpeditionGearStatusView,
+  ExpeditionAbilityView,
+  ExpeditionAbilityStepView,
+  ExpeditionRemainingView,
+  ExpeditionRankedCardView,
+  ExpeditionEffectView,
   ExpeditionCompletedTrickView,
   ExpeditionCurrentTrickView,
   ExpeditionRevealView,
@@ -56,10 +60,12 @@ export type { RunAction } from "./expedition/run/types";
 export type { RunError } from "./expedition/run/types";
 export { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "./expedition/adapter/view-leak-check";
 export type { ExpeditionSeatSecrets } from "./expedition/adapter/view-leak-check";
-export { GEAR_DISPLAY, BOSS_DISPLAY } from "./expedition/adapter/catalog-display";
+export { SOURCE_DISPLAY, CHARACTER_DISPLAY, BOSS_DISPLAY } from "./expedition/adapter/catalog-display";
 export type {
-  GearDisplay,
+  SourceDisplay,
+  SourceActiveDisplay,
+  CharacterDisplay,
   BossDisplay,
   ExpeditionTargetKind,
-  ExpeditionGearWindow,
+  ExpeditionActiveWindow,
 } from "./expedition/adapter/catalog-display";

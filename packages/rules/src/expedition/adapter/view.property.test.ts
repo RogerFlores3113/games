@@ -16,16 +16,17 @@
 
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
-import { GEAR_REGISTRY } from "../gear/registry";
+import { ITEMS } from "../content/items/registry";
 import { BOSS_REGISTRY } from "../boss/registry";
 import { CATALOG } from "../run/catalog";
+import { draftOfferFor } from "../run/draft";
 import { createRun } from "../run/lifecycle";
 import { driveRun, setupRun } from "../run/run-test-support";
 import { toExpeditionPlayerView } from "./view";
 import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "./view-leak-check";
 import type { CampNumber, RunState } from "../run/types";
 
-const GEAR_IDS = Object.keys(GEAR_REGISTRY);
+const ITEM_IDS = Object.keys(ITEMS);
 const BOSS_IDS = Object.keys(BOSS_REGISTRY);
 
 function seatIdsFor(seatCount: number): string[] {
@@ -38,7 +39,7 @@ type RunInput = {
   choices: number[];
   startCamp: CampNumber;
   bossPair: [string, string];
-  loadouts: Record<string, string[]>;
+  kits: Record<string, string[]>;
 };
 
 // Copied from run/run.property.test.ts (file-local there, not exported) —
@@ -47,11 +48,10 @@ const bossPairArb: fc.Arbitrary<[string, string]> = fc
   .tuple(fc.constantFrom(...BOSS_IDS), fc.constantFrom(...BOSS_IDS))
   .filter(([a, b]) => a !== b) as fc.Arbitrary<[string, string]>;
 
-// Copied from run/run.property.test.ts: per-seat loadouts, a subarray of
-// GEAR_REGISTRY keys, kept to at most 4 items each.
-function loadoutsArb(seatIds: readonly string[]): fc.Arbitrary<Record<string, string[]>> {
+// Per-seat kits: a subarray of ITEMS keys, kept to at most 4 items each.
+function kitsArb(seatIds: readonly string[]): fc.Arbitrary<Record<string, string[]>> {
   return fc
-    .tuple(...seatIds.map(() => fc.subarray(GEAR_IDS, { maxLength: 4 })))
+    .tuple(...seatIds.map(() => fc.subarray(ITEM_IDS, { maxLength: 4 })))
     .map((perSeat) => Object.fromEntries(seatIds.map((seatId, i) => [seatId, perSeat[i]!])));
 }
 
@@ -68,7 +68,7 @@ const runInputArb: fc.Arbitrary<RunInput> = fc
       choices: fc.array(fc.nat({ max: 1000 }), { minLength: 1, maxLength: 64 }),
       startCamp: fc.constantFrom<CampNumber>(1, 2, 3, 4, 5, 6),
       bossPair: bossPairArb,
-      loadouts: loadoutsArb(seatIds),
+      kits: kitsArb(seatIds),
     });
   });
 
@@ -82,6 +82,7 @@ const counters = {
   draftOfferChecks: 0,
   unseatedChecks: 0,
   preDealChecks: 0,
+  musterChecks: 0,
 };
 
 /** Checks every seat's view AND an unseated "spectator" viewer's view for
@@ -103,6 +104,7 @@ function assertNoLeaksAt(state: RunState, seed: string): void {
     if (view.yourDraftOffer !== null) counters.draftOfferChecks++;
     if (id === "spectator") counters.unseatedChecks++;
     if (view.runPhase === "pre-deal") counters.preDealChecks++;
+    if (view.runPhase === "muster") counters.musterChecks++;
   }
 }
 
@@ -116,22 +118,20 @@ function otherBossId(bossId: string): string {
 /** One deterministic example per (boss id, player count) pair, so ENG-03's
  * "every boss twist" and this file's non-vacuity counters are guaranteed
  * positive regardless of fast-check's own random seed — not left to chance.
- * loadouts give seat 0 "peek" (a between-tricks reveal, for
- * revealViewChecks) and seat 1 "jam" (a pre-deal gear, for preDealChecks);
- * every other seat gets no gear. */
+ * seat 0 is the Scout (a between-tricks reveal, for revealViewChecks) and
+ * seat 1 carries the Rain Poncho (a pre-deal ability, for preDealChecks);
+ * every other seat gets no items. */
 const examples: RunInput[] = BOSS_IDS.flatMap((bossId) =>
   [3, 4, 5].map((seatCount) => {
     const seatIds = seatIdsFor(seatCount);
-    const loadouts: Record<string, string[]> = Object.fromEntries(
-      seatIds.map((seatId, i) => [seatId, i === 0 ? ["peek"] : i === 1 ? ["jam"] : []]),
-    );
+    const kits: Record<string, string[]> = Object.fromEntries(seatIds.map((seatId, i) => [seatId, i === 1 ? ["rain-poncho"] : []]));
     return {
       seatIds,
       seed: DETERMINISTIC_SEED,
       choices: DETERMINISTIC_CHOICES,
       startCamp: 3 as CampNumber,
       bossPair: [bossId, otherBossId(bossId)] as [string, string],
-      loadouts,
+      kits,
     };
   }),
 );
@@ -139,13 +139,14 @@ const examples: RunInput[] = BOSS_IDS.flatMap((bossId) =>
 describe("property: whole-run per-seat leak checker (COMM-03/ENG-03)", () => {
   it("no seat's view, nor an unseated viewer's view, ever leaks another seat's card at any step of a whole simulated run", () => {
     fc.assert(
-      fc.property(runInputArb, ({ seatIds, seed, choices, startCamp, bossPair, loadouts }) => {
+      fc.property(runInputArb, ({ seatIds, seed, choices, startCamp, bossPair, kits }) => {
         const initial = setupRun({
           seatIds,
           seed,
           catalog: CATALOG,
           campNumber: startCamp,
-          loadouts,
+          characters: { [seatIds[0]!]: "scout" },
+          kits,
           bossTwists: { 3: bossPair[0], 6: bossPair[1] },
         });
 
@@ -156,10 +157,22 @@ describe("property: whole-run per-seat leak checker (COMM-03/ENG-03)", () => {
     );
   });
 
-  it("draft-offer coverage: a fresh fireside gives every seat a real private draft offer (3, 4 and 5 seats)", () => {
+  it("draft-offer coverage: every seat holding a real private draft offer leaks nothing (3, 4 and 5 seats)", () => {
     for (const seatCount of [3, 4, 5]) {
-      const seatIds = seatIdsFor(seatCount);
-      const state = createRun({ seatIds, seed: DETERMINISTIC_SEED }, CATALOG);
+      const base = setupRun({ seatIds: seatIdsFor(seatCount), seed: DETERMINISTIC_SEED, catalog: CATALOG, campNumber: 2 });
+      const state: RunState = {
+        ...base,
+        seats: base.seats.map((seat) => ({ ...seat, draftOffer: draftOfferFor(DETERMINISTIC_SEED, 2, seat, CATALOG) })),
+      };
+      expect(state.seats.every((seat) => seat.draftOffer !== null)).toBe(true);
+      assertNoLeaksAt(state, DETERMINISTIC_SEED);
+    }
+  });
+
+  it("muster coverage: a fresh run still choosing characters leaks nothing (3, 4 and 5 seats)", () => {
+    for (const seatCount of [3, 4, 5]) {
+      const state = createRun({ seatIds: seatIdsFor(seatCount), seed: DETERMINISTIC_SEED });
+      expect(toExpeditionPlayerView(state, "seat-0", CATALOG).runPhase).toBe("muster");
       assertNoLeaksAt(state, DETERMINISTIC_SEED);
     }
   });
@@ -171,5 +184,6 @@ describe("property: whole-run per-seat leak checker (COMM-03/ENG-03)", () => {
     expect(counters.draftOfferChecks).toBeGreaterThan(0);
     expect(counters.unseatedChecks).toBeGreaterThan(0);
     expect(counters.preDealChecks).toBeGreaterThan(0);
+    expect(counters.musterChecks).toBeGreaterThan(0);
   });
 });

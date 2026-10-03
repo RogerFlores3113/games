@@ -1,20 +1,20 @@
 // The Phase 9 seam for spec §6.1's rule hooks (Plan 04). The Core calls ONLY
 // through a CoreRules value — every Core function that behaves differently
-// under a twist/gear takes `rules: CoreRules = baseRules` as its LAST
+// under a twist or source takes `rules: CoreRules = baseRules` as its LAST
 // parameter, so Phase 10 can pass a composed rule set (base -> boss twist ->
-// gear, each hook receiving the previous layer's answer) without changing
+// sources, each hook receiving the previous layer's answer) without changing
 // any call signature.
 //
 // Hook seam scope (spec §6.1): this plan defines CoreRules with only the
 // hooks the Core layer itself calls — deckFor, leaderFor, isTrump,
 // trickWinner, legalPlays, nextLeader, failureChecks — and a baseRules
 // implementation. The layering/composition mechanism and the
-// whisper/objectiveAssignment/capacity/failureCost hooks are Phase 10, added
+// whisper/objectiveAssignment/failureCost hooks are Phase 10, added
 // additively by extending this type. Core modules must never name a boss or
-// gear id.
+// source id.
 //
 // WR-03 (Phase 10, Plan 01): composition (Plan 10-03) first folds isTrump
-// across the boss/gear layers, then builds the base rules from
+// across the boss and source layers, then builds the base rules from
 // baseRulesWith(composedIsTrump), so a layer overriding only isTrump is
 // honored by trick ranking and follow-suit legality without touching this
 // file again.

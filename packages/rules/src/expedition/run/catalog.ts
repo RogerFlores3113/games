@@ -1,17 +1,30 @@
-// The production CATALOG (Plan 10-16, RUN-06/ENG-01). This is the single
-// Catalog value Phase 11's adapter passes to every applyRunAction/createRun
-// call — the real ten-item gear catalogue (gear/registry.ts's
-// GEAR_REGISTRY) plus the four provisional boss twists (boss/registry.ts's
-// BOSS_REGISTRY), and nothing else.
-//
-// Tests may extend this with local fakes (spread CATALOG.gear/CATALOG.bosses
-// into a wider object literal) rather than importing a second production
-// catalog — replay-reset.test.ts's fail-then-replay fixture does exactly
-// this to add a deterministic "fails the camp on demand" fixture gear
-// alongside the real ten items.
+// The production CATALOG: the six characters (with their upgrades), the
+// thirteen items and the boss twists. buildCatalog flattens every source
+// into one index; tests build their own catalogues through it.
 
-import { GEAR_REGISTRY } from "../gear/registry";
+import { CHARACTERS } from "../content/characters/registry";
+import { ITEMS } from "../content/items/registry";
+import type { CharacterDef, ItemDef, SourceDef } from "../content/source-def";
 import { BOSS_REGISTRY } from "../boss/registry";
+import type { BossDef } from "../boss/boss-def";
 import type { Catalog } from "./types";
 
-export const CATALOG: Catalog = { gear: GEAR_REGISTRY, bosses: BOSS_REGISTRY };
+export function buildCatalog(parts: {
+  readonly characters: Readonly<Record<string, CharacterDef>>;
+  readonly items: Readonly<Record<string, ItemDef>>;
+  readonly bosses: Readonly<Record<string, BossDef>>;
+}): Catalog {
+  const sources: Record<string, SourceDef> = {};
+  const add = (def: SourceDef): void => {
+    if (sources[def.id] !== undefined) throw new Error(`buildCatalog: duplicate source id "${def.id}"`);
+    sources[def.id] = def;
+  };
+  for (const character of Object.values(parts.characters)) {
+    add(character);
+    for (const upgrade of character.upgrades) add(upgrade);
+  }
+  for (const item of Object.values(parts.items)) add(item);
+  return { characters: parts.characters, items: parts.items, bosses: parts.bosses, sources };
+}
+
+export const CATALOG: Catalog = buildCatalog({ characters: CHARACTERS, items: ITEMS, bosses: BOSS_REGISTRY });

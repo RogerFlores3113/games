@@ -1,39 +1,30 @@
-// Phase 10 run lifecycle (Plan 05, RUN-01..03, RUN-06, D-01..D-04, D-06,
-// D-12). This is the six-camp run's state machine: create, derive status
-// and phase, draft, capacity, boss drawing, the pre-deal wait, dealing each
-// attempt, face-down assignment, and camp settlement (supplies, replay,
-// advance, win and loss). The dispatcher (Plan 10-07) calls advanceRun after
-// every accepted RunAction.
+// The six-camp run's state machine: create, derive status and phase, muster,
+// boss drawing, the gated pre-deal wait, dealing each attempt, face-down
+// assignment, and camp settlement (supplies, pool regain, drafts, replay,
+// advance, win and loss). The dispatcher calls advanceRun after every
+// accepted RunAction.
 //
-// DERIVE, DON'T CACHE: runStatus/runPhase/nextAttemptNumber/capacityOf are
-// all recomputed from RunState on every call. RunState never stores a
-// `phase` or `status` field (mirrors run/types.ts's own header, and Phase
-// 9's CampState discipline).
+// DERIVE, DON'T CACHE: runStatus/runPhase/nextAttemptNumber are recomputed
+// from RunState on every call. RunState never stores a `phase` or `status`
+// field (Phase 9's CampState discipline).
 //
-// THE LOOP: fireside -> (every seat ready) startAttempt -> pre-deal (only
-// while any seat's equipped pre-deal gear is still unresolved, D-12) ->
-// dealAttempt -> camp (playing) -> settleIfDecided -> fireside (replay, no
-// draft, D-01) or fireside-with-drafts (cleared, next camp) or ended (camp 6
-// cleared, won; supplies at 0, lost).
+// THE LOOP: muster (every seat picks a character) -> fireside -> (every seat
+// ready) startAttempt -> pre-deal (only while a seat can still fire or pass a
+// pre-deal ability) -> dealAttempt -> camp (playing, with a rescue pause when
+// a seat can answer a failed objective) -> settleIfDecided -> fireside
+// (replay, no draft, D-01) or fireside-with-drafts (cleared, next camp) or
+// ended (camp 6 cleared, won; supplies at 0, lost).
 //
-// D-01: a failed camp returns to the fireside for a replay with NO draft;
-// this file's settleIfDecided never touches `seats` on a failure, so a
-// seat's stored draftOffer (null, set by a prior pick — Plan 10-07's
-// concern) is left exactly as it was.
+// D-01: a failed camp returns to the fireside for a replay with NO draft.
 // D-02: a boss camp's twist is drawn once, on first arrival, and kept
 // through every replay — startAttempt only draws when bossTwists[N] is
 // still null.
 // D-03: camp 6's twist pool excludes camp 3's twist, so a run never repeats
 // a boss twist.
-// D-06: a failure never touches equippedGearIds; a seat's loadout survives
-// the replay untouched.
-// D-12: the pre-deal window (run/windows.ts) only waits on seats with an equipped, unspent,
-// currently-available pre-deal gear; a seat with no pre-deal gear (or whose
-// pre-deal gear cannot currently be used) never blocks the deal.
 //
 // RUN-06 (structural reset-on-replay): startAttempt always builds a fresh
-// AttemptState (gearUses/effects/reveals/log all empty, bossCancelled
-// false); nothing here carries an old attempt's data forward.
+// AttemptState (effects/reveals/log all empty, bossCancelled false). Ledgers
+// live on the seats and need no reset: per-camp limits count by stamp.
 
 import { assertPlayerCount } from "../deck";
 import { shuffleWithSeed } from "../../shuffle";
@@ -41,6 +32,8 @@ import { createCamp, checkCampOutcome } from "../camp";
 import type { CampState } from "../state";
 import { rulesFor } from "./compose";
 import { draftOfferFor } from "./draft";
+import { resolveTuned } from "../content/source-def";
+import { currentStamp, ownerOf } from "./usage";
 import { BOSS_CAMPS, FINAL_CAMP, STARTING_SUPPLIES, objectiveSlotsFor } from "./balance";
 import { attemptSeed, STREAMS, seededIndex } from "./rng";
 import { currentWindow, gatedPendingSeatIds } from "./windows";
@@ -60,10 +53,10 @@ function isBossCampNumber(n: CampNumber): n is BossCampNumber {
   return BOSS_CAMPS.includes(n as BossCampNumber);
 }
 
-/** Validates (seatIds, seed), builds every seat's fresh camp-1 draft offer,
- * and returns the run at the fireside with full supplies. Throws for a
- * player count outside 3-5, duplicate seat ids, or an empty seed. */
-export function createRun(input: { seatIds: readonly string[]; seed: string }, catalog: Catalog): RunState {
+/** Validates (seatIds, seed) and returns the run in muster: every seat
+ * still has to pick a character, with full supplies. Throws for a player
+ * count outside 3-5, duplicate seat ids, or an empty seed. */
+export function createRun(input: { seatIds: readonly string[]; seed: string }): RunState {
   const { seatIds, seed } = input;
 
   assertPlayerCount(seatIds.length);
@@ -74,13 +67,7 @@ export function createRun(input: { seatIds: readonly string[]; seed: string }, c
     throw new Error("createRun: seed must not be empty");
   }
 
-  const allGearIds = Object.keys(catalog.gear);
-  const seats: SeatRun[] = seatIds.map((seatId) => ({
-    seatId,
-    ownedGearIds: [],
-    equippedGearIds: [],
-    draftOffer: draftOfferFor(seed, 1, seatId, allGearIds, []),
-  }));
+  const seats: SeatRun[] = seatIds.map((seatId) => ({ seatId, characterId: null, kit: [], draftOffer: null, ledger: [] }));
 
   return {
     seed,
@@ -106,11 +93,12 @@ export function runStatus(run: RunState): RunStatus {
   return "in_progress";
 }
 
-/** Derived, never stored: ended once runStatus leaves in_progress; fireside
- * with no attempt; pre-deal with an attempt but no camp yet; camp once
- * dealt. */
+/** Derived, never stored: ended once runStatus leaves in_progress; muster
+ * while any seat has no character; fireside with no attempt; pre-deal with
+ * an attempt but no camp yet; camp once dealt. */
 export function runPhase(run: RunState): RunPhase {
   if (runStatus(run) !== "in_progress") return "ended";
+  if (run.seats.some((seat) => seat.characterId === null)) return "muster";
   if (run.attempt === null) return "fireside";
   if (run.attempt.camp === null) return "pre-deal";
   return "camp";
@@ -120,26 +108,6 @@ export function runPhase(run: RunState): RunPhase {
  * campNumber (each recorded entry is one completed attempt). */
 export function nextAttemptNumber(run: RunState): number {
   return 1 + run.history.filter((entry) => entry.campNumber === run.campNumber).length;
-}
-
-/** RUN-03: the composed capacity hook for `seatId`, independent of attempt
- * number by construction (baseRunHooks.capacity returns campNumber alone;
- * only a passive gear/boss layer could change that, and none in v1 reads
- * attemptNumber). */
-export function capacityOf(run: RunState, seatId: string, catalog: Catalog): number {
-  return rulesFor(run, catalog).capacity(run, seatId);
-}
-
-/** The sum of each gear id's size. Throws for a gear id absent from the
- * catalog — a loadout naming unknown gear is a content/caller defect. */
-export function loadoutSize(gearIds: readonly string[], catalog: Catalog): number {
-  return gearIds.reduce((sum, gearId) => {
-    const def = catalog.gear[gearId];
-    if (def === undefined) {
-      throw new Error(`loadoutSize: unknown gear id "${gearId}"`);
-    }
-    return sum + def.size;
-  }, 0);
 }
 
 /** D-02/D-03: sorts the pool, removes `excludedId` (camp 6 excludes camp
@@ -159,8 +127,8 @@ export function drawBossTwist(
 
 /** Starts a fresh attempt at the current camp: requires every seat ready at
  * the fireside, draws the boss twist on first arrival only (D-02/D-03),
- * resets readySeatIds, and hands off to advanceRun to deal (or wait on
- * pre-deal gear) and settle. */
+ * resets readySeatIds, and hands off to advanceRun to deal (or wait on the
+ * pre-deal window) and settle. */
 export function startAttempt(run: RunState, catalog: Catalog): RunState {
   if (runPhase(run) !== "fireside") {
     throw new Error("startAttempt: run is not at the fireside");
@@ -179,7 +147,6 @@ export function startAttempt(run: RunState, catalog: Catalog): RunState {
   const attempt: AttemptState = {
     attemptNumber: nextAttemptNumber(run),
     bossCancelled: false,
-    gearUses: [],
     effects: [],
     reveals: [],
     log: [],
@@ -247,10 +214,10 @@ export function assignFaceDown(camp: CampState, seed: string, campNumber: number
 /** Settles a decided camp (no-op while still in_progress, or before a camp
  * even exists). A failure spends rules.failureCost(run) supplies — computed
  * BEFORE the attempt is cleared — and returns to the fireside with NO draft
- * (D-01) and loadouts untouched (D-06). A success advances the camp and
- * deals every seat a fresh private offer, or ends the run at FINAL_CAMP
- * (won). Supplies reaching 0 makes runStatus "lost" (checked by callers via
- * runStatus, not stored here). */
+ * (D-01), unless the rescue window still waits on a seat. A success regains
+ * each pooled character's pool, then advances the camp and deals every seat
+ * a fresh private offer, or ends the run at FINAL_CAMP (won). Supplies
+ * reaching 0 makes runStatus "lost". */
 export function settleIfDecided(run: RunState, catalog: Catalog): RunState {
   if (run.attempt === null || run.attempt.camp === null) return run;
   const attempt = run.attempt;
@@ -291,17 +258,19 @@ export function settleIfDecided(run: RunState, catalog: Catalog): RunState {
     suppliesSpent: 0,
   };
   const history = [...run.history, result];
+  const at = currentStamp(run)!;
+  const regained = run.seats.map((seat) => {
+    const pool = seat.characterId === null ? undefined : catalog.characters[seat.characterId]?.pool;
+    if (pool === undefined) return seat;
+    return { ...seat, ledger: [...seat.ledger, { kind: "regained" as const, amount: resolveTuned(pool.regain, ownerOf(seat)), at }] };
+  });
 
   if (run.campNumber === FINAL_CAMP) {
-    return { ...run, attempt: null, history };
+    return { ...run, seats: regained, attempt: null, history };
   }
 
   const nextCampNumber = (run.campNumber + 1) as CampNumber;
-  const allGearIds = Object.keys(catalog.gear);
-  const seats = run.seats.map((seat) => ({
-    ...seat,
-    draftOffer: draftOfferFor(run.seed, nextCampNumber, seat.seatId, allGearIds, seat.ownedGearIds),
-  }));
+  const seats = regained.map((seat) => ({ ...seat, draftOffer: draftOfferFor(run.seed, nextCampNumber, seat, catalog) }));
 
   return { ...run, campNumber: nextCampNumber, seats, attempt: null, history };
 }
