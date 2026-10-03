@@ -65,7 +65,7 @@ function mapError(error: AdapterError): GameErrorDetail {
   }
 }
 
-/** Expedition's own error mapper — an exhaustive switch over all 24
+/** Expedition's own error mapper — an exhaustive switch over all 25
  * `RunError` members with a `never`-typed default, mirroring Hanabi's
  * `mapError` above exactly (D-07, D-08). No `String(error)` fallback. */
 function mapExpeditionError(error: RunError): GameErrorDetail {
@@ -88,30 +88,32 @@ function mapExpeditionError(error: RunError): GameErrorDetail {
       return { gameId: EXPEDITION_GAME_ID, code: "not_a_seat" };
     case "run_over":
       return { gameId: EXPEDITION_GAME_ID, code: "run_over" };
+    case "unknown_character":
+      return { gameId: EXPEDITION_GAME_ID, code: "unknown_character" };
+    case "character_taken":
+      return { gameId: EXPEDITION_GAME_ID, code: "character_taken" };
+    case "character_pending":
+      return { gameId: EXPEDITION_GAME_ID, code: "character_pending" };
     case "draft_pending":
       return { gameId: EXPEDITION_GAME_ID, code: "draft_pending" };
     case "no_draft_pending":
       return { gameId: EXPEDITION_GAME_ID, code: "no_draft_pending" };
     case "not_offered":
       return { gameId: EXPEDITION_GAME_ID, code: "not_offered" };
-    case "gear_not_owned":
-      return { gameId: EXPEDITION_GAME_ID, code: "gear_not_owned" };
-    case "duplicate_gear":
-      return { gameId: EXPEDITION_GAME_ID, code: "duplicate_gear" };
-    case "over_capacity":
-      return { gameId: EXPEDITION_GAME_ID, code: "over_capacity" };
     case "already_ready":
       return { gameId: EXPEDITION_GAME_ID, code: "already_ready" };
-    case "gear_not_equipped":
-      return { gameId: EXPEDITION_GAME_ID, code: "gear_not_equipped" };
-    case "gear_already_used":
-      return { gameId: EXPEDITION_GAME_ID, code: "gear_already_used" };
+    case "not_owned":
+      return { gameId: EXPEDITION_GAME_ID, code: "not_owned" };
     case "wrong_window":
       return { gameId: EXPEDITION_GAME_ID, code: "wrong_window" };
+    case "ability_spent":
+      return { gameId: EXPEDITION_GAME_ID, code: "ability_spent" };
+    case "cannot_afford":
+      return { gameId: EXPEDITION_GAME_ID, code: "cannot_afford" };
+    case "ability_unavailable":
+      return { gameId: EXPEDITION_GAME_ID, code: "ability_unavailable" };
     case "invalid_target":
       return { gameId: EXPEDITION_GAME_ID, code: "invalid_target" };
-    case "gear_unavailable":
-      return { gameId: EXPEDITION_GAME_ID, code: "gear_unavailable" };
     case "whisper_blocked":
       return { gameId: EXPEDITION_GAME_ID, code: "whisper_blocked" };
     case "no_whispers_left":

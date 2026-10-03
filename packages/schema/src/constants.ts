@@ -30,8 +30,11 @@
  * Bumped to 5 in Phase 8 when the top-level `variant` field was replaced by
  * `gameId` + `config` (D-04): a persisted pre-change room resets to an empty
  * lobby rather than being parsed against the new envelope (D-13; owner
- * decision: reset on deploy, no migration). */
-export const ROOM_SCHEMA_VERSION = 5;
+ * decision: reset on deploy, no migration).
+ *
+ * Bumped to 6 when Expedition's gear gave way to characters, upgrades and
+ * items: a persisted run with gear-shaped seats resets to an empty lobby. */
+export const ROOM_SCHEMA_VERSION = 6;
 
 /** D-01: 32 uppercase-safe characters — no `I`, `O`, `0`, `1` — because the
  * room code is read aloud over a voice call. Do not add lowercase. */

@@ -198,7 +198,6 @@ describe("Phase 7 plan 10 stack-shape swap (owner gap closure, UAT gap 3): pre-c
 
 describe("Phase 8 multi-game envelope (D-13): pre-change v4 Hanabi rooms reset", () => {
   it("a schemaVersion 4 room with a real v4 Hanabi blob (top-level variant, no gameId/config/gameLocked) resets to an empty lobby without reading the room blob", async () => {
-    expect(ROOM_SCHEMA_VERSION).toBe(5);
     expect(ROOM_SCHEMA_VERSION).toBeGreaterThan(4);
 
     const { storage, getCalls } = makeFakeStorage();
@@ -252,6 +251,21 @@ describe("Phase 8 multi-game envelope (D-13): pre-change v4 Hanabi rooms reset",
     // The reset is persisted on the next save with the CURRENT version.
     await saveRoom(storage, result.room, []);
     expect(await storage.get(STORAGE_KEYS.schemaVersion)).toBe(ROOM_SCHEMA_VERSION);
+  });
+});
+
+describe("characters replace gear: v5 Expedition rooms reset", () => {
+  it("a schemaVersion 5 room resets to an empty lobby without reading the room blob", async () => {
+    const { storage, getCalls } = makeFakeStorage();
+    await storage.put(STORAGE_KEYS.schemaVersion, 5);
+    await storage.put(STORAGE_KEYS.room, { code: ROOM_CODE, gameId: "expedition", game: { seats: [{ ownedGearIds: [] }] } });
+    getCalls.length = 0;
+
+    const result = await loadRoom(storage, fallbackRoom);
+
+    expect(result.wasReset).toBe(true);
+    expect(getCalls).not.toContain(STORAGE_KEYS.room);
+    expect(result.room.status).toBe("lobby");
   });
 });
 

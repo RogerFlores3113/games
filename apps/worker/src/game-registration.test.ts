@@ -4,7 +4,7 @@ import type { GameRegistry, GameRegistryEntry } from "./game-registration";
 import { GameErrorDetailSchema } from "@games/schema";
 import type { RunError } from "@games/rules";
 
-/** All 24 `RunError` members (7 `CampError` + 17 more), in the same order as
+/** All 25 `RunError` members (7 `CampError` + 18 more), in the same order as
  * `packages/schema/src/games/expedition-errors.ts`'s `ExpeditionErrorCodeSchema`. */
 const ALL_RUN_ERRORS: readonly RunError[] = [
   "not_your_turn",
@@ -16,18 +16,19 @@ const ALL_RUN_ERRORS: readonly RunError[] = [
   "invalid_action",
   "not_a_seat",
   "run_over",
+  "unknown_character",
+  "character_taken",
+  "character_pending",
   "draft_pending",
   "no_draft_pending",
   "not_offered",
-  "gear_not_owned",
-  "duplicate_gear",
-  "over_capacity",
   "already_ready",
-  "gear_not_equipped",
-  "gear_already_used",
+  "not_owned",
   "wrong_window",
+  "ability_spent",
+  "cannot_afford",
+  "ability_unavailable",
   "invalid_target",
-  "gear_unavailable",
   "whisper_blocked",
   "no_whispers_left",
   "nothing_to_skip",
@@ -62,7 +63,7 @@ describe("D-08/D-09: GAME_REGISTRY / resolveGame", () => {
     expect(entry?.mapError("no_whispers_left")).toEqual({ gameId: "expedition", code: "no_whispers_left" });
   });
 
-  it("mapError maps every one of the 24 RunError names to a wire-parseable GameErrorDetail", () => {
+  it("mapError maps every one of the 25 RunError names to a wire-parseable GameErrorDetail", () => {
     const entry = resolveGame("expedition");
     expect(entry).toBeDefined();
     for (const name of ALL_RUN_ERRORS) {

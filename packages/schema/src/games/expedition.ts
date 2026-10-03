@@ -56,9 +56,20 @@ const CardViewSchema = z.strictObject({
   identity: CardIdentityViewSchema,
 });
 
+// `effectiveRank` is set only when the composed rank differs from the
+// printed one.
+const EffectiveRankSchema = z.number().int().nullable();
+
+const RankedCardViewSchema = z.strictObject({
+  id: z.string().min(1),
+  identity: CardIdentityViewSchema,
+  effectiveRank: EffectiveRankSchema,
+});
+
 const TrickPlayViewSchema = z.strictObject({
   seatId: z.string().min(1),
   card: CardViewSchema,
+  effectiveRank: EffectiveRankSchema,
 });
 
 const CompletedTrickViewSchema = z.strictObject({
@@ -137,20 +148,34 @@ const LogEntryViewSchema = z.strictObject({
   event: z.string().min(1),
   actorSeatId: z.string().min(1),
   subjectSeatIds: z.array(z.string().min(1)),
-  gearId: z.string().min(1).nullable(),
+  sourceId: z.string().min(1).nullable(),
   private: z.boolean(),
 });
 
-const GearUseViewSchema = z.strictObject({
-  seatId: z.string().min(1),
-  gearId: z.string().min(1),
-  kind: z.enum(["used", "skipped"]),
-});
+const ActiveWindowSchema = z.enum(["pre-deal", "objective-pick", "between-tricks", "in-trick", "rescue"]);
 
+const TargetKindSchema = z.enum([
+  "self",
+  "player",
+  "hand",
+  "card",
+  "objective",
+  "completed-objective",
+  "failed-objective",
+  "whisper",
+  "won-trick",
+  "card-value",
+  "board",
+  "supplies",
+]);
+
+// `params` is null unless the effect is public or the viewer owns it.
 const EffectViewSchema = z.strictObject({
-  gearId: z.string().min(1),
+  sourceId: z.string().min(1),
   seatId: z.string().min(1),
   atTrick: z.number().int().min(0),
+  lasts: z.enum(["attempt", "trick"]),
+  params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).nullable(),
 });
 
 const CampViewSchema = z.strictObject({
@@ -162,7 +187,7 @@ const CampViewSchema = z.strictObject({
   // Deliberately no `objectiveDeck` key: the undrawn objective deck order
   // must never be projected.
   objectives: z.array(ObjectiveViewSchema),
-  yourHand: z.array(CardViewSchema),
+  yourHand: z.array(RankedCardViewSchema),
   yourLegalCardIds: z.array(z.string().min(1)),
   handSizes: z.array(HandSizeViewSchema),
   completedTricks: z.array(CompletedTrickViewSchema),
@@ -174,9 +199,9 @@ const CampViewSchema = z.strictObject({
 const AttemptViewSchema = z.strictObject({
   attemptNumber: z.number().int().min(1),
   bossCancelled: z.boolean(),
-  gearWindow: z.enum(["pre-deal", "objective-pick", "between-tricks"]).nullable(),
-  preDealPendingSeatIds: z.array(z.string().min(1)),
-  gearUses: z.array(GearUseViewSchema),
+  window: ActiveWindowSchema.nullable(),
+  pendingSeatIds: z.array(z.string().min(1)),
+  rescue: z.strictObject({ failedObjectiveIds: z.array(z.string().min(1)) }).nullable(),
   effects: z.array(EffectViewSchema),
   reveals: z.array(RevealViewSchema),
   log: z.array(LogEntryViewSchema),
@@ -184,21 +209,37 @@ const AttemptViewSchema = z.strictObject({
   yourWhisper: z.strictObject({ allowed: z.boolean(), left: z.number().int().min(0) }).nullable(),
 });
 
-// Deliberately no `draftOffer`/`ownedGearIds` keys for any OTHER seat: only
-// the public loadout (`equippedGearIds`) and a boolean draft-pending flag are
-// ever visible about a seat that is not the viewer.
+const RemainingViewSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("uses"), left: z.number().int().min(0), of: z.number().int().min(1) }),
+  z.strictObject({ kind: z.literal("single-use") }),
+  z.strictObject({ kind: z.literal("pool"), balance: z.number().int(), max: z.number().int().min(0), cost: z.number().int().min(0) }),
+  z.strictObject({ kind: z.literal("supplies"), cost: z.number().int().min(0) }),
+]);
+
+// Deliberately no `draftOffer`/`ledger` keys for any seat: character, kit,
+// pool and per-source usage are public; a seat's draft is a boolean here.
 const SeatViewSchema = z.strictObject({
   seatId: z.string().min(1),
-  equippedGearIds: z.array(z.string().min(1)),
+  characterId: z.string().min(1).nullable(),
+  kit: z.array(z.string().min(1)),
   ready: z.boolean(),
   draftPending: z.boolean(),
+  pool: z.strictObject({ balance: z.number().int(), max: z.number().int().min(0) }).nullable(),
+  usage: z.array(z.strictObject({ sourceId: z.string().min(1), remaining: RemainingViewSchema })),
 });
 
-const GearStatusViewSchema = z.strictObject({
-  gearId: z.string().min(1),
-  spent: z.boolean(),
+const AbilityStepViewSchema = z.strictObject({
+  kind: TargetKindSchema,
+  prompt: z.string().min(1).max(200),
+  choices: z.array(z.string().min(1)),
+});
+
+// The viewer's own abilities; `steps` is [] unless usableNow.
+const AbilityViewSchema = z.strictObject({
+  sourceId: z.string().min(1),
   usableNow: z.boolean(),
   reason: z.string().min(1).max(200).nullable(),
+  steps: z.array(AbilityStepViewSchema),
 });
 
 const CampResultViewSchema = z.strictObject({
@@ -218,7 +259,7 @@ const CampResultViewSchema = z.strictObject({
 // must never be projected to any client (T-11-03/T-11-09).
 export const ExpeditionViewSchema = z.strictObject({
   yourSeatId: z.string().min(1).nullable(),
-  runPhase: z.enum(["fireside", "pre-deal", "camp", "ended"]),
+  runPhase: z.enum(["muster", "fireside", "pre-deal", "camp", "ended"]),
   runStatus: z.enum(["in_progress", "won", "lost"]),
   campNumber: z.number().int().min(1).max(6),
   supplies: z.number().int().min(0),
@@ -228,11 +269,8 @@ export const ExpeditionViewSchema = z.strictObject({
   }),
   activeBossTwistId: z.string().min(1).nullable(),
   seats: z.array(SeatViewSchema),
-  yourOwnedGearIds: z.array(z.string().min(1)),
   yourDraftOffer: z.array(z.string().min(1)).nullable(),
-  yourCapacity: z.number().int().min(0).nullable(),
-  yourBaseCapacity: z.number().int().min(0).nullable().optional(),
-  yourGear: z.array(GearStatusViewSchema),
+  yourAbilities: z.array(AbilityViewSchema),
   history: z.array(CampResultViewSchema),
   attempt: AttemptViewSchema.nullable(),
 });

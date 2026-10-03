@@ -19,7 +19,7 @@
 // seed is passed through to secretsForExpeditionSeat.
 
 import { describe, expect, it } from "vitest";
-import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "@games/rules";
+import { CHARACTER_DISPLAY, checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "@games/rules";
 import type { ExpeditionEndResult, RunAction, RunState } from "@games/rules";
 import type { RoomCode, RoomState } from "@games/schema";
 import { encodeServerMessage } from "@games/schema";
@@ -63,70 +63,42 @@ function joinSeats(seatCount: number): { state: RoomState; seatIds: string[] } {
   return { state, seatIds };
 }
 
+/** The cartesian product of each step's first few choices. */
+function targetCombos(steps: readonly { choices: readonly string[] }[]): string[][] {
+  return steps.reduce<string[][]>((acc, step) => acc.flatMap((prefix) => step.choices.slice(0, 3).map((id) => [...prefix, id])), [[]]);
+}
+
 /** Every candidate action for `seatId`, built ONLY from `view` (the seat's
- * own projected view — bots never read room.game to decide). Priority order
- * per Plan 11-07's <action> spec: pick-draft, set-loadout (at most once per
- * seat per fireside visit, tracked via `setLoadoutDone`), ready, use-gear (in
- * every window a candidate could be usable), whisper, skip-window,
- * pick-objective, play-card. `applyGameAction` (called by the caller) is the
- * sole arbiter of legality — a candidate here is a GUESS, not a re-derived
- * rule. */
-function buildCandidates(view: ExpeditionViewWire, seatId: string, setLoadoutDone: Set<string>): RunAction[] {
+ * own projected view — bots never read room.game to decide) and the public
+ * character list. Priority order: pick-character, pick-draft, ready,
+ * use-ability (targets from the server's own step choices), whisper,
+ * skip-window, pick-objective, play-card. `applyGameAction` (called by the
+ * caller) is the sole arbiter of legality — a candidate here is a GUESS,
+ * not a re-derived rule. */
+function buildCandidates(view: ExpeditionViewWire, seatId: string): RunAction[] {
   const candidates: RunAction[] = [];
 
-  if (view.yourDraftOffer !== null) {
-    for (const gearId of view.yourDraftOffer) {
-      candidates.push({ type: "pick-draft", gearId });
-    }
+  const taken = new Set(view.seats.map((seat) => seat.characterId));
+  for (const characterId of Object.keys(CHARACTER_DISPLAY)) {
+    if (!taken.has(characterId)) candidates.push({ type: "pick-character", characterId });
   }
 
-  // Tracked by seatId + campNumber + history length (both read from the
-  // VIEW, never from room.game) so set-loadout is tried at most once per
-  // seat per fireside visit, letting `ready` actually get a turn afterward.
-  const loadoutKey = `${seatId}:${view.campNumber}:${view.history.length}`;
-  if (!setLoadoutDone.has(loadoutKey)) {
-    candidates.push({ type: "set-loadout", gearIds: Array.from(view.yourOwnedGearIds) });
-    for (const gearId of view.yourOwnedGearIds) {
-      candidates.push({ type: "set-loadout", gearIds: [gearId] });
-    }
-    candidates.push({ type: "set-loadout", gearIds: [] });
-    setLoadoutDone.add(loadoutKey);
+  for (const sourceId of view.yourDraftOffer ?? []) {
+    candidates.push({ type: "pick-draft", sourceId });
   }
 
   candidates.push({ type: "ready" });
 
-  const teammateIds = view.seats.map((seat) => seat.seatId).filter((id) => id !== seatId);
-  const ownCardIds = view.attempt?.camp !== null && view.attempt?.camp !== undefined
-    ? view.attempt.camp.yourHand.map((card) => card.id)
-    : [];
-  const visibleObjectiveIds =
-    view.attempt?.camp !== null && view.attempt?.camp !== undefined
-      ? view.attempt.camp.objectives.map((objective) => objective.id)
-      : [];
-
-  for (const gear of view.yourGear) {
-    if (!gear.usableNow) continue;
-    candidates.push({ type: "use-gear", gearId: gear.gearId, targets: [] });
-    for (const teammateId of teammateIds) {
-      candidates.push({ type: "use-gear", gearId: gear.gearId, targets: [teammateId] });
-    }
-    for (const cardId of ownCardIds) {
-      candidates.push({ type: "use-gear", gearId: gear.gearId, targets: [cardId] });
-    }
-    for (const objectiveId of visibleObjectiveIds) {
-      candidates.push({ type: "use-gear", gearId: gear.gearId, targets: [objectiveId] });
-    }
-    for (const teammateId of teammateIds) {
-      for (const cardId of ownCardIds) {
-        candidates.push({ type: "use-gear", gearId: gear.gearId, targets: [teammateId, cardId] });
-      }
-    }
-    for (const cardId of ownCardIds) {
-      for (const teammateId of teammateIds) {
-        candidates.push({ type: "use-gear", gearId: gear.gearId, targets: [cardId, teammateId] });
-      }
+  for (const ability of view.yourAbilities) {
+    if (!ability.usableNow) continue;
+    for (const targets of targetCombos(ability.steps)) {
+      candidates.push({ type: "use-ability", sourceId: ability.sourceId, targets });
     }
   }
+
+  const teammateIds = view.seats.map((seat) => seat.seatId).filter((id) => id !== seatId);
+  const camp = view.attempt?.camp ?? null;
+  const ownCardIds = camp !== null ? camp.yourHand.map((card) => card.id) : [];
 
   for (const teammateId of teammateIds) {
     for (const cardId of ownCardIds) {
@@ -136,18 +108,12 @@ function buildCandidates(view: ExpeditionViewWire, seatId: string, setLoadoutDon
 
   candidates.push({ type: "skip-window" });
 
-  const unownedObjectiveIds =
-    view.attempt?.camp !== null && view.attempt?.camp !== undefined
-      ? view.attempt.camp.objectives.filter((objective) => objective.ownerSeatId === null).map((o) => o.id)
-      : [];
-  for (const objectiveId of unownedObjectiveIds) {
-    candidates.push({ type: "pick-objective", objectiveId });
+  for (const objective of camp?.objectives ?? []) {
+    if (objective.ownerSeatId === null) candidates.push({ type: "pick-objective", objectiveId: objective.id });
   }
 
-  const legalCardIds =
-    view.attempt?.camp !== null && view.attempt?.camp !== undefined ? view.attempt.camp.yourLegalCardIds : [];
-  const playCardIds = legalCardIds.length > 0 ? legalCardIds : ownCardIds;
-  for (const cardId of playCardIds) {
+  const legalCardIds = camp !== null ? camp.yourLegalCardIds : [];
+  for (const cardId of legalCardIds.length > 0 ? legalCardIds : ownCardIds) {
     candidates.push({ type: "play-card", cardId });
   }
 
@@ -157,7 +123,7 @@ function buildCandidates(view: ExpeditionViewWire, seatId: string, setLoadoutDon
 type RunCounters = {
   phaseCounts: Record<string, number>;
   revealViews: number;
-  gearSpentViews: number;
+  abilityUseViews: number;
 };
 
 /** Drives a single `seatCount`-player Expedition room from `startGame`
@@ -174,7 +140,6 @@ function driveExpeditionRoomToEnd(seatCount: number, seed: string, counters: Run
   let room = started.state;
 
   const viewerIds: readonly string[] = [...seatIds, "spectator"];
-  const setLoadoutDone = new Set<string>();
   let step = 0;
 
   while (room.status === "in_progress") {
@@ -197,7 +162,7 @@ function driveExpeditionRoomToEnd(seatCount: number, seed: string, counters: Run
       const gameView = projected.game as ExpeditionViewWire;
       counters.phaseCounts[gameView.runPhase] = (counters.phaseCounts[gameView.runPhase] ?? 0) + 1;
       if (gameView.attempt !== null && gameView.attempt.reveals.length > 0) counters.revealViews++;
-      if (gameView.yourGear.some((gear) => gear.spent)) counters.gearSpentViews++;
+      if (gameView.attempt?.log.some((entry) => entry.event === "use-ability")) counters.abilityUseViews++;
     }
 
     let committed = false;
@@ -206,7 +171,7 @@ function driveExpeditionRoomToEnd(seatCount: number, seed: string, counters: Run
       const projected = projectSeatView(room, seatId);
       if (projected === null) continue;
       const view = projected.game as ExpeditionViewWire;
-      const candidates = buildCandidates(view, seatId, setLoadoutDone);
+      const candidates = buildCandidates(view, seatId);
 
       for (const action of candidates) {
         const result = applyGameAction(room, seatId, `a${step}`, action, room.lastActivityAt + 1);
@@ -281,7 +246,7 @@ describe("Expedition room lobby limits (MGR-02)", () => {
 });
 
 describe("Expedition full room-layer runs: lobby -> in_progress -> ended (COMM-03/ENG-03/T-11-23/T-11-09/T-11-21/T-11-24)", () => {
-  const counters: RunCounters = { phaseCounts: {}, revealViews: 0, gearSpentViews: 0 };
+  const counters: RunCounters = { phaseCounts: {}, revealViews: 0, abilityUseViews: 0 };
 
   for (const playerCount of PLAYER_COUNTS) {
     for (const seed of SEEDS) {
@@ -295,10 +260,11 @@ describe("Expedition full room-layer runs: lobby -> in_progress -> ended (COMM-0
     }
   }
 
-  it("non-vacuity: views were checked in fireside and camp phases, with at least one reveal and one spent gear reaching the wire across all six runs", () => {
+  it("non-vacuity: views were checked in muster, fireside and camp phases, with at least one reveal and one ability use reaching the wire across all six runs", () => {
+    expect(counters.phaseCounts["muster"] ?? 0, "expected muster views to be checked").toBeGreaterThan(0);
     expect(counters.phaseCounts["fireside"] ?? 0, "expected fireside views to be checked").toBeGreaterThan(0);
     expect(counters.phaseCounts["camp"] ?? 0, "expected camp views to be checked").toBeGreaterThan(0);
     expect(counters.revealViews, "expected at least one checked view with a non-empty reveals list").toBeGreaterThan(0);
-    expect(counters.gearSpentViews, "expected at least one checked view with a spent gear item").toBeGreaterThan(0);
+    expect(counters.abilityUseViews, "expected at least one checked view logging an ability use").toBeGreaterThan(0);
   });
 });
