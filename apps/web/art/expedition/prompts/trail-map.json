@@ -1,10 +1,13 @@
 {
   "id": "trail-map",
   "tool": "create_image_pixflux",
-  "size": {
-    "w": 568,
-    "h": 64
+  "params": {
+    "description": "a long horizontal strip of aged parchment paper with torn edges, a faint winding dotted trail drawn across it from left to right, ending at a tiny temple sketch on the right, empty space along the path, no text",
+    "width": 284,
+    "height": 32,
+    "outline": "lineless",
+    "shading": "flat shading",
+    "no_background": false
   },
-  "description": "a long horizontal strip of aged parchment showing a winding dotted jungle trail from left to right ending at a small temple, with room for six camp markers along it",
-  "style": "pixel art, night jungle expedition, warm campfire light, limited palette of deep greens, blue-black sky, firelight orange and gold, moss and bark browns, single-pixel dark outline, simple shading, no dithering noise, no people, no text, no watermark"
+  "scale": 2
 }

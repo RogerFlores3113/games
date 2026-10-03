@@ -1,10 +1,15 @@
 {
   "id": "stump-table",
-  "tool": "create_map_object",
-  "size": {
-    "w": 368,
-    "h": 128
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "a huge oval tree-stump tabletop seen from above at a low angle, flat wide oval top showing visible concentric growth rings in warm brown wood, mossy bark rim around the edge, isolated on transparent background, no people, no text",
+    "width": 368,
+    "height": 128,
+    "view": "high top-down",
+    "outline": "single color outline",
+    "shading": "medium shading",
+    "no_background": true
   },
-  "description": "a huge oval tree-stump tabletop seen from above at a low angle, visible growth rings, mossy bark rim, transparent background",
-  "style": "pixel art, night jungle expedition, warm campfire light, limited palette of deep greens, blue-black sky, firelight orange and gold, moss and bark browns, single-pixel dark outline, simple shading, no dithering noise, no people, no text, no watermark"
+  "scale": 1,
+  "note": "came back on a flat grey backdrop despite no_background; ArtDef.matte keys it out at load"
 }

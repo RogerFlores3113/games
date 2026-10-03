@@ -1,12 +1,20 @@
 {
   "id": "mascot-flop",
-  "tool": "animate_character",
-  "size": {
-    "w": 32,
-    "h": 32
+  "tool": "create_1_direction_object",
+  "params": {
+    "name": "red panda mascot",
+    "description": "cute red panda camp mascot sitting upright facing the viewer, rusty red fur, white face markings, bushy ringed tail curled beside it, single-pixel dark outline, simple shading, transparent background",
+    "size": 32,
+    "view": "sidescroller"
   },
-  "description": "the red panda mascot flopping over sadly onto its back",
-  "style": "pixel art, night jungle expedition, warm campfire light, limited palette of deep greens, blue-black sky, firelight orange and gold, moss and bark browns, single-pixel dark outline, simple shading, no dithering noise, no people, no text, no watermark",
-  "frames": 4,
-  "from": "mascot-panda"
+  "candidate_used": 7,
+  "animation": {
+    "tool": "animate_object",
+    "model": "v3",
+    "display_name": "flop",
+    "description": "flop: sighs and flops over sadly onto its back, paws up",
+    "frame_count": 4,
+    "keep_first_frame": false
+  },
+  "scale": 1
 }

@@ -1,10 +1,15 @@
 {
   "id": "backpack-open",
-  "tool": "create_map_object",
-  "size": {
-    "w": 96,
-    "h": 64
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "an open explorer's canvas backpack filling the whole frame, seen from above, flap pulled back revealing large empty compartments inside, brown leather straps and brass buckles, isolated on transparent background, no text",
+    "width": 96,
+    "height": 64,
+    "view": "high top-down",
+    "outline": "single color outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "text_guidance_scale": 10
   },
-  "description": "an open explorer's backpack seen from above with empty compartments, transparent background",
-  "style": "pixel art, night jungle expedition, warm campfire light, limited palette of deep greens, blue-black sky, firelight orange and gold, moss and bark browns, single-pixel dark outline, simple shading, no dithering noise, no people, no text, no watermark"
+  "scale": 1
 }

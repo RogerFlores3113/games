@@ -13,6 +13,7 @@ interface ArtDef {
   frames?: number;         // horizontal strip; animated when > 1
   fps?: number;
   fallback: { color: number; label: string }; // drawn when the PNG is missing
+  matte?: true;            // PNG has a flat backdrop: keyed out from the border at load
 }
 ```
 
@@ -23,14 +24,20 @@ interface ArtDef {
 - A `preload()` step loads every `ART` entry whose file exists. A generated manifest
   (`art-files.generated.ts`, written by the art script) lists the files actually on
   disk, so the browser never requests a 404.
-- Card faces stay procedural (card packs). Fonts stay procedural.
+- Card faces stay procedural (card packs). Fonts stay procedural. Fireflies are drawn
+  procedurally as blinking dots.
 
 ## Sources and records
 
 - Generated with PixelLab through its MCP tools. Each asset's prompt spec lives in
-  `apps/web/art/expedition/prompts/<id>.json`: `{ id, tool, prompt, negative,
-  size, view, direction, outline, shading, detail, palette, seed }`. Re-running the
-  same spec reproduces the style.
+  `apps/web/art/expedition/prompts/<id>.json`, written by `make-prompts.mjs` from
+  one table: `{ id, tool, params, scale }` with the exact parameters sent, plus
+  `item_description`/`batch_index` for the icon batch, `animation` for the mascot
+  strips and `frames_used` for the campfire. Re-running the same spec reproduces
+  the style.
+- `npm run art:files --workspace apps/web` rewrites `art-files.generated.ts` from the
+  sprites folder; `art-registry.test.ts` fails when it is stale or when a PNG's size
+  differs from its entry.
 - PNGs are committed under `apps/web/public/expedition/sprites/`.
 - `apps/web/public/expedition/CREDITS.md` gets one row per asset when it is added:
   asset, file, source (PixelLab generation and spec path, or the pack's URL), licence,
@@ -53,17 +60,16 @@ low top-down view to match the stump table.
 | `bg-jungle-night` | 640x360 | camp | Backdrop: canopy silhouettes, vines, stars. Leaves the centre calm for the stump |
 | `stump-table` | 368x128 | camp | Oval tree-stump tabletop, rings visible, seen from above at an angle |
 | `campfire` | 32x32 x4 | camp, fireside | Animated flames |
-| `lantern` | 16x32 | camp | Hanging oil lantern |
-| `firefly` | 4x4 x2 | camp | Glow blink |
+| `lantern` | 16x16 | camp | Hanging oil lantern |
 | `mascot-panda` | 32x32 x4 | camp | Red panda idle loop. Extra strips: `mascot-cheer`, `mascot-flop` |
-| `crate` | 12x10 | camp, fireside | Supply crate |
-| `seat-pack` | 24x24 | camp | Backpack and bedroll marking a seat |
-| `leader-sun` | 10x10 | camp | Leader marker |
-| `icon-whisper` | 12x12 | camp | A leaf with a small speech curl |
-| `icon-tricks` | 10x10 | camp | Stack of won cards |
+| `crate` | 16x16 | camp, fireside | Supply crate |
+| `seat-pack` | 16x16 | camp | Backpack and bedroll marking a seat |
+| `leader-sun` | 16x16 | camp | Leader marker |
+| `icon-whisper` | 16x16 | camp | A leaf with a small speech curl |
+| `icon-tricks` | 16x16 | camp | Stack of won cards |
 | `gear-<id>` | 16x16 | all | One per gear: whistle, spyglass, flare, camouflage net, compass, monkey, machete, poncho, trail map, tonic bottle |
 | `bg-fireside` | 640x360 | fireside | Clearing at night around a fire, logs to sit on |
-| `trail-map` | 608x64 | fireside, run end | Parchment strip with a winding path, room for 6 markers and the temple |
+| `trail-map` | 568x64 | fireside, run end | Parchment strip with a winding path, room for 6 markers and the temple |
 | `marker-camp` / `marker-cleared` / `marker-boss` / `temple` | 16x16 | fireside, run end | Trail markers |
 | `backpack-open` | 96x64 | fireside | Open backpack the slots sit on |
 | `bg-temple-dawn` | 640x360 | run end (won) | Overgrown temple at dawn |

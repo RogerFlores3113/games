@@ -1,10 +1,13 @@
 {
   "id": "lantern",
-  "tool": "create_map_object",
-  "size": {
-    "w": 16,
-    "h": 32
+  "tool": "create_1_direction_object",
+  "params": {
+    "name": "expedition icons",
+    "description": "jungle expedition item icon, warm night palette, single-pixel dark outline, simple shading, transparent background",
+    "size": 16,
+    "view": "sidescroller"
   },
-  "description": "a hanging brass oil lantern on a short rope, warm glow, transparent background",
-  "style": "pixel art, night jungle expedition, warm campfire light, limited palette of deep greens, blue-black sky, firelight orange and gold, moss and bark browns, single-pixel dark outline, simple shading, no dithering noise, no people, no text, no watermark"
+  "item_description": "hanging brass oil lantern glowing warm",
+  "batch_index": 20,
+  "scale": 1
 }
