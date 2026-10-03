@@ -2,7 +2,7 @@
   "id": "bg-temple-dawn",
   "tool": "create_image_pixflux",
   "params": {
-    "description": "an ancient overgrown stone jungle temple rising from the jungle at dawn, golden sunrise light breaking through the canopy, vines on the stone steps, triumphant warm mood, no people, no text",
+    "description": "full-bleed scene filling the entire frame edge to edge: an ancient overgrown stone jungle temple rising from the jungle at dawn, golden sunrise light breaking through the canopy, vines on the stone steps, triumphant warm mood, no borders, no black bars, no people, no text",
     "width": 320,
     "height": 180,
     "view": "side",

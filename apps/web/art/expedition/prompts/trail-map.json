@@ -2,12 +2,13 @@
   "id": "trail-map",
   "tool": "create_image_pixflux",
   "params": {
-    "description": "a long horizontal strip of aged parchment paper with torn edges, a faint winding dotted trail drawn across it from left to right, ending at a tiny temple sketch on the right, empty space along the path, no text",
+    "description": "a long horizontal strip of aged tan parchment paper, slightly darker worn edges, filled edge to edge with parchment texture, a faint winding dotted trail line across the middle from left to right, no figures, no people, no silhouettes, no text, no white areas",
     "width": 284,
     "height": 32,
     "outline": "lineless",
     "shading": "flat shading",
-    "no_background": false
+    "no_background": false,
+    "text_guidance_scale": 10
   },
   "scale": 2
 }

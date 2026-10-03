@@ -75,7 +75,7 @@ const specs = {
     "side view of a quiet jungle clearing at night around a central campfire glow, fallen logs to sit on, packs and bedrolls resting nearby, dark canopy framing the top edge, warm orange firelight on the ground, deep greens and blue-black sky, no people, no text",
   ),
   "bg-temple-dawn": backdrop(
-    "an ancient overgrown stone jungle temple rising from the jungle at dawn, golden sunrise light breaking through the canopy, vines on the stone steps, triumphant warm mood, no people, no text",
+    "full-bleed scene filling the entire frame edge to edge: an ancient overgrown stone jungle temple rising from the jungle at dawn, golden sunrise light breaking through the canopy, vines on the stone steps, triumphant warm mood, no borders, no black bars, no people, no text",
   ),
   "bg-trail-dusk": backdrop(
     "an abandoned jungle campsite at dusk, a cold empty fire pit and a fallen tent, the trail fading into dark trees, purple and deep blue dusk sky, wistful mood, no people, no text",
@@ -99,12 +99,13 @@ const specs = {
     tool: "create_image_pixflux",
     params: {
       description:
-        "a long horizontal strip of aged parchment paper with torn edges, a faint winding dotted trail drawn across it from left to right, ending at a tiny temple sketch on the right, empty space along the path, no text",
+        "a long horizontal strip of aged tan parchment paper, slightly darker worn edges, filled edge to edge with parchment texture, a faint winding dotted trail line across the middle from left to right, no figures, no people, no silhouettes, no text, no white areas",
       width: 284,
       height: 32,
       outline: "lineless",
       shading: "flat shading",
       no_background: false,
+      text_guidance_scale: 10,
     },
     scale: 2,
   },
@@ -142,6 +143,11 @@ const specs = {
   ...Object.fromEntries(
     ICONS.map(([id, item], batch_index) => [id, { ...ICON_BATCH, item_description: item, batch_index, scale: 1 }]),
   ),
+  "icon-tricks": {
+    tool: "hand-drawn",
+    script: "apps/web/art/expedition/draw-icon-tricks.mjs",
+    note: "neither the batch candidate nor a 64-candidate retry read as a card stack",
+  },
 };
 
 for (const file of fs.readdirSync(dir)) {
