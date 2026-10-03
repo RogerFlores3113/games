@@ -24,18 +24,10 @@ const ICON_BATCH = {
   },
 };
 
-/** Batch order: `batch_index` is the frame each icon was taken from. */
+/** Batch order: `batch_index` is the frame each icon was taken from. The
+ * batch's first ten frames were gear icons, since retired. */
+const FIRST_ICON_FRAME = 10;
 const ICONS = [
-  ["gear-chatter", "brass signal whistle on a cord"],
-  ["gear-peek", "brass collapsible spyglass"],
-  ["gear-broadcast", "red signal flare stick with a spark at the tip"],
-  ["gear-ghost", "folded green and brown camouflage net"],
-  ["gear-reroll", "old brass compass with open lid"],
-  ["gear-pickpocket", "small brown capuchin monkey"],
-  ["gear-commandeer", "jungle machete with wooden handle"],
-  ["gear-jam", "folded yellow rain poncho"],
-  ["gear-reassign", "rolled parchment map with red dotted path"],
-  ["gear-overclock", "corked glass bottle of glowing green tonic"],
   ["marker-camp", "tiny canvas tent"],
   ["marker-cleared", "tiny canvas tent with a green flag beside it"],
   ["marker-boss", "dark storm cloud with a yellow lightning bolt"],
@@ -48,6 +40,75 @@ const ICONS = [
   ["icon-tricks", "small stack of playing cards"],
   ["lantern", "hanging brass oil lantern glowing warm"],
 ];
+
+/** The second icon batch: one per character base power, upgrade and item,
+ * in catalogue order. `frame` is the batch candidate chosen by eye. */
+const SOURCE_BATCH = {
+  ...ICON_BATCH,
+  params: { description: ICON_BATCH.params.description, size: 16, view: "sidescroller" },
+  object_id: "540589d3-84e0-49f2-80e5-4fc599074fd9",
+};
+
+const SOURCE_ICONS = [
+  ["scout", "brass spyglass, diagonal"],
+  ["guide", "machete blade"],
+  ["botanist", "green vial with a leaf"],
+  ["medic", "rolled white bandage"],
+  ["signaller", "hourglass drum"],
+  ["cartographer", "pencil over a card"],
+  ["scout.keen-eye", "eye with a gold glint"],
+  ["scout.eavesdrop", "cupped ear with a sound arc"],
+  ["guide.pathfinder", "two boot prints"],
+  ["guide.howler-call", "howler monkey head, mouth open"],
+  ["botanist.greenhouse", "glass dome over a sprout"],
+  ["botanist.antidote", "stoppered blue bottle"],
+  ["medic.rally", "raised hand holding a card"],
+  ["medic.field-kit", "small crate with a green leaf"],
+  ["signaller.loud-call", "conch shell"],
+  ["signaller.call-and-response", "two speech arcs facing each other"],
+  ["cartographer.detour", "bent arrow"],
+  ["cartographer.landmark", "flag on a stone cairn"],
+  ["trained-monkey", "small monkey holding a card"],
+  ["pack-mule", "mule head with a pack"],
+  ["parrot", "red parrot in profile"],
+  ["trail-map", "folded map with a dotted path"],
+  ["rain-poncho", "yellow poncho"],
+  ["smoke-signal", "smoke puffs over a fire"],
+  ["whetstone", "grey stone with a spark"],
+  ["puffball", "puffball mushroom with spores"],
+  ["bait", "banana on a string"],
+  ["camouflage", "leafy cloak"],
+  ["rope-ladder", "rope ladder"],
+  ["heavy-pack", "bulging backpack"],
+  ["mosquito-net", "net with a mosquito"],
+];
+const SOURCE_FRAMES = [0, 43, 2, 44, 4, 5, 6, 7, 62, 40, ...Array.from({ length: 21 }, (_, i) => 10 + i)];
+
+/** Seated silhouettes behind the stump, one per character. */
+const CREW = [
+  ["scout", "spyglass raised to one eye", 7, "096975a2"],
+  ["guide", "machete held high", 7, "c606e1d6"],
+  ["botanist", "wide straw hat with a flower", 7, "7c44a336"],
+  ["medic", "shoulder satchel with a rolled bandage", 11, "23711889"],
+  ["signaller", "talking drum slung at the hip", 11, "e2526109"],
+  ["cartographer", "map tube across the back", 11, "b5819dd6"],
+];
+const crewSpec = (prop, seed, job) => ({
+  tool: "create_image_pixflux",
+  params: {
+    width: 64,
+    height: 80,
+    view: "side",
+    outline: "lineless",
+    shading: "basic shading",
+    no_background: true,
+    seed,
+  },
+  prop,
+  job,
+  scale: 1,
+  note: "the full description text was not recorded; each asked for a seated dark explorer silhouette carrying `prop`. Alpha thresholded and grey halos stripped locally; drawn bottom-centred",
+});
 
 const MASCOT = {
   tool: "create_1_direction_object",
@@ -83,17 +144,14 @@ const specs = {
   "stump-table": {
     tool: "create_image_pixflux",
     params: {
-      description:
-        "a huge oval tree-stump tabletop seen from above at a low angle, flat wide oval top showing visible concentric growth rings in warm brown wood, mossy bark rim around the edge, isolated on transparent background, no people, no text",
-      width: 368,
-      height: 128,
+      width: 384,
+      height: 176,
       view: "high top-down",
-      outline: "single color outline",
-      shading: "medium shading",
       no_background: true,
     },
+    job: "a030638f-1d4e-4aaf-b2d2-8c4cf2d4bcde",
     scale: 1,
-    note: "came back on a flat grey backdrop despite no_background; ArtDef.matte keys it out at load",
+    note: "the description text was not recorded (a tree-stump table with roots and glowing mushrooms). Keyed offline with `fetch-art.mjs ... --matte`; the flat top spans x 78..322, y 12..85",
   },
   "trail-map": {
     tool: "create_image_pixflux",
@@ -141,8 +199,12 @@ const specs = {
   "mascot-cheer": mascotStrip("cheer", "cheer: hops up happily with both paws raised in the air, then lands"),
   "mascot-flop": mascotStrip("flop", "flop: sighs and flops over sadly onto its back, paws up"),
   ...Object.fromEntries(
-    ICONS.map(([id, item], batch_index) => [id, { ...ICON_BATCH, item_description: item, batch_index, scale: 1 }]),
+    ICONS.map(([id, item], i) => [id, { ...ICON_BATCH, item_description: item, batch_index: FIRST_ICON_FRAME + i, scale: 1 }]),
   ),
+  ...Object.fromEntries(
+    SOURCE_ICONS.map(([id, item], i) => [`source-${id}`, { ...SOURCE_BATCH, item_description: item, batch_index: SOURCE_FRAMES[i], scale: 1 }]),
+  ),
+  ...Object.fromEntries(CREW.map(([id, prop, seed, job]) => [`crew-${id}`, crewSpec(prop, seed, job)])),
   "icon-tricks": {
     tool: "hand-drawn",
     script: "apps/web/art/expedition/draw-icon-tricks.mjs",

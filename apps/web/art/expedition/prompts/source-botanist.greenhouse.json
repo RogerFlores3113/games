@@ -1,0 +1,13 @@
+{
+  "id": "source-botanist.greenhouse",
+  "tool": "create_1_direction_object",
+  "params": {
+    "description": "jungle expedition item icon, warm night palette, single-pixel dark outline, simple shading, transparent background",
+    "size": 16,
+    "view": "sidescroller"
+  },
+  "object_id": "540589d3-84e0-49f2-80e5-4fc599074fd9",
+  "item_description": "glass dome over a sprout",
+  "batch_index": 10,
+  "scale": 1
+}

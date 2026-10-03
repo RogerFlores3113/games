@@ -17,17 +17,39 @@ export interface ArtDef {
   fps?: number;
   /** Drawn when the PNG is missing. The label is drawn only if it fits. */
   fallback: { color: number; label: string };
-  /** The PNG came back with a flat backdrop instead of transparency: the
-   * colour of its top-left pixel, where it reaches the border, is keyed out
-   * when the texture loads. Drop it once the sprite is regenerated. */
-  matte?: true;
 }
 
 const c = toPhaserColor;
 
+/** Every character, upgrade and item, each with a 16x16 icon under
+ * sources/<id>.png. `source-icons.test.ts` checks this against the catalogue. */
+export const SOURCE_ICON_IDS = [
+  "scout", "guide", "botanist", "medic", "signaller", "cartographer",
+  "scout.keen-eye", "scout.eavesdrop", "guide.pathfinder", "guide.howler-call",
+  "botanist.greenhouse", "botanist.antidote", "medic.rally", "medic.field-kit",
+  "signaller.loud-call", "signaller.call-and-response", "cartographer.detour", "cartographer.landmark",
+  "trained-monkey", "pack-mule", "parrot", "trail-map", "rain-poncho", "smoke-signal", "whetstone",
+  "puffball", "bait", "camouflage", "rope-ladder", "heavy-pack", "mosquito-net",
+] as const;
+
+/** The six characters, each a 64x80 seated silhouette under crew/<id>.png,
+ * drawn bottom-centred. */
+export const CREW_IDS = ["scout", "guide", "botanist", "medic", "signaller", "cartographer"] as const;
+
+type SourceIconId = `source-${(typeof SOURCE_ICON_IDS)[number]}`;
+type CrewArtId = `crew-${(typeof CREW_IDS)[number]}`;
+
+const SOURCE_ART = Object.fromEntries(
+  SOURCE_ICON_IDS.map((id) => [`source-${id}`, { file: `sources/${id}.png`, w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } }]),
+) as Record<SourceIconId, ArtDef>;
+
+const CREW_ART = Object.fromEntries(
+  CREW_IDS.map((id) => [`crew-${id}`, { file: `crew/${id}.png`, w: 64, h: 80, fallback: { color: c(PALETTE.letterbox), label: "" } }]),
+) as Record<CrewArtId, ArtDef>;
+
 export const ART = {
   "bg-jungle-night": { file: "camp/bg-jungle-night.png", w: 640, h: 360, fallback: { color: c(PALETTE.jungle), label: "" } },
-  "stump-table": { file: "camp/stump-table.png", w: 368, h: 128, matte: true, fallback: { color: c(PALETTE.stump), label: "" } },
+  "stump-table": { file: "camp/stump-table.png", w: 384, h: 176, fallback: { color: c(PALETTE.stump), label: "" } },
   campfire: { file: "camp/campfire.png", w: 32, h: 32, frames: 4, fps: 6, fallback: { color: c(PALETTE.sun), label: "fire" } },
   lantern: { file: "camp/lantern.png", w: 16, h: 16, fallback: { color: c(PALETTE.sun), label: "" } },
   "mascot-panda": { file: "camp/mascot-panda.png", w: 32, h: 32, frames: 4, fps: 4, fallback: { color: c(PALETTE.sun), label: "panda" } },
@@ -38,16 +60,6 @@ export const ART = {
   "leader-sun": { file: "camp/leader-sun.png", w: 16, h: 16, fallback: { color: c(PALETTE.sun), label: "*" } },
   "icon-whisper": { file: "camp/icon-whisper.png", w: 16, h: 16, fallback: { color: c(PALETTE.turn), label: "W" } },
   "icon-tricks": { file: "camp/icon-tricks.png", w: 16, h: 16, fallback: { color: c(PALETTE.textDim), label: "" } },
-  "gear-chatter": { file: "gear/chatter.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
-  "gear-peek": { file: "gear/peek.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
-  "gear-broadcast": { file: "gear/broadcast.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
-  "gear-ghost": { file: "gear/ghost.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
-  "gear-reroll": { file: "gear/reroll.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
-  "gear-pickpocket": { file: "gear/pickpocket.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
-  "gear-commandeer": { file: "gear/commandeer.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
-  "gear-jam": { file: "gear/jam.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
-  "gear-reassign": { file: "gear/reassign.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
-  "gear-overclock": { file: "gear/overclock.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
   "bg-fireside": { file: "fireside/bg-fireside.png", w: 640, h: 360, fallback: { color: c(PALETTE.jungle), label: "" } },
   "trail-map": { file: "fireside/trail-map.png", w: 568, h: 64, fallback: { color: c(PALETTE.cardFace), label: "" } },
   "marker-camp": { file: "fireside/marker-camp.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
@@ -58,6 +70,8 @@ export const ART = {
   "backpack-open": { file: "fireside/backpack-open.png", w: 96, h: 64, fallback: { color: c(PALETTE.moss), label: "backpack" } },
   "bg-temple-dawn": { file: "run-end/bg-temple-dawn.png", w: 640, h: 360, fallback: { color: c(PALETTE.jungle), label: "" } },
   "bg-trail-dusk": { file: "run-end/bg-trail-dusk.png", w: 640, h: 360, fallback: { color: c(PALETTE.letterbox), label: "" } },
+  ...SOURCE_ART,
+  ...CREW_ART,
 } as const satisfies Readonly<Record<string, ArtDef>>;
 
 export type ArtId = keyof typeof ART;
@@ -68,9 +82,15 @@ export function artTextureKey(id: ArtId): string {
   return `art:${id}`;
 }
 
-/** The icon for a gear id, or null when it has none. */
-export function gearArtId(gearId: string): ArtId | null {
-  const id = `gear-${gearId}`;
+/** The icon for a character, upgrade or item, or null when it has none. */
+export function sourceArtId(sourceId: string): ArtId | null {
+  const id = `source-${sourceId}`;
+  return id in ART ? (id as ArtId) : null;
+}
+
+/** The seated silhouette for a character, or null when it has none. */
+export function crewArtId(characterId: string): ArtId | null {
+  const id = `crew-${characterId}`;
   return id in ART ? (id as ArtId) : null;
 }
 

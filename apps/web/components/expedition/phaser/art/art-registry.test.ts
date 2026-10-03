@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ART, fittedFallbackLabel, gearArtId, resolveArt, type ArtId } from "./art-registry";
+import { ART, fittedFallbackLabel, crewArtId, resolveArt, sourceArtId, type ArtId } from "./art-registry";
 import { ART_FILES } from "./art-files.generated";
 
 const SPRITES_DIR = fileURLToPath(new URL("../../../../public/expedition/sprites/", import.meta.url));
@@ -52,9 +52,11 @@ describe("ART and ART_FILES", () => {
     expect(mismatched).toEqual([]);
   });
 
-  it("gearArtId finds the icon for a source that has one and null for one that has none", () => {
-    expect(gearArtId("peek")).toBe("gear-peek");
-    expect(gearArtId("not-a-source")).toBeNull();
+  it("sourceArtId and crewArtId find the art for an id that has one and null otherwise", () => {
+    expect(sourceArtId("botanist.antidote")).toBe("source-botanist.antidote");
+    expect(sourceArtId("not-a-source")).toBeNull();
+    expect(crewArtId("medic")).toBe("crew-medic");
+    expect(crewArtId("bait")).toBeNull();
   });
 
   it("no two entries share a file", () => {

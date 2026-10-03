@@ -7,7 +7,7 @@ import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
 import { FIRESIDE_ZONES, rowBoxes, trailStopXs, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
-import { ART, gearArtId, type ArtId } from "../art/art-registry";
+import { ART, sourceArtId, type ArtId } from "../art/art-registry";
 import type { ObjectIndex } from "../object-index";
 import type { CrewRow, DraftItem, FiresideModel, KitItem, TrailStop } from "../../../../lib/expedition/fireside-model";
 import { fitLabel } from "./text-fit";
@@ -114,7 +114,7 @@ function drawDraftTile(ctx: Ctx, item: DraftItem, x: number, y: number, w: numbe
   const bg = scene.add.rectangle(0, 0, w, TILE_H, toPhaserColor(PALETTE.stump)).setOrigin(0, 0);
   bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn));
   container.add(bg);
-  const art = gearArtId(item.sourceId);
+  const art = sourceArtId(item.sourceId);
   if (art !== null) container.add(placeArt(scene, art, w / 2, 22).setScale(2));
   const cx = Math.floor(w / 2);
   const cells = Math.floor((w - 4) / LABEL_CELL.w);
@@ -144,7 +144,7 @@ function drawDraft(ctx: Ctx): void {
   }
   const cy = zone.y + zone.h / 2;
   if (draft.kind === "taken") {
-    const art = gearArtId(draft.sourceId);
+    const art = sourceArtId(draft.sourceId);
     if (art !== null) layer.add(placeArt(scene, art, zone.x + 48, cy).setScale(2));
     layer.add(text(scene, zone.x + 80, cy - 10, `Taken: ${draft.name}`));
     layer.add(text(scene, zone.x + 80, cy + 2, "It is in your kit below", PALETTE.textDim));
@@ -186,7 +186,7 @@ function drawCrewRow(ctx: Ctx, row: CrewRow, x: number, y: number, w: number): v
     const source = row.sources[i]!;
     const rest = row.sources.length - i - 1;
     const reserve = rest > 0 ? labelWidth(`+${rest}`) + 2 : 0;
-    const art = gearArtId(source.sourceId);
+    const art = sourceArtId(source.sourceId);
     const iconW = art === null ? 0 : ART[art].w + 1;
     const label = fitLabel(source.name, Math.floor((x + w - reserve - cursor - 4 - iconW) / LABEL_CELL.w));
     if (Array.from(label).length < 3) {
@@ -229,7 +229,7 @@ function drawKitTile(ctx: Ctx, item: KitItem, x: number, y: number, w: number): 
   const container = scene.add.container(x, y);
   const bg = scene.add.rectangle(0, 0, w, KIT_H, toPhaserColor(PALETTE.stump)).setOrigin(0, 0);
   container.add(bg);
-  const art = gearArtId(item.sourceId);
+  const art = sourceArtId(item.sourceId);
   if (art !== null) container.add(placeArt(scene, art, w / 2, 11));
   const cx = Math.floor(w / 2);
   const cells = Math.floor((w - 2) / LABEL_CELL.w);

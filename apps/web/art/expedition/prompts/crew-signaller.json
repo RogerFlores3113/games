@@ -1,0 +1,17 @@
+{
+  "id": "crew-signaller",
+  "tool": "create_image_pixflux",
+  "params": {
+    "width": 64,
+    "height": 80,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "basic shading",
+    "no_background": true,
+    "seed": 11
+  },
+  "prop": "talking drum slung at the hip",
+  "job": "e2526109",
+  "scale": 1,
+  "note": "the full description text was not recorded; each asked for a seated dark explorer silhouette carrying `prop`. Alpha thresholded and grey halos stripped locally; drawn bottom-centred"
+}

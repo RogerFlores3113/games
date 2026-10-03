@@ -3,7 +3,6 @@ import { buildLabelAtlas, type GlyphAtlas } from "../font/glyph-atlas";
 import { PALETTE } from "../palette";
 import { ART, artFallbackKey, fittedFallbackLabel, resolveArt, type ArtId } from "./art-registry";
 import { ART_FILES } from "./art-files.generated";
-import { keyOutBorderColour } from "./matte";
 
 const FILES: ReadonlySet<string> = new Set(ART_FILES);
 
@@ -46,21 +45,6 @@ function ensureFallbackTexture(scene: Phaser.Scene, id: ArtId, key: string): voi
   texture.refresh();
 }
 
-/** A copy of `key`'s image with its flat backdrop keyed out (`ArtDef.matte`). */
-function ensureMatted(scene: Phaser.Scene, key: string): string {
-  const matted = `${key}:matte`;
-  if (scene.textures.exists(matted)) return matted;
-  const image = scene.textures.get(key).getSourceImage() as HTMLImageElement;
-  const texture = scene.textures.createCanvas(matted, image.width, image.height);
-  if (!texture) return key;
-  texture.context.drawImage(image, 0, 0);
-  const pixels = texture.context.getImageData(0, 0, image.width, image.height);
-  keyOutBorderColour(pixels.data, image.width, image.height);
-  texture.context.putImageData(pixels, 0, 0);
-  texture.refresh();
-  return matted;
-}
-
 /** The animation that plays `id`'s strip, repeating `repeat` more times (-1
  * loops), or null when the strip is not loaded. */
 function artAnimation(scene: Phaser.Scene, id: ArtId, repeat: number): string | null {
@@ -85,9 +69,8 @@ function artAnimation(scene: Phaser.Scene, id: ArtId, repeat: number): string | 
 export function placeArt(scene: Phaser.Scene, id: ArtId, x: number, y: number): Phaser.GameObjects.Sprite {
   const source = resolveArt(id, FILES);
   const loaded = source.kind === "file" && scene.textures.exists(source.key);
-  let key = loaded ? source.key : artFallbackKey(id);
+  const key = loaded ? source.key : artFallbackKey(id);
   if (!loaded) ensureFallbackTexture(scene, id, key);
-  else if (source.def.matte) key = ensureMatted(scene, key);
 
   const sprite = scene.add.sprite(Math.round(x), Math.round(y), key);
   const loop = artAnimation(scene, id, -1);

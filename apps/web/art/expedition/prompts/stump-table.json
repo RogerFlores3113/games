@@ -2,14 +2,12 @@
   "id": "stump-table",
   "tool": "create_image_pixflux",
   "params": {
-    "description": "a huge oval tree-stump tabletop seen from above at a low angle, flat wide oval top showing visible concentric growth rings in warm brown wood, mossy bark rim around the edge, isolated on transparent background, no people, no text",
-    "width": 368,
-    "height": 128,
+    "width": 384,
+    "height": 176,
     "view": "high top-down",
-    "outline": "single color outline",
-    "shading": "medium shading",
     "no_background": true
   },
+  "job": "a030638f-1d4e-4aaf-b2d2-8c4cf2d4bcde",
   "scale": 1,
-  "note": "came back on a flat grey backdrop despite no_background; ArtDef.matte keys it out at load"
+  "note": "the description text was not recorded (a tree-stump table with roots and glowing mushrooms). Keyed offline with `fetch-art.mjs ... --matte`; the flat top spans x 78..322, y 12..85"
 }

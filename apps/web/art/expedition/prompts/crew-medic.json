@@ -1,0 +1,17 @@
+{
+  "id": "crew-medic",
+  "tool": "create_image_pixflux",
+  "params": {
+    "width": 64,
+    "height": 80,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "basic shading",
+    "no_background": true,
+    "seed": 11
+  },
+  "prop": "shoulder satchel with a rolled bandage",
+  "job": "23711889",
+  "scale": 1,
+  "note": "the full description text was not recorded; each asked for a seated dark explorer silhouette carrying `prop`. Alpha thresholded and grey halos stripped locally; drawn bottom-centred"
+}

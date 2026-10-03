@@ -1,0 +1,17 @@
+{
+  "id": "crew-scout",
+  "tool": "create_image_pixflux",
+  "params": {
+    "width": 64,
+    "height": 80,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "basic shading",
+    "no_background": true,
+    "seed": 7
+  },
+  "prop": "spyglass raised to one eye",
+  "job": "096975a2",
+  "scale": 1,
+  "note": "the full description text was not recorded; each asked for a seated dark explorer silhouette carrying `prop`. Alpha thresholded and grey halos stripped locally; drawn bottom-centred"
+}

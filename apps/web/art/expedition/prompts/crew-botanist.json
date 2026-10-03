@@ -1,0 +1,17 @@
+{
+  "id": "crew-botanist",
+  "tool": "create_image_pixflux",
+  "params": {
+    "width": 64,
+    "height": 80,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "basic shading",
+    "no_background": true,
+    "seed": 7
+  },
+  "prop": "wide straw hat with a flower",
+  "job": "7c44a336",
+  "scale": 1,
+  "note": "the full description text was not recorded; each asked for a seated dark explorer silhouette carrying `prop`. Alpha thresholded and grey halos stripped locally; drawn bottom-centred"
+}

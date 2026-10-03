@@ -11,7 +11,7 @@ import { cardTextureKey } from "../card-packs/card-pack-def";
 import type { CardPackId } from "../../../../lib/expedition/card-pack-ids";
 import type { ObjectiveChip } from "../../../../lib/expedition/build-scene-model";
 import { placeArt } from "../art/place-art";
-import { ART, gearArtId, type ArtId } from "../art/art-registry";
+import { ART, sourceArtId, type ArtId } from "../art/art-registry";
 import { fitLabel } from "./text-fit";
 
 export type Layer = Phaser.GameObjects.Container;
@@ -52,7 +52,7 @@ const GEAR_NAME_MIN_CHARS = 4;
 /** A gear's icon followed by its name, centred on (cx, cy) and no wider
  * than `maxW`: the name is shortened to fit, or dropped when too short. */
 export function gearLabel(scene: Phaser.Scene, cx: number, cy: number, maxW: number, gearId: string, name: string): Phaser.GameObjects.GameObject[] {
-  const art = gearArtId(gearId);
+  const art = sourceArtId(gearId);
   const iconW = art === null ? 0 : ART[art].w + 1;
   const room = Math.floor((maxW - iconW) / LABEL_CELL.w);
   const shown = room >= GEAR_NAME_MIN_CHARS ? fitLabel(name, room) : "";
