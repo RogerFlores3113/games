@@ -397,7 +397,18 @@ describe("the rescue window", () => {
       apply: (ctx) => [{ op: "remove-objective", objectiveId: ctx.targets[0].objective.id }],
     }),
   });
-  const catalog = testCatalog({ items: { "test-rope": rope, "test-lasso": lasso } });
+  const shove = defineItem({
+    id: "test-shove",
+    name: "Test Shove",
+    text: "Give the first trick to a player.",
+    active: ability({
+      window: "between-tricks",
+      limit: { kind: "per-run", times: 3 },
+      targets: [{ kind: "player", who: "anyone" }],
+      apply: (ctx) => [{ op: "reassign-trick", trickIndex: 0, toSeatId: ctx.targets[0].seatId }],
+    }),
+  });
+  const catalog = testCatalog({ items: { "test-rope": rope, "test-lasso": lasso, "test-shove": shove } });
 
   /** Between tricks with every seat holding a no-tricks objective, so the
    * first trick fails exactly its winner's objective. */
@@ -444,11 +455,12 @@ describe("the rescue window", () => {
 
   it("a pass settles the camp as failed", () => {
     const paused = playTrick(everyoneDucks({ p0: ["test-rope"] }));
+    const winner = paused.attempt!.camp!.completedTricks[0]!.winnerSeatId;
     const passed = act(paused, "p0", { type: "skip-window" });
     expect(passed.attempt).toBeNull();
     expect(passed.supplies).toBe(2);
     expect(passed.history).toEqual([{ campNumber: 1, attemptNumber: 1, status: "failed", suppliesSpent: 1 }]);
-    expect(passed.seats[0]!.ledger).toEqual([{ kind: "passed", sourceId: "test-rope", at: { camp: 1, attempt: 1, trick: 1 } }]);
+    expect(passed.seats[0]!.ledger).toEqual([{ kind: "passed", sourceId: "test-rope", at: { camp: 1, attempt: 1, trick: 1 }, failedObjectiveIds: [`duck-${winner}`] }]);
   });
 
   it("a rescue that clears every failure resumes play and spends a single-use item", () => {
@@ -477,7 +489,7 @@ describe("the rescue window", () => {
     const firstWinner = paused.attempt!.camp!.completedTricks[0]!.winnerSeatId;
 
     const afterPass = act(paused, "p0", { type: "skip-window" });
-    expect(afterPass.seats[0]!.ledger).toEqual([{ kind: "passed", sourceId: "test-lasso", at: { camp: 1, attempt: 1, trick: 1 } }]);
+    expect(afterPass.seats[0]!.ledger).toEqual([{ kind: "passed", sourceId: "test-lasso", at: { camp: 1, attempt: 1, trick: 1 }, failedObjectiveIds: [`duck-${firstWinner}`] }]);
     expect(gatedPendingSeatIds(afterPass, catalog)).toEqual(["p1"]);
     expect(afterPass.attempt).not.toBeNull();
 
@@ -487,6 +499,20 @@ describe("the rescue window", () => {
     expect(currentWindow(second, rulesFor(second, catalog))).toBe("rescue");
     expect(gatedPendingSeatIds(second, catalog)).toEqual(["p0"]);
     expect(second.seats[0]!.ledger).toHaveLength(1);
+  });
+
+  it("a pass covers only the failures it saw, so a new failure at the same trick reopens rescue", () => {
+    const paused = playTrick(everyoneDucks({ p0: ["test-lasso"], p1: ["test-rope"], p2: ["test-shove"] }, "reopen-seed"));
+    const firstWinner = paused.attempt!.camp!.completedTricks[0]!.winnerSeatId;
+    const afterPass = act(paused, "p0", { type: "skip-window" });
+    const rescued = act(afterPass, "p1", { type: "use-ability", sourceId: "test-rope", targets: [`objective:duck-${firstWinner}`] });
+    expect(currentWindow(rescued, rulesFor(rescued, catalog))).toBe("between-tricks");
+
+    const blamed = SEAT_IDS.find((id) => id !== firstWinner)!;
+    const shoved = act(rescued, "p2", { type: "use-ability", sourceId: "test-shove", targets: [`seat:${blamed}`] });
+    expect(shoved.attempt!.camp!.completedTricks).toHaveLength(1);
+    expect(currentWindow(shoved, rulesFor(shoved, catalog))).toBe("rescue");
+    expect(gatedPendingSeatIds(shoved, catalog)).toEqual(["p0"]);
   });
 
   it("skip-window outside a gated window is wrong_window", () => {

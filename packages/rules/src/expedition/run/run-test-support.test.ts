@@ -116,7 +116,7 @@ describe("advanceTo", () => {
   it("skips a pre-deal item to reach the deal", () => {
     const run = setupRun({ seatIds: SEAT_IDS, seed: "adv-5", catalog, kits: { p0: ["item-predeal"] } });
     const result = advanceTo(run, "objective-pick", catalog);
-    expect(result.seats[0]!.ledger).toEqual([{ kind: "passed", sourceId: "item-predeal", at: { camp: 1, attempt: 1, trick: null } }]);
+    expect(result.seats[0]!.ledger).toEqual([{ kind: "passed", sourceId: "item-predeal", at: { camp: 1, attempt: 1, trick: null }, failedObjectiveIds: [] }]);
   });
 });
 

@@ -904,3 +904,8 @@ target kind, a window. Green check **`source-icons`**: a new
 - Review fix: `pick-character` tests the catalogue with `Object.hasOwn`, so a prototype key such as
   `constructor` is `unknown_character`; `sourceDef` does the same. Draft picks and ability uses
   already match against the seat's offer and live sources, so they refuse those keys unchanged.
+- Review fix: a `passed` ledger entry also records the failed objective ids on the table
+  (`failedObjectiveIds`, `[]` before the deal). A pass covers its stamp and only those failures, so
+  an ability that fails another objective in the same gap between tricks asks the seat again. An
+  objective rescued and then failed again in that same gap stays declined; the seat already passed
+  on it.

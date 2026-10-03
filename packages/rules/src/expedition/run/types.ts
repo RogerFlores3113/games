@@ -79,7 +79,7 @@ export type Stamp = { readonly camp: CampNumber; readonly attempt: number; reado
 
 export type LedgerEntry =
   | { readonly kind: "used"; readonly sourceId: SourceId; readonly at: Stamp; readonly poolCost: number } // 0 unless a pool limit
-  | { readonly kind: "passed"; readonly sourceId: SourceId; readonly at: Stamp } // gated-window pass
+  | { readonly kind: "passed"; readonly sourceId: SourceId; readonly at: Stamp; readonly failedObjectiveIds: readonly string[] } // gated-window pass; the failures it declined ([] before the deal)
   | { readonly kind: "regained"; readonly amount: number; readonly at: Stamp }; // pool regain on a clear
 
 export type SeatRun = {

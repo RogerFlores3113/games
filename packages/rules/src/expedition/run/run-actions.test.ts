@@ -267,7 +267,7 @@ describe("applyRunAction: skip-window and use-ability in pre-deal (D-12)", () =>
   it("a pass by the pending seat is stamped and deals (runPhase becomes camp)", () => {
     const state = ok(applyRunAction(preDealRun(), "p0", { type: "skip-window" }, catalog));
     expect(runPhase(state)).toBe("camp");
-    expect(state.seats[0]!.ledger).toEqual([{ kind: "passed", sourceId: "predeal", at: { camp: 1, attempt: 1, trick: null } }]);
+    expect(state.seats[0]!.ledger).toEqual([{ kind: "passed", sourceId: "predeal", at: { camp: 1, attempt: 1, trick: null }, failedObjectiveIds: [] }]);
   });
 
   it("using the pre-deal item records a use and deals", () => {

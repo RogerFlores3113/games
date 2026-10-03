@@ -5,6 +5,7 @@
 
 import type { AdapterResult } from "../../adapter";
 import { shuffleWithSeed } from "../../shuffle";
+import { checkCampOutcome } from "../camp";
 import type { AbilityContext, ActiveAbility, SourceId } from "../content/source-def";
 import { rulesFor } from "./compose";
 import { STREAMS, seededIndex } from "./rng";
@@ -90,16 +91,31 @@ export function abilityStatus(run: RunState, seatId: string, sourceId: SourceId,
   return statusWith(run, seat, sourceId, active, catalog, rulesFor(run, catalog));
 }
 
+/** The camp's failed objective ids right now; [] with no camp or no failure. */
+function failedObjectiveIds(run: RunState, rules: RunRules): readonly string[] {
+  const camp = run.attempt?.camp ?? null;
+  if (camp === null) return [];
+  const outcome = checkCampOutcome(camp, rules);
+  return outcome.status === "failed" ? outcome.failedObjectiveIds : [];
+}
+
 /** The seat's live sources it could fire in `window` right now and has not
- * passed at the current stamp. */
+ * passed. A pass covers its stamp and only the failures it saw, so a new
+ * failure in the same gap between tricks asks the seat again. */
 export function pendingSourceIds(run: RunState, seatId: string, window: ActiveWindow, catalog: Catalog, rules: RunRules): readonly SourceId[] {
   const seat = seatOf(run, seatId);
   const stamp = currentStamp(run);
+  const failed = failedObjectiveIds(run, rules);
   return liveSourceIds(seat).filter((sourceId) => {
     const active = activeOf(catalog, sourceId);
     if (active === undefined || active.window !== window) return false;
     const passed = seat.ledger.some(
-      (entry) => entry.kind === "passed" && entry.sourceId === sourceId && stamp !== null && sameStamp(entry.at, stamp),
+      (entry) =>
+        entry.kind === "passed" &&
+        entry.sourceId === sourceId &&
+        stamp !== null &&
+        sameStamp(entry.at, stamp) &&
+        failed.every((id) => entry.failedObjectiveIds.includes(id)),
     );
     return !passed && statusWith(run, seat, sourceId, active, catalog, rules).usable;
   });
@@ -159,7 +175,8 @@ export function passWindow(run: RunState, seatId: string, catalog: Catalog): Ada
   const pending = pendingSourceIds(run, seatId, window, catalog, rules);
   if (pending.length === 0) return { ok: false, error: "nothing_to_skip" };
   const at = currentStamp(run)!;
-  const passes: LedgerEntry[] = pending.map((sourceId) => ({ kind: "passed", sourceId, at }));
+  const failed = failedObjectiveIds(run, rules);
+  const passes: LedgerEntry[] = pending.map((sourceId) => ({ kind: "passed", sourceId, at, failedObjectiveIds: failed }));
   const seats = run.seats.map((s) => (s.seatId === seatId ? { ...s, ledger: [...s.ledger, ...passes] } : s));
   return { ok: true, state: { ...run, seats } };
 }
