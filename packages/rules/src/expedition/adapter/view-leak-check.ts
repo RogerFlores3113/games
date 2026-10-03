@@ -174,16 +174,19 @@ export function secretsForExpeditionSeat(
 }
 
 /** Recursively walks `subtree`, collecting structural leak reasons: any
- * object key in FORBIDDEN_VIEW_KEYS, and any string LEAF value exactly
- * equal to a hiddenIds entry. Uses Object.keys/the `in` operator (key
- * presence), never a truthiness/undefined comparison. */
+ * object key in FORBIDDEN_VIEW_KEYS, and any string LEAF value, or any of
+ * its ":"-separated segments (target choice ids such as `card:<id>`),
+ * exactly equal to a hiddenIds entry. Uses Object.keys/the `in` operator
+ * (key presence), never a truthiness/undefined comparison. */
 function walkStructural(subtree: unknown, hiddenIds: ReadonlySet<string>, reasons: Set<string>): void {
   if (Array.isArray(subtree)) {
     for (const item of subtree) walkStructural(item, hiddenIds, reasons);
     return;
   }
   if (typeof subtree === "string") {
-    if (hiddenIds.has(subtree)) reasons.add(`structural:hidden-id:${subtree}`);
+    for (const part of [subtree, ...subtree.split(":")]) {
+      if (hiddenIds.has(part)) reasons.add(`structural:hidden-id:${part}`);
+    }
     return;
   }
   if (subtree === null || typeof subtree !== "object") return;

@@ -844,3 +844,10 @@ target kind, a window. Green check **`source-icons`**: a new
 - Unit 2: `EffectParams` lives in `run/types.ts` beside `ActiveEffect`, and `ActiveEffect` keeps
   `gearId` until the swap. `content/source-def.ts` arrives in unit 6, which moves the type and
   renames the field to `sourceId`.
+- Unit 3: choice ids carry a kind prefix (`card:<id>`), which the leak check's exact-leaf scan
+  would miss. `view-leak-check.ts` now also tests each `:`-separated segment of a string leaf
+  against the hidden ids, so the per-kind coverage the spec promises is real. Canary I proves it.
+- Unit 3: until the swap, gear keeps bare target ids. `validateTargets` maps each gear kind to a
+  registry spec and prefixes the id before `resolveTargets`; both go in unit 6.
+- Unit 3: `card-value` offers ranks around the printed rank, not the composed `rankOf`, so a
+  second tonic on the same card replaces the first instead of stacking.

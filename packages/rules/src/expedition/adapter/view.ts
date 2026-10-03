@@ -33,6 +33,7 @@ import { activeBossId, rulesFor } from "../run/compose";
 import { runPhase, runStatus, preDealPendingSeatIds } from "../run/lifecycle";
 import { whispersUsedBy } from "../run/whisper";
 import { gearAvailability, currentWindow, isGearSpent } from "../run/toolkit";
+import { visibleObjectives } from "../run/visibility";
 import type { Catalog, LogEntry, Reveal, RunState } from "../run/types";
 import type { CampState, CardIdentity, ExpeditionCard, Objective, StandardIdentity } from "../state";
 import type {
@@ -254,12 +255,7 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
     if (rawAttempt.camp !== null) {
       const campState = rawAttempt.camp;
       const assignment = rules.objectiveAssignment(state);
-      const visibleObjectives =
-        assignment === "face-down"
-          ? seated
-            ? campState.objectives.filter((o) => o.ownerSeatId === seatId)
-            : []
-          : campState.objectives;
+      const shownObjectives = visibleObjectives(state, campState, rules, seatId);
 
       const yourHandRaw = seated ? campState.hands.find((h) => h.seatId === seatId) : undefined;
       const yourHand: ExpeditionCardView[] = yourHandRaw !== undefined ? yourHandRaw.cards.map(toCardView) : [];
@@ -286,7 +282,7 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
         totalTricks: campState.totalTricks,
         removedCards: campState.removedCards.map(toIdentityView),
         objectiveAssignment: assignment,
-        objectives: visibleObjectives.map((o) => toObjectiveView(campState, o)),
+        objectives: shownObjectives.map((o) => toObjectiveView(campState, o)),
         yourHand,
         yourLegalCardIds,
         handSizes,

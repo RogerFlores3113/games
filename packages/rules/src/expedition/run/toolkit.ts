@@ -16,21 +16,20 @@
 // state. Purposes must be distinct within a single `apply` call, or two
 // draws in the same call would collide on the same stream name.
 //
-// OWN-HAND-ONLY TARGET RULE (T-10-11): an "own-card" target is resolved
-// ONLY via legality.ts's findOwnCard(camp, self, id) — never by searching a
-// teammate's hand. Probing a teammate's card id as an own-card target
-// returns a plain reason string, the same as any other invalid target; it
+// OWN-HAND-ONLY TARGET RULE (T-10-11): an "own-card" target resolves only
+// among the actor's own hand choices (run/targets.ts). Probing a teammate's
+// card id returns the same plain reason as any other invalid target; it
 // never reveals whether that id exists in someone else's hand.
 //
 // This file must never import from ./compose — callers pass the composed
 // RunRules in, keeping this plan parallel with Plan 10-03.
 
 import { campPhase } from "../camp";
-import { findOwnCard } from "../legality";
 import { evaluateObjective } from "../objectives";
 import type { CampState } from "../state";
-import type { GearContext, GearWindow, TargetSpec, ToolkitOp } from "../gear/gear-def";
+import type { GearContext, GearWindow, TargetKind as GearTargetKind, TargetSpec, ToolkitOp } from "../gear/gear-def";
 import { STREAMS, seededIndex } from "./rng";
+import { resolveTargets, type TargetSpec as RegistrySpec } from "./targets";
 import type { RunRules } from "./run-rules";
 import type { ActiveEffect, AttemptState, Catalog, LogEntry, Reveal, RunError, RunState } from "./types";
 
@@ -150,46 +149,24 @@ export function gearAvailability(
   return { ok: true };
 }
 
-/** Generic target-kind validation, shared by every gear. The own-card
- * lookup goes through findOwnCard ONLY (T-10-11) — never a search of other
- * hands. */
+/** Each gear target kind as a registry spec, plus the prefix that turns a
+ * gear's bare id into that kind's choice id. Lives until gear is replaced. */
+const GEAR_TARGET_SPECS: Readonly<Record<GearTargetKind, { readonly spec: RegistrySpec; readonly prefix: string }>> = {
+  teammate: { spec: { kind: "player", who: "teammate" }, prefix: "seat:" },
+  "own-card": { spec: { kind: "card", where: "my-hand" }, prefix: "card:" },
+  "face-up-objective": { spec: { kind: "objective", whose: "unclaimed" }, prefix: "objective:" },
+  "own-objective": { spec: { kind: "objective", whose: "mine" }, prefix: "objective:" },
+};
+
+/** Generic target-kind validation, shared by every gear, through the
+ * target-kind registry: a target is legal only if it is among the seat's
+ * choices, so an own-card target never matches a teammate's card (T-10-11). */
 export function validateTargets(ctx: GearContext, specs: readonly TargetSpec[]): true | string {
-  if (ctx.targets.length !== specs.length) {
-    return `Expected ${specs.length} target(s), got ${ctx.targets.length}`;
-  }
-
-  for (let i = 0; i < specs.length; i++) {
-    const spec = specs[i]!;
-    const target = ctx.targets[i]!;
-
-    if (spec.kind === "teammate") {
-      if (target === ctx.self || !ctx.run.seatIds.includes(target)) {
-        return "Target must be a teammate";
-      }
-    } else if (spec.kind === "own-card") {
-      if (ctx.camp === null || findOwnCard(ctx.camp, ctx.self, target) === null) {
-        return "Target must be a card in your own hand";
-      }
-    } else if (spec.kind === "face-up-objective") {
-      const objective = ctx.camp?.objectives.find((o) => o.id === target);
-      if (!objective || objective.ownerSeatId !== null) {
-        return "Target must be a face-up objective";
-      }
-    } else {
-      // own-objective
-      const objective = ctx.camp?.objectives.find((o) => o.id === target);
-      if (
-        !objective ||
-        ctx.camp === null ||
-        objective.ownerSeatId !== ctx.self ||
-        evaluateObjective(ctx.camp, objective) !== "pending"
-      ) {
-        return "Target must be one of your own pending objectives";
-      }
-    }
-  }
-
-  return true;
+  const mapped = specs.map((spec) => GEAR_TARGET_SPECS[spec.kind]);
+  const ids = ctx.targets.length === specs.length ? ctx.targets.map((target, i) => `${mapped[i]!.prefix}${target}`) : ctx.targets;
+  const scope = { run: ctx.run, seatId: ctx.self, camp: ctx.camp, rules: ctx.rules };
+  const resolved = resolveTargets(scope, mapped.map((m) => m.spec), ids);
+  return resolved.ok ? true : resolved.reason;
 }
 
 /** Every card id currently in play (hands, completed tricks, the

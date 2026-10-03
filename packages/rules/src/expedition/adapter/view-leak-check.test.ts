@@ -252,4 +252,17 @@ describe("view-leak-check: canary suite", () => {
     expect(reasons).toContain(`structural:hidden-id:${otherCard.id}`);
     expect(reasons.some((r) => r.startsWith("typed:identity-count-exceeded:"))).toBe(true);
   });
+
+  it("Canary I: another seat's card id inside a prefixed target choice id is flagged", () => {
+    const state = dealtFaceUpCamp();
+    const viewer = "p0";
+    const view = toExpeditionPlayerView(state, viewer, CATALOG);
+    const secrets = secretsForExpeditionSeat(state, viewer, CATALOG, SEED);
+    const otherCard = state.attempt!.camp!.hands.find((h) => h.seatId !== viewer)!.cards[0]!;
+
+    const leaky = { ...view, steps: [{ kind: "card", prompt: "", choices: [`card:${otherCard.id}`, `value:${otherCard.id}:5`] }] };
+
+    const reasons = checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets });
+    expect(reasons).toEqual([`structural:hidden-id:${otherCard.id}`]);
+  });
 });
