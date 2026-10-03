@@ -5,6 +5,7 @@ export const signaller = defineCharacter({
   id: "signaller",
   name: "The Signaller",
   theme: "Talks in drums",
+  power: "Talking Drum",
   text: "You may whisper twice each camp.",
   passive: { modifier: (owner) => extraWhisper(owner.seatId) },
   upgrades: [

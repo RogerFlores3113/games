@@ -72,7 +72,7 @@ describe("SOURCE_DISPLAY", () => {
 describe("CHARACTER_DISPLAY", () => {
   it("has one entry per character, listing its two upgrades and its pool", () => {
     expect(Object.keys(CHARACTER_DISPLAY).sort()).toEqual(Object.keys(CATALOG.characters).sort());
-    expect(CHARACTER_DISPLAY.scout).toMatchObject({ id: "scout", pool: null, upgradeIds: ["scout.keen-eye", "scout.eavesdrop"] });
+    expect(CHARACTER_DISPLAY.scout).toMatchObject({ id: "scout", power: "Spyglass", pool: null, upgradeIds: ["scout.keen-eye", "scout.eavesdrop"] });
     expect(CHARACTER_DISPLAY.botanist!.pool).toEqual({ name: "Herbs", start: 2, max: 3 });
   });
 

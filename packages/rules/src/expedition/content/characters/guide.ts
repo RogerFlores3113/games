@@ -5,6 +5,7 @@ export const guide = defineCharacter({
   id: "guide",
   name: "The Guide",
   theme: "Cuts the trail",
+  power: "Machete",
   text: "Choose who leads the next trick.",
   active: ability({
     window: "between-tricks",

@@ -314,6 +314,7 @@ describe("settleIfDecided / advanceRun on success", () => {
     id: "pooled",
     name: "Pooled",
     theme: "Has a pool",
+    power: "Pool power",
     text: "Nothing happens.",
     pool: { name: "Herbs", start: 1, max: 3, regain: (owner) => (owner.hasUpgrade("pooled.rich") ? 2 : 1) },
     upgrades: [

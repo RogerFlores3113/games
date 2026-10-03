@@ -21,7 +21,7 @@ import type { BossDef } from "./boss-def";
 export const blindOrders: BossDef = {
   id: "blind-orders",
   name: "Thick Fog",
-  text: "Objectives are dealt face-down at random instead of picked; each player sees only their own.",
+  text: "Objectives are dealt face down, and you see only your own.",
   modifiers: {
     objectiveAssignment: () => () => "face-down",
   },

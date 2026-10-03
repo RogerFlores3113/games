@@ -4,6 +4,7 @@ export const scout = defineCharacter({
   id: "scout",
   name: "The Scout",
   theme: "Eyes in the canopy",
+  power: "Spyglass",
   text: "See a random card in a teammate's hand.",
   active: ability({
     window: "between-tricks",

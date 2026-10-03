@@ -5,6 +5,7 @@ export const cartographer = defineCharacter({
   id: "cartographer",
   name: "The Cartographer",
   theme: "Redraws the route",
+  power: "Redraw",
   text: "Replace a face-up objective with a new one.",
   active: ability({
     window: "objective-pick",

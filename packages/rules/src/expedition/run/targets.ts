@@ -186,7 +186,7 @@ export const TARGET_KINDS: { readonly [K in TargetKind]: TargetKindDef<K> } = {
   },
   "card-value": {
     kind: "card-value",
-    describe: () => "Pick a card in your hand and the rank it counts as",
+    describe: () => "Pick a card in your hand to recount",
     choices: ({ camp, seatId }, spec) => {
       const own = camp?.hands.find((hand) => hand.seatId === seatId)?.cards ?? [];
       return own.flatMap((card) => {

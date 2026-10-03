@@ -41,6 +41,8 @@ export type CharacterDisplay = {
   id: string;
   name: string;
   theme: string;
+  /** The base power's name: "Spyglass". */
+  power: string;
   pool: { name: string; start: number; max: number } | null;
   upgradeIds: string[];
 };
@@ -106,6 +108,7 @@ export const CHARACTER_DISPLAY: Readonly<Record<string, CharacterDisplay>> = Obj
       id: def.id,
       name: def.name,
       theme: def.theme,
+      power: def.power,
       pool: def.pool === undefined ? null : { name: def.pool.name, start: def.pool.start, max: def.pool.max },
       upgradeIds: def.upgrades.map((upgrade) => upgrade.id),
     },

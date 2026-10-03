@@ -52,7 +52,7 @@ export function eclipseDeckFor(playerCount: PlayerCount): CardIdentity[] {
 export const eclipse: BossDef = {
   id: "eclipse",
   name: "Eclipse",
-  text: "The Sun and Moon are removed; there are no trumps. A♠'s holder leads.",
+  text: "The Sun and Moon are out, and the A♠ holder leads.",
   modifiers: {
     deckFor: () => eclipseDeckFor,
   },

@@ -30,6 +30,7 @@ function plainCharacter(n: number): CharacterDef {
     id: `plain-${n}`,
     name: `Plain ${n}`,
     theme: "No powers",
+    power: "Nothing",
     text: "Nothing happens.",
     upgrades: [
       defineUpgrade({ id: `plain-${n}.a`, name: `Plain ${n} A`, text: "Nothing happens." }),

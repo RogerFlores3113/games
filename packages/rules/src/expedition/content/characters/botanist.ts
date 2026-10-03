@@ -5,6 +5,7 @@ export const botanist = defineCharacter({
   id: "botanist",
   name: "The Botanist",
   theme: "Brews jungle herbs",
+  power: "Herb Tonic",
   pool: { name: "Herbs", start: 2, max: 3, regain: (owner) => (owner.hasUpgrade("botanist.greenhouse") ? 2 : 1) },
   text: "A card in your hand counts one rank higher or lower this camp.",
   active: ability({

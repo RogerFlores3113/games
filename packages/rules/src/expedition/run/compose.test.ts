@@ -242,6 +242,7 @@ describe("rulesFor / ruleLayersFor", () => {
       id: "tuned",
       name: "Tuned",
       theme: "t",
+      power: "p",
       text: "",
       passive: {
         modifier: (owner) => ({
@@ -317,6 +318,7 @@ describe("layer order", () => {
     id: "char-0",
     name: "C0",
     theme: "t",
+    power: "p",
     text: "",
     passive: passive("char-0"),
     upgrades: [defineUpgrade({ id: "char-0.a", name: "A", text: "", passive: passive("char-0.a") }), defineUpgrade({ id: "char-0.b", name: "B", text: "" })],
@@ -325,6 +327,7 @@ describe("layer order", () => {
     id: "char-1",
     name: "C1",
     theme: "t",
+    power: "p",
     text: "",
     passive: passive("char-1"),
     upgrades: [defineUpgrade({ id: "char-1.a", name: "A", text: "" }), defineUpgrade({ id: "char-1.b", name: "B", text: "" })],

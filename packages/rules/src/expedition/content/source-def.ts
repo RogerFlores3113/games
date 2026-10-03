@@ -75,6 +75,8 @@ export type UpgradeDef = SourceBase & { readonly kind: "upgrade"; readonly chara
 export type CharacterDef = SourceBase & {
   readonly kind: "character";
   readonly theme: string;
+  /** The base power's name, which upgrades refer to ("Your Spyglass ..."). */
+  readonly power: string;
   readonly pool?: PoolDef;
   readonly upgrades: readonly [UpgradeDef, UpgradeDef];
 };

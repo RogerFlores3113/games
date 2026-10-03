@@ -5,6 +5,7 @@ export const medic = defineCharacter({
   id: "medic",
   name: "The Medic",
   theme: "Keeps the crew walking",
+  power: "Triage",
   text: "Drop a failed objective.",
   active: ability({
     window: "rescue",
