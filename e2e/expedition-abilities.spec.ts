@@ -44,6 +44,32 @@ async function sentRequests(sent: { request?: unknown }[]): Promise<unknown[]> {
   return sent.map((m) => m.request);
 }
 
+/** Plays the camp from every page until the host is asked to rescue.
+ * False when the camp ends first. */
+async function playUntilRescue(host: Page, pages: Page[]): Promise<boolean> {
+  for (let step = 0; step < 600; step++) {
+    const model = await getModel<CampModel>(host);
+    if (model.sceneKey !== "camp") return false;
+    if (model.banner?.window === "rescue") {
+      if (model.banner.youPending) return true;
+      for (const p of pages.slice(1)) expect((await getModel<CampModel>(p)).banner?.detail).toMatch(/Waiting on Roger/);
+    }
+    for (const p of pages) {
+      const m = await getModel<CampModel>(p);
+      if (m.sceneKey !== "camp" || m.banner !== null) continue;
+      const pickable = m.faceUpObjectives.find((o) => (o as unknown as { pickable: boolean }).pickable);
+      if (pickable) {
+        await clickUntilChanged<CampModel>(p, pickable.objectId, (mm) => !mm.faceUpObjectives.some((o) => o.objectiveId === pickable.objectiveId && (o as unknown as { pickable: boolean }).pickable));
+        continue;
+      }
+      const card = m.hand.find((c) => c.playable);
+      if (card === undefined) continue;
+      await clickHandCard<CampModel>(p, card.objectId, (mm) => mm.sceneKey !== "camp" || !mm.hand.some((c) => c.id === card.id)).catch(() => undefined);
+    }
+  }
+  return false;
+}
+
 test.describe("Expedition characters and abilities", () => {
   test("muster: each picks an explorer, taken ones show who took them", async ({ page, browser }) => {
     test.setTimeout(90_000);
@@ -185,40 +211,13 @@ test.describe("Expedition characters and abilities", () => {
       for (const [i, id] of ["medic", "scout", "guide"].entries()) await musterPick(pages[i]!, id);
       await readyAll(pages);
 
-      let rescued = false;
-      for (let step = 0; step < 600 && !rescued; step++) {
-        const host = await getModel<CampModel>(page);
-        if (host.sceneKey !== "camp") break;
-        if (host.banner?.window === "rescue") {
-          if (host.banner.youPending) {
-            expect(host.banner.title).toMatch(/^Objectives? failed: /);
-            await page.screenshot({ path: ".audit/abilities/rescue-banner.png" });
-            await clickUntilChanged<CampModel>(page, "predeal-use:medic", (m) => m.targeting !== null);
-            const failed = (await getModel<CampModel>(page)).seats.flatMap((s) => s.objectives).find((o) => o.targetable)!;
-            await clickUntilChanged<CampModel>(page, failed.objectId, (m) => m.targeting?.canConfirm === true);
-            await clickUntilChanged<CampModel>(page, "confirm", (m) => m.sceneKey !== "camp" || m.targeting === null);
-            rescued = true;
-            break;
-          }
-          for (const p of pages.slice(1)) {
-            const mm = await getModel<CampModel>(p);
-            expect(mm.banner?.detail).toMatch(/Waiting on Roger/);
-          }
-        }
-        for (const p of pages) {
-          const m = await getModel<CampModel>(p);
-          if (m.sceneKey !== "camp" || m.banner !== null) continue;
-          const pickable = m.faceUpObjectives.find((o) => (o as unknown as { pickable: boolean }).pickable);
-          if (pickable) {
-            await clickUntilChanged<CampModel>(p, pickable.objectId, (mm) => !mm.faceUpObjectives.some((o) => o.objectiveId === pickable.objectiveId && (o as unknown as { pickable: boolean }).pickable));
-            continue;
-          }
-          const card = m.hand.find((c) => c.playable);
-          if (card === undefined) continue;
-          await clickHandCard<CampModel>(p, card.objectId, (mm) => mm.sceneKey !== "camp" || !mm.hand.some((c) => c.id === card.id)).catch(() => undefined);
-        }
-      }
-      expect(rescued, "an objective failed and the Medic was asked to rescue it").toBe(true);
+      expect(await playUntilRescue(page, pages), "an objective failed and the Medic was asked to rescue it").toBe(true);
+      expect((await getModel<CampModel>(page)).banner!.title).toMatch(/^Objectives? failed: /);
+      await page.screenshot({ path: ".audit/abilities/rescue-banner.png" });
+      await clickUntilChanged<CampModel>(page, "predeal-use:medic", (m) => m.targeting !== null);
+      const failed = (await getModel<CampModel>(page)).seats.flatMap((s) => s.objectives).find((o) => o.targetable)!;
+      await clickUntilChanged<CampModel>(page, failed.objectId, (m) => m.targeting?.canConfirm === true);
+      await clickUntilChanged<CampModel>(page, "confirm", (m) => m.sceneKey !== "camp" || m.targeting === null);
       await expect.poll(async () => (await getModel<CampModel>(page)).banner, { timeout: 15_000 }).toBeNull();
       await page.screenshot({ path: ".audit/abilities/after-rescue.png" });
       const after = await getModel<CampModel>(page);
@@ -226,6 +225,27 @@ test.describe("Expedition characters and abilities", () => {
         expect(after.prompt.text).not.toMatch(/^Camp failed/);
         expect(after.hand.length).toBeGreaterThan(0);
       }
+    } finally {
+      for (const c of contexts) await c.close();
+    }
+  });
+
+  test("an absent Medic is passed for after the grace period, so the table moves on", async ({ page, browser }) => {
+    test.setTimeout(300_000);
+    const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
+    try {
+      for (const [i, id] of ["medic", "scout", "guide"].entries()) await musterPick(pages[i]!, id);
+      await readyAll(pages);
+      expect(await playUntilRescue(page, pages), "an objective failed and the Medic was asked to rescue it").toBe(true);
+      const bianca = pages[1]!;
+      await expect.poll(async () => (await getModel<CampModel>(bianca)).banner?.detail).toMatch(/Waiting on Roger/);
+
+      const left = Date.now();
+      await page.close();
+      await expect.poll(async () => (await getModel<CampModel>(bianca)).banner?.window ?? null, { timeout: 90_000, intervals: [1_000] }).not.toBe("rescue");
+      const waited = Date.now() - left;
+      expect(waited, "the pass waited out the grace period").toBeGreaterThanOrEqual(29_000);
+      await bianca.screenshot({ path: ".audit/abilities/after-auto-pass.png" });
     } finally {
       for (const c of contexts) await c.close();
     }
