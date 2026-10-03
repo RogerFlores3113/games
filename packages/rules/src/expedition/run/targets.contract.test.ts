@@ -128,6 +128,18 @@ describe("target-kind registry", () => {
     ]);
   });
 
+  it("under Thick Fog a seat sees its own objectives and every failed one, never another seat's open one", () => {
+    const run = richState(3, true);
+    const loser = run.attempt!.camp!.objectives.find((o) => o.id === "obj-failed")!.ownerSeatId!;
+    const other = ["p0", "p1", "p2"].find((id) => id !== loser)!;
+    const ids = (seatId: string) => toExpeditionPlayerView(run, seatId, CATALOG).attempt!.camp!.objectives.map((o) => o.id).sort();
+    expect(ids(other)).toEqual(expect.arrayContaining(["obj-failed", `obj-${other}`]));
+    expect(ids(other)).not.toContain(`obj-${loser}`);
+    expect(ids(other)).not.toContain("obj-open");
+    expect(choicesFor(scopeFor(run, other), { kind: "failed-objective" }).map((c) => c.id)).toEqual(["objective:obj-failed"]);
+    expect(toExpeditionPlayerView(run, "spectator", CATALOG).attempt!.camp!.objectives).toEqual([]);
+  });
+
   it("card-value offers each other rank within the spread, inside 2..14", () => {
     const run = richState(3, false);
     const own = run.attempt!.camp!.hands.find((h) => h.seatId === "p0")!.cards;

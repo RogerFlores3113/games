@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { applyRunAction } from "../run/run-actions";
 import { advanceTo, setupRun } from "../run/run-test-support";
 import { rulesFor } from "../run/compose";
-import { currentWindow } from "../run/toolkit";
+import { currentWindow } from "../run/windows";
 import { assignFaceDown } from "../run/lifecycle";
 import { objectiveSlotsFor } from "../run/balance";
 import { attemptSeed } from "../run/rng";

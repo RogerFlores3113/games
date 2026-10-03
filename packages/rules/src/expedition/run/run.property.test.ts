@@ -26,14 +26,16 @@ import fc from "fast-check";
 import { GEAR_REGISTRY } from "../gear/registry";
 import { BOSS_REGISTRY } from "../boss/registry";
 import { runStatus } from "./lifecycle";
-import { advanceTo, driveRun, replayRun, setupRun } from "./run-test-support";
+import { WINDOW_TEST_GEAR, advanceTo, driveRun, replayRun, setupRun } from "./run-test-support";
 import { campCardIds } from "./toolkit";
+import { rulesFor } from "./compose";
+import { currentWindow } from "./windows";
 import { toExpeditionPlayerView } from "../adapter/view";
 import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "../adapter/view-leak-check";
 import type { Catalog, CampNumber } from "./types";
 
-const CATALOG: Catalog = { gear: GEAR_REGISTRY, bosses: BOSS_REGISTRY };
-const GEAR_IDS = Object.keys(GEAR_REGISTRY);
+const CATALOG: Catalog = { gear: { ...GEAR_REGISTRY, ...WINDOW_TEST_GEAR }, bosses: BOSS_REGISTRY };
+const GEAR_IDS = Object.keys(CATALOG.gear);
 const BOSS_IDS = Object.keys(BOSS_REGISTRY);
 
 // Non-vacuity: at least one view is checked across the whole suite (T-11-19
@@ -231,5 +233,29 @@ describe("property: whole-run simulation (RUN-07)", () => {
 
     expect(sawDifference).toBe(true);
   });
-});
 
+  it("with rescue and in-trick gear on every other seat, every run ends, replays, round-trips JSON and visits rescue", () => {
+    let rescueStates = 0;
+    let windowGearUses = 0;
+    fc.assert(
+      fc.property(fc.constantFrom(3, 4, 5), fc.string({ minLength: 1 }), fc.array(fc.nat({ max: 1000 }), { minLength: 1, maxLength: 64 }), (seatCount, seed, choices) => {
+        const seatIds = seatIdsFor(seatCount);
+        const loadouts = Object.fromEntries(seatIds.map((seatId, i) => [seatId, i % 2 === 0 ? Object.keys(WINDOW_TEST_GEAR) : []]));
+        const initial = setupRun({ seatIds, seed, catalog: CATALOG, loadouts });
+
+        const { states, log } = driveRun(initial, choices, CATALOG);
+
+        expect(runStatus(states[states.length - 1]!)).not.toBe("in_progress");
+        expect(replayRun(initial, log, CATALOG)).toEqual(states);
+        for (const state of states) {
+          expect(JSON.parse(JSON.stringify(state))).toEqual(state);
+          if (currentWindow(state, rulesFor(state, CATALOG)) === "rescue") rescueStates++;
+        }
+        windowGearUses += log.filter((entry) => entry.action.type === "use-gear" && entry.action.gearId in WINDOW_TEST_GEAR).length;
+      }),
+      { numRuns: 20 },
+    );
+    expect(rescueStates).toBeGreaterThan(0);
+    expect(windowGearUses).toBeGreaterThan(0);
+  });
+});

@@ -1,5 +1,5 @@
 // Tests for run/lifecycle.ts (Plan 10-05: createRun, runStatus, runPhase,
-// nextAttemptNumber, capacityOf, loadoutSize, preDealPendingSeatIds,
+// nextAttemptNumber, capacityOf, loadoutSize, the gated pre-deal and rescue windows,
 // drawBossTwist, startAttempt, dealAttempt, assignFaceDown,
 // settleIfDecided, advanceRun).
 //
@@ -7,7 +7,7 @@
 // arrive in wave 5.
 
 import { describe, expect, it } from "vitest";
-import { campPhase } from "../camp";
+import { campPhase, currentActorSeatId } from "../camp";
 import {
   advanceRun,
   assignFaceDown,
@@ -17,13 +17,16 @@ import {
   drawBossTwist,
   loadoutSize,
   nextAttemptNumber,
-  preDealPendingSeatIds,
   runPhase,
   runStatus,
   settleIfDecided,
   startAttempt,
 } from "./lifecycle";
 import { attemptSeed } from "./rng";
+import { applyRunAction } from "./run-actions";
+import { IN_TRICK_TEST_GEAR, RESCUE_TEST_GEAR, advanceTo, setupRun } from "./run-test-support";
+import { currentWindow, gatedPendingSeatIds } from "./windows";
+import { CATALOG } from "./catalog";
 import { rulesFor } from "./compose";
 import type { AttemptState, CampResult, Catalog, RunState, SeatRun } from "./types";
 import type { GearDef } from "../gear/gear-def";
@@ -193,7 +196,7 @@ describe("drawBossTwist", () => {
   });
 });
 
-describe("preDealPendingSeatIds (D-12)", () => {
+describe("the pre-deal gated window (D-12)", () => {
   function catalogWithPreDealGear(canUse: true | string): Catalog {
     const gear: Record<string, GearDef> = {
       "pre-deal-gear": fakeGear({ id: "pre-deal-gear", window: "pre-deal", canUse: () => canUse }),
@@ -219,7 +222,7 @@ describe("preDealPendingSeatIds (D-12)", () => {
     };
     const started: RunState = { ...withGear, attempt };
     expect(runPhase(started)).toBe("pre-deal");
-    expect(preDealPendingSeatIds(started, catalog)).toEqual(["p0"]);
+    expect(gatedPendingSeatIds(started, catalog)).toEqual(["p0"]);
   });
 
   it("a seat whose pre-deal gear's canUse returns a reason is not pending", () => {
@@ -239,7 +242,7 @@ describe("preDealPendingSeatIds (D-12)", () => {
       camp: null,
     };
     const started: RunState = { ...withGear, attempt };
-    expect(preDealPendingSeatIds(started, catalog)).toEqual([]);
+    expect(gatedPendingSeatIds(started, catalog)).toEqual([]);
   });
 
   it("a seat with no pre-deal gear never blocks", () => {
@@ -255,7 +258,7 @@ describe("preDealPendingSeatIds (D-12)", () => {
       camp: null,
     };
     const started: RunState = { ...run, attempt };
-    expect(preDealPendingSeatIds(started, catalog)).toEqual([]);
+    expect(gatedPendingSeatIds(started, catalog)).toEqual([]);
   });
 });
 
@@ -489,5 +492,99 @@ describe("advanceRun", () => {
     const preDeal: RunState = { ...run, attempt };
     const advanced = advanceRun(preDeal, catalog);
     expect(advanced.attempt!.camp).not.toBeNull();
+  });
+});
+
+describe("the rescue window", () => {
+  const catalog: Catalog = { gear: { ...CATALOG.gear, [RESCUE_TEST_GEAR.id]: RESCUE_TEST_GEAR }, bosses: CATALOG.bosses };
+
+  /** Between tricks with every seat holding a no-tricks objective, so the
+   * first trick fails exactly its winner's objective. */
+  function everyoneDucks(loadouts: Readonly<Record<string, readonly string[]>>): RunState {
+    const run = advanceTo(setupRun({ seatIds: ["p0", "p1", "p2"], seed: "rescue-seed", catalog, loadouts }), "between-tricks", catalog);
+    const camp = run.attempt!.camp!;
+    const objectives = camp.seatIds.map((seatId) => ({ id: `duck-${seatId}`, kind: "no-tricks" as const, ownerSeatId: seatId }));
+    return { ...run, attempt: { ...run.attempt!, camp: { ...camp, objectives } } };
+  }
+
+  function playCard(run: RunState): RunState {
+    const camp = run.attempt!.camp!;
+    const rules = rulesFor(run, catalog);
+    const actor = currentActorSeatId(camp, rules)!;
+    const played = applyRunAction(run, actor, { type: "play-card", cardId: rules.legalPlays(camp, actor)[0]!.id }, catalog);
+    if (!played.ok) throw new Error(played.error);
+    return played.state;
+  }
+
+  function playTrick(run: RunState): RunState {
+    return run.seatIds.reduce((next) => playCard(next), run);
+  }
+
+  it("a rescue holder pauses settle", () => {
+    const paused = playTrick(everyoneDucks({ p0: [RESCUE_TEST_GEAR.id] }));
+    expect(paused.attempt).not.toBeNull();
+    expect(currentWindow(paused, rulesFor(paused, catalog))).toBe("rescue");
+    expect(gatedPendingSeatIds(paused, catalog)).toEqual(["p0"]);
+    expect(paused.history).toEqual([]);
+    expect(paused.supplies).toBe(3);
+    expect(applyRunAction(paused, "p1", { type: "skip-window" }, catalog)).toEqual({ ok: false, error: "nothing_to_skip" });
+    const winner = paused.attempt!.camp!.completedTricks[0]!.winnerSeatId;
+    expect(applyRunAction(paused, winner, { type: "whisper", targetSeatId: winner === "p0" ? "p1" : "p0", cardId: "x" }, catalog)).toEqual({
+      ok: false,
+      error: "wrong_window",
+    });
+  });
+
+  it("a pass settles the camp as failed", () => {
+    const paused = playTrick(everyoneDucks({ p0: [RESCUE_TEST_GEAR.id] }));
+    const passed = applyRunAction(paused, "p0", { type: "skip-window" }, catalog);
+    if (!passed.ok) throw new Error(passed.error);
+    expect(passed.state.attempt).toBeNull();
+    expect(passed.state.supplies).toBe(2);
+    expect(passed.state.history).toEqual([{ campNumber: 1, attemptNumber: 1, status: "failed", suppliesSpent: 1 }]);
+  });
+
+  it("a rescue that clears every failure resumes play", () => {
+    const paused = playTrick(everyoneDucks({ p0: [RESCUE_TEST_GEAR.id] }));
+    const winner = paused.attempt!.camp!.completedTricks[0]!.winnerSeatId;
+    const rescued = applyRunAction(paused, "p0", { type: "use-gear", gearId: RESCUE_TEST_GEAR.id, targets: [] }, catalog);
+    if (!rescued.ok) throw new Error(rescued.error);
+    const camp = rescued.state.attempt!.camp!;
+    expect(camp.objectives.map((o) => o.id)).toEqual(["p0", "p1", "p2"].filter((id) => id !== winner).map((id) => `duck-${id}`));
+    expect(campPhase(camp, rulesFor(rescued.state, catalog))).toBe("playing");
+    expect(currentWindow(rescued.state, rulesFor(rescued.state, catalog))).toBe("between-tricks");
+    expect(rescued.state.history).toEqual([]);
+    expect(playCard(rescued.state).attempt!.camp!.currentTrick.plays).toHaveLength(1);
+  });
+
+  it("with no rescue holder the camp fails at once", () => {
+    const failed = playTrick(everyoneDucks({}));
+    expect(failed.attempt).toBeNull();
+    expect(failed.supplies).toBe(2);
+    expect(failed.history).toEqual([{ campNumber: 1, attemptNumber: 1, status: "failed", suppliesSpent: 1 }]);
+  });
+});
+
+describe("the in-trick window", () => {
+  const catalog: Catalog = { gear: { ...CATALOG.gear, [IN_TRICK_TEST_GEAR.id]: IN_TRICK_TEST_GEAR }, bosses: CATALOG.bosses };
+  const use = { type: "use-gear", gearId: IN_TRICK_TEST_GEAR.id, targets: [] } as const;
+
+  it("opens once the leader plays and admits only the seat whose turn it is", () => {
+    const loadouts = { p0: [IN_TRICK_TEST_GEAR.id], p1: [IN_TRICK_TEST_GEAR.id], p2: [IN_TRICK_TEST_GEAR.id] };
+    const start = advanceTo(setupRun({ seatIds: ["p0", "p1", "p2"], seed: "in-trick-seed", catalog, loadouts }), "between-tricks", catalog);
+    const leader = start.attempt!.camp!.currentTrick.leaderSeatId;
+    expect(applyRunAction(start, leader, use, catalog)).toEqual({ ok: false, error: "wrong_window" });
+
+    const rules = rulesFor(start, catalog);
+    const led = applyRunAction(start, leader, { type: "play-card", cardId: rules.legalPlays(start.attempt!.camp!, leader)[0]!.id }, catalog);
+    if (!led.ok) throw new Error(led.error);
+    const ledRules = rulesFor(led.state, catalog);
+    const next = currentActorSeatId(led.state.attempt!.camp!, ledRules)!;
+    const later = ["p0", "p1", "p2"].find((id) => id !== leader && id !== next)!;
+    expect(currentWindow(led.state, ledRules)).toBe("in-trick");
+    expect(applyRunAction(led.state, leader, use, catalog)).toEqual({ ok: false, error: "wrong_window" });
+    expect(applyRunAction(led.state, later, use, catalog)).toEqual({ ok: false, error: "wrong_window" });
+    const used = applyRunAction(led.state, next, use, catalog);
+    expect(used.ok).toBe(true);
   });
 });

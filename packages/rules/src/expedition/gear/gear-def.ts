@@ -18,10 +18,11 @@
 
 import type { ActiveEffect, EffectParams, RunState } from "../run/types";
 import type { RuleModifier, RunRules } from "../run/run-rules";
+import type { ActiveWindow } from "../run/windows";
 import type { CampState, ExpeditionCard } from "../state";
 
-export type GearWindow = "pre-deal" | "objective-pick" | "between-tricks" | "passive";
-export const GEAR_WINDOWS: readonly GearWindow[] = ["pre-deal", "objective-pick", "between-tricks", "passive"];
+export type GearWindow = ActiveWindow | "passive";
+export const GEAR_WINDOWS: readonly GearWindow[] = ["pre-deal", "objective-pick", "between-tricks", "in-trick", "rescue", "passive"];
 
 export type TargetKind = "teammate" | "own-card" | "face-up-objective" | "own-objective";
 export const TARGET_KINDS: readonly TargetKind[] = ["teammate", "own-card", "face-up-objective", "own-objective"];

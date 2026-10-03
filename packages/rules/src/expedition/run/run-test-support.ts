@@ -21,18 +21,13 @@
 import { currentActorSeatId } from "../camp";
 import { evaluateObjective } from "../objectives";
 import { rulesFor } from "./compose";
-import {
-  capacityOf,
-  createRun,
-  loadoutSize,
-  preDealPendingSeatIds,
-  runPhase,
-  runStatus,
-} from "./lifecycle";
+import { winnerExcluding } from "../content/helpers";
+import { capacityOf, createRun, loadoutSize, runPhase, runStatus } from "./lifecycle";
 import { applyRunAction } from "./run-actions";
-import { currentWindow } from "./toolkit";
+import { visibleObjectives } from "./visibility";
+import { currentWindow, gatedPendingSeatIds, WINDOWS } from "./windows";
 import type { CampState } from "../state";
-import type { TargetSpec } from "../gear/gear-def";
+import type { GearContext, GearDef, TargetSpec } from "../gear/gear-def";
 import type { Catalog, CampNumber, RunAction, RunState } from "./types";
 
 /** Builds a fireside RunState with every seat's owned/equipped gear set
@@ -100,7 +95,7 @@ export function advanceTo(
   }
 
   while (runPhase(next) === "pre-deal") {
-    const pending = preDealPendingSeatIds(next, catalog);
+    const pending = gatedPendingSeatIds(next, catalog);
     for (const seatId of pending) {
       const result = applyRunAction(next, seatId, { type: "skip-window" }, catalog);
       if (!result.ok) {
@@ -250,6 +245,21 @@ export function enumerateLegalRunActions(
       }
     }
 
+    const window = currentWindow(run, rules);
+    if (window === "in-trick" || window === "rescue") {
+      for (const seat of run.seats) {
+        if (WINDOWS[window].gated) candidates.push({ seatId: seat.seatId, action: { type: "skip-window" } });
+        for (const gearId of seat.equippedGearIds) {
+          const def = catalog.gear[gearId];
+          if (def === undefined || def.window !== window) continue;
+          const pools = targetOptionsFor(def.targets, run, camp, seat.seatId);
+          for (const targets of cartesian(pools)) {
+            candidates.push({ seatId: seat.seatId, action: { type: "use-gear", gearId, targets } });
+          }
+        }
+      }
+    }
+
     if (currentWindow(run, rules) === "objective-pick") {
       for (const seat of run.seats) {
         for (const gearId of seat.equippedGearIds) {
@@ -379,3 +389,43 @@ export function replayRun(
 
   return states;
 }
+
+function failedVisibleObjectiveIds(ctx: GearContext): string[] {
+  const camp = ctx.camp;
+  if (camp === null) return [];
+  return visibleObjectives(ctx.run, camp, ctx.rules, ctx.self)
+    .filter((o) => evaluateObjective(camp, o) === "failed")
+    .map((o) => o.id);
+}
+
+/** Test-only rescue gear: drops the first failed objective it can see. */
+export const RESCUE_TEST_GEAR: GearDef = {
+  id: "test-rope",
+  name: "Test Rope",
+  size: 1,
+  window: "rescue",
+  text: "Drop a failed objective.",
+  targets: [],
+  canUse: (ctx) => (failedVisibleObjectiveIds(ctx).length > 0 ? true : "No failed objective"),
+  apply: (ctx) => [{ op: "remove-objective", objectiveId: failedVisibleObjectiveIds(ctx)[0]! }],
+};
+
+/** Test-only in-trick gear: the user's own play can't win this trick. */
+export const IN_TRICK_TEST_GEAR: GearDef = {
+  id: "test-duck",
+  name: "Test Duck",
+  size: 1,
+  window: "in-trick",
+  text: "Your card can't win this trick.",
+  targets: [],
+  apply: () => [{ op: "add-modifier", lasts: "trick", params: {}, audience: "public" }],
+  effectModifier: (effect) => ({
+    trickWinner: (prev) => (plays) => winnerExcluding(prev, plays, (play) => play.seatId === effect.seatId),
+  }),
+};
+
+/** The windows no production gear uses, each driven by one test def. */
+export const WINDOW_TEST_GEAR: Readonly<Record<string, GearDef>> = {
+  [RESCUE_TEST_GEAR.id]: RESCUE_TEST_GEAR,
+  [IN_TRICK_TEST_GEAR.id]: IN_TRICK_TEST_GEAR,
+};

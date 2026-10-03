@@ -19,8 +19,10 @@
 // Type-only imports from "../run/types" and "../state" — this module stays
 // zero-runtime-dependency, per packages/rules' FDN-02 rule, EXCEPT for
 // rulesFor (a real function call, needed to determine objectiveAssignment,
-// exactly as the projection function itself does).
+// exactly as the projection function itself does) and evaluateObjective (a
+// failed objective is public even under face-down assignment).
 
+import { evaluateObjective } from "../objectives";
 import { rulesFor } from "../run/compose";
 import { CATALOG } from "../run/catalog";
 import type { Catalog, RunState } from "../run/types";
@@ -148,7 +150,8 @@ export function secretsForExpeditionSeat(
 
     const assignment = rulesFor(state, catalog).objectiveAssignment(state);
     for (const objective of camp.objectives) {
-      const visible = assignment === "face-up" || (seated && objective.ownerSeatId === seatId);
+      const visible =
+        assignment === "face-up" || (seated && (objective.ownerSeatId === seatId || evaluateObjective(camp, objective) === "failed"));
       if (visible) {
         if (objective.kind === "win-card" || objective.kind === "ordered") {
           bump({ kind: "standard", suit: objective.target.suit, rank: objective.target.rank });

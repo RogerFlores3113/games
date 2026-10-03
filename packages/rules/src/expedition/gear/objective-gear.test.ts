@@ -18,7 +18,7 @@ import { applyRunAction } from "../run/run-actions";
 import { advanceTo, setupRun } from "../run/run-test-support";
 import { checkUseGear } from "../run/use-gear";
 import { rulesFor } from "../run/compose";
-import { currentWindow } from "../run/toolkit";
+import { currentWindow } from "../run/windows";
 import type { BossDef } from "../boss/boss-def";
 import type { CampState, CompletedTrick, StandardIdentity } from "../state";
 import type { Catalog, CampNumber, RunState } from "../run/types";

@@ -19,11 +19,11 @@ import {
   applyToolkitOps,
   buildGearContext,
   campCardIds,
-  currentWindow,
   gearAvailability,
   isGearSpent,
   validateTargets,
 } from "./toolkit";
+import { currentWindow } from "./windows";
 
 const SEAT_IDS = ["p0", "p1", "p2"] as const;
 
@@ -188,7 +188,7 @@ describe("currentWindow", () => {
     expect(currentWindow(run, rules)).toBe("between-tricks");
   });
 
-  it("is null the instant the trick's leader plays (D-13, no grace period)", () => {
+  it("closes between-tricks and opens in-trick the instant the trick's leader plays (D-13, no grace period)", () => {
     let camp = pickAllObjectives(freshCamp());
     const actor = currentActorSeatId(camp, rules)!;
     const card = rules.legalPlays(camp, actor)[0]!;
@@ -196,7 +196,7 @@ describe("currentWindow", () => {
     if (!result.ok) throw new Error("test setup failed");
     camp = result.state;
     const run = makeRun({ camp });
-    expect(currentWindow(run, rules)).toBeNull();
+    expect(currentWindow(run, rules)).toBe("in-trick");
   });
 
   it("returns to between-tricks once the trick completes", () => {

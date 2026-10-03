@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { createRun, runPhase, runStatus } from "./lifecycle";
 import { applyRunAction } from "./run-actions";
 import { advanceTo, driveRun, enumerateLegalRunActions, replayRun, setupRun } from "./run-test-support";
-import { currentWindow } from "./toolkit";
+import { currentWindow } from "./windows";
 import { rulesFor } from "./compose";
 import { reroll } from "../gear/reroll";
 import type { Catalog, CampNumber } from "./types";

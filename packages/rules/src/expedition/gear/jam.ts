@@ -10,7 +10,7 @@
 //
 // D-12 exactly: `canUse` refuses "There is no boss twist this camp" whenever
 // activeBossId(ctx.run) is already null (no boss camp, or the twist is
-// already cancelled) — this is what keeps preDealPendingSeatIds
+// already cancelled) — this is what keeps the gated pre-deal window
 // (lifecycle.ts) from ever waiting on a Poncho owner at a non-boss camp,
 // since gearAvailability calls the same canUse to decide "currently
 // available" before counting a seat as pending.

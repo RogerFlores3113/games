@@ -27,7 +27,7 @@
 // a boss twist.
 // D-06: a failure never touches equippedGearIds; a seat's loadout survives
 // the replay untouched.
-// D-12: preDealPendingSeatIds only counts seats with an equipped, unspent,
+// D-12: the pre-deal window (run/windows.ts) only waits on seats with an equipped, unspent,
 // currently-available pre-deal gear; a seat with no pre-deal gear (or whose
 // pre-deal gear cannot currently be used) never blocks the deal.
 //
@@ -43,7 +43,7 @@ import { rulesFor } from "./compose";
 import { draftOfferFor } from "./draft";
 import { BOSS_CAMPS, FINAL_CAMP, STARTING_SUPPLIES, objectiveSlotsFor } from "./balance";
 import { attemptSeed, STREAMS, seededIndex } from "./rng";
-import { gearAvailability, isGearSpent } from "./toolkit";
+import { currentWindow, gatedPendingSeatIds } from "./windows";
 import type {
   AttemptState,
   BossCampNumber,
@@ -140,29 +140,6 @@ export function loadoutSize(gearIds: readonly string[], catalog: Catalog): numbe
     }
     return sum + def.size;
   }, 0);
-}
-
-/** D-12: the deal waits only for seats with an equipped, unspent,
- * currently-available pre-deal gear. Only meaningful during the pre-deal
- * window (attempt started, camp not yet dealt); returns [] otherwise. */
-export function preDealPendingSeatIds(run: RunState, catalog: Catalog): string[] {
-  if (run.attempt === null || run.attempt.camp !== null) return [];
-  const attempt = run.attempt;
-  const rules = rulesFor(run, catalog);
-
-  return run.seats
-    .filter((seat) =>
-      seat.equippedGearIds.some((gearId) => {
-        const def = catalog.gear[gearId];
-        if (def === undefined) {
-          throw new Error(`preDealPendingSeatIds: unknown gear id "${gearId}"`);
-        }
-        if (def.window !== "pre-deal") return false;
-        if (isGearSpent(attempt, seat.seatId, gearId)) return false;
-        return gearAvailability(run, seat.seatId, gearId, catalog, rules).ok;
-      }),
-    )
-    .map((seat) => seat.seatId);
 }
 
 /** D-02/D-03: sorts the pool, removes `excludedId` (camp 6 excludes camp
@@ -284,6 +261,9 @@ export function settleIfDecided(run: RunState, catalog: Catalog): RunState {
   if (outcome.status === "in_progress") return run;
 
   if (outcome.status === "failed") {
+    // A camp failed only by failed objectives waits while a seat can still
+    // rescue it (the rescue window); otherwise it fails in this same call.
+    if (currentWindow(run, rules) === "rescue" && gatedPendingSeatIds(run, catalog).length > 0) return run;
     // Computed while the attempt (and its effects layer) still exists.
     const cost = rules.failureCost(run);
     if (!Number.isInteger(cost) || cost < 1) {
@@ -331,7 +311,7 @@ export function settleIfDecided(run: RunState, catalog: Catalog): RunState {
  * the resulting (or already-existing) camp is decided. */
 export function advanceRun(run: RunState, catalog: Catalog): RunState {
   let next = run;
-  if (runPhase(next) === "pre-deal" && preDealPendingSeatIds(next, catalog).length === 0) {
+  if (runPhase(next) === "pre-deal" && gatedPendingSeatIds(next, catalog).length === 0) {
     next = dealAttempt(next, catalog);
   }
   return settleIfDecided(next, catalog);

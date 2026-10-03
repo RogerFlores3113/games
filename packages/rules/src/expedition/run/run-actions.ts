@@ -28,16 +28,8 @@
 
 import { applyCampAction } from "../actions";
 import { rulesFor } from "./compose";
-import {
-  advanceRun,
-  capacityOf,
-  loadoutSize,
-  preDealPendingSeatIds,
-  runPhase,
-  runStatus,
-  startAttempt,
-} from "./lifecycle";
-import { gearAvailability, isGearSpent } from "./toolkit";
+import { advanceRun, capacityOf, loadoutSize, runPhase, runStatus, startAttempt } from "./lifecycle";
+import { WINDOWS, currentWindow, gatedPendingSeatIds, pendingGearIds } from "./windows";
 import { applyUseGear } from "./use-gear";
 import { applyWhisper } from "./whisper";
 import type { AdapterResult } from "../../adapter";
@@ -126,22 +118,20 @@ function handleReady(run: RunState, actorSeatId: string, catalog: Catalog): Adap
   return accept(next, catalog);
 }
 
+/** Passes the open gated window (pre-deal or rescue): every gear the seat
+ * could still fire in it is marked skipped. */
 function handleSkipWindow(run: RunState, actorSeatId: string, catalog: Catalog): AdapterResult<RunState, RunError> {
-  if (runPhase(run) !== "pre-deal") return err("wrong_phase");
-  if (!preDealPendingSeatIds(run, catalog).includes(actorSeatId)) return err("nothing_to_skip");
-
-  const attempt = run.attempt!; // runPhase === "pre-deal" guarantees this
-  const seat = run.seats.find((s) => s.seatId === actorSeatId)!;
   const rules = rulesFor(run, catalog);
+  const window = currentWindow(run, rules);
+  if (window === null || !WINDOWS[window].gated) return err("wrong_phase");
+  if (!gatedPendingSeatIds(run, catalog).includes(actorSeatId)) return err("nothing_to_skip");
 
-  const newUses: GearUse[] = seat.equippedGearIds
-    .filter((gearId) => {
-      const def = catalog.gear[gearId];
-      if (def === undefined || def.window !== "pre-deal") return false;
-      if (isGearSpent(attempt, actorSeatId, gearId)) return false;
-      return gearAvailability(run, actorSeatId, gearId, catalog, rules).ok;
-    })
-    .map((gearId) => ({ seatId: actorSeatId, gearId, kind: "skipped" as const }));
+  const attempt = run.attempt!; // a gated window is only open during an attempt
+  const newUses: GearUse[] = pendingGearIds(run, actorSeatId, window, catalog, rules).map((gearId) => ({
+    seatId: actorSeatId,
+    gearId,
+    kind: "skipped" as const,
+  }));
 
   return accept(
     { ...run, attempt: { ...attempt, gearUses: [...attempt.gearUses, ...newUses] } },

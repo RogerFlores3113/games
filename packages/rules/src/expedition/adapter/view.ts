@@ -30,9 +30,10 @@
 import { campPhase, currentActorSeatId } from "../camp";
 import { evaluateObjective } from "../objectives";
 import { activeBossId, rulesFor } from "../run/compose";
-import { runPhase, runStatus, preDealPendingSeatIds } from "../run/lifecycle";
+import { runPhase, runStatus } from "../run/lifecycle";
 import { whispersUsedBy } from "../run/whisper";
-import { gearAvailability, currentWindow, isGearSpent } from "../run/toolkit";
+import { gearAvailability, isGearSpent } from "../run/toolkit";
+import { currentWindow, gatedPendingSeatIds } from "../run/windows";
 import { visibleObjectives } from "../run/visibility";
 import type { Catalog, LogEntry, Reveal, RunState } from "../run/types";
 import type { CampState, CardIdentity, ExpeditionCard, Objective, StandardIdentity } from "../state";
@@ -235,7 +236,7 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
   if (state.attempt !== null) {
     const rawAttempt = state.attempt;
     const rawWindow = currentWindow(state, rules);
-    const gearWindow: ExpeditionAttemptView["gearWindow"] = rawWindow === "passive" ? null : rawWindow;
+    const gearWindow: ExpeditionAttemptView["gearWindow"] = rawWindow === "in-trick" || rawWindow === "rescue" ? null : rawWindow;
 
     const reveals: ExpeditionRevealView[] = [];
     if (seated && rawAttempt.camp !== null) {
@@ -297,7 +298,7 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
       attemptNumber: rawAttempt.attemptNumber,
       bossCancelled: rawAttempt.bossCancelled,
       gearWindow,
-      preDealPendingSeatIds: preDealPendingSeatIds(state, catalog),
+      preDealPendingSeatIds: rawWindow === "pre-deal" ? Array.from(gatedPendingSeatIds(state, catalog)) : [],
       gearUses: rawAttempt.gearUses.map(toGearUseView),
       effects: rawAttempt.effects.map(toEffectView),
       reveals,

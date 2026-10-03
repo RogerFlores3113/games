@@ -6,10 +6,6 @@
 // (D-09/D-04). A violation is a content-author defect and THROWS (POLICY
 // A3), matching actions.ts's composed-hook throw policy.
 //
-// D-13: the between-tricks window has NO grace period — it closes the
-// moment the trick's leader plays (camp.currentTrick.plays.length > 0), and
-// reopens only once the next trick starts fresh.
-//
 // A1: every gear draw goes through STREAMS.gear(campNumber, attemptNumber,
 // useIndex, gearId, seatId, purpose), where useIndex = k =
 // attempt.gearUses.length AT THE TIME OF USE — never a stored/carried PRNG
@@ -24,33 +20,16 @@
 // This file must never import from ./compose — callers pass the composed
 // RunRules in, keeping this plan parallel with Plan 10-03.
 
-import { campPhase } from "../camp";
 import { identitiesEqual } from "../deck";
 import { evaluateObjective } from "../objectives";
 import type { CampState, Objective } from "../state";
 import { STARTING_SUPPLIES } from "./balance";
-import type { GearContext, GearWindow, TargetKind as GearTargetKind, TargetSpec, ToolkitOp } from "../gear/gear-def";
+import type { GearContext, GearDef, GearWindow, TargetKind as GearTargetKind, TargetSpec, ToolkitOp } from "../gear/gear-def";
 import { STREAMS, seededIndex } from "./rng";
-import { resolveTargets, type TargetSpec as RegistrySpec } from "./targets";
+import { choicesFor, resolveTargets, type TargetSpec as RegistrySpec } from "./targets";
+import { WINDOWS, currentWindow } from "./windows";
 import type { RunRules } from "./run-rules";
 import type { ActiveEffect, AttemptState, Catalog, LogEntry, Reveal, RunError, RunState } from "./types";
-
-/** The open timing window, or null when no gear can be used right now
- * (mid-trick, fireside, or the camp has ended). Derived fresh from
- * RunState on every call — nothing cached. */
-export function currentWindow(run: RunState, rules: RunRules): GearWindow | null {
-  if (run.attempt === null) return null; // fireside
-  const camp = run.attempt.camp;
-  if (camp === null) return "pre-deal";
-
-  const phase = campPhase(camp, rules);
-  if (phase === "objective-pick") return "objective-pick";
-  if (phase === "playing") {
-    // D-13: the window closes the instant the leader plays.
-    return camp.currentTrick.plays.length === 0 ? "between-tricks" : null;
-  }
-  return null; // "ended"
-}
 
 /** True whether the seat used OR skipped this gear already this camp. */
 export function isGearSpent(attempt: AttemptState, seatId: string, gearId: string): boolean {
@@ -108,6 +87,8 @@ const WINDOW_PHRASES: Record<GearWindow, string> = {
   "pre-deal": "before the deal",
   "objective-pick": "while objectives are picked",
   "between-tricks": "between tricks",
+  "in-trick": "on your turn in a trick",
+  rescue: "when an objective fails",
   passive: "always",
 };
 
@@ -140,7 +121,7 @@ export function gearAvailability(
     return { ok: false, error: "wrong_window", reason: "Passive gear is always active" };
   }
   const window = currentWindow(run, rules);
-  if (def.window !== window) {
+  if (window === null || def.window !== window || !WINDOWS[window].mayAct(run, rules, seatId)) {
     return { ok: false, error: "wrong_window", reason: `Can only be used ${WINDOW_PHRASES[def.window]}` };
   }
   const ctx = buildGearContext(run, seatId, gearId, [], rules);
@@ -159,6 +140,13 @@ const GEAR_TARGET_SPECS: Readonly<Record<GearTargetKind, { readonly spec: Regist
   "face-up-objective": { spec: { kind: "objective", whose: "unclaimed" }, prefix: "objective:" },
   "own-objective": { spec: { kind: "objective", whose: "mine" }, prefix: "objective:" },
 };
+
+/** True when every target step of `def` has at least one choice for the
+ * seat right now. */
+export function gearTargetsHaveChoices(run: RunState, seatId: string, def: GearDef, rules: RunRules): boolean {
+  const scope = { run, seatId, camp: run.attempt?.camp ?? null, rules };
+  return def.targets.every((spec) => choicesFor(scope, GEAR_TARGET_SPECS[spec.kind].spec).length > 0);
+}
 
 /** Generic target-kind validation, shared by every gear, through the
  * target-kind registry: a target is legal only if it is among the seat's

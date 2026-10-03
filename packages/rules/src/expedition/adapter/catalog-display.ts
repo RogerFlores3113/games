@@ -15,7 +15,16 @@ import { BOSS_REGISTRY } from "../boss/registry";
 import type { GearWindow, TargetKind } from "../gear/gear-def";
 
 export type ExpeditionTargetKind = TargetKind;
-export type ExpeditionGearWindow = GearWindow;
+/** The windows production gear uses. In-trick and rescue are open to test
+ * gear only until gear gives way to abilities. */
+export type ExpeditionGearWindow = Exclude<GearWindow, "in-trick" | "rescue">;
+
+function displayWindow(id: string, window: GearWindow): ExpeditionGearWindow {
+  if (window === "in-trick" || window === "rescue") {
+    throw new Error(`GEAR_DISPLAY: production gear "${id}" uses the ${window} window`);
+  }
+  return window;
+}
 
 export type GearDisplay = {
   id: string;
@@ -36,7 +45,7 @@ export const GEAR_DISPLAY: Readonly<Record<string, GearDisplay>> = Object.fromEn
       id: def.id,
       name: def.name,
       size: def.size,
-      window: def.window,
+      window: displayWindow(def.id, def.window),
       text: def.text,
       downside: def.downside ?? null,
       targets: def.targets.map((t) => t.kind),

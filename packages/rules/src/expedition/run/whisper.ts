@@ -33,7 +33,7 @@
 // never names any of them.
 
 import { findOwnCard } from "../legality";
-import { currentWindow } from "./toolkit";
+import { currentWindow } from "./windows";
 import { rulesFor } from "./compose";
 import type { Catalog, LogEntry, Reveal, RunError, RunState } from "./types";
 import type { AdapterResult } from "../../adapter";

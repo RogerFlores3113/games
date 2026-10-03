@@ -856,3 +856,18 @@ target kind, a window. Green check **`source-icons`**: a new
 - Unit 4: `reassign-objective` and `reassign-trick` throw when the new seat is the current one, and
   `reassign-objective` refuses an unowned objective (taking one is a pick). Rally's `canTarget`
   must refuse an ordered objective whose card its owner won.
+- Unit 5: gear has no stamped ledger yet, so a rescue pass marks the seat's rescue gear skipped for
+  the rest of the attempt. The stamped `passed` entry, which lets a later failure reopen rescue for
+  that seat, arrives with the ledger in unit 6.
+- Unit 5: `gatedPendingSeatIds` requires a choice for every target step; `gearAvailability` does
+  not, so existing gear keeps its `usableNow` answers until `abilityStatus` replaces it.
+- Unit 5: until the view swap, `gearWindow` reports `in-trick` and `rescue` as null and
+  `preDealPendingSeatIds` reads the gated list only in pre-deal. `ExpeditionGearWindow` excludes the
+  two new windows and `GEAR_DISPLAY` throws if production gear uses one, so the web compiles
+  unchanged.
+- Unit 5: the lead decision "rescue sees every failed objective" lands here, in
+  `run/visibility.ts` and the leak check's independent rule, because rescue is what makes a failed
+  objective observable in a live camp.
+- Unit 5: the test-only defs (`WINDOW_TEST_GEAR`: a rescue rope and an in-trick duck) live in
+  `run/run-test-support.ts`. `run.property.test.ts` adds them to its catalogue and gains a property
+  that guarantees them on alternate seats and asserts rescue was reached.
