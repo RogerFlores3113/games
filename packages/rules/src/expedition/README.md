@@ -101,7 +101,7 @@ one `apply`; the context builds both, so an ability never names a stream.
    - `canUse?(ctx)`: target-free availability, `true` or a player-facing
      reason. `canTarget?(ctx)`: rules across targets, `true` or a reason.
    - `apply(ctx)`: returns `ToolkitOp` data. If it emits `add-modifier`,
-     also give `effect(e)`, the `RuleModifier` that op switches on.
+     also give `effect(e, run)`, the `RuleModifier` that op switches on.
    A passive item gives `passive: { modifier(owner) }` instead.
 3. Add one line to `content/items/registry.ts`'s `ITEMS`.
 4. `content/sources.contract.test.ts` covers it with no edits: shape, one
