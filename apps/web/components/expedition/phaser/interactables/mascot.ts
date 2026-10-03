@@ -15,7 +15,6 @@ import { ART } from "../art/art-registry";
 import { placeArt, playArtThenIdle } from "../art/place-art";
 import { ZONES } from "../layout";
 import type { InteractableDef } from "./interactable-def";
-import { addHoverLabel } from "./hover-label";
 
 const LINES: readonly string[] = [
   "Psst - the Sun always wins.",
@@ -49,7 +48,6 @@ function place(scene: Phaser.Scene, anchor: { x: number; y: number }): Phaser.Ga
   PANDA.set(container, panda);
   container.setSize(art.w, art.h);
   container.setInteractive({ useHandCursor: true });
-  addHoverLabel(scene, container, "Panda", -art.h / 2 - 2);
   return container;
 }
 

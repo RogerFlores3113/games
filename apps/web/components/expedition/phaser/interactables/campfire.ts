@@ -9,7 +9,6 @@ import { PALETTE, toPhaserColor } from "../palette";
 import { ART } from "../art/art-registry";
 import { placeArt } from "../art/place-art";
 import type { InteractableDef } from "./interactable-def";
-import { addHoverLabel } from "./hover-label";
 
 const SPARK_COUNT_MIN = 6;
 const SPARK_COUNT_MAX = 10;
@@ -33,7 +32,6 @@ function place(scene: Phaser.Scene, anchor: { x: number; y: number }): Phaser.Ga
   container.add([glow, placeArt(scene, "campfire", 0, 0)]);
   container.setSize(art.w, art.h);
   container.setInteractive({ useHandCursor: true });
-  addHoverLabel(scene, container, "Campfire", -art.h / 2 - 2);
   return container;
 }
 

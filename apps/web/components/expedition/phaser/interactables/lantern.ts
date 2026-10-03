@@ -8,7 +8,6 @@ import { PALETTE, toPhaserColor } from "../palette";
 import { ART } from "../art/art-registry";
 import { placeArt } from "../art/place-art";
 import type { InteractableDef } from "./interactable-def";
-import { addHoverLabel } from "./hover-label";
 
 const SWING_START_DEGREES = 18;
 const SWING_STEP_MS = 260;
@@ -25,7 +24,6 @@ function place(scene: Phaser.Scene, anchor: { x: number; y: number }): Phaser.Ga
   container.add([rope, placeArt(scene, "lantern", 0, 0)]);
   container.setSize(art.w, art.h);
   container.setInteractive({ useHandCursor: true });
-  addHoverLabel(scene, container, "Lantern", art.h / 2 + 10);
   return container;
 }
 

@@ -8,7 +8,6 @@
 import type Phaser from "phaser";
 import { PALETTE, toPhaserColor } from "../palette";
 import type { InteractableDef } from "./interactable-def";
-import { addHoverLabel } from "./hover-label";
 
 const FIREFLY_COUNT = 6;
 const DRIFT_RADIUS = 8;
@@ -67,7 +66,6 @@ function place(scene: Phaser.Scene, anchor: { x: number; y: number }): Phaser.Ga
   const span = (DRIFT_RADIUS + DRIFT_WOBBLE) * 2;
   container.setSize(span, span);
   container.setInteractive({ useHandCursor: true });
-  addHoverLabel(scene, container, "Fireflies", -span / 2 - 2);
   return container;
 }
 
