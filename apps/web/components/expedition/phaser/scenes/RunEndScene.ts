@@ -9,14 +9,14 @@ import { LABEL_CELL, SIGN_CELL, WORLD_SIGN_FONT } from "../font/font-keys";
 import { preloadArt, placeArt } from "../art/place-art";
 import { PALETTE, toPhaserColor } from "../palette";
 import { RUN_END_ZONES, STAGE, rowBoxes } from "../layout";
-import { button, labelWidth, plate, text, type Layer } from "../draw/ui-kit";
+import { PANEL_ALPHA, button, labelWidth, plate, text, type Layer } from "../draw/ui-kit";
 import { LEAVE_ID, NEW_EXPEDITION_ID } from "../../../../lib/expedition/expedition-ids";
 import type { RunEndCamp, RunEndModel } from "../../../../lib/expedition/run-end-model";
 import type { ObjectIndex } from "../object-index";
 import type { SceneDeps } from "./scene-registry";
 
-const PANEL_ALPHA = 0.8;
 const COLUMN_GAP = 4;
+const MASCOT_SHADOW_DY = 14;
 
 function runEndModel(store: SceneDeps["store"]): RunEndModel | null {
   const model = store.getState().model;
@@ -80,7 +80,10 @@ export class RunEndScene extends Phaser.Scene {
     this.drawHeadline(layer, model);
     this.drawStrip(layer, model);
     const mascot = RUN_END_ZONES.mascot;
-    layer.add(placeArt(this, won ? "mascot-cheer" : "mascot-flop", mascot.x + mascot.w / 2, mascot.y + mascot.h / 2));
+    const cx = mascot.x + mascot.w / 2;
+    const cy = mascot.y + mascot.h / 2;
+    layer.add(this.add.ellipse(cx, cy + MASCOT_SHADOW_DY, 30, 6, toPhaserColor(PALETTE.letterbox), 0.55));
+    layer.add(placeArt(this, won ? "mascot-cheer" : "mascot-flop", cx, cy));
     this.drawActions(layer, model);
   }
 

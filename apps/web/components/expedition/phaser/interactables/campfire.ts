@@ -18,6 +18,9 @@ const SPARK_DURATION_MS = 400;
 const SPARK_SPREAD_X = 12;
 const SPARK_RISE_MIN = 10;
 const SPARK_RISE_MAX = 20;
+const GLOW_W = 44;
+const GLOW_H = 14;
+const GLOW_MS = 700;
 
 function place(scene: Phaser.Scene, anchor: { x: number; y: number }): Phaser.GameObjects.GameObject {
   const x = Math.round(anchor.x);
@@ -25,7 +28,9 @@ function place(scene: Phaser.Scene, anchor: { x: number; y: number }): Phaser.Ga
   const container = scene.add.container(x, y);
 
   const art = ART.campfire;
-  container.add(placeArt(scene, "campfire", 0, 0));
+  const glow = scene.add.ellipse(0, art.h / 2 - 4, GLOW_W, GLOW_H, toPhaserColor(PALETTE.sun), 0.35);
+  scene.tweens.add({ targets: glow, alpha: { from: 1, to: 0.6 }, scaleX: { from: 1, to: 0.9 }, duration: GLOW_MS, yoyo: true, repeat: -1, ease: "Sine.InOut" });
+  container.add([glow, placeArt(scene, "campfire", 0, 0)]);
   container.setSize(art.w, art.h);
   container.setInteractive({ useHandCursor: true });
   addHoverLabel(scene, container, "Campfire", -art.h / 2 - 2);

@@ -30,11 +30,12 @@ import type { ObjectIndex } from "../object-index";
 import type { CardModel, SceneModel } from "../../../../lib/expedition/build-scene-model";
 import type { CampHandlers } from "./camp-handlers";
 import { fitLabel } from "./text-fit";
-import { DIM_ALPHA, labelWidth, miniCard, text, type Layer } from "./ui-kit";
+import { DIM_ALPHA, PANEL_ALPHA, labelWidth, miniCard, plate, platedText, text, type Layer } from "./ui-kit";
 
 const DEAL_TWEEN_MS = 150;
 const TRICK_NAME_CHARS = 7;
 const FAN_STEP = 16;
+const TRAY_PAD = 3;
 
 /** Where a seat's played card flies in from: its opponent block, or your hand. */
 function seatOrigin(model: SceneModel, seatId: string): Point {
@@ -48,8 +49,18 @@ function nameOf(model: SceneModel, seatId: string): string {
   return model.seats.find((s) => s.seatId === seatId)?.displayLabel ?? "?";
 }
 
+/** A dark tray under the fan, so dimmed cards dim against it, not the art. */
+function drawHandTray(scene: Phaser.Scene, layer: Layer, xs: number[]): void {
+  if (xs.length === 0) return;
+  const zone = ZONES.hand;
+  const x = xs[0]! - TRAY_PAD;
+  const y = HAND_CARD_Y - HOVER_LIFT - HAND_MARKER_H - 2;
+  layer.add(plate(scene, x, y, xs.at(-1)! + CARD_W + TRAY_PAD - x, zone.y + zone.h - y).setAlpha(PANEL_ALPHA));
+}
+
 export function drawHand(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   const xs = handFanXs(model.hand.length);
+  drawHandTray(scene, layer, xs);
   const order = model.hand.map((card, i) => ({ card, i })).sort((a, b) => Number(a.card.lifted) - Number(b.card.lifted));
 
   for (const { card, i } of order) {
@@ -115,9 +126,9 @@ export function drawTrick(scene: Phaser.Scene, layer: Layer, model: SceneModel, 
     index.register("camp", play.card.objectId, image);
 
     const name = fitLabel(nameOf(model, play.seatId), TRICK_NAME_CHARS);
-    layer.add(text(scene, x - Math.floor(labelWidth(name) / 2), TRICK_CARD_TOP + CARD_H + 3, name));
+    layer.add(platedText(scene, x - Math.floor(labelWidth(name) / 2), TRICK_CARD_TOP + CARD_H + 3, name));
     if (play.isLed) {
-      layer.add(text(scene, x - Math.floor(labelWidth("Led") / 2), TRICK_CARD_TOP - LABEL_CELL.h - 2, "Led", PALETTE.sun));
+      layer.add(platedText(scene, x - Math.floor(labelWidth("Led") / 2), TRICK_CARD_TOP - LABEL_CELL.h - 2, "Led", PALETTE.sun));
     }
   });
 }
@@ -128,10 +139,11 @@ export function drawLastTrick(scene: Phaser.Scene, layer: Layer, model: SceneMod
   const zone = ZONES.lastTrick;
   const right = zone.x + zone.w - 2;
 
-  layer.add(text(scene, right - labelWidth("Last trick"), zone.y, "Last trick", PALETTE.textDim));
+  layer.add(plate(scene, zone.x, zone.y, zone.w, zone.h).setAlpha(PANEL_ALPHA));
+  layer.add(text(scene, right - labelWidth("Last trick"), zone.y + 1, "Last trick", PALETTE.textDim));
 
   const pileX = right - MINI_W - 4;
-  const pileY = zone.y + 10;
+  const pileY = zone.y + 11;
   const pile = scene.add.container(pileX + MINI_W / 2, pileY + MINI_H / 2);
   pile.add(scene.add.image(0, 0, cardBackTextureKey(model.cardPackId, "mini")));
   pile.setSize(MINI_W + 8, MINI_H + 4);

@@ -11,7 +11,7 @@ import { placeArt } from "../art/place-art";
 import { ART } from "../art/art-registry";
 import type { BossEffect, Tooltip, TopBar } from "../../../../lib/expedition/build-scene-model";
 import type { Prompt, PromptTone } from "../../../../lib/expedition/build-prompt";
-import { labelWidth, plate, text, type Layer } from "./ui-kit";
+import { PANEL_ALPHA, labelWidth, plate, text, type Layer } from "./ui-kit";
 import { wrapWords } from "./text-fit";
 
 const MAX_CRATES = 8;
@@ -26,6 +26,7 @@ export function drawStaticWorld(scene: Phaser.Scene): void {
 
 export function drawTopBar(scene: Phaser.Scene, layer: Layer, bar: TopBar): void {
   const zone = ZONES.topBar;
+  layer.add(plate(scene, zone.x, zone.y, zone.w, zone.h).setAlpha(PANEL_ALPHA));
   const textY = zone.y + Math.floor((zone.h - LABEL_CELL.h) / 2);
   const crate = ART.crate;
   const crates = Math.min(bar.supplies, MAX_CRATES);

@@ -14,7 +14,7 @@ import type { ObjectIndex } from "../object-index";
 import type { GearChip, ObjectiveChip, SceneModel, SeatModel } from "../../../../lib/expedition/build-scene-model";
 import type { CampHandlers } from "./camp-handlers";
 import { fitLabel } from "./text-fit";
-import { DIM_ALPHA, labelWidth, objectiveItem, objectiveItemWidth, plate, text, type Layer } from "./ui-kit";
+import { DIM_ALPHA, PANEL_ALPHA, gearLabel, labelWidth, objectiveItem, objectiveItemWidth, plate, text, type Layer } from "./ui-kit";
 
 const NAME_MAX_CHARS = 14;
 const ROW_H = 12;
@@ -120,9 +120,7 @@ function gearGrid(ctx: Ctx, group: Layer, chips: GearChip[], area: Rect, cols: n
     const container = ctx.scene.add.container(Math.round(cx), Math.round(cy));
     const bg = ctx.scene.add.rectangle(0, 0, w, GEAR_H, toPhaserColor(PALETTE.bark));
     if (interactive && chip.usable) bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn));
-    const label = fitLabel(chip.name, Math.floor((w - 2) / LABEL_CELL.w));
-    const t = text(ctx.scene, -Math.floor(labelWidth(label) / 2), -LABEL_CELL.h / 2, label);
-    container.add([bg, t]);
+    container.add([bg, ...gearLabel(ctx.scene, 0, 0, w - 2, chip.gearId, chip.name)]);
     container.setSize(w, GEAR_H);
     container.setAlpha(chip.spent ? DIM_ALPHA : 1);
     if (interactive) {
@@ -164,7 +162,7 @@ function drawOpponent(ctx: Ctx, layer: Layer, seat: SeatModel, block: Rect): voi
   const pack = ART["seat-pack"];
   const leftW = iw - pack.w - 4;
 
-  group.add(plate(scene, block.x, block.y, block.w, block.h).setAlpha(0.7));
+  group.add(plate(scene, block.x, block.y, block.w, block.h).setAlpha(PANEL_ALPHA));
 
   const badges: { value: string; color: string; id?: string }[] = [];
   if (!seat.connected) badges.push({ value: "away", color: PALETTE.statusDisconnected });
@@ -196,7 +194,7 @@ function drawYou(ctx: Ctx, layer: Layer, seat: SeatModel): void {
   const group = scene.add.container(0, 0);
   layer.add(group);
   const z = ZONES.you;
-  group.add(plate(scene, z.x, z.y, z.w, z.h).setAlpha(0.7));
+  group.add(plate(scene, z.x, z.y, z.w, z.h).setAlpha(PANEL_ALPHA));
   const x0 = z.x + 2;
   const iw = z.w - 4;
 

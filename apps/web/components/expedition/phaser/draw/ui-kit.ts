@@ -10,11 +10,15 @@ import { MINI_H, MINI_W } from "../layout";
 import { cardTextureKey } from "../card-packs/card-pack-def";
 import type { CardPackId } from "../../../../lib/expedition/card-pack-ids";
 import type { ObjectiveChip } from "../../../../lib/expedition/build-scene-model";
+import { placeArt } from "../art/place-art";
+import { ART, gearArtId, type ArtId } from "../art/art-registry";
 import { fitLabel } from "./text-fit";
 
 export type Layer = Phaser.GameObjects.Container;
 
 export const DIM_ALPHA = 0.45;
+/** Opacity of the dark plates that keep text readable over the art. */
+export const PANEL_ALPHA = 0.82;
 
 /** Label-font text with its top-left at (x, y). */
 export function text(scene: Phaser.Scene, x: number, y: number, value: string, color: string = PALETTE.text): Phaser.GameObjects.BitmapText {
@@ -29,9 +33,40 @@ export function plate(scene: Phaser.Scene, x: number, y: number, w: number, h: n
   return scene.add.rectangle(Math.round(x), Math.round(y), w, h, toPhaserColor(color)).setOrigin(0, 0);
 }
 
-/** A labelled button centred on (cx, cy). Interactive only when `onClick` is
- * given; a disabled button is dimmed unless `dim: false`. `big` sets the
- * label in the sign font. Returns the container. */
+/** Label-font text at (x, y) on a snug dark plate, for text drawn straight
+ * over art. Add both to a layer: `layer.add(platedText(...))`. */
+export function platedText(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  value: string,
+  color: string = PALETTE.text,
+): [Phaser.GameObjects.Rectangle, Phaser.GameObjects.BitmapText] {
+  const backing = plate(scene, x - 2, y - 1, labelWidth(value) + 3, LABEL_CELL.h + 1).setAlpha(PANEL_ALPHA);
+  return [backing, text(scene, x, y, value, color)];
+}
+
+/** Below this many characters a gear name is dropped and its icon shown alone. */
+const GEAR_NAME_MIN_CHARS = 4;
+
+/** A gear's icon followed by its name, centred on (cx, cy) and no wider
+ * than `maxW`: the name is shortened to fit, or dropped when too short. */
+export function gearLabel(scene: Phaser.Scene, cx: number, cy: number, maxW: number, gearId: string, name: string): Phaser.GameObjects.GameObject[] {
+  const art = gearArtId(gearId);
+  const iconW = art === null ? 0 : ART[art].w + 1;
+  const room = Math.floor((maxW - iconW) / LABEL_CELL.w);
+  const shown = room >= GEAR_NAME_MIN_CHARS ? fitLabel(name, room) : "";
+  const left = cx - Math.floor((iconW + labelWidth(shown)) / 2);
+  const parts: Phaser.GameObjects.GameObject[] = [];
+  if (art !== null) parts.push(placeArt(scene, art, left + ART[art].w / 2, cy));
+  if (shown !== "") parts.push(text(scene, left + iconW, cy - LABEL_CELL.h / 2, shown));
+  return parts;
+}
+
+/** A labelled button centred on (cx, cy), with an optional 16px icon left
+ * of the label. Interactive only when `onClick` is given; a disabled button
+ * is drawn as a dark plate with a dim label unless `dim: false`. `big` sets
+ * the label in the sign font. Returns the container. */
 export function button(
   scene: Phaser.Scene,
   cx: number,
@@ -39,24 +74,31 @@ export function button(
   w: number,
   h: number,
   label: string,
-  opts: { onClick?: () => void; outline?: boolean; color?: string; big?: boolean; dim?: boolean } = {},
+  opts: { onClick?: () => void; outline?: boolean; color?: string; big?: boolean; dim?: boolean; icon?: ArtId } = {},
 ): Phaser.GameObjects.Container {
   const container = scene.add.container(Math.round(cx), Math.round(cy));
-  const bg = scene.add.rectangle(0, 0, w, h, toPhaserColor(opts.color ?? PALETTE.stump));
+  const disabled = opts.onClick === undefined && opts.dim !== false;
+  const bg = scene.add.rectangle(0, 0, w, h, toPhaserColor(disabled ? PALETTE.plate : (opts.color ?? PALETTE.stump)));
   if (opts.outline) bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn));
+  else if (disabled) bg.setStrokeStyle(1, toPhaserColor(PALETTE.plateEdge));
+  container.add(bg);
   const cell = opts.big ? SIGN_CELL : LABEL_CELL;
-  const shown = fitLabel(label, Math.floor((w - 2) / cell.w));
+  const iconW = opts.icon === undefined ? 0 : ART[opts.icon].w + 2;
+  const shown = fitLabel(label, Math.floor((w - 2 - iconW) / cell.w));
   const shownW = Array.from(shown).length * cell.w;
+  const left = -Math.floor((shownW + iconW) / 2);
+  if (opts.icon !== undefined) {
+    const icon = placeArt(scene, opts.icon, left + ART[opts.icon].w / 2, 0);
+    container.add(disabled ? icon.setAlpha(DIM_ALPHA) : icon);
+  }
   const t = scene.add
-    .bitmapText(-Math.floor(shownW / 2), -Math.floor(cell.h / 2), opts.big ? WORLD_SIGN_FONT : WORLD_LABEL_FONT, shown)
-    .setTint(toPhaserColor(PALETTE.text));
-  container.add([bg, t]);
+    .bitmapText(left + iconW, -Math.floor(cell.h / 2), opts.big ? WORLD_SIGN_FONT : WORLD_LABEL_FONT, shown)
+    .setTint(toPhaserColor(disabled ? PALETTE.textDim : PALETTE.text));
+  container.add(t);
   container.setSize(w, h);
   if (opts.onClick) {
     container.setInteractive({ useHandCursor: true });
     container.on("pointerdown", opts.onClick);
-  } else if (opts.dim !== false) {
-    container.setAlpha(DIM_ALPHA);
   }
   return container;
 }

@@ -94,3 +94,14 @@ export function placeArt(scene: Phaser.Scene, id: ArtId, x: number, y: number): 
   if (loop !== null) sprite.play(loop);
   return sprite;
 }
+
+/** Plays `id`'s strip `times` times on `sprite`, then goes back to looping
+ * `idle`. Does nothing unless both strips are loaded. */
+export function playArtThenIdle(sprite: Phaser.GameObjects.Sprite, id: ArtId, times: number, idle: ArtId): void {
+  const once = artAnimation(sprite.scene, id, times - 1);
+  const loop = artAnimation(sprite.scene, idle, -1);
+  if (once === null || loop === null) return;
+  sprite.chain();
+  sprite.play(once);
+  sprite.chain(loop);
+}

@@ -11,8 +11,9 @@ import { MINI_H, MINI_W, OBJECTIVE_POOL_STEP, ZONES, stumpRowXs } from "../layou
 import { CANCEL_ID, CONFIRM_ID, PREDEAL_SKIP_ID, WHISPER_ID, preDealUseObjectId } from "../../../../lib/expedition/expedition-ids";
 import type { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
+import type { ArtId } from "../art/art-registry";
 import type { CampHandlers } from "./camp-handlers";
-import { button, labelWidth, miniCard, plate, text, type Layer } from "./ui-kit";
+import { button, labelWidth, miniCard, plate, platedText, text, type Layer } from "./ui-kit";
 
 const TILE_W = OBJECTIVE_POOL_STEP - 2;
 const BUTTON_H = 14;
@@ -30,7 +31,7 @@ function drawObjectivePool(scene: Phaser.Scene, layer: Layer, model: SceneModel,
   if (pool.length === 0) return;
   const zone = ZONES.stump;
   const title = "Objectives";
-  layer.add(text(scene, zone.x + Math.floor((zone.w - labelWidth(title)) / 2), zone.y + 8, title, PALETTE.textDim));
+  layer.add(platedText(scene, zone.x + Math.floor((zone.w - labelWidth(title)) / 2), zone.y + 8, title));
 
   const bodyY = zone.y + 24;
   stumpRowXs(pool.length, OBJECTIVE_POOL_STEP).forEach((cx, i) => {
@@ -45,7 +46,7 @@ function drawObjectivePool(scene: Phaser.Scene, layer: Layer, model: SceneModel,
       container.add(plate(scene, bodyX, 0, MINI_W, MINI_H, PALETTE.stump));
       container.add(text(scene, bodyX + Math.floor((MINI_W - labelWidth(body)) / 2), (MINI_H - LABEL_CELL.h) / 2, body));
     }
-    container.add(text(scene, Math.floor((TILE_W - labelWidth(caption)) / 2), MINI_H + 3, caption));
+    container.add(platedText(scene, Math.floor((TILE_W - labelWidth(caption)) / 2), MINI_H + 3, caption));
 
     const highlighted = chip.pickable || chip.targetable;
     if (highlighted || chip.selected) {
@@ -67,6 +68,7 @@ interface Action {
   label: string;
   onClick?: () => void;
   outline?: boolean;
+  icon?: ArtId;
   /** Row in the actions zone; buttons in one row split its width. */
   row: number;
 }
@@ -84,8 +86,8 @@ function actionList(model: SceneModel, handlers: CampHandlers): Action[] {
     const label = model.whisper.used ? "Whisper used" : "Whisper";
     actions.push(
       model.whisper.visible
-        ? { id: WHISPER_ID, label, onClick: () => handlers.onWhisper(), outline: model.whisper.active, row: 0 }
-        : { id: WHISPER_ID, label, row: 0 },
+        ? { id: WHISPER_ID, label, onClick: () => handlers.onWhisper(), outline: model.whisper.active, icon: "icon-whisper", row: 0 }
+        : { id: WHISPER_ID, label, icon: "icon-whisper", row: 0 },
     );
   }
   if (model.targeting !== null) {
@@ -109,7 +111,7 @@ function drawActions(scene: Phaser.Scene, layer: Layer, model: SceneModel, index
     const cy = zone.y + 2 + row * (BUTTON_H + ROW_GAP) + BUTTON_H / 2;
     items.forEach((a, i) => {
       const cx = zone.x + 2 + i * (w + gap) + w / 2;
-      const b = button(scene, cx, cy, w, BUTTON_H, a.label, { onClick: a.onClick, outline: a.outline });
+      const b = button(scene, cx, cy, w, BUTTON_H, a.label, { onClick: a.onClick, outline: a.outline, icon: a.icon });
       layer.add(b);
       // Only clickable buttons are registered: a registered id is one a
       // player (or a test) can press.

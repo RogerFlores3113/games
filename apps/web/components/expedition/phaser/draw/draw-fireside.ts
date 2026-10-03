@@ -11,7 +11,7 @@ import { ART, gearArtId, type ArtId } from "../art/art-registry";
 import type { ObjectIndex } from "../object-index";
 import type { CrewRow, DraftItem, FiresideModel, OwnedItem, TrailStop } from "../../../../lib/expedition/fireside-model";
 import { fitLabel } from "./text-fit";
-import { DIM_ALPHA, button, labelWidth, plate, text, type Layer } from "./ui-kit";
+import { DIM_ALPHA, PANEL_ALPHA, button, gearLabel, labelWidth, plate, text, type Layer } from "./ui-kit";
 
 export interface FiresideHandlers {
   onDraft(gearId: string): void;
@@ -28,7 +28,6 @@ interface Ctx {
   handlers: FiresideHandlers;
 }
 
-const PANEL_ALPHA = 0.75;
 const INK = PALETTE.cardEdge;
 const PULSE_MS = 600;
 
@@ -44,9 +43,10 @@ function panel(ctx: Ctx, zone: Rect): void {
 // Trail
 // ---------------------------------------------------------------------------
 
-const MARKER_ROW = 36;
-const LABEL_ROW = 46;
-const CAPTION_ROW = 55;
+// Rows inside the parchment, clear of its torn white edges.
+const MARKER_ROW = 30;
+const LABEL_ROW = 40;
+const CAPTION_ROW = 49;
 
 const CAPTION_COLOR: Readonly<Record<TrailStop["state"], string>> = {
   cleared: PALETTE.moss,
@@ -86,8 +86,8 @@ function drawTrail(ctx: Ctx): void {
       layer.add(glow);
       scene.tweens.add({ targets: glow, alpha: { from: 1, to: 0.3 }, duration: PULSE_MS, yoyo: true, repeat: -1 });
       const token = ART["crew-token"];
-      layer.add(placeArt(scene, "crew-token", x, zone.y + 4 + token.h / 2));
-      layer.add(text(scene, x + token.w / 2 + 2, zone.y + 8, "Crew", INK));
+      layer.add(placeArt(scene, "crew-token", x, zone.y + 2 + token.h / 2));
+      layer.add(text(scene, x + token.w / 2 + 2, zone.y + 6, "Crew", INK));
     }
     const marker = placeArt(scene, markerFor(stop), x, y);
     if (stop.state === "ahead") marker.setAlpha(0.7);
@@ -194,16 +194,20 @@ function drawCrewRow(ctx: Ctx, row: CrewRow, x: number, y: number, w: number): v
   }
   let cursor = x;
   for (let i = 0; i < row.gear.length; i++) {
+    const gear = row.gear[i]!;
     const rest = row.gear.length - i - 1;
     const reserve = rest > 0 ? labelWidth(`+${rest}`) + 2 : 0;
-    const label = fitLabel(row.gear[i]!.name, Math.floor((x + w - reserve - cursor - 4) / LABEL_CELL.w));
+    const art = gearArtId(gear.gearId);
+    const iconW = art === null ? 0 : ART[art].w + 1;
+    const label = fitLabel(gear.name, Math.floor((x + w - reserve - cursor - 4 - iconW) / LABEL_CELL.w));
     if (Array.from(label).length < 3) {
       layer.add(text(scene, cursor, chipY + 1, `+${rest + 1}`, PALETTE.textDim));
       return;
     }
-    const chipW = labelWidth(label) + 4;
+    const chipW = iconW + labelWidth(label) + 4;
     layer.add(plate(scene, cursor, chipY, chipW, CHIP_H, PALETTE.bark));
-    layer.add(text(scene, cursor + 2, chipY + 1, label));
+    if (art !== null) layer.add(placeArt(scene, art, cursor + 1 + ART[art].w / 2, chipY + CHIP_H / 2));
+    layer.add(text(scene, cursor + 2 + iconW, chipY + 1, label));
     cursor += chipW + 2;
   }
 }
@@ -283,7 +287,7 @@ function drawBackpack(ctx: Ctx): void {
   const slotY = zone.y + 14;
   const slots = rowBoxes(x0, rowW, bag.capacity, SLOT_GAP, SLOT_MAX_W);
   for (const slot of slots) {
-    layer.add(scene.add.rectangle(slot.x, slotY, slot.w, SLOT_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.plateEdge)));
+    layer.add(plate(scene, slot.x, slotY, slot.w, SLOT_H, PALETTE.letterbox).setAlpha(PANEL_ALPHA).setStrokeStyle(1, toPhaserColor(PALETTE.plateEdge)));
   }
   for (const item of bag.packed) {
     if (item.size === 0) continue;
@@ -292,8 +296,7 @@ function drawBackpack(ctx: Ctx): void {
     if (first === undefined || last === undefined) continue;
     const w = last.x + last.w - first.x;
     layer.add(plate(scene, first.x, slotY, w, SLOT_H, PALETTE.bark));
-    const label = fitLabel(item.name, Math.floor((w - 4) / LABEL_CELL.w));
-    layer.add(centredText(scene, first.x + w / 2, slotY + Math.floor((SLOT_H - LABEL_CELL.h) / 2), label));
+    layer.add(gearLabel(scene, first.x + w / 2, slotY + SLOT_H / 2, w - 4, item.gearId, item.name));
   }
 
   const ownedY = zone.y + zone.h - OWNED_H - 2;
