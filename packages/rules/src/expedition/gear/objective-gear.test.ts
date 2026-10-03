@@ -506,7 +506,7 @@ describe("Camouflage (ghost, D-11)", () => {
 
     const nextCamp = result.state.attempt!.camp!;
     expect(nextCamp.objectives.some((o) => o.id === ownObjective.id)).toBe(false);
-    expect(result.state.attempt!.effects).toContainEqual({ gearId: "ghost", seatId: "p0", atTrick: 0 });
+    expect(result.state.attempt!.effects).toContainEqual({ gearId: "ghost", seatId: "p0", atTrick: 0, lasts: "attempt", params: {}, audience: "public" });
   });
 
   it("failureChecks is empty right after activation, but includes ghost-broke-cover once the owner wins a trick", () => {

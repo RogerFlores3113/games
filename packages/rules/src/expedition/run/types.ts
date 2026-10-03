@@ -92,7 +92,16 @@ export type LogEntry = {
   readonly audience: "public" | readonly string[];
 };
 
-export type ActiveEffect = { readonly gearId: string; readonly seatId: string; readonly atTrick: number };
+export type EffectParams = Readonly<Record<string, string | number | boolean>>;
+
+export type ActiveEffect<P extends EffectParams = EffectParams> = {
+  readonly gearId: string;
+  readonly seatId: string;
+  readonly atTrick: number; // currentTrick.index at activation
+  readonly lasts: "attempt" | "trick"; // "trick": live only while currentTrick.index === atTrick
+  readonly params: P;
+  readonly audience: "public" | "owner"; // who may see params in a view
+};
 export type GearUse = { readonly seatId: string; readonly gearId: string; readonly kind: "used" | "skipped" };
 
 export type AttemptState = {

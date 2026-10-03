@@ -344,8 +344,8 @@ function applyOp(run: RunState, attempt: AttemptState, actorSeatId: string, gear
     }
 
     case "add-modifier": {
-      const atTrick = attempt.camp ? attempt.camp.completedTricks.length : 0;
-      const effect: ActiveEffect = { gearId, seatId: actorSeatId, atTrick };
+      const atTrick = attempt.camp ? attempt.camp.currentTrick.index : 0;
+      const effect: ActiveEffect = { gearId, seatId: actorSeatId, atTrick, lasts: op.lasts, params: op.params, audience: op.audience };
       return { ...attempt, effects: [...attempt.effects, effect] };
     }
 

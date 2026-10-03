@@ -16,7 +16,7 @@
 // camp), and a `cancel-boss-twist` op for D-04 Rain Poncho (cancels the
 // twist for the current attempt only; used flags reset on replay, RUN-06).
 
-import type { ActiveEffect, RunState } from "../run/types";
+import type { ActiveEffect, EffectParams, RunState } from "../run/types";
 import type { RuleModifier, RunRules } from "../run/run-rules";
 import type { CampState, ExpeditionCard } from "../state";
 
@@ -28,14 +28,14 @@ export const TARGET_KINDS: readonly TargetKind[] = ["teammate", "own-card", "fac
 
 export type TargetSpec = { readonly kind: TargetKind };
 
-export type ToolkitOp =
+export type ToolkitOp<P extends EffectParams = EffectParams> =
   | { readonly op: "move-card"; readonly cardId: string; readonly fromSeatId: string; readonly toSeatId: string }
   | { readonly op: "swap-cards"; readonly seatA: string; readonly cardIdA: string; readonly seatB: string; readonly cardIdB: string }
   | { readonly op: "replace-objective"; readonly objectiveId: string }
   | { readonly op: "swap-objectives"; readonly seatA: string; readonly seatB: string }
   | { readonly op: "remove-objective"; readonly objectiveId: string }
   | { readonly op: "reveal"; readonly cardId: string; readonly audience: readonly string[] }
-  | { readonly op: "add-modifier" }
+  | { readonly op: "add-modifier"; readonly lasts: "attempt" | "trick"; readonly params: P; readonly audience: "public" | "owner" }
   | { readonly op: "set-next-leader"; readonly seatId: string }
   | { readonly op: "cancel-boss-twist" }
   | { readonly op: "log"; readonly event: string; readonly subjectSeatIds: readonly string[]; readonly audience: "public" | readonly string[] };

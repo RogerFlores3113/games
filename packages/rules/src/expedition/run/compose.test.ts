@@ -2,10 +2,16 @@
 // rulesFor, activeBossId).
 
 import { describe, expect, it } from "vitest";
+import fc from "fast-check";
+import { baseDeckFor, dealHands } from "../deck";
 import { createCamp } from "../camp";
 import { baseRules } from "../rules";
 import { isTrump, trickWinner } from "../trick";
+import { currentActorSeatId } from "../camp";
+import { winnerExcluding } from "../content/helpers";
 import { activeBossId, composeRules, ruleLayersFor, rulesFor } from "./compose";
+import { applyRunAction } from "./run-actions";
+import { advanceTo, setupRun } from "./run-test-support";
 import type { RuleModifier } from "./run-rules";
 import type { AttemptState, Catalog, RunState, SeatRun } from "./types";
 import type { CampState, CardIdentity, ExpeditionCard, Hand, TrickPlay } from "../state";
@@ -236,7 +242,7 @@ describe("rulesFor / ruleLayersFor", () => {
   it("applies effectModifier for attempt.effects", () => {
     const run = makeRun({
       campNumber: 2,
-      attempt: makeAttempt({ effects: [{ gearId: "gear-effect", seatId: "p0", atTrick: 1 }] }),
+      attempt: makeAttempt({ effects: [{ gearId: "gear-effect", seatId: "p0", atTrick: 1, lasts: "attempt", params: {}, audience: "public" }] }),
     });
     expect(rulesFor(run, catalog).whispersPerCamp(run, "p0")).toBe(2);
   });
@@ -252,7 +258,7 @@ describe("rulesFor / ruleLayersFor", () => {
     const withoutEffect = makeRun({ campNumber: 2, attempt: makeAttempt({ effects: [] }) });
     const withEffect = makeRun({
       campNumber: 2,
-      attempt: makeAttempt({ effects: [{ gearId: "gear-effect", seatId: "p0", atTrick: 1 }] }),
+      attempt: makeAttempt({ effects: [{ gearId: "gear-effect", seatId: "p0", atTrick: 1, lasts: "attempt", params: {}, audience: "public" }] }),
     });
     expect(rulesFor(withoutEffect, catalog).whispersPerCamp(withoutEffect, "p0")).toBe(1);
     expect(rulesFor(withEffect, catalog).whispersPerCamp(withEffect, "p0")).toBe(2);
@@ -274,5 +280,94 @@ describe("composeRules([]) end-to-end against a createCamp fixture", () => {
     const rules = composeRules([]);
     const camp = createCamp({ seatIds: ["p0", "p1", "p2"], seed: "fixture-seed", objectiveSlots: [{ kind: "win-card" }] }, rules);
     expect(camp.seatIds).toEqual(["p0", "p1", "p2"]);
+  });
+});
+
+describe("trick-scoped effects", () => {
+  function sitOutGear(id: string, lasts: "attempt" | "trick"): GearDef {
+    return {
+      id,
+      name: id,
+      size: 0,
+      window: "between-tricks",
+      text: "",
+      targets: [],
+      apply: () => [{ op: "add-modifier", lasts, params: {}, audience: "public" }],
+      effectModifier: (effect) => ({
+        trickWinner: (prev) => (plays) => winnerExcluding(prev, plays, (play) => play.seatId === effect.seatId),
+      }),
+    };
+  }
+  const catalog: Catalog = {
+    gear: { "sit-out-trick": sitOutGear("sit-out-trick", "trick"), "sit-out-camp": sitOutGear("sit-out-camp", "attempt") },
+    bosses: {},
+  };
+  const probe: TrickPlay[] = [
+    { seatId: "p0", card: card("x0", { kind: "standard", suit: "hearts", rank: 14 }) },
+    { seatId: "p1", card: card("x1", HEARTS_2) },
+    { seatId: "p2", card: card("x2", HEARTS_5) },
+  ];
+
+  function useThenPlayOneTrick(gearId: string): { afterUse: RunState; afterTrick: RunState } {
+    const start = advanceTo(
+      setupRun({ seatIds: ["p0", "p1", "p2"], seed: "trick-scope", catalog, loadouts: { p0: [gearId] } }),
+      "between-tricks",
+      catalog,
+    );
+    const used = applyRunAction(start, "p0", { type: "use-gear", gearId, targets: [] }, catalog);
+    if (!used.ok) throw new Error(used.error);
+    let run = used.state;
+    for (let i = 0; i < 3; i++) {
+      const rules = rulesFor(run, catalog);
+      const camp = run.attempt!.camp!;
+      const actor = currentActorSeatId(camp, rules)!;
+      const played = applyRunAction(run, actor, { type: "play-card", cardId: rules.legalPlays(camp, actor)[0]!.id }, catalog);
+      if (!played.ok) throw new Error(played.error);
+      run = played.state;
+    }
+    return { afterUse: used.state, afterTrick: run };
+  }
+
+  it("a trick-scoped effect bends exactly one trick", () => {
+    const { afterUse, afterTrick } = useThenPlayOneTrick("sit-out-trick");
+    expect(rulesFor(afterUse, catalog).trickWinner(probe)).toBe("p2");
+    expect(afterTrick.attempt!.camp!.completedTricks[0]!.winnerSeatId).not.toBe("p0");
+    expect(afterTrick.attempt!.camp!.completedTricks).toHaveLength(1);
+    expect(rulesFor(afterTrick, catalog).trickWinner(probe)).toBe("p0");
+  });
+
+  it("an attempt-scoped effect keeps bending after that trick", () => {
+    const { afterTrick } = useThenPlayOneTrick("sit-out-camp");
+    expect(rulesFor(afterTrick, catalog).trickWinner(probe)).toBe("p2");
+  });
+});
+
+describe("property: winnerExcluding", () => {
+  it("winnerExcluding always returns a seat that played", () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(3, 4, 5),
+        fc.stringMatching(/^[0-9a-f]{32}$/),
+        fc.array(fc.nat(), { minLength: 5, maxLength: 5 }),
+        fc.nat(),
+        fc.boolean(),
+        (playerCount, seed, cardPicks, excludedPick, spadesTrump) => {
+          const seatIds = Array.from({ length: playerCount }, (_, i) => `seat-${i}`);
+          const { hands } = dealHands({ seatIds, seed, deck: baseDeckFor(playerCount as 3 | 4 | 5) });
+          const plays: TrickPlay[] = hands.map((hand, i) => ({
+            seatId: hand.seatId,
+            card: hand.cards[cardPicks[i]! % hand.cards.length]!,
+          }));
+          const excludedSeatId = plays[excludedPick % plays.length]!.seatId;
+          const prev = composeRules(spadesTrump ? [spadesAlsoTrump] : []).trickWinner;
+
+          const winner = winnerExcluding(prev, plays, (play) => play.seatId === excludedSeatId);
+
+          expect(seatIds).toContain(winner);
+          expect(winner).not.toBe(excludedSeatId);
+        },
+      ),
+      { numRuns: 200 },
+    );
   });
 });

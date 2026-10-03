@@ -39,7 +39,7 @@ export const chatter: GearDef = {
     return true;
   },
   apply(_ctx) {
-    return [{ op: "add-modifier" }];
+    return [{ op: "add-modifier", lasts: "attempt", params: {}, audience: "public" }];
   },
   effectModifier(effect) {
     return {

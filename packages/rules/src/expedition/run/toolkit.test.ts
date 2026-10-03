@@ -444,7 +444,7 @@ describe("applyToolkitOps", () => {
     const p0Card = camp.hands.find((h) => h.seatId === "p0")!.cards[0]!;
     const ops: ToolkitOp[] = [
       { op: "move-card", cardId: p0Card.id, fromSeatId: "p0", toSeatId: "p1" },
-      { op: "add-modifier" },
+      { op: "add-modifier", lasts: "attempt", params: {}, audience: "public" },
       { op: "log", event: "test-event", subjectSeatIds: ["p0"], audience: "public" },
     ];
     applyToolkitOps(run, "p0", "test-gear", ops);
@@ -685,11 +685,15 @@ describe("applyToolkitOps", () => {
     ).toThrow();
   });
 
-  it("add-modifier appends an ActiveEffect at the current completed-tricks count", () => {
+  it("add-modifier appends an ActiveEffect stamped with the current trick index", () => {
     const camp = playOneTrick(pickAllObjectives(freshCamp()));
     const run = makeRun({ camp });
-    const result = applyToolkitOps(run, "p0", "energy-tonic", [{ op: "add-modifier" }]);
-    expect(result.attempt!.effects).toEqual([{ gearId: "energy-tonic", seatId: "p0", atTrick: 1 }]);
+    const result = applyToolkitOps(run, "p0", "energy-tonic", [
+      { op: "add-modifier", lasts: "trick", params: { cardId: "c9" }, audience: "owner" },
+    ]);
+    expect(result.attempt!.effects).toEqual([
+      { gearId: "energy-tonic", seatId: "p0", atTrick: 1, lasts: "trick", params: { cardId: "c9" }, audience: "owner" },
+    ]);
   });
 
   it("set-next-leader sets the leader before trick 1 is allowed (D-09)", () => {

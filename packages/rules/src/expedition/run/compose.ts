@@ -114,7 +114,12 @@ export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
   }
 
   if (run.attempt !== null) {
+    const trickIndex = run.attempt.camp?.currentTrick.index ?? 0;
     for (const effect of run.attempt.effects) {
+      // A trick-scoped effect bends only the trick it was stamped with:
+      // applyCampAction resolves trickWinner while currentTrick.index still
+      // equals atTrick, and the next trick's index drops the layer.
+      if (effect.lasts === "trick" && effect.atTrick !== trickIndex) continue;
       const gearDef = catalog.gear[effect.gearId];
       if (gearDef === undefined) {
         throw new Error(`ruleLayersFor: active effect names unknown gear id "${effect.gearId}"`);

@@ -49,7 +49,7 @@ const FAKE_SABOTAGE: GearDef = {
   text: "x",
   targets: [],
   apply(_ctx) {
-    return [{ op: "add-modifier" }];
+    return [{ op: "add-modifier", lasts: "attempt", params: {}, audience: "public" }];
   },
   effectModifier(_effect) {
     return { failureChecks: (_prev) => () => ["sabotage"] };

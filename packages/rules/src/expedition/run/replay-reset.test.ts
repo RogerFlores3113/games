@@ -40,7 +40,7 @@ function testSabotageGear(): GearDef {
     text: "Test fixture only: always fails the camp.",
     targets: [],
     apply(_ctx) {
-      return [{ op: "add-modifier" }];
+      return [{ op: "add-modifier", lasts: "attempt", params: {}, audience: "public" }];
     },
     effectModifier(_effect) {
       return {

@@ -836,3 +836,11 @@ six silhouettes, through `apps/web/art/expedition`. README recipes: add an item,
 target kind, a window. Green check **`source-icons`**: a new
 `apps/web/lib/expedition/source-icons.test.ts` asserts every `SOURCE_DISPLAY` id has
 `public/expedition/sprites/sources/<id>.png`; `npm test` passes.
+
+---
+
+## Implementation notes
+
+- Unit 2: `EffectParams` lives in `run/types.ts` beside `ActiveEffect`, and `ActiveEffect` keeps
+  `gearId` until the swap. `content/source-def.ts` arrives in unit 6, which moves the type and
+  renames the field to `sourceId`.

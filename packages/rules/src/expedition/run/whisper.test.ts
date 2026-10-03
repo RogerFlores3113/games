@@ -234,7 +234,7 @@ describe("applyWhisper", () => {
     const catalog: Catalog = { gear: { boost: boostGear }, bosses: {} };
     const run = makeRun({
       camp,
-      effects: [{ gearId: "boost", seatId: "p0", atTrick: 0 }],
+      effects: [{ gearId: "boost", seatId: "p0", atTrick: 0, lasts: "attempt", params: {}, audience: "public" }],
       log: [{ event: "whisper", actorSeatId: "p0", subjectSeatIds: ["p1"], gearId: null, audience: "public" }],
     });
     const cardId = camp.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
@@ -260,7 +260,7 @@ describe("applyWhisper", () => {
       },
     };
     const catalog: Catalog = { gear: { broadcast: broadcastGear }, bosses: {} };
-    const run = makeRun({ camp, effects: [{ gearId: "broadcast", seatId: "p0", atTrick: 0 }] });
+    const run = makeRun({ camp, effects: [{ gearId: "broadcast", seatId: "p0", atTrick: 0, lasts: "attempt", params: {}, audience: "public" }] });
     const cardId = camp.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
 
     const result = applyWhisper(run, "p0", { targetSeatId: "p1", cardId }, catalog);

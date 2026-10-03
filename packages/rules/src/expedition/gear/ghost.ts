@@ -37,7 +37,7 @@ export const ghost: GearDef = {
     return true;
   },
   apply(ctx) {
-    return [{ op: "remove-objective", objectiveId: ctx.targets[0]! }, { op: "add-modifier" }];
+    return [{ op: "remove-objective", objectiveId: ctx.targets[0]! }, { op: "add-modifier", lasts: "attempt", params: {}, audience: "public" }];
   },
   effectModifier(effect) {
     return {

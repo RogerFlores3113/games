@@ -40,7 +40,7 @@ export const jam: GearDef = {
     return true;
   },
   apply(_ctx) {
-    return [{ op: "cancel-boss-twist" }, { op: "add-modifier" }];
+    return [{ op: "cancel-boss-twist" }, { op: "add-modifier", lasts: "attempt", params: {}, audience: "public" }];
   },
   effectModifier(_effect) {
     return {
