@@ -61,6 +61,8 @@ interface SeatModel {
   objectives: ObjectiveChip[];
   reveals: { objectId: string }[];
   targetable: boolean;
+  handObjectId: string;
+  handPick: { targetable: boolean; selected: boolean };
 }
 
 interface TrickPlayModel {
@@ -88,10 +90,13 @@ interface CampModel {
   receivedWhispers: { fromSeatId: string; fromName: string; card: string }[];
   sentWhispers: { toSeatId: string; toName: string; card: string }[];
   whisperLog: string[];
-  tooltip: { title: string; text: string; reason: string | null } | null;
+  tooltip: { title: string; text: string; badges: string[]; reason: string | null } | null;
   drag: { cardId: string; legal: boolean } | null;
   targeting: Targeting | null;
-  gate: { window: string; youPending: boolean } | null;
+  banner: { window: string; youPending: boolean } | null;
+  tray: { options: { objectId: string }[] } | null;
+  boardPick: { targetable: boolean } | null;
+  topBar: { suppliesPick: { targetable: boolean } | null };
 }
 
 interface DriveState {
@@ -363,10 +368,23 @@ async function runAbility(page: Page, sourceId: string): Promise<void> {
     const leader = model.trick?.leaderSeatId;
     const card = model.hand.find((c) => c.targetable);
     const seat = model.seats.find((s) => s.targetable && s.seatId !== leader) ?? model.seats.find((s) => s.targetable);
+    const hand = model.seats.find((s) => s.handPick.targetable);
+    const played = model.trick?.plays.find((p) => p.card.targetable);
+    const option = model.tray?.options[0];
     const objective = model.faceUpObjectives.find((o) => o.targetable) ?? model.seats.flatMap((s) => s.objectives).find((o) => o.targetable);
-    const progressed = (m: CampModel) => m.targeting === null || m.targeting.nextKind !== kindBefore || JSON.stringify(m.targeting) !== selectedBefore;
-    if (card) {
+    const progressed = (m: CampModel) => m.targeting === null || m.targeting.nextKind !== kindBefore || JSON.stringify(m.targeting) !== selectedBefore || JSON.stringify(m.tray) !== JSON.stringify(model.tray);
+    if (option) {
+      model = await clickUntilChanged<CampModel>(page, option.objectId, progressed);
+    } else if (card) {
       model = await clickHandCard<CampModel>(page, card.objectId, progressed);
+    } else if (hand) {
+      model = await clickUntilChanged<CampModel>(page, hand.handObjectId, progressed);
+    } else if (played) {
+      model = await clickUntilChanged<CampModel>(page, played.card.objectId, progressed);
+    } else if (model.boardPick?.targetable) {
+      model = await clickUntilChanged<CampModel>(page, "board", progressed);
+    } else if (model.topBar.suppliesPick?.targetable) {
+      model = await clickUntilChanged<CampModel>(page, "supplies", progressed);
     } else if (seat) {
       model = await clickUntilChanged<CampModel>(page, seat.objectId, progressed);
     } else if (objective) {
@@ -446,8 +464,8 @@ async function stepCamp(pages: Page[], state: DriveState): Promise<void> {
     const you = model.seats.find((s) => s.isYou);
     if (!you) continue;
 
-    if (model.gate?.youPending && model.targeting === null) {
-      await clickUntilChanged<CampModel>(page, PREDEAL_SKIP_ID, (m) => m.sceneKey !== "camp" || !(m.gate?.youPending ?? false));
+    if (model.banner?.youPending && model.targeting === null) {
+      await clickUntilChanged<CampModel>(page, PREDEAL_SKIP_ID, (m) => m.sceneKey !== "camp" || !(m.banner?.youPending ?? false));
       continue;
     }
 
@@ -590,6 +608,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
       await expect.poll(async () => (await getModel<CampModel>(idler!)).tooltip).toEqual({
         title: `Can't play ${refused.label}`,
         text: "",
+        badges: [],
         reason: "Not your turn yet",
       });
       const idleAfter = await getModel<CampModel>(idler);

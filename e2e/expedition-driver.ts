@@ -32,16 +32,32 @@ export interface DraftTile {
   name: string;
 }
 
+export interface MusterCard {
+  characterId: string;
+  objectId: string;
+  name: string;
+  pickable: boolean;
+  yours: boolean;
+  takenBy: string | null;
+}
+
 export interface FiresideView {
   sceneKey?: string;
-  /** `pick` is "character" during muster, "draft" after a cleared camp. */
-  draft?: { kind: "offer"; pick: "character" | "draft"; items: DraftTile[] } | { kind: "taken" | "none" };
+  /** The six characters while the crew musters. */
+  muster?: MusterCard[] | null;
+  draft?: { kind: "offer"; items: DraftTile[] } | { kind: "taken" | "none" };
   kit?: { sourceId: string; objectId: string; name: string }[] | null;
   ready?: { state: "blocked" | "open" | "done" } | null;
   lastResult?: { campNumber: number; status: "succeeded" | "failed" } | null;
 }
 
+/** What you may pick now: the free characters at muster until yours is
+ * picked, then a draft offer after a cleared camp. */
 export function draftOffer(m: FiresideView): DraftTile[] | null {
+  if (m.muster != null) {
+    if (m.muster.some((c) => c.yours)) return null;
+    return m.muster.filter((c) => c.pickable).map((c) => ({ sourceId: c.characterId, objectId: c.objectId, name: c.name }));
+  }
   return m.draft?.kind === "offer" ? m.draft.items : null;
 }
 

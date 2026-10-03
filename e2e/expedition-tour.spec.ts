@@ -15,6 +15,7 @@ import {
   type SceneName,
 } from "./expedition-driver";
 import { clickObject, getModel, getScene, hoverObject, startExpeditionGame } from "./expedition-helpers";
+import { PICKER_SCENARIOS, rescue, rewriteViews, type Game } from "./expedition-scenarios";
 
 /**
  * UI tour. Plays 3-player runs and screenshots each phase from player 1's
@@ -51,12 +52,12 @@ const TOUR_DRAFT_PREFERENCE = ["rain-poncho", ...DRAFT_PREFERENCE];
 
 /** Phases scripted play reaches often enough to keep starting new runs for. */
 const WANTED = [
-  "draft", "kit", "ready", "objective-pick", "trick-led", "mid-trick", "ability-targeting", "whisper-targeting", "whisper-sent", "whisper-received",
+  "muster", "muster-picked", "objective-pick", "trick-led", "mid-trick", "ability-targeting", "whisper-targeting", "whisper-sent", "whisper-received",
   "last-trick-glance", "objective-hover", "fireside-after-fail", "between-camps-draft", "between-camps-kit", "next-camp",
   "run-end-lost", "run-end-guest",
 ];
 /** Phases play rarely reaches; each is also captured from a rewritten view. */
-const RARE = ["predeal-ability", "run-end-won"];
+const RARE = ["predeal-ability", "run-end-won", "between-camps-draft"];
 
 interface Identity { kind: "standard" | "joker"; suit?: string; rank?: number; joker?: "sun" | "moon" }
 interface Card { id: string; objectId: string; label: string; identity: Identity; playable: boolean }
@@ -71,7 +72,7 @@ interface CampModel {
   lastTrick: { open: boolean; plays: unknown[] } | null;
   faceUpObjectives: Chip[];
   whisper: { visible: boolean; active: boolean };
-  gate: { youPending: boolean } | null;
+  banner: { window: string; youPending: boolean } | null;
   targeting: { canConfirm: boolean } | null;
 }
 interface PhaseRecord { file: string; entries: number; violations: Violation[] }
@@ -114,7 +115,7 @@ class Tour {
 // ---------------------------------------------------------------------------
 
 function firesideNames(m: FiresideView): { draft: string; kit: string; ready: string } {
-  if (m.lastResult == null) return { draft: "draft", kit: "kit", ready: "ready" };
+  if (m.lastResult == null) return { draft: "muster", kit: "muster-picked", ready: "muster-ready" };
   if (m.lastResult.status === "succeeded") {
     return { draft: "between-camps-draft", kit: "between-camps-kit", ready: "between-camps-ready" };
   }
@@ -211,7 +212,7 @@ async function peekTargeting(page: Page, tour: Tour, openId: string, name: strin
 async function captureHostState(host: Page, tour: Tour): Promise<void> {
   const m = await getModel<CampModel>(host);
   if (m.sceneKey !== "camp") return;
-  if (m.gate?.youPending) await tour.shot("predeal-ability");
+  if (m.banner?.youPending) await tour.shot(m.banner.window === "rescue" ? "rescue-played" : "predeal-ability");
   if (m.faceUpObjectives.some((o) => o.pickable)) await tour.shot("objective-pick");
   const plays = m.trick?.plays.length ?? 0;
   if (plays >= 1) await tour.shot("trick-led");
@@ -257,9 +258,9 @@ async function stepPage(page: Page, isHost: boolean, tour: Tour): Promise<void> 
   const you = model.seats.find((s) => s.isYou);
   if (!you) return;
 
-  if (model.gate?.youPending) {
-    if (isHost) await tour.shot("predeal-ability");
-    await clickUntilChanged<CampModel>(page, PREDEAL_SKIP_ID, (m) => !(m.gate?.youPending ?? false));
+  if (model.banner?.youPending) {
+    if (isHost) await tour.shot(model.banner.window === "rescue" ? "rescue-played" : "predeal-ability");
+    await clickUntilChanged<CampModel>(page, PREDEAL_SKIP_ID, (m) => !(m.banner?.youPending ?? false));
     return;
   }
   if (you.mayAct) {
@@ -307,13 +308,14 @@ async function stepPage(page: Page, isHost: boolean, tour: Tour): Promise<void> 
 
 /** Plays one run to its end. Returns the outcome, or null if the budget ran
  * out first. */
-async function playRun(pages: Page[], tour: Tour, deadline: number): Promise<"won" | "lost" | null> {
+async function playRun(pages: Page[], tour: Tour, deadline: number, rewrite: Rewriter): Promise<"won" | "lost" | null> {
   const host = pages[0]!;
   for (;;) {
     await fireside(host, tour);
     for (const guest of pages.slice(1)) await fireside(guest, null);
     for (const p of pages) await waitForScene(p, "camp", 60_000);
     if ((await getModel<CampModel>(host)).campNumber >= 2) await tour.shot("next-camp");
+    if (!tour.has("picker-self")) await capturePickers(host, tour, rewrite);
 
     for (let pass = 0; pass < 400; pass++) {
       const scenes = await Promise.all(pages.map((p) => getScene(p)));
@@ -357,8 +359,6 @@ const h = (campNumber: number, attemptNumber: number, status: "succeeded" | "fai
   suppliesSpent: status === "failed" ? 1 : 0,
 });
 
-type Game = Record<string, unknown> & { yourSeatId: string; seats: { seatId: string }[] };
-
 /** Pre-deal at boss camp 3 with your Rain Poncho waiting on you. */
 function preDealView(game: Game): Game {
   const poncho = { sourceId: "rain-poncho", remaining: { kind: "uses", left: 1, of: 1 } };
@@ -401,40 +401,59 @@ function wonView(game: Game): Game {
   };
 }
 
-/** Rewrites every room view the host receives through `rewrite.current`,
- * for the phases scripted play can't reach in a tour's budget. */
-async function rewriteViews(host: Page): Promise<{ current: (game: Game) => Game }> {
-  const rewrite = { current: (game: Game) => game };
-  await host.routeWebSocket(() => true, (ws) => {
-    const server = ws.connectToServer();
-    ws.onMessage((m) => server.send(m));
-    server.onMessage((m) => {
-      try {
-        const data = JSON.parse(String(m));
-        if ((data.type === "state" || data.type === "joined") && data.view?.game) {
-          data.view.game = rewrite.current(data.view.game);
-          ws.send(JSON.stringify(data));
-          return;
-        }
-      } catch {
-        // not a room message
-      }
-      ws.send(m);
-    });
-  });
-  return rewrite;
+/** Opens each target kind's picker from a rewritten camp, and the rescue
+ * window from both sides, and captures them. */
+type Rewriter = { current: (g: Game) => Game };
+
+async function capturePickers(host: Page, tour: Tour, rewrite: Rewriter): Promise<void> {
+  const reloadTo = async (fn: (g: Game) => Game): Promise<void> => {
+    rewrite.current = fn;
+    await host.reload();
+    await waitForScene(host, "camp", 30_000);
+  };
+  for (const [kind, scenario] of Object.entries(PICKER_SCENARIOS)) {
+    await reloadTo(scenario.rewrite);
+    if (kind === "card") await tour.shot("in-trick-affordance");
+    if (kind === "failed-objective") {
+      await tour.shot("rescue-you");
+      await clickUntilChanged<CampModel>(host, `predeal-use:${scenario.sourceId}`, (m) => m.targeting !== null);
+    } else {
+      await clickUntilChanged<CampModel>(host, `source:${scenario.sourceId}`, (m) => m.targeting !== null);
+    }
+    if (kind === "card-value") {
+      const card = (await getModel<CampModel>(host)).hand.find((c) => c.targetable);
+      if (card !== undefined) await clickHandCard<CampModel & { tray: unknown }>(host, card.objectId, (m) => m.tray !== null);
+    }
+    await host.mouse.move(5, 5);
+    await tour.shot(`picker-${kind}`);
+  }
+  await reloadTo((g) => rescue(g, { youPending: false }));
+  await tour.shot("rescue-waiting");
+  await reloadTo((g) => g);
 }
 
-async function captureRare(host: Page, tour: Tour): Promise<void> {
-  const rewrite = await rewriteViews(host);
-  if (!tour.has("predeal-ability")) {
-    rewrite.current = preDealView;
+async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<void> {
+  if (!tour.has("between-camps-draft")) {
+    rewrite.current = (g) => ({
+      ...g,
+      runPhase: "fireside",
+      attempt: null,
+      yourDraftOffer: [g.seats.find((s) => s.seatId === g.yourSeatId)?.characterId === "guide" ? "guide.pathfinder" : "scout.keen-eye", "bait", "smoke-signal"],
+      seats: g.seats.map((s) => (s.seatId === g.yourSeatId ? { ...s, characterId: s.characterId ?? "scout", draftPending: true, ready: false } : s)),
+      history: [{ campNumber: 1, attemptNumber: 1, status: "succeeded", suppliesSpent: 0 }],
+    });
     await host.reload();
-    await host.waitForFunction(() => (window.__expeditionTest?.model as { gate?: { youPending: boolean } } | null)?.gate?.youPending === true);
+    await waitForScene(host, "fireside", 30_000);
+    await tour.shot("between-camps-draft-rewritten");
+  }
+  if (!tour.has("predeal-ability")) {
+    rewrite.current = preDealView as (g: Game) => Game;
+    await host.reload();
+    await host.waitForFunction(() => (window.__expeditionTest?.model as { banner?: { youPending: boolean } } | null)?.banner?.youPending === true);
     await tour.shot("predeal-ability-rewritten");
   }
   if (!tour.has("run-end-won")) {
-    rewrite.current = wonView;
+    rewrite.current = wonView as (g: Game) => Game;
     await host.reload();
     await waitForScene(host, "run-end", 30_000);
     await tour.shot("run-end-won-rewritten");
@@ -449,6 +468,7 @@ test.describe("@tour Expedition UI tour", () => {
       test.setTimeout(TOUR_BUDGET_MS + 180_000);
       await page.setViewportSize({ width: size.width, height: size.height });
       const tour = new Tour(page, path.join(OUT_ROOT, size.name));
+      const rewrite = await rewriteViews(page);
       const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
       await pages[1]!.setViewportSize({ width: size.width, height: size.height });
       const deadline = Date.now() + TOUR_BUDGET_MS;
@@ -458,11 +478,11 @@ test.describe("@tour Expedition UI tour", () => {
       try {
         for (let run = 1; run <= MAX_RUNS; run++) {
           if (run > 1) await newExpedition(pages);
-          const outcome = await playRun(pages, tour, deadline);
+          const outcome = await playRun(pages, tour, deadline, rewrite);
           outcomes.push(outcome ?? "budget spent");
           if (outcome === null || missing().length === 0 || Date.now() > deadline) break;
         }
-        await captureRare(page, tour);
+        await captureRare(page, tour, rewrite);
       } finally {
         const notes: string[] = [];
         if (!tour.has("between-camps-draft")) notes.push(`no camp was cleared in ${outcomes.length} run(s), so the fireside after a cleared camp was not reached`);

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { SOURCE_DISPLAY } from "@games/rules";
+import { CHARACTER_DISPLAY } from "@games/rules";
 import { clickUntilChanged, draftOffer, type FiresideView } from "./expedition-driver";
 import { getModel, startExpeditionGame } from "./expedition-helpers";
 
@@ -14,10 +14,11 @@ test("rules modal shows the reference, lists your character, and closes on Escap
     await host.getByTestId("expedition-rules-button").click();
     const dialog = host.getByRole("dialog", { name: "Rules" });
     await expect(dialog).toBeVisible();
-    for (const heading of ["Goal", "Tricks", "Objectives", "The Whisper", "Your kit", "This camp"]) {
+    for (const heading of ["Goal", "Tricks", "Objectives", "The Whisper", "Explorers and gear", "Your kit", "This camp"]) {
       await expect(dialog.getByRole("heading", { name: heading, exact: true })).toBeVisible();
     }
-    await expect(dialog.getByText(SOURCE_DISPLAY[pick.sourceId]!.name, { exact: true })).toBeVisible();
+    const character = CHARACTER_DISPLAY[pick.sourceId]!;
+    await expect(dialog.getByText(`${character.power} (${character.name})`, { exact: true })).toBeVisible();
 
     await host.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
