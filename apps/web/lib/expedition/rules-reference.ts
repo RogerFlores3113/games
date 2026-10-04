@@ -17,7 +17,8 @@ type RulesView = Pick<ExpeditionView, "seats" | "yourSeatId">;
 
 function kitSection(view: RulesView | null): RulesSection {
   const you = view?.seats.find((s) => s.seatId === view.yourSeatId);
-  const owned = you === undefined ? [] : [...(you.characterId === null ? [] : [you.characterId]), ...you.kit];
+  const itemIds = you === undefined ? [] : [...you.items.equipped, ...(you.items.backpack ?? [])].map((item) => item.itemId);
+  const owned = you === undefined ? [] : [...(you.characterId === null ? [] : [you.characterId]), ...(you.upgradeId === null ? [] : [you.upgradeId]), ...new Set(itemIds)];
   const paragraphs = ["Your explorer's power and everything you draft stay with you for the run."];
   const items: RulesItem[] = [];
   for (const id of owned) {

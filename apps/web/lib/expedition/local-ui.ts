@@ -17,7 +17,7 @@ import type { ExpeditionAbilityStepView, ExpeditionTargetKind, ExpeditionView, R
 /** `valueCardId`: the hand card a rank pick is for, chosen first on a
  * card-value step; the rank tray then offers that card's ranks. */
 export type Targeting =
-  | { mode: "ability"; sourceId: string; selected: string[]; valueCardId: string | null }
+  | { mode: "ability"; sourceKey: string; selected: string[]; valueCardId: string | null }
   | { mode: "whisper"; selected: string[] };
 
 /** What a clicked thing on the table is, for matching it to a choice id.
@@ -46,10 +46,11 @@ export interface LocalUiState {
   targeting: Targeting | null;
   hoveredCardId: string | null;
   lastTrickOpen: boolean;
+  /** One of your source keys, or a def id where there is no instance (a draft card). */
   tooltipSourceId: string | null;
   tooltipObjectiveId: string | null;
-  /** A teammate's source: read-only, so it never starts targeting. */
-  tooltipMateSource: { seatId: string; sourceId: string } | null;
+  /** A teammate's source key: read-only, so it never starts targeting. */
+  tooltipMateSource: { seatId: string; sourceKey: string } | null;
   /** The hand-card gesture in flight: press, drag, or the return after a
    * rejected drop. */
   drag: DragState;
@@ -78,7 +79,7 @@ export function targetingSteps(ui: LocalUiState, view: ExpeditionView): Expediti
   const targeting = ui.targeting;
   if (targeting === null) return [];
   if (targeting.mode === "whisper") return whisperSteps(view);
-  return view.yourAbilities.find((a) => a.sourceId === targeting.sourceId)?.steps ?? [];
+  return view.yourAbilities.find((a) => a.sourceKey === targeting.sourceKey)?.steps ?? [];
 }
 
 /** The step still to pick, or null when nothing is targeting or every step
@@ -132,12 +133,12 @@ function autoPick(ui: LocalUiState, view: ExpeditionView): LocalUiState {
   return next;
 }
 
-/** Begins targeting for `sourceId`. A no-op unless the server says the
- * ability is usable now (`yourAbilities[].usableNow`). */
-export function beginAbilityTargeting(ui: LocalUiState, view: ExpeditionView, sourceId: string): LocalUiState {
-  const ability = view.yourAbilities.find((a) => a.sourceId === sourceId);
+/** Begins targeting for the ability used through `sourceKey`. A no-op
+ * unless the server says it is usable now (`yourAbilities[].usableNow`). */
+export function beginAbilityTargeting(ui: LocalUiState, view: ExpeditionView, sourceKey: string): LocalUiState {
+  const ability = view.yourAbilities.find((a) => a.sourceKey === sourceKey);
   if (!ability || !ability.usableNow) return ui;
-  return autoPick({ ...ui, trayPage: 0, targeting: { mode: "ability", sourceId, selected: [], valueCardId: null } }, view);
+  return autoPick({ ...ui, trayPage: 0, targeting: { mode: "ability", sourceKey, selected: [], valueCardId: null } }, view);
 }
 
 /** Begins Whisper targeting (a card, then a teammate). A no-op unless it is
@@ -185,7 +186,7 @@ export function confirmTargeting(ui: LocalUiState, view: ExpeditionView): { ui: 
   const targeting = ui.targeting;
   if (targeting === null || currentStep(ui, view) !== null) return { ui, request: null };
   if (targeting.mode === "ability") {
-    return { ui: { ...ui, targeting: null }, request: { type: "use-ability", sourceId: targeting.sourceId, targets: [...targeting.selected] } };
+    return { ui: { ...ui, targeting: null }, request: { type: "use-ability", sourceKey: targeting.sourceKey, targets: [...targeting.selected] } };
   }
   const [card, seat] = targeting.selected;
   if (card === undefined || seat === undefined) return { ui, request: null };
@@ -205,7 +206,7 @@ export function reconcileLocalUi(ui: LocalUiState, view: ExpeditionView): LocalU
   if (targeting !== null) {
     const stillOpen =
       targeting.mode === "ability"
-        ? view.yourAbilities.some((a) => a.sourceId === targeting.sourceId && a.usableNow)
+        ? view.yourAbilities.some((a) => a.sourceKey === targeting.sourceKey && a.usableNow)
         : attemptOf(view)?.window === "between-tricks";
     if (!stillOpen) {
       next = { ...next, targeting: null };
@@ -248,8 +249,8 @@ export function setTooltipObjective(ui: LocalUiState, objectiveId: string | null
   return ui.tooltipObjectiveId === objectiveId ? ui : { ...ui, tooltipObjectiveId: objectiveId };
 }
 
-export function setTooltipMateSource(ui: LocalUiState, mate: { seatId: string; sourceId: string } | null): LocalUiState {
-  const same = ui.tooltipMateSource?.seatId === mate?.seatId && ui.tooltipMateSource?.sourceId === mate?.sourceId;
+export function setTooltipMateSource(ui: LocalUiState, mate: { seatId: string; sourceKey: string } | null): LocalUiState {
+  const same = ui.tooltipMateSource?.seatId === mate?.seatId && ui.tooltipMateSource?.sourceKey === mate?.sourceKey;
   return same ? ui : { ...ui, tooltipMateSource: mate };
 }
 

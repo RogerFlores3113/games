@@ -1,7 +1,7 @@
 // Phase 10 hook-composition engine (Plan 03, spec §6.1).
 //
 // COMPOSITION ORDER: base -> each seat's live passives
-// (seat order, then [character, ...kit] order) -> active effects (in the
+// (seat order, then [character, upgrade, ...equipped] order) -> active effects (in the
 // order stored on the attempt's effects). Every layer's RuleModifier maps the PREVIOUS
 // layer's answer to its own, per hook (run-rules.ts's own header repeats
 // this contract; this file is what actually folds it).
@@ -31,7 +31,7 @@ import { baseRulesWith } from "../rules";
 import { cardReading, isTrump } from "../trick";
 import { HOOK_NAMES, baseRunHooks, type HookName, type RuleModifier, type RunRules } from "./run-rules";
 import type { Catalog, RunState } from "./types";
-import { liveSourceIds, ownerOf, sourceDef } from "./usage";
+import { defOfKey, liveSourceKeys, ownerOf, sourceDef } from "./usage";
 import { attemptOf } from "./attempt";
 
 const CARD_HOOKS = ["identityOf", "isTrump", "rankOf"] as const;
@@ -74,7 +74,7 @@ export function composeRules(layers: readonly RuleModifier[]): RunRules {
 }
 
 /** Builds the ordered layer list for `run` under `catalog`: each seat's
- * live passives (seat order, then [character, ...kit] order) -> each live
+ * live passives (seat order, then [character, upgrade, ...equipped] order) -> each live
  * attempt effect's `active.effect`, in attempt.effects order. Throws a named
  * Error for any source id missing from the catalog (POLICY A3). */
 export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
@@ -82,8 +82,8 @@ export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
 
   for (const seat of run.seats) {
     const owner = ownerOf(seat);
-    for (const sourceId of liveSourceIds(seat)) {
-      const passive = sourceDef(catalog, sourceId).passive;
+    for (const key of liveSourceKeys(seat)) {
+      const passive = defOfKey(seat, key, catalog).passive;
       if (passive !== undefined) layers.push(passive.modifier(owner));
     }
   }

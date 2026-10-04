@@ -16,14 +16,14 @@ export interface CampHandlers {
   onTrayPick(choiceId: string): void;
   onTrayMore(): void;
   /** Your own character or kit source: starts its targeting. */
-  onSource(sourceId: string): void;
-  onSourceHover(sourceId: string | null): void;
-  onMateSourceHover(mate: { seatId: string; sourceId: string } | null): void;
+  onSource(sourceKey: string): void;
+  onSourceHover(sourceKey: string | null): void;
+  onMateSourceHover(mate: { seatId: string; sourceKey: string } | null): void;
   onWhisper(): void;
   onConfirm(): void;
   onCancel(): void;
   /** Use or pass in a gated window: before the deal, or a rescue. */
-  onGateUse(sourceId: string): void;
+  onGateUse(sourceKey: string): void;
   onGateSkip(): void;
   onLastTrickHover(open: boolean): void;
 }

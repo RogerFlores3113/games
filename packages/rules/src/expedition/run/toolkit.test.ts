@@ -62,7 +62,7 @@ function playOneTrick(camp: CampState): CampState {
 }
 
 function makeSeats(): readonly SeatRun[] {
-  return SEAT_IDS.map((seatId) => ({ seatId, characterId: "plain-1", kit: [], draftOffer: null, ledger: [] }));
+  return SEAT_IDS.map((seatId) => ({ seatId, characterId: "plain-1", upgradeId: null, items: [], equipped: [], offers: [], ledger: [] }));
 }
 
 /** A run in camp 1 whose attempt holds `camp`; at the loadout, with no
@@ -72,10 +72,10 @@ function makeRun(input: { camp: CampState | null; seed?: string }): RunState {
   const spec = campSpecAt(seed, "standard", campIndex(1));
   const stage: RunState["stage"] =
     input.camp === null
-      ? { tag: "loadout", camp: spec, ready: {} }
+      ? { tag: "loadout", camp: spec, stock: null, ready: {} }
       : { tag: "camp", camp: spec, attempt: { attemptNumber: 1, effects: [], reveals: [], log: [], camp: input.camp } };
 
-  return { seed, seatIds: [...SEAT_IDS], seats: makeSeats(), purse: 0, supplies: 3, plan: { length: "standard", bosses: [] }, history: [], lastVote: null, stage };
+  return { seed, seatIds: [...SEAT_IDS], seats: makeSeats(), purse: 0, supplies: 3, plan: { length: "standard", bosses: [] }, history: [], lastVote: null, itemSerial: 0, stage };
 }
 
 describe("currentWindow", () => {

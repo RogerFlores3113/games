@@ -10,5 +10,5 @@ export const event: StageDef<"event"> = {
       return ready === null ? err("already_ready") : ok({ ...run, stage: { ...run.stage, ready } });
     },
   },
-  advance: (run) => (everySeat(run, run.stage.ready) ? openLoadout(run, run.stage.route.next) : run),
+  advance: (run, catalog) => (everySeat(run, run.stage.ready) ? openLoadout(run, run.stage.route.next, catalog) : run),
 };

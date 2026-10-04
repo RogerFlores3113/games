@@ -36,10 +36,11 @@ import { bossAt, campCount } from "../run/plan";
 import { slotKindsFor, type CampSpec } from "../run/route";
 import { whispersUsedBy } from "../run/whisper";
 import { abilityStatus } from "../run/abilities";
-import { liveSourceIds, poolBalance, remaining, type Remaining } from "../run/usage";
+import { activeOfKey, backpackOf, itemOf, liveSourceKeys, poolBalance, remaining, type Remaining } from "../run/usage";
+import { upgradeOffers, type StockEntry } from "../run/shop";
 import { currentWindow, gatedPendingSeatIds } from "../run/windows";
 import type { RunRules } from "../run/run-rules";
-import type { ActiveEffect, AttemptState, Catalog, LogEntry, PerSeat, Reveal, RunState, SeatRun } from "../run/types";
+import type { ActiveEffect, AttemptState, Catalog, ItemInstance, LogEntry, PerSeat, Reveal, RunState, SeatRun } from "../run/types";
 import { rankOf } from "../trick";
 import type { CampState, CardIdentity, ExpeditionCard, Objective, ResolvedPlay, StandardIdentity } from "../state";
 import type {
@@ -56,13 +57,16 @@ import type {
   ExpeditionAbilityView,
   ExpeditionEffectView,
   ExpeditionHandSizeView,
+  ExpeditionItemView,
   ExpeditionLogEntryView,
   ExpeditionObjectiveView,
   ExpeditionRankedCardView,
   ExpeditionRemainingView,
   ExpeditionRevealView,
   ExpeditionSeatView,
+  ExpeditionShopView,
   ExpeditionStageView,
+  ExpeditionStockView,
   ExpeditionTrickPlayView,
   ExpeditionView,
 } from "./view-types";
@@ -219,13 +223,16 @@ function toRemainingView(left: Remaining): ExpeditionRemainingView {
   switch (left.kind) {
     case "uses":
       return { kind: "uses", left: left.left, of: left.of };
-    case "single-use":
-      return { kind: "single-use" };
     case "pool":
       return { kind: "pool", balance: left.balance, max: left.max, cost: left.cost };
     case "supplies":
       return { kind: "supplies", cost: left.cost };
   }
+}
+
+function toItemView(state: RunState, seat: SeatRun, item: ItemInstance, catalog: Catalog): ExpeditionItemView {
+  const active = activeOfKey(seat, item.uid, catalog);
+  return { uid: item.uid, itemId: item.itemId, remaining: active === undefined ? null : toRemainingView(remaining(state, seat.seatId, item.uid, catalog)) };
 }
 
 function toSeatView(state: RunState, seat: SeatRun, catalog: Catalog): ExpeditionSeatView {
@@ -234,29 +241,52 @@ function toSeatView(state: RunState, seat: SeatRun, catalog: Catalog): Expeditio
   return {
     seatId: seat.seatId,
     characterId: seat.characterId,
-    kit: Array.from(seat.kit),
+    upgradeId: seat.upgradeId,
+    items: {
+      equipped: seat.equipped.map((uid) => toItemView(state, seat, itemOf(seat, uid)!, catalog)),
+      backpack: backpackOf(seat).map((item) => toItemView(state, seat, item, catalog)),
+      concealed: false,
+    },
     pool: balance !== null && pool !== undefined ? { balance, max: pool.max } : null,
-    usage: liveSourceIds(seat)
-      .filter((sourceId) => catalog.sources[sourceId]?.active !== undefined)
-      .map((sourceId) => ({ sourceId, remaining: toRemainingView(remaining(state, seat.seatId, sourceId, catalog)) })),
+    usage: liveSourceKeys(seat)
+      .filter((key) => activeOfKey(seat, key, catalog) !== undefined)
+      .map((sourceKey) => ({ sourceKey, remaining: toRemainingView(remaining(state, seat.seatId, sourceKey, catalog)) })),
   };
 }
 
 function toAbilityViews(state: RunState, seat: SeatRun, catalog: Catalog): ExpeditionAbilityView[] {
-  return liveSourceIds(seat).flatMap((sourceId) => {
-    const status = abilityStatus(state, seat.seatId, sourceId, catalog);
+  return liveSourceKeys(seat).flatMap((sourceKey) => {
+    const status = abilityStatus(state, seat.seatId, sourceKey, catalog);
     if (status === null) return [];
     return [
       status.usable
         ? {
-            sourceId,
+            sourceKey,
             usableNow: true,
             reason: null,
             steps: status.steps.map((step) => ({ kind: step.kind, prompt: step.prompt, choices: Array.from(step.choices) })),
           }
-        : { sourceId, usableNow: false, reason: status.reason, steps: [] },
+        : { sourceKey, usableNow: false, reason: status.reason, steps: [] },
     ];
   });
+}
+
+function toStockView(entry: StockEntry): ExpeditionStockView {
+  const what = entry.what;
+  return {
+    stockId: entry.stockId,
+    what: what.kind === "supplies" ? { kind: "supplies" } : { kind: "item", itemId: what.itemId },
+    price: entry.price,
+    soldTo: entry.soldTo,
+  };
+}
+
+function toShopView(stock: readonly StockEntry[] | null, ownSeat: SeatRun | undefined, catalog: Catalog): ExpeditionShopView | null {
+  if (stock === null) return null;
+  return {
+    stock: stock.map(toStockView),
+    yourUpgrades: ownSeat === undefined ? [] : upgradeOffers(ownSeat, catalog).map((o) => ({ stockId: o.stockId, upgradeId: o.upgradeId, price: o.price })),
+  };
 }
 
 function toCampResultView(result: RunState["history"][number]): ExpeditionCampResultView {
@@ -272,6 +302,7 @@ function toPreviewView(state: RunState, spec: CampSpec): ExpeditionCampPreviewVi
     event: spec.event,
     slotKinds: Array.from(slotKindsFor(spec)),
     bossId: boss === null ? null : boss.modId,
+    shop: boss !== null,
   };
 }
 
@@ -360,7 +391,13 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
     case "muster":
       return { tag: "muster", ballots: toBallotViews(state, stage.ballots) };
     case "loadout":
-      return { tag: "loadout", camp: toPreviewView(state, stage.camp), readySeatIds: readySeatIds(state, stage.ready) };
+      return {
+        tag: "loadout",
+        camp: toPreviewView(state, stage.camp),
+        yourSlots: ownSeat === undefined ? 0 : rules.itemSlots(state, seatId),
+        shop: toShopView(stage.stock, ownSeat, catalog),
+        readySeatIds: readySeatIds(state, stage.ready),
+      };
     case "camp":
       return { tag: "camp", camp: toPreviewView(state, stage.camp), attempt: toAttemptView(state, stage.attempt, seatId, ownSeat !== undefined, rules, catalog) };
     case "draft":
@@ -368,8 +405,8 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
         tag: "draft",
         cleared: stage.cleared,
         payout: stage.payout,
-        yourOffer: ownSeat !== undefined && ownSeat.draftOffer !== null ? Array.from(ownSeat.draftOffer) : null,
-        pendingSeatIds: state.seats.filter((seat) => seat.draftOffer !== null).map((seat) => seat.seatId),
+        yourOffer: ownSeat?.offers[0] === undefined ? null : { bundles: ownSeat.offers[0].bundles.map((bundle) => Array.from(bundle)) },
+        pendingSeatIds: state.seats.filter((seat) => seat.offers.length > 0).map((seat) => seat.seatId),
       };
     case "route":
       return {

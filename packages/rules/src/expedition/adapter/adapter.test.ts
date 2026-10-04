@@ -21,7 +21,7 @@ const SEED = "cccccccccccccccccccccccccccccccc";
 function fixtures(supplies?: number): Record<string, RunState> {
   const fresh = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
   const rescue = failedFirstTrick(
-    advanceTo(setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, camp: 3, supplies, kits: { p0: ["rope-ladder"] } }), "between-tricks", CATALOG),
+    advanceTo(setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, camp: 3, supplies, items: { p0: ["rope-ladder"] } }), "between-tricks", CATALOG),
   );
   const objectivePick = advanceTo(
     setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, camp: 2 }),
@@ -33,7 +33,14 @@ function fixtures(supplies?: number): Record<string, RunState> {
     "between-tricks",
     CATALOG,
   );
-  return { fresh, rescue, objectivePick, betweenTricks };
+  const shop = setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, camp: 3, purse: 9, items: { p0: ["bait", "parrot", "whetstone"] } });
+  const draftBase = setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, camp: 2 });
+  const draft: RunState = {
+    ...draftBase,
+    seats: draftBase.seats.map((seat) => ({ ...seat, offers: [{ kind: "standard", bundles: [["bait", "parrot"], ["whetstone"]] }] })),
+    stage: { tag: "draft", cleared: campIndex(2), payout: 5 },
+  };
+  return { fresh, rescue, objectivePick, betweenTricks, shop, draft };
 }
 
 /** Gives every seat a no-tricks objective and plays one trick, so its winner's
@@ -55,11 +62,13 @@ function failedFirstTrick(run: RunState): RunState {
 const WELL_SHAPED_NONSENSE_ARB = fc.oneof(
   fc.record({ type: fc.constant("pick-character" as const), characterId: fc.string() }),
   fc.record({ type: fc.constant("vote" as const), choice: fc.option(fc.string(), { nil: null }) }),
-  fc.record({ type: fc.constant("pick-draft" as const), sourceId: fc.string() }),
+  fc.record({ type: fc.constant("equip" as const), itemUids: fc.array(fc.oneof(fc.string(), fc.constantFrom("it0", "it1", "it2")), { maxLength: 5 }) }),
+  fc.record({ type: fc.constant("buy" as const), stockId: fc.oneof(fc.string(), fc.constantFrom("supplies", "item0", "upgrade:scout.keen-eye", "upgrade:")) }),
+  fc.record({ type: fc.constant("pick-bundle" as const), bundle: fc.integer({ min: 0, max: 5 }) }),
   fc.record({ type: fc.constant("ready" as const) }),
   fc.record({
     type: fc.constant("use-ability" as const),
-    sourceId: fc.string(),
+    sourceKey: fc.oneof(fc.string(), fc.constantFrom("it0", "scout", "rope-ladder")),
     targets: fc.array(fc.string(), { maxLength: 5 }),
   }),
   fc.record({ type: fc.constant("skip-window" as const) }),

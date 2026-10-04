@@ -13,6 +13,8 @@ export function attemptSeed(seed: string, campIndex: number, attemptNumber: numb
 }
 
 export type RouteField = "event" | "mix";
+/** An item draw rolls its rarity, then picks an item of that rarity. */
+export type ItemDrawPart = "rarity" | "pick";
 
 export const STREAMS = {
   lengthVote(): string {
@@ -29,11 +31,12 @@ export const STREAMS = {
   routeField(nextCamp: number, reroll: number, option: number, field: RouteField): string {
     return `expedition-route:camp${nextCamp}:reroll${reroll}:option${option}:${field}`;
   },
-  draftUpgrade(clearedCamp: number, seatId: string): string {
-    return `expedition-draft:camp${clearedCamp}:seat${seatId}:upgrade`;
+  draftItem(clearedCamp: number, seatId: string, offer: number, bundle: number, item: number, part: ItemDrawPart): string {
+    return `expedition-draft:camp${clearedCamp}:seat${seatId}:offer${offer}:bundle${bundle}:item${item}:${part}`;
   },
-  draftItems(clearedCamp: number, seatId: string): string {
-    return `expedition-draft:camp${clearedCamp}:seat${seatId}:items`;
+  /** A replay of the boss camp is a new visit with the same names, so the same stock. */
+  shopItem(campIndex: number, item: number, part: ItemDrawPart): string {
+    return `expedition-shop:camp${campIndex}:item${item}:${part}`;
   },
   trickCountKind(campIndex: number, attemptNumber: number): string {
     return `expedition-trickcount-kind:camp${campIndex}:attempt${attemptNumber}`;

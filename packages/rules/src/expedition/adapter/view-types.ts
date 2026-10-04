@@ -15,15 +15,15 @@
 //   - every objective, public: `camp.objectives`
 //   - audience-filtered reveals and log: `attempt.reveals`, `attempt.log`
 //     (never carries an `audience` key — see (c))
-//   - public characters, kits, pools and usage: `seats[]`
-//   - own draft offer only: the draft stage's `yourOffer` (never any other seat's)
+//   - public characters, upgrades, items, pools and usage: `seats[]`
+//   - own head draft offer only: the draft stage's `yourOffer` (never any other seat's)
 //   - own abilities with server-computed target choices: `yourAbilities`
 //   - removed cards: `camp.removedCards`
 //   - the run header: `length`, `campCount`, `purse`, `supplies`, `plan`,
 //     `history`, `lastVote`, `runStatus`; the stage and its data: `stage`
 //
 // (c) Deliberately ABSENT keys, at every nesting level in this file: `seed`,
-// `objectiveDeck`, any other seat's `draftOffer`, any `ledger`, `audience`.
+// `objectiveDeck`, `offers`, `itemSerial`, any `ledger`, `audience`.
 // A hidden field is structurally impossible to populate because no type
 // here names it — not merely "stripped" at runtime.
 //
@@ -189,26 +189,30 @@ export type ExpeditionAttemptView = {
 
 export type ExpeditionRemainingView =
   | { kind: "uses"; left: number; of: number }
-  | { kind: "single-use" }
   | { kind: "pool"; balance: number; max: number; cost: number }
   | { kind: "supplies"; cost: number };
 
-// Deliberately no `draftOffer`/`ledger` keys for any seat: a seat's
-// character, kit, pool and per-source usage are public; the viewer's own
+/** One owned item instance. `remaining` is null for a passive item. */
+export type ExpeditionItemView = { uid: string; itemId: string; remaining: ExpeditionRemainingView | null };
+
+// Deliberately no `offers`/`ledger` keys for any seat: a seat's character,
+// upgrade, items, pool and per-source usage are public; the viewer's own
 // draft offer is the draft stage's `yourOffer`.
 export type ExpeditionSeatView = {
   seatId: string;
   characterId: string | null;
-  kit: string[];
+  upgradeId: string | null;
+  /** `concealed` stays false (and `backpack` shown) until fog lands. */
+  items: { equipped: ExpeditionItemView[]; backpack: ExpeditionItemView[] | null; concealed: boolean };
   pool: { balance: number; max: number } | null;
-  /** Every live source with an active ability. */
-  usage: { sourceId: string; remaining: ExpeditionRemainingView }[];
+  /** Every live source key with an active ability. */
+  usage: { sourceKey: string; remaining: ExpeditionRemainingView }[];
 };
 
 export type ExpeditionAbilityStepView = { kind: TargetKind; prompt: string; choices: string[] };
 
-/** The viewer's own abilities. `steps` is [] unless usableNow. */
-export type ExpeditionAbilityView = { sourceId: string; usableNow: boolean; reason: string | null; steps: ExpeditionAbilityStepView[] };
+/** The viewer's own abilities, by source key. `steps` is [] unless usableNow. */
+export type ExpeditionAbilityView = { sourceKey: string; usableNow: boolean; reason: string | null; steps: ExpeditionAbilityStepView[] };
 
 export type ExpeditionCampResultView = { camp: number; attempt: number; status: "cleared" | "failed"; coins: number };
 
@@ -216,7 +220,8 @@ export type ExpeditionRunLengthView = RunLength;
 export type ExpeditionSlotKindView = SlotTemplate["kind"];
 
 /** A camp as a preview shows it: before the deal, on a route card, or
- * during play. `bossId` is null for a plain camp or a boss not drawn. */
+ * during play. `bossId` is null for a plain camp or a boss not drawn.
+ * `shop` is true for a boss camp, whose loadout opens the shop. */
 export type ExpeditionCampPreviewView = {
   index: number;
   location: string;
@@ -224,6 +229,21 @@ export type ExpeditionCampPreviewView = {
   event: string | null;
   slotKinds: ExpeditionSlotKindView[];
   bossId: string | null;
+  shop: boolean;
+};
+
+export type ExpeditionStockView = {
+  stockId: string;
+  what: { kind: "supplies" } | { kind: "item"; itemId: string };
+  price: number;
+  soldTo: string | null;
+};
+
+/** The shop before a boss camp: the shared stock, and the viewer's own
+ * character's upgrades while the viewer owns none. */
+export type ExpeditionShopView = {
+  stock: ExpeditionStockView[];
+  yourUpgrades: { stockId: string; upgradeId: string; price: number }[];
 };
 
 /** A seat's public ballot; `choice` null abstains. Seats yet to vote are absent. */
@@ -241,9 +261,9 @@ export type ExpeditionPlanBossView = { at: number; tier: BossTier; bossId: strin
 
 export type ExpeditionStageView =
   | { tag: "muster"; ballots: ExpeditionBallotView[] }
-  | { tag: "loadout"; camp: ExpeditionCampPreviewView; readySeatIds: string[] }
+  | { tag: "loadout"; camp: ExpeditionCampPreviewView; yourSlots: number; shop: ExpeditionShopView | null; readySeatIds: string[] }
   | { tag: "camp"; camp: ExpeditionCampPreviewView; attempt: ExpeditionAttemptView }
-  | { tag: "draft"; cleared: number; payout: number; yourOffer: string[] | null; pendingSeatIds: string[] }
+  | { tag: "draft"; cleared: number; payout: number; yourOffer: { bundles: string[][] } | null; pendingSeatIds: string[] }
   | { tag: "route"; options: { id: string; next: ExpeditionCampPreviewView }[]; ballots: ExpeditionBallotView[] }
   | { tag: "event"; event: string; next: ExpeditionCampPreviewView; readySeatIds: string[] }
   | { tag: "ended"; result: "won" | "lost" };

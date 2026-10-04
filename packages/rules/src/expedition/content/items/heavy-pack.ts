@@ -4,6 +4,8 @@ import { defineItem } from "../source-def";
 export const heavyPack = defineItem({
   id: "heavy-pack",
   name: "Heavy Pack",
+  rarity: "common",
+  price: 3,
   text: "You may whisper once more each camp, but a failed camp costs 1 more supply.",
   passive: {
     modifier: (owner) => ({

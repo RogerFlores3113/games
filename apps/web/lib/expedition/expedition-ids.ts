@@ -89,6 +89,11 @@ export function draftObjectId(sourceId: string): string {
   return `draft:${sourceId}`;
 }
 
+/** A bundle of your draft offer, by its index. */
+export function bundleObjectId(bundle: number): string {
+  return `bundle:${bundle}`;
+}
+
 /** A run length on the muster's ballot. */
 export function lengthObjectId(lengthId: string): string {
   return `length:${lengthId}`;

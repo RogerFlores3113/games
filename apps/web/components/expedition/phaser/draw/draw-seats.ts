@@ -104,11 +104,11 @@ function kitIcons(ctx: Ctx, group: Layer, seat: SeatModel, right: number, cy: nu
     if (art !== null) container.add(placeArt(ctx.scene, art, 0, 0));
     container.setSize(ICON, ICON);
     container.setAlpha(chip.spent ? DIM_ALPHA : 1);
-    const mate = { seatId: seat.seatId, sourceId: chip.sourceId };
+    const mate = { seatId: seat.seatId, sourceKey: chip.sourceKey };
     container.setInteractive();
     container.on("pointerover", () => ctx.handlers.onMateSourceHover(mate));
     container.on("pointerout", () => ctx.handlers.onMateSourceHover(null));
-    ctx.index.register("camp", mateSourceObjectId(seat.seatId, chip.sourceId), container);
+    ctx.index.register("camp", mateSourceObjectId(seat.seatId, chip.sourceKey), container);
     group.add(container);
   });
   return shown.length * (ICON + 1);
@@ -249,13 +249,13 @@ function kitRow(ctx: Ctx, layer: Layer, chip: SourceChip, x: number, y: number, 
   container.setAlpha(chip.spent ? DIM_ALPHA + 0.2 : 1);
   const hit = scene.add.zone(0, 0, w, KIT_ROW_H).setOrigin(0, 0);
   hit.setInteractive({ useHandCursor: chip.usable });
-  hit.on("pointerdown", () => handlers.onSource(chip.sourceId));
-  hit.on("pointerover", () => handlers.onSourceHover(chip.sourceId));
+  hit.on("pointerdown", () => handlers.onSource(chip.sourceKey));
+  hit.on("pointerover", () => handlers.onSourceHover(chip.sourceKey));
   hit.on("pointerout", () => handlers.onSourceHover(null));
   container.add(hit);
   if (chip.pulse) scene.tweens.add({ targets: bg, alpha: { from: 1, to: 0.55 }, duration: PULSE_DURATION_MS, yoyo: true, repeat: -1 });
   layer.add(container);
-  index.register("camp", sourceObjectId(chip.sourceId), container);
+  index.register("camp", chip.objectId, container);
 }
 
 /** Your character and kit, one row each: icon, name and what is left. */

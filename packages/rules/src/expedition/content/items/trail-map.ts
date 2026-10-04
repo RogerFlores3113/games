@@ -1,13 +1,15 @@
 import { hasPendingObjective } from "../helpers";
-import { ability, defineItem } from "../source-def";
+import { defineItem, itemAbility } from "../source-def";
 
 export const trailMap = defineItem({
   id: "trail-map",
   name: "Trail Map",
+  rarity: "rare",
+  price: 5,
+  uses: { kind: "single-use" },
   text: "Swap all your open objectives with a teammate's.",
-  active: ability({
+  active: itemAbility({
     window: "between-tricks",
-    limit: { kind: "per-run", times: 1 },
     targets: [{ kind: "player", who: "teammate" }],
     canTarget: (ctx) => {
       const camp = ctx.camp;

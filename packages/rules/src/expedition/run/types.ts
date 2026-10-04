@@ -14,15 +14,17 @@
 // A1: RunState carries only the run's `seed` string, never generator state.
 // Every draw derives a fresh stream by a unique name (run/rng.ts's STREAMS).
 //
-// PRIVACY: `seed` is never projected. `SeatRun.draftOffer` is owner-only.
+// PRIVACY: `seed` is never projected. `SeatRun.offers` is owner-only.
 // `SeatRun.ledger` is never projected raw. `Reveal.audience` is the only list
 // of seats that may see a reveal's card; a reveal pins the identity and the
 // holder at reveal time and never follows the card (WR-03).
 
 import type { CampError, CampState } from "../state";
 import type { CharacterDef, EffectParams, ItemDef, SourceDef, SourceId } from "../content/source-def";
+import type { DraftOffer } from "./draft";
 import type { RunPlan } from "./plan";
 import type { CampSpec, RouteChoice, RouteOption } from "./route";
+import type { StockEntry } from "./shop";
 import type { VoteRecord } from "./vote";
 
 export type RunLength = "short" | "standard" | "long";
@@ -35,16 +37,25 @@ export type PerSeat<T> = Readonly<Partial<Record<SeatId, T>>>;
 /** When a ledger entry happened. `trick` is completedTricks.length. */
 export type Stamp = { readonly camp: CampIndex; readonly attempt: number; readonly trick: number };
 
+/** "it7", minted from RunState.itemSerial, so an id never names its item. */
+export type ItemUid = string;
+export type ItemInstance = { readonly uid: ItemUid; readonly itemId: SourceId };
+/** What an ability is used through: a character id, an upgrade id or an
+ * item instance's uid, so two copies of one item keep separate uses. */
+export type SourceKey = string;
+
 export type LedgerEntry =
-  | { readonly kind: "used"; readonly sourceId: SourceId; readonly at: Stamp; readonly poolCost: number } // 0 unless a pool limit
-  | { readonly kind: "passed"; readonly sourceId: SourceId; readonly at: Stamp; readonly failedObjectiveIds: readonly string[] } // gated-window pass; the failures it declined
+  | { readonly kind: "used"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly poolCost: number } // 0 unless a pool limit
+  | { readonly kind: "passed"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly failedObjectiveIds: readonly string[] } // gated-window pass; the failures it declined
   | { readonly kind: "regained"; readonly amount: number; readonly at: Stamp }; // pool regain on a clear
 
 export type SeatRun = {
   readonly seatId: SeatId;
   readonly characterId: string | null; // PUBLIC; null only in muster; unique in the crew
-  readonly kit: readonly SourceId[]; // PUBLIC; upgrades and items in draft order; single-use items leave on use
-  readonly draftOffer: readonly SourceId[] | null; // PRIVATE to seatId; null = no pick due
+  readonly upgradeId: string | null; // PUBLIC; one per seat, bought at the shop
+  readonly items: readonly ItemInstance[]; // PUBLIC; owned; a spent instance leaves
+  readonly equipped: readonly ItemUid[]; // PUBLIC; a subset of items, within rules.itemSlots
+  readonly offers: readonly DraftOffer[]; // PRIVATE to seatId; the head is the one to pick
   readonly ledger: readonly LedgerEntry[]; // never projected raw; append-only; survives replays
 };
 
@@ -93,7 +104,7 @@ export type CampResult = {
 
 export type Stage =
   | { readonly tag: "muster"; readonly ballots: PerSeat<RunLength | null> } // null abstains
-  | { readonly tag: "loadout"; readonly camp: CampSpec; readonly ready: PerSeat<true> }
+  | { readonly tag: "loadout"; readonly camp: CampSpec; readonly stock: readonly StockEntry[] | null; readonly ready: PerSeat<true> } // stock: the shop before a boss camp
   | { readonly tag: "camp"; readonly camp: CampSpec; readonly attempt: AttemptState }
   | { readonly tag: "draft"; readonly cleared: CampIndex; readonly payout: number }
   | { readonly tag: "route"; readonly from: CampIndex; readonly options: readonly RouteOption[]; readonly ballots: PerSeat<RouteChoice | null> }
@@ -110,6 +121,7 @@ export type RunState = {
   readonly plan: RunPlan | null; // null only in muster
   readonly history: readonly CampResult[];
   readonly lastVote: VoteRecord | null; // the latest resolved vote, for the flip the table sees
+  readonly itemSerial: number; // the next item instance number; never projected
   readonly stage: Stage;
 };
 
@@ -121,9 +133,11 @@ export type RunStatus = "in_progress" | "won" | "lost";
 export type RunAction =
   | { readonly type: "pick-character"; readonly characterId: string } // muster
   | { readonly type: "vote"; readonly choice: string | null } // muster, route; null abstains
-  | { readonly type: "pick-draft"; readonly sourceId: string } // draft
+  | { readonly type: "equip"; readonly itemUids: readonly string[] } // loadout; replaces the equipped set
+  | { readonly type: "buy"; readonly stockId: string } // loadout before a boss camp
+  | { readonly type: "pick-bundle"; readonly bundle: number } // draft
   | { readonly type: "ready" } // loadout, event
-  | { readonly type: "use-ability"; readonly sourceId: string; readonly targets: readonly string[] }
+  | { readonly type: "use-ability"; readonly sourceKey: SourceKey; readonly targets: readonly string[] }
   | { readonly type: "skip-window" }
   | { readonly type: "whisper"; readonly targetSeatId: string; readonly cardId: string }
   | { readonly type: "pick-objective"; readonly objectiveId: string }
@@ -137,8 +151,12 @@ export type RunError =
   | "not_a_choice"
   | "unknown_character"
   | "character_taken"
-  | "no_draft_pending"
-  | "not_offered"
+  | "not_owned_item"
+  | "too_many_items"
+  | "sold_out"
+  | "supplies_full"
+  | "upgrade_owned"
+  | "not_your_upgrade"
   | "already_ready"
   | "not_owned"
   | "wrong_window"
@@ -159,4 +177,6 @@ export type Catalog = {
 
 export type { CampSpec, RouteChoice, RouteOption } from "./route";
 export type { RunPlan } from "./plan";
+export type { DraftOffer } from "./draft";
+export type { StockEntry } from "./shop";
 export type { VoteRecord } from "./vote";

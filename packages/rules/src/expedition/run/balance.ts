@@ -25,10 +25,23 @@ export const MIX_FROM_CAMP = 4;
 
 export const SUPPLIES_START = 3;
 export const SUPPLIES_MAX = 4;
+/** Coins for one supply at the shop. */
+export const SUPPLY_PRICE = 6;
 
 export const PAYOUT = { base: 5, perUnplayedTrick: 1, unplayedCap: 3 } as const;
 
 export const ROUTE_OPTIONS = { min: 2, max: 3 } as const;
+
+/** A draft offer: `options` bundles of `bundleSize` items; each item is rare
+ * with `rareChance` percent. */
+export const DRAFT = { options: 3, bundleSize: 2, rareChance: 15 } as const;
+
+/** The shop before a boss camp: `items` single copies beside the supplies,
+ * and each seat's own character's upgrades. */
+export const SHOP = { items: 3, upgradePrice: 8 } as const;
+
+/** Item slots a seat starts with; camp rules and passives move it. */
+export const ITEM_SLOTS = 2;
 
 /** Placeholder: an exactly-n slot draws N uniformly from this range. */
 export const TRICK_COUNT_N_RANGE = { min: 2, max: 4 } as const;

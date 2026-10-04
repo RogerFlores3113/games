@@ -322,13 +322,13 @@ async function runWhisper(pages: Page[], page: Page): Promise<void> {
   }
 }
 
-/** Runs the D-02 highlight-then-confirm ability flow on `page` for
- * `sourceId`: click its chip, walk `targeting.nextKind` clicking the first
- * targetable hand card, seat or objective the server offers (never the seat
- * that already leads, which the Machete refuses), then confirm and wait
- * until that chip reports `spent`. */
-async function runAbility(page: Page, sourceId: string): Promise<void> {
-  const chipId = `source:${sourceId}`;
+/** Runs the D-02 highlight-then-confirm ability flow on `page` for `chip`:
+ * click it, walk `targeting.nextKind` clicking the first targetable hand
+ * card, seat or objective the server offers (never the seat that already
+ * leads, which the Machete refuses), then confirm and wait until that chip
+ * reports `spent`, or leaves with an item's last use. */
+async function runAbility(page: Page, chip: SourceChip): Promise<void> {
+  const chipId = chip.objectId;
   let model = await clickUntilChanged<CampModel>(page, chipId, (m) => m.targeting !== null && m.targeting.sourceObjectId === chipId);
 
   while (model.targeting !== null && model.targeting.nextKind !== null) {
@@ -371,7 +371,7 @@ async function runAbility(page: Page, sourceId: string): Promise<void> {
     .poll(
       async () => {
         const after = await getModel<CampModel>(page);
-        return after.seats.find((s) => s.isYou)?.sources.find((g) => g.sourceId === sourceId)?.spent ?? false;
+        return after.seats.find((s) => s.isYou)?.sources.find((g) => g.objectId === chipId)?.spent ?? true;
       },
       { timeout: 15_000 },
     )
@@ -461,7 +461,7 @@ async function stepCamp(pages: Page[], state: DriveState): Promise<void> {
       if (!state.abilityDone) {
         const ability = you.sources.find((g) => g.usable && DRIVABLE_ABILITIES.has(g.sourceId));
         if (ability) {
-          await runAbility(page, ability.sourceId);
+          await runAbility(page, ability);
           state.abilityDone = true;
           continue;
         }

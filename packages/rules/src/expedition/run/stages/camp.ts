@@ -28,7 +28,7 @@ function settleIfDecided(run: RunAt<"camp">, catalog: Catalog) {
 
 export const camp: StageDef<"camp"> = {
   on: {
-    "use-ability": (run, seatId, action, catalog) => useAbility(run, seatId, action.sourceId, action.targets, catalog),
+    "use-ability": (run, seatId, action, catalog) => useAbility(run, seatId, action.sourceKey, action.targets, catalog),
     "skip-window": (run, seatId, _action, catalog) => passWindow(run, seatId, catalog),
     whisper: (run, seatId, action, catalog) => applyWhisper(run, seatId, action, catalog),
     "pick-objective": campAction,

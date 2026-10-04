@@ -1,13 +1,15 @@
 import { identitiesEqual } from "../../deck";
-import { ability, defineItem } from "../source-def";
+import { defineItem, itemAbility } from "../source-def";
 
 export const packMule = defineItem({
   id: "pack-mule",
   name: "Pack Mule",
+  rarity: "common",
+  price: 3,
+  uses: { kind: "per-camp" },
   text: "Give a trick you won to a teammate.",
-  active: ability({
+  active: itemAbility({
     window: "between-tricks",
-    limit: { kind: "per-camp", times: 1 },
     targets: [{ kind: "won-trick" }, { kind: "player", who: "teammate" }],
     canTarget: (ctx) => {
       const { trick } = ctx.targets[0];

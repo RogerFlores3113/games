@@ -7,13 +7,13 @@
 
 import { describe, expect, it } from "vitest";
 import { campPhase, currentActorSeatId, guard } from "../camp";
-import { ability, defineCharacter, defineItem, defineUpgrade } from "../content/source-def";
+import { ability, defineCharacter, defineItem, defineUpgrade, itemAbility } from "../content/source-def";
 import { attemptOf, withAttempt } from "./attempt";
 import { rulesFor } from "./compose";
 import { createRun, dealCamp, nextAttemptNumber, runStatus, settleCamp } from "./lifecycle";
 import { campIndex } from "./plan";
 import { applyRunAction } from "./stages/registry";
-import { advanceTo, setupRun, testCatalog } from "./run-test-support";
+import { advanceTo, plainItem, setupRun, testCatalog } from "./run-test-support";
 import type { Catalog, RunAt, RunState } from "./types";
 import { currentWindow, gatedPendingSeatIds } from "./windows";
 
@@ -22,6 +22,8 @@ const SEAT_IDS = ["p0", "p1", "p2"];
 const FORCED_FAILURE = defineItem({
   id: "always-fails",
   name: "Always Fails",
+  rarity: "common",
+  price: 2,
   text: "The camp fails.",
   passive: { modifier: () => ({ goals: () => () => [guard("forced", true)] }) },
 });
@@ -43,7 +45,7 @@ function clearedCamp(run: RunState, catalog: Catalog): RunAt<"camp"> {
 }
 
 describe("createRun", () => {
-  it("starts in muster with 3 supplies, an empty purse and no plan: no characters, empty kits, no drafts, no ledger", () => {
+  it("starts in muster with 3 supplies, an empty purse and no plan: no characters, no items, no offers, no ledger", () => {
     const run = createRun({ seatIds: SEAT_IDS, seed: "s" });
     expect(run.stage).toEqual({ tag: "muster", ballots: {} });
     expect(run.supplies).toBe(3);
@@ -51,7 +53,8 @@ describe("createRun", () => {
     expect(run.plan).toBeNull();
     expect(run.lastVote).toBeNull();
     expect(run.history).toEqual([]);
-    expect(run.seats).toEqual(SEAT_IDS.map((seatId) => ({ seatId, characterId: null, kit: [], draftOffer: null, ledger: [] })));
+    expect(run.itemSerial).toBe(0);
+    expect(run.seats).toEqual(SEAT_IDS.map((seatId) => ({ seatId, characterId: null, upgradeId: null, items: [], equipped: [], offers: [], ledger: [] })));
     expect(runStatus(run)).toBe("in_progress");
   });
 
@@ -88,6 +91,7 @@ describe("muster and the length vote", () => {
     expect(run.stage).toEqual({
       tag: "loadout",
       camp: { index: 1, location: "jungle", weather: "fair", event: null, slots: [{ kind: "win-card" }, { kind: "win-card" }] },
+      stock: null,
       ready: {},
     });
   });
@@ -160,26 +164,26 @@ describe("dealing a camp", () => {
 
 describe("settling a failure", () => {
   const catalog = testCatalog({ items: { "always-fails": FORCED_FAILURE } });
-  const atCamp3 = (opts: { supplies?: number; kits?: Record<string, readonly string[]>; cat?: Catalog } = {}): RunState =>
-    setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog: opts.cat ?? catalog, camp: 3, supplies: opts.supplies, kits: { p2: ["always-fails"], ...opts.kits } });
+  const atCamp3 = (opts: { supplies?: number; items?: Record<string, readonly string[]>; cat?: Catalog } = {}): RunState =>
+    setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog: opts.cat ?? catalog, camp: 3, supplies: opts.supplies, items: { p2: ["always-fails"], ...opts.items } });
 
   it("costs a supply, records the failure, deals no draft and reopens the loadout for the same spec", () => {
-    const kits = { p0: ["item-a"], p1: [] };
-    const cat = testCatalog({ items: { "always-fails": FORCED_FAILURE, "item-a": defineItem({ id: "item-a", name: "A", text: "Nothing." }) } });
-    const before = atCamp3({ kits, cat });
+    const items = { p0: ["item-a"], p1: [] };
+    const cat = testCatalog({ items: { "always-fails": FORCED_FAILURE, "item-a": plainItem("item-a") } });
+    const before = atCamp3({ items, cat });
     const failed = readyAll(before, cat);
 
     expect(failed.supplies).toBe(2);
     expect(failed.purse).toBe(0);
     expect(failed.history).toEqual([{ camp: 3, attempt: 1, status: "failed", suppliesSpent: 1, coins: 0 }]);
     expect(failed.stage).toEqual({ ...before.stage, ready: {} });
-    expect(failed.seats.map((s) => s.draftOffer)).toEqual([null, null, null]);
-    expect(failed.seats.map((s) => s.kit)).toEqual([["item-a"], [], ["always-fails"]]);
+    expect(failed.seats.map((s) => s.offers)).toEqual([[], [], []]);
+    expect(failed.seats.map((s) => s.items)).toEqual([[{ uid: "it0", itemId: "item-a" }], [], [{ uid: "it1", itemId: "always-fails" }]]);
     expect(nextAttemptNumber(failed, campIndex(3))).toBe(2);
   });
 
   it("a failure replays the same spec with a fresh deal", () => {
-    const first = readyAll(atCamp3({ kits: { p2: [] } }), catalog);
+    const first = readyAll(atCamp3({ items: { p2: [] } }), catalog);
     const firstHands = attemptOf(first)!.camp.hands;
     const failed = settleCamp(first as RunAt<"camp">, "failed", catalog);
     const replay = readyAll(failed, catalog) as RunAt<"camp">;
@@ -192,11 +196,13 @@ describe("settling a failure", () => {
     const tonic = defineItem({
       id: "energy-tonic",
       name: "Energy Tonic",
+      rarity: "common",
+      price: 2,
       text: "Failures cost more.",
       passive: { modifier: () => ({ failureCost: (prev) => (run) => prev(run) + 1 }) },
     });
     const cat = testCatalog({ items: { "always-fails": FORCED_FAILURE, "energy-tonic": tonic } });
-    const failed = readyAll(atCamp3({ kits: { p0: ["energy-tonic"], p1: ["energy-tonic"] }, cat }), cat);
+    const failed = readyAll(atCamp3({ items: { p0: ["energy-tonic"], p1: ["energy-tonic"] }, cat }), cat);
     expect(failed.history[0]!.suppliesSpent).toBe(3);
     expect(failed.supplies).toBe(0);
     expect(failed.stage).toEqual({ tag: "ended", result: "lost" });
@@ -206,11 +212,13 @@ describe("settling a failure", () => {
     const zero = defineItem({
       id: "zero",
       name: "Zero",
+      rarity: "common",
+      price: 2,
       text: "Failures are free.",
       passive: { modifier: () => ({ goals: () => () => [guard("forced", true)], failureCost: () => () => 0 }) },
     });
     const cat = testCatalog({ items: { zero } });
-    expect(() => readyAll(setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog: cat, kits: { p0: ["zero"] } }), cat)).toThrow();
+    expect(() => readyAll(setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog: cat, items: { p0: ["zero"] } }), cat)).toThrow();
   });
 
   it("supplies at 0 end the run lost, and every later action is run_over", () => {
@@ -223,7 +231,7 @@ describe("settling a failure", () => {
 
   it("seats and ledgers persist across a replay (RUN-06)", () => {
     const failed = readyAll(atCamp3(), catalog);
-    const ledger = [{ kind: "used" as const, sourceId: "plain-1", at: { camp: campIndex(3), attempt: 1, trick: 0 }, poolCost: 0 }];
+    const ledger = [{ kind: "used" as const, sourceKey: "plain-1", at: { camp: campIndex(3), attempt: 1, trick: 0 }, poolCost: 0 }];
     const seats = failed.seats.map((s) => (s.seatId === "p0" ? { ...s, ledger } : s));
     const second = readyAll({ ...failed, seats }, catalog);
     expect(second.history.map((h) => h.attempt)).toEqual([1, 2]);
@@ -246,7 +254,7 @@ describe("settling a clear", () => {
   });
   const catalog = testCatalog({
     characters: { pooled },
-    items: { "item-a": defineItem({ id: "item-a", name: "A", text: "Nothing." }), "item-b": defineItem({ id: "item-b", name: "B", text: "Nothing." }), "item-c": defineItem({ id: "item-c", name: "C", text: "Nothing." }) },
+    items: { "item-a": plainItem("item-a"), "item-b": plainItem("item-b"), "item-c": plainItem("item-c") },
   });
 
   it("a clear pays 5 + min(3, unplayed tricks) into the purse", () => {
@@ -262,20 +270,24 @@ describe("settling a clear", () => {
     expect(settleCamp(withUnplayed(0), "cleared", catalog).purse).toBe(5);
   });
 
-  it("opens the draft and deals every seat a fresh offer: its own unowned upgrade first, no owned source", () => {
-    const run = setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog, kits: { p0: ["item-a"] } });
+  it("opens the draft and deals every seat one offer of item bundles, owned items included", () => {
+    const run = setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog, items: { p0: ["item-a"] } });
     const settled = settleCamp(clearedCamp(run, catalog), "cleared", catalog);
     expect(settled.stage).toEqual({ tag: "draft", cleared: 1, payout: 8 });
     expect(settled.history).toEqual([{ camp: 1, attempt: 1, status: "cleared", suppliesSpent: 0, coins: 8 }]);
     for (const seat of settled.seats) {
-      expect(seat.draftOffer).toHaveLength(3);
-      expect(seat.draftOffer![0]!.startsWith(`${seat.characterId}.`)).toBe(true);
+      expect(seat.offers).toHaveLength(1);
+      expect(seat.offers[0]!.bundles).toHaveLength(3);
+      for (const bundle of seat.offers[0]!.bundles) {
+        expect(new Set(bundle).size).toBe(2);
+        for (const id of bundle) expect(["item-a", "item-b", "item-c"]).toContain(id);
+      }
     }
-    expect(settled.seats[0]!.draftOffer).not.toContain("item-a");
+    expect(settled.seats[0]!.offers[0]!.bundles.flat()).toContain("item-a");
   });
 
   it("appends a pool `regained` ledger entry for a pooled character, stamped at the clear, tuned by its upgrades", () => {
-    const run = setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog, characters: { p0: "pooled", p1: "plain-1", p2: "plain-2" }, kits: { p0: ["pooled.rich"] } });
+    const run = setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog, characters: { p0: "pooled", p1: "plain-1", p2: "plain-2" }, upgrades: { p0: "pooled.rich" } });
     const settled = settleCamp(clearedCamp(run, catalog), "cleared", catalog);
     expect(settled.seats[0]!.ledger).toEqual([{ kind: "regained", amount: 2, at: { camp: 1, attempt: 1, trick: 0 } }]);
     expect(settled.seats[1]!.ledger).toEqual([]);
@@ -299,10 +311,10 @@ describe("settling a clear", () => {
 
 describe("between camps: draft, route vote and event", () => {
   const catalog = testCatalog({
-    items: { "item-a": defineItem({ id: "item-a", name: "A", text: "Nothing." }), "item-b": defineItem({ id: "item-b", name: "B", text: "Nothing." }) },
+    items: { "item-a": plainItem("item-a"), "item-b": plainItem("item-b") },
   });
   const drafting = (camp = 1, seed = "between") => settleCamp(clearedCamp(setupRun({ seatIds: SEAT_IDS, seed, catalog, camp }), catalog), "cleared", catalog);
-  const drafted = (run: RunState): RunState => run.seats.reduce((next, seat) => act(next, seat.seatId, { type: "pick-draft", sourceId: seat.draftOffer![0]! }, catalog), run);
+  const drafted = (run: RunState): RunState => run.seats.reduce((next, seat) => act(next, seat.seatId, { type: "pick-bundle", bundle: 0 }, catalog), run);
 
   it("the last draft pick opens the route vote over 2 or 3 options to the next camp", () => {
     const run = drafted(drafting());
@@ -325,7 +337,7 @@ describe("between camps: draft, route vote and event", () => {
     expect(run.lastVote).toEqual({ topic: "route", result: { tally: expect.arrayContaining([{ choice: "a", votes: 1 }, { choice: "b", votes: 2 }]), tied: null, winner: "b" } });
     expect(applyRunAction(run, "p0", { type: "vote", choice: "a" }, catalog)).toEqual({ ok: false, error: "wrong_stage" });
     run = readyAll(run, catalog);
-    expect(run.stage).toEqual({ tag: "loadout", camp: second.next, ready: {} });
+    expect(run.stage).toEqual({ tag: "loadout", camp: second.next, stock: null, ready: {} });
   });
 
   it("a route vote naming no option is not_a_choice", () => {
@@ -352,10 +364,12 @@ describe("the rescue window", () => {
   const rope = defineItem({
     id: "test-rope",
     name: "Test Rope",
+    rarity: "common",
+    price: 2,
+    uses: { kind: "single-use" },
     text: "Drop a failed objective.",
-    active: ability({
+    active: itemAbility({
       window: "rescue",
-      limit: { kind: "single-use" },
       targets: [{ kind: "failed-objective" }],
       apply: (ctx) => [{ op: "remove-objective", objectiveId: ctx.targets[0].objective.id }],
     }),
@@ -363,10 +377,12 @@ describe("the rescue window", () => {
   const lasso = defineItem({
     id: "test-lasso",
     name: "Test Lasso",
+    rarity: "common",
+    price: 2,
+    uses: { kind: "charges", n: 3 },
     text: "Drop a failed objective, three times a run.",
-    active: ability({
+    active: itemAbility({
       window: "rescue",
-      limit: { kind: "per-run", times: 3 },
       targets: [{ kind: "failed-objective" }],
       apply: (ctx) => [{ op: "remove-objective", objectiveId: ctx.targets[0].objective.id }],
     }),
@@ -374,10 +390,12 @@ describe("the rescue window", () => {
   const shove = defineItem({
     id: "test-shove",
     name: "Test Shove",
+    rarity: "common",
+    price: 2,
+    uses: { kind: "charges", n: 3 },
     text: "Give the first trick to a player.",
-    active: ability({
+    active: itemAbility({
       window: "between-tricks",
-      limit: { kind: "per-run", times: 3 },
       targets: [{ kind: "player", who: "anyone" }],
       apply: (ctx) => [{ op: "reassign-trick", trickIndex: 0, toSeatId: ctx.targets[0].seatId }],
     }),
@@ -386,8 +404,9 @@ describe("the rescue window", () => {
 
   /** Between tricks with every seat holding a no-tricks objective, so the
    * first trick fails exactly its winner's objective. */
-  function everyoneDucks(kits: Readonly<Record<string, readonly string[]>>, seed = "rescue-seed"): RunState {
-    const run = advanceTo(setupRun({ seatIds: SEAT_IDS, seed, catalog, kits }), "between-tricks", catalog);
+  /** Items mint in seat order: the first seat's first item is it0. */
+  function everyoneDucks(items: Readonly<Record<string, readonly string[]>>, seed = "rescue-seed"): RunState {
+    const run = advanceTo(setupRun({ seatIds: SEAT_IDS, seed, catalog, items }), "between-tricks", catalog);
     const attempt = attemptOf(run)!;
     const objectives = attempt.camp.seatIds.map((seatId) => ({ id: `duck-${seatId}`, kind: "no-tricks" as const, ownerSeatId: seatId }));
     return withAttempt(run, { ...attempt, camp: { ...attempt.camp, objectives } });
@@ -430,19 +449,20 @@ describe("the rescue window", () => {
     expect(passed.stage.tag).toBe("loadout");
     expect(passed.supplies).toBe(2);
     expect(passed.history).toEqual([{ camp: 1, attempt: 1, status: "failed", suppliesSpent: 1, coins: 0 }]);
-    expect(passed.seats[0]!.ledger).toEqual([{ kind: "passed", sourceId: "test-rope", at: { camp: 1, attempt: 1, trick: 1 }, failedObjectiveIds: [`duck-${winner}`] }]);
+    expect(passed.seats[0]!.ledger).toEqual([{ kind: "passed", sourceKey: "it0", at: { camp: 1, attempt: 1, trick: 1 }, failedObjectiveIds: [`duck-${winner}`] }]);
   });
 
   it("a rescue that clears every failure resumes play and spends a single-use item", () => {
     const paused = playTrick(everyoneDucks({ p0: ["test-rope"] }));
     const winner = attemptOf(paused)!.camp.completedTricks[0]!.winnerSeatId;
-    const rescued = use(paused, "p0", { type: "use-ability", sourceId: "test-rope", targets: [`objective:duck-${winner}`] });
+    const rescued = use(paused, "p0", { type: "use-ability", sourceKey: "it0", targets: [`objective:duck-${winner}`] });
     const camp = attemptOf(rescued)!.camp;
     expect(camp.objectives.map((o) => o.id)).toEqual(SEAT_IDS.filter((id) => id !== winner).map((id) => `duck-${id}`));
     expect(campPhase(camp, rulesFor(rescued, catalog))).toBe("playing");
     expect(currentWindow(rescued, rulesFor(rescued, catalog))).toBe("between-tricks");
     expect(rescued.history).toEqual([]);
-    expect(rescued.seats[0]!.kit).toEqual([]);
+    expect(rescued.seats[0]!.items).toEqual([]);
+    expect(rescued.seats[0]!.equipped).toEqual([]);
     expect(attemptOf(playCard(rescued))!.camp.currentTrick.plays).toHaveLength(1);
   });
 
@@ -459,11 +479,11 @@ describe("the rescue window", () => {
     const firstWinner = attemptOf(paused)!.camp.completedTricks[0]!.winnerSeatId;
 
     const afterPass = use(paused, "p0", { type: "skip-window" });
-    expect(afterPass.seats[0]!.ledger).toEqual([{ kind: "passed", sourceId: "test-lasso", at: { camp: 1, attempt: 1, trick: 1 }, failedObjectiveIds: [`duck-${firstWinner}`] }]);
+    expect(afterPass.seats[0]!.ledger).toEqual([{ kind: "passed", sourceKey: "it0", at: { camp: 1, attempt: 1, trick: 1 }, failedObjectiveIds: [`duck-${firstWinner}`] }]);
     expect(gatedPendingSeatIds(afterPass, catalog)).toEqual(["p1"]);
     expect(afterPass.stage.tag).toBe("camp");
 
-    const rescued = use(afterPass, "p1", { type: "use-ability", sourceId: "test-rope", targets: [`objective:duck-${firstWinner}`] });
+    const rescued = use(afterPass, "p1", { type: "use-ability", sourceKey: "it1", targets: [`objective:duck-${firstWinner}`] });
     const second = playTrick(rescued);
     expect(attemptOf(second)!.camp.completedTricks).toHaveLength(2);
     expect(currentWindow(second, rulesFor(second, catalog))).toBe("rescue");
@@ -475,11 +495,11 @@ describe("the rescue window", () => {
     const paused = playTrick(everyoneDucks({ p0: ["test-lasso"], p1: ["test-rope"], p2: ["test-shove"] }, "reopen-seed"));
     const firstWinner = attemptOf(paused)!.camp.completedTricks[0]!.winnerSeatId;
     const afterPass = use(paused, "p0", { type: "skip-window" });
-    const rescued = use(afterPass, "p1", { type: "use-ability", sourceId: "test-rope", targets: [`objective:duck-${firstWinner}`] });
+    const rescued = use(afterPass, "p1", { type: "use-ability", sourceKey: "it1", targets: [`objective:duck-${firstWinner}`] });
     expect(currentWindow(rescued, rulesFor(rescued, catalog))).toBe("between-tricks");
 
     const blamed = SEAT_IDS.find((id) => id !== firstWinner)!;
-    const shoved = use(rescued, "p2", { type: "use-ability", sourceId: "test-shove", targets: [`seat:${blamed}`] });
+    const shoved = use(rescued, "p2", { type: "use-ability", sourceKey: "it2", targets: [`seat:${blamed}`] });
     expect(attemptOf(shoved)!.camp.completedTricks).toHaveLength(1);
     expect(currentWindow(shoved, rulesFor(shoved, catalog))).toBe("rescue");
     expect(gatedPendingSeatIds(shoved, catalog)).toEqual(["p0"]);
@@ -495,10 +515,12 @@ describe("the in-trick window", () => {
   const duck = defineItem({
     id: "test-duck",
     name: "Test Duck",
+    rarity: "common",
+    price: 2,
+    uses: { kind: "charges", n: 3 },
     text: "Your card can't win this trick.",
-    active: ability({
+    active: itemAbility({
       window: "in-trick",
-      limit: { kind: "per-run", times: 3 },
       targets: [{ kind: "self" }],
       apply: (ctx) => [{ op: "add-modifier", lasts: "trick", params: { seatId: ctx.self }, audience: "public" }],
       effect: (effect) => ({
@@ -512,10 +534,10 @@ describe("the in-trick window", () => {
   const catalog = testCatalog({ items: { "test-duck": duck } });
 
   it("opens once the leader plays and admits only the seat whose turn it is", () => {
-    const kits = { p0: ["test-duck"], p1: ["test-duck"], p2: ["test-duck"] };
-    const start = advanceTo(setupRun({ seatIds: SEAT_IDS, seed: "in-trick-seed", catalog, kits }), "between-tricks", catalog);
+    const items = { p0: ["test-duck"], p1: ["test-duck"], p2: ["test-duck"] };
+    const start = advanceTo(setupRun({ seatIds: SEAT_IDS, seed: "in-trick-seed", catalog, items }), "between-tricks", catalog);
     const leader = attemptOf(start)!.camp.currentTrick.leaderSeatId;
-    const useAs = (seatId: string) => ({ type: "use-ability" as const, sourceId: "test-duck", targets: [`seat:${seatId}`] });
+    const useAs = (seatId: string) => ({ type: "use-ability" as const, sourceKey: `it${SEAT_IDS.indexOf(seatId)}`, targets: [`seat:${seatId}`] });
     expect(applyRunAction(start, leader, useAs(leader), catalog)).toEqual({ ok: false, error: "wrong_window" });
 
     const rules = rulesFor(start, catalog);

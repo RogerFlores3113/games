@@ -1,14 +1,16 @@
 import { guard } from "../../camp";
 import { countTricksWon } from "../../objectives";
-import { ability, defineItem } from "../source-def";
+import { defineItem, itemAbility } from "../source-def";
 
 export const camouflage = defineItem({
   id: "camouflage",
   name: "Camouflage",
+  rarity: "rare",
+  price: 4,
+  uses: { kind: "single-use" },
   text: "Drop one of your open objectives, and the camp fails if you win a trick.",
-  active: ability({
+  active: itemAbility({
     window: "between-tricks",
-    limit: { kind: "single-use" },
     targets: [{ kind: "objective", whose: "mine" }],
     canUse: (ctx) => (countTricksWon(ctx.camp, ctx.self) > 0 ? "You have already won a trick this camp" : true),
     apply: (ctx) => [

@@ -22,13 +22,13 @@ import {
 } from "./local-ui";
 
 const SCOUT: ExpeditionAbilityView = {
-  sourceId: "scout",
+  sourceKey: "scout",
   usableNow: true,
   reason: null,
   steps: [{ kind: "hand", prompt: "Pick a teammate's hand", choices: ["hand:p1", "hand:p2"] }],
 };
 const MONKEY: ExpeditionAbilityView = {
-  sourceId: "trained-monkey",
+  sourceKey: "trained-monkey",
   usableNow: true,
   reason: null,
   steps: [
@@ -36,13 +36,23 @@ const MONKEY: ExpeditionAbilityView = {
     { kind: "player", prompt: "Pick a teammate", choices: ["seat:p1"] },
   ],
 };
-const BAIT: ExpeditionAbilityView = { sourceId: "bait", usableNow: true, reason: null, steps: [] };
+const BAIT: ExpeditionAbilityView = { sourceKey: "bait", usableNow: true, reason: null, steps: [] };
 const PARROT: ExpeditionAbilityView = {
-  sourceId: "parrot",
+  sourceKey: "parrot",
   usableNow: true,
   reason: null,
   steps: [{ kind: "objective", prompt: "Pick an objective", choices: ["objective:o1"] }],
 };
+
+/** Old-style kit ids as a seat's upgrade and equipped items; an item's uid
+ * here is its item id, so ability keys in these fixtures read by name. */
+function kitOf(kit: readonly string[]): Pick<ExpeditionView["seats"][number], "upgradeId" | "items"> {
+  const items = kit.filter((id) => !id.includes("."));
+  return {
+    upgradeId: kit.find((id) => id.includes(".")) ?? null,
+    items: { equipped: items.map((id) => ({ uid: id, itemId: id, remaining: null })), backpack: [], concealed: false },
+  };
+}
 
 function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
   const base: ExpeditionView = {
@@ -54,16 +64,16 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     supplies: { count: 3, max: 5 },
     plan: [],
     seats: [
-      { seatId: "p0", characterId: "scout", kit: ["trained-monkey", "bait"], pool: null, usage: [] },
-      { seatId: "p1", characterId: "guide", kit: [], pool: null, usage: [] },
-      { seatId: "p2", characterId: "medic", kit: [], pool: null, usage: [] },
+      { seatId: "p0", characterId: "scout", ...kitOf(["trained-monkey", "bait"]), pool: null, usage: [] },
+      { seatId: "p1", characterId: "guide", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
+      { seatId: "p2", characterId: "medic", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
     ],
     yourAbilities: [SCOUT, MONKEY, BAIT, PARROT],
     history: [],
     lastVote: null,
     stage: {
       tag: "camp",
-      camp: { index: 1, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null },
+      camp: { index: 1, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null, shop: false },
       attempt: {
       attemptNumber: 1,
       window: "between-tricks",
@@ -152,7 +162,7 @@ describe("initialLocalUi", () => {
 
 describe("beginAbilityTargeting", () => {
   it("is a no-op when the ability is not usable now", () => {
-    const view = makeView({ yourAbilities: [{ sourceId: "scout", usableNow: false, reason: "Already used this camp", steps: [] }] });
+    const view = makeView({ yourAbilities: [{ sourceKey: "scout", usableNow: false, reason: "Already used this camp", steps: [] }] });
     const ui = freeze(initialLocalUi());
     expect(beginAbilityTargeting(ui, view, "scout")).toBe(ui);
   });
@@ -166,7 +176,7 @@ describe("beginAbilityTargeting", () => {
   it("begins targeting the scout with an empty selection; next kind is hand", () => {
     const view = makeView();
     const next = beginAbilityTargeting(freeze(initialLocalUi()), view, "scout");
-    expect(next.targeting).toEqual({ mode: "ability", sourceId: "scout", selected: [], valueCardId: null });
+    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "scout", selected: [], valueCardId: null });
     expect(nextTargetKind(next, view)).toBe("hand");
     expect(currentStep(next, view)?.prompt).toBe("Pick a teammate's hand");
   });
@@ -196,7 +206,7 @@ describe("selectTarget", () => {
     const view = makeView();
     const started = beginAbilityTargeting(freeze(initialLocalUi()), view, "scout");
     const next = selectTarget(freeze(started), view, "hand:p1");
-    expect(next.targeting).toEqual({ mode: "ability", sourceId: "scout", selected: ["hand:p1"], valueCardId: null });
+    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "scout", selected: ["hand:p1"], valueCardId: null });
     expect(nextTargetKind(next, view)).toBeNull();
   });
 
@@ -211,7 +221,7 @@ describe("selectTarget", () => {
     expect(nextTargetKind(ui, view)).toBe("player");
 
     ui = freeze(selectTarget(ui, view, "seat:p1"));
-    expect(ui.targeting).toEqual({ mode: "ability", sourceId: "trained-monkey", selected: ["card:c1", "seat:p1"], valueCardId: null });
+    expect(ui.targeting).toEqual({ mode: "ability", sourceKey: "trained-monkey", selected: ["card:c1", "seat:p1"], valueCardId: null });
     expect(nextTargetKind(ui, view)).toBeNull();
   });
 });
@@ -238,8 +248,8 @@ describe("choiceFor", () => {
   });
 
   it("maps the board and the supplies to their single ids", () => {
-    const howler: ExpeditionAbilityView = { sourceId: "guide.howler-call", usableNow: true, reason: null, steps: [{ kind: "board", prompt: "Pick the trick on the table", choices: ["board"] }] };
-    const kit: ExpeditionAbilityView = { sourceId: "medic.field-kit", usableNow: true, reason: null, steps: [{ kind: "supplies", prompt: "Pick the crew's supplies", choices: ["supplies"] }] };
+    const howler: ExpeditionAbilityView = { sourceKey: "guide.howler-call", usableNow: true, reason: null, steps: [{ kind: "board", prompt: "Pick the trick on the table", choices: ["board"] }] };
+    const kit: ExpeditionAbilityView = { sourceKey: "medic.field-kit", usableNow: true, reason: null, steps: [{ kind: "supplies", prompt: "Pick the crew's supplies", choices: ["supplies"] }] };
     const view = makeView({ yourAbilities: [howler, kit] });
     expect(choiceFor(beginAbilityTargeting(initialLocalUi(), view, "guide.howler-call"), view, "board", "")).toBe("board");
     expect(choiceFor(beginAbilityTargeting(initialLocalUi(), view, "medic.field-kit"), view, "supplies", "")).toBe("supplies");
@@ -248,7 +258,7 @@ describe("choiceFor", () => {
 
 describe("card-value steps", () => {
   const TONIC: ExpeditionAbilityView = {
-    sourceId: "botanist",
+    sourceKey: "botanist",
     usableNow: true,
     reason: null,
     steps: [{ kind: "card-value", prompt: "Pick a card in your hand to recount", choices: ["value:c1:4", "value:c1:6", "value:c2:9"] }],
@@ -264,7 +274,7 @@ describe("card-value steps", () => {
     expect(isPicked(ui, "card", "c1")).toBe(true);
     ui = selectTarget(ui, view, "value:c1:6");
     expect(valueChoices(ui, view)).toEqual([]);
-    expect(confirmTargeting(ui, view).request).toEqual({ type: "use-ability", sourceId: "botanist", targets: ["value:c1:6"] });
+    expect(confirmTargeting(ui, view).request).toEqual({ type: "use-ability", sourceKey: "botanist", targets: ["value:c1:6"] });
   });
 
   it("a rank for another card than the held one is refused", () => {
@@ -276,11 +286,11 @@ describe("card-value steps", () => {
 
 describe("self steps", () => {
   it("are picked as soon as targeting begins", () => {
-    const puffball: ExpeditionAbilityView = { sourceId: "puffball", usableNow: true, reason: null, steps: [{ kind: "self", prompt: "Use it on yourself", choices: ["seat:p0"] }] };
+    const puffball: ExpeditionAbilityView = { sourceKey: "puffball", usableNow: true, reason: null, steps: [{ kind: "self", prompt: "Use it on yourself", choices: ["seat:p0"] }] };
     const view = makeView({ yourAbilities: [puffball] });
     const ui = beginAbilityTargeting(initialLocalUi(), view, "puffball");
     expect(currentStep(ui, view)).toBeNull();
-    expect(confirmTargeting(ui, view).request).toEqual({ type: "use-ability", sourceId: "puffball", targets: ["seat:p0"] });
+    expect(confirmTargeting(ui, view).request).toEqual({ type: "use-ability", sourceKey: "puffball", targets: ["seat:p0"] });
   });
 });
 
@@ -293,14 +303,14 @@ describe("confirmTargeting", () => {
     expect(ui).toBe(started);
   });
 
-  it("after all steps are picked: emits use-ability with exactly type/sourceId/targets, clears targeting", () => {
+  it("after all steps are picked: emits use-ability with exactly type/sourceKey/targets, clears targeting", () => {
     const view = makeView();
     let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "trained-monkey"));
     ui = freeze(selectTarget(ui, view, "card:c1"));
     ui = freeze(selectTarget(ui, view, "seat:p1"));
     const { ui: nextUi, request } = confirmTargeting(ui, view);
-    expect(request).toEqual({ type: "use-ability", sourceId: "trained-monkey", targets: ["card:c1", "seat:p1"] });
-    expect(Object.keys(request!).sort()).toEqual(["sourceId", "targets", "type"]);
+    expect(request).toEqual({ type: "use-ability", sourceKey: "trained-monkey", targets: ["card:c1", "seat:p1"] });
+    expect(Object.keys(request!).sort()).toEqual(["sourceKey", "targets", "type"]);
     expect(nextUi.targeting).toBeNull();
   });
 
@@ -308,7 +318,7 @@ describe("confirmTargeting", () => {
     const view = makeView();
     const started = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "bait"));
     const { ui, request } = confirmTargeting(started, view);
-    expect(request).toEqual({ type: "use-ability", sourceId: "bait", targets: [] });
+    expect(request).toEqual({ type: "use-ability", sourceKey: "bait", targets: [] });
     expect(ui.targeting).toBeNull();
   });
 
@@ -365,7 +375,7 @@ describe("reconcileLocalUi", () => {
   it("clears an ability targeting whose ability is no longer usable", () => {
     const view1 = makeView();
     let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view1, "scout"));
-    const view2 = makeView({ yourAbilities: [{ sourceId: "scout", usableNow: false, reason: "Already used this camp", steps: [] }] });
+    const view2 = makeView({ yourAbilities: [{ sourceKey: "scout", usableNow: false, reason: "Already used this camp", steps: [] }] });
     ui = reconcileLocalUi(ui, view2);
     expect(ui.targeting).toBeNull();
   });
@@ -389,7 +399,7 @@ describe("reconcileLocalUi", () => {
       steps: [{ kind: "card", prompt: "Pick one of your cards", choices: ["card:c2"] }, MONKEY.steps[1]!],
     };
     const next = reconcileLocalUi(ui, makeView({ yourAbilities: [narrowed] }));
-    expect(next.targeting).toEqual({ mode: "ability", sourceId: "trained-monkey", selected: [], valueCardId: null });
+    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "trained-monkey", selected: [], valueCardId: null });
   });
 
   it("keeps a still-offered first pick and drops only the later one", () => {
@@ -403,7 +413,7 @@ describe("reconcileLocalUi", () => {
       steps: [MONKEY.steps[0]!, { kind: "player", prompt: "Pick a teammate", choices: ["seat:p2"] }],
     };
     const next = reconcileLocalUi(ui, makeView({ yourAbilities: [narrowed] }));
-    expect(next.targeting).toEqual({ mode: "ability", sourceId: "trained-monkey", selected: ["card:c1"], valueCardId: null });
+    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "trained-monkey", selected: ["card:c1"], valueCardId: null });
   });
 
   it("drops a whisper card pick that left the hand", () => {
@@ -434,7 +444,7 @@ describe("reconcileLocalUi", () => {
     let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "scout"));
     ui = freeze(setHoveredCard(ui, "c1"));
     const next = reconcileLocalUi(ui, view);
-    expect(next.targeting).toEqual({ mode: "ability", sourceId: "scout", selected: [], valueCardId: null });
+    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "scout", selected: [], valueCardId: null });
     expect(next.hoveredCardId).toBe("c1");
   });
 });
@@ -446,9 +456,9 @@ describe("setHoveredCard / setLastTrickOpen / tooltip setters", () => {
     expect(setLastTrickOpen(ui, true)).toEqual({ ...initialLocalUi(), lastTrickOpen: true });
     expect(setTooltipSource(ui, "scout")).toEqual({ ...initialLocalUi(), tooltipSourceId: "scout" });
     expect(setTooltipObjective(ui, "o1")).toEqual({ ...initialLocalUi(), tooltipObjectiveId: "o1" });
-    expect(setTooltipMateSource(ui, { seatId: "s1", sourceId: "bait" })).toEqual({
+    expect(setTooltipMateSource(ui, { seatId: "s1", sourceKey: "bait" })).toEqual({
       ...initialLocalUi(),
-      tooltipMateSource: { seatId: "s1", sourceId: "bait" },
+      tooltipMateSource: { seatId: "s1", sourceKey: "bait" },
     });
     expect(ui).toEqual(initialLocalUi());
   });

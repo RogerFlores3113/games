@@ -39,12 +39,38 @@ describe("checkRunState", () => {
     expect(checkRunState(broken, CATALOG).some((p) => /^card conservation: .+ appears 2 times, expected 1$/.test(p))).toBe(true);
   });
 
-  it("names a duplicate character and an unknown kit id", () => {
+  it("names a duplicate character", () => {
     const run = createRun({ seatIds: SEATS, seed: "check" });
-    const seats = run.seats.map((s, i) => ({ ...s, characterId: "scout", kit: i === 0 ? ["nope"] : [] }));
-    const problems = checkRunState({ ...run, seats }, CATALOG);
-    expect(problems).toContain("character scout is held by more than one seat");
-    expect(problems).toContain("a: kit holds unknown source nope");
+    const seats = run.seats.map((s) => ({ ...s, characterId: "scout" }));
+    expect(checkRunState({ ...run, seats }, CATALOG)).toEqual(["character scout is held by more than one seat"]);
+  });
+
+  it("passes items given through the shortcut, and flags each broken instance, equipped set and upgrade", () => {
+    const given = DEV_SHORTCUTS["give-item"].apply(DEV_SHORTCUTS["give-item"].apply(dealt(), { seat: "a", item: "bait" }, CATALOG), { seat: "b", item: "parrot" }, CATALOG);
+    expect(checkRunState(given, CATALOG)).toEqual([]);
+    const seats = given.seats.map((s) =>
+      s.seatId === "a"
+        ? { ...s, items: [...s.items, { uid: "it7", itemId: "nope" }, { uid: "x1", itemId: "bait" }], equipped: ["it0", "it0", "it9", "x1"], upgradeId: "guide.pathfinder" }
+        : s.seatId === "b"
+          ? { ...s, items: [...s.items, { uid: "it0", itemId: "bait" }], offers: [{ kind: "standard" as const, bundles: [["bait", "ghost"]] }] }
+          : s,
+    );
+    expect(checkRunState({ ...given, seats }, CATALOG)).toEqual([
+      "a: item uid it7 is not it<n> below itemSerial 2",
+      "a: item it7 is unknown item nope",
+      "a: item uid x1 is not it<n> below itemSerial 2",
+      "a: it0 is equipped twice",
+      "a: equipped it9 is not owned",
+      "a: upgrade guide.pathfinder is not one of its character's",
+      "b: draft offer holds unknown item ghost",
+      "item uid it0 is owned more than once",
+    ]);
+  });
+
+  it("flags more items equipped than the composed slots", () => {
+    const given = ["bait", "parrot", "puffball"].reduce((run, item) => DEV_SHORTCUTS["give-item"].apply(run, { seat: "a", item }, CATALOG), dealt());
+    const over = { ...given, seats: given.seats.map((s) => (s.seatId === "a" ? { ...s, equipped: ["it0", "it1", "it2"] } : s)) };
+    expect(checkRunState(over, CATALOG)).toEqual(["a: 3 items equipped, 2 slots"]);
   });
 
   it("flags supplies out of range and a stray ready seat", () => {

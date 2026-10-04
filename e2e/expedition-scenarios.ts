@@ -24,7 +24,15 @@ interface Camp extends Json {
   currentActorSeatId: string | null;
   handSizes: { seatId: string; size: number }[];
 }
-interface Seat { seatId: string; characterId: string | null; kit: string[]; usage: { sourceId: string; remaining: Json }[]; pool: Json | null }
+interface Item { uid: string; itemId: string; remaining: Json | null }
+interface Seat {
+  seatId: string;
+  characterId: string | null;
+  upgradeId: string | null;
+  items: { equipped: Item[]; backpack: Item[] | null; concealed: boolean };
+  usage: { sourceKey: string; remaining: Json }[];
+  pool: Json | null;
+}
 type Attempt = Json & { camp: Camp; log: Json[]; reveals: Json[]; window: string | null; pendingSeatIds: string[]; rescue: Json | null };
 export interface Game extends Json {
   yourSeatId: string;
@@ -47,20 +55,32 @@ function others(game: Game): string[] {
   return game.seats.map((s) => s.seatId).filter((id) => id !== game.yourSeatId);
 }
 
-/** Your seat holds `sourceId` (as its character for a character id) with
- * `remaining` uses. */
+/** The instance uid a rewritten view gives the item under test. */
+export const ITEM_UID = "it90";
+
+/** The key a scenario's source is used through: an item's instance, else its id. */
+export function scenarioKey(sourceId: string): string {
+  return ITEM_SOURCES.has(sourceId) ? ITEM_UID : sourceId;
+}
+
+const ITEM_SOURCES = new Set(["puffball", "bait", "pack-mule"]);
+
+/** Your seat holds `sourceId` with `remaining` uses: as its character for a
+ * character id, its upgrade for an upgrade id, else an equipped item. */
 function holding(game: Game, sourceId: string, characterId: string, remaining: Json): Game {
   const next = clone(game);
+  const key = scenarioKey(sourceId);
   next.seats = next.seats.map((s) => {
     if (s.seatId !== game.yourSeatId) return s;
-    const kit = sourceId === characterId || s.kit.includes(sourceId) ? s.kit : [...s.kit, sourceId];
-    return { ...s, characterId, kit, usage: [{ sourceId, remaining }] };
+    const upgradeId = sourceId.includes(".") ? sourceId : s.upgradeId;
+    const equipped = key === ITEM_UID ? [...s.items.equipped.filter((i) => i.uid !== ITEM_UID), { uid: ITEM_UID, itemId: sourceId, remaining }] : s.items.equipped;
+    return { ...s, characterId, upgradeId, items: { ...s.items, equipped }, usage: [{ sourceKey: key, remaining }] };
   });
   return next;
 }
 
 function withAbility(game: Game, sourceId: string, steps: { kind: string; prompt: string; choices: string[] }[]): Game {
-  return { ...game, yourAbilities: [{ sourceId, usableNow: true, reason: null, steps }] };
+  return { ...game, yourAbilities: [{ sourceKey: scenarioKey(sourceId), usableNow: true, reason: null, steps }] };
 }
 
 /** A camp mid-play with plays on the table and tricks behind it, the next
@@ -91,11 +111,11 @@ export function playing(game: Game, opts: { plays: number; window: "between-tric
 const STD = (c: Card): c is Card & { identity: { kind: "standard"; rank: number } } => c.identity.kind === "standard";
 
 /** One rewrite per target kind: the ability, its steps and the state that
- * makes them choosable. `expect` is the request the test confirms. */
+ * makes them choosable. The test uses it through `scenarioKey(sourceId)`. */
 export const PICKER_SCENARIOS: Record<string, { sourceId: string; rewrite: Rewrite }> = {
   self: {
     sourceId: "puffball",
-    rewrite: (g) => withAbility(holding(playing(g, { plays: 0, window: "between-tricks" }), "puffball", "guide", { kind: "single-use" }), "puffball", [
+    rewrite: (g) => withAbility(holding(playing(g, { plays: 0, window: "between-tricks" }), "puffball", "guide", { kind: "uses", left: 1, of: 1 }), "puffball", [
       { kind: "self", prompt: "Use it on yourself", choices: [`seat:${g.yourSeatId}`] },
     ]),
   },
@@ -114,7 +134,7 @@ export const PICKER_SCENARIOS: Record<string, { sourceId: string; rewrite: Rewri
   card: {
     sourceId: "bait",
     rewrite: (g) => {
-      const next = holding(playing(g, { plays: 2, window: "in-trick" }), "bait", "guide", { kind: "single-use" });
+      const next = holding(playing(g, { plays: 2, window: "in-trick" }), "bait", "guide", { kind: "uses", left: 1, of: 1 });
       return withAbility(next, "bait", [{ kind: "card", prompt: "Pick a card on the table", choices: attempt(next).camp.currentTrick.plays.map((p) => `card:${p.card.id}`) }]);
     },
   },
@@ -200,7 +220,7 @@ export function rescue(game: Game, opts: { youPending?: boolean } = {}): Game {
   attempt(next).pendingSeatIds = [youPending ? game.yourSeatId : mates[0]!];
   attempt(next).rescue = { failedObjectiveIds: [failed.id] };
   next.yourAbilities = youPending
-    ? [{ sourceId: "medic", usableNow: true, reason: null, steps: [{ kind: "failed-objective", prompt: "Pick a failed objective", choices: [`objective:${failed.id}`] }] }]
+    ? [{ sourceKey: "medic", usableNow: true, reason: null, steps: [{ kind: "failed-objective", prompt: "Pick a failed objective", choices: [`objective:${failed.id}`] }] }]
     : [];
   return next;
 }

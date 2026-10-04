@@ -58,10 +58,12 @@ card or was discarded, and fails if never played by the final trick.
   (`abilityStatus`, `useAbility`, `passWindow`), `run/targets.ts`
   (`TARGET_KINDS`, `resolveTargets`, `stepsFor`), `run/windows.ts`
   (`WINDOWS`, `currentWindow`, `gatedPendingSeatIds`), `run/usage.ts`
-  (`remaining`, `poolBalance`, `liveSourceIds`), `run/compose.ts`
+  (`remaining`, `poolBalance`, `liveSourceKeys`, `backpackOf`,
+  `defIdOf`), `run/items.ts` (`mintItems`, `equipError`), `run/compose.ts`
   (`rulesFor`, the rule layers), `run/run-rules.ts` (`RunHooks`,
   `HOOK_NAMES`), `run/toolkit.ts` (`ToolkitOp`, `applyToolkitOps`, the only
-  mutation surface for abilities), `run/draft.ts`, `run/whisper.ts`,
+  mutation surface for abilities), `run/draft.ts` (`draftOfferFor`,
+  `drawItem`), `run/shop.ts` (`stockFor`, `buy`), `run/whisper.ts`,
   `run/balance.ts` (every tunable number), `run/rng.ts` (`STREAMS`,
   `seededIndex`) and `run/catalog.ts`'s `CATALOG` (`{ characters, items }`
   plus the flattened `sources` index). `content/events/` holds `EVENTS`.
@@ -76,14 +78,21 @@ until the tag stops changing.
    until the vote resolves. The last missing input resolves it (majority,
    else a seeded coin flip recorded in `lastVote`), draws the plan and opens
    the loadout for camp 1 (the Jungle, fair weather).
-2. **Loadout.** Each seat sends `ready`; the last one deals the camp.
+2. **Loadout.** Each seat sends `equip { itemUids }` (replaces its equipped
+   set, within `rules.itemSlots`), before a boss camp `buy { stockId }` at
+   the shop (supplies, three single items, and the seat's own character's
+   upgrades while it has none), then `ready`, which re-checks the slots.
+   After its `ready` a seat can change nothing. The last `ready` deals the
+   camp.
 3. **Camp.** Play as before. A decided camp settles unless a rescue is
    pending.
 4. **Settle.** A failure costs supplies and reopens the loadout for the same
    camp spec with a fresh deal; 0 supplies ends the run. A clear pays
    `5 + min(3, unplayed tricks)` into the shared purse and deals every seat
    a private draft offer, or wins the run at the final camp.
-5. **Draft.** Each seat with an offer sends `pick-draft`.
+5. **Draft.** Each seat with an offer sends `pick-bundle { bundle }`: one
+   instance per item of that bundle of its head offer, equipped while a slot
+   is free, else into the backpack.
 6. **Route.** Each seat votes over 2 or 3 options to the next camp.
 7. **Event.** A stub with no effect yet. Each seat sends `ready`, then the
    next camp's loadout opens.
@@ -92,8 +101,16 @@ A disconnected seat's ballot is cast as an abstention by the worker's
 auto-pass after the existing grace.
 
 **Layering order** (`run/compose.ts`): **base, then per seat (seat order)
-each live source's passive in `[character, ...kit]` order, then each live
-effect's layer in `attempt.effects` order.**
+each live source's passive in `[character, upgrade, ...equipped]` order,
+then each live effect's layer in `attempt.effects` order.** A backpack item
+is not live: no passive, no ability.
+
+**Source keys.** A seat acts through a key: its character id, its upgrade
+id, or an item instance's uid (`it7`, minted from `RunState.itemSerial`).
+The ledger, `use-ability`, `abilityStatus`, `remaining` and the view's
+`yourAbilities` and `usage` are keyed by it, so two copies of one item keep
+separate uses. Effects, log entries and reveals carry the def id (the
+item's id), since a spent instance is gone by the time they are read.
 Each layer's `RuleModifier` maps the previous layer's answer to its own, hook
 by hook. The card-reading hooks `identityOf`, `isTrump` and `rankOf` fold
 first, in that order (WR-03); every other hook folds over the base built
@@ -107,8 +124,9 @@ conservation after every op; a broken op throws (a content-author defect,
 POLICY A3).
 
 **Spending is the engine's job.** `useAbility` appends a `used` ledger entry
-(with its pool cost), takes the supplies of a supplies limit, and removes a
-single-use item from the kit. Authors never count uses.
+(with its pool cost), takes the supplies of a supplies limit, and removes an
+item instance on the use that spends its last charge. Authors never count
+uses.
 
 **The RNG stream rule (A1):** `RunState` carries only a `seed` string. Every
 draw derives a fresh, uniquely named stream via `run/rng.ts`'s `STREAMS`:
@@ -119,8 +137,8 @@ draw derives a fresh, uniquely named stream via `run/rng.ts`'s `STREAMS`:
 | Route vote tie | `expedition-vote:route:camp{k}` (k = the next camp) |
 | Route option count | `expedition-route:camp{k}:count` |
 | Route option field | `expedition-route:camp{k}:reroll{r}:option{i}:{event\|mix}` |
-| Draft, upgrade slot | `expedition-draft:camp{k}:seat{id}:upgrade` (k = the cleared camp) |
-| Draft, item slots | `expedition-draft:camp{k}:seat{id}:items` |
+| Draft item | `expedition-draft:camp{k}:seat{id}:offer{o}:bundle{b}:item{j}:{rarity\|pick}` (k = the cleared camp) |
+| Shop item | `expedition-shop:camp{k}:item{i}:{rarity\|pick}` (a replay of the boss camp draws the same stock) |
 | Attempt deal seed | `{seed}:camp{k}:attempt{A}` |
 | Trick-count kind and N | `expedition-trickcount-{kind\|n}:camp{k}:attempt{A}` |
 | Ability draws (`ctx.randomCards`, `ctx.randomIndex`) | `expedition-ability:camp{k}:attempt{A}:seat{id}:use{u}:draw{j}` |
@@ -130,16 +148,21 @@ one `apply`; the context builds both, so an ability never names a stream.
 
 ## Add an item
 
-1. Create `content/items/<id>.ts` exporting `defineItem({ id, name, text,
-   active?, passive? })`. `text` is one short sentence about the effect; the
-   window and limit render as badges from the def, so the text never repeats
-   them.
-2. For an active item, `active: ability({ window, limit, targets, apply })`:
+1. Create `content/items/<id>.ts` exporting `defineItem({ id, name, rarity,
+   price, text, ... })`. `rarity` is `"common"` or `"rare"` (the draft and
+   the shop roll it first), `price` is its cost at the shop, and the optional
+   `exclusiveTo` names the one character it is drafted for. `text` is one
+   short sentence about the effect; the window and uses render as badges
+   from the def, so the text never repeats them.
+2. An active item gives `uses` and `active: itemAbility({ window, targets,
+   apply })`; a passive item gives `passive: { modifier(owner) }` and
+   neither of the others (the type allows only these two shapes).
+   - `uses`: `{ kind: "single-use" }`, `{ kind: "per-camp" }` (once per
+     attempt, never runs out) or `{ kind: "charges", n }`. The uses are the
+     limit, so an item ability has no `limit`; the engine counts them per
+     instance and removes a spent instance from its owner.
    - `window`: one of `run/windows.ts`'s `ActiveWindow`s (see "Add a
      window").
-   - `limit`: `{ kind: "per-camp", times }`, `{ kind: "per-run", times }`,
-     `{ kind: "single-use" }` or `{ kind: "supplies", cost }`. A `pool` limit
-     is for characters only.
    - `targets`: a list of `TargetSpec`s, one picker step each (see "Add a
      target kind"). `ctx.targets` arrives resolved and typed per kind; you
      never parse an id or check a choice.
@@ -147,18 +170,19 @@ one `apply`; the context builds both, so an ability never names a stream.
      reason. `canTarget?(ctx)`: rules across targets, `true` or a reason.
    - `apply(ctx)`: returns `ToolkitOp` data. If it emits `add-modifier`,
      also give `effect(e, run)`, the `RuleModifier` that op switches on.
-   A passive item gives `passive: { modifier(owner) }` instead.
 3. Add one line to `content/items/registry.ts`'s `ITEMS`.
 4. `content/sources.contract.test.ts` covers it with no edits: shape, one
    sentence of text, `effect` iff `add-modifier`, determinism, conservation,
-   a JSON round-trip, the per-seat leak check and the usage limits. Add its
+   a JSON round-trip, the per-seat leak check, the usage limits, and for an
+   active item that its uses exhaust as declared, that a per-camp item resets
+   on a replay, and that a spent instance leaves its owner. Add its
    16x16 icon as `apps/web/public/expedition/sprites/sources/<id>.png` and its
    id to `SOURCE_ICON_IDS` (`apps/web/components/expedition/phaser/art/
    art-registry.ts`); `source-icons.test.ts` fails until you do.
 
-**Worked example (Bait, `content/items/bait.ts`):** window `"in-trick"`,
-limit `single-use`, one `{ kind: "card", where: "board" }` target. `apply`
-returns one trick-scoped `add-modifier` whose params name the card, and
+**Worked example (Bait, `content/items/bait.ts`):** common, price 2, uses
+`single-use`, window `"in-trick"`, one `{ kind: "card", where: "board" }`
+target. `apply` returns one trick-scoped `add-modifier` whose params name the card, and
 `effect` overrides `trickWinner` with `winnerExcluding(prev, plays, led, ...)`, so
 that card can't win this one trick.
 
@@ -166,15 +190,19 @@ that card can't win this one trick.
 
 1. Create `content/characters/<id>.ts` exporting `defineCharacter({ id,
    name, theme, power, text, pool?, active?, passive?, upgrades })`. `power`
-   names the base power ("Spyglass"); `text` says what it does.
+   names the base power ("Spyglass"); `text` says what it does. A character
+   or upgrade ability gives `ability({ window, limit, targets, apply })`
+   with `limit` one of `{ kind: "per-camp", times }`, `{ kind: "per-run",
+   times }`, `{ kind: "pool", cost }` or `{ kind: "supplies", cost }`.
 2. `pool` (optional) is the character's resource: `{ name, start, max,
    regain }`. Abilities of this character and its upgrades may use
    `{ kind: "pool", cost }`; the engine regains it after each cleared camp.
 3. `upgrades` is exactly two `defineUpgrade({...})` entries in the same
-   file. `defineCharacter` stamps the character id onto both. An upgrade
-   that tunes the base power has no ability of its own: the base power reads
-   `owner.hasUpgrade("<upgrade id>")` through a `Tuned<T>` value (see
-   Pathfinder in `guide.ts`).
+   file. `defineCharacter` stamps the character id onto both. A seat buys
+   one of its own character's upgrades at the shop, and owning one also
+   gives it one more whisper per camp. An upgrade that tunes the base power
+   has no ability of its own: the base power reads `owner.hasUpgrade("<upgrade
+   id>")` through a `Tuned<T>` value (see Pathfinder in `guide.ts`).
 4. Add one line to `content/characters/registry.ts`'s `CHARACTERS`. The
    contract tests cover the character and both upgrades with no edits. Add
    the 64x80 silhouette as `sprites/crew/<id>.png`, the icons for the power
@@ -333,13 +361,16 @@ to turn it on. The web app shows the panel when `NODE_ENV` is `development`
 - Shortcuts: jump to a camp of a chosen run length (arriving at its
   loadout or dealt), jump to the final camp, end the run won or lost, force
   the camp to clear or fail (through the real settle), set supplies, set the
-  purse, set a seat's character or kit, give a source, move a card between
-  hands, set an objective's owner.
+  purse, set a seat's character, give a seat an item (`give-item`: a new
+  instance, equipped while a slot is free), set a seat's upgrade
+  (`set-upgrade`, its own character's or none), move a card between hands,
+  set an objective's owner.
 - Reveal all hands: a plain-text dump of every hand, objective and trick.
 - State: the whole `RunState` as JSON. Edit and Apply; the worker parses it
   with `ExpeditionRunStateSchema` and then `dev/check.ts` (card conservation,
-  known ids, seat alignment), and answers with a readable error if either
-  fails.
+  known ids, seat alignment, item instances below `itemSerial`, equipped
+  sets within the slots, draft offers of known items, upgrades of the seat's
+  own character), and answers with a readable error if either fails.
 - Snapshots: named copies of the state in this browser's localStorage. One
   saved in another room loads into any room with the same seat count; its
   seat ids are renamed to the room's.
@@ -351,7 +382,8 @@ DevPanel.tsx`, which renders whatever shortcuts the game describes. The
 Expedition layer is `dev/`: `shortcuts.ts` (the `DEV_SHORTCUTS` registry,
 one small pure function over `RunState` each), `check.ts`, `autoplay.ts`
 (`botMove`, the first priority move `applyRunAction` accepts, never a
-whisper or an ability), `inspect.ts` and `hooks.ts`. When `RunState`
+whisper, an ability, an equip or a buy; it takes a draft's first bundle),
+`inspect.ts` and `hooks.ts`. When `RunState`
 changes, update `ExpeditionRunStateSchema` (the worker's compile-time
 assertion in `game-registration.ts` fails until you do), then `check.ts` and
 whichever shortcuts touch the changed fields.
@@ -389,11 +421,13 @@ whichever shortcuts touch the changed fields.
 - **The seed and draft offers are private.** `RunState.seed` is redacted by
   `adapter/view.ts`'s explicit allowlist — it is never written into any view
   literal, at any nesting level — since it is the root of every RNG stream
-  and its exposure would let a client predict future draws. `SeatRun.draftOffer`
+  and its exposure would let a client predict future draws. `SeatRun.offers`
   is likewise redacted to a plain per-seat conditional lookup: a viewer's
-  draft stage's `yourOffer` is their own offer or `null`, never another seat's. Both
-  are proven redacted by `adapter/view.property.test.ts`'s whole-run
-  per-seat leak property (COMM-03/ENG-03).
+  draft stage's `yourOffer` is the head of their own offers or `null`, never
+  another seat's, and `itemSerial` is never projected. The leak check flags
+  another seat's bundles anywhere in a view. Both are proven redacted by
+  `adapter/view.property.test.ts`'s whole-run per-seat leak property
+  (COMM-03/ENG-03).
 - **A reveal pins identity only (WR-03).** A `Reveal` shows the card's
   identity and the seat that held it at the moment of the reveal; it never
   follows the card after a later move/swap, and the view never re-derives a
@@ -418,4 +452,5 @@ registered per the recipes above is leak-checked automatically by
 real checker for every registered entry with zero test edits.
 `adapter/catalog-display.ts` projects the catalogue for the client
 (`SOURCE_DISPLAY`, `CHARACTER_DISPLAY`): names, text, window and limit
-badges, never a function.
+badges (an item's uses badge: "Single use", "Once per camp", "2 charges"),
+an item's rarity and price, never a function.

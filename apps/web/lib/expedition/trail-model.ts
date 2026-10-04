@@ -4,8 +4,8 @@ import type { Prompt } from "./build-prompt";
 import { buildTrailPrompt } from "./build-prompt";
 import type { SceneServerInput, Tooltip, TopBar } from "./build-scene-model";
 import { buildTopBar } from "./build-scene-model";
-import { characterName, chargeText, sourceBadges, sourceKind, sourceName, sourceRulesText } from "./source-text";
-import { draftObjectId, kitObjectId, lengthObjectId, READY_ID, routeObjectId } from "./expedition-ids";
+import { characterName, chargeText, liveSourceKeys, sourceBadges, sourceIdOfKey, sourceKind, sourceName, sourceRulesText } from "./source-text";
+import { bundleObjectId, draftObjectId, kitObjectId, lengthObjectId, READY_ID, routeObjectId } from "./expedition-ids";
 import type { LocalUiState } from "./local-ui";
 import { bossLabel, focusCampIndex, modName, plannedBossAt } from "./view-access";
 
@@ -28,17 +28,19 @@ export interface TrailStop {
   caption: string;
 }
 
-/** A draft offer. An upgrade belongs to your character and says which
- * power it improves; an item is a separate tool. */
-export interface DraftItem {
+/** One bundle of a draft offer: its items arrive together. */
+export interface DraftBundle {
+  bundle: number;
+  itemIds: string[];
+  /** The first item, for the card's art. */
   sourceId: string;
   objectId: string;
+  /** "Bait + Parrot". */
   name: string;
-  kind: "upgrade" | "item";
-  /** "Spyglass upgrade" or "Item". */
+  /** "Bundle 1". */
   ribbon: string;
   text: string;
-  /** When it works and how often: ["Between tricks", "1 per camp"]. */
+  /** Each item's uses: ["Bait: Single use", "Parrot: Once per camp"]. */
   badges: string[];
 }
 
@@ -118,7 +120,7 @@ export interface VoteResult {
 }
 
 export type DraftPanel =
-  | { kind: "offer"; items: DraftItem[] }
+  | { kind: "offer"; bundles: DraftBundle[] }
   | { kind: "taken"; sourceId: string; name: string }
   | { kind: "none"; text: string };
 
@@ -129,7 +131,10 @@ export type TrailPanel =
   | { kind: "event"; name: string; text: string; next: CampPreview }
   | { kind: "loadout"; next: CampPreview };
 
+/** One of your live sources: `sourceKey` is what you act through, and
+ * `sourceId` the def it names. */
 export interface KitItem {
+  sourceKey: string;
   sourceId: string;
   objectId: string;
   name: string;
@@ -146,7 +151,7 @@ export interface CrewRow {
   status: "ready" | "waiting" | "drafting" | "voted" | "voting";
   /** "The Scout", or null while still choosing. */
   character: string | null;
-  sources: { sourceId: string; name: string }[];
+  sources: { sourceKey: string; sourceId: string; name: string }[];
 }
 
 export interface TrailModel {
@@ -156,7 +161,7 @@ export interface TrailModel {
   /** The run's camps; null at muster, before the length is chosen. */
   trail: TrailStop[] | null;
   panel: TrailPanel;
-  /** Your character, then your kit in draft order. Null for a spectator. */
+  /** Your character, your upgrade, then your equipped items. Null for a spectator. */
   kit: KitItem[] | null;
   crew: CrewRow[];
   /** The loadout's Set out or the event's Continue; null otherwise or for a
@@ -180,10 +185,6 @@ function votersFor(server: SceneServerInput, ballots: readonly { seatId: string;
   const seatIds = ballots.filter((b) => b.choice === choice).map((b) => b.seatId);
   const you = server.game.yourSeatId;
   return [...seatIds.filter((id) => id === you), ...seatIds.filter((id) => id !== you)].map((id) => nameOf(server, id));
-}
-
-function liveSourceIds(seat: View["seats"][number]): string[] {
-  return seat.characterId === null ? [...seat.kit] : [seat.characterId, ...seat.kit];
 }
 
 function stopKind(view: View, index: number): StopKind {
@@ -289,20 +290,26 @@ function buildMuster(server: SceneServerInput, ballots: readonly { seatId: strin
   return { kind: "muster", characters, lengths, crew, votes: `${ballots.length} of ${view.seats.length} voted` };
 }
 
-function itemFor(sourceId: string): DraftItem {
-  const display = SOURCE_DISPLAY[sourceId];
-  const kind = sourceKind(sourceId) === "upgrade" ? "upgrade" : "item";
-  const ribbon = kind === "upgrade" && display?.characterId != null ? `${sourceName(display.characterId)} upgrade` : "Item";
-  return { sourceId, objectId: draftObjectId(sourceId), name: sourceName(sourceId), kind, ribbon, text: display?.text ?? "", badges: sourceBadges(sourceId) };
+function bundleFor(itemIds: readonly string[], bundle: number): DraftBundle {
+  return {
+    bundle,
+    itemIds: [...itemIds],
+    sourceId: itemIds[0] ?? "",
+    objectId: bundleObjectId(bundle),
+    name: itemIds.map(sourceName).join(" + "),
+    ribbon: `Bundle ${bundle + 1}`,
+    text: itemIds.map((id) => SOURCE_DISPLAY[id]?.text ?? "").join(" "),
+    badges: itemIds.map((id) => `${sourceName(id)}: ${SOURCE_DISPLAY[id]?.item?.uses ?? "Always"}`),
+  };
 }
 
-function buildDraft(view: View, yourOffer: string[] | null): DraftPanel {
+function buildDraft(view: View, yourOffer: { bundles: string[][] } | null): DraftPanel {
   const you = view.seats.find((s) => s.seatId === view.yourSeatId);
   if (you === undefined) return { kind: "none", text: "The crew is choosing" };
-  if (yourOffer !== null) return { kind: "offer", items: yourOffer.map(itemFor) };
-  // A pick appends to the kit, so its last source is the one just taken.
-  const taken = you.kit.at(-1);
-  return taken === undefined ? { kind: "none", text: "Nothing left to take" } : { kind: "taken", sourceId: taken, name: sourceName(taken) };
+  if (yourOffer !== null) return { kind: "offer", bundles: yourOffer.bundles.map(bundleFor) };
+  // Instances mint in order, so the newest is the last one taken.
+  const taken = [...you.items.equipped, ...(you.items.backpack ?? [])].sort((a, b) => Number(a.uid.slice(2)) - Number(b.uid.slice(2))).at(-1);
+  return taken === undefined ? { kind: "none", text: "Nothing left to take" } : { kind: "taken", sourceId: taken.itemId, name: sourceName(taken.itemId) };
 }
 
 function buildRoutes(server: SceneServerInput, stage: Extract<View["stage"], { tag: "route" }>): RouteCard[] {
@@ -375,7 +382,10 @@ function buildCrew(server: SceneServerInput): CrewRow[] {
       connected: room?.connected ?? false,
       status: crewStatus(view, seat.seatId),
       character: seat.characterId === null ? null : characterName(seat.characterId),
-      sources: liveSourceIds(seat).map((sourceId) => ({ sourceId, name: sourceName(sourceId) })),
+      sources: liveSourceKeys(seat).map((sourceKey) => {
+        const sourceId = sourceIdOfKey(seat, sourceKey);
+        return { sourceKey, sourceId, name: sourceName(sourceId) };
+      }),
     };
   });
 }
@@ -383,13 +393,17 @@ function buildCrew(server: SceneServerInput): CrewRow[] {
 function buildKit(view: View): KitItem[] | null {
   const you = view.seats.find((s) => s.seatId === view.yourSeatId);
   if (you === undefined) return null;
-  return liveSourceIds(you).map((sourceId) => ({
-    sourceId,
-    objectId: kitObjectId(sourceId),
-    name: sourceName(sourceId),
-    kind: sourceKind(sourceId),
-    charge: chargeText(sourceId, you.usage.find((u) => u.sourceId === sourceId)?.remaining ?? null),
-  }));
+  return liveSourceKeys(you).map((sourceKey) => {
+    const sourceId = sourceIdOfKey(you, sourceKey);
+    return {
+      sourceKey,
+      sourceId,
+      objectId: kitObjectId(sourceKey),
+      name: sourceName(sourceId),
+      kind: sourceKind(sourceId),
+      charge: chargeText(sourceId, you.usage.find((u) => u.sourceKey === sourceKey)?.remaining ?? null),
+    };
+  });
 }
 
 function buildReady(view: View): TrailModel["ready"] {
@@ -443,9 +457,9 @@ function buildVote(view: View): VoteResult | null {
   };
 }
 
-function buildTooltip(ui: LocalUiState): Tooltip | null {
+function buildTooltip(view: View, ui: LocalUiState): Tooltip | null {
   if (ui.tooltipSourceId === null) return null;
-  const rules = sourceRulesText(ui.tooltipSourceId);
+  const rules = sourceRulesText(sourceIdOfKey(view.seats.find((s) => s.seatId === view.yourSeatId), ui.tooltipSourceId));
   return rules === null ? null : { ...rules, reason: null };
 }
 
@@ -462,6 +476,6 @@ export function buildTrailModel(server: SceneServerInput, ui: LocalUiState, reco
     ready: buildReady(view),
     status: buildStatus(view),
     vote: buildVote(view),
-    tooltip: buildTooltip(ui),
+    tooltip: buildTooltip(view, ui),
   };
 }

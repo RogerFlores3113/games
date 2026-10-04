@@ -23,14 +23,15 @@ function trailModel(store: SceneDeps["store"]): TrailModel | null {
 
 function buildHandlers(store: SceneDeps["store"]): TrailHandlers {
   return {
-    onDraft(sourceId) {
+    onDraft(characterId) {
       const model = trailModel(store);
-      if (model === null) return;
-      if (model.panel.kind === "muster") {
-        if (model.panel.characters.some((c) => c.characterId === sourceId && c.pickable)) store.getState().dispatch({ type: "pick-character", characterId: sourceId });
-        return;
+      if (model?.panel.kind === "muster" && model.panel.characters.some((c) => c.characterId === characterId && c.pickable)) {
+        store.getState().dispatch({ type: "pick-character", characterId });
       }
-      if (model.panel.kind === "draft" && model.panel.draft.kind === "offer") store.getState().dispatch({ type: "pick-draft", sourceId });
+    },
+    onBundle(bundle) {
+      const model = trailModel(store);
+      if (model?.panel.kind === "draft" && model.panel.draft.kind === "offer") store.getState().dispatch({ type: "pick-bundle", bundle });
     },
     onVote(choice) {
       store.getState().dispatch({ type: "vote", choice });

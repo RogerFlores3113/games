@@ -6,7 +6,7 @@
 // This file lives under adapter/ because purity.test.ts's Core fence forbids
 // top-level files from importing ./run.
 
-import { resolveTuned, type ActiveAbility, type CharacterDef, type Owner, type SourceDef } from "../content/source-def";
+import { resolveTuned, type CharacterDef, type ItemUses, type Owner, type Rarity, type SourceDef, type UsageLimit } from "../content/source-def";
 import { CATALOG } from "../run/catalog";
 import type { TargetKind } from "../run/targets";
 import { WINDOWS, type ActiveWindow } from "../run/windows";
@@ -27,6 +27,13 @@ export type SourceActiveDisplay = {
   targets: ExpeditionTargetKind[];
 };
 
+export type ItemDisplay = {
+  rarity: Rarity;
+  price: number;
+  /** "Single use", "Once per camp", "2 charges"; null for a passive item. */
+  uses: string | null;
+};
+
 export type SourceDisplay = {
   id: string;
   name: string;
@@ -37,6 +44,8 @@ export type SourceDisplay = {
   /** null for a source with no active ability. */
   active: SourceActiveDisplay | null;
   passive: boolean;
+  /** null for a character or an upgrade. */
+  item: ItemDisplay | null;
 };
 
 export type CharacterDisplay = {
@@ -58,15 +67,23 @@ function characterOf(def: SourceDef): CharacterDef | null {
   return null;
 }
 
-function limitBadge(active: ActiveAbility, character: CharacterDef | null): string {
-  const limit = resolveTuned(active.limit, BASE_OWNER);
+function usesBadge(uses: ItemUses): string {
+  switch (uses.kind) {
+    case "single-use":
+      return "Single use";
+    case "per-camp":
+      return "Once per camp";
+    case "charges":
+      return `${uses.n} charges`;
+  }
+}
+
+function limitBadge(limit: UsageLimit, character: CharacterDef | null): string {
   switch (limit.kind) {
     case "per-camp":
       return `${limit.times} per camp`;
     case "per-run":
       return limit.times === 1 ? "Once per run" : `${limit.times} per run`;
-    case "single-use":
-      return "Single use";
     case "pool": {
       const name = (character?.pool?.name ?? "pool").toLowerCase();
       return `${limit.cost} ${limit.cost === 1 && name.endsWith("s") ? name.slice(0, -1) : name}`;
@@ -74,6 +91,11 @@ function limitBadge(active: ActiveAbility, character: CharacterDef | null): stri
     case "supplies":
       return `${limit.cost} ${limit.cost === 1 ? "supply" : "supplies"}`;
   }
+}
+
+function badgeOf(def: SourceDef, character: CharacterDef | null): string {
+  if (def.kind === "item") return def.uses === undefined ? "" : usesBadge(def.uses);
+  return def.active === undefined ? "" : limitBadge(resolveTuned(def.active.limit, BASE_OWNER), character);
 }
 
 function toSourceDisplay(def: SourceDef): SourceDisplay {
@@ -90,10 +112,11 @@ function toSourceDisplay(def: SourceDef): SourceDisplay {
         : {
             window: def.active.window,
             windowPhrase: WINDOWS[def.active.window].phrase,
-            limitBadge: limitBadge(def.active, character),
+            limitBadge: badgeOf(def, character),
             targets: def.active.targets.map((spec) => spec.kind),
           },
     passive: def.passive !== undefined,
+    item: def.kind === "item" ? { rarity: def.rarity, price: def.price, uses: def.uses === undefined ? null : usesBadge(def.uses) } : null,
   };
 }
 

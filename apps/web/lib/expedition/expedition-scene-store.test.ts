@@ -5,7 +5,7 @@ import { beginAbilityTargeting, selectTarget, setTooltipSource } from "./local-u
 import { createExpeditionSceneStore, type ExpeditionSceneStore } from "./expedition-scene-store";
 
 const SCOUT: ExpeditionAbilityView = {
-  sourceId: "scout",
+  sourceKey: "scout",
   usableNow: true,
   reason: null,
   steps: [{ kind: "hand", prompt: "Pick a teammate's hand", choices: ["hand:s1", "hand:s3"] }],
@@ -55,16 +55,16 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     supplies: { count: 5, max: 5 },
     plan: [],
     seats: [
-      { seatId: "s1", characterId: "guide", kit: [], pool: null, usage: [] },
-      { seatId: "s2", characterId: "scout", kit: [], pool: null, usage: [] },
-      { seatId: "s3", characterId: "medic", kit: [], pool: null, usage: [] },
+      { seatId: "s1", characterId: "guide", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
+      { seatId: "s2", characterId: "scout", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
+      { seatId: "s3", characterId: "medic", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
     ],
     yourAbilities: [SCOUT],
     history: [],
     lastVote: null,
     stage: {
       tag: "camp",
-      camp: { index: 2, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null },
+      camp: { index: 2, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null, shop: false },
       attempt: {
         attemptNumber: 1,
         window: "between-tricks",
@@ -85,7 +85,7 @@ function onTrail(stage: ExpeditionStageView, overrides: Partial<ExpeditionView> 
   return makeView({ stage, ...overrides });
 }
 
-const draftOffer: ExpeditionStageView = { tag: "draft", cleared: 1, payout: 8, yourOffer: ["trained-monkey"], pendingSeatIds: ["s2"] };
+const draftOffer: ExpeditionStageView = { tag: "draft", cleared: 1, payout: 8, yourOffer: { bundles: [["trained-monkey"]] }, pendingSeatIds: ["s2"] };
 const ended: ExpeditionStageView = { tag: "ended", result: "lost" };
 
 function server(view: ExpeditionView, seats = roomSeats()): SceneServerInput {
@@ -191,7 +191,7 @@ describe("createExpeditionSceneStore", () => {
     store.getState().confirmTargeting();
 
     expect(onAction).toHaveBeenCalledTimes(1);
-    expect(onAction).toHaveBeenCalledWith({ type: "use-ability", sourceId: "scout", targets: ["hand:s1"] });
+    expect(onAction).toHaveBeenCalledWith({ type: "use-ability", sourceKey: "scout", targets: ["hand:s1"] });
     expect(store.getState().localUi.targeting).toBeNull();
   });
 
@@ -221,7 +221,7 @@ describe("createExpeditionSceneStore", () => {
     store.getState().updateLocalUi((ui, v) => beginAbilityTargeting(ui, v, "scout"));
     expect(store.getState().localUi.targeting).not.toBeNull();
 
-    const nextView = makeView({ yourAbilities: [{ sourceId: "scout", usableNow: false, reason: "Already used this camp", steps: [] }] });
+    const nextView = makeView({ yourAbilities: [{ sourceKey: "scout", usableNow: false, reason: "Already used this camp", steps: [] }] });
     store.getState().setServer(server(nextView));
     expect(store.getState().localUi.targeting).toBeNull();
   });

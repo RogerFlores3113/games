@@ -65,7 +65,7 @@ function mapError(error: AdapterError): GameErrorDetail {
   }
 }
 
-/** Expedition's own error mapper — an exhaustive switch over all 25
+/** Expedition's own error mapper — an exhaustive switch over all 29
  * `RunError` members with a `never`-typed default, mirroring Hanabi's
  * `mapError` above exactly (D-07, D-08). No `String(error)` fallback. */
 function mapExpeditionError(error: RunError): GameErrorDetail {
@@ -96,10 +96,18 @@ function mapExpeditionError(error: RunError): GameErrorDetail {
       return { gameId: EXPEDITION_GAME_ID, code: "unknown_character" };
     case "character_taken":
       return { gameId: EXPEDITION_GAME_ID, code: "character_taken" };
-    case "no_draft_pending":
-      return { gameId: EXPEDITION_GAME_ID, code: "no_draft_pending" };
-    case "not_offered":
-      return { gameId: EXPEDITION_GAME_ID, code: "not_offered" };
+    case "not_owned_item":
+      return { gameId: EXPEDITION_GAME_ID, code: "not_owned_item" };
+    case "too_many_items":
+      return { gameId: EXPEDITION_GAME_ID, code: "too_many_items" };
+    case "sold_out":
+      return { gameId: EXPEDITION_GAME_ID, code: "sold_out" };
+    case "supplies_full":
+      return { gameId: EXPEDITION_GAME_ID, code: "supplies_full" };
+    case "upgrade_owned":
+      return { gameId: EXPEDITION_GAME_ID, code: "upgrade_owned" };
+    case "not_your_upgrade":
+      return { gameId: EXPEDITION_GAME_ID, code: "not_your_upgrade" };
     case "already_ready":
       return { gameId: EXPEDITION_GAME_ID, code: "already_ready" };
     case "not_owned":

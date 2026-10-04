@@ -21,7 +21,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
       { at: 3, tier: "animal", bossId: null },
       { at: 6, tier: "temple", bossId: null },
     ],
-    seats: [{ seatId: "s1", characterId: "scout", kit: [], pool: null, usage: [] }],
+    seats: [{ seatId: "s1", characterId: "scout", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] }],
     yourAbilities: [],
     history: [result(1, 1, "failed"), result(1, 2, "cleared"), result(2, 1, "failed"), result(2, 2, "failed")],
     lastVote: null,

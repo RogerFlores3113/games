@@ -26,9 +26,9 @@ export const muster: StageDef<"muster"> = {
       return ok({ ...run, stage: { ...run.stage, ballots: { ...run.stage.ballots, [seatId]: action.choice as RunLength | null } } });
     },
   },
-  advance(run) {
+  advance(run, catalog) {
     if (run.seats.some((seat) => seat.characterId === null) || !everySeat(run, run.stage.ballots)) return run;
     const result = tally(run.seed, STREAMS.lengthVote(), LENGTHS, run.seatIds, run.stage.ballots)!;
-    return openLoadout({ ...run, plan: drawPlan(result.winner), lastVote: { topic: "length", result } }, firstCampSpec(result.winner));
+    return openLoadout({ ...run, plan: drawPlan(result.winner), lastVote: { topic: "length", result } }, firstCampSpec(result.winner), catalog);
   },
 };

@@ -23,8 +23,8 @@ describe("expeditionDevHooks", () => {
       ["set-supplies", "Run"],
       ["set-purse", "Run"],
       ["set-character", "Crew"],
-      ["set-kit", "Crew"],
-      ["give-source", "Crew"],
+      ["give-item", "Crew"],
+      ["set-upgrade", "Crew"],
       ["move-card", "Cards"],
       ["set-objective-owner", "Cards"],
     ]);
@@ -45,10 +45,10 @@ describe("expeditionDevHooks", () => {
   });
 
   it("refuses a shortcut whose result fails the check", () => {
-    const result = hooks.runShortcut(fresh(), "set-kit", { seat: "a", kit: "bait" });
+    const result = hooks.runShortcut(fresh(), "give-item", { seat: "a", item: "bait" });
     expect(result.ok).toBe(true);
-    const bad = hooks.runShortcut({ ...fresh(), supplies: -1 }, "set-kit", { seat: "a", kit: "bait" });
-    expect(bad).toEqual({ ok: false, error: "shortcut set-kit produced an invalid state: supplies must be a whole number from 0 to 4, got -1" });
+    const bad = hooks.runShortcut({ ...fresh(), supplies: -1 }, "give-item", { seat: "a", item: "bait" });
+    expect(bad).toEqual({ ok: false, error: "shortcut give-item produced an invalid state: supplies must be a whole number from 0 to 4, got -1" });
   });
 
   it("moves the milestone only when a camp settles or the run ends", () => {

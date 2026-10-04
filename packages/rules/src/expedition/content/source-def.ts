@@ -1,8 +1,9 @@
 // The catalogue's def types: characters (each with a base power and exactly
 // two upgrades), upgrades and items are all sources. A source may carry an
 // active ability (a window, a limit and typed targets) and a passive rule
-// layer. `apply` returns toolkit op data; the engine owns spending, gating,
-// target resolution, RNG naming and projection.
+// layer. An item's `uses` is its limit, counted per owned instance. `apply`
+// returns toolkit op data; the engine owns spending, gating, target
+// resolution, RNG naming and projection.
 
 import type { RuleModifier, RunRules } from "../run/run-rules";
 import type { TargetSpec, TargetsOf } from "../run/targets";
@@ -17,7 +18,6 @@ export type SourceId = string;
 export type UsageLimit =
   | { readonly kind: "per-camp"; readonly times: number } // counted by (camp, attempt) stamp; a replay is a fresh camp
   | { readonly kind: "per-run"; readonly times: number } // counted over the whole ledger; survives replays
-  | { readonly kind: "single-use" } // the item leaves the kit on use
   | { readonly kind: "pool"; readonly cost: number } // the owner's character pool; characters and upgrades only
   | { readonly kind: "supplies"; readonly cost: number }; // the crew's supplies; never spends the last one
 
@@ -60,17 +60,36 @@ export type ActiveAbility<S extends readonly TargetSpec[] = readonly TargetSpec[
   effect?(effect: ActiveEffect<P>, run: RunState): RuleModifier;
 };
 
+/** An item's ability: its `uses` stand in for the limit. */
+export type ItemAbility<S extends readonly TargetSpec[] = readonly TargetSpec[], P extends EffectParams = EffectParams> = Omit<ActiveAbility<S, P>, "limit">;
+
 export type PassiveAbility = { modifier(owner: Owner): RuleModifier };
 
-type SourceBase = {
+export type Rarity = "common" | "rare";
+/** single-use is one charge; a spent instance leaves its owner. per-camp
+ * resets with every attempt and never runs out. */
+export type ItemUses = { readonly kind: "single-use" } | { readonly kind: "per-camp" } | { readonly kind: "charges"; readonly n: number };
+
+type Named = {
   readonly id: SourceId;
   readonly name: string;
   readonly text: string; // one plain sentence, effect only
-  readonly active?: ActiveAbility;
-  readonly passive?: PassiveAbility;
   readonly art?: string;
 };
-export type ItemDef = SourceBase & { readonly kind: "item" };
+type SourceBase = Named & {
+  readonly active?: ActiveAbility;
+  readonly passive?: PassiveAbility;
+};
+export type ItemDef = Named & {
+  readonly kind: "item";
+  readonly rarity: Rarity;
+  readonly price: number;
+  /** Drafted only by this character. */
+  readonly exclusiveTo?: string;
+} & (
+    | { readonly uses: ItemUses; readonly active: ItemAbility; readonly passive?: never }
+    | { readonly uses?: never; readonly active?: never; readonly passive: PassiveAbility }
+  );
 export type UpgradeDef = SourceBase & { readonly kind: "upgrade"; readonly characterId: string };
 export type CharacterDef = SourceBase & {
   readonly kind: "character";
@@ -89,8 +108,15 @@ export function ability<const S extends readonly TargetSpec[], P extends EffectP
   return a as unknown as ActiveAbility;
 }
 
-export function defineItem(def: Omit<ItemDef, "kind">): ItemDef {
-  return { ...def, kind: "item" };
+/** ability() for an item: no limit, since the item's uses are its limit. */
+export function itemAbility<const S extends readonly TargetSpec[], P extends EffectParams = EffectParams>(a: ItemAbility<S, P>): ItemAbility {
+  return a as unknown as ItemAbility;
+}
+
+type ItemInput = ItemDef extends infer D ? (D extends unknown ? Omit<D, "kind"> : never) : never;
+
+export function defineItem(def: ItemInput): ItemDef {
+  return { ...def, kind: "item" } as ItemDef;
 }
 
 export function defineUpgrade(def: Omit<UpgradeDef, "kind" | "characterId">): UnboundUpgrade {

@@ -15,7 +15,7 @@ import type {
   CampPreview,
   CharacterCard,
   CrewRow,
-  DraftItem,
+  DraftBundle,
   KitItem,
   LengthOption,
   MusterCrewRow,
@@ -30,8 +30,10 @@ import { fitLabel, wrapWords } from "./text-fit";
 import { PANEL_ALPHA, button, coin, labelWidth, plate, setCoinFace, text, type Layer } from "./ui-kit";
 
 export interface TrailHandlers {
-  /** A muster or draft tile: picks a character or takes a source. */
-  onDraft(sourceId: string): void;
+  /** A muster character card: picks that character. */
+  onDraft(characterId: string): void;
+  /** A draft bundle card: takes that bundle. */
+  onBundle(bundle: number): void;
   /** A length at muster or a route between camps. */
   onVote(choice: string): void;
   onReady(): void;
@@ -438,16 +440,15 @@ function drawVoteResult(ctx: Ctx, vote: VoteResult, zone: Rect): void {
 const TILE_GAP = 6;
 const TILE_MAX_W = 128;
 
-function drawDraftTile(ctx: Ctx, item: DraftItem, x: number, y: number, w: number, h: number): void {
+function drawDraftTile(ctx: Ctx, item: DraftBundle, x: number, y: number, w: number, h: number): void {
   const { scene, layer, index, handlers } = ctx;
   const container = scene.add.container(x, y);
-  const upgrade = item.kind === "upgrade";
-  const bg = scene.add.rectangle(0, 0, w, h, toPhaserColor(upgrade ? PALETTE.stump : PALETTE.bark)).setOrigin(0, 0);
+  const bg = scene.add.rectangle(0, 0, w, h, toPhaserColor(PALETTE.bark)).setOrigin(0, 0);
   bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn));
   container.add(bg);
   const chars = Math.floor((w - 6) / LABEL_CELL.w);
   const cx = Math.floor(w / 2);
-  container.add(scene.add.rectangle(0, 0, w, 11, toPhaserColor(upgrade ? PALETTE.turn : PALETTE.moss)).setOrigin(0, 0));
+  container.add(scene.add.rectangle(0, 0, w, 11, toPhaserColor(PALETTE.moss)).setOrigin(0, 0));
   container.add(centredText(scene, cx, 2, fitLabel(item.ribbon, chars)));
   const art = sourceArtId(item.sourceId);
   if (art !== null) container.add(placeArt(scene, art, cx, 26).setScale(2));
@@ -469,7 +470,7 @@ function drawDraftTile(ctx: Ctx, item: DraftItem, x: number, y: number, w: numbe
   container.setSize(w, h);
   const hit = scene.add.zone(0, 0, w, h).setOrigin(0, 0);
   hit.setInteractive({ useHandCursor: true });
-  hit.on("pointerdown", () => handlers.onDraft(item.sourceId));
+  hit.on("pointerdown", () => handlers.onBundle(item.bundle));
   container.add(hit);
   layer.add(container);
   index.register("trail", item.objectId, container);
@@ -483,8 +484,8 @@ function drawDraft(ctx: Ctx, draft: Extract<TrailPanel, { kind: "draft" }>): voi
   layer.add(text(scene, zone.x + 21, zone.y + 5, draft.heading, PALETTE.sun));
   const offer = draft.draft;
   if (offer.kind === "offer") {
-    rowBoxes(zone.x + 6, zone.w - 12, offer.items.length, TILE_GAP, TILE_MAX_W).forEach((box, i) => {
-      drawDraftTile(ctx, offer.items[i]!, box.x, zone.y + 17, box.w, zone.h - 21);
+    rowBoxes(zone.x + 6, zone.w - 12, offer.bundles.length, TILE_GAP, TILE_MAX_W).forEach((box, i) => {
+      drawDraftTile(ctx, offer.bundles[i]!, box.x, zone.y + 17, box.w, zone.h - 21);
     });
     return;
   }
@@ -667,7 +668,7 @@ function drawKitTile(ctx: Ctx, item: KitItem, x: number, y: number, w: number): 
   container.add(text(scene, 20, KIT_ROW_H - LABEL_CELL.h - 1, fitLabel(item.charge, chars), PALETTE.textDim));
   container.setSize(w, KIT_ROW_H);
   bg.setInteractive();
-  bg.on("pointerover", () => handlers.onSourceHover(item.sourceId));
+  bg.on("pointerover", () => handlers.onSourceHover(item.sourceKey));
   bg.on("pointerout", () => handlers.onSourceHover(null));
   layer.add(container);
   index.register("trail", item.objectId, container);

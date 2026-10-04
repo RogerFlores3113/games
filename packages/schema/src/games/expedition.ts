@@ -224,20 +224,31 @@ const AttemptViewSchema = z.strictObject({
 
 const RemainingViewSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("uses"), left: z.number().int().min(0), of: z.number().int().min(1) }),
-  z.strictObject({ kind: z.literal("single-use") }),
   z.strictObject({ kind: z.literal("pool"), balance: z.number().int(), max: z.number().int().min(0), cost: z.number().int().min(0) }),
   z.strictObject({ kind: z.literal("supplies"), cost: z.number().int().min(0) }),
 ]);
 
-// Deliberately no `draftOffer`/`ledger` keys for any seat: character, kit,
-// pool and per-source usage are public; the viewer's own draft offer is the
-// draft stage's `yourOffer`.
+// `remaining` is null for a passive item.
+const ItemViewSchema = z.strictObject({
+  uid: z.string().min(1),
+  itemId: z.string().min(1),
+  remaining: RemainingViewSchema.nullable(),
+});
+
+// Deliberately no `offers`/`ledger` keys for any seat: character, upgrade,
+// items, pool and per-source usage are public; the viewer's own draft offer
+// is the draft stage's `yourOffer`.
 const SeatViewSchema = z.strictObject({
   seatId: z.string().min(1),
   characterId: z.string().min(1).nullable(),
-  kit: z.array(z.string().min(1)),
+  upgradeId: z.string().min(1).nullable(),
+  items: z.strictObject({
+    equipped: z.array(ItemViewSchema),
+    backpack: z.array(ItemViewSchema).nullable(),
+    concealed: z.boolean(),
+  }),
   pool: z.strictObject({ balance: z.number().int(), max: z.number().int().min(0) }).nullable(),
-  usage: z.array(z.strictObject({ sourceId: z.string().min(1), remaining: RemainingViewSchema })),
+  usage: z.array(z.strictObject({ sourceKey: z.string().min(1), remaining: RemainingViewSchema })),
 });
 
 const AbilityStepViewSchema = z.strictObject({
@@ -246,9 +257,9 @@ const AbilityStepViewSchema = z.strictObject({
   choices: z.array(z.string().min(1)),
 });
 
-// The viewer's own abilities; `steps` is [] unless usableNow.
+// The viewer's own abilities, by source key; `steps` is [] unless usableNow.
 const AbilityViewSchema = z.strictObject({
-  sourceId: z.string().min(1),
+  sourceKey: z.string().min(1),
   usableNow: z.boolean(),
   reason: z.string().min(1).max(200).nullable(),
   steps: z.array(AbilityStepViewSchema),
@@ -272,6 +283,19 @@ const CampPreviewViewSchema = z.strictObject({
   event: z.string().min(1).nullable(),
   slotKinds: z.array(z.enum(["win-card", "ordered", "no-tricks", "exactly-n", "trick-count"])),
   bossId: z.string().min(1).nullable(),
+  shop: z.boolean(),
+});
+
+const StockViewSchema = z.strictObject({
+  stockId: z.string().min(1),
+  what: z.discriminatedUnion("kind", [z.strictObject({ kind: z.literal("supplies") }), z.strictObject({ kind: z.literal("item"), itemId: z.string().min(1) })]),
+  price: z.number().int().min(0),
+  soldTo: z.string().min(1).nullable(),
+});
+
+const ShopViewSchema = z.strictObject({
+  stock: z.array(StockViewSchema),
+  yourUpgrades: z.array(z.strictObject({ stockId: z.string().min(1), upgradeId: z.string().min(1), price: z.number().int().min(0) })),
 });
 
 const BallotViewSchema = z.strictObject({ seatId: z.string().min(1), choice: z.string().min(1).nullable() });
@@ -291,13 +315,19 @@ const PlanBossViewSchema = z.strictObject({
 
 const StageViewSchema = z.discriminatedUnion("tag", [
   z.strictObject({ tag: z.literal("muster"), ballots: z.array(BallotViewSchema) }),
-  z.strictObject({ tag: z.literal("loadout"), camp: CampPreviewViewSchema, readySeatIds: z.array(z.string().min(1)) }),
+  z.strictObject({
+    tag: z.literal("loadout"),
+    camp: CampPreviewViewSchema,
+    yourSlots: z.number().int().min(0),
+    shop: ShopViewSchema.nullable(),
+    readySeatIds: z.array(z.string().min(1)),
+  }),
   z.strictObject({ tag: z.literal("camp"), camp: CampPreviewViewSchema, attempt: AttemptViewSchema }),
   z.strictObject({
     tag: z.literal("draft"),
     cleared: CampIndexSchema,
     payout: z.number().int().min(0),
-    yourOffer: z.array(z.string().min(1)).nullable(),
+    yourOffer: z.strictObject({ bundles: z.array(z.array(z.string().min(1))) }).nullable(),
     pendingSeatIds: z.array(z.string().min(1)),
   }),
   z.strictObject({

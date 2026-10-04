@@ -1,6 +1,6 @@
 // The dev sandbox's stand-in for a player: the first move the engine accepts
-// for the seats it controls. Never whispers or uses abilities, and abstains
-// from votes so the human's ballot decides.
+// for the seats it controls. Never whispers, uses abilities, equips or buys;
+// takes the first bundle; abstains from votes so the human's ballot decides.
 
 import { currentActorSeatId } from "../camp";
 import { rulesFor } from "../run/compose";
@@ -28,7 +28,7 @@ function candidates(run: RunState, seatIds: readonly string[], catalog: Catalog)
     case "event":
       return each({ type: "ready" });
     case "draft":
-      return mine.flatMap((seat) => (seat.draftOffer?.[0] === undefined ? [] : [{ seatId: seat.seatId, request: { type: "pick-draft", sourceId: seat.draftOffer[0] } }]));
+      return mine.filter((seat) => seat.offers.length > 0).map((seat) => ({ seatId: seat.seatId, request: { type: "pick-bundle", bundle: 0 } }));
     case "camp": {
       const out: Candidate[] = gatedPendingSeatIds(run, catalog)
         .filter((seatId) => seatIds.includes(seatId))

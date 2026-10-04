@@ -9,23 +9,26 @@
 // always the real dispatcher's call. If a rule in the real engine is wrong,
 // this helper must reproduce that same wrongness, not silently correct it.
 //
-// setupRun is a deliberate TEST SEAM: it assigns characters and kits
-// directly and opens a camp's loadout, skipping muster, votes and drafts, so
-// content/contract/property tests can start a fixture already built.
+// setupRun is a deliberate TEST SEAM: it assigns characters, upgrades and
+// items directly and opens a camp's loadout, skipping muster, votes and
+// drafts, so content/contract/property tests can start a fixture already
+// built.
 
 import { currentActorSeatId } from "../camp";
 import { rulesFor } from "./compose";
 import { buildCatalog } from "./catalog";
 import { abilityStatus } from "./abilities";
+import { mintItems } from "./items";
 import { createRun, openLoadout, runStatus } from "./lifecycle";
 import { campIndex, drawPlan } from "./plan";
 import { campSpecAt } from "./route";
 import { applyRunAction } from "./stages/registry";
 import { attemptOf } from "./attempt";
 import { RUN_LENGTHS } from "./balance";
-import { liveSourceIds } from "./usage";
+import { liveSourceKeys } from "./usage";
+import { upgradeOffers } from "./shop";
 import { currentWindow, WINDOWS } from "./windows";
-import { defineCharacter, defineUpgrade, type CharacterDef, type ItemDef, type SourceId } from "../content/source-def";
+import { defineCharacter, defineItem, defineUpgrade, type CharacterDef, type ItemDef, type Rarity } from "../content/source-def";
 import type { Catalog, RunAction, RunLength, RunState } from "./types";
 
 function plainCharacter(n: number): CharacterDef {
@@ -51,6 +54,11 @@ export const PLAIN_CHARACTERS: Readonly<Record<string, CharacterDef>> = Object.f
   }),
 );
 
+/** An item that does nothing: a no-op passive. */
+export function plainItem(id: string, opts: { readonly rarity?: Rarity; readonly price?: number } = {}): ItemDef {
+  return defineItem({ id, name: id, rarity: opts.rarity ?? "common", price: opts.price ?? 2, text: "Nothing happens.", passive: { modifier: () => ({}) } });
+}
+
 /** A catalogue of plain characters (unless given) plus the given items and
  * extra characters. */
 export function testCatalog(parts: {
@@ -65,8 +73,11 @@ export function testCatalog(parts: {
 
 /** Builds a run at the loadout of camp `camp` (default 1) of a `length`
  * (default standard) run: each seat gets `characters[seat]` or the
- * catalogue's next unclaimed plain character, and `kits[seat]` as its kit,
- * so a test can call `ready` at once. `supplies` defaults to createRun's. */
+ * catalogue's next unclaimed plain character, `upgrades[seat]` as its
+ * upgrade, and one instance per id of `items[seat]`, minted in seat order as
+ * the draft mints them (it0, it1, ...; equipped while a slot is free), so a
+ * test can call `ready` at once. `supplies` and `purse` default to
+ * createRun's. */
 export function setupRun(opts: {
   seatIds: readonly string[];
   seed: string;
@@ -74,8 +85,10 @@ export function setupRun(opts: {
   length?: RunLength;
   camp?: number;
   supplies?: number;
+  purse?: number;
   characters?: Readonly<Record<string, string>>;
-  kits?: Readonly<Record<string, readonly SourceId[]>>;
+  upgrades?: Readonly<Record<string, string>>;
+  items?: Readonly<Record<string, readonly string[]>>;
 }): RunState {
   const run = createRun({ seatIds: opts.seatIds, seed: opts.seed });
   const chosen = Object.values(opts.characters ?? {});
@@ -84,14 +97,15 @@ export function setupRun(opts: {
   const seats = run.seats.map((seat) => {
     const characterId = opts.characters?.[seat.seatId] ?? spare.shift();
     if (characterId === undefined) throw new Error("setupRun: not enough characters in the catalogue");
-    return { ...seat, characterId, kit: [...(opts.kits?.[seat.seatId] ?? [])], draftOffer: null };
+    return { ...seat, characterId, upgradeId: opts.upgrades?.[seat.seatId] ?? null };
   });
 
   const length = opts.length ?? "standard";
-  return openLoadout(
-    { ...run, plan: drawPlan(length), supplies: opts.supplies ?? run.supplies, seats },
-    campSpecAt(opts.seed, length, campIndex(opts.camp ?? 1)),
+  const crewed = opts.seatIds.reduce<RunState>(
+    (acc, seatId) => mintItems(acc, seatId, opts.items?.[seatId] ?? [], opts.catalog),
+    { ...run, plan: drawPlan(length), supplies: opts.supplies ?? run.supplies, purse: opts.purse ?? run.purse, seats },
   );
+  return openLoadout(crewed, campSpecAt(opts.seed, length, campIndex(opts.camp ?? 1)), opts.catalog);
 }
 
 /** Drives `run` forward through applyRunAction ONLY until `target` is
@@ -162,15 +176,34 @@ function cartesian(pools: readonly (readonly string[])[]): string[][] {
  * built from the engine's own step choices (the first few per step). */
 function abilityCandidates(run: RunState, catalog: Catalog): Array<{ seatId: string; action: RunAction }> {
   return run.seats.flatMap((seat) =>
-    liveSourceIds(seat).flatMap((sourceId) => {
-      const status = abilityStatus(run, seat.seatId, sourceId, catalog);
+    liveSourceKeys(seat).flatMap((sourceKey) => {
+      const status = abilityStatus(run, seat.seatId, sourceKey, catalog);
       if (status === null || !status.usable) return [];
       return cartesian(status.steps.map((step) => step.choices.slice(0, 4))).map((targets) => ({
         seatId: seat.seatId,
-        action: { type: "use-ability" as const, sourceId, targets },
+        action: { type: "use-ability" as const, sourceKey, targets },
       }));
     }),
   );
+}
+
+/** Loadout candidates past ready: every buy, and equipping the newest items
+ * when that changes the set. Equip moves one way only, so a deterministic
+ * driver cannot toggle forever. */
+function loadoutCandidates(run: RunState, catalog: Catalog): Array<{ seatId: string; action: RunAction }> {
+  if (run.stage.tag !== "loadout") return [];
+  const stock = run.stage.stock;
+  return run.seats.flatMap((seat) => {
+    const out: Array<{ seatId: string; action: RunAction }> = [];
+    const newest = seat.items.slice(-rulesFor(run, catalog).itemSlots(run, seat.seatId)).map((item) => item.uid);
+    if (newest.join() !== seat.equipped.join()) out.push({ seatId: seat.seatId, action: { type: "equip", itemUids: newest } });
+    if (stock !== null) {
+      for (const stockId of [...stock.map((e) => e.stockId), ...upgradeOffers(seat, catalog).map((o) => o.stockId)]) {
+        out.push({ seatId: seat.seatId, action: { type: "buy", stockId } });
+      }
+    }
+    return out;
+  });
 }
 
 /** Every candidate action for every seat at `run`'s current stage, kept
@@ -202,12 +235,11 @@ export function enumerateLegalRunActions(
     votes(stage.ballots, stage.options.map((o) => o.id));
   } else if (stage.tag === "draft") {
     for (const seat of run.seats) {
-      for (const sourceId of seat.draftOffer ?? []) {
-        candidates.push({ seatId: seat.seatId, action: { type: "pick-draft", sourceId } });
-      }
+      (seat.offers[0]?.bundles ?? []).forEach((_, bundle) => candidates.push({ seatId: seat.seatId, action: { type: "pick-bundle", bundle } }));
     }
   } else if (stage.tag === "loadout" || stage.tag === "event") {
     for (const seat of run.seats) candidates.push({ seatId: seat.seatId, action: { type: "ready" } });
+    candidates.push(...loadoutCandidates(run, catalog));
   } else if (stage.tag === "camp") {
     const camp = stage.attempt.camp;
     const rules = rulesFor(run, catalog);

@@ -1,13 +1,16 @@
 // Folds over a seat's ledger: how much of each limit is left, what a
 // character's pool holds, and which sources are live. Nothing here is stored;
 // a replay needs no reset because per-camp counts filter by stamp.
+//
+// Abilities are keyed by SourceKey: the character id, the upgrade id, or an
+// item instance's uid. Effects, logs and reveals carry the def id instead
+// (defIdOf), since a spent instance is gone by the time they are read.
 
-import { resolveTuned, type Owner, type SourceDef, type SourceId, type UsageLimit } from "../content/source-def";
-import type { Catalog, RunState, SeatRun, Stamp } from "./types";
+import { resolveTuned, type ItemAbility, type ItemUses, type Owner, type SourceDef, type SourceId, type UsageLimit } from "../content/source-def";
+import type { Catalog, ItemInstance, RunState, SeatRun, SourceKey, Stamp } from "./types";
 
 export type Remaining =
-  | { readonly kind: "uses"; readonly left: number; readonly of: number } // per-camp, per-run
-  | { readonly kind: "single-use" } // held means available
+  | { readonly kind: "uses"; readonly left: number; readonly of: number } // per-camp, per-run, item uses
   | { readonly kind: "pool"; readonly balance: number; readonly max: number; readonly cost: number }
   | { readonly kind: "supplies"; readonly cost: number };
 
@@ -23,7 +26,30 @@ export function sourceDef(catalog: Catalog, sourceId: SourceId): SourceDef {
 }
 
 export function ownerOf(seat: SeatRun): Owner {
-  return { seatId: seat.seatId, hasUpgrade: (upgradeId) => seat.kit.includes(upgradeId) };
+  return { seatId: seat.seatId, hasUpgrade: (upgradeId) => seat.upgradeId === upgradeId };
+}
+
+export function itemOf(seat: SeatRun, uid: string): ItemInstance | undefined {
+  return seat.items.find((item) => item.uid === uid);
+}
+
+/** The def id behind a key: an instance's item id, else the key itself. */
+export function defIdOf(seat: SeatRun, key: SourceKey): SourceId {
+  return itemOf(seat, key)?.itemId ?? key;
+}
+
+export function defOfKey(seat: SeatRun, key: SourceKey, catalog: Catalog): SourceDef {
+  return sourceDef(catalog, defIdOf(seat, key));
+}
+
+/** The ability behind a key, without its limit; undefined for a passive. */
+export function activeOfKey(seat: SeatRun, key: SourceKey, catalog: Catalog): ItemAbility | undefined {
+  return defOfKey(seat, key, catalog).active;
+}
+
+/** Owned items not equipped. They give no passive and no ability. */
+export function backpackOf(seat: SeatRun): readonly ItemInstance[] {
+  return seat.items.filter((item) => !seat.equipped.includes(item.uid));
 }
 
 /** The stamp a ledger entry written now would carry; null outside a camp. */
@@ -37,9 +63,9 @@ export function sameStamp(a: Stamp, b: Stamp): boolean {
   return a.camp === b.camp && a.attempt === b.attempt && a.trick === b.trick;
 }
 
-/** [characterId, ...kit]: every source that contributes passives and abilities. */
-export function liveSourceIds(seat: SeatRun): readonly SourceId[] {
-  return seat.characterId === null ? seat.kit : [seat.characterId, ...seat.kit];
+/** [character, upgrade?, ...equipped uids]: every key that contributes passives and abilities. */
+export function liveSourceKeys(seat: SeatRun): readonly SourceKey[] {
+  return [...(seat.characterId === null ? [] : [seat.characterId]), ...(seat.upgradeId === null ? [] : [seat.upgradeId]), ...seat.equipped];
 }
 
 /** start, then in ledger order: minus poolCost, plus regained capped at max. */
@@ -54,19 +80,40 @@ export function poolBalance(seat: SeatRun, catalog: Catalog): number | null {
   }, pool.start);
 }
 
-export function limitOf(seat: SeatRun, sourceId: SourceId, catalog: Catalog): UsageLimit {
-  const active = sourceDef(catalog, sourceId).active;
-  if (active === undefined) throw new Error(`usage: source "${sourceId}" has no active ability`);
-  return resolveTuned(active.limit, ownerOf(seat));
+/** An item's uses as a limit: per-camp is once per attempt, charges count
+ * all time, single-use is one charge. */
+function limitOfUses(uses: ItemUses): UsageLimit {
+  switch (uses.kind) {
+    case "per-camp":
+      return { kind: "per-camp", times: 1 };
+    case "charges":
+      return { kind: "per-run", times: uses.n };
+    case "single-use":
+      return { kind: "per-run", times: 1 };
+  }
+}
+
+export function limitOf(seat: SeatRun, key: SourceKey, catalog: Catalog): UsageLimit {
+  const def = defOfKey(seat, key, catalog);
+  if (def.kind === "item" && def.uses !== undefined) return limitOfUses(def.uses);
+  if (def.kind === "item" || def.active === undefined) throw new Error(`usage: source "${key}" has no active ability`);
+  return resolveTuned(def.active.limit, ownerOf(seat));
+}
+
+/** True when the key is an item instance that leaves its owner once its uses run out. */
+export function spendsInstance(seat: SeatRun, key: SourceKey, catalog: Catalog): boolean {
+  const def = defOfKey(seat, key, catalog);
+  return def.kind === "item" && def.uses !== undefined && def.uses.kind !== "per-camp";
 }
 
 /** per-camp: times minus `used` entries stamped (camp, attempt). per-run:
  * times minus all `used` entries. pool: the character's balance. supplies:
- * the crew's, which a use never spends to zero. */
-export function remaining(run: RunState, seatId: string, sourceId: SourceId, catalog: Catalog): Remaining {
+ * the crew's, which a use never spends to zero. Counted per key, so two
+ * instances of one item have separate uses. */
+export function remaining(run: RunState, seatId: string, key: SourceKey, catalog: Catalog): Remaining {
   const seat = seatOf(run, seatId);
-  const limit = limitOf(seat, sourceId, catalog);
-  const uses = seat.ledger.filter((entry) => entry.kind === "used" && entry.sourceId === sourceId);
+  const limit = limitOf(seat, key, catalog);
+  const uses = seat.ledger.filter((entry) => entry.kind === "used" && entry.sourceKey === key);
   switch (limit.kind) {
     case "per-camp": {
       const stamp = currentStamp(run);
@@ -76,13 +123,11 @@ export function remaining(run: RunState, seatId: string, sourceId: SourceId, cat
     }
     case "per-run":
       return { kind: "uses", left: Math.max(0, limit.times - uses.length), of: limit.times };
-    case "single-use":
-      return { kind: "single-use" };
     case "pool": {
       const balance = poolBalance(seat, catalog);
       const pool = seat.characterId === null ? undefined : catalog.characters[seat.characterId]?.pool;
       if (balance === null || pool === undefined) {
-        throw new Error(`usage: source "${sourceId}" spends a pool its holder's character lacks`);
+        throw new Error(`usage: source "${key}" spends a pool its holder's character lacks`);
       }
       return { kind: "pool", balance, max: pool.max, cost: limit.cost };
     }
@@ -96,8 +141,6 @@ export function limitBlock(run: RunState, left: Remaining): { readonly error: "a
   switch (left.kind) {
     case "uses":
       return left.left > 0 ? null : { error: "ability_spent", reason: left.of === 1 ? "Already used" : `Already used ${left.of} times` };
-    case "single-use":
-      return null;
     case "pool":
       return left.balance >= left.cost ? null : { error: "cannot_afford", reason: `Needs ${left.cost}, you have ${left.balance}` };
     case "supplies":

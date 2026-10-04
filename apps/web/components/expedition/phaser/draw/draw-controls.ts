@@ -161,7 +161,7 @@ function drawBanner(scene: Phaser.Scene, layer: Layer, model: SceneModel, index:
   });
   if (!banner.youPending) return;
   const items = [
-    ...banner.uses.map((u) => ({ id: gateUseObjectId(u.sourceId), label: `Use ${u.name}`, onClick: () => handlers.onGateUse(u.sourceId), outline: true })),
+    ...banner.uses.map((u) => ({ id: gateUseObjectId(u.sourceKey), label: `Use ${u.name}`, onClick: () => handlers.onGateUse(u.sourceKey), outline: true })),
     { id: GATE_SKIP_ID, label: "Pass", onClick: () => handlers.onGateSkip(), outline: false },
   ];
   const gap = 6;

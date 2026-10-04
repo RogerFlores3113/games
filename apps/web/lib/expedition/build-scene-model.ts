@@ -23,7 +23,7 @@ import type { Prompt } from "./build-prompt";
 import { buildPrompt } from "./build-prompt";
 import type { ObjectiveHolder } from "./objective-tooltip";
 import { objectiveTooltip } from "./objective-tooltip";
-import { chargeText, isSpent, sourceKind, sourceName, sourceRulesText, type SourceKind } from "./source-text";
+import { chargeText, isSpent, liveSourceKeys, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, type SourceKind } from "./source-text";
 
 /**
  * D-12 boundary (spec §7.1): `buildSceneModel` renders `view.camp.
@@ -117,9 +117,12 @@ export interface ObjectiveChip {
   selected: boolean;
 }
 
-/** A character or kit source. `usable`/`reason` are yours only. `charge`
- * is what is left: "1 left", "used", "2/3 herbs", "always on". */
+/** A character, upgrade or equipped item. `sourceKey` is what the seat
+ * acts through (an item's instance uid); `sourceId` names the def, for art
+ * and text. `usable`/`reason` are yours only. `charge` is what is left:
+ * "1 left", "used", "2/3 herbs", "always on". */
 export interface SourceChip {
+  sourceKey: string;
   sourceId: string;
   objectId: string;
   name: string;
@@ -304,16 +307,19 @@ function pickOrNull(ui: LocalUiState, view: ExpeditionView, entity: PickEntity):
   return pick.targetable || pick.selected ? pick : null;
 }
 
-function sourceChipFor(sourceId: string, seatId: string, view: ExpeditionView, ui: LocalUiState): SourceChip {
+function sourceChipFor(sourceKey: string, seatId: string, view: ExpeditionView, ui: LocalUiState): SourceChip {
   const isYou = seatId === view.yourSeatId && view.yourSeatId !== null;
-  const remaining = view.seats.find((s) => s.seatId === seatId)?.usage.find((u) => u.sourceId === sourceId)?.remaining ?? null;
-  const ability = isYou ? view.yourAbilities.find((a) => a.sourceId === sourceId) : undefined;
+  const seat = view.seats.find((s) => s.seatId === seatId);
+  const sourceId = sourceIdOfKey(seat, sourceKey);
+  const remaining = seat?.usage.find((u) => u.sourceKey === sourceKey)?.remaining ?? null;
+  const ability = isYou ? view.yourAbilities.find((a) => a.sourceKey === sourceKey) : undefined;
   const usable = ability?.usableNow ?? false;
   const reason = ability?.reason ?? null;
   const pulse = isYou && usable && ui.targeting === null;
   return {
+    sourceKey,
     sourceId,
-    objectId: sourceObjectId(sourceId),
+    objectId: sourceObjectId(sourceKey),
     name: sourceName(sourceId),
     kind: sourceKind(sourceId),
     charge: chargeText(sourceId, remaining),
@@ -405,8 +411,7 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
   }
 
   const seatView = view.seats.find((s) => s.seatId === seatId);
-  const liveIds = seatView === undefined || seatView.characterId === null ? (seatView?.kit ?? []) : [seatView.characterId, ...seatView.kit];
-  const sources = liveIds.map((id) => sourceChipFor(id, seatId, view, ui));
+  const sources = (seatView === undefined ? [] : liveSourceKeys(seatView)).map((key) => sourceChipFor(key, seatId, view, ui));
   const objectives = objectivesForOwner(camp, seatId, view, ui);
 
   const reveals: MiniCard[] = (attemptOf(view)?.reveals ?? [])
@@ -580,13 +585,14 @@ function buildTooltip(server: SceneServerInput, ui: LocalUiState): Tooltip | nul
     return objectiveTooltip(o, holder);
   }
   if (ui.tooltipMateSource !== null) {
-    const rules = sourceRulesText(ui.tooltipMateSource.sourceId);
+    const mate = ui.tooltipMateSource;
+    const rules = sourceRulesText(sourceIdOfKey(view.seats.find((s) => s.seatId === mate.seatId), mate.sourceKey));
     return rules === null ? null : { ...rules, reason: null };
   }
   if (ui.tooltipSourceId === null) return null;
-  const rules = sourceRulesText(ui.tooltipSourceId);
+  const rules = sourceRulesText(sourceIdOfKey(view.seats.find((s) => s.seatId === view.yourSeatId), ui.tooltipSourceId));
   if (rules === null) return null;
-  const ability = view.yourAbilities.find((a) => a.sourceId === ui.tooltipSourceId);
+  const ability = view.yourAbilities.find((a) => a.sourceKey === ui.tooltipSourceId);
   const reason = ability !== undefined && !ability.usableNow ? ability.reason : null;
   return { ...rules, reason };
 }
@@ -606,8 +612,8 @@ function buildBanner(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalU
   const youPending = you !== null && pending.includes(you);
   const uses = youPending
     ? view.yourAbilities
-        .filter((a) => a.usableNow && SOURCE_DISPLAY[a.sourceId]?.active?.window === "rescue")
-        .map((a) => sourceChipFor(a.sourceId, you, view, ui))
+        .map((a) => sourceChipFor(a.sourceKey, you, view, ui))
+        .filter((chip) => chip.usable && SOURCE_DISPLAY[chip.sourceId]?.active?.window === "rescue")
     : [];
   const others = pending.filter((id) => id !== you).map((id) => roomSeatFor(roomSeats, id).displayLabel);
   const useNames = uses.map((u) => u.name).join(" or ");
@@ -698,7 +704,7 @@ export function buildSceneModel(
   let targeting: SceneModel["targeting"] = null;
   if (ui.targeting !== null) {
     const step = currentStep(ui, view);
-    const objectId = ui.targeting.mode === "ability" ? sourceObjectId(ui.targeting.sourceId) : WHISPER_ID;
+    const objectId = ui.targeting.mode === "ability" ? sourceObjectId(ui.targeting.sourceKey) : WHISPER_ID;
     targeting = { mode: ui.targeting.mode, sourceObjectId: objectId, nextKind: step?.kind ?? null, canConfirm: step === null };
   }
 

@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import { guard } from "../camp";
-import { ability, defineItem } from "../content/source-def";
+import { defineItem, itemAbility } from "../content/source-def";
 import { buildCatalog, CATALOG as PRODUCTION } from "./catalog";
 import { rulesFor } from "./compose";
 import { attemptOf } from "./attempt";
@@ -23,10 +23,12 @@ import type { RunState } from "./types";
 const testSabotage = defineItem({
   id: "test-sabotage",
   name: "Test Sabotage (fixture only)",
+  rarity: "common",
+  price: 2,
+  uses: { kind: "single-use" },
   text: "Test fixture only: always fails the camp.",
-  active: ability({
+  active: itemAbility({
     window: "between-tricks",
-    limit: { kind: "single-use" },
     targets: [],
     apply: () => [{ op: "add-modifier", lasts: "attempt", params: {}, audience: "public" }],
     effect: () => ({ goals: (prev) => (state) => [...prev(state), guard("sabotage", true)] }),
@@ -45,7 +47,7 @@ function act(run: RunState, seatId: string, action: Parameters<typeof applyRunAc
 }
 
 describe("fail-then-replay resets every camp-scoped resource (RUN-06)", () => {
-  it("resets effects, reveals and per-camp uses, while kits, per-run uses and history persist", () => {
+  it("resets effects, reveals and per-camp uses, while items, charges and history persist", () => {
     const SEED = "10-16-fail-then-replay";
     const [scoutSeat, camoSeat, sabotageSeat] = ["s0", "s1", "s2"] as const;
     const whispersOf = (state: RunState, seatId: string) => rulesFor(state, catalog).whispersPerCamp(state, seatId);
@@ -56,41 +58,38 @@ describe("fail-then-replay resets every camp-scoped resource (RUN-06)", () => {
       catalog,
       camp: 3,
       characters: { [scoutSeat]: "scout", [camoSeat]: "signaller", [sabotageSeat]: "medic" },
-      kits: { [scoutSeat]: ["rain-poncho"], [camoSeat]: ["camouflage"], [sabotageSeat]: ["test-sabotage"] },
+      items: { [scoutSeat]: ["rain-poncho"], [camoSeat]: ["camouflage"], [sabotageSeat]: ["test-sabotage"] },
     });
+    const [poncho, camouflage, sabotage] = ["it0", "it1", "it2"];
 
     run = advanceTo(run, "between-tricks", catalog);
     const camp1Hands = attemptOf(run)!.camp.hands;
 
-    run = act(run, scoutSeat, { type: "use-ability", sourceId: "rain-poncho", targets: [] });
+    run = act(run, scoutSeat, { type: "use-ability", sourceKey: poncho, targets: [] });
     expect(whispersOf(run, scoutSeat)).toBe(2);
 
     // The Scout's Spyglass reveals one card to the Scout alone (COMM-02).
-    run = act(run, scoutSeat, { type: "use-ability", sourceId: "scout", targets: [`hand:${sabotageSeat}`] });
+    run = act(run, scoutSeat, { type: "use-ability", sourceKey: "scout", targets: [`hand:${sabotageSeat}`] });
     expect(attemptOf(run)!.reveals).toHaveLength(1);
     expect(attemptOf(run)!.reveals[0]!.audience).toEqual([scoutSeat]);
 
     // Camouflage drops its owner's objective and adds its effect.
     const camoObjective = attemptOf(run)!.camp.objectives.find((o) => o.ownerSeatId === camoSeat)!;
-    run = act(run, camoSeat, { type: "use-ability", sourceId: "camouflage", targets: [`objective:${camoObjective.id}`] });
+    run = act(run, camoSeat, { type: "use-ability", sourceKey: camouflage, targets: [`objective:${camoObjective.id}`] });
     expect(attemptOf(run)!.camp.objectives.some((o) => o.id === camoObjective.id)).toBe(false);
     expect(attemptOf(run)!.effects).toHaveLength(2);
 
     const suppliesBefore = run.supplies;
 
     // The camp fails and settles inside this same call.
-    run = act(run, sabotageSeat, { type: "use-ability", sourceId: "test-sabotage", targets: [] });
+    run = act(run, sabotageSeat, { type: "use-ability", sourceKey: sabotage, targets: [] });
 
     expect(run.stage.tag).toBe("loadout");
     expect(suppliesBefore).toBe(3);
     expect(run.supplies).toBe(2);
-    expect(run.seats.every((seat) => seat.draftOffer === null)).toBe(true); // D-01: no draft on a failure
-    expect(run.seats.map((s) => s.kit)).toEqual([["rain-poncho"], [], []]); // single-use items are spent
-    expect(run.seats.map((s) => s.ledger.map((e) => (e.kind === "used" ? e.sourceId : e.kind)))).toEqual([
-      ["rain-poncho", "scout"],
-      ["camouflage"],
-      ["test-sabotage"],
-    ]);
+    expect(run.seats.every((seat) => seat.offers.length === 0)).toBe(true); // D-01: no draft on a failure
+    expect(run.seats.map((s) => s.items)).toEqual([[{ uid: poncho, itemId: "rain-poncho" }], [], []]); // single-use items are spent
+    expect(run.seats.map((s) => s.ledger.map((e) => (e.kind === "used" ? e.sourceKey : e.kind)))).toEqual([[poncho, "scout"], [camouflage], [sabotage]]);
     expect(run.history).toEqual([{ camp: 3, attempt: 1, status: "failed", suppliesSpent: 1, coins: 0 }]);
     expect(nextAttemptNumber(run, campIndex(3))).toBe(2);
 
@@ -104,8 +103,8 @@ describe("fail-then-replay resets every camp-scoped resource (RUN-06)", () => {
     expect(run.stage.tag).toBe("camp");
     expect(attemptOf(run)!.camp.hands).not.toEqual(camp1Hands); // a fresh deal
 
-    // Rain Poncho is per-run: one use left, and its extra whisper is gone.
-    expect(remaining(run, scoutSeat, "rain-poncho", catalog)).toEqual({ kind: "uses", left: 1, of: 2 });
+    // Rain Poncho's charges survive the replay: one left, and its extra whisper is gone.
+    expect(remaining(run, scoutSeat, poncho, catalog)).toEqual({ kind: "uses", left: 1, of: 2 });
     expect(whispersOf(run, scoutSeat)).toBe(1);
 
     run = advanceTo(run, "between-tricks", catalog);
@@ -114,7 +113,7 @@ describe("fail-then-replay resets every camp-scoped resource (RUN-06)", () => {
     expect(remaining(run, scoutSeat, "scout", catalog)).toEqual({ kind: "uses", left: 1, of: 1 });
     expect(run.seats[0]!.ledger).toHaveLength(2);
     expect(
-      enumerateLegalRunActions(run, catalog).some((c) => c.seatId === scoutSeat && c.action.type === "use-ability" && c.action.sourceId === "scout"),
+      enumerateLegalRunActions(run, catalog).some((c) => c.seatId === scoutSeat && c.action.type === "use-ability" && c.action.sourceKey === "scout"),
     ).toBe(true);
     for (const seatId of run.seatIds) expect(whispersUsedBy(run, seatId)).toBe(0);
   });
@@ -125,7 +124,7 @@ describe("Whisper end to end (COMM-01/COMM-02)", () => {
     const SEAT_IDS = ["p0", "p1", "p2"];
     const [p0, p1, p2] = SEAT_IDS as [string, string, string];
 
-    let run = setupRun({ seatIds: SEAT_IDS, seed: "10-16-whisper-lifecycle", catalog, camp: 2, kits: { [p2]: ["test-sabotage"] } });
+    let run = setupRun({ seatIds: SEAT_IDS, seed: "10-16-whisper-lifecycle", catalog, camp: 2, items: { [p2]: ["test-sabotage"] } });
     run = advanceTo(run, "objective-pick", catalog);
     const objectivePickCard = attemptOf(run)!.camp.hands.find((h) => h.seatId === p0)!.cards[0]!.id;
 
@@ -171,7 +170,7 @@ describe("Whisper end to end (COMM-01/COMM-02)", () => {
     expect(attemptOf(run)!.reveals.some((r) => r.cardId === whisperedCardId)).toBe(true);
 
     // Fail the camp, then replay.
-    run = act(run, p2, { type: "use-ability", sourceId: "test-sabotage", targets: [] });
+    run = act(run, p2, { type: "use-ability", sourceKey: "it0", targets: [] });
     expect(run.stage.tag).toBe("loadout");
     for (const seatId of SEAT_IDS) run = act(run, seatId, { type: "ready" });
 

@@ -10,10 +10,11 @@ const source = readFileSync(
   fileURLToPath(new URL("../components/expedition/ExpeditionRulesModal.tsx", import.meta.url)),
   "utf-8",
 );
-const game = {
+const partial: Pick<ExpeditionView, "yourSeatId" | "seats"> = {
   yourSeatId: "s1",
-  seats: [{ seatId: "s1", characterId: "scout", kit: ["bait"] }],
-} as ExpeditionView;
+  seats: [{ seatId: "s1", characterId: "scout", upgradeId: null, items: { equipped: [{ uid: "it0", itemId: "bait", remaining: null }], backpack: [], concealed: false }, pool: null, usage: [] }],
+};
+const game = partial as ExpeditionView;
 
 const render = (props: { open: boolean; game: ExpeditionView | null }) =>
   renderToStaticMarkup(createElement(ExpeditionRulesModal, { onClose: () => {}, ...props }));

@@ -1251,3 +1251,46 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
   The top bar shows supplies of their cap, the purse as a coin, and the camp with its boss.
   Before camp 4 the route cards are identical (one location, one weather, one event), as the
   spec expected.
+
+### Implementation notes (unit 4)
+
+- A newly minted instance (from `pick-bundle`, `buy` or the dev `give-item`) is equipped while
+  the seat has a free slot, else it goes to the backpack (`run/items.ts`'s `mintItems`). The spec
+  minted into the backpack; a new player who drafts a bundle and presses Set out without opening
+  the backpack would then walk into camp empty-handed. "A free slot" reads the composed
+  `itemSlots`, so a passive that raises or lowers the slots counts.
+- Effects (`ActiveEffect.sourceId`), log entries and reveals keep the def id (an item's `itemId`),
+  not the source key: a spent instance is gone by the time compose needs its `effect`. Unit 5's
+  `Origin` must carry the def id beside the source key for the same reason.
+- `openLoadout` draws the stock on every visit to a boss camp's loadout, from the same stream
+  names, so a failed boss camp's replay offers the same stock again, unsold. An item bought on
+  the first visit stays with its buyer and is for sale again.
+- `liveSourceKeys(seat)` takes the seat alone; unit 5 adds the run and catalogue when granted
+  mod abilities join the keys.
+- `ExpeditionItemView.remaining` is `null` for a passive item. The seat view keeps `pool` until
+  unit 13 deletes pools.
+- The shop draws its items with the draft's rarity-then-pick rule over a pool with no character,
+  so an item with `exclusiveTo` is never stocked. A draft or shop pool that runs out gives a
+  shorter bundle or stock; an empty bundle is a legal pick that mints nothing (reachable only with
+  a test catalogue).
+- `buy` refuses in this order: `not_a_choice` (no shop, unknown stock id), `already_ready`, the
+  entry's own refusal (`supplies_full`, `sold_out`, `upgrade_owned`, `not_your_upgrade`), then
+  `cannot_afford`, so "sold out" wins over "can't afford".
+- `ITEM_SLOTS = 2` lives in `balance.ts`; the base `itemSlots` reads it. The base
+  `whispersPerCamp` gives an upgrade owner its extra whisper, so every count that included an
+  upgrade owner went up by one.
+- The leak check's `ownDraft` is the viewer's head offer; `foreignOffers` holds every other seat's
+  offers (queued ones too) as JSON, and any array in a view equal to one is
+  `structural:foreign-offer`. `FORBIDDEN_VIEW_KEYS` gains `offers` and `itemSerial` and loses
+  `draftOffer`; `bosses` and `readySeatIds` are left to the units that change them.
+- `dev/check.ts` checks the slots only when the crew's ids are all known, since composing rules
+  over an unknown id throws. The two whole-run properties in `run.property.test.ts` have a 30 s
+  timeout: with shop and equip moves in the random walk they passed the 5 s default under the full
+  suite's load.
+- Web: the draft panel draws each bundle as one card (`bundle:<n>`, its items' names, texts and
+  uses badges) with "Take it"; after the pick it names the newest instance. Camp chips, the kit
+  rows and the gated-window buttons are keyed by source key (`source:<key>`, `kit:<key>`,
+  `seat-source:<seat>:<key>`, `gate-use:<key>`) and resolve the def id for art and text. There
+  is no equip or shop UI yet (part B); the loadout's kit lists the equipped items.
+- e2e: the rewritten-view scenarios give the item under test the uid `it90`
+  (`scenarioKey`); `DRAFT_PREFERENCE` lost its upgrades, since upgrades are never drafted.

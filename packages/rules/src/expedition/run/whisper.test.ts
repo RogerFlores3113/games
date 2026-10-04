@@ -11,7 +11,7 @@ import { applyCampAction } from "../actions";
 import { campPhase, createCamp, currentActorSeatId } from "../camp";
 import { baseRules } from "../rules";
 import type { CampState } from "../state";
-import { ability, defineItem } from "../content/source-def";
+import { ability, defineItem, itemAbility } from "../content/source-def";
 import { attemptOf, withAttempt } from "./attempt";
 import { campIndex } from "./plan";
 import { campSpecAt } from "./route";
@@ -71,7 +71,7 @@ function betweenTricksCamp(seed?: string): CampState {
 }
 
 function makeSeats(): readonly SeatRun[] {
-  return SEAT_IDS.map((seatId) => ({ seatId, characterId: "plain-1", kit: [], draftOffer: null, ledger: [] }));
+  return SEAT_IDS.map((seatId) => ({ seatId, characterId: "plain-1", upgradeId: null, items: [], equipped: [], offers: [], ledger: [] }));
 }
 
 /** A run in camp 2 whose attempt holds `camp`; at the loadout, with no
@@ -86,7 +86,7 @@ function makeRun(input: {
   const spec = campSpecAt(seed, "standard", campIndex(2));
   const stage: RunState["stage"] =
     input.camp === null
-      ? { tag: "loadout", camp: spec, ready: {} }
+      ? { tag: "loadout", camp: spec, stock: null, ready: {} }
       : {
           tag: "camp",
           camp: spec,
@@ -102,6 +102,7 @@ function makeRun(input: {
     plan: { length: "standard", bosses: [] },
     history: [],
     lastVote: null,
+    itemSerial: 0,
     stage,
   };
 }
@@ -138,9 +139,9 @@ describe("whisperLegality", () => {
 
   it("rejects with whisper_blocked when a layer forbids whispering", () => {
     const camp = betweenTricksCamp();
-    const gag = defineItem({ id: "gag", name: "Gag", text: "Nobody may whisper.", passive: { modifier: () => ({ whisperAllowed: () => () => false }) } });
+    const gag = defineItem({ id: "gag", name: "Gag", rarity: "common", price: 2, text: "Nobody may whisper.", passive: { modifier: () => ({ whisperAllowed: () => () => false }) } });
     const catalog: Catalog = testCatalog({ items: { gag } });
-    const run = { ...makeRun({ camp }), seats: makeSeats().map((seat) => (seat.seatId === "p2" ? { ...seat, kit: ["gag"] } : seat)) };
+    const run = { ...makeRun({ camp }), seats: makeSeats().map((seat) => (seat.seatId === "p2" ? { ...seat, items: [{ uid: "it0", itemId: "gag" }], equipped: ["it0"] } : seat)) };
     const cardId = camp.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
     const result = whisperLegality(run, "p0", "p1", cardId, catalog);
     expect(result).toEqual({ legal: false, reason: "whisper_blocked" });
@@ -208,10 +209,12 @@ describe("applyWhisper", () => {
     const boost = defineItem({
       id: "boost",
       name: "Boost",
+      rarity: "common",
+      price: 2,
+      uses: { kind: "per-camp" },
       text: "",
-      active: ability({
+      active: itemAbility({
         window: "between-tricks",
-        limit: { kind: "per-camp", times: 1 },
         targets: [],
         apply: () => [],
         effect: (effect: ActiveEffect) => ({
@@ -237,10 +240,12 @@ describe("applyWhisper", () => {
     const broadcast = defineItem({
       id: "broadcast",
       name: "Broadcast",
+      rarity: "common",
+      price: 2,
+      uses: { kind: "per-camp" },
       text: "",
-      active: ability({
+      active: itemAbility({
         window: "between-tricks",
-        limit: { kind: "per-camp", times: 1 },
         targets: [],
         apply: () => [],
         effect: () => ({ whisperAudience: () => (r) => [...r.seatIds] }),

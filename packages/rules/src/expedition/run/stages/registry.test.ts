@@ -5,27 +5,29 @@
 // forced to decide the camp deterministically.
 
 import { describe, expect, it } from "vitest";
-import { ability, defineItem } from "../../content/source-def";
+import { defineItem, itemAbility } from "../../content/source-def";
 import type { CampState } from "../../state";
 import { attemptOf } from "../attempt";
 import { createRun, runStatus } from "../lifecycle";
 import { campIndex } from "../plan";
-import { advanceTo, setupRun, testCatalog } from "../run-test-support";
+import { advanceTo, plainItem, setupRun, testCatalog } from "../run-test-support";
 import type { RunAction, RunAt, RunState, SeatRun } from "../types";
 import { applyRunAction } from "./registry";
 
-const plain = (id: string) => defineItem({ id, name: id, text: "Nothing happens." });
 const catalog = testCatalog({
   items: {
     spare: defineItem({
       id: "spare",
       name: "Spare",
+      rarity: "common",
+      price: 2,
+      uses: { kind: "charges", n: 1 },
       text: "Does nothing between tricks.",
-      active: ability({ window: "between-tricks", limit: { kind: "per-run", times: 1 }, targets: [], apply: () => [] }),
+      active: itemAbility({ window: "between-tricks", targets: [], apply: () => [] }),
     }),
-    "item-a": plain("item-a"),
-    "item-b": plain("item-b"),
-    "item-c": plain("item-c"),
+    "item-a": plainItem("item-a"),
+    "item-b": plainItem("item-b"),
+    "item-c": plainItem("item-c"),
   },
 });
 
@@ -36,8 +38,8 @@ function musterRun(seed = "fixture"): RunState {
   return createRun({ seatIds: SEAT_IDS, seed });
 }
 
-function loadoutRun(kits: Record<string, readonly string[]> = {}): RunState {
-  return setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog, kits });
+function loadoutRun(items: Record<string, readonly string[]> = {}): RunState {
+  return setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog, items });
 }
 
 function withSeats(run: RunState, overrides: Record<string, Partial<SeatRun>>): RunState {
@@ -79,16 +81,25 @@ function decidingCamp(): CampState {
   };
 }
 
-function campRun(kits: Record<string, readonly string[]> = {}): RunState {
-  const loadout = loadoutRun(kits) as RunAt<"loadout">;
+function campRun(items: Record<string, readonly string[]> = {}): RunState {
+  const loadout = loadoutRun(items) as RunAt<"loadout">;
   return { ...loadout, stage: { tag: "camp", camp: loadout.stage.camp, attempt: { attemptNumber: 1, effects: [], reveals: [], log: [], camp: decidingCamp() } } };
 }
 
+/** p0 holds item-c (it0) and an offer of two bundles; p1 has a second
+ * offer queued behind its first; p2 has none. */
 function draftRun(): RunState {
-  return { ...withSeats(loadoutRun({ p0: ["item-c"] }), { p0: { draftOffer: ["item-a", "item-b"] } }), stage: { tag: "draft", cleared: campIndex(1), payout: 8 } };
+  const offer = (bundles: string[][]) => ({ kind: "standard" as const, bundles });
+  return {
+    ...withSeats(loadoutRun({ p0: ["item-c"] }), {
+      p0: { offers: [offer([["item-a", "item-b"], ["item-b"]])] },
+      p1: { offers: [offer([["item-a"]]), offer([["item-c"]])] },
+    }),
+    stage: { tag: "draft", cleared: campIndex(1), payout: 8 },
+  };
 }
 
-/** Between tricks of a dealt camp, with p0 holding the between-tricks item. */
+/** Between tricks of a dealt camp, with p0 holding the between-tricks item (it0). */
 function betweenRun(): RunState {
   return advanceTo(loadoutRun({ p0: ["spare"] }), "between-tricks", catalog);
 }
@@ -131,9 +142,11 @@ describe("applyRunAction: each stage accepts only its own actions", () => {
   const every: RunAction[] = [
     { type: "pick-character", characterId: "plain-5" },
     { type: "vote", choice: null },
-    { type: "pick-draft", sourceId: "item-a" },
+    { type: "equip", itemUids: [] },
+    { type: "buy", stockId: "supplies" },
+    { type: "pick-bundle", bundle: 0 },
     { type: "ready" },
-    { type: "use-ability", sourceId: "spare", targets: [] },
+    { type: "use-ability", sourceKey: "spare", targets: [] },
     { type: "skip-window" },
     { type: "whisper", targetSeatId: "p1", cardId: "x" },
     { type: "pick-objective", objectiveId: "x" },
@@ -149,16 +162,16 @@ describe("applyRunAction: each stage accepts only its own actions", () => {
     expect(accepted(musterRun())).toEqual(["pick-character", "vote"]);
   });
 
-  it("loadout: ready", () => {
-    expect(accepted(loadoutRun())).toEqual(["ready"]);
+  it("loadout: equip, buy and ready", () => {
+    expect(accepted(loadoutRun())).toEqual(["equip", "buy", "ready"]);
   });
 
   it("camp: abilities, window passes, whispers and the two camp actions", () => {
     expect(accepted(campRun())).toEqual(["use-ability", "skip-window", "whisper", "pick-objective", "play-card"]);
   });
 
-  it("draft: pick-draft", () => {
-    expect(accepted(draftRun())).toEqual(["pick-draft"]);
+  it("draft: pick-bundle", () => {
+    expect(accepted(draftRun())).toEqual(["pick-bundle"]);
   });
 });
 
@@ -205,47 +218,62 @@ describe("applyRunAction: pick-character (muster)", () => {
   });
 });
 
-describe("applyRunAction: pick-draft (RUN-04)", () => {
-  it("adds the offered source to the kit after what is already held, and clears the offer", () => {
-    const state = ok(applyRunAction(draftRun(), "p0", { type: "pick-draft", sourceId: "item-b" }, catalog));
+describe("applyRunAction: pick-bundle", () => {
+  it("mints one instance per item of the bundle, equips into the free slot, and drops the offer", () => {
+    const state = ok(applyRunAction(draftRun(), "p0", { type: "pick-bundle", bundle: 0 }, catalog));
     const seat = state.seats[0]!;
-    expect(seat.kit).toEqual(["item-c", "item-b"]);
-    expect(seat.draftOffer).toBeNull();
+    expect(seat.items).toEqual([
+      { uid: "it0", itemId: "item-c" },
+      { uid: "it1", itemId: "item-a" },
+      { uid: "it2", itemId: "item-b" },
+    ]);
+    expect(seat.equipped).toEqual(["it0", "it1"]);
+    expect(seat.offers).toEqual([]);
+    expect(state.itemSerial).toBe(3);
   });
 
-  it("rejects an id not offered as not_offered", () => {
-    expect(applyRunAction(draftRun(), "p0", { type: "pick-draft", sourceId: "item-c" }, catalog)).toEqual({ ok: false, error: "not_offered" });
+  it("takes from the head offer and leaves the queued one", () => {
+    const state = ok(applyRunAction(draftRun(), "p1", { type: "pick-bundle", bundle: 0 }, catalog));
+    expect(state.seats[1]!.items).toEqual([{ uid: "it1", itemId: "item-a" }]);
+    expect(state.seats[1]!.offers).toEqual([{ kind: "standard", bundles: [["item-c"]] }]);
   });
 
-  it.each(PROTOTYPE_KEYS)("rejects the prototype key %s as not_offered", (sourceId) => {
-    expect(applyRunAction(draftRun(), "p0", { type: "pick-draft", sourceId }, catalog)).toEqual({ ok: false, error: "not_offered" });
+  it("rejects an index past the head offer's bundles, or a seat with no offer, as not_a_choice", () => {
+    expect(applyRunAction(draftRun(), "p0", { type: "pick-bundle", bundle: 2 }, catalog)).toEqual({ ok: false, error: "not_a_choice" });
+    expect(applyRunAction(draftRun(), "p2", { type: "pick-bundle", bundle: 0 }, catalog)).toEqual({ ok: false, error: "not_a_choice" });
   });
 
-  it("rejects a seat with no offer as no_draft_pending", () => {
-    expect(applyRunAction(draftRun(), "p1", { type: "pick-draft", sourceId: "item-a" }, catalog)).toEqual({
-      ok: false,
-      error: "no_draft_pending",
-    });
+  it("opens the route once no seat has an offer", () => {
+    let run = draftRun();
+    for (const seatId of ["p0", "p1", "p1"]) {
+      expect(run.stage.tag).toBe("draft");
+      run = ok(applyRunAction(run, seatId, { type: "pick-bundle", bundle: 0 }, catalog));
+    }
+    expect(run.stage.tag).toBe("route");
   });
 });
 
 describe("applyRunAction: skip-window and use-ability", () => {
-  it("using a between-tricks item records a use stamped with the trick", () => {
-    const state = ok(applyRunAction(betweenRun(), "p0", { type: "use-ability", sourceId: "spare", targets: [] }, catalog));
+  it("using a between-tricks item records a use keyed by its uid, stamped with the trick", () => {
+    const state = ok(applyRunAction(betweenRun(), "p0", { type: "use-ability", sourceKey: "it0", targets: [] }, catalog));
     expect(state.stage.tag).toBe("camp");
-    expect(state.seats[0]!.ledger).toEqual([{ kind: "used", sourceId: "spare", at: { camp: 1, attempt: 1, trick: 0 }, poolCost: 0 }]);
+    expect(state.seats[0]!.ledger).toEqual([{ kind: "used", sourceKey: "it0", at: { camp: 1, attempt: 1, trick: 0 }, poolCost: 0 }]);
+  });
+
+  it("refuses the item's def id as a key: abilities are used through the instance", () => {
+    expect(applyRunAction(betweenRun(), "p0", { type: "use-ability", sourceKey: "spare", targets: [] }, catalog)).toEqual({ ok: false, error: "not_owned" });
   });
 
   it("rejects skip-window in an ungated window as wrong_window", () => {
     expect(applyRunAction(campRun(), "p0", { type: "skip-window" }, catalog)).toEqual({ ok: false, error: "wrong_window" });
   });
 
-  it.each(PROTOTYPE_KEYS)("rejects using the prototype key %s as not_owned", (sourceId) => {
-    expect(applyRunAction(betweenRun(), "p0", { type: "use-ability", sourceId, targets: [] }, catalog)).toEqual({ ok: false, error: "not_owned" });
+  it.each(PROTOTYPE_KEYS)("rejects using the prototype key %s as not_owned", (sourceKey) => {
+    expect(applyRunAction(betweenRun(), "p0", { type: "use-ability", sourceKey, targets: [] }, catalog)).toEqual({ ok: false, error: "not_owned" });
   });
 
   it("rejects using a source the seat does not hold as not_owned", () => {
-    expect(applyRunAction(betweenRun(), "p1", { type: "use-ability", sourceId: "spare", targets: [] }, catalog)).toEqual({
+    expect(applyRunAction(betweenRun(), "p1", { type: "use-ability", sourceKey: "it0", targets: [] }, catalog)).toEqual({
       ok: false,
       error: "not_owned",
     });
@@ -264,12 +292,11 @@ describe("applyRunAction: camp delegation", () => {
     expect(attemptOf(state)).toBeNull();
   });
 
-  it("deals each seat a private offer after a clear and leaves kits and characters as they were", () => {
+  it("deals each seat one private offer of three bundles after a clear and leaves items and characters as they were", () => {
     const state = ok(applyRunAction(campRun({ p0: ["item-a"] }), "p0", { type: "play-card", cardId: "c-p0" }, catalog));
-    expect(state.seats.map((s) => s.kit)).toEqual([["item-a"], [], []]);
+    expect(state.seats.map((s) => s.items)).toEqual([[{ uid: "it0", itemId: "item-a" }], [], []]);
     expect(state.seats.map((s) => s.characterId)).toEqual(["plain-1", "plain-2", "plain-3"]);
-    for (const seat of state.seats) expect(seat.draftOffer).toHaveLength(3);
-    expect(state.seats[0]!.draftOffer).not.toContain("item-a");
+    for (const seat of state.seats) expect(seat.offers.map((offer) => offer.bundles.length)).toEqual([3]);
   });
 
   it("never mutates the input run when settling", () => {

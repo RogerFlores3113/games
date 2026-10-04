@@ -54,14 +54,16 @@ function freshLoadout(): RunState {
   return setupRun({ seatIds: SEAT_IDS, seed: SEED, catalog: CATALOG });
 }
 
-/** setupRun clears every seat's draftOffer to null, so this opens the draft
- * after camp 2 with each seat's real private offer, which Canary F needs to
- * prove a cross-seat draft-offer swap is detected. */
+/** setupRun deals no offers, so this opens the draft after camp 2 with each
+ * seat's real private offer (p0 with a second one queued), which Canaries F
+ * and F2 need to prove another seat's offer is detected. */
 function realDraft(): RunState {
   const base = setupRun({ seatIds: SEAT_IDS, seed: SEED, catalog: CATALOG, camp: 2 });
+  const offers = (seat: RunState["seats"][number]) =>
+    [draftOfferFor(SEED, campIndex(2), seat, 0, CATALOG), ...(seat.seatId === "p0" ? [draftOfferFor(SEED, campIndex(2), seat, 1, CATALOG)] : [])];
   return {
     ...base,
-    seats: base.seats.map((seat) => ({ ...seat, draftOffer: draftOfferFor(SEED, 2, seat, CATALOG) })),
+    seats: base.seats.map((seat) => ({ ...seat, offers: offers(seat) })),
     stage: { tag: "draft", cleared: campIndex(2), payout: 5 },
   };
 }
@@ -73,12 +75,12 @@ function musterRun(): RunState {
 /** p0 has used a Whetstone: an owner-audience effect naming one of p0's cards. */
 function afterWhetstone(): RunState {
   const start = advanceTo(
-    setupRun({ seatIds: SEAT_IDS, seed: SEED, catalog: CATALOG, kits: { p0: ["whetstone"] } }),
+    setupRun({ seatIds: SEAT_IDS, seed: SEED, catalog: CATALOG, items: { p0: ["whetstone"] } }),
     "between-tricks",
     CATALOG,
   );
-  const step = toExpeditionPlayerView(start, "p0", CATALOG).yourAbilities.find((a) => a.sourceId === "whetstone")!.steps[0]!;
-  const result = applyRunAction(start, "p0", { type: "use-ability", sourceId: "whetstone", targets: [step.choices[0]!] }, CATALOG);
+  const step = toExpeditionPlayerView(start, "p0", CATALOG).yourAbilities.find((a) => a.sourceKey === "it0")!.steps[0]!;
+  const result = applyRunAction(start, "p0", { type: "use-ability", sourceKey: "it0", targets: [step.choices[0]!] }, CATALOG);
   if (!result.ok) throw new Error(`afterWhetstone: ${result.error}`);
   return result.state;
 }
@@ -106,11 +108,13 @@ describe("view-leak-check: cards that count as others", () => {
     const spadesAsHearts = defineItem({
       id: "spades-as-hearts",
       name: "Spades as hearts",
+      rarity: "common",
+      price: 2,
       text: "Spades count as hearts.",
       passive: { modifier: () => ({ identityOf: (prev) => (card) => (card.identity.kind === "standard" && card.identity.suit === "spades" ? { ...card.identity, suit: "hearts" } : prev(card)) }) },
     });
     const catalog = testCatalog({ characters: CATALOG.characters, items: { ...CATALOG.items, "spades-as-hearts": spadesAsHearts } });
-    let state = advanceTo(setupRun({ seatIds: SEAT_IDS, seed: SEED, catalog, kits: { p2: ["spades-as-hearts"] } }), "between-tricks", catalog);
+    let state = advanceTo(setupRun({ seatIds: SEAT_IDS, seed: SEED, catalog, items: { p2: ["spades-as-hearts"] } }), "between-tricks", catalog);
     for (let i = 0; i < SEAT_IDS.length; i++) {
       const rules = rulesFor(state, catalog);
       const actor = currentActorSeatId(attemptOf(state)!.camp, rules)!;
@@ -194,10 +198,23 @@ describe("view-leak-check: canary suite", () => {
     const secrets = secretsForExpeditionSeat(state, "p0", CATALOG, SEED);
 
     const leaky = structuredClone(view);
-    (leaky.seats[1] as unknown as Record<string, unknown>).ledger = [{ kind: "used", sourceId: "scout" }];
+    (leaky.seats[1] as unknown as Record<string, unknown>).ledger = [{ kind: "used", sourceKey: "scout" }];
 
     const reasons = checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets });
     expect(reasons).toContain("structural:forbidden-key:ledger");
+  });
+
+  it("Canary B3: a seat's offers and the run's itemSerial are each flagged as forbidden keys", () => {
+    const state = realDraft();
+    const view = toExpeditionPlayerView(state, "p0", CATALOG);
+    const secrets = secretsForExpeditionSeat(state, "p0", CATALOG, SEED);
+
+    const leaky = structuredClone(view) as unknown as Record<string, unknown> & { seats: Record<string, unknown>[] };
+    leaky.seats[0]!.offers = [];
+    leaky.itemSerial = state.itemSerial;
+
+    const reasons = checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets });
+    expect(reasons).toEqual(expect.arrayContaining(["structural:forbidden-key:offers", "structural:forbidden-key:itemSerial"]));
   });
 
   it("Canary C: the 32-hex seed embedded inside a log entry's event string", () => {
@@ -245,16 +262,29 @@ describe("view-leak-check: canary suite", () => {
   it("Canary F: the draft stage's yourOffer replaced with another seat's offer", () => {
     const state = realDraft();
     const viewer = "p0";
-    const other = state.seats.find((s) => s.seatId !== viewer && s.draftOffer !== null)!;
+    const other = state.seats.find((s) => s.seatId !== viewer)!;
     const view = toExpeditionPlayerView(state, viewer, CATALOG);
     const secrets = secretsForExpeditionSeat(state, viewer, CATALOG, SEED);
 
     const leaky = structuredClone(view);
     if (leaky.stage.tag !== "draft") throw new Error("expected the draft stage");
-    leaky.stage.yourOffer = [...other.draftOffer!];
+    leaky.stage.yourOffer = { bundles: other.offers[0]!.bundles.map((b) => [...b]) };
 
     const reasons = checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets });
-    expect(reasons).toContain("structural:draft-offer-mismatch");
+    expect(reasons).toEqual(expect.arrayContaining(["structural:draft-offer-mismatch", "structural:foreign-offer"]));
+  });
+
+  it("Canary F2: another seat's bundles anywhere in the view are a leak, its queued offer included", () => {
+    const state = realDraft();
+    const view = toExpeditionPlayerView(state, "p1", CATALOG);
+    const secrets = secretsForExpeditionSeat(state, "p1", CATALOG, SEED);
+    const p0 = state.seats[0]!;
+
+    for (const offer of p0.offers) {
+      const leaky = structuredClone(view) as unknown as Record<string, unknown>;
+      leaky.hint = offer.bundles.map((b) => [...b]);
+      expect(checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets })).toEqual(["structural:foreign-offer"]);
+    }
   });
 
   it("Canary G: a private log entry addressed to a different seat, appended", () => {

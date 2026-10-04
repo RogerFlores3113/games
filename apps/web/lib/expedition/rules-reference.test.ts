@@ -3,10 +3,20 @@ import { SOURCE_DISPLAY, type ExpeditionView } from "@games/rules";
 import { buildRulesReference } from "./rules-reference";
 
 function viewWith(over: { characterId?: string | null; kit?: string[] }) {
-  return {
+  const view: Pick<ExpeditionView, "yourSeatId" | "seats"> = {
     yourSeatId: "s1",
-    seats: [{ seatId: "s1", characterId: over.characterId === undefined ? "scout" : over.characterId, kit: over.kit ?? [] }],
-  } as ExpeditionView;
+    seats: [
+      {
+        seatId: "s1",
+        characterId: over.characterId === undefined ? "scout" : over.characterId,
+        upgradeId: null,
+        items: { equipped: (over.kit ?? []).map((itemId, i) => ({ uid: `it${i}`, itemId, remaining: null })), backpack: [], concealed: false },
+        pool: null,
+        usage: [],
+      },
+    ],
+  };
+  return view as ExpeditionView;
 }
 
 const byId = (sections: ReturnType<typeof buildRulesReference>, id: string) => sections.find((s) => s.id === id)!;

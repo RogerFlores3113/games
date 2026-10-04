@@ -21,6 +21,7 @@ describe("SOURCE_DISPLAY", () => {
       characterId: "scout",
       active: { window: "between-tricks", windowPhrase: "Between tricks", limitBadge: "1 per camp", targets: ["hand"] },
       passive: false,
+      item: null,
     });
   });
 
@@ -36,13 +37,23 @@ describe("SOURCE_DISPLAY", () => {
   it("carries an item with a null characterId, and flags passive-only sources", () => {
     expect(SOURCE_DISPLAY["trained-monkey"]).toMatchObject({ kind: "item", characterId: null, active: { targets: ["card", "hand"] } });
     expect(SOURCE_DISPLAY["heavy-pack"]).toMatchObject({ kind: "item", characterId: null, active: null, passive: true });
+    expect(SOURCE_DISPLAY["heavy-pack"]!.item).toEqual({ rarity: "common", price: 3, uses: null });
     expect(SOURCE_DISPLAY.signaller).toMatchObject({ kind: "character", active: null, passive: true });
   });
 
-  it("phrases each limit kind", () => {
+  it("carries an item's rarity, price and uses badge", () => {
+    expect(SOURCE_DISPLAY["trail-map"]!.item).toEqual({ rarity: "rare", price: 5, uses: "Single use" });
+    expect(SOURCE_DISPLAY["pack-mule"]!.item).toEqual({ rarity: "common", price: 3, uses: "Once per camp" });
+    expect(SOURCE_DISPLAY["rain-poncho"]!.item).toEqual({ rarity: "common", price: 3, uses: "2 charges" });
+    expect(SOURCE_DISPLAY["scout.keen-eye"]!.item).toBeNull();
+  });
+
+  it("phrases each limit kind, and an item's uses as its badge", () => {
     expect(SOURCE_DISPLAY.scout!.active!.limitBadge).toBe("1 per camp");
-    expect(SOURCE_DISPLAY["trail-map"]!.active!.limitBadge).toBe("Once per run");
-    expect(SOURCE_DISPLAY["rain-poncho"]!.active!.limitBadge).toBe("2 per run");
+    expect(SOURCE_DISPLAY["guide.howler-call"]!.active!.limitBadge).toBe("Once per run");
+    expect(SOURCE_DISPLAY["trail-map"]!.active!.limitBadge).toBe("Single use");
+    expect(SOURCE_DISPLAY["rain-poncho"]!.active!.limitBadge).toBe("2 charges");
+    expect(SOURCE_DISPLAY["parrot"]!.active!.limitBadge).toBe("Once per camp");
     expect(SOURCE_DISPLAY.whetstone!.active!.limitBadge).toBe("Single use");
     expect(SOURCE_DISPLAY.botanist!.active!.limitBadge).toBe("1 herb");
     expect(SOURCE_DISPLAY["botanist.antidote"]!.active!.limitBadge).toBe("2 herbs");

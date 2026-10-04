@@ -70,7 +70,7 @@ function targetCombos(steps: readonly { choices: readonly string[] }[]): string[
 
 /** Every candidate action for `seatId`, built ONLY from `view` (the seat's
  * own projected view — bots never read room.game to decide) and the public
- * character list. Priority order: pick-character, pick-draft, a vote
+ * character list. Priority order: pick-character, pick-bundle, a vote
  * (a short run at muster, route a between camps), ready,
  * use-ability (targets from the server's own step choices), whisper,
  * skip-window, pick-objective, play-card. `applyGameAction` (called by the
@@ -86,7 +86,7 @@ function buildCandidates(view: ExpeditionViewWire, seatId: string): RunAction[] 
 
   const stage = view.stage;
   if (stage.tag === "draft") {
-    for (const sourceId of stage.yourOffer ?? []) candidates.push({ type: "pick-draft", sourceId });
+    (stage.yourOffer?.bundles ?? []).forEach((_, bundle) => candidates.push({ type: "pick-bundle", bundle }));
   }
   if (stage.tag === "muster") candidates.push({ type: "vote", choice: "short" });
   if (stage.tag === "route") candidates.push({ type: "vote", choice: stage.options[0]!.id });
@@ -96,7 +96,7 @@ function buildCandidates(view: ExpeditionViewWire, seatId: string): RunAction[] 
   for (const ability of view.yourAbilities) {
     if (!ability.usableNow) continue;
     for (const targets of targetCombos(ability.steps)) {
-      candidates.push({ type: "use-ability", sourceId: ability.sourceId, targets });
+      candidates.push({ type: "use-ability", sourceKey: ability.sourceKey, targets });
     }
   }
 

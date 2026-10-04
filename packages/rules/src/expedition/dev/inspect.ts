@@ -8,6 +8,7 @@ import { SUPPLIES_MAX } from "../run/balance";
 import { rulesFor } from "../run/compose";
 import { runStatus } from "../run/lifecycle";
 import { campCount } from "../run/plan";
+import { backpackOf } from "../run/usage";
 import type { CampSpec } from "../run/route";
 import type { Catalog, PerSeat, RunState } from "../run/types";
 import type { ResolvedPlay } from "../state";
@@ -32,7 +33,11 @@ function stageLines(run: RunState): string[] {
     case "muster":
       return [`length ballots: ${perSeat(run, stage.ballots)}`];
     case "loadout":
-      return [specLabel(stage.camp), `ready: ${perSeat(run, stage.ready)}`];
+      return [
+        specLabel(stage.camp),
+        `shop: ${stage.stock === null ? "closed" : stage.stock.map((e) => `${e.stockId} ${e.what.kind === "item" ? e.what.itemId : "supply"} ${e.price}${e.soldTo === null ? "" : ` sold to ${e.soldTo}`}`).join(", ")}`,
+        `ready: ${perSeat(run, stage.ready)}`,
+      ];
     case "camp":
       return [specLabel(stage.camp), `attempt ${stage.attempt.attemptNumber}`];
     case "draft":
@@ -53,7 +58,7 @@ export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[]
       title: "Run",
       lines: [
         `stage ${run.stage.tag}, status ${runStatus(run)}, ${run.plan === null ? "no plan yet" : `${run.plan.length} run of ${campCount(run.plan)} camps`}`,
-        `supplies ${run.supplies} of ${SUPPLIES_MAX}, purse ${run.purse}`,
+        `supplies ${run.supplies} of ${SUPPLIES_MAX}, purse ${run.purse}, next item it${run.itemSerial}`,
         `bosses: ${run.plan?.bosses.map((b) => `${b.tier} at ${b.at} (${b.modId ?? "none drawn"})`).join(", ") || "none"}`,
         `history: ${run.history.map((h) => `${h.camp}.${h.attempt} ${h.status}${h.coins > 0 ? ` +${h.coins}` : ""}`).join(", ") || "empty"}`,
         `last vote: ${vote === null ? "none" : `${vote.topic} -> ${vote.result.winner}${vote.result.tied === null ? "" : ` (flip between ${vote.result.tied.join(", ")})`}`}`,
@@ -62,7 +67,11 @@ export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[]
     },
     {
       title: "Crew",
-      lines: run.seats.map((s) => `${s.seatId}: ${s.characterId ?? "no character"}, kit [${s.kit.join(", ")}], offer [${(s.draftOffer ?? []).join(", ")}]`),
+      lines: run.seats.map((s) => {
+        const item = (uid: string) => `${s.items.find((i) => i.uid === uid)?.itemId ?? "?"} ${uid}`;
+        const offer = s.offers[0]?.bundles.map((bundle) => bundle.join(" + ")).join(" | ") ?? "none";
+        return `${s.seatId}: ${s.characterId ?? "no character"}, upgrade ${s.upgradeId ?? "none"}, equipped [${s.equipped.map(item).join(", ")}], backpack [${backpackOf(s).map((i) => item(i.uid)).join(", ")}], offer ${offer}${s.offers.length > 1 ? ` (+${s.offers.length - 1} queued)` : ""}`;
+      }),
     },
   ];
 

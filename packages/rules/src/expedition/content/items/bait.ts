@@ -1,13 +1,15 @@
 import { winnerExcluding } from "../helpers";
-import { ability, defineItem } from "../source-def";
+import { defineItem, itemAbility } from "../source-def";
 
 export const bait = defineItem({
   id: "bait",
   name: "Bait",
+  rarity: "common",
+  price: 2,
+  uses: { kind: "single-use" },
   text: "A card on the table can't win this trick.",
-  active: ability({
+  active: itemAbility({
     window: "in-trick",
-    limit: { kind: "single-use" },
     targets: [{ kind: "card", where: "board" }],
     apply: (ctx) => [{ op: "add-modifier", lasts: "trick", audience: "public", params: { cardId: ctx.targets[0].cardId } }],
     effect: (effect) => ({

@@ -13,7 +13,7 @@ function roomSeats(): RoomSeatInfo[] {
 }
 
 function preview(index: number, over: Partial<ExpeditionCampPreviewView> = {}): ExpeditionCampPreviewView {
-  return { index, location: "jungle", weather: "fair", event: null, slotKinds: ["win-card", "win-card"], bossId: null, ...over };
+  return { index, location: "jungle", weather: "fair", event: null, slotKinds: ["win-card", "win-card"], bossId: null, shop: false, ...over };
 }
 
 const STANDARD_PLAN: ExpeditionView["plan"] = [
@@ -22,6 +22,16 @@ const STANDARD_PLAN: ExpeditionView["plan"] = [
 ];
 
 const CLEARED_1 = { camp: 1, attempt: 1, status: "cleared" as const, coins: 8 };
+
+/** Old-style kit ids as a seat's upgrade and equipped items; an item's uid
+ * here is its item id, so ability keys in these fixtures read by name. */
+function kitOf(kit: readonly string[]): Pick<ExpeditionView["seats"][number], "upgradeId" | "items"> {
+  const items = kit.filter((id) => !id.includes("."));
+  return {
+    upgradeId: kit.find((id) => id.includes(".")) ?? null,
+    items: { equipped: items.map((id) => ({ uid: id, itemId: id, remaining: null })), backpack: [], concealed: false },
+  };
+}
 
 function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
   return {
@@ -33,14 +43,14 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     supplies: { count: 3, max: 5 },
     plan: STANDARD_PLAN,
     seats: [
-      { seatId: "s1", characterId: "scout", kit: [], pool: null, usage: [] },
-      { seatId: "s2", characterId: "guide", kit: ["trained-monkey"], pool: null, usage: [] },
-      { seatId: "s3", characterId: "medic", kit: ["bait"], pool: null, usage: [] },
+      { seatId: "s1", characterId: "scout", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
+      { seatId: "s2", characterId: "guide", ...kitOf(["trained-monkey"]), pool: null, usage: [] },
+      { seatId: "s3", characterId: "medic", ...kitOf(["bait"]), pool: null, usage: [] },
     ],
     yourAbilities: [],
     history: [CLEARED_1],
     lastVote: null,
-    stage: { tag: "loadout", camp: preview(2), readySeatIds: [] },
+    stage: { tag: "loadout", camp: preview(2), yourSlots: 2, shop: null, readySeatIds: [] },
     ...overrides,
   };
 }
@@ -78,7 +88,7 @@ describe("topBar", () => {
   });
 
   it("labels a boss camp and the temple by their tier", () => {
-    const loadout = (index: number) => at({ tag: "loadout", camp: preview(index), readySeatIds: [] });
+    const loadout = (index: number) => at({ tag: "loadout", camp: preview(index), yourSlots: 2, shop: null, readySeatIds: [] });
     expect(model(loadout(3)).topBar.camp).toBe("Camp 3 of 6 - Animal boss");
     expect(model(loadout(6)).topBar.camp).toBe("Camp 6 of 6 - The Temple");
   });
@@ -92,7 +102,7 @@ describe("topBar", () => {
 describe("trail", () => {
   it("marks cleared camps, the camp ahead, and the boss and temple stops of a standard run", () => {
     const view = at(
-      { tag: "loadout", camp: preview(3), readySeatIds: [] },
+      { tag: "loadout", camp: preview(3), yourSlots: 2, shop: null, readySeatIds: [] },
       {
         history: [
           CLEARED_1,
@@ -112,7 +122,7 @@ describe("trail", () => {
   });
 
   it("keeps a failed camp as the stop you are at and counts the retry", () => {
-    const view = at({ tag: "loadout", camp: preview(2), readySeatIds: [] }, { history: [CLEARED_1, { camp: 2, attempt: 1, status: "failed", coins: 0 }] });
+    const view = at({ tag: "loadout", camp: preview(2), yourSlots: 2, shop: null, readySeatIds: [] }, { history: [CLEARED_1, { camp: 2, attempt: 1, status: "failed", coins: 0 }] });
     expect(model(view).trail![1]).toEqual({ index: 2, state: "here", kind: "camp", caption: "try 2" });
   });
 
@@ -191,9 +201,9 @@ describe("muster", () => {
   it("lists the crew you first: choosing until a character is picked, voting until a ballot is cast, then ready", () => {
     const view = musterView([{ seatId: "s2", choice: "short" }], {
       seats: [
-        { seatId: "s1", characterId: null, kit: [], pool: null, usage: [] },
-        { seatId: "s2", characterId: "guide", kit: [], pool: null, usage: [] },
-        { seatId: "s3", characterId: "medic", kit: [], pool: null, usage: [] },
+        { seatId: "s1", characterId: null, upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
+        { seatId: "s2", characterId: "guide", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
+        { seatId: "s3", characterId: "medic", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
       ],
     });
     expect(panel(view).crew).toEqual([
@@ -204,7 +214,7 @@ describe("muster", () => {
   });
 
   describe("characters", () => {
-    const mustering = (you: Partial<ExpeditionView["seats"][number]>): ExpeditionView => musterView([], { seats: seatsWith({ kit: [], ...you }) });
+    const mustering = (you: Partial<ExpeditionView["seats"][number]>): ExpeditionView => musterView([], { seats: seatsWith({ upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, ...you }) });
 
     it("shows all six characters, marking the ones teammates took, all pickable for you until you pick", () => {
       const cards = panel(mustering({ characterId: null })).characters;
@@ -253,38 +263,40 @@ describe("draft", () => {
     expect(panel(at(draftStage({ cleared: 3, payout: 12 }))).heading).toBe("Camp 3 cleared: +12 coins");
   });
 
-  it("offers an upgrade for your character and items, each with its text and badges", () => {
-    expect(panel(at(draftStage({ yourOffer: ["guide.howler-call", "rain-poncho"] }))).draft).toEqual({
+  it("offers each bundle as one card naming its items, with their text and uses", () => {
+    expect(panel(at(draftStage({ yourOffer: { bundles: [["rain-poncho", "bait"], ["heavy-pack"]] } }))).draft).toEqual({
       kind: "offer",
-      items: [
+      bundles: [
         {
-          sourceId: "guide.howler-call",
-          objectId: "draft:guide.howler-call",
-          name: "Howler Call",
-          kind: "upgrade",
-          ribbon: "Machete upgrade",
-          text: "The lowest card of the led suit wins this trick.",
-          badges: ["On your turn", "Once per run"],
+          bundle: 0,
+          itemIds: ["rain-poncho", "bait"],
+          sourceId: "rain-poncho",
+          objectId: "bundle:0",
+          name: "Rain Poncho + Bait",
+          ribbon: "Bundle 1",
+          text: "Whisper once more this camp. A card on the table can't win this trick.",
+          badges: ["Rain Poncho: 2 charges", "Bait: Single use"],
         },
         {
-          sourceId: "rain-poncho",
-          objectId: "draft:rain-poncho",
-          name: "Rain Poncho",
-          kind: "item",
-          ribbon: "Item",
-          text: "Whisper once more this camp.",
-          badges: ["Between tricks", "2 per run"],
+          bundle: 1,
+          itemIds: ["heavy-pack"],
+          sourceId: "heavy-pack",
+          objectId: "bundle:1",
+          name: "Heavy Pack",
+          ribbon: "Bundle 2",
+          text: "You may whisper once more each camp, but a failed camp costs 1 more supply.",
+          badges: ["Heavy Pack: Always"],
         },
       ],
     });
   });
 
-  it("shows the source just taken once the pick is made", () => {
+  it("shows the newest item once the pick is made", () => {
     expect(panel(at(draftStage())).draft).toEqual({ kind: "taken", sourceId: "trained-monkey", name: "Trained Monkey" });
   });
 
   it("says nothing is left when the pick is made and the kit is empty", () => {
-    expect(panel(at(draftStage(), { seats: seatsWith({ kit: [] }) })).draft).toEqual({ kind: "none", text: "Nothing left to take" });
+    expect(panel(at(draftStage(), { seats: seatsWith({ upgradeId: null, items: { equipped: [], backpack: [], concealed: false } }) })).draft).toEqual({ kind: "none", text: "Nothing left to take" });
   });
 
   it("tells a spectator the crew is choosing", () => {
@@ -294,7 +306,7 @@ describe("draft", () => {
 
 describe("route", () => {
   const options: Extract<ExpeditionStageView, { tag: "route" }>["options"] = [
-    { id: "a", next: preview(3, { event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: "jaguar" }) },
+    { id: "a", next: preview(3, { event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: "jaguar", shop: false }) },
     { id: "b", next: preview(3, { location: "river-delta", weather: "storm", slotKinds: ["ordered", "ordered", "win-card", "trick-count"] }) },
   ];
   const routeView = (ballots: { seatId: string; choice: string | null }[], over: Partial<ExpeditionView> = {}): ExpeditionView =>
@@ -372,7 +384,7 @@ describe("vote", () => {
     tied: null,
     winner: "b",
   };
-  const firstLoadout: ExpeditionStageView = { tag: "loadout", camp: preview(1), readySeatIds: [] };
+  const firstLoadout: ExpeditionStageView = { tag: "loadout", camp: preview(1), yourSlots: 2, shop: null, readySeatIds: [] };
   const event: ExpeditionStageView = { tag: "event", event: "event", next: preview(4), readySeatIds: [] };
 
   it("shows the length vote on camp 1's first loadout, with the flip that settled a tie", () => {
@@ -437,7 +449,7 @@ describe("vote", () => {
 describe("ready", () => {
   it("is Set out in the loadout: open, then done once you are in readySeatIds", () => {
     expect(model(makeView()).ready).toEqual({ objectId: "ready", label: "Set out", state: "open" });
-    const readied = at({ tag: "loadout", camp: preview(2), readySeatIds: ["s1", "s2"] });
+    const readied = at({ tag: "loadout", camp: preview(2), yourSlots: 2, shop: null, readySeatIds: ["s1", "s2"] });
     expect(model(readied).ready).toEqual({ objectId: "ready", label: "Set out", state: "done" });
   });
 
@@ -477,20 +489,20 @@ describe("kit", () => {
     const view = makeView({
       seats: seatsWith({
         usage: [
-          { sourceId: "guide", remaining: { kind: "uses", left: 0, of: 1 } },
-          { sourceId: "trained-monkey", remaining: { kind: "uses", left: 1, of: 1 } },
+          { sourceKey: "guide", remaining: { kind: "uses", left: 0, of: 1 } },
+          { sourceKey: "trained-monkey", remaining: { kind: "uses", left: 1, of: 1 } },
         ],
       }),
     });
     expect(model(view).kit).toEqual([
-      { sourceId: "guide", objectId: "kit:guide", name: "Machete", kind: "character", charge: "used" },
-      { sourceId: "trained-monkey", objectId: "kit:trained-monkey", name: "Trained Monkey", kind: "item", charge: "1 left" },
+      { sourceKey: "guide", sourceId: "guide", objectId: "kit:guide", name: "Machete", kind: "character", charge: "used" },
+      { sourceKey: "trained-monkey", sourceId: "trained-monkey", objectId: "kit:trained-monkey", name: "Trained Monkey", kind: "item", charge: "1 left" },
     ]);
   });
 
   it("marks a passive-only character as always on", () => {
-    const view = makeView({ seats: seatsWith({ characterId: "signaller", kit: [] }) });
-    expect(model(view).kit).toEqual([{ sourceId: "signaller", objectId: "kit:signaller", name: "Talking Drum", kind: "character", charge: "always on" }]);
+    const view = makeView({ seats: seatsWith({ characterId: "signaller", upgradeId: null, items: { equipped: [], backpack: [], concealed: false } }) });
+    expect(model(view).kit).toEqual([{ sourceKey: "signaller", sourceId: "signaller", objectId: "kit:signaller", name: "Talking Drum", kind: "character", charge: "always on" }]);
   });
 
   it("is null for a spectator", () => {
@@ -508,21 +520,35 @@ describe("crew", () => {
         connected: true,
         status: "waiting",
         character: "The Guide",
-        sources: [{ sourceId: "guide", name: "Machete" }, { sourceId: "trained-monkey", name: "Trained Monkey" }],
+        sources: [
+          { sourceKey: "guide", sourceId: "guide", name: "Machete" },
+          { sourceKey: "trained-monkey", sourceId: "trained-monkey", name: "Trained Monkey" },
+        ],
       },
-      { seatId: "s3", displayLabel: "Cara", isYou: false, connected: false, status: "waiting", character: "The Medic", sources: [{ sourceId: "medic", name: "Triage" }, { sourceId: "bait", name: "Bait" }] },
-      { seatId: "s1", displayLabel: "Alice", isYou: false, connected: true, status: "waiting", character: "The Scout", sources: [{ sourceId: "scout", name: "Spyglass" }] },
+      {
+        seatId: "s3",
+        displayLabel: "Cara",
+        isYou: false,
+        connected: false,
+        status: "waiting",
+        character: "The Medic",
+        sources: [
+          { sourceKey: "medic", sourceId: "medic", name: "Triage" },
+          { sourceKey: "bait", sourceId: "bait", name: "Bait" },
+        ],
+      },
+      { seatId: "s1", displayLabel: "Alice", isYou: false, connected: true, status: "waiting", character: "The Scout", sources: [{ sourceKey: "scout", sourceId: "scout", name: "Spyglass" }] },
     ]);
   });
 
   it("shows a seat with no character yet as having none", () => {
-    const view = at({ tag: "muster", ballots: [] }, { seats: seatsWith({ characterId: null, kit: [] }) });
+    const view = at({ tag: "muster", ballots: [] }, { seats: seatsWith({ characterId: null, upgradeId: null, items: { equipped: [], backpack: [], concealed: false } }) });
     expect(model(view).crew[0]).toMatchObject({ seatId: "s2", character: null, sources: [] });
   });
 
   it("reads each stage's status in the order you, s3, s1", () => {
     const statuses = (stage: ExpeditionStageView) => model(at(stage)).crew.map((c) => c.status);
-    expect(statuses({ tag: "loadout", camp: preview(2), readySeatIds: ["s1", "s2"] })).toEqual(["ready", "waiting", "ready"]);
+    expect(statuses({ tag: "loadout", camp: preview(2), yourSlots: 2, shop: null, readySeatIds: ["s1", "s2"] })).toEqual(["ready", "waiting", "ready"]);
     expect(statuses({ tag: "event", event: "event", next: preview(4), readySeatIds: ["s3"] })).toEqual(["waiting", "ready", "waiting"]);
     expect(statuses(draftStage({ pendingSeatIds: ["s3"] }))).toEqual(["ready", "drafting", "ready"]);
     expect(statuses({ tag: "route", options: [], ballots: [{ seatId: "s1", choice: "a" }] })).toEqual(["voting", "voting", "voted"]);
@@ -532,11 +558,11 @@ describe("crew", () => {
 
 describe("tooltip", () => {
   it("shows the hovered source's rules, with its window and limit as badges", () => {
-    const poncho = model(at(draftStage({ yourOffer: ["rain-poncho"] })), ui({ tooltipSourceId: "rain-poncho" })).tooltip;
+    const poncho = model(at(draftStage({ yourOffer: { bundles: [["rain-poncho"]] } })), ui({ tooltipSourceId: "rain-poncho" })).tooltip;
     expect(poncho).toEqual({
       title: "Rain Poncho",
       text: "Whisper once more this camp.",
-      badges: ["Between tricks", "2 per run"],
+      badges: ["Between tricks", "2 charges"],
       reason: null,
     });
     expect(model(makeView()).tooltip).toBeNull();
@@ -554,7 +580,7 @@ describe("tooltip", () => {
 
 describe("prompt", () => {
   it("greets a cleared camp with the draft", () => {
-    expect(model(at(draftStage({ yourOffer: ["trained-monkey"] }))).prompt).toEqual({ text: "Camp 1 cleared! +8 coins. Take one", tone: "your-move" });
+    expect(model(at(draftStage({ yourOffer: { bundles: [["trained-monkey"]] } }))).prompt).toEqual({ text: "Camp 1 cleared! +8 coins. Take one", tone: "your-move" });
   });
 
   it("says Reconnecting while the socket is down", () => {

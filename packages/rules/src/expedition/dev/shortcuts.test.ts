@@ -70,7 +70,7 @@ describe("dev shortcuts", () => {
     const cleared = run("force-camp", fresh(), { outcome: "cleared" });
     expect(cleared.stage.tag).toBe("draft");
     expect(cleared.stage.tag === "draft" && cleared.stage.cleared).toBe(1);
-    expect(cleared.seats.every((s) => s.draftOffer !== null)).toBe(true);
+    expect(cleared.seats.every((s) => s.offers.length === 1)).toBe(true);
     expect(cleared.purse).toBe(cleared.history[0]!.coins);
     expect(cleared.history[0]).toMatchObject({ camp: 1, attempt: 1, status: "cleared", suppliesSpent: 0 });
   });
@@ -84,11 +84,24 @@ describe("dev shortcuts", () => {
     expect(() => run("set-character", crewed, { seat: "b", character: "scout" })).toThrow("scout already belongs to a");
   });
 
-  it("set-kit and give-source edit the kit and reject a character id", () => {
-    const kitted = run("set-kit", fresh(), { seat: "a", kit: "bait, parrot" });
-    expect(kitted.seats[0]!.kit).toEqual(["bait", "parrot"]);
-    expect(run("give-source", kitted, { seat: "a", source: "puffball" }).seats[0]!.kit).toEqual(["bait", "parrot", "puffball"]);
-    expect(() => run("set-kit", fresh(), { seat: "a", kit: "scout" })).toThrow("scout is not an upgrade or item in the catalogue");
+  it("give-item mints an instance, equipped while a slot is free, and refuses a non-item", () => {
+    const given = ["bait", "parrot", "puffball"].reduce((state, item) => run("give-item", state, { seat: "a", item }), fresh());
+    expect(given.seats[0]!.items).toEqual([
+      { uid: "it0", itemId: "bait" },
+      { uid: "it1", itemId: "parrot" },
+      { uid: "it2", itemId: "puffball" },
+    ]);
+    expect(given.seats[0]!.equipped).toEqual(["it0", "it1"]);
+    expect(given.itemSerial).toBe(3);
+    expect(() => run("give-item", fresh(), { seat: "a", item: "scout" })).toThrow("item must be one of:");
+  });
+
+  it("set-upgrade sets or clears an upgrade of the seat's own character only", () => {
+    const scout = run("set-character", fresh(), { seat: "a", character: "scout" });
+    const upgraded = run("set-upgrade", scout, { seat: "a", upgrade: "scout.keen-eye" });
+    expect(upgraded.seats[0]!.upgradeId).toBe("scout.keen-eye");
+    expect(run("set-upgrade", upgraded, { seat: "a", upgrade: "none" }).seats[0]!.upgradeId).toBeNull();
+    expect(() => run("set-upgrade", scout, { seat: "a", upgrade: "guide.pathfinder" })).toThrow("guide.pathfinder belongs to guide, not a's scout");
   });
 
   it("set-supplies sets supplies within bounds", () => {

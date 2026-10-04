@@ -10,7 +10,7 @@ type Log = Attempt["log"];
 const club3 = { id: "c3", identity: { kind: "standard", suit: "clubs", rank: 3 } } as const;
 const club4 = { id: "c4", identity: { kind: "standard", suit: "clubs", rank: 4 } } as const;
 
-const preview = { index: 1, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null };
+const preview = { index: 1, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null, shop: false };
 
 function objective(id: string, status: Obj["status"], ownerSeatId: string | null = null): Obj {
   return { id, kind: "no-tricks", ownerSeatId, status };
@@ -36,8 +36,18 @@ function camp(over: Partial<Camp> = {}): Camp {
   };
 }
 
+/** Old-style kit ids as a seat's upgrade and equipped items; an item's uid
+ * here is its item id, so ability keys in these fixtures read by name. */
+function kitOf(kit: readonly string[]): Pick<ExpeditionView["seats"][number], "upgradeId" | "items"> {
+  const items = kit.filter((id) => !id.includes("."));
+  return {
+    upgradeId: kit.find((id) => id.includes(".")) ?? null,
+    items: { equipped: items.map((id) => ({ uid: id, itemId: id, remaining: null })), backpack: [], concealed: false },
+  };
+}
+
 function seat(seatId: string, characterId: string | null, kit: string[] = []): ExpeditionView["seats"][number] {
-  return { seatId, characterId, kit, pool: null, usage: [] };
+  return { seatId, characterId, ...kitOf(kit), pool: null, usage: [] };
 }
 
 function game(over: Partial<ExpeditionView> = {}, campOver: Partial<Camp> = {}, log: Log = [], attemptNumber = 1): ExpeditionView {
@@ -72,7 +82,7 @@ function game(over: Partial<ExpeditionView> = {}, campOver: Partial<Camp> = {}, 
   };
 }
 
-const loadout: ExpeditionView["stage"] = { tag: "loadout", camp: preview, readySeatIds: [] };
+const loadout: ExpeditionView["stage"] = { tag: "loadout", camp: preview, yourSlots: 2, shop: null, readySeatIds: [] };
 const draft: ExpeditionView["stage"] = { tag: "draft", cleared: 1, payout: 8, yourOffer: null, pendingSeatIds: [] };
 
 describe("cuesFor", () => {

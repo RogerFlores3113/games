@@ -57,8 +57,8 @@ const CampIndexSchema = z.number().int().min(1).transform((n) => n as number & {
 const StampSchema = z.strictObject({ camp: CampIndexSchema, attempt: z.number().int().min(1), trick: z.number().int().min(0) });
 
 const LedgerEntrySchema = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("used"), sourceId: z.string().min(1), at: StampSchema, poolCost: z.number().int().min(0) }),
-  z.strictObject({ kind: z.literal("passed"), sourceId: z.string().min(1), at: StampSchema, failedObjectiveIds: z.array(z.string()) }),
+  z.strictObject({ kind: z.literal("used"), sourceKey: z.string().min(1), at: StampSchema, poolCost: z.number().int().min(0) }),
+  z.strictObject({ kind: z.literal("passed"), sourceKey: z.string().min(1), at: StampSchema, failedObjectiveIds: z.array(z.string()) }),
   z.strictObject({ kind: z.literal("regained"), amount: z.number().int(), at: StampSchema }),
 ]);
 
@@ -121,9 +121,16 @@ const RouteOptionSchema = z.strictObject({ id: RouteChoiceSchema, next: CampSpec
 const PerSeatSchema = <T extends z.ZodType>(value: T) => z.record(z.string().min(1), value);
 const ReadySchema = PerSeatSchema(z.literal(true));
 
+const StockEntrySchema = z.strictObject({
+  stockId: z.string().min(1),
+  what: z.discriminatedUnion("kind", [z.strictObject({ kind: z.literal("supplies") }), z.strictObject({ kind: z.literal("item"), itemId: z.string().min(1) })]),
+  price: z.number().int().min(0),
+  soldTo: z.string().min(1).nullable(),
+});
+
 const StageSchema = z.discriminatedUnion("tag", [
   z.strictObject({ tag: z.literal("muster"), ballots: PerSeatSchema(RunLengthSchema.nullable()) }),
-  z.strictObject({ tag: z.literal("loadout"), camp: CampSpecSchema, ready: ReadySchema }),
+  z.strictObject({ tag: z.literal("loadout"), camp: CampSpecSchema, stock: z.array(StockEntrySchema).nullable(), ready: ReadySchema }),
   z.strictObject({ tag: z.literal("camp"), camp: CampSpecSchema, attempt: AttemptSchema }),
   z.strictObject({ tag: z.literal("draft"), cleared: CampIndexSchema, payout: z.number().int().min(0) }),
   z.strictObject({ tag: z.literal("route"), from: CampIndexSchema, options: z.array(RouteOptionSchema), ballots: PerSeatSchema(RouteChoiceSchema.nullable()) }),
@@ -144,8 +151,10 @@ export const ExpeditionRunStateSchema = z.strictObject({
     z.strictObject({
       seatId: z.string().min(1),
       characterId: z.string().min(1).nullable(),
-      kit: z.array(z.string().min(1)),
-      draftOffer: z.array(z.string().min(1)).nullable(),
+      upgradeId: z.string().min(1).nullable(),
+      items: z.array(z.strictObject({ uid: z.string().min(1), itemId: z.string().min(1) })),
+      equipped: z.array(z.string().min(1)),
+      offers: z.array(z.strictObject({ kind: z.literal("standard"), bundles: z.array(z.array(z.string().min(1))) })),
       ledger: z.array(LedgerEntrySchema),
     }),
   ),
@@ -167,6 +176,7 @@ export const ExpeditionRunStateSchema = z.strictObject({
     }),
   ),
   lastVote: z.strictObject({ topic: z.enum(["length", "route"]), result: VoteResultSchema }).nullable(),
+  itemSerial: z.number().int().min(0),
   stage: StageSchema,
 });
 export type ExpeditionRunStateWire = z.infer<typeof ExpeditionRunStateSchema>;

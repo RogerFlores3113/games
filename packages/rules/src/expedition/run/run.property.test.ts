@@ -1,6 +1,6 @@
 // Whole-run fast-check simulation properties (RUN-07): arbitrary seeds, 3/4/5
 // players, short/standard/long runs, random starting camps,
-// random characters and kits drawn from the production CATALOG, driven by
+// random characters, upgrades and items drawn from the production CATALOG, driven by
 // random bots through driveRun, which applies every step through the real
 // applyRunAction transition (the only dispatcher in the run layer).
 //
@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { toExpeditionPlayerView } from "../adapter/view";
 import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "../adapter/view-leak-check";
+import { checkRunState } from "../dev/check";
 import { CATALOG } from "./catalog";
 import { rulesFor } from "./compose";
 import { attemptOf } from "./attempt";
@@ -26,12 +27,17 @@ import { createRun, runStatus } from "./lifecycle";
 import { advanceTo, driveRun, replayRun, setupRun } from "./run-test-support";
 import { campCardIds } from "./toolkit";
 import type { RunLength, RunState } from "./types";
+import { defIdOf } from "./usage";
 import { currentWindow } from "./windows";
 
 const CHARACTER_IDS = Object.keys(CATALOG.characters);
-const KIT_POOL = [...Object.keys(CATALOG.items), ...Object.values(CATALOG.characters).flatMap((c) => c.upgrades.map((u) => u.id))];
+const ITEM_IDS = Object.keys(CATALOG.items);
 
 let leakViewsChecked = 0;
+
+// Whole random runs, shop and draft moves included, can pass the 5 s default
+// when the full suite shares the machine.
+const WHOLE_RUN_TIMEOUT_MS = 30_000;
 
 function seatIdsFor(seatCount: number): string[] {
   return Array.from({ length: seatCount }, (_, i) => `seat-${i}`);
@@ -44,7 +50,8 @@ type RunInput = {
   length: RunLength;
   startCamp: number;
   characters: Record<string, string>;
-  kits: Record<string, string[]>;
+  upgrades: Record<string, string>;
+  items: Record<string, string[]>;
 };
 
 const choicesArb = fc.array(fc.nat({ max: 1000 }), { minLength: 1, maxLength: 64 });
@@ -60,15 +67,17 @@ const runInputArb: fc.Arbitrary<RunInput> = fc.tuple(fc.constantFrom(3, 4, 5), l
       length: fc.constant(length),
       startCamp: fc.integer({ min: 1, max: RUN_LENGTHS[length].camps }),
       crew: fc.shuffledSubarray(CHARACTER_IDS, { minLength: seatCount, maxLength: seatCount }),
-      picks: fc.tuple(...seatIds.map(() => fc.subarray(KIT_POOL, { maxLength: 4 }))),
+      upgradePicks: fc.tuple(...seatIds.map(() => fc.constantFrom(-1, 0, 1))),
+      picks: fc.tuple(...seatIds.map(() => fc.array(fc.constantFrom(...ITEM_IDS), { maxLength: 4 }))),
     })
-    .map(({ crew, picks, ...rest }) => {
+    .map(({ crew, upgradePicks, picks, ...rest }) => {
       const characters = Object.fromEntries(seatIds.map((seatId, i) => [seatId, crew[i]!]));
       // An upgrade is only a legal pick for a seat whose character it belongs to.
-      const kits = Object.fromEntries(
-        seatIds.map((seatId, i) => [seatId, picks[i]!.filter((id) => CATALOG.sources[id]!.kind !== "upgrade" || (CATALOG.sources[id] as { characterId: string }).characterId === characters[seatId])]),
+      const upgrades = Object.fromEntries(
+        seatIds.flatMap((seatId, i) => (upgradePicks[i] === -1 ? [] : [[seatId, CATALOG.characters[crew[i]!]!.upgrades[upgradePicks[i]!]!.id]])),
       );
-      return { seatIds, characters, kits, ...rest };
+      const items = Object.fromEntries(seatIds.map((seatId, i) => [seatId, picks[i]!]));
+      return { seatIds, characters, upgrades, items, ...rest };
     });
 });
 
@@ -80,7 +89,8 @@ function build(input: RunInput): RunState {
     length: input.length,
     camp: input.startCamp,
     characters: input.characters,
-    kits: input.kits,
+    upgrades: input.upgrades,
+    items: input.items,
   });
 }
 
@@ -93,10 +103,8 @@ function checkRun(states: readonly RunState[]): void {
     expect(state.supplies).toBeGreaterThanOrEqual(0);
     expect(state.supplies).toBeLessThanOrEqual(SUPPLIES_MAX);
 
-    // Every draft offer excludes sources the seat already holds (RUN-04).
-    for (const seat of state.seats) {
-      for (const sourceId of seat.draftOffer ?? []) expect(seat.kit).not.toContain(sourceId);
-    }
+    // Instances, equipped sets, offers, upgrades and cards are all ones the engine could produce.
+    expect(checkRunState(state, CATALOG)).toEqual([]);
 
     for (const id of [...state.seatIds, "spectator"]) {
       const view = toExpeditionPlayerView(state, id, CATALOG);
@@ -136,7 +144,7 @@ describe("property: whole-run simulation (RUN-07)", () => {
       { numRuns: 30 },
     );
     expect(leakViewsChecked).toBeGreaterThan(0);
-  });
+  }, WHOLE_RUN_TIMEOUT_MS);
 
   it("drives a run from muster through the length vote, drafts and routes to the end without throwing, replaying identically", () => {
     fc.assert(
@@ -187,8 +195,8 @@ describe("property: whole-run simulation (RUN-07)", () => {
       fc.property(fc.constantFrom(3, 4, 5), fc.string({ minLength: 1 }), choicesArb, (seatCount, seed, choices) => {
         const seatIds = seatIdsFor(seatCount);
         const characters = Object.fromEntries(seatIds.map((seatId, i) => [seatId, ["medic", "guide", "scout", "signaller", "botanist"][i]!]));
-        const kits = Object.fromEntries(seatIds.map((seatId, i) => [seatId, i % 2 === 0 ? ["rope-ladder", "bait"] : []]));
-        const initial = setupRun({ seatIds, seed, catalog: CATALOG, characters, kits });
+        const items = Object.fromEntries(seatIds.map((seatId, i) => [seatId, i % 2 === 0 ? ["rope-ladder", "bait"] : []]));
+        const initial = setupRun({ seatIds, seed, catalog: CATALOG, characters, items });
 
         const { states, log } = driveRun(initial, choices, CATALOG);
 
@@ -198,16 +206,18 @@ describe("property: whole-run simulation (RUN-07)", () => {
           expect(JSON.parse(JSON.stringify(state))).toEqual(state);
           if (currentWindow(state, rulesFor(state, CATALOG)) === "rescue") rescueStates++;
         }
-        for (const entry of log) {
-          if (entry.action.type !== "use-ability" || !RESCUE_AND_IN_TRICK.has(entry.action.sourceId)) continue;
-          if (entry.action.sourceId === "bait") inTrickUses++;
+        log.forEach((entry, i) => {
+          if (entry.action.type !== "use-ability") return;
+          const defId = defIdOf(states[i]!.seats.find((s) => s.seatId === entry.seatId)!, entry.action.sourceKey);
+          if (!RESCUE_AND_IN_TRICK.has(defId)) return;
+          if (defId === "bait") inTrickUses++;
           else rescueUses++;
-        }
+        });
       }),
       { numRuns: 20 },
     );
     expect(rescueStates).toBeGreaterThan(0);
     expect(rescueUses).toBeGreaterThan(0);
     expect(inTrickUses).toBeGreaterThan(0);
-  });
+  }, WHOLE_RUN_TIMEOUT_MS);
 });

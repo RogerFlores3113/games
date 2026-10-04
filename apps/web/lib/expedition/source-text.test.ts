@@ -30,7 +30,7 @@ describe("chargeText and isSpent", () => {
   it.each([
     ["scout", { kind: "uses", left: 1, of: 1 }, "1 left", false],
     ["scout", { kind: "uses", left: 0, of: 1 }, "used", true],
-    ["bait", { kind: "single-use" }, "1 use", false],
+    ["bait", { kind: "uses", left: 1, of: 1 }, "1 left", false],
     ["botanist", { kind: "pool", balance: 2, max: 3, cost: 1 }, "2/3 herbs", false],
     ["botanist.antidote", { kind: "pool", balance: 1, max: 3, cost: 2 }, "1/3 herbs", true],
     ["medic", { kind: "supplies", cost: 1 }, "1 supply", false],

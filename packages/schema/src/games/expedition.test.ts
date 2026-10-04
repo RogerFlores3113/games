@@ -6,7 +6,7 @@ import {
   ExpeditionViewSchema,
 } from "./expedition";
 
-// The 25 RunError names: CampError's 7 members, then RunError's 18
+// The 29 RunError names: CampError's 7 members, then RunError's 22
 // additional members.
 const EXPEDITION_ERROR_CODES = [
   "not_your_turn",
@@ -22,8 +22,12 @@ const EXPEDITION_ERROR_CODES = [
   "not_a_choice",
   "unknown_character",
   "character_taken",
-  "no_draft_pending",
-  "not_offered",
+  "not_owned_item",
+  "too_many_items",
+  "sold_out",
+  "supplies_full",
+  "upgrade_owned",
+  "not_your_upgrade",
   "already_ready",
   "not_owned",
   "wrong_window",
@@ -36,7 +40,8 @@ const EXPEDITION_ERROR_CODES = [
   "nothing_to_skip",
 ] as const;
 
-const preview = { index: 2, location: "jungle", weather: "fair", event: "event", slotKinds: ["win-card", "ordered", "ordered"], bossId: null };
+const preview = { index: 2, location: "jungle", weather: "fair", event: "event", slotKinds: ["win-card", "ordered", "ordered"], bossId: null, shop: false };
+const noItems = { equipped: [], backpack: [], concealed: false };
 
 const header = {
   yourSeatId: "seat-1",
@@ -55,36 +60,51 @@ const draftView = {
     {
       seatId: "seat-1",
       characterId: "botanist",
-      kit: [],
+      upgradeId: "botanist.greenhouse",
+      items: noItems,
       pool: { balance: 2, max: 3 },
-      usage: [{ sourceId: "botanist", remaining: { kind: "pool", balance: 2, max: 3, cost: 1 } }],
+      usage: [{ sourceKey: "botanist", remaining: { kind: "pool", balance: 2, max: 3, cost: 1 } }],
     },
     {
       seatId: "seat-2",
       characterId: "scout",
-      kit: ["bait"],
+      upgradeId: null,
+      items: {
+        equipped: [
+          { uid: "it0", itemId: "bait", remaining: { kind: "uses", left: 1, of: 1 } },
+          { uid: "it1", itemId: "heavy-pack", remaining: null },
+        ],
+        backpack: [{ uid: "it2", itemId: "parrot", remaining: { kind: "uses", left: 1, of: 1 } }],
+        concealed: false,
+      },
       pool: null,
       usage: [
-        { sourceId: "scout", remaining: { kind: "uses", left: 1, of: 1 } },
-        { sourceId: "bait", remaining: { kind: "single-use" } },
+        { sourceKey: "scout", remaining: { kind: "uses", left: 1, of: 1 } },
+        { sourceKey: "it0", remaining: { kind: "uses", left: 1, of: 1 } },
       ],
     },
   ],
-  yourAbilities: [{ sourceId: "botanist", usableNow: false, reason: "Usable between tricks", steps: [] }],
+  yourAbilities: [{ sourceKey: "botanist", usableNow: false, reason: "Usable between tricks", steps: [] }],
   history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }],
-  stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: ["botanist.greenhouse", "bait", "parrot"], pendingSeatIds: ["seat-1"] },
+  stage: {
+    tag: "draft",
+    cleared: 1,
+    payout: 8,
+    yourOffer: { bundles: [["bait", "parrot"], ["whetstone", "trail-map"], ["bait", "puffball"]] },
+    pendingSeatIds: ["seat-1"],
+  },
 };
 
 const campSeats = [
-  { seatId: "seat-1", characterId: "guide", kit: [], pool: null, usage: [] },
-  { seatId: "seat-2", characterId: "medic", kit: [], pool: null, usage: [] },
-  { seatId: "seat-3", characterId: "signaller", kit: [], pool: null, usage: [] },
+  { seatId: "seat-1", characterId: "guide", upgradeId: null, items: noItems, pool: null, usage: [] },
+  { seatId: "seat-2", characterId: "medic", upgradeId: null, items: noItems, pool: null, usage: [] },
+  { seatId: "seat-3", characterId: "signaller", upgradeId: null, items: noItems, pool: null, usage: [] },
 ];
 
 const midCampFields = {
   yourAbilities: [
     {
-      sourceId: "guide",
+      sourceKey: "guide",
       usableNow: true,
       reason: null,
       steps: [{ kind: "player", prompt: "Pick a player", choices: ["seat:seat-1", "seat:seat-2", "seat:seat-3"] }],
@@ -188,7 +208,23 @@ describe("ExpeditionViewSchema", () => {
   });
 
   it.each([
-    ["loadout", { tag: "loadout", camp: preview, readySeatIds: ["seat-2"] }],
+    ["loadout", { tag: "loadout", camp: preview, yourSlots: 2, shop: null, readySeatIds: ["seat-2"] }],
+    [
+      "loadout with the shop",
+      {
+        tag: "loadout",
+        camp: { ...preview, index: 3, shop: true },
+        yourSlots: 2,
+        shop: {
+          stock: [
+            { stockId: "supplies", what: { kind: "supplies" }, price: 6, soldTo: null },
+            { stockId: "item0", what: { kind: "item", itemId: "bait" }, price: 2, soldTo: "seat-2" },
+          ],
+          yourUpgrades: [{ stockId: "upgrade:guide.pathfinder", upgradeId: "guide.pathfinder", price: 8 }],
+        },
+        readySeatIds: [],
+      },
+    ],
     ["route", { tag: "route", options: [{ id: "a", next: preview }, { id: "b", next: { ...preview, slotKinds: ["win-card", "trick-count"] } }], ballots: [{ seatId: "seat-1", choice: "b" }] }],
     ["event", { tag: "event", event: "event", next: preview, readySeatIds: [] }],
     ["ended", { tag: "ended", result: "won" }],
@@ -259,18 +295,24 @@ describe("ExpeditionViewSchema", () => {
         },
       },
     ],
+    ["top-level itemSerial", { ...draftView, itemSerial: 3 }],
     [
-      "seats entry carrying draftOffer",
+      "a remaining of the removed single-use kind",
+      { ...draftView, seats: [{ ...draftView.seats[1], usage: [{ sourceKey: "it0", remaining: { kind: "single-use" } }] }] },
+    ],
+    ["a bare list as the draft offer", { ...draftView, stage: { ...draftView.stage, yourOffer: ["bait", "parrot"] } }],
+    [
+      "seats entry carrying offers",
       {
         ...draftView,
-        seats: [{ ...draftView.seats[0], draftOffer: ["bait"] }],
+        seats: [{ ...draftView.seats[0], offers: [] }],
       },
     ],
     ["seats entry carrying ledger", { ...draftView, seats: [{ ...draftView.seats[0], ledger: [] }] }],
     ["yourGear from the gear era", { ...draftView, yourGear: [] }],
     [
       "ability step of an unknown kind",
-      { ...draftView, yourAbilities: [{ sourceId: "x", usableNow: true, reason: null, steps: [{ kind: "teammate", prompt: "p", choices: [] }] }] },
+      { ...draftView, yourAbilities: [{ sourceKey: "x", usableNow: true, reason: null, steps: [{ kind: "teammate", prompt: "p", choices: [] }] }] },
     ],
     [
       "joker identity carrying suit",
@@ -380,8 +422,8 @@ describe("ExpeditionErrorCodeSchema", () => {
     expect(ExpeditionErrorCodeSchema.safeParse(code).success).toBe(false);
   });
 
-  it("has exactly 25 members", () => {
-    expect(ExpeditionErrorCodeSchema.options.length).toBe(25);
+  it("has exactly 29 members", () => {
+    expect(ExpeditionErrorCodeSchema.options.length).toBe(29);
   });
 });
 

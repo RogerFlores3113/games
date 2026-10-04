@@ -14,7 +14,7 @@ import { attemptOf, withAttempt } from "../run/attempt";
 import { createRun } from "../run/lifecycle";
 import { campIndex } from "../run/plan";
 import { applyRunAction } from "../run/stages/registry";
-import { ability, defineItem } from "../content/source-def";
+import { defineItem, itemAbility } from "../content/source-def";
 import { advanceTo, enumerateLegalRunActions, setupRun, testCatalog } from "../run/run-test-support";
 import { CATALOG } from "../run/catalog";
 import type { RunState } from "../run/types";
@@ -39,43 +39,63 @@ describe("toExpeditionPlayerView", () => {
     expect(view.stage).toEqual({ tag: "muster", ballots: [] });
     expect(view.runStatus).toBe("in_progress");
     expect([view.length, view.campCount, view.plan, view.lastVote]).toEqual([null, null, [], null]);
-    expect(view.seats).toEqual(SEATS.map((seatId) => ({ seatId, characterId: null, kit: [], pool: null, usage: [] })));
+    expect(view.seats).toEqual(
+      SEATS.map((seatId) => ({ seatId, characterId: null, upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] })),
+    );
     expect(view.yourAbilities).toEqual([]);
     expect(JSON.stringify(view).includes(seed)).toBe(false);
   });
 
-  it("draft: own offer only, pendingSeatIds names the seats still to pick, seed absent from JSON", () => {
+  it("draft: the viewer's head offer only, pendingSeatIds names the seats still to pick, seed absent from JSON", () => {
     const seed = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const base = setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG, camp: 2, characters: { p0: "scout" } });
-    const offer = draftOfferFor(seed, 2, base.seats[0]!, CATALOG)!;
+    const offer = draftOfferFor(seed, campIndex(2), base.seats[0]!, 0, CATALOG);
+    const queued = draftOfferFor(seed, campIndex(2), base.seats[0]!, 1, CATALOG);
     const run: RunState = {
       ...base,
-      seats: base.seats.map((s) => (s.seatId === "p0" ? { ...s, draftOffer: offer } : s)),
+      seats: base.seats.map((s) => (s.seatId === "p0" ? { ...s, offers: [offer, queued] } : s)),
       stage: { tag: "draft", cleared: campIndex(2), payout: 6 },
     };
 
     const own = toExpeditionPlayerView(run, "p0", CATALOG);
     const other = toExpeditionPlayerView(run, "p1", CATALOG);
 
-    expect(own.stage).toEqual({ tag: "draft", cleared: 2, payout: 6, yourOffer: [...offer], pendingSeatIds: ["p0"] });
-    expect(offer).toHaveLength(3);
-    expect(["scout.keen-eye", "scout.eavesdrop"]).toContain(offer[0]);
+    expect(own.stage).toEqual({ tag: "draft", cleared: 2, payout: 6, yourOffer: { bundles: offer.bundles.map((b) => [...b]) }, pendingSeatIds: ["p0"] });
     expect(other.stage).toEqual({ tag: "draft", cleared: 2, payout: 6, yourOffer: null, pendingSeatIds: ["p0"] });
     expect(JSON.stringify(own).includes(seed)).toBe(false);
-    for (const seat of other.seats) expect(Object.keys(seat).sort()).toEqual(["characterId", "kit", "pool", "seatId", "usage"]);
+    expect(JSON.stringify(own).includes(JSON.stringify(queued.bundles))).toBe(false);
+    for (const seat of other.seats) expect(Object.keys(seat).sort()).toEqual(["characterId", "items", "pool", "seatId", "upgradeId", "usage"]);
   });
 
-  it("loadout: previews the camp and lists the seats that readied", () => {
-    const run = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3 });
+  it("loadout: previews the camp, lists the seats that readied, and closes the shop before a plain camp", () => {
+    const run = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 2 });
     const readied = applyRunAction(run, "p1", { type: "ready" }, CATALOG);
     if (!readied.ok) throw new Error(readied.error);
 
     const view = toExpeditionPlayerView(readied.state, "p0", CATALOG);
 
-    expect(view.stage.tag === "loadout" && view.stage.readySeatIds).toEqual(["p1"]);
-    expect(view.stage.tag === "loadout" && view.stage.camp.index).toBe(3);
+    expect(view.stage).toMatchObject({ tag: "loadout", yourSlots: 2, shop: null, readySeatIds: ["p1"], camp: { index: 2, shop: false } });
     expect([view.length, view.campCount, view.purse, view.supplies]).toEqual(["standard", 6, 0, { count: 3, max: 4 }]);
     expect(view.plan).toEqual([{ at: 3, tier: "animal", bossId: null }, { at: 6, tier: "temple", bossId: null }]);
+  });
+
+  it("loadout before a boss camp: the shared stock, and only the viewer's own character's upgrades while it has none", () => {
+    const run = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3, characters: { p0: "scout", p1: "guide" }, upgrades: { p1: "guide.pathfinder" } });
+    const stock = run.stage.tag === "loadout" ? run.stage.stock! : [];
+    const own = toExpeditionPlayerView(run, "p0", CATALOG);
+
+    expect(own.stage).toMatchObject({ tag: "loadout", camp: { index: 3, shop: true } });
+    expect(own.stage.tag === "loadout" && own.stage.shop).toEqual({
+      stock: stock.map((e) => ({ stockId: e.stockId, what: e.what, price: e.price, soldTo: null })),
+      yourUpgrades: [
+        { stockId: "upgrade:scout.keen-eye", upgradeId: "scout.keen-eye", price: 8 },
+        { stockId: "upgrade:scout.eavesdrop", upgradeId: "scout.eavesdrop", price: 8 },
+      ],
+    });
+    expect(stock.map((e) => e.stockId)).toEqual(["supplies", "item0", "item1", "item2"]);
+    const upgraded = toExpeditionPlayerView(run, "p1", CATALOG);
+    expect(upgraded.stage.tag === "loadout" && upgraded.stage.shop!.yourUpgrades).toEqual([]);
+    expect(toExpeditionPlayerView(run, "spectator", CATALOG).stage).toMatchObject({ yourSlots: 0, shop: { yourUpgrades: [] } });
   });
 
   it("muster votes: every seat's ballot is public, and the resolved length vote is reported with its tally", () => {
@@ -120,13 +140,14 @@ describe("toExpeditionPlayerView", () => {
     expect([view.runStatus, view.stage, view.supplies]).toEqual(["lost", { tag: "ended", result: "lost" }, { count: 0, max: 4 }]);
   });
 
-  it("seats[] carry each seat's public character, kit, pool and usage", () => {
+  it("seats[] carry each seat's public character, upgrade, equipped and backpack items, pool and usage by key", () => {
     const run = setupRun({
       seatIds: [...SEATS],
       seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       catalog: CATALOG,
       characters: { p0: "botanist", p1: "scout", p2: "signaller" },
-      kits: { p0: ["botanist.greenhouse", "rain-poncho"] },
+      upgrades: { p0: "botanist.greenhouse" },
+      items: { p0: ["rain-poncho", "heavy-pack", "parrot"] },
     });
 
     const seats = toExpeditionPlayerView(run, "p1", CATALOG).seats;
@@ -134,14 +155,22 @@ describe("toExpeditionPlayerView", () => {
     expect(seats[0]).toEqual({
       seatId: "p0",
       characterId: "botanist",
-      kit: ["botanist.greenhouse", "rain-poncho"],
+      upgradeId: "botanist.greenhouse",
+      items: {
+        equipped: [
+          { uid: "it0", itemId: "rain-poncho", remaining: { kind: "uses", left: 2, of: 2 } },
+          { uid: "it1", itemId: "heavy-pack", remaining: null },
+        ],
+        backpack: [{ uid: "it2", itemId: "parrot", remaining: { kind: "uses", left: 1, of: 1 } }],
+        concealed: false,
+      },
       pool: { balance: 2, max: 3 },
       usage: [
-        { sourceId: "botanist", remaining: { kind: "pool", balance: 2, max: 3, cost: 1 } },
-        { sourceId: "rain-poncho", remaining: { kind: "uses", left: 2, of: 2 } },
+        { sourceKey: "botanist", remaining: { kind: "pool", balance: 2, max: 3, cost: 1 } },
+        { sourceKey: "it0", remaining: { kind: "uses", left: 2, of: 2 } },
       ],
     });
-    expect(seats[1]).toMatchObject({ characterId: "scout", kit: [], pool: null, usage: [{ sourceId: "scout", remaining: { kind: "uses", left: 1, of: 1 } }] });
+    expect(seats[1]).toMatchObject({ characterId: "scout", upgradeId: null, pool: null, usage: [{ sourceKey: "scout", remaining: { kind: "uses", left: 1, of: 1 } }] });
     expect(seats[2]).toMatchObject({ characterId: "signaller", pool: null, usage: [] });
   });
 
@@ -295,8 +324,8 @@ describe("toExpeditionPlayerView", () => {
 
   it("yourWhisper: a Rain Poncho gives only its owner one more whisper this camp", () => {
     const seed = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    const run = advanceTo(setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG, camp: 3, kits: { p0: ["rain-poncho"] } }), "between-tricks", CATALOG);
-    const used = applyRunAction(run, "p0", { type: "use-ability", sourceId: "rain-poncho", targets: [] }, CATALOG);
+    const run = advanceTo(setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG, camp: 3, items: { p0: ["rain-poncho"] } }), "between-tricks", CATALOG);
+    const used = applyRunAction(run, "p0", { type: "use-ability", sourceKey: "it0", targets: [] }, CATALOG);
     if (!used.ok) throw new Error(used.error);
     expect(attemptViewOf(toExpeditionPlayerView(used.state, "p0", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 2 });
     expect(attemptViewOf(toExpeditionPlayerView(used.state, "p1", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 1 });
@@ -323,22 +352,22 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
 
   it("yourAbilities: a usable ability lists its steps' choices, an unusable one a reason and no steps", () => {
     const run = advanceTo(
-      setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG, characters: { p0: "scout", p1: "signaller" }, kits: { p0: ["rope-ladder"] } }),
+      setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG, characters: { p0: "scout", p1: "signaller" }, items: { p0: ["rope-ladder"] } }),
       "between-tricks",
       CATALOG,
     );
 
     const abilities = toExpeditionPlayerView(run, "p0", CATALOG).yourAbilities;
 
-    expect(abilities.map((a) => a.sourceId)).toEqual(["scout", "rope-ladder"]);
+    expect(abilities.map((a) => a.sourceKey)).toEqual(["scout", "it0"]);
     const [scout, ladder] = abilities;
     expect(scout).toEqual({
-      sourceId: "scout",
+      sourceKey: "scout",
       usableNow: true,
       reason: null,
       steps: [{ kind: "hand", prompt: "Pick a teammate's hand", choices: ["hand:p1", "hand:p2"] }],
     });
-    expect(ladder).toEqual({ sourceId: "rope-ladder", usableNow: false, reason: "Usable when an objective fails", steps: [] });
+    expect(ladder).toEqual({ sourceKey: "it0", usableNow: false, reason: "Usable when an objective fails", steps: [] });
     expect(toExpeditionPlayerView(run, "p1", CATALOG).yourAbilities).toEqual([]);
   });
 
@@ -348,24 +377,24 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
       "between-tricks",
       CATALOG,
     );
-    const used = applyRunAction(start, "p0", { type: "use-ability", sourceId: "scout", targets: ["hand:p1"] }, CATALOG);
+    const used = applyRunAction(start, "p0", { type: "use-ability", sourceKey: "scout", targets: ["hand:p1"] }, CATALOG);
     if (!used.ok) throw new Error(used.error);
 
     const view = toExpeditionPlayerView(used.state, "p0", CATALOG);
 
-    expect(view.yourAbilities).toEqual([{ sourceId: "scout", usableNow: false, reason: "Already used", steps: [] }]);
-    expect(view.seats[0]!.usage).toEqual([{ sourceId: "scout", remaining: { kind: "uses", left: 0, of: 1 } }]);
+    expect(view.yourAbilities).toEqual([{ sourceKey: "scout", usableNow: false, reason: "Already used", steps: [] }]);
+    expect(view.seats[0]!.usage).toEqual([{ sourceKey: "scout", remaining: { kind: "uses", left: 0, of: 1 } }]);
     expect(attemptViewOf(view).reveals.map((r) => r.source)).toEqual(["scout"]);
   });
 
   it("effect params: shown to the owner of an owner-audience effect, null for everyone else; public params shown to all", () => {
     const start = advanceTo(
-      setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG, kits: { p0: ["whetstone"], p1: ["rain-poncho"] } }),
+      setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG, items: { p0: ["whetstone"], p1: ["rain-poncho"] } }),
       "between-tricks",
       CATALOG,
     );
-    const step = toExpeditionPlayerView(start, "p0", CATALOG).yourAbilities.find((a) => a.sourceId === "whetstone")!.steps[0]!;
-    const used = applyRunAction(start, "p0", { type: "use-ability", sourceId: "whetstone", targets: [step.choices[0]!] }, CATALOG);
+    const step = toExpeditionPlayerView(start, "p0", CATALOG).yourAbilities.find((a) => a.sourceKey === "it0")!.steps[0]!;
+    const used = applyRunAction(start, "p0", { type: "use-ability", sourceKey: "it0", targets: [step.choices[0]!] }, CATALOG);
     if (!used.ok) throw new Error(used.error);
 
     const ownerEffect = attemptViewOf(toExpeditionPlayerView(used.state, "p0", CATALOG)).effects[0]!;
@@ -382,10 +411,12 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
         flag: defineItem({
           id: "flag",
           name: "Flag",
+          rarity: "common",
+          price: 2,
+          uses: { kind: "per-camp" },
           text: "Nothing happens.",
-          active: ability({
+          active: itemAbility({
             window: "between-tricks",
-            limit: { kind: "per-camp", times: 1 },
             targets: [],
             apply: () => [{ op: "add-modifier", lasts: "attempt", params: { colour: "red", n: 2 }, audience: "public" }],
             effect: () => ({}),
@@ -394,9 +425,9 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
       },
     });
     const flagged = applyRunAction(
-      advanceTo(setupRun({ seatIds: [...SEATS], seed: SEED, catalog: publicCatalog, kits: { p0: ["flag"] } }), "between-tricks", publicCatalog),
+      advanceTo(setupRun({ seatIds: [...SEATS], seed: SEED, catalog: publicCatalog, items: { p0: ["flag"] } }), "between-tricks", publicCatalog),
       "p0",
-      { type: "use-ability", sourceId: "flag", targets: [] },
+      { type: "use-ability", sourceKey: "it0", targets: [] },
       publicCatalog,
     );
     if (!flagged.ok) throw new Error(flagged.error);
@@ -405,15 +436,15 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
 
   it("effectiveRank is set only on the card whose rank the composed rankOf changed", () => {
     const start = advanceTo(
-      setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG, kits: { p0: ["whetstone"] } }),
+      setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG, items: { p0: ["whetstone"] } }),
       "between-tricks",
       CATALOG,
     );
     const before = attemptViewOf(toExpeditionPlayerView(start, "p0", CATALOG)).camp.yourHand;
     expect(before.every((card) => card.effectiveRank === null)).toBe(true);
 
-    const step = toExpeditionPlayerView(start, "p0", CATALOG).yourAbilities.find((a) => a.sourceId === "whetstone")!.steps[0]!;
-    const used = applyRunAction(start, "p0", { type: "use-ability", sourceId: "whetstone", targets: [step.choices[0]!] }, CATALOG);
+    const step = toExpeditionPlayerView(start, "p0", CATALOG).yourAbilities.find((a) => a.sourceKey === "it0")!.steps[0]!;
+    const used = applyRunAction(start, "p0", { type: "use-ability", sourceKey: "it0", targets: [step.choices[0]!] }, CATALOG);
     if (!used.ok) throw new Error(used.error);
 
     const view = toExpeditionPlayerView(used.state, "p0", CATALOG);
@@ -431,10 +462,12 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
         boost: defineItem({
           id: "boost",
           name: "Boost",
+          rarity: "common",
+          price: 2,
+          uses: { kind: "per-camp" },
           text: "Nothing happens.",
-          active: ability({
+          active: itemAbility({
             window: "between-tricks",
-            limit: { kind: "per-camp", times: 1 },
             targets: [],
             apply: () => [{ op: "add-modifier", lasts: "attempt", params: {}, audience: "public" }],
             effect: () => ({ rankOf: (prev) => (card) => (card.identity.kind === "standard" ? prev(card) + 1 : prev(card)) }),
@@ -442,8 +475,8 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
         }),
       },
     });
-    const start = advanceTo(setupRun({ seatIds: [...SEATS], seed: SEED, catalog: boostCatalog, kits: { p0: ["boost"] } }), "between-tricks", boostCatalog);
-    const used = applyRunAction(start, "p0", { type: "use-ability", sourceId: "boost", targets: [] }, boostCatalog);
+    const start = advanceTo(setupRun({ seatIds: [...SEATS], seed: SEED, catalog: boostCatalog, items: { p0: ["boost"] } }), "between-tricks", boostCatalog);
+    const used = applyRunAction(start, "p0", { type: "use-ability", sourceKey: "it0", targets: [] }, boostCatalog);
     if (!used.ok) throw new Error(used.error);
     const camp = attemptOf(used.state)!.camp;
     const rules = rulesFor(used.state, boostCatalog);
@@ -491,7 +524,7 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
     for (const id of rescue.failedObjectiveIds) {
       expect(attemptViewOf(view).camp.objectives.find((o) => o.id === id)!.status).toBe("failed");
     }
-    expect(view.yourAbilities.find((a) => a.sourceId === "medic")!.usableNow).toBe(true);
+    expect(view.yourAbilities.find((a) => a.sourceKey === "medic")!.usableNow).toBe(true);
 
     const between = advanceTo(setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG }), "between-tricks", CATALOG);
     expect(attemptViewOf(toExpeditionPlayerView(between, "p0", CATALOG)).rescue).toBeNull();

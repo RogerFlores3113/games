@@ -38,14 +38,17 @@ export interface ExpeditionSeatSecrets {
   /** Raw strings that must never appear in the serialized view (the server
    * seed). */
   readonly forbiddenTokens: readonly string[];
-  /** This seat's own draft offer (null if unseated or none due). */
-  readonly ownDraftOffer: readonly string[] | null;
+  /** This seat's own head draft offer (null if unseated or none due). */
+  readonly ownDraft: { readonly bundles: readonly (readonly string[])[] } | null;
+  /** Other seats' offers' bundle lists, as JSON, that this view must never
+   * carry (an equal copy of the viewer's own is not counted). */
+  readonly foreignOffers: readonly string[];
   /** The number of attempt log entries this seat may legitimately see. */
   readonly visibleLogEntryCount: number;
 }
 
 /** Keys a view object literal must never carry, at ANY nesting level. */
-export const FORBIDDEN_VIEW_KEYS = ["seed", "objectiveDeck", "draftOffer", "hands", "audience", "ledger"] as const;
+export const FORBIDDEN_VIEW_KEYS = ["seed", "objectiveDeck", "offers", "itemSerial", "hands", "audience", "ledger"] as const;
 
 function identityKey(identity: CardIdentity): string {
   return identity.kind === "joker" ? `joker:${identity.joker}` : `standard:${identity.suit}:${identity.rank}`;
@@ -159,8 +162,13 @@ export function secretsForExpeditionSeat(
   }
 
   const forbiddenTokens = seed !== undefined ? [seed] : [];
-  const ownDraftOffer: readonly string[] | null =
-    seated && ownSeat !== undefined && ownSeat.draftOffer !== null ? ownSeat.draftOffer : null;
+  const ownHead = seated ? ownSeat?.offers[0] : undefined;
+  const ownDraft = ownHead === undefined ? null : { bundles: ownHead.bundles };
+  const ownJson = ownDraft === null ? null : JSON.stringify(ownDraft.bundles);
+  const foreignOffers = state.seats
+    .filter((seat) => !seated || seat.seatId !== seatId)
+    .flatMap((seat) => seat.offers.map((offer) => JSON.stringify(offer.bundles)))
+    .filter((json) => json !== ownJson);
 
   const visibleLogEntryCount =
     attempt === null
@@ -169,17 +177,19 @@ export function secretsForExpeditionSeat(
           (entry) => entry.audience === "public" || (seated && entry.audience.includes(seatId)),
         ).length;
 
-  return { hiddenIds, allowedIdentityCounts: counts, forbiddenTokens, ownDraftOffer, visibleLogEntryCount };
+  return { hiddenIds, allowedIdentityCounts: counts, forbiddenTokens, ownDraft, foreignOffers, visibleLogEntryCount };
 }
 
 /** Recursively walks `subtree`, collecting structural leak reasons: any
- * object key in FORBIDDEN_VIEW_KEYS, and any string LEAF value, or any of
- * its ":"-separated segments (target choice ids such as `card:<id>`),
- * exactly equal to a hiddenIds entry. Uses Object.keys/the `in` operator
- * (key presence), never a truthiness/undefined comparison. */
-function walkStructural(subtree: unknown, hiddenIds: ReadonlySet<string>, reasons: Set<string>): void {
+ * object key in FORBIDDEN_VIEW_KEYS, any string LEAF value, or any of its
+ * ":"-separated segments (target choice ids such as `card:<id>`), exactly
+ * equal to a hiddenIds entry, and any array equal to another seat's offer's
+ * bundles. Uses Object.keys/the `in` operator (key presence), never a
+ * truthiness/undefined comparison. */
+function walkStructural(subtree: unknown, hiddenIds: ReadonlySet<string>, foreignOffers: ReadonlySet<string>, reasons: Set<string>): void {
   if (Array.isArray(subtree)) {
-    for (const item of subtree) walkStructural(item, hiddenIds, reasons);
+    if (foreignOffers.size > 0 && foreignOffers.has(JSON.stringify(subtree))) reasons.add("structural:foreign-offer");
+    for (const item of subtree) walkStructural(item, hiddenIds, foreignOffers, reasons);
     return;
   }
   if (typeof subtree === "string") {
@@ -198,7 +208,7 @@ function walkStructural(subtree: unknown, hiddenIds: ReadonlySet<string>, reason
   }
 
   for (const value of Object.values(obj)) {
-    walkStructural(value, hiddenIds, reasons);
+    walkStructural(value, hiddenIds, foreignOffers, reasons);
   }
 }
 
@@ -226,7 +236,8 @@ function collectIdentityCounts(subtree: unknown, counts: Map<string, number>): v
 
 /** Checks a projected Expedition view for leaks of `secrets`: structurally
  * (forbidden-key presence, hidden-id leaf equality), by typed multiset (an
- * excess identity count), by draft-offer/log-entry-count mismatch, and via a
+ * excess identity count), by draft-offer/log-entry-count mismatch, by another
+ * seat's offer anywhere in the view, and via a
  * raw substring scan of `serialized` for forbidden tokens (the seed).
  * Returns an empty array when clean. Reasons are deduplicated, in
  * first-seen order. */
@@ -237,7 +248,7 @@ export function checkExpeditionViewForLeaks(input: {
 }): string[] {
   const reasons = new Set<string>();
   const hiddenIds = new Set(input.secrets.hiddenIds);
-  walkStructural(input.view, hiddenIds, reasons);
+  walkStructural(input.view, hiddenIds, new Set(input.secrets.foreignOffers), reasons);
 
   const counts = new Map<string, number>();
   collectIdentityCounts(input.view, counts);
@@ -251,7 +262,7 @@ export function checkExpeditionViewForLeaks(input: {
   const stage = input.view !== null && typeof input.view === "object" ? (input.view as Record<string, unknown>).stage : undefined;
   if (stage !== null && typeof stage === "object" && "yourOffer" in stage) {
     const viewDraftOffer = (stage as Record<string, unknown>).yourOffer;
-    if (JSON.stringify(viewDraftOffer) !== JSON.stringify(input.secrets.ownDraftOffer)) {
+    if (JSON.stringify(viewDraftOffer) !== JSON.stringify(input.secrets.ownDraft)) {
       reasons.add("structural:draft-offer-mismatch");
     }
   }

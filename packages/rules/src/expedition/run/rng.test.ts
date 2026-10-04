@@ -17,6 +17,7 @@ describe("STREAMS distinctness (A1)", () => {
     const draws = [0, 1, 2];
     const options = [0, 1, 2];
     const fields = ["event", "mix"] as const;
+    const parts = ["rarity", "pick"] as const;
 
     for (const camp of camps) {
       names.push(STREAMS.routeVote(camp), STREAMS.routeCount(camp));
@@ -26,8 +27,16 @@ describe("STREAMS distinctness (A1)", () => {
         }
       }
       for (const seat of seats) {
-        names.push(STREAMS.draftUpgrade(camp, seat));
-        names.push(STREAMS.draftItems(camp, seat));
+        for (const offer of [0, 1]) {
+          for (const bundle of options) {
+            for (const item of [0, 1]) {
+              for (const part of parts) names.push(STREAMS.draftItem(camp, seat, offer, bundle, item, part));
+            }
+          }
+        }
+      }
+      for (const item of options) {
+        for (const part of parts) names.push(STREAMS.shopItem(camp, item, part));
       }
       for (const attempt of attempts) {
         names.push(STREAMS.trickCountKind(camp, attempt));
@@ -52,8 +61,8 @@ describe("STREAMS names", () => {
     expect(STREAMS.routeVote(4)).toBe("expedition-vote:route:camp4");
     expect(STREAMS.routeCount(4)).toBe("expedition-route:camp4:count");
     expect(STREAMS.routeField(4, 0, 2, "mix")).toBe("expedition-route:camp4:reroll0:option2:mix");
-    expect(STREAMS.draftUpgrade(2, "p1")).toBe("expedition-draft:camp2:seatp1:upgrade");
-    expect(STREAMS.draftItems(2, "p1")).toBe("expedition-draft:camp2:seatp1:items");
+    expect(STREAMS.draftItem(2, "p1", 0, 2, 1, "rarity")).toBe("expedition-draft:camp2:seatp1:offer0:bundle2:item1:rarity");
+    expect(STREAMS.shopItem(3, 1, "pick")).toBe("expedition-shop:camp3:item1:pick");
     expect(STREAMS.ability(3, 2, "p0", 1, 0)).toBe("expedition-ability:camp3:attempt2:seatp0:use1:draw0");
   });
 });

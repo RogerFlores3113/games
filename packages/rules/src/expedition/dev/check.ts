@@ -4,8 +4,9 @@
 import { buildFullDeck, cardLabel } from "../deck";
 import { SUPPLIES_MAX } from "../run/balance";
 import { attemptOf } from "../run/attempt";
+import { rulesFor } from "../run/compose";
 import { campCount } from "../run/plan";
-import type { Catalog, RunState } from "../run/types";
+import type { Catalog, RunState, SeatRun } from "../run/types";
 
 function duplicates(values: readonly string[]): string[] {
   return [...new Set(values.filter((v, i) => values.indexOf(v) !== i))];
@@ -28,16 +29,41 @@ function checkCrew(run: RunState, catalog: Catalog, problems: string[]): void {
     if (seat.characterId !== null && !Object.hasOwn(catalog.characters, seat.characterId)) {
       problems.push(`${seat.seatId}: unknown character ${seat.characterId}`);
     }
-    for (const id of seat.kit) {
-      if (!Object.hasOwn(catalog.sources, id)) problems.push(`${seat.seatId}: kit holds unknown source ${id}`);
-      else if (Object.hasOwn(catalog.characters, id)) problems.push(`${seat.seatId}: kit holds character ${id}`);
+    checkItems(run, seat, catalog, problems);
+    if (seat.upgradeId !== null) {
+      const upgrades = seat.characterId === null ? [] : (catalog.characters[seat.characterId]?.upgrades ?? []).map((u) => u.id);
+      if (!upgrades.includes(seat.upgradeId)) problems.push(`${seat.seatId}: upgrade ${seat.upgradeId} is not one of its character's`);
     }
-    for (const id of seat.draftOffer ?? []) {
-      if (!Object.hasOwn(catalog.sources, id)) problems.push(`${seat.seatId}: draft offer holds unknown source ${id}`);
+    for (const offer of seat.offers) {
+      for (const id of offer.bundles.flat()) {
+        if (!Object.hasOwn(catalog.items, id)) problems.push(`${seat.seatId}: draft offer holds unknown item ${id}`);
+      }
     }
   }
   const characterIds = seats.flatMap((seat) => (seat.characterId === null ? [] : [seat.characterId]));
   for (const id of duplicates(characterIds)) problems.push(`character ${id} is held by more than one seat`);
+  for (const uid of duplicates(seats.flatMap((seat) => seat.items.map((item) => item.uid)))) problems.push(`item uid ${uid} is owned more than once`);
+  // The slots come from the composed rules, which only a crew of known ids can compose.
+  if (problems.length > 0) return;
+  const rules = rulesFor(run, catalog);
+  for (const seat of seats) {
+    const slots = rules.itemSlots(run, seat.seatId);
+    if (seat.equipped.length > slots) problems.push(`${seat.seatId}: ${seat.equipped.length} items equipped, ${slots} slots`);
+  }
+}
+
+/** Instances are it<n> with n below itemSerial and a known item; the
+ * equipped set is owned and distinct. */
+function checkItems(run: RunState, seat: SeatRun, catalog: Catalog, problems: string[]): void {
+  for (const item of seat.items) {
+    const serial = /^it(\d+)$/.exec(item.uid);
+    if (serial === null || Number(serial[1]) >= run.itemSerial) problems.push(`${seat.seatId}: item uid ${item.uid} is not it<n> below itemSerial ${run.itemSerial}`);
+    if (!Object.hasOwn(catalog.items, item.itemId)) problems.push(`${seat.seatId}: item ${item.uid} is unknown item ${item.itemId}`);
+  }
+  for (const uid of duplicates(seat.equipped)) problems.push(`${seat.seatId}: ${uid} is equipped twice`);
+  for (const uid of seat.equipped) {
+    if (!seat.items.some((item) => item.uid === uid)) problems.push(`${seat.seatId}: equipped ${uid} is not owned`);
+  }
 }
 
 function checkPerSeat(run: RunState, what: string, keys: readonly string[], problems: string[]): void {
@@ -52,6 +78,7 @@ function checkSpecIndex(run: RunState, what: string, index: number, problems: st
 function checkRunFields(run: RunState, problems: string[]): void {
   if (!Number.isInteger(run.supplies) || run.supplies < 0 || run.supplies > SUPPLIES_MAX) problems.push(`supplies must be a whole number from 0 to ${SUPPLIES_MAX}, got ${run.supplies}`);
   if (!Number.isInteger(run.purse) || run.purse < 0) problems.push(`the purse must be a non-negative whole number, got ${run.purse}`);
+  if (!Number.isInteger(run.itemSerial) || run.itemSerial < 0) problems.push(`itemSerial must be a non-negative whole number, got ${run.itemSerial}`);
   const stage = run.stage;
   if ((run.plan === null) !== (stage.tag === "muster")) problems.push(stage.tag === "muster" ? "a run in muster has no plan yet" : `a run at ${stage.tag} needs a plan`);
   if (run.plan !== null) for (const entry of run.history) checkSpecIndex(run, "a history entry", entry.camp, problems);

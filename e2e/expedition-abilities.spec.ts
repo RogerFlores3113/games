@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { clickHandCard, clickUntilChanged, draftOffer, trailToCamp, waitForScene, type MusterCard, type TrailView } from "./expedition-driver";
 import { getModel, getScene, startExpeditionGame } from "./expedition-helpers";
-import { PICKER_SCENARIOS, rewriteViews, type Game } from "./expedition-scenarios";
+import { PICKER_SCENARIOS, rewriteViews, scenarioKey, type Game } from "./expedition-scenarios";
 
 /**
  * Characters, drafts and abilities through the real canvas: the muster, a
@@ -108,28 +108,33 @@ test.describe("Expedition characters and abilities", () => {
 
       rw.current = (g: Game) => ({
         ...g,
-        stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: ["guide.pathfinder", "bait", "parrot"], pendingSeatIds: [g.yourSeatId] },
+        stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: { bundles: [["whetstone", "parrot"], ["bait", "puffball"], ["parrot"]] }, pendingSeatIds: [g.yourSeatId] },
         history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }],
       });
       await page.reload();
       await waitForScene(page, "trail");
       const offer = draftOffer(await getModel<TrailView>(page))!;
-      expect(offer.map((o) => o.sourceId)).toEqual(["guide.pathfinder", "bait", "parrot"]);
+      expect(offer.map((o) => [o.objectId, o.itemIds])).toEqual([
+        ["bundle:0", ["whetstone", "parrot"]],
+        ["bundle:1", ["bait", "puffball"]],
+        ["bundle:2", ["parrot"]],
+      ]);
       rw.sent.length = 0;
-      await clickUntilChanged(page, "draft:bait", () => rw.sent.length > 0);
-      expect(await sentRequests(rw.sent)).toEqual([{ type: "pick-draft", sourceId: "bait" }]);
+      await clickUntilChanged(page, "bundle:1", () => rw.sent.length > 0);
+      expect(await sentRequests(rw.sent)).toEqual([{ type: "pick-bundle", bundle: 1 }]);
 
       const use = async (kind: string, pick: (m: CampModel) => Promise<string[]>): Promise<void> => {
         const scenario = PICKER_SCENARIOS[kind]!;
+        const sourceKey = scenarioKey(scenario.sourceId);
         rw.current = scenario.rewrite;
         await page.reload();
         await waitForScene(page, "camp");
         let model = await getModel<CampModel>(page);
         if (kind === "failed-objective") {
           expect(model.banner).toMatchObject({ youPending: true });
-          model = await clickUntilChanged<CampModel>(page, `gate-use:${scenario.sourceId}`, (m) => m.targeting !== null);
+          model = await clickUntilChanged<CampModel>(page, `gate-use:${sourceKey}`, (m) => m.targeting !== null);
         } else {
-          model = await clickUntilChanged<CampModel>(page, `source:${scenario.sourceId}`, (m) => m.targeting !== null);
+          model = await clickUntilChanged<CampModel>(page, `source:${sourceKey}`, (m) => m.targeting !== null);
         }
         const targets = await pick(model);
         await expect.poll(async () => (await getModel<CampModel>(page)).targeting?.canConfirm, { message: kind }).toBe(true);
@@ -137,7 +142,7 @@ test.describe("Expedition characters and abilities", () => {
         expect(ask, `${kind} confirm line`).toMatch(/^Use /);
         rw.sent.length = 0;
         await clickUntilChanged(page, "confirm", () => rw.sent.length > 0);
-        expect(await sentRequests(rw.sent), kind).toEqual([{ type: "use-ability", sourceId: scenario.sourceId, targets }]);
+        expect(await sentRequests(rw.sent), kind).toEqual([{ type: "use-ability", sourceKey, targets }]);
       };
       const click = async (objectId: string): Promise<CampModel> => {
         const before = JSON.stringify((await getModel<CampModel>(page)).targeting);

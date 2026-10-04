@@ -1,29 +1,51 @@
-// Draft offers after a cleared camp (RUN-04). An offer is PRIVATE to the
-// offered seat; callers store it on that seat's own SeatRun.draftOffer.
+// Draft offers after a cleared camp. An offer is PRIVATE to its seat and
+// lives on that seat's SeatRun.offers queue; the head is the one to pick.
 //
-// Slot 1 is one of the seat's own character's unowned upgrades, while any
-// remain. The other slots are items not in the seat's kit, so a consumed
-// single-use item can return. Each part draws on its own stream, once per
-// (cleared camp, seat), since a draft only follows a clear.
+// Each item of a bundle rolls its rarity, then picks uniformly over that
+// rarity's sorted ids, so catalogue order never changes a draw. Upgrades are
+// never drafted: they are bought at the shop.
 
-import { shuffleWithSeed } from "../../shuffle";
-import type { SourceId } from "../content/source-def";
-import { STREAMS } from "./rng";
-import type { Catalog, SeatRun } from "./types";
+import type { Rarity } from "../content/source-def";
+import { DRAFT } from "./balance";
+import { STREAMS, seededIndex, type ItemDrawPart } from "./rng";
+import type { CampIndex, Catalog, SeatRun } from "./types";
 
-const DRAFT_OFFER_SIZE = 3;
+export type DraftOffer = { readonly kind: "standard"; readonly bundles: readonly (readonly string[])[] };
 
-/** A private offer of up to DRAFT_OFFER_SIZE sources for `seat` after
- * clearing `clearedCamp`, deterministic for identical arguments. null only
- * when nothing is left to offer. Candidates are sorted before shuffling so
- * catalogue order never changes a draw. */
-export function draftOfferFor(seed: string, clearedCamp: number, seat: SeatRun, catalog: Catalog): readonly SourceId[] | null {
-  const owned = new Set(seat.kit);
-  const character = seat.characterId === null ? undefined : catalog.characters[seat.characterId];
-  const upgrades = (character?.upgrades ?? []).map((upgrade) => upgrade.id).filter((id) => !owned.has(id)).sort();
-  const upgradeSlot = shuffleWithSeed(upgrades, seed, STREAMS.draftUpgrade(clearedCamp, seat.seatId)).slice(0, 1);
-  const items = Object.keys(catalog.items).filter((id) => !owned.has(id)).sort();
-  const itemSlots = shuffleWithSeed(items, seed, STREAMS.draftItems(clearedCamp, seat.seatId)).slice(0, DRAFT_OFFER_SIZE - upgradeSlot.length);
-  const offer = [...upgradeSlot, ...itemSlots];
-  return offer.length === 0 ? null : offer;
+/** Item ids by rarity, sorted, without items exclusive to another character
+ * (with no character, every exclusive item is out). */
+export type ItemPool = Readonly<Record<Rarity, readonly string[]>>;
+
+export function itemPool(catalog: Catalog, characterId: string | null): ItemPool {
+  const open = Object.values(catalog.items).filter((item) => item.exclusiveTo === undefined || item.exclusiveTo === characterId);
+  const ids = (rarity: Rarity): string[] => open.filter((item) => item.rarity === rarity).map((item) => item.id).sort();
+  return { common: ids("common"), rare: ids("rare") };
+}
+
+/** Rolls a rarity (rare at DRAFT.rareChance percent), then picks an item of
+ * it not in `taken`; falls back to the other rarity when that one has none
+ * left. null when the pool has nothing left at all. */
+export function drawItem(seed: string, stream: (part: ItemDrawPart) => string, pool: ItemPool, taken: ReadonlySet<string>): string | null {
+  const rolled: Rarity = seededIndex(seed, stream("rarity"), 100) < DRAFT.rareChance ? "rare" : "common";
+  for (const rarity of [rolled, rolled === "rare" ? "common" : "rare"] as const) {
+    const left = pool[rarity].filter((id) => !taken.has(id));
+    if (left.length > 0) return left[seededIndex(seed, stream("pick"), left.length)]!;
+  }
+  return null;
+}
+
+/** DRAFT.options bundles of up to DRAFT.bundleSize distinct items, seeded
+ * per (cleared camp, seat, ordinal). Bundles may repeat across options and
+ * may hold items the seat already owns. */
+export function draftOfferFor(seed: string, cleared: CampIndex, seat: SeatRun, ordinal: number, catalog: Catalog): DraftOffer {
+  const pool = itemPool(catalog, seat.characterId);
+  const bundles = Array.from({ length: DRAFT.options }, (_, bundle) => {
+    const taken = new Set<string>();
+    for (let item = 0; item < DRAFT.bundleSize; item++) {
+      const id = drawItem(seed, (part) => STREAMS.draftItem(cleared, seat.seatId, ordinal, bundle, item, part), pool, taken);
+      if (id !== null) taken.add(id);
+    }
+    return [...taken];
+  });
+  return { kind: "standard", bundles };
 }

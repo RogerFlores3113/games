@@ -43,10 +43,12 @@ function ownedObjectiveIds(g: Game): Set<string> {
   return new Set(attemptOf(g)?.camp.objectives.filter((o) => o.ownerSeatId !== null).map((o) => o.id) ?? []);
 }
 
-/** Your character and kit: a pick at muster or at a draft changes it. */
+/** Your character, upgrade and items: a pick at muster, a draft or a buy changes it. */
 function ownKit(g: Game): string {
   const you = g.seats.find((s) => s.seatId === g.yourSeatId);
-  return you === undefined ? "" : [you.characterId ?? "", ...you.kit].join(",");
+  if (you === undefined) return "";
+  const items = [...you.items.equipped, ...(you.items.backpack ?? [])].map((item) => item.uid).sort();
+  return [you.characterId ?? "", you.upgradeId ?? "", ...items].join(",");
 }
 
 function newDeal(prev: Game, next: Game): boolean {

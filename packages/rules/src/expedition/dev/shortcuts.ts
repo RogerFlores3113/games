@@ -5,6 +5,7 @@
 import { cardLabel } from "../deck";
 import { RUN_LENGTHS, SUPPLIES_MAX } from "../run/balance";
 import { attemptOf, withAttempt } from "../run/attempt";
+import { mintItems } from "../run/items";
 import { dealCamp, openLoadout, runStatus, settleCamp } from "../run/lifecycle";
 import { rulesFor } from "../run/compose";
 import { campIndex, drawPlan } from "../run/plan";
@@ -39,7 +40,6 @@ function readChoice(params: DevParams, name: string, options: readonly DevOption
 
 const opts = (values: readonly string[]): DevOption[] => values.map((value) => ({ value, label: value }));
 const seatOptions = (run: RunState): DevOption[] => opts(run.seatIds);
-const nonCharacterSourceIds = (catalog: Catalog): string[] => Object.keys(catalog.sources).filter((id) => !Object.hasOwn(catalog.characters, id));
 const LENGTHS = Object.keys(RUN_LENGTHS) as RunLength[];
 const MAX_CAMPS = Math.max(...LENGTHS.map((length) => RUN_LENGTHS[length].camps));
 const lengthOf = (run: RunState): RunLength => run.plan?.length ?? "standard";
@@ -61,14 +61,14 @@ function assignCharacters(run: RunState, catalog: Catalog): RunState {
     if (characterId === undefined) throw new Error("the catalogue has no unclaimed character left");
     return { ...s, characterId };
   });
-  return { ...run, seats: seats.map((s) => ({ ...s, draftOffer: null })) };
+  return { ...run, seats: seats.map((s) => ({ ...s, offers: [] })) };
 }
 
 /** The loadout of camp `k` in a run of `length`. */
 function loadoutAt(run: RunState, length: RunLength, k: number, catalog: Catalog): RunAt<"loadout"> {
   if (k > RUN_LENGTHS[length].camps) throw new Error(`a ${length} run has ${RUN_LENGTHS[length].camps} camps, not ${k}`);
   const crewed: RunState = { ...assignCharacters(run, catalog), plan: drawPlan(length), supplies: Math.max(run.supplies, 1) };
-  return openLoadout({ ...crewed, history: crewed.history.filter((h) => h.camp < k) }, campSpecAt(run.seed, length, campIndex(k)));
+  return openLoadout({ ...crewed, history: crewed.history.filter((h) => h.camp < k) }, campSpecAt(run.seed, length, campIndex(k)), catalog);
 }
 
 function jumpToCamp(run: RunState, length: RunLength, k: number, stage: "loadout" | "camp", catalog: Catalog): RunState {
@@ -86,7 +86,7 @@ function toCamp(run: RunState, catalog: Catalog): RunAt<"camp"> {
     case "loadout":
       return dealCamp(run as RunAt<"loadout">, catalog);
     case "event":
-      return dealCamp(openLoadout(run, stage.route.next), catalog);
+      return dealCamp(openLoadout(run, stage.route.next, catalog), catalog);
     case "muster":
       return dealCamp(loadoutAt(run, lengthOf(run), 1, catalog), catalog);
     case "draft":
@@ -114,6 +114,10 @@ const lengthField = (run: RunState): DevField => ({
   options: opts([lengthOf(run), ...LENGTHS.filter((length) => length !== lengthOf(run))]),
 });
 const seatField = (run: RunState): DevField => ({ name: "seat", label: "Seat", kind: "choice", options: seatOptions(run) });
+const upgradeOptions = (catalog: Catalog): DevOption[] => [
+  { value: "none", label: "none" },
+  ...Object.values(catalog.characters).flatMap((character) => character.upgrades.map((u) => ({ value: u.id, label: `${u.name} (${character.id})` }))),
+];
 const STAGE_OPTIONS = opts(["camp", "loadout"]);
 
 export const DEV_SHORTCUTS = {
@@ -184,30 +188,28 @@ export const DEV_SHORTCUTS = {
       return withSeat(run, seatId, { characterId: character });
     },
   },
-  "set-kit": {
-    label: "Set a seat's kit",
+  "give-item": {
+    label: "Give a seat an item",
     group: "Crew",
-    fields: (run) => [seatField(run), { name: "kit", label: "Source ids, comma separated", kind: "text", initial: "" }],
+    fields: (run, catalog) => [seatField(run), { name: "item", label: "Item", kind: "choice", options: opts(Object.keys(catalog.items)) }],
     apply: (run, params, catalog) => {
       const seatId = readChoice(params, "seat", seatOptions(run));
-      const raw = params["kit"];
-      if (typeof raw !== "string") throw new Error("kit must be text");
-      const kit = raw.split(",").map((id) => id.trim()).filter((id) => id !== "");
-      const allowed = nonCharacterSourceIds(catalog);
-      const bad = kit.find((id) => !allowed.includes(id));
-      if (bad !== undefined) throw new Error(`${bad} is not an upgrade or item in the catalogue`);
-      return withSeat(run, seatId, { kit });
+      const item = readChoice(params, "item", opts(Object.keys(catalog.items)));
+      return mintItems(run, seatId, [item], catalog);
     },
   },
-  "give-source": {
-    label: "Give a seat an upgrade or item",
+  "set-upgrade": {
+    label: "Set a seat's upgrade",
     group: "Crew",
-    fields: (run, catalog) => [seatField(run), { name: "source", label: "Source", kind: "choice", options: opts(nonCharacterSourceIds(catalog)) }],
+    fields: (run, catalog) => [seatField(run), { name: "upgrade", label: "Upgrade", kind: "choice", options: upgradeOptions(catalog) }],
     apply: (run, params, catalog) => {
       const seatId = readChoice(params, "seat", seatOptions(run));
-      const source = readChoice(params, "source", opts(nonCharacterSourceIds(catalog)));
-      const seat = run.seats.find((s) => s.seatId === seatId)!;
-      return withSeat(run, seatId, { kit: [...seat.kit, source] });
+      const upgrade = readChoice(params, "upgrade", upgradeOptions(catalog));
+      if (upgrade === "none") return withSeat(run, seatId, { upgradeId: null });
+      const characterId = run.seats.find((s) => s.seatId === seatId)!.characterId;
+      const owner = Object.values(catalog.characters).find((c) => c.upgrades.some((u) => u.id === upgrade))!;
+      if (owner.id !== characterId) throw new Error(`${upgrade} belongs to ${owner.id}, not ${seatId}'s ${characterId ?? "missing character"}`);
+      return withSeat(run, seatId, { upgradeId: upgrade });
     },
   },
   "move-card": {

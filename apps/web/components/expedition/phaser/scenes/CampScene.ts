@@ -119,15 +119,15 @@ function buildHandlers(store: SceneDeps["store"], pointer: () => Point): CampHan
       if (state.reconnecting) return;
       state.updateLocalUi((ui) => nextTrayPage(ui));
     },
-    onSource(sourceId) {
+    onSource(sourceKey) {
       const state = store.getState();
       if (state.reconnecting) return;
-      state.updateLocalUi((ui, view) => beginAbilityTargeting(ui, view, sourceId));
+      state.updateLocalUi((ui, view) => beginAbilityTargeting(ui, view, sourceKey));
     },
-    onSourceHover(sourceId) {
+    onSourceHover(sourceKey) {
       const state = store.getState();
       if (state.reconnecting) return;
-      state.updateLocalUi((ui) => setTooltipSource(ui, sourceId));
+      state.updateLocalUi((ui) => setTooltipSource(ui, sourceKey));
     },
     onObjectiveHover(objectiveId) {
       const state = store.getState();
@@ -154,15 +154,15 @@ function buildHandlers(store: SceneDeps["store"], pointer: () => Point): CampHan
       if (state.reconnecting) return;
       state.updateLocalUi((ui) => cancelTargeting(ui));
     },
-    onGateUse(sourceId) {
+    onGateUse(sourceKey) {
       const state = store.getState();
       if (state.reconnecting) return;
-      const steps = state.server?.game.yourAbilities.find((a) => a.sourceId === sourceId)?.steps ?? [];
+      const steps = state.server?.game.yourAbilities.find((a) => a.sourceKey === sourceKey)?.steps ?? [];
       if (steps.length === 0) {
-        state.dispatch({ type: "use-ability", sourceId, targets: [] });
+        state.dispatch({ type: "use-ability", sourceKey, targets: [] });
         return;
       }
-      state.updateLocalUi((ui, view) => beginAbilityTargeting(ui, view, sourceId));
+      state.updateLocalUi((ui, view) => beginAbilityTargeting(ui, view, sourceKey));
     },
     onGateSkip() {
       const state = store.getState();
@@ -441,7 +441,7 @@ export class CampScene extends Phaser.Scene {
       const chip = findObjective(campModel(this.sceneStore), ui.tooltipObjectiveId);
       if (chip === null || !over(chip.objectId)) this.handlers.onObjectiveHover(null);
     }
-    if (ui.tooltipMateSource !== null && !over(mateSourceObjectId(ui.tooltipMateSource.seatId, ui.tooltipMateSource.sourceId))) {
+    if (ui.tooltipMateSource !== null && !over(mateSourceObjectId(ui.tooltipMateSource.seatId, ui.tooltipMateSource.sourceKey))) {
       this.handlers.onMateSourceHover(null);
     }
   }

@@ -1,13 +1,15 @@
 import { winnerExcluding } from "../helpers";
-import { ability, defineItem } from "../source-def";
+import { defineItem, itemAbility } from "../source-def";
 
 export const puffball = defineItem({
   id: "puffball",
   name: "Puffball",
+  rarity: "common",
+  price: 2,
+  uses: { kind: "single-use" },
   text: "You can't win the next trick.",
-  active: ability({
+  active: itemAbility({
     window: "between-tricks",
-    limit: { kind: "single-use" },
     targets: [{ kind: "self" }],
     apply: () => [{ op: "add-modifier", lasts: "trick", audience: "public", params: {} }],
     effect: (effect) => ({

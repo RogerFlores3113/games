@@ -4,22 +4,10 @@ import { getModel } from "./expedition-helpers";
 /** Click-driving helpers shared by the UI tour. Extracted verbatim from
  * expedition-camp.spec.ts (which keeps its own copy until it is migrated). */
 
-/** Characters and draft picks whose abilities the camp drivers can target
- * (a seat, a hand card or an objective) and that never hold a gated window
- * (before the deal, or a rescue). */
-export const DRAFT_PREFERENCE = [
-  "guide",
-  "scout",
-  "cartographer",
-  "signaller",
-  "guide.pathfinder",
-  "scout.keen-eye",
-  "cartographer.detour",
-  "trail-map",
-  "trained-monkey",
-  "smoke-signal",
-  "whetstone",
-];
+/** Characters and drafted items whose abilities the camp drivers can
+ * target (a seat, a hand card or an objective) and that never hold a gated
+ * window (a rescue). */
+export const DRAFT_PREFERENCE = ["guide", "scout", "cartographer", "signaller", "trail-map", "trained-monkey", "smoke-signal", "whetstone"];
 
 export type SceneName = "camp" | "trail" | "run-end";
 
@@ -30,6 +18,8 @@ export interface DraftTile {
   sourceId: string;
   objectId: string;
   name: string;
+  /** A draft bundle's items; absent for a muster character. */
+  itemIds?: string[];
 }
 
 export interface MusterCard {
@@ -50,7 +40,7 @@ export interface VoteOption {
 
 export type TrailPanel =
   | { kind: "muster"; characters: MusterCard[]; lengths: VoteOption[] }
-  | { kind: "draft"; heading: string; draft: { kind: "offer"; items: DraftTile[] } | { kind: "taken" | "none" } }
+  | { kind: "draft"; heading: string; draft: { kind: "offer"; bundles: DraftTile[] } | { kind: "taken" | "none" } }
   | { kind: "route"; options: VoteOption[] }
   | { kind: "event" }
   | { kind: "loadout" };
@@ -64,14 +54,14 @@ export interface TrailView {
 }
 
 /** What you may pick now: the free characters at muster until yours is
- * picked, then a draft offer after a cleared camp. */
+ * picked, then the bundles of a draft offer after a cleared camp. */
 export function draftOffer(m: TrailView): DraftTile[] | null {
   const panel = m.panel;
   if (panel?.kind === "muster") {
     if (panel.characters.some((c) => c.yours)) return null;
     return panel.characters.filter((c) => c.pickable).map((c) => ({ sourceId: c.characterId, objectId: c.objectId, name: c.name }));
   }
-  return panel?.kind === "draft" && panel.draft.kind === "offer" ? panel.draft.items : null;
+  return panel?.kind === "draft" && panel.draft.kind === "offer" ? panel.draft.bundles : null;
 }
 
 /** The muster's lengths or the route options, while this page has not voted. */
@@ -82,7 +72,7 @@ export function openVote(m: TrailView): VoteOption[] | null {
   return options;
 }
 
-/** Your character, then your kit. */
+/** Your character, your upgrade, then your equipped items, by def id. */
 export function kitIds(m: TrailView): string[] {
   return (m.kit ?? []).map((k) => k.sourceId);
 }
@@ -234,9 +224,10 @@ export async function clickHandCard<T>(
   return clickUntilChanged(page, objectId, isSatisfied, { xOffsetFraction: 0.25, ...opts });
 }
 
-export function pickDraftOffer<T extends { sourceId: string }>(offers: T[], preference: readonly string[] = DRAFT_PREFERENCE): T {
+/** The first offer holding a preferred character or item, else the first. */
+export function pickDraftOffer<T extends { sourceId: string; itemIds?: string[] }>(offers: T[], preference: readonly string[] = DRAFT_PREFERENCE): T {
   for (const preferred of preference) {
-    const found = offers.find((o) => o.sourceId === preferred);
+    const found = offers.find((o) => (o.itemIds ?? [o.sourceId]).includes(preferred));
     if (found) return found;
   }
   const first = offers[0];

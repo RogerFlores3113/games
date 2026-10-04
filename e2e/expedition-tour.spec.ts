@@ -16,7 +16,7 @@ import {
   type TrailView,
 } from "./expedition-driver";
 import { clickObject, getModel, getScene, hoverObject, startExpeditionGame } from "./expedition-helpers";
-import { PICKER_SCENARIOS, rescue, rewriteViews, type Game } from "./expedition-scenarios";
+import { PICKER_SCENARIOS, rescue, rewriteViews, scenarioKey, type Game } from "./expedition-scenarios";
 
 /**
  * UI tour. Plays 3-player runs and screenshots each phase from player 1's
@@ -58,7 +58,7 @@ const RARE = ["run-end-won", "between-camps-draft", "vote-tie-length", "vote-tie
 
 interface Identity { kind: "standard" | "joker"; suit?: string; rank?: number; joker?: "sun" | "moon" }
 interface Card { id: string; objectId: string; label: string; identity: Identity; playable: boolean }
-interface Chip { objectId: string; label?: string; status?: string; pickable?: boolean; objectiveId?: string; usable?: boolean; sourceId?: string }
+interface Chip { objectId: string; label?: string; status?: string; pickable?: boolean; objectiveId?: string; usable?: boolean; sourceId?: string; sourceKey?: string }
 interface CampModel {
   sceneKey: SceneName;
   campIndex: number;
@@ -247,7 +247,7 @@ async function captureHostState(host: Page, tour: Tour): Promise<void> {
   }
   const mate = m.seats.find((s) => !s.isYou && s.sources.length > 0);
   if (mate !== undefined && !tour.has("teammate-source-hover")) {
-    await hoverObject(host, `seat-source:${mate.seatId}:${mate.sources[0]!.sourceId}`);
+    await hoverObject(host, `seat-source:${mate.seatId}:${mate.sources[0]!.sourceKey}`);
     await tour.shot("teammate-source-hover");
     await host.mouse.move(5, 5);
   }
@@ -301,7 +301,7 @@ async function stepPage(page: Page, isHost: boolean, tour: Tour): Promise<void> 
   }
   const ability = you.sources.find((g) => g.usable);
   if (isHost && !tour.has("ability-targeting") && ability) {
-    await peekTargeting(page, tour, `source:${ability.sourceId}`, "ability-targeting", (m) => m.targeting !== null);
+    await peekTargeting(page, tour, ability.objectId, "ability-targeting", (m) => m.targeting !== null);
     return;
   }
   // A hand card can sit under a seat chip or label and swallow the click, so
@@ -421,9 +421,9 @@ async function capturePickers(host: Page, tour: Tour, rewrite: Rewriter): Promis
     if (kind === "card") await tour.shot("in-trick-affordance");
     if (kind === "failed-objective") {
       await tour.shot("rescue-you");
-      await clickUntilChanged<CampModel>(host, `gate-use:${scenario.sourceId}`, (m) => m.targeting !== null);
+      await clickUntilChanged<CampModel>(host, `gate-use:${scenarioKey(scenario.sourceId)}`, (m) => m.targeting !== null);
     } else {
-      await clickUntilChanged<CampModel>(host, `source:${scenario.sourceId}`, (m) => m.targeting !== null);
+      await clickUntilChanged<CampModel>(host, `source:${scenarioKey(scenario.sourceId)}`, (m) => m.targeting !== null);
     }
     if (kind === "card-value") {
       const card = (await getModel<CampModel>(host)).hand.find((c) => c.targetable);
@@ -450,7 +450,7 @@ async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<v
       (g) => ({
         ...g,
         history: [h(1, 1, "cleared")],
-        stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: [g.seats.find((s) => s.seatId === g.yourSeatId)?.characterId === "guide" ? "guide.pathfinder" : "scout.keen-eye", "bait", "smoke-signal"], pendingSeatIds: [g.yourSeatId] },
+        stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: { bundles: [["bait", "smoke-signal"], ["whetstone", "parrot"], ["trail-map"]] }, pendingSeatIds: [g.yourSeatId] },
       }),
       "trail",
       "between-camps-draft-rewritten",

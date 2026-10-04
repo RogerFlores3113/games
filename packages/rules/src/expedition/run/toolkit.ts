@@ -6,8 +6,8 @@
 // content-author defect and THROWS (POLICY A3), matching actions.ts's
 // composed-hook throw policy.
 //
-// Ops fold over RunState: supplies are run-level, every other op changes
-// only the attempt.
+// Ops fold over RunState: supplies and coins are run-level, every other op
+// changes only the attempt.
 
 import { identitiesEqual } from "../deck";
 import type { CoreRules } from "../rules";
@@ -25,6 +25,7 @@ export type ToolkitOp<P extends EffectParams = EffectParams> =
   | { readonly op: "reassign-trick"; readonly trickIndex: number; readonly toSeatId: string } // winner change; cards untouched
   | { readonly op: "share-reveal"; readonly whisperOrdinal: number; readonly audience: readonly string[] }
   | { readonly op: "adjust-supplies"; readonly delta: number }
+  | { readonly op: "adjust-coins"; readonly delta: number }
   | { readonly op: "swap-objectives"; readonly seatA: string; readonly seatB: string }
   | { readonly op: "remove-objective"; readonly objectiveId: string }
   | { readonly op: "reveal"; readonly cardId: string; readonly audience: readonly string[] }
@@ -63,7 +64,7 @@ function assertAudience(run: RunState, audience: readonly string[], opName: stri
   }
 }
 
-/** Supplies are run-level; every other op changes only the attempt. */
+/** Supplies and coins are run-level; every other op changes only the attempt. */
 function applyOp(run: RunState, actorSeatId: string, sourceId: SourceId, op: ToolkitOp, rules: CoreRules): RunState {
   if (op.op === "adjust-supplies") {
     // The crew keeps at least one supply and never exceeds the cap.
@@ -73,6 +74,13 @@ function applyOp(run: RunState, actorSeatId: string, sourceId: SourceId, op: Too
     }
     return { ...run, supplies };
   }
+  if (op.op === "adjust-coins") {
+    const purse = run.purse + op.delta;
+    if (!Number.isInteger(op.delta) || purse < 0) {
+      throw new Error(`toolkit: adjust-coins: ${run.purse} + ${op.delta} is below 0`);
+    }
+    return { ...run, purse };
+  }
   return withAttempt(run, applyAttemptOp(run, attemptOf(run)!, actorSeatId, sourceId, op, rules));
 }
 
@@ -81,7 +89,7 @@ function applyAttemptOp(
   attempt: AttemptState,
   actorSeatId: string,
   sourceId: SourceId,
-  op: Exclude<ToolkitOp, { readonly op: "adjust-supplies" }>,
+  op: Exclude<ToolkitOp, { readonly op: "adjust-supplies" | "adjust-coins" }>,
   rules: CoreRules,
 ): AttemptState {
   switch (op.op) {

@@ -38,11 +38,11 @@ type RunInput = {
   choices: number[];
   length: RunLength;
   startCamp: number;
-  kits: Record<string, string[]>;
+  items: Record<string, string[]>;
 };
 
-// Per-seat kits: a subarray of ITEMS keys, kept to at most 4 items each.
-function kitsArb(seatIds: readonly string[]): fc.Arbitrary<Record<string, string[]>> {
+// Per-seat items: a subarray of ITEMS keys, kept to at most 4 items each.
+function itemsArb(seatIds: readonly string[]): fc.Arbitrary<Record<string, string[]>> {
   return fc
     .tuple(...seatIds.map(() => fc.subarray(ITEM_IDS, { maxLength: 4 })))
     .map((perSeat) => Object.fromEntries(seatIds.map((seatId, i) => [seatId, perSeat[i]!])));
@@ -61,7 +61,7 @@ const runInputArb: fc.Arbitrary<RunInput> = fc
       choices: fc.array(fc.nat({ max: 1000 }), { minLength: 1, maxLength: 64 }),
       length: fc.constant(length),
       startCamp: fc.integer({ min: 1, max: RUN_LENGTHS[length].camps }),
-      kits: kitsArb(seatIds),
+      items: itemsArb(seatIds),
     });
   });
 
@@ -107,14 +107,14 @@ const DETERMINISTIC_CHOICES = [0, 1, 2, 3, 5, 8, 13, 21];
  * gets no items. */
 const examples: RunInput[] = [3, 4, 5].map((seatCount) => {
   const seatIds = seatIdsFor(seatCount);
-  const kits: Record<string, string[]> = Object.fromEntries(seatIds.map((seatId, i) => [seatId, i === 1 ? ["rain-poncho"] : []]));
-  return { seatIds, seed: DETERMINISTIC_SEED, choices: DETERMINISTIC_CHOICES, length: "standard" as const, startCamp: 3, kits };
+  const items: Record<string, string[]> = Object.fromEntries(seatIds.map((seatId, i) => [seatId, i === 1 ? ["rain-poncho"] : []]));
+  return { seatIds, seed: DETERMINISTIC_SEED, choices: DETERMINISTIC_CHOICES, length: "standard" as const, startCamp: 3, items };
 });
 
 describe("property: whole-run per-seat leak checker (COMM-03/ENG-03)", () => {
   it("no seat's view, nor an unseated viewer's view, ever leaks another seat's card at any step of a whole simulated run", () => {
     fc.assert(
-      fc.property(runInputArb, ({ seatIds, seed, choices, length, startCamp, kits }) => {
+      fc.property(runInputArb, ({ seatIds, seed, choices, length, startCamp, items }) => {
         const initial = setupRun({
           seatIds,
           seed,
@@ -122,7 +122,7 @@ describe("property: whole-run per-seat leak checker (COMM-03/ENG-03)", () => {
           length,
           camp: startCamp,
           characters: { [seatIds[0]!]: "scout" },
-          kits,
+          items,
         });
 
         const { states } = driveRun(initial, choices, CATALOG);
@@ -137,10 +137,10 @@ describe("property: whole-run per-seat leak checker (COMM-03/ENG-03)", () => {
       const base = setupRun({ seatIds: seatIdsFor(seatCount), seed: DETERMINISTIC_SEED, catalog: CATALOG, camp: 2 });
       const state: RunState = {
         ...base,
-        seats: base.seats.map((seat) => ({ ...seat, draftOffer: draftOfferFor(DETERMINISTIC_SEED, 2, seat, CATALOG) })),
+        seats: base.seats.map((seat) => ({ ...seat, offers: [draftOfferFor(DETERMINISTIC_SEED, campIndex(2), seat, 0, CATALOG)] })),
         stage: { tag: "draft", cleared: campIndex(2), payout: 5 },
       };
-      expect(state.seats.every((seat) => seat.draftOffer !== null)).toBe(true);
+      expect(state.seats.every((seat) => seat.offers.length === 1)).toBe(true);
       assertNoLeaksAt(state, DETERMINISTIC_SEED);
     }
   });

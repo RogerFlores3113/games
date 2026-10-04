@@ -3,8 +3,8 @@
 // mirroring hanabi/actions.ts's isPlayRequest exact-own-key discipline. Hand-
 // written guards, not Zod, because packages/rules is zero-dependency
 // (FDN-02) — Zod lives only in packages/schema, on the outbound side. The
-// MAX_REQUEST_LIST_LENGTH cap bounds per-request work for targets
-// before any engine code runs (T-11-08).
+// MAX_REQUEST_LIST_LENGTH cap bounds per-request work for targets and
+// item uids before any engine code runs (T-11-08).
 
 import type { RunAction } from "../run/types";
 
@@ -38,10 +38,22 @@ function parseVote(record: Record<string, unknown>): RunAction | null {
   return { type: "vote", choice: record.choice };
 }
 
-function parsePickDraft(record: Record<string, unknown>): RunAction | null {
-  if (!hasExactKeys(record, ["type", "sourceId"])) return null;
-  if (typeof record.sourceId !== "string") return null;
-  return { type: "pick-draft", sourceId: record.sourceId };
+function parseEquip(record: Record<string, unknown>): RunAction | null {
+  if (!hasExactKeys(record, ["type", "itemUids"])) return null;
+  if (!isBoundedStringArray(record.itemUids)) return null;
+  return { type: "equip", itemUids: Array.from(record.itemUids) };
+}
+
+function parseBuy(record: Record<string, unknown>): RunAction | null {
+  if (!hasExactKeys(record, ["type", "stockId"])) return null;
+  if (typeof record.stockId !== "string") return null;
+  return { type: "buy", stockId: record.stockId };
+}
+
+function parsePickBundle(record: Record<string, unknown>): RunAction | null {
+  if (!hasExactKeys(record, ["type", "bundle"])) return null;
+  if (typeof record.bundle !== "number" || !Number.isInteger(record.bundle) || record.bundle < 0) return null;
+  return { type: "pick-bundle", bundle: record.bundle };
 }
 
 function parseReady(record: Record<string, unknown>): RunAction | null {
@@ -50,10 +62,10 @@ function parseReady(record: Record<string, unknown>): RunAction | null {
 }
 
 function parseUseAbility(record: Record<string, unknown>): RunAction | null {
-  if (!hasExactKeys(record, ["type", "sourceId", "targets"])) return null;
-  if (typeof record.sourceId !== "string") return null;
+  if (!hasExactKeys(record, ["type", "sourceKey", "targets"])) return null;
+  if (typeof record.sourceKey !== "string") return null;
   if (!isBoundedStringArray(record.targets)) return null;
-  return { type: "use-ability", sourceId: record.sourceId, targets: Array.from(record.targets) };
+  return { type: "use-ability", sourceKey: record.sourceKey, targets: Array.from(record.targets) };
 }
 
 function parseSkipWindow(record: Record<string, unknown>): RunAction | null {
@@ -94,8 +106,12 @@ export function parseRunAction(request: unknown): RunAction | null {
       return parsePickCharacter(request);
     case "vote":
       return parseVote(request);
-    case "pick-draft":
-      return parsePickDraft(request);
+    case "equip":
+      return parseEquip(request);
+    case "buy":
+      return parseBuy(request);
+    case "pick-bundle":
+      return parsePickBundle(request);
     case "ready":
       return parseReady(request);
     case "use-ability":

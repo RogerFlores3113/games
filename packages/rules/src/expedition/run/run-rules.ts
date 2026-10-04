@@ -8,7 +8,7 @@
 //
 // COMPOSITION ORDER (spec §6.1, "each hook receives the previous layer's
 // answer"): base -> live passives (seat order, then each
-// seat's [character, ...kit] order) -> active effects (in the order they
+// seat's [character, upgrade, ...equipped] order) -> active effects (in the order they
 // were added).
 // A RuleModifier is a function from the previous layer's hook to this
 // layer's hook; composing a full RunRules means folding every layer's
@@ -22,6 +22,7 @@
 // rule objects.
 
 import type { CoreRules } from "../rules";
+import { ITEM_SLOTS } from "./balance";
 import type { RunState } from "./types";
 
 export type RunHooks = {
@@ -29,6 +30,7 @@ export type RunHooks = {
   whisperAudience(run: RunState, seatId: string, targetSeatId: string): readonly string[];
   whispersPerCamp(run: RunState, seatId: string): number;
   failureCost(run: RunState): number;
+  itemSlots(run: RunState, seatId: string): number;
 };
 
 export type RunRules = CoreRules & RunHooks;
@@ -58,6 +60,7 @@ const HOOK_NAME_SET: Record<HookName, true> = {
   whisperAudience: true,
   whispersPerCamp: true,
   failureCost: true,
+  itemSlots: true,
 };
 
 export const HOOK_NAMES: readonly HookName[] = Object.keys(HOOK_NAME_SET) as HookName[];
@@ -69,10 +72,14 @@ export const baseRunHooks: RunHooks = {
   whisperAudience(_run, _seatId, targetSeatId) {
     return [targetSeatId];
   },
-  whispersPerCamp(_run, _seatId) {
-    return 1;
+  /** One, and one more for a seat that owns an upgrade. */
+  whispersPerCamp(run, seatId) {
+    return run.seats.some((seat) => seat.seatId === seatId && seat.upgradeId !== null) ? 2 : 1;
   },
   failureCost(_run) {
     return 1;
+  },
+  itemSlots(_run, _seatId) {
+    return ITEM_SLOTS;
   },
 };

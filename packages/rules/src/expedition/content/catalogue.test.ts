@@ -77,7 +77,8 @@ function crew(spec: Spec): RunState {
     ...(spec.camp === undefined ? {} : { camp: spec.camp }),
     ...(spec.supplies === undefined ? {} : { supplies: spec.supplies }),
     characters: { p0: character, p1: p1!, p2: p2! },
-    kits: { p0: spec.kit ?? [] },
+    upgrades: Object.fromEntries((spec.kit ?? []).filter((id) => CATALOG.sources[id]!.kind === "upgrade").map((id) => ["p0", id])),
+    items: { p0: (spec.kit ?? []).filter((id) => CATALOG.sources[id]!.kind === "item") },
   });
 }
 
@@ -122,17 +123,24 @@ function act(run: RunState, seatId: string, action: RunAction): RunState {
   return result.state;
 }
 
-const use = (run: RunState, seatId: string, sourceId: string, targets: readonly string[]) => act(run, seatId, { type: "use-ability", sourceId, targets });
+/** The key a seat uses a source through: its first equipped instance of an
+ * item, else the id itself (a character or an upgrade). */
+const keyOf = (run: RunState, seatId: string, sourceId: string): string => {
+  const seat = run.seats.find((s) => s.seatId === seatId)!;
+  return seat.items.find((item) => item.itemId === sourceId && seat.equipped.includes(item.uid))?.uid ?? sourceId;
+};
+const use = (run: RunState, seatId: string, sourceId: string, targets: readonly string[]) =>
+  act(run, seatId, { type: "use-ability", sourceKey: keyOf(run, seatId, sourceId), targets });
 /** Without the dispatcher's settle, so a rescued camp stays inspectable. */
 const rescue = (run: RunState, seatId: string, sourceId: string, targets: readonly string[]) => {
-  const result = useAbility(run, seatId, sourceId, targets, CATALOG);
+  const result = useAbility(run, seatId, keyOf(run, seatId, sourceId), targets, CATALOG);
   if (!result.ok) throw new Error(`${seatId} ${sourceId} refused: ${result.error}`);
   return result.state;
 };
 const play = (run: RunState, seatId: string, cardId: string) => act(run, seatId, { type: "play-card", cardId });
 const whisper = (run: RunState, from: string, to: string, cardId: string) => act(run, from, { type: "whisper", targetSeatId: to, cardId });
 const refusal = (run: RunState, seatId: string, sourceId: string, targets: readonly string[]) => {
-  const result = useAbility(run, seatId, sourceId, targets, CATALOG);
+  const result = useAbility(run, seatId, keyOf(run, seatId, sourceId), targets, CATALOG);
   return result.ok ? "ok" : result.error;
 };
 
@@ -336,9 +344,9 @@ describe("Signaller", () => {
 
   it("Call and Response gives the whispered-to teammate one more whisper", () => {
     const start = table({ character: "signaller", kit: ["signaller.call-and-response"] });
-    expect(whisperAllowance(start)).toEqual([2, 1, 1]);
+    expect(whisperAllowance(start)).toEqual([3, 1, 1]);
     const run = whisper(start, "p0", "p1", "a");
-    expect(whisperAllowance(run)).toEqual([2, 2, 1]);
+    expect(whisperAllowance(run)).toEqual([3, 2, 1]);
     const heard = whisper(whisper(run, "p1", "p2", "b"), "p1", "p0", "b");
     expect(attemptOf(heard)!.log.filter((e) => e.event === "whisper" && e.actorSeatId === "p1")).toHaveLength(2);
   });
@@ -368,9 +376,9 @@ describe("Cartographer", () => {
     const objectives = [winCard("done", ident("spades", 12), "p1"), PENDING];
     const start = table({ character: "cartographer", kit: ["cartographer.landmark"], objectives, tricks: [WON_BY_P1] });
     expect(evaluateObjective(camp(start), objectiveOf(start, "done"))).toBe("done");
-    expect(whisperAllowance(start)).toEqual([1, 1, 1]);
+    expect(whisperAllowance(start)).toEqual([2, 1, 1]);
     const run = use(start, "p0", "cartographer.landmark", ["objective:done"]);
-    expect(whisperAllowance(run)).toEqual([1, 2, 1]);
+    expect(whisperAllowance(run)).toEqual([2, 2, 1]);
   });
 });
 
@@ -424,31 +432,35 @@ describe("items", () => {
     ]);
   });
 
-  it("Rain Poncho gives its owner one more whisper this camp, twice a run", () => {
+  it("Rain Poncho gives its owner one more whisper this camp, on each of its two charges", () => {
     const start = table({ kit: ["rain-poncho"] });
     expect(whisperAllowance(start)).toEqual([1, 1, 1]);
     const once = use(start, "p0", "rain-poncho", []);
     expect(whisperAllowance(once)).toEqual([2, 1, 1]);
     const twice = use(once, "p0", "rain-poncho", []);
     expect(whisperAllowance(twice)).toEqual([3, 1, 1]);
-    expect(refusal(twice, "p0", "rain-poncho", [])).toBe("ability_spent");
+    expect(twice.seats[0]!.items).toEqual([]);
+    expect(refusal(twice, "p0", "rain-poncho", [])).toBe("not_owned");
   });
 
-  it("Smoke Signal gives everyone one more whisper and spends a supply", () => {
+  it("Smoke Signal gives everyone one more whisper, costs no supply, and has two charges", () => {
     const start = table({ kit: ["smoke-signal"], supplies: 3 });
     expect(whisperAllowance(start)).toEqual([1, 1, 1]);
     const run = use(start, "p0", "smoke-signal", []);
     expect(whisperAllowance(run)).toEqual([2, 2, 2]);
-    expect(run.supplies).toBe(2);
+    expect(run.supplies).toBe(3);
+    const twice = use(run, "p0", "smoke-signal", []);
+    expect(whisperAllowance(twice)).toEqual([3, 3, 3]);
+    expect(twice.seats[0]!.items).toEqual([]);
   });
 
-  it("Whetstone shifts a card by up to two and leaves the kit", () => {
+  it("Whetstone shifts a card by up to two and leaves its owner", () => {
     const hands = { p0: [std("a5", "spades", 5)] };
     const start = table({ kit: ["whetstone"], hands });
     expect(refusal(start, "p0", "whetstone", ["value:a5:8"])).toBe("invalid_target");
     const run = use(start, "p0", "whetstone", ["value:a5:7"]);
     expect(rules(run).rankOf(hands.p0[0]!)).toBe(7);
-    expect(run.seats[0]!.kit).toEqual([]);
+    expect(run.seats[0]!.items).toEqual([]);
   });
 
   it("Puffball makes its user lose the next trick only", () => {
@@ -471,7 +483,7 @@ describe("items", () => {
       p2: [std("c4", "spades", 4)],
     };
     const start = table({ hands, leader: "p0" });
-    const stocked: RunState = { ...start, seats: start.seats.map((seat) => ({ ...seat, kit: ["puffball"] })) };
+    const stocked: RunState = { ...start, seats: start.seats.map((seat, i) => ({ ...seat, items: [{ uid: `it${i}`, itemId: "puffball" }], equipped: [`it${i}`] })) };
     const puffed = SEATS.reduce<RunState>((run, seatId) => use(run, seatId, "puffball", [`seat:${seatId}`]), stocked);
     const done = play(play(play(puffed, "p0", "a14"), "p1", "b3"), "p2", "c4");
     expect(camp(done).completedTricks[0]!.winnerSeatId).toBe("p0");
@@ -512,10 +524,10 @@ describe("items", () => {
     expect(failed.supplies).toBe(2);
   });
 
-  it("Rope Ladder removes a failed objective and leaves the kit", () => {
+  it("Rope Ladder removes a failed objective and leaves its owner", () => {
     const run = rescue(failedTable({ kit: ["rope-ladder"] }), "p0", "rope-ladder", ["objective:o1"]);
     expect(camp(run).objectives).toEqual([]);
-    expect(run.seats[0]!.kit).toEqual([]);
+    expect(run.seats[0]!.items).toEqual([]);
   });
 
   it("Heavy Pack adds a whisper and 1 to a failed camp's supply cost", () => {
@@ -537,9 +549,9 @@ describe("items", () => {
   });
 
   it("Mosquito Net lets its owner whisper through a layer that forbids it", () => {
-    const gag = defineItem({ id: "gag", name: "Gag", text: "Nobody may whisper.", passive: { modifier: () => ({ whisperAllowed: () => () => false }) } });
+    const gag = defineItem({ id: "gag", name: "Gag", rarity: "common", price: 2, text: "Nobody may whisper.", passive: { modifier: () => ({ whisperAllowed: () => () => false }) } });
     const catalog = testCatalog({ characters: CATALOG.characters, items: { ...CATALOG.items, gag } });
-    const run = advanceTo(setupRun({ seatIds: SEATS, seed: "catalogue", catalog, kits: { p0: ["gag", "mosquito-net"] } }), "between-tricks", catalog);
+    const run = advanceTo(setupRun({ seatIds: SEATS, seed: "catalogue", catalog, items: { p0: ["gag", "mosquito-net"] } }), "between-tricks", catalog);
     expect(SEATS.map((seatId) => rulesFor(run, catalog).whisperAllowed(run, seatId))).toEqual([true, false, false]);
   });
 });

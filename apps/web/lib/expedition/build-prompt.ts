@@ -4,7 +4,7 @@ import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } f
 import { cardLabel, rankLabel, SUIT_GLYPH } from "./expedition-ids";
 import type { LocalUiState } from "./local-ui";
 import { currentStep } from "./local-ui";
-import { sourceName } from "./source-text";
+import { sourceName, yourSourceId } from "./source-text";
 
 /**
  * The one line that always says what to do next. Reads only fields the view
@@ -110,7 +110,7 @@ function targetingPrompt(view: ExpeditionView, ui: LocalUiState, nameOf: (seatId
     return { text: `Whisper ${shown} to ${nameOf(picked("seat"))}? Confirm or Cancel`, tone: "your-move" };
   }
 
-  const name = sourceName(targeting.sourceId);
+  const name = sourceName(yourSourceId(view, targeting.sourceKey));
   if (step !== null) {
     const held = targeting.valueCardId === null ? null : identityOf(view, targeting.valueCardId);
     if (held !== null) return { text: `${name}: pick the rank ${cardLabel(held)} counts as`, tone: "your-move" };
@@ -128,8 +128,8 @@ function gatePrompt(view: ExpeditionView, nameOf: (seatId: string | null) => str
   if (attemptOf(view)?.window !== "rescue") return null;
   const pending = attemptOf(view)!.pendingSeatIds;
   if (view.yourSeatId !== null && pending.includes(view.yourSeatId)) {
-    const ability = view.yourAbilities.find((a) => a.usableNow && SOURCE_DISPLAY[a.sourceId]?.active?.window === "rescue");
-    const name = ability === undefined ? "an ability" : sourceName(ability.sourceId);
+    const ability = view.yourAbilities.find((a) => a.usableNow && SOURCE_DISPLAY[yourSourceId(view, a.sourceKey)]?.active?.window === "rescue");
+    const name = ability === undefined ? "an ability" : sourceName(yourSourceId(view, ability.sourceKey));
     return { text: `An objective failed: rescue it with ${name}, or pass`, tone: "your-move" };
   }
   if (pending.length === 0) return null;
@@ -169,7 +169,10 @@ function campOverPrompt(camp: ExpeditionCampView, nameOf: (seatId: string | null
 /** "Bait" or "Bait or Howler Call": your abilities usable on your turn,
  * before you play. */
 function onYourTurnNames(view: ExpeditionView): string | null {
-  const names = view.yourAbilities.filter((a) => a.usableNow && SOURCE_DISPLAY[a.sourceId]?.active?.window === "in-trick").map((a) => sourceName(a.sourceId));
+  const names = view.yourAbilities
+    .map((a) => ({ usable: a.usableNow, sourceId: yourSourceId(view, a.sourceKey) }))
+    .filter((a) => a.usable && SOURCE_DISPLAY[a.sourceId]?.active?.window === "in-trick")
+    .map((a) => sourceName(a.sourceId));
   return names.length === 0 ? null : names.join(" or ");
 }
 

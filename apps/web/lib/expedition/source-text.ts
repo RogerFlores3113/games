@@ -1,4 +1,4 @@
-import { CHARACTER_DISPLAY, SOURCE_DISPLAY, type ExpeditionRemainingView } from "@games/rules";
+import { CHARACTER_DISPLAY, SOURCE_DISPLAY, type ExpeditionRemainingView, type ExpeditionSeatView, type ExpeditionView } from "@games/rules";
 
 /**
  * How every screen names a character, upgrade or item. The catalogue text
@@ -7,6 +7,24 @@ import { CHARACTER_DISPLAY, SOURCE_DISPLAY, type ExpeditionRemainingView } from 
  */
 
 export type SourceKind = "character" | "upgrade" | "item";
+
+/** The def id behind a source key: an item instance's item, else the key
+ * itself (a character or an upgrade id). */
+export function sourceIdOfKey(seat: ExpeditionSeatView | undefined, key: string): string {
+  if (seat === undefined) return key;
+  return [...seat.items.equipped, ...(seat.items.backpack ?? [])].find((item) => item.uid === key)?.itemId ?? key;
+}
+
+/** sourceIdOfKey for one of the viewer's own keys. */
+export function yourSourceId(view: ExpeditionView, key: string): string {
+  return sourceIdOfKey(view.seats.find((s) => s.seatId === view.yourSeatId), key);
+}
+
+/** The keys a seat acts through: its character, its upgrade, then its
+ * equipped item instances. */
+export function liveSourceKeys(seat: ExpeditionSeatView): string[] {
+  return [...(seat.characterId === null ? [] : [seat.characterId]), ...(seat.upgradeId === null ? [] : [seat.upgradeId]), ...seat.items.equipped.map((item) => item.uid)];
+}
 
 /** A source as it acts: a character is its base power ("Spyglass"), an
  * upgrade or item its own name. */
@@ -51,14 +69,12 @@ function poolUnit(sourceId: string): string {
 }
 
 /** What is left of a source right now: "1 left", "used", "2/3 herbs",
- * "1 supply", "1 use". A passive is always on. */
+ * "1 supply". A passive is always on. */
 export function chargeText(sourceId: string, remaining: ExpeditionRemainingView | null): string {
   if (remaining === null) return SOURCE_DISPLAY[sourceId]?.active === null ? "always on" : "";
   switch (remaining.kind) {
     case "uses":
       return remaining.left === 0 ? "used" : `${remaining.left} left`;
-    case "single-use":
-      return "1 use";
     case "pool":
       return `${remaining.balance}/${remaining.max} ${poolUnit(sourceId)}`;
     case "supplies":

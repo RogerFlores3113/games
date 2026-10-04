@@ -37,7 +37,7 @@ function camp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampView {
   };
 }
 
-const PREVIEW: ExpeditionCampPreviewView = { index: 1, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null };
+const PREVIEW: ExpeditionCampPreviewView = { index: 1, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null, shop: false };
 
 function withAttempt(v: ExpeditionView, patch: Partial<ExpeditionAttemptView>): ExpeditionView {
   if (v.stage.tag !== "camp") throw new Error("fixture is not in a camp");
@@ -53,7 +53,7 @@ function view(campView: ExpeditionCampView, overrides: Partial<ExpeditionView> =
     purse: 0,
     supplies: { count: 3, max: 5 },
     plan: [],
-    seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: "scout", kit: [], pool: null, usage: [] })),
+    seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: "scout", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] })),
     yourAbilities: [],
     history: [],
     lastVote: null,
@@ -76,15 +76,15 @@ function view(campView: ExpeditionCampView, overrides: Partial<ExpeditionView> =
   };
 }
 
-const MEDIC: ExpeditionAbilityView = { sourceId: "medic", usableNow: true, reason: null, steps: [] };
+const MEDIC: ExpeditionAbilityView = { sourceKey: "medic", usableNow: true, reason: null, steps: [] };
 const SCOUT: ExpeditionAbilityView = {
-  sourceId: "scout",
+  sourceKey: "scout",
   usableNow: true,
   reason: null,
   steps: [{ kind: "hand", prompt: "Pick a teammate's hand", choices: ["hand:ana", "hand:bo"] }],
 };
 const MONKEY: ExpeditionAbilityView = {
-  sourceId: "trained-monkey",
+  sourceKey: "trained-monkey",
   usableNow: true,
   reason: null,
   steps: [
@@ -94,13 +94,13 @@ const MONKEY: ExpeditionAbilityView = {
 };
 
 const TONIC: ExpeditionAbilityView = {
-  sourceId: "botanist",
+  sourceKey: "botanist",
   usableNow: true,
   reason: null,
   steps: [{ kind: "card-value", prompt: "Pick a card in your hand to recount", choices: ["value:h7:6", "value:h7:8"] }],
 };
 const LONG_STEP: ExpeditionAbilityView = {
-  sourceId: "trained-monkey",
+  sourceKey: "trained-monkey",
   usableNow: true,
   reason: null,
   steps: [{ kind: "card", prompt: "Pick one of your cards to swap with a teammate now", choices: ["card:h7"] }],
@@ -203,42 +203,42 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   [
     "ability, first step",
     view(camp(), { yourAbilities: [SCOUT] }),
-    ui({ targeting: { mode: "ability", sourceId: "scout", selected: [], valueCardId: null } }),
+    ui({ targeting: { mode: "ability", sourceKey: "scout", selected: [], valueCardId: null } }),
     playing,
     { text: "Spyglass: Pick a teammate's hand", tone: "your-move" },
   ],
   [
     "ability with no steps, ready to confirm",
-    view(camp(), { yourAbilities: [{ sourceId: "bait", usableNow: true, reason: null, steps: [] }] }),
-    ui({ targeting: { mode: "ability", sourceId: "bait", selected: [], valueCardId: null } }),
+    view(camp(), { yourAbilities: [{ sourceKey: "bait", usableNow: true, reason: null, steps: [] }] }),
+    ui({ targeting: { mode: "ability", sourceKey: "bait", selected: [], valueCardId: null } }),
     playing,
     { text: "Use Bait? Confirm or Cancel", tone: "your-move" },
   ],
   [
     "Trained Monkey, second step",
     view(camp(), { yourAbilities: [MONKEY] }),
-    ui({ targeting: { mode: "ability", sourceId: "trained-monkey", selected: ["card:h7"], valueCardId: null } }),
+    ui({ targeting: { mode: "ability", sourceKey: "trained-monkey", selected: ["card:h7"], valueCardId: null } }),
     playing,
     { text: "Trained Monkey: Pick a teammate", tone: "your-move" },
   ],
   [
     "Trained Monkey, ready to confirm",
     view(camp(), { yourAbilities: [MONKEY] }),
-    ui({ targeting: { mode: "ability", sourceId: "trained-monkey", selected: ["card:h7", "seat:bo"], valueCardId: null } }),
+    ui({ targeting: { mode: "ability", sourceKey: "trained-monkey", selected: ["card:h7", "seat:bo"], valueCardId: null } }),
     playing,
     { text: "Use Trained Monkey on your 7♥ and Bo? Confirm or Cancel", tone: "your-move" },
   ],
   [
     "Herb Tonic, a held card waits for its rank",
     view(camp(), { yourAbilities: [TONIC] }),
-    ui({ targeting: { mode: "ability", sourceId: "botanist", selected: [], valueCardId: "h7" } }),
+    ui({ targeting: { mode: "ability", sourceKey: "botanist", selected: [], valueCardId: "h7" } }),
     playing,
     { text: "Herb Tonic: pick the rank 7♥ counts as", tone: "your-move" },
   ],
   [
     "a step prompt too long for the line drops the source name",
     view(camp(), { yourAbilities: [LONG_STEP] }),
-    ui({ targeting: { mode: "ability", sourceId: "trained-monkey", selected: [], valueCardId: null } }),
+    ui({ targeting: { mode: "ability", sourceKey: "trained-monkey", selected: [], valueCardId: null } }),
     playing,
     { text: "Pick one of your cards to swap with a teammate now", tone: "your-move" },
   ],
@@ -246,7 +246,7 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
     "your turn to follow with Bait usable",
     view(
       camp({ currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "h2", identity: H2 }, effectiveRank: null }] } }),
-      { yourAbilities: [{ sourceId: "bait", usableNow: true, reason: null, steps: [] }] },
+      { yourAbilities: [{ sourceKey: "bait", usableNow: true, reason: null, steps: [] }] },
     ),
     ui(),
     playing,
@@ -256,7 +256,7 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
     "your turn to follow with Bait usable, too long to keep the hint",
     view(
       camp({ yourLegalCardIds: ["h7"], currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "h2", identity: H2 }, effectiveRank: null }] } }),
-      { yourAbilities: [{ sourceId: "bait", usableNow: true, reason: null, steps: [] }] },
+      { yourAbilities: [{ sourceKey: "bait", usableNow: true, reason: null, steps: [] }] },
     ),
     ui(),
     playing,
@@ -389,7 +389,7 @@ describe("buildTrailPrompt", () => {
   });
   const at = (v: ExpeditionView, seats: PromptSeat[] = SEATS, reconnecting = false): Prompt => buildTrailPrompt(v, seats, { reconnecting });
   const withCharacter = (characterId: string | null): Partial<ExpeditionView> => ({
-    seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: s.seatId === "me" ? characterId : "scout", kit: [], pool: null, usage: [] })),
+    seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: s.seatId === "me" ? characterId : "scout", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] })),
   });
   const failedCamp3 = [{ camp: 3, attempt: 1, status: "failed" as const, coins: 0 }];
 
@@ -419,7 +419,7 @@ describe("buildTrailPrompt", () => {
   });
 
   it("at the draft announces the cleared camp, its payout and the pick", () => {
-    const v = trail({ tag: "draft", cleared: 1, payout: 8, yourOffer: ["trained-monkey"], pendingSeatIds: ["me", "bo"] });
+    const v = trail({ tag: "draft", cleared: 1, payout: 8, yourOffer: { bundles: [["trained-monkey"]] }, pendingSeatIds: ["me", "bo"] });
     expect(at(v)).toEqual({ text: "Camp 1 cleared! +8 coins. Take one", tone: "your-move" });
   });
 
@@ -454,17 +454,17 @@ describe("buildTrailPrompt", () => {
   });
 
   it("at the loadout tells you to set out by your character", () => {
-    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 2 }, readySeatIds: [] }, { history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }] });
+    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 2 }, yourSlots: 2, shop: null, readySeatIds: [] }, { history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }] });
     expect(at(v)).toEqual({ text: "The Scout, set out for camp 2 when ready", tone: "your-move" });
   });
 
   it("at the loadout after a failure tells you to try the camp again", () => {
-    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 3 }, readySeatIds: [] }, { history: failedCamp3 });
+    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 3 }, yourSlots: 2, shop: null, readySeatIds: [] }, { history: failedCamp3 });
     expect(at(v)).toEqual({ text: "Camp 3 failed. Set out to try again", tone: "alert" });
   });
 
   it("at the loadout names who is not ready once you are", () => {
-    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 3 }, readySeatIds: ["me"] }, { history: failedCamp3 });
+    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 3 }, yourSlots: 2, shop: null, readySeatIds: ["me"] }, { history: failedCamp3 });
     expect(at(v)).toEqual({ text: "Waiting for Ana and Bo", tone: "waiting" });
   });
 
@@ -476,12 +476,12 @@ describe("buildTrailPrompt", () => {
       { seatId: "cy", displayLabel: "Cyprianus" },
       { seatId: "di", displayLabel: "Dionysia" },
     ];
-    const base = trail({ tag: "loadout", camp: PREVIEW, readySeatIds: ["me"] });
-    const five = { ...base, seats: long.map((s) => ({ seatId: s.seatId, characterId: "scout", kit: [], pool: null, usage: [] })) };
+    const base = trail({ tag: "loadout", camp: PREVIEW, yourSlots: 2, shop: null, readySeatIds: ["me"] });
+    const five = { ...base, seats: long.map((s) => ({ seatId: s.seatId, characterId: "scout", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] })) };
     expect(at(five, long)).toEqual({ text: "Waiting for 4 teammates", tone: "waiting" });
   });
 
   it("says Reconnecting while the socket is down", () => {
-    expect(at(trail({ tag: "loadout", camp: PREVIEW, readySeatIds: [] }), SEATS, true)).toEqual({ text: "Reconnecting…", tone: "alert" });
+    expect(at(trail({ tag: "loadout", camp: PREVIEW, yourSlots: 2, shop: null, readySeatIds: [] }), SEATS, true)).toEqual({ text: "Reconnecting…", tone: "alert" });
   });
 });

@@ -4,7 +4,7 @@
 // of a camp failed only by failed objectives.
 
 import { campPhase, checkCampOutcome, currentActorSeatId } from "../camp";
-import { pendingSourceIds } from "./abilities";
+import { pendingSourceKeys } from "./abilities";
 import { attemptOf } from "./attempt";
 import { rulesFor } from "./compose";
 import type { RunRules } from "./run-rules";
@@ -85,5 +85,5 @@ export function gatedPendingSeatIds(run: RunState, catalog: Catalog): readonly s
   const rules = rulesFor(run, catalog);
   const window = currentWindow(run, rules);
   if (window === null || !WINDOWS[window].gated) return [];
-  return run.seatIds.filter((seatId) => pendingSourceIds(run, seatId, window, catalog, rules).length > 0);
+  return run.seatIds.filter((seatId) => pendingSourceKeys(run, seatId, window, catalog, rules).length > 0);
 }
