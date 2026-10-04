@@ -19,7 +19,7 @@ interface CampModel {
   youSeatId: string;
   seats: Seat[];
   hand: { id: string; objectId: string; label: string; playable: boolean; targetable: boolean }[];
-  trick: { plays: { seatId: string; card: { id: string; objectId: string; targetable: boolean } }[] } | null;
+  trick: { plays: { seatId: string; card?: { id: string; objectId: string; targetable: boolean } }[] } | null;
   faceUpObjectives: Chip[];
   banner: { youPending: boolean; title: string; detail: string } | null;
   tray: { options: { choiceId: string; objectId: string }[] } | null;
@@ -172,9 +172,9 @@ test.describe("Expedition characters and abilities", () => {
         return [`hand:${mate(m).seatId}`];
       });
       await use("card", async (m) => {
-        const play = m.trick!.plays.find((p) => p.card.targetable)!;
-        await click(play.card.objectId);
-        return [`card:${play.card.id}`];
+        const play = m.trick!.plays.find((p) => p.card?.targetable)!;
+        await click(play.card!.objectId);
+        return [`card:${play.card!.id}`];
       });
       await use("objective", async (m) => {
         const o = m.faceUpObjectives.find((x) => x.targetable)!;

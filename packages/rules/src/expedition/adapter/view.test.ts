@@ -509,6 +509,7 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
 
     const play = attemptViewOf(toExpeditionPlayerView(played.state, "p0", boostCatalog)).camp.currentTrick.plays[0]!;
 
+    if (play.hidden) throw new Error("expected the play face up");
     expect(play.card.id).toBe(standard.id);
     expect(standard.identity.kind === "standard" && play.effectiveRank).toBe(standard.identity.kind === "standard" ? standard.identity.rank + 1 : null);
   });

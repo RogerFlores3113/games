@@ -1379,3 +1379,40 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
 - The loadout draws the backdrop of the camp it sets out for; the draft, route and event keep the
   fireside. `bg-temple` is registered, but nothing draws it until unit 10 decides whether the
   temple camp shows it over its location.
+
+### Implementation notes (unit 7)
+
+- `goals` receives every objective's composed status: `goals(camp, statuses)`, called only
+  through `campGoals(camp, rules)` (the outcome, the view and inspect). Flooding's guard needs
+  "every objective is done", which a layer cannot ask the composed `objectiveStatus`. The guard
+  breaks once `river(totalTricks)` tricks are complete with an objective not done; `river` lives
+  in `content/mods/flooding.ts` over `RIVER_SHARE` in `balance.ts`, for Monsoon to share.
+- `hides` is a run hook (base false; each layer ORs its own). The Desert's mirage hides
+  `objectives[roll("mirage", n)]` until a trick completes; nothing is hidden in the loadout, which
+  has no objectives. Heavy fog applies in the loadout too, since the weather is on its stack.
+- A board card target skips plays hidden from the seat (`targets.ts`), so Bait cannot name a
+  face-down card. An effect whose params name a card hidden from the viewer shows `params: null`.
+  The leak check hides a face-down card's id unless it was revealed to the viewer, and does not
+  exempt it for a public effect's params (canary M).
+- Fog shows an equipped item once a `used` ledger entry stamps it with this camp and attempt, in
+  `items.equipped` and `usage`; `backpack` is null. The leak check's secrets gain
+  `concealedSeatIds`, and a non-null backpack for one is `structural:fogged-backpack`.
+- Steam and Flooding have weight 0. Magma is `deckFor` only; the public `removedCards` already
+  says what the heat burned. `route.property.test.ts` now checks the real `PAIRINGS`.
+- `RunState` is unchanged, so `ROOM_SCHEMA_VERSION` stays 11. The view's current-trick play is
+  `{ hidden: false, card, effectiveRank }` or `{ hidden: true, suit }`, objectives gain
+  `kind: "hidden"` and status parts `meter`, each mirrored in the schema.
+- Web: a face-down trick card is the pack's card back with a suit pip (a star for a joker),
+  registered as `trick:face-down:<seatId>`. A hidden objective is a mini card back with "?" (the
+  pool captions it "hidden"); its tooltip names the mirage. A fogged teammate shows a fog tile
+  left of their kit icons (`seat-fog:<seatId>`, hovering shows Heavy fog's rules) and on their
+  loadout crew row. The Flooding chip reads "N left" with a gauge and turns to an alert one trick
+  out, and the river rises behind the table as the tricks run out. The magma chip reads
+  "No 2s 3s 4♣" and its tooltip repeats it. Night darkens the sky; Heavy fog drifts mist bands
+  kept clear of the seat plates. The seven new defs have pixel icons.
+- The Whisper caption under rain showed only "whispers" (`fitLabel` keeps the last word of a
+  label that does not fit); it reads "Blocked by Rain" now.
+- e2e: the scenarios' `playing()` gives current plays `hidden: false`, which the client's schema
+  now requires. The tour gains `camp-cave`, `camp-night`, `camp-desert`, `camp-fog`,
+  `camp-magma`, `camp-flood` and `loadout-fog` from rewritten views, and its bot reads a face-down
+  lead's suit.

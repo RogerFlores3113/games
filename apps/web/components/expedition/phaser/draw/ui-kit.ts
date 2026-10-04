@@ -7,7 +7,7 @@ import type Phaser from "phaser";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL, SIGN_CELL, WORLD_LABEL_FONT, WORLD_SIGN_FONT } from "../font/font-keys";
 import { MINI_H, MINI_W } from "../layout";
-import { cardTextureKey } from "../card-packs/card-pack-def";
+import { cardBackTextureKey, cardTextureKey } from "../card-packs/card-pack-def";
 import type { CardPackId } from "../../../../lib/expedition/card-pack-ids";
 import type { ObjectiveChip } from "../../../../lib/expedition/build-scene-model";
 import { placeArt } from "../art/place-art";
@@ -139,7 +139,7 @@ function orderText(chip: ObjectiveChip): string | null {
 /** Width of one compact objective item: a mini card plus a badge column, or
  * a text tag for trick-count objectives. */
 export function objectiveItemWidth(chip: ObjectiveChip): number {
-  const isCard = chip.kind === "win-card" || chip.kind === "ordered";
+  const isCard = chip.kind === "win-card" || chip.kind === "ordered" || chip.kind === "hidden";
   return isCard ? MINI_W + 1 + LABEL_CELL.w : labelWidth(chip.label) + 4 + LABEL_CELL.w;
 }
 
@@ -155,11 +155,13 @@ export function objectiveItem(
   opts: { onClick: () => void; onHover: (over: boolean) => void; dim: boolean },
 ): Phaser.GameObjects.Container {
   const container = scene.add.container(Math.round(x), Math.round(y));
-  const isCard = chip.kind === "win-card" || chip.kind === "ordered";
+  const isCard = chip.kind === "win-card" || chip.kind === "ordered" || chip.kind === "hidden";
   const w = objectiveItemWidth(chip);
   const bodyW = isCard ? MINI_W : labelWidth(chip.label) + 4;
 
-  if (isCard) {
+  if (chip.kind === "hidden") {
+    container.add(hiddenMiniCard(scene, 0, 0, packId));
+  } else if (isCard) {
     container.add(scene.add.image(0, 0, cardTextureKey(packId, chip.label, "mini")).setOrigin(0, 0));
   } else {
     container.add(plate(scene, 0, 0, bodyW, MINI_H, PALETTE.stump));
@@ -181,6 +183,13 @@ export function objectiveItem(
   if (chip.targetable) hit.on("pointerdown", opts.onClick);
   container.setAlpha(opts.dim && !chip.targetable && !chip.selected ? DIM_ALPHA : 1);
   return container;
+}
+
+/** A face-down objective: a mini card back with a "?". */
+export function hiddenMiniCard(scene: Phaser.Scene, x: number, y: number, packId: CardPackId): Phaser.GameObjects.GameObject[] {
+  const qx = Math.round(x) + Math.floor((MINI_W - LABEL_CELL.w) / 2) + 1;
+  const qy = Math.round(y) + Math.floor((MINI_H - LABEL_CELL.h) / 2);
+  return [scene.add.image(Math.round(x), Math.round(y), cardBackTextureKey(packId, "mini")).setOrigin(0, 0), text(scene, qx, qy, "?", PALETTE.coinShine)];
 }
 
 export function miniCard(scene: Phaser.Scene, x: number, y: number, label: string, packId: CardPackId): Phaser.GameObjects.Image {

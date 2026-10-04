@@ -67,11 +67,21 @@ const RankedCardViewSchema = z.strictObject({
   countsAs: CardIdentityViewSchema.nullable(),
 });
 
-const TrickPlayViewSchema = z.strictObject({
-  seatId: z.string().min(1),
-  card: CardViewSchema,
-  effectiveRank: EffectiveRankSchema,
-});
+// A current-trick play: face up, or face down with only the suit it follows
+// as ("joker" for the Sun or Moon).
+const TrickPlayViewSchema = z.discriminatedUnion("hidden", [
+  z.strictObject({
+    seatId: z.string().min(1),
+    hidden: z.literal(false),
+    card: CardViewSchema,
+    effectiveRank: EffectiveRankSchema,
+  }),
+  z.strictObject({
+    seatId: z.string().min(1),
+    hidden: z.literal(true),
+    suit: z.union([SuitSchema, z.literal("joker")]),
+  }),
+]);
 
 const CompletedPlayViewSchema = z.strictObject({
   seatId: z.string().min(1),
@@ -128,11 +138,20 @@ const ExactlyNObjectiveViewSchema = z.strictObject({
   status: ObjectiveStatusSchema,
 });
 
+// Face down (a Desert's mirage): its kind and target are kept.
+const HiddenObjectiveViewSchema = z.strictObject({
+  id: z.string().min(1),
+  kind: z.literal("hidden"),
+  ownerSeatId: z.string().min(1).nullable(),
+  status: ObjectiveStatusSchema,
+});
+
 const ObjectiveViewSchema = z.discriminatedUnion("kind", [
   WinCardObjectiveViewSchema,
   OrderedObjectiveViewSchema,
   NoTricksObjectiveViewSchema,
   ExactlyNObjectiveViewSchema,
+  HiddenObjectiveViewSchema,
 ]);
 
 const HandSizeViewSchema = z.strictObject({
@@ -325,6 +344,7 @@ const PlanBossViewSchema = z.strictObject({
 const StatusPartViewSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("chance"), percent: z.number().int().min(0).max(100), strikesLeft: z.number().int().min(0) }),
   z.strictObject({ kind: z.literal("strike") }),
+  z.strictObject({ kind: z.literal("meter"), left: z.number().int().min(0), of: z.number().int().min(0) }),
 ]);
 
 const ModViewSchema = z.strictObject({

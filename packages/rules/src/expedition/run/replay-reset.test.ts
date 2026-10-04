@@ -30,7 +30,7 @@ const testSabotage = defineItem({
     window: "between-tricks",
     targets: [],
     apply: () => [{ op: "add-modifier", lasts: "attempt", params: {}, audience: "public" }],
-    effect: () => ({ goals: (prev) => (state) => [...prev(state), guard("sabotage", true)] }),
+    effect: () => ({ goals: (prev) => (state, statuses) => [...prev(state, statuses), guard("sabotage", true)] }),
   }),
 });
 

@@ -3,6 +3,8 @@ import { attemptOf } from "../../run/attempt";
 import { CATALOG } from "../../run/catalog";
 import { rulesFor } from "../../run/compose";
 import { react } from "../../run/react";
+import { toExpeditionPlayerView } from "../../adapter/view";
+import { currentActorSeatId } from "../../camp";
 import { advanceTo, enumerateLegalRunActions, setupRun } from "../../run/run-test-support";
 import { campStack, modCtx } from "../../run/stack";
 import { STAGES, applyRunAction } from "../../run/stages/registry";
@@ -16,7 +18,7 @@ const card = (id: string, identity: CardIdentity): ExpeditionCard => ({ id, iden
 
 const STRIKE: ActiveEffect = { origin: { kind: "mod", modId: "thunderstorm", strength: "full" }, atTrick: 0, lasts: "trick", deferIfFatal: true, params: { strike: true }, audience: "public" };
 
-/** The loadout of camp 2 with the given location and weather. */
+/** The loadout of camp 2 in the Jungle with the given weather. */
 function loadoutIn(weather: string, items: Record<string, readonly string[]> = {}, seed = "weather"): RunAt<"loadout"> {
   const run = setupRun({ seatIds: SEATS, seed, catalog: CATALOG, camp: 2, items }) as RunAt<"loadout">;
   return { ...run, stage: { ...run.stage, camp: { ...run.stage.camp, location: "jungle", weather } } };
@@ -160,5 +162,58 @@ describe("Rain", () => {
   it("leaves whispers alone in fair weather", () => {
     const run = advanceTo(loadoutIn("fair"), "between-tricks", CATALOG);
     expect(rulesFor(run, CATALOG).whisperAllowed(run, "p1")).toBe(true);
+  });
+});
+
+/** The current actor plays their first legal card through the camp stage's
+ * own handler, so a decided camp is not settled away. */
+function playFirst(run: RunState): { run: RunState; seatId: string } {
+  const camp = attemptOf(run)!.camp;
+  const rules = rulesFor(run, CATALOG);
+  const seatId = currentActorSeatId(camp, rules)!;
+  const result = STAGES.camp.on["play-card"]!(run as RunAt<"camp">, seatId, { type: "play-card", cardId: rules.legalPlays(camp, seatId)[0]!.id }, CATALOG);
+  if (!result.ok) throw new Error(result.error);
+  return { run: result.state, seatId };
+}
+
+function campView(run: RunState, seatId: string) {
+  const view = toExpeditionPlayerView(run, seatId, CATALOG);
+  if (view.stage.tag !== "camp") throw new Error(`expected a camp view, got ${view.stage.tag}`);
+  return view.stage.attempt.camp;
+}
+
+describe("Night", () => {
+  it("keeps only the leader's card face down to the others; the next play shows", () => {
+    const lead = playFirst(advanceTo(loadoutIn("night"), "between-tricks", CATALOG));
+    const second = playFirst(lead.run);
+    const third = SEATS.find((s) => s !== lead.seatId && s !== second.seatId)!;
+    const plays = campView(second.run, third).currentTrick.plays;
+    expect(plays.map((p) => [p.seatId, p.hidden])).toEqual([
+      [lead.seatId, true],
+      [second.seatId, false],
+    ]);
+    expect(campView(second.run, lead.seatId).currentTrick.plays.map((p) => p.hidden)).toEqual([false, false]);
+  });
+});
+
+describe("Heavy fog", () => {
+  const items = { p0: ["smoke-signal", "bait"], p1: ["parrot"] };
+
+  it("hides another seat's items in the loadout, but never your own", () => {
+    const run = loadoutIn("fog", items);
+    const seatOf = (viewer: string, seatId: string) => toExpeditionPlayerView(run, viewer, CATALOG).seats.find((s) => s.seatId === seatId)!;
+    expect(seatOf("p1", "p0").items).toEqual({ equipped: [], backpack: null, concealed: true });
+    expect(seatOf("p1", "p0").usage.map((u) => u.sourceKey)).toEqual(["scout"]);
+    expect(seatOf("p0", "p0").items).toMatchObject({ equipped: [{ itemId: "smoke-signal" }, { itemId: "bait" }], backpack: [], concealed: false });
+  });
+
+  it("using an item reveals it, even under fog", () => {
+    const between = advanceTo(loadoutIn("fog", items), "between-tricks", CATALOG);
+    const uid = between.seats[0]!.equipped[0]!;
+    const used = applyRunAction(between, "p0", { type: "use-ability", sourceKey: uid, targets: [] }, CATALOG);
+    if (!used.ok) throw new Error(used.error);
+    const seen = toExpeditionPlayerView(used.state, "p2", CATALOG).seats[0]!;
+    expect(seen.items).toEqual({ equipped: [{ uid, itemId: "smoke-signal", remaining: { kind: "uses", left: 1, of: 2 } }], backpack: null, concealed: true });
+    expect(seen.usage.map((u) => u.sourceKey)).toEqual(["scout", uid]);
   });
 });

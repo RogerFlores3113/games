@@ -172,6 +172,8 @@ export interface CrewRow {
   /** "The Scout", or null while still choosing. */
   character: string | null;
   sources: { sourceKey: string; sourceId: string; name: string }[];
+  /** Heavy fog hides the items this teammate took. */
+  itemsHidden: boolean;
 }
 
 export interface TrailModel {
@@ -435,6 +437,7 @@ function buildCrew(server: SceneServerInput): CrewRow[] {
         const sourceId = sourceIdOfKey(seat, sourceKey);
         return { sourceKey, sourceId, name: sourceName(sourceId) };
       }),
+      itemsHidden: seat.seatId !== view.yourSeatId && seat.items.concealed,
     };
   });
 }

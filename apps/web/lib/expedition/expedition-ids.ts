@@ -46,18 +46,28 @@ export function trickObjectId(identity: ExpeditionCardIdentityView): string {
   return `trick:${cardLabel(identity)}`;
 }
 
+/** A face-down card on the stump, named by the seat that played it. */
+export function faceDownTrickObjectId(seatId: string): string {
+  return `trick:face-down:${seatId}`;
+}
+
 export function revealObjectId(identity: ExpeditionCardIdentityView): string {
   return `reveal:${cardLabel(identity)}`;
 }
 
 /** For win-card/ordered objectives, uses the target's card label
- * (e.g. "objective:K♦"); for no-tricks/exactly-n objectives, which have no
- * card target, falls back to the objective's own id. */
+ * (e.g. "objective:K♦"); for no-tricks/exactly-n and hidden objectives,
+ * which show no card, falls back to the objective's own id. */
 export function objectiveObjectId(o: ExpeditionObjectiveView): string {
   if (o.kind === "win-card" || o.kind === "ordered") {
     return `objective:${cardLabel(o.target)}`;
   }
   return `objective:${o.id}`;
+}
+
+/** The fog over a teammate's items, for its tooltip. */
+export function seatFogObjectId(seatId: string): string {
+  return `seat-fog:${seatId}`;
 }
 
 export function seatObjectId(seatId: string): string {

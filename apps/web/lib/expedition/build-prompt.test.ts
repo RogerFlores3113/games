@@ -148,7 +148,7 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   ],
   [
     "your turn, must follow",
-    view(camp({ yourLegalCardIds: ["h7"], currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "h2", identity: H2 }, effectiveRank: null }] } })),
+    view(camp({ yourLegalCardIds: ["h7"], currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", hidden: false, card: { id: "h2", identity: H2 }, effectiveRank: null }] } })),
     ui(),
     playing,
     { text: "Your turn: follow ♥ (highlighted cards)", tone: "your-move" },
@@ -159,7 +159,7 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
       camp({
         yourHand: [{ id: "s9", identity: S9, effectiveRank: null, countsAs: null }],
         yourLegalCardIds: ["s9"],
-        currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "h2", identity: H2 }, effectiveRank: null }] },
+        currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", hidden: false, card: { id: "h2", identity: H2 }, effectiveRank: null }] },
       }),
     ),
     ui(),
@@ -168,7 +168,7 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   ],
   [
     "a teammate is playing",
-    view(camp({ currentActorSeatId: "ana", currentTrick: { index: 0, leaderSeatId: "bo", plays: [{ seatId: "bo", card: { id: "c4", identity: C4 }, effectiveRank: null }] } })),
+    view(camp({ currentActorSeatId: "ana", currentTrick: { index: 0, leaderSeatId: "bo", plays: [{ seatId: "bo", hidden: false, card: { id: "c4", identity: C4 }, effectiveRank: null }] } })),
     ui(),
     playing,
     { text: "Ana is playing", tone: "waiting" },
@@ -246,7 +246,7 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   [
     "your turn to follow with Bait usable",
     view(
-      camp({ currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "h2", identity: H2 }, effectiveRank: null }] } }),
+      camp({ currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", hidden: false, card: { id: "h2", identity: H2 }, effectiveRank: null }] } }),
       { yourAbilities: [{ sourceKey: "bait", usableNow: true, reason: null, steps: [] }] },
     ),
     ui(),
@@ -256,7 +256,7 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   [
     "your turn to follow with Bait usable, too long to keep the hint",
     view(
-      camp({ yourLegalCardIds: ["h7"], currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "h2", identity: H2 }, effectiveRank: null }] } }),
+      camp({ yourLegalCardIds: ["h7"], currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", hidden: false, card: { id: "h2", identity: H2 }, effectiveRank: null }] } }),
       { yourAbilities: [{ sourceKey: "bait", usableNow: true, reason: null, steps: [] }] },
     ),
     ui(),
@@ -354,7 +354,7 @@ describe("describeChoice", () => {
   const v = view(
     camp({
       objectives: [{ id: "o1", kind: "win-card", target: S9, ownerSeatId: "ana", status: "failed" }, { id: "o2", kind: "no-tricks", ownerSeatId: null, status: "pending" }],
-      currentTrick: { index: 3, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "c4", identity: C4 }, effectiveRank: null }] },
+      currentTrick: { index: 3, leaderSeatId: "ana", plays: [{ seatId: "ana", hidden: false, card: { id: "c4", identity: C4 }, effectiveRank: null }] },
     }),
   );
   const withLog = withAttempt(v, { log: [{ event: "whisper", actorSeatId: "ana", subjectSeatIds: ["me"], sourceId: null, private: false }] });

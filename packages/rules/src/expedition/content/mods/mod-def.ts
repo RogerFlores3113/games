@@ -45,7 +45,8 @@ export type Reactions = { readonly [E in EngineEventType]?: (ctx: ReactionCtx<E>
  * only the current trick. */
 export type StatusPart =
   | { readonly kind: "chance"; readonly percent: number; readonly strikesLeft: number } // Thunderstorm: the next trick's chance
-  | { readonly kind: "strike" }; // a strike sits on this trick
+  | { readonly kind: "strike" } // a strike sits on this trick
+  | { readonly kind: "meter"; readonly left: number; readonly of: number }; // Flooding: tricks left before the river floods
 
 export type ModBody = {
   readonly rules?: (ctx: ModCtx) => RuleModifier;

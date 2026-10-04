@@ -16,7 +16,7 @@ import {
   type TrailView,
 } from "./expedition-driver";
 import { clickObject, getModel, getScene, hoverObject, startExpeditionGame } from "./expedition-helpers";
-import { PICKER_SCENARIOS, rescue, rewriteViews, scenarioKey, type Game } from "./expedition-scenarios";
+import { PICKER_SCENARIOS, playing, rescue, rewriteViews, scenarioKey, type Game } from "./expedition-scenarios";
 
 /**
  * UI tour. Plays 3-player runs and screenshots each phase from player 1's
@@ -54,7 +54,10 @@ const WANTED = [
   "route-voted", "event", "loadout", "next-camp", "run-end-lost", "run-end-guest",
 ];
 /** Phases play rarely reaches; each is also captured from a rewritten view. */
-const RARE = ["run-end-won", "between-camps-draft", "vote-tie-length", "vote-tie-route", "shop", "camp-storm-strike", "camp-rain", "route-weather"];
+const RARE = [
+  "run-end-won", "between-camps-draft", "vote-tie-length", "vote-tie-route", "shop", "camp-storm-strike", "camp-rain", "route-weather",
+  "camp-cave", "camp-night", "camp-desert", "camp-fog", "camp-magma", "camp-flood", "loadout-fog",
+];
 
 interface Identity { kind: "standard" | "joker"; suit?: string; rank?: number; joker?: "sun" | "moon" }
 interface Card { id: string; objectId: string; label: string; identity: Identity; playable: boolean }
@@ -65,7 +68,8 @@ interface CampModel {
   seats: { seatId: string; objectId: string; isYou: boolean; mayAct: boolean; targetable?: boolean; sources: Chip[]; objectives: Chip[] }[];
   hand: (Card & { targetable?: boolean })[];
   receivedWhispers: unknown[];
-  trick: { plays: { seatId: string; card: { label: string; identity: Identity } }[] } | null;
+  /** A face-down play has no card, only the suit it follows as. */
+  trick: { plays: { seatId: string; card?: { label: string; identity: Identity }; suit?: string }[] } | null;
   lastTrick: { open: boolean; plays: unknown[] } | null;
   faceUpObjectives: Chip[];
   whisper: { visible: boolean; active: boolean };
@@ -177,9 +181,11 @@ function beats(card: { identity: Identity }, best: { identity: Identity }, led: 
   return card.identity.suit === led && (best.identity.suit !== led || strength(card) > strength(best));
 }
 
-function trickWinner(plays: NonNullable<CampModel["trick"]>["plays"]): { seatId: string; card: { identity: Identity } } | null {
-  const led = plays[0]?.card.identity.suit;
-  return plays.reduce<(typeof plays)[number] | null>((best, p) => (best === null || beats(p.card, best.card, led) ? p : best), null);
+type ShownPlay = { seatId: string; card: { label: string; identity: Identity } };
+
+/** The best face-up play; face-down cards can't be judged. */
+function trickWinner(plays: ShownPlay[], led: string | undefined): ShownPlay | null {
+  return plays.reduce<ShownPlay | null>((best, p) => (best === null || beats(p.card, best.card, led) ? p : best), null);
 }
 
 /** Plays to clear objectives: lead or chase your own objective's card, feed
@@ -192,9 +198,10 @@ function cardToPlay(model: CampModel): Card[] {
   const ownerOf = new Map(model.seats.filter((s) => !s.isYou).flatMap((s) => pending(s.objectives).map((l) => [l, s.seatId] as const)));
   const playable = model.hand.filter((c) => c.playable).sort((a, b) => strength(a) - strength(b));
   const safe = playable.filter((c) => !ownerOf.has(c.label));
-  const plays = model.trick?.plays ?? [];
-  const winner = trickWinner(plays);
-  const led = plays[0]?.card.identity.suit;
+  const all = model.trick?.plays ?? [];
+  const plays = all.filter((p): p is ShownPlay => p.card !== undefined);
+  const led = all[0]?.card?.identity.suit ?? all[0]?.suit;
+  const winner = trickWinner(plays, led);
   const ordered = (() => {
     if (winner === null) return [...playable.filter((c) => mine.has(c.label) && strength(c) >= 12), ...safe];
     if (plays.some((p) => mine.has(p.card.label))) return [...playable].reverse();
@@ -480,6 +487,82 @@ function rainView(game: Game): Game {
   return { ...game, stage: { ...stage, camp: { ...stage.camp, weather: "rain" }, mods: [mod("jungle", "location"), mod("rain", "weather")], attempt } };
 }
 
+type CampStage = Game["stage"] & { camp: Record<string, unknown>; attempt: NonNullable<Game["stage"]["attempt"]> };
+
+/** The camp in play at `location` in `weather` with the given layers; `edit`
+ * changes the attempt's camp in place. */
+function campIn(game: Game, location: string, weather: string, mods: ReturnType<typeof mod>[], edit: (camp: Record<string, unknown>) => void = () => {}): Game {
+  const next = JSON.parse(JSON.stringify(game)) as Game;
+  const stage = next.stage as CampStage;
+  stage.camp = { ...stage.camp, location, weather };
+  (stage as Record<string, unknown>).mods = mods;
+  edit(stage.attempt.camp as unknown as Record<string, unknown>);
+  return next;
+}
+
+type Plays = { seatId: string; hidden?: boolean; card?: { identity: { suit?: string } }; suit?: string }[];
+const faceDown = (play: Plays[number]) => ({ seatId: play.seatId, hidden: true, suit: play.card?.identity.suit ?? "joker" });
+
+/** Mid-trick in a cave: both teammates' cards face down, showing their suit. */
+function caveView(game: Game): Game {
+  return campIn(playing(game, { plays: 2, window: "in-trick" }), "cave", "fair", [mod("cave", "location"), mod("fair", "weather")], (camp) => {
+    const trick = camp.currentTrick as { plays: Plays };
+    trick.plays = trick.plays.map(faceDown);
+  });
+}
+
+/** Mid-trick at night: only the leader's card face down. */
+function nightView(game: Game): Game {
+  return campIn(playing(game, { plays: 2, window: "in-trick" }), "jungle", "night", [mod("jungle", "location"), mod("night", "weather")], (camp) => {
+    const trick = camp.currentTrick as { plays: Plays };
+    trick.plays = trick.plays.map((play, i) => (i === 0 ? faceDown(play) : play));
+  });
+}
+
+/** The objective pick in the desert: one objective under the mirage. */
+function desertView(game: Game): Game {
+  return campIn(game, "desert", "fair", [mod("desert", "location"), mod("fair", "weather")], (camp) => {
+    const objectives = camp.objectives as Record<string, unknown>[];
+    camp.objectives = objectives.map((o, i) => (i === 1 ? { id: o.id, kind: "hidden", ownerSeatId: null, status: "pending" } : { ...o, ownerSeatId: null, status: "pending" }));
+    camp.campPhase = "objective-pick";
+    camp.currentActorSeatId = game.yourSeatId;
+    camp.currentTrick = { index: 0, leaderSeatId: game.yourSeatId, plays: [] };
+    camp.completedTricks = [];
+  });
+}
+
+/** Heavy fog: every teammate's items hidden. */
+function fogged(game: Game): Game {
+  return { ...game, seats: game.seats.map((s) => (s.seatId === game.yourSeatId ? s : { ...s, items: { equipped: [], backpack: null, concealed: true } })) };
+}
+
+function fogView(game: Game): Game {
+  return fogged(campIn(game, "jungle", "fog", [mod("jungle", "location"), mod("fog", "weather")]));
+}
+
+const HEAT_REMOVED = ["spades", "hearts", "diamonds", "clubs"].flatMap((suit) => [2, 3].map((rank) => ({ kind: "standard", suit, rank }))).concat([{ kind: "standard", suit: "clubs", rank: 4 }]);
+
+/** The magma pool, its chip naming the cards the heat burned. */
+function magmaView(game: Game): Game {
+  return campIn(game, "magma", "fair", [mod("magma", "location"), mod("fair", "weather")], (camp) => {
+    camp.removedCards = HEAT_REMOVED;
+  });
+}
+
+/** A flooded cave two tricks from the flood: the meter on its chip and the
+ * river high around the stump. */
+function floodView(game: Game): Game {
+  const next = campIn(game, "cave", "rain", [mod("cave", "location"), mod("rain", "weather"), mod("flooding", "pairing", [{ kind: "meter", left: 2, of: 14 }])]);
+  const stage = next.stage as CampStage;
+  (stage.attempt as Record<string, unknown>).yourWhisper = { allowed: false, left: 1 };
+  return next;
+}
+
+/** The loadout under Heavy fog: the crew's items hidden. */
+function fogLoadoutView(game: Game): Game {
+  return fogged({ ...game, stage: { tag: "loadout", camp: { ...PREVIEW, weather: "fog" }, mods: [mod("jungle", "location"), mod("fog", "weather")], yourSlots: 2, shop: null, readySeatIds: [] } });
+}
+
 /** A route vote whose options show every weather, and a pairing. */
 function routeWeatherView(game: Game): Game {
   const next = (location: string, weather: string, pairing: string | null) => ({ ...PREVIEW, index: 4, location, weather, pairing });
@@ -490,8 +573,8 @@ function routeWeatherView(game: Game): Game {
       tag: "route",
       options: [
         { id: "a", next: next("clearing", "thunderstorm", null) },
-        { id: "b", next: next("clifftop", "rain", "steam") },
-        { id: "c", next: next("jungle", "fair", null) },
+        { id: "b", next: next("magma", "rain", "steam") },
+        { id: "c", next: next("cave", "rain", "flooding") },
       ],
       ballots: [],
     },
@@ -531,6 +614,10 @@ async function capturePickers(host: Page, tour: Tour, rewrite: Rewriter): Promis
   await tour.shot("camp-storm-strike");
   await reloadTo(rainView);
   await tour.shot("camp-rain");
+  for (const [name, view] of [["camp-cave", caveView], ["camp-night", nightView], ["camp-desert", desertView], ["camp-fog", fogView], ["camp-magma", magmaView], ["camp-flood", floodView]] as const) {
+    await reloadTo(view);
+    await tour.shot(name);
+  }
   await reloadTo((g) => g);
 }
 
@@ -555,6 +642,7 @@ async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<v
   }
   await capture(shopView, "trail", "shop");
   await capture(routeWeatherView, "trail", "route-weather");
+  await capture(fogLoadoutView, "trail", "loadout-fog");
   await capture(lengthTieView as (g: Game) => Game, "trail", "vote-tie-length", 2_000);
   await capture(routeTieView as (g: Game) => Game, "trail", "vote-tie-route", 2_000);
   if (!tour.has("run-end-won")) await capture(wonView as (g: Game) => Game, "run-end", "run-end-won-rewritten");

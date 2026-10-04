@@ -10,7 +10,8 @@ import { LABEL_CELL } from "../font/font-keys";
 import { MINI_H, PLATE_H, SILHOUETTE_H, STUMP_ART_AT, ZONES, plateRect, seatSpots, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
 import { ART, crewArtId, sourceArtId } from "../art/art-registry";
-import { mateSourceObjectId, seatObjectId, sourceObjectId } from "../../../../lib/expedition/expedition-ids";
+import { mateSourceObjectId, seatFogObjectId, seatObjectId, sourceObjectId } from "../../../../lib/expedition/expedition-ids";
+import { fogTile } from "./draw-weather";
 import type { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel, SeatModel, SourceChip } from "../../../../lib/expedition/build-scene-model";
 import type { CampHandlers } from "./camp-handlers";
@@ -114,6 +115,18 @@ function kitIcons(ctx: Ctx, group: Layer, seat: SeatModel, right: number, cy: nu
   return shown.length * (ICON + 1);
 }
 
+/** Heavy fog over the items a teammate has not used: a fog tile left of
+ * their kit icons, whose hover explains it. Returns the width it takes. */
+function fogOverItems(ctx: Ctx, group: Layer, seat: SeatModel, x: number, y: number): number {
+  const tile = fogTile(ctx.scene, x, y);
+  tile.setInteractive();
+  tile.on("pointerover", () => ctx.handlers.onModHover("fog"));
+  tile.on("pointerout", () => ctx.handlers.onModHover(null));
+  group.add(tile);
+  ctx.index.register("camp", seatFogObjectId(seat.seatId), tile);
+  return ICON + 1;
+}
+
 /** "12 cards": the seat's hand, a target for hand picks. */
 function handCount(ctx: Ctx, group: Layer, seat: SeatModel, x: number, y: number): void {
   const { scene, index, handlers } = ctx;
@@ -173,7 +186,8 @@ function drawPlate(ctx: Ctx, layer: Layer, seat: SeatModel, box: Rect): void {
   group.add(text(scene, x0 + iw - labelWidth(tricks) - 1, countsY + 1, tricks, PALETTE.textDim));
 
   const rowY = box.y + PLATE_H - MINI_H - 3;
-  const iconsW = kitIcons(ctx, group, seat, x0 + iw, rowY + MINI_H / 2, Math.floor(iw / 2));
+  let iconsW = kitIcons(ctx, group, seat, x0 + iw, rowY + MINI_H / 2, Math.floor(iw / 2));
+  if (seat.itemsHidden) iconsW += fogOverItems(ctx, group, seat, x0 + iw - iconsW - ICON, rowY + Math.floor((MINI_H - ICON) / 2));
   if (seat.objectives.length > 0) objectivesRow(ctx, group, seat.objectives, x0, rowY, iw - iconsW - 4);
 
   if (!seat.connected) group.setAlpha(DISCONNECTED_ALPHA);

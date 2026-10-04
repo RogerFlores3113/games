@@ -25,7 +25,19 @@ import type { CoreRules } from "../rules";
 import { ITEM_SLOTS } from "./balance";
 import type { RunState } from "./types";
 
+/** A thing a camp rule may keep from a viewer. */
+export type Concealable =
+  /** A play in the current trick. */
+  | { readonly kind: "play"; readonly trickIndex: number; readonly position: number; readonly seatId: string }
+  /** An objective's kind and target, not its existence. */
+  | { readonly kind: "objective"; readonly objectiveId: string }
+  /** A seat's backpack and the equipped items it has not used this attempt. */
+  | { readonly kind: "loadout"; readonly seatId: string };
+
 export type RunHooks = {
+  /** Whether `subject` is kept from `viewerSeatId`. The view and the leak
+   * check both read it. */
+  hides(run: RunState, viewerSeatId: string, subject: Concealable): boolean;
   whisperAllowed(run: RunState, seatId: string): boolean;
   whisperAudience(run: RunState, seatId: string, targetSeatId: string): readonly string[];
   whispersPerCamp(run: RunState, seatId: string): number;
@@ -56,6 +68,7 @@ const HOOK_NAME_SET: Record<HookName, true> = {
   nextLeader: true,
   objectiveStatus: true,
   goals: true,
+  hides: true,
   whisperAllowed: true,
   whisperAudience: true,
   whispersPerCamp: true,
@@ -66,6 +79,9 @@ const HOOK_NAME_SET: Record<HookName, true> = {
 export const HOOK_NAMES: readonly HookName[] = Object.keys(HOOK_NAME_SET) as HookName[];
 
 export const baseRunHooks: RunHooks = {
+  hides(_run, _viewerSeatId, _subject) {
+    return false;
+  },
   whisperAllowed(_run, _seatId) {
     return true;
   },

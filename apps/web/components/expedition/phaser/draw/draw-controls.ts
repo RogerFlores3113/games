@@ -14,7 +14,7 @@ import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build
 import type { ArtId } from "../art/art-registry";
 import type { CampHandlers } from "./camp-handlers";
 import { fitLabel, wrapWords } from "./text-fit";
-import { button, labelWidth, miniCard, plate, platedText, text, type Layer } from "./ui-kit";
+import { button, hiddenMiniCard, labelWidth, miniCard, plate, platedText, text, type Layer } from "./ui-kit";
 
 const TILE_W = OBJECTIVE_POOL_STEP - 4;
 const BUTTON_H = 14;
@@ -23,6 +23,7 @@ const ROW_GAP = 4;
 const PULSE_MS = 600;
 
 function tileCaption(chip: ObjectiveChip): { body: string | null; caption: string } {
+  if (chip.kind === "hidden") return { body: null, caption: "hidden" };
   if (chip.kind === "no-tricks") return { body: "0", caption: "tricks" };
   if (chip.kind === "exactly-n") return { body: chip.label.split(" ")[0]!, caption: "tricks" };
   if (chip.orderBadge === null) return { body: null, caption: chip.label };
@@ -43,7 +44,9 @@ function drawObjectivePool(scene: Phaser.Scene, layer: Layer, model: SceneModel,
     const container = scene.add.container(Math.round(tileX), bodyY);
     const bodyX = Math.round(TILE_W / 2 - MINI_W / 2);
     const { body, caption } = tileCaption(chip);
-    if (body === null) {
+    if (chip.kind === "hidden") {
+      container.add(hiddenMiniCard(scene, bodyX, 0, model.cardPackId));
+    } else if (body === null) {
       container.add(miniCard(scene, bodyX, 0, chip.label, model.cardPackId));
     } else {
       container.add(plate(scene, bodyX, 0, MINI_W, MINI_H, PALETTE.stump));

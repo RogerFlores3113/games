@@ -38,6 +38,10 @@ export const NORMAL_WEATHER_CHANCE = 80;
 /** A strike's chance before trick t is firstChance + perTrick * t percent. */
 export const THUNDERSTORM = { firstChance: 20, perTrick: 10, maxStrikes: 2 } as const;
 
+/** Flooding (and Monsoon): every objective must be done once this share of
+ * the camp's tricks is played. Placeholder. */
+export const RIVER_SHARE = 3 / 4;
+
 /** A draft offer: `options` bundles of `bundleSize` items; each item is rare
  * with `rareChance` percent. */
 export const DRAFT = { options: 3, bundleSize: 2, rareChance: 15 } as const;

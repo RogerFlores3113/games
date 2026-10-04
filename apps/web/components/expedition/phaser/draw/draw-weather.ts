@@ -9,7 +9,7 @@ import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
 import { STAGE, STUMP_CENTRE, ZONES } from "../layout";
 import type { ObjectIndex } from "../object-index";
-import type { ModChip, Precipitation } from "../../../../lib/expedition/weather-model";
+import type { Haze, ModChip, Precipitation, Sky } from "../../../../lib/expedition/weather-model";
 import { labelWidth, plate, text, type Layer } from "./ui-kit";
 
 // ---------------------------------------------------------------------------
@@ -27,6 +27,8 @@ const ICON_INK: Readonly<Record<string, string>> = {
   t: PALETTE.done,
   k: PALETTE.bark,
   m: PALETTE.moss,
+  r: PALETTE.destructive,
+  c: PALETTE.cardFace,
 };
 
 const ICONS: Readonly<Record<string, readonly string[]>> = {
@@ -36,6 +38,13 @@ const ICONS: Readonly<Record<string, readonly string[]>> = {
   jungle: ["...ttt...", "..ttttt..", ".ttttttt.", "ttttttttt", ".ttttttt.", "...kkk...", "....k....", "....k....", "mmmmmmmmm"],
   clearing: [".........", ".........", "....o....", "...ooo...", ".........", "t..t...t.", "tt.tt.ttt", "mmmmmmmmm", "mmmmmmmmm"],
   clifftop: ["....w....", "...www...", "...gwg...", "..ggggg..", "..gdggg..", ".ggggdgg.", ".gdggggg.", "ggggggdgg", "ddddddddd"],
+  desert: ["......o..", ".....ooo.", "......o..", "..t......", ".ttt.....", "..t...cc.", "..t..cccc", "ccccccccc", "ccccccccc"],
+  cave: ["...ggg...", ".ggggggg.", "ggg...ggg", "gg.....gg", "gg..b..gg", "g...b...g", "g..bbb..g", "g.......g", "ggggggggg"],
+  magma: ["...r.r...", "....r....", "...kkk...", "..kkokk..", "..kkokk..", ".kkkokkk.", ".kkoookk.", "kkoooookk", "ooooooooo"],
+  fog: [".........", "wwwww....", "...wwwwww", ".........", ".wwwwww..", "....wwwww", ".........", "wwwww....", "..wwwwww."],
+  night: ["..www....", ".ww......", "ww.....y.", "ww.......", "ww....y..", "ww.......", ".ww.....y", "..www....", "........."],
+  steam: [".w...w...", "..w...w..", ".w...w...", "..w...w..", ".........", "..rrrrr..", ".rrooorr.", "rrooooorr", "rrrrrrrrr"],
+  flooding: [".b..b..b.", "b..b..b..", ".........", "bb...bb..", "..bbb..bb", ".........", "bb...bb..", "..bbb..bb", "bbbbbbbbb"],
 };
 
 /** A shape for each kind when its def has no icon of its own. */
@@ -65,6 +74,16 @@ export function modIcon(scene: Phaser.Scene, id: string, kind: ModChip["kind"], 
   return g;
 }
 
+/** A seat's items hidden by fog: the fog icon on a 16x16 grey tile, its
+ * top-left at (x, y). */
+export function fogTile(scene: Phaser.Scene, x: number, y: number): Phaser.GameObjects.Container {
+  const tile = scene.add.container(Math.round(x), Math.round(y));
+  tile.add(plate(scene, 0, 0, 16, 16, PALETTE.plateEdge).setStrokeStyle(1, toPhaserColor(PALETTE.textDim)));
+  tile.add(modIcon(scene, "fog", "weather", 4, 4));
+  tile.setSize(16, 16);
+  return tile;
+}
+
 // ---------------------------------------------------------------------------
 // The strip
 // ---------------------------------------------------------------------------
@@ -74,10 +93,27 @@ const CHIP_PAD = 3;
 const CHIP_GAP = 4;
 const PIP_W = 4;
 
+const GAUGE_W = 18;
+const GAUGE_H = 6;
+
 function chipWidth(chip: ModChip, withBadge: boolean): number {
   const badge = withBadge && chip.badge !== null ? CHIP_GAP + labelWidth(chip.badge) : 0;
   const pips = withBadge && chip.pips > 0 ? CHIP_GAP + chip.pips * (PIP_W + 1) - 1 : 0;
-  return CHIP_PAD + ICON_SIZE + CHIP_PAD + labelWidth(chip.name) + badge + pips + CHIP_PAD;
+  const gauge = chip.gauge !== null ? CHIP_GAP + GAUGE_W : 0;
+  return CHIP_PAD + ICON_SIZE + CHIP_PAD + labelWidth(chip.name) + badge + pips + gauge + CHIP_PAD;
+}
+
+/** The river's meter: the water risen so far, the dry part above it. */
+function gauge(scene: Phaser.Scene, x: number, y: number, left: number, of: number): Phaser.GameObjects.Graphics {
+  const g = scene.add.graphics();
+  g.fillStyle(toPhaserColor(PALETTE.letterbox), 1);
+  g.fillRect(x, y, GAUGE_W, GAUGE_H);
+  const risen = of === 0 ? GAUGE_W - 2 : Math.round(((of - left) / of) * (GAUGE_W - 2));
+  g.fillStyle(toPhaserColor(PALETTE.rain), 1);
+  g.fillRect(x + 1, y + 1, risen, GAUGE_H - 2);
+  g.lineStyle(1, toPhaserColor(PALETTE.plateEdge), 1);
+  g.strokeRect(x + 0.5, y + 0.5, GAUGE_W - 1, GAUGE_H - 1);
+  return g;
 }
 
 /** A small bolt, 4 wide, 7 tall. */
@@ -125,6 +161,11 @@ export function drawModStrip(scene: Phaser.Scene, layer: Layer, chips: ModChip[]
       const pips = scene.add.graphics();
       for (let i = 0; i < chip.pips; i++) bolt(pips, cx + i * (PIP_W + 1), Math.floor((CHIP_H - 7) / 2), PALETTE.coin);
       container.add(pips);
+      cx += chip.pips * (PIP_W + 1) - 1;
+    }
+    if (chip.gauge !== null) {
+      cx += CHIP_GAP;
+      container.add(gauge(scene, cx, Math.floor((CHIP_H - GAUGE_H) / 2), chip.gauge.left, chip.gauge.of));
     }
     container.setSize(w, CHIP_H);
     const hit = scene.add.zone(0, 0, w, CHIP_H).setOrigin(0, 0);
@@ -144,6 +185,20 @@ export function drawModStrip(scene: Phaser.Scene, layer: Layer, chips: ModChip[]
 
 const DROP_KEY = "weather:drop";
 const SKY_DIM: Readonly<Record<Precipitation, number>> = { none: 0, rain: 0.18, storm: 0.34 };
+const NIGHT_DIM = 0.38;
+const FOG_KEY = "weather:fog-band";
+/** Mist above the seat plates, around the stump and low on the ground, so
+ * the plates' text never sits on a bright band. */
+const FOG_BANDS = [
+  { y: 46, alpha: 0.3, drift: 60, ms: 9000 },
+  { y: 182, alpha: 0.38, drift: -80, ms: 11000 },
+  { y: 248, alpha: 0.3, drift: 70, ms: 10000 },
+] as const;
+/** The water line: just under the hand panels when the river is low, the
+ * stump's foot when it floods. */
+const RIVER_LOW_Y = 300;
+const RIVER_HIGH_Y = 232;
+const RIVER_MS = 700;
 const FLASH_MS = 520;
 
 function ensureDropTexture(scene: Phaser.Scene): void {
@@ -157,11 +212,30 @@ function ensureDropTexture(scene: Phaser.Scene): void {
   g.destroy();
 }
 
-/** The rain and the storm's dimmer sky, drawn between the backdrop and the
- * table; rebuilt only when the precipitation changes. */
+/** A soft horizontal band of mist, clear at its top and bottom edges. */
+function ensureFogTexture(scene: Phaser.Scene): void {
+  if (scene.textures.exists(FOG_KEY)) return;
+  const texture = scene.textures.createCanvas(FOG_KEY, STAGE.w + 160, 56);
+  if (!texture) return;
+  const ctx = texture.context;
+  const gradient = ctx.createLinearGradient(0, 0, 0, 56);
+  gradient.addColorStop(0, "rgba(201, 205, 214, 0)");
+  gradient.addColorStop(0.5, "rgba(201, 205, 214, 1)");
+  gradient.addColorStop(1, "rgba(201, 205, 214, 0)");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, STAGE.w + 160, 56);
+  texture.refresh();
+}
+
+/** The weather between the backdrop and the table: rain and the storm's
+ * darker sky, the night's dark, drifting fog, and the river rising in a
+ * flooded cave. Each part is rebuilt only when it changes. */
 export class WeatherOverlay {
   private current: Precipitation | null = null;
+  private haze: Haze | null = null;
   private objects: Phaser.GameObjects.GameObject[] = [];
+  private hazeObjects: Phaser.GameObjects.GameObject[] = [];
+  private river: Phaser.GameObjects.Container | null = null;
   private readonly flashed = new Set<string>();
 
   constructor(
@@ -170,7 +244,52 @@ export class WeatherOverlay {
     private readonly top: Layer,
   ) {}
 
-  setPrecipitation(precipitation: Precipitation): void {
+  setSky(sky: Pick<Sky, "precipitation" | "haze" | "flood">): void {
+    this.setHaze(sky.haze);
+    this.setPrecipitation(sky.precipitation);
+    this.setRiver(sky.flood);
+  }
+
+  private setHaze(haze: Haze): void {
+    if (haze === this.haze) return;
+    this.haze = haze;
+    for (const obj of this.hazeObjects) obj.destroy();
+    this.hazeObjects = [];
+    if (haze === "night") {
+      this.hazeObjects = [this.scene.add.rectangle(0, 0, STAGE.w, STAGE.h, toPhaserColor(PALETTE.letterbox), NIGHT_DIM).setOrigin(0, 0)];
+    } else if (haze === "fog") {
+      ensureFogTexture(this.scene);
+      this.hazeObjects = [
+        this.scene.add.rectangle(0, 0, STAGE.w, STAGE.h, toPhaserColor(PALETTE.moon), 0.12).setOrigin(0, 0),
+        ...FOG_BANDS.map((band) => {
+          const image = this.scene.add.image(-80, band.y, FOG_KEY).setOrigin(0, 0.5).setAlpha(band.alpha);
+          this.scene.tweens.add({ targets: image, x: -80 + band.drift, duration: band.ms, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+          return image;
+        }),
+      ];
+    }
+    this.sky.add(this.hazeObjects);
+  }
+
+  /** The water rises to its new line; a fresh camp starts it there. */
+  private setRiver(flood: number | null): void {
+    if (flood === null) {
+      this.river?.destroy();
+      this.river = null;
+      return;
+    }
+    const y = Math.round(RIVER_LOW_Y - flood * (RIVER_LOW_Y - RIVER_HIGH_Y));
+    if (this.river === null) {
+      const water = this.scene.add.rectangle(0, 0, STAGE.w, STAGE.h, toPhaserColor(PALETTE.rain), 0.32).setOrigin(0, 0);
+      const crest = this.scene.add.rectangle(0, 0, STAGE.w, 2, toPhaserColor(PALETTE.moon), 0.55).setOrigin(0, 0);
+      this.river = this.scene.add.container(0, y, [water, crest]);
+      this.sky.add(this.river);
+      return;
+    }
+    if (this.river.y !== y) this.scene.tweens.add({ targets: this.river, y, duration: RIVER_MS, ease: "Quad.easeOut" });
+  }
+
+  private setPrecipitation(precipitation: Precipitation): void {
     if (precipitation === this.current) return;
     this.current = precipitation;
     for (const obj of this.objects) obj.destroy();

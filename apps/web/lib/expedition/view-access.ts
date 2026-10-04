@@ -1,4 +1,4 @@
-import type { ExpeditionAttemptView, ExpeditionLogEntryView, ExpeditionPlanBossView, ExpeditionView } from "@games/rules";
+import type { ExpeditionAttemptView, ExpeditionCampView, ExpeditionLogEntryView, ExpeditionPlanBossView, ExpeditionView } from "@games/rules";
 
 /**
  * Reads that every scene model shares: the dealt attempt, which camp the
@@ -8,6 +8,15 @@ import type { ExpeditionAttemptView, ExpeditionLogEntryView, ExpeditionPlanBossV
 
 export function attemptOf(view: ExpeditionView): ExpeditionAttemptView | null {
   return view.stage.tag === "camp" ? view.stage.attempt : null;
+}
+
+/** The suit the current trick was led in, face up or face down; null
+ * before the lead or when a joker led. */
+export function ledSuit(camp: ExpeditionCampView): "spades" | "hearts" | "diamonds" | "clubs" | null {
+  const lead = camp.currentTrick.plays[0];
+  if (lead === undefined) return null;
+  if (lead.hidden) return lead.suit === "joker" ? null : lead.suit;
+  return lead.card.identity.kind === "standard" ? lead.card.identity.suit : null;
 }
 
 /** The attempt's whispers in order; a whisper always has a sender. */

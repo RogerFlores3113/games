@@ -28,6 +28,7 @@ import type {
   Hand,
   Objective,
   ObjectiveStatus,
+  ObjectiveStatusEntry,
   PlayerCount,
   StandardIdentity,
   TrickPlay,
@@ -49,8 +50,9 @@ export type CoreRules = {
   burns(plays: readonly TrickPlay[], led: CardIdentity, winnerOf: (plays: readonly TrickPlay[]) => string): readonly string[];
   nextLeader(state: CampState, trick: CompletedTrick): string;
   objectiveStatus(state: CampState, objective: Objective): ObjectiveStatus;
-  /** Camp-wide conditions beside the objectives. */
-  goals(state: CampState): readonly Goal[];
+  /** Camp-wide conditions beside the objectives, given every objective's
+   * composed status. */
+  goals(state: CampState, statuses: readonly ObjectiveStatusEntry[]): readonly Goal[];
 };
 
 /** Standard identities ranked above the deck's lowest standard rank, so a

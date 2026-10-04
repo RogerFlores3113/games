@@ -57,6 +57,7 @@ import type {
   OrderedObjective,
   OrderMarker,
   ObjectiveStatus,
+  ObjectiveStatusEntry,
   WinCardObjective,
 } from "./state";
 
@@ -257,7 +258,7 @@ export function evaluateObjective(state: CampState, objective: Objective): Objec
   return def.evaluate(state, objective);
 }
 
-export function objectiveStatuses(state: CampState, rules: Pick<CoreRules, "objectiveStatus">): Array<{ objectiveId: string; status: ObjectiveStatus }> {
+export function objectiveStatuses(state: CampState, rules: Pick<CoreRules, "objectiveStatus">): ObjectiveStatusEntry[] {
   return state.objectives.map((objective) => ({
     objectiveId: objective.id,
     status: rules.objectiveStatus(state, objective),

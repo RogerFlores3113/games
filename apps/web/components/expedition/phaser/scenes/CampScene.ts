@@ -298,7 +298,7 @@ export class CampScene extends Phaser.Scene {
       this.backdropLayer.add(drawBackdrop(this, model.sky.location));
       this.backdropLocation = model.sky.location;
     }
-    this.weather?.setPrecipitation(model.sky.precipitation);
+    this.weather?.setSky(model.sky);
     this.weather?.flash(model.sky.strike);
   }
 

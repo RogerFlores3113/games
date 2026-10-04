@@ -3,8 +3,13 @@ import type { ExpeditionAbilityView, ExpeditionAttemptView, ExpeditionCampView, 
 import { initialLocalUi } from "./local-ui";
 import type { LocalUiState } from "./local-ui";
 import { cardLabel, handObjectId, objectiveObjectId, seatObjectId, sourceObjectId, trickObjectId, WHISPER_ID } from "./expedition-ids";
-import type { RoomSeatInfo, SceneServerInput } from "./build-scene-model";
+import type { RoomSeatInfo, SceneServerInput, ShownPlayModel, TrickPlayModel } from "./build-scene-model";
 import { buildSceneModel, sceneKeyFor } from "./build-scene-model";
+
+function shown(play: TrickPlayModel): ShownPlayModel {
+  if (play.hidden) throw new Error(`expected ${play.seatId}'s play face up`);
+  return play;
+}
 
 const AS: ExpeditionCardIdentityView = { kind: "standard", suit: "spades", rank: 14 }; // A♠
 const KD: ExpeditionCardIdentityView = { kind: "standard", suit: "diamonds", rank: 13 }; // K♦
@@ -352,7 +357,7 @@ describe("drag and drop", () => {
   }
 
   it("names the suit you must follow for a card the server did not list as legal", () => {
-    const led = { seatId: "s1", card: { id: "led", identity: AS }, effectiveRank: null };
+    const led = { seatId: "s1", hidden: false as const, card: { id: "led", identity: AS }, effectiveRank: null };
     const model = buildSceneModel(
       server(dragView({ currentActorSeatId: "s2", currentTrick: { index: 0, leaderSeatId: "s1", plays: [led] }, yourLegalCardIds: ["as"] })),
       ui(),
@@ -407,8 +412,8 @@ describe("trick and lastTrick", () => {
             index: 0,
             leaderSeatId: "s2",
             plays: [
-              { seatId: "s2", card: { id: "c1", identity: AS }, effectiveRank: null },
-              { seatId: "s3", card: { id: "c2", identity: KD }, effectiveRank: null },
+              { seatId: "s2", hidden: false, card: { id: "c1", identity: AS }, effectiveRank: null },
+              { seatId: "s3", hidden: false, card: { id: "c2", identity: KD }, effectiveRank: null },
             ],
           },
         }),
@@ -418,7 +423,7 @@ describe("trick and lastTrick", () => {
     expect(model.trick!.leaderSeatId).toBe("s2");
     expect(model.trick!.plays[0]!.isLed).toBe(true);
     expect(model.trick!.plays[1]!.isLed).toBe(false);
-    expect(model.trick!.plays[0]!.card.objectId).toBe(trickObjectId(AS));
+    expect(shown(model.trick!.plays[0]!).card.objectId).toBe(trickObjectId(AS));
 
     const noAttempt = makeView({ stage: { tag: "loadout", camp: { index: 2, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false }, mods: [], yourSlots: 2, shop: null, readySeatIds: [] } });
     const model2 = buildSceneModel(server(noAttempt), ui(), "big-index");
@@ -466,7 +471,7 @@ describe("trick and lastTrick", () => {
               ],
             },
           ],
-          currentTrick: { index: 1, leaderSeatId: "s2", plays: [{ seatId: "s2", card: { id: "c3", identity: TH }, effectiveRank: null }] },
+          currentTrick: { index: 1, leaderSeatId: "s2", plays: [{ seatId: "s2", hidden: false, card: { id: "c3", identity: TH }, effectiveRank: null }] },
         }),
       },
     });
@@ -475,7 +480,7 @@ describe("trick and lastTrick", () => {
       ["A♠", true, null],
       ["K♦", false, { kind: "standard", suit: "hearts", rank: 13 }],
     ]);
-    expect(model.trick!.plays.map((p) => [p.burned, p.countsAs])).toEqual([[false, null]]);
+    expect(model.trick!.plays.map((p) => [shown(p).burned, shown(p).countsAs])).toEqual([[false, null]]);
   });
 
   it("a board card step makes the offered card on the table targetable", () => {
@@ -488,15 +493,15 @@ describe("trick and lastTrick", () => {
             index: 0,
             leaderSeatId: "s1",
             plays: [
-              { seatId: "s1", card: { id: "c1", identity: AS }, effectiveRank: null },
-              { seatId: "s3", card: { id: "c2", identity: KD }, effectiveRank: null },
+              { seatId: "s1", hidden: false, card: { id: "c1", identity: AS }, effectiveRank: null },
+              { seatId: "s3", hidden: false, card: { id: "c2", identity: KD }, effectiveRank: null },
             ],
           },
         }),
       },
     });
     const model = buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceKey: "bait", selected: [], valueCardId: null } }), "big-index");
-    expect(model.trick!.plays.map((p) => [p.card.id, p.card.targetable])).toEqual([
+    expect(model.trick!.plays.map((p) => [shown(p).card.id, shown(p).card.targetable])).toEqual([
       ["c1", false],
       ["c2", true],
     ]);
@@ -731,11 +736,11 @@ describe("whisper status", () => {
     expect(buildSceneModel(server(view), ui(), "big-index").whisper).toMatchObject({ visible: false, state: "blocked", reason: "Blocked right now" });
   });
 
-  it("blocked under rain: says the rain stops whispers", () => {
+  it("blocked under rain: says the rain blocks it", () => {
     const view = whisperView({ yourWhisper: { allowed: false, left: 1 } });
     if (view.stage.tag !== "camp") throw new Error("camp fixture");
     const rainy: ExpeditionView = { ...view, stage: { ...view.stage, mods: [{ id: "rain", kind: "weather", strength: "full", status: [] }] } };
-    expect(buildSceneModel(server(rainy), ui(), "big-index").whisper).toMatchObject({ state: "blocked", reason: "Rain stops whispers" });
+    expect(buildSceneModel(server(rainy), ui(), "big-index").whisper).toMatchObject({ state: "blocked", reason: "Blocked by Rain" });
   });
 
   it("active reflects ui.targeting.mode === whisper", () => {
@@ -1063,5 +1068,45 @@ describe("cardPackId and youSeatId passthrough", () => {
     const model = buildSceneModel(server(makeView({ yourSeatId: "s3" })), ui(), "classic");
     expect(model.cardPackId).toBe("classic");
     expect(model.youSeatId).toBe("s3");
+  });
+});
+
+describe("concealment", () => {
+  it("draws a face-down play as its suit only, named by its seat, and says to follow that suit", () => {
+    const view = makeView({
+      attempt: {
+        ...makeAttempt(),
+        camp: makeCamp({
+          currentTrick: { index: 0, leaderSeatId: "s1", plays: [{ seatId: "s1", hidden: true, suit: "hearts" }] },
+          yourHand: [
+            { id: "c-as", identity: AS, effectiveRank: null, countsAs: null },
+            { id: "c-th", identity: TH, effectiveRank: null, countsAs: null },
+          ],
+          yourLegalCardIds: ["c-th"],
+        }),
+      },
+    });
+    const model = buildSceneModel(server(view), ui(), "big-index");
+    expect(model.trick!.plays).toEqual([{ seatId: "s1", hidden: true, suit: "hearts", objectId: "trick:face-down:s1", isLed: true }]);
+    expect(model.hand.find((c) => c.id === "c-as")!.blockedReason).toBe("Must follow ♥");
+  });
+
+  it("shows a hidden objective as a face-down card that explains the mirage", () => {
+    const hidden: ExpeditionObjectiveView = { id: "o-mirage", kind: "hidden", ownerSeatId: null, status: "pending" };
+    const view = makeView({ attempt: { ...makeAttempt(), camp: makeCamp({ objectives: [hidden], campPhase: "objective-pick" }) } });
+    const model = buildSceneModel(server(view), ui({ tooltipObjectiveId: "o-mirage" }), "big-index");
+    expect(model.faceUpObjectives.map((o) => [o.objectId, o.kind, o.label])).toEqual([["objective:o-mirage", "hidden", "?"]]);
+    expect(model.tooltip).toEqual({ title: "Hidden objective", text: "A mirage hides this objective until the first trick is won.", badges: ["Still open"], reason: null });
+  });
+
+  it("marks a teammate's items hidden under fog, never your own", () => {
+    const fogged = (s: ExpeditionView["seats"][number]) => ({ ...s, items: { equipped: [], backpack: null, concealed: true } });
+    const base = makeView();
+    const model = buildSceneModel(server({ ...base, seats: base.seats.map((s) => (s.seatId === "s2" ? s : fogged(s))) }), ui(), "big-index");
+    expect(model.seats.map((s) => [s.seatId, s.itemsHidden])).toEqual([
+      ["s2", false],
+      ["s3", true],
+      ["s1", true],
+    ]);
   });
 });

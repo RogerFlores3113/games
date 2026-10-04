@@ -1,9 +1,10 @@
 import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionObjectiveView, ExpeditionTargetKind, ExpeditionView } from "@games/rules";
-import { attemptOf, campHeadline, focusCampIndex, whisperLog } from "./view-access";
+import { attemptOf, campHeadline, focusCampIndex, ledSuit, whisperLog } from "./view-access";
 import { SOURCE_DISPLAY } from "@games/rules";
 import type { CardPackId } from "./card-pack-ids";
 import {
   cardLabel,
+  faceDownTrickObjectId,
   rankLabel,
   SUIT_GLYPH,
   handObjectId,
@@ -103,7 +104,7 @@ export interface CardModel {
   dragging: boolean;
 }
 
-export type ObjectiveKind = "win-card" | "ordered" | "no-tricks" | "exactly-n";
+export type ObjectiveKind = "win-card" | "ordered" | "no-tricks" | "exactly-n" | "hidden";
 
 export interface ObjectiveChip {
   objectiveId: string;
@@ -181,6 +182,8 @@ export interface SeatModel {
   tricksWon: number;
   objectives: ObjectiveChip[];
   sources: SourceChip[];
+  /** Heavy fog hides the items this teammate has not used yet. */
+  itemsHidden: boolean;
   reveals: MiniCard[];
   targetable: boolean;
   selected: boolean;
@@ -208,8 +211,9 @@ export interface Banner {
   uses: SourceChip[];
 }
 
-export interface TrickPlayModel {
+export interface ShownPlayModel {
   seatId: string;
+  hidden: false;
   card: CardModel;
   isLed: boolean;
   /** Left its completed trick: it never won and counts for nothing. */
@@ -217,6 +221,18 @@ export interface TrickPlayModel {
   /** What a completed play counted as, when not its printed card. */
   countsAs: ExpeditionCardIdentityView | null;
 }
+
+/** A card on the stump played face down (a Cave, the Night's lead): only
+ * the suit it follows as shows. */
+export interface FaceDownPlayModel {
+  seatId: string;
+  hidden: true;
+  suit: "spades" | "hearts" | "diamonds" | "clubs" | "joker";
+  objectId: string;
+  isLed: boolean;
+}
+
+export type TrickPlayModel = ShownPlayModel | FaceDownPlayModel;
 
 export interface SceneModel {
   sceneKey: "camp";
@@ -232,7 +248,7 @@ export interface SceneModel {
   seats: SeatModel[];
   hand: CardModel[];
   trick: { leaderSeatId: string; plays: TrickPlayModel[] } | null;
-  lastTrick: { leaderSeatId: string; winnerSeatId: string; plays: TrickPlayModel[]; open: boolean } | null;
+  lastTrick: { leaderSeatId: string; winnerSeatId: string; plays: ShownPlayModel[]; open: boolean } | null;
   faceUpObjectives: ObjectiveChip[];
   removedCardLabels: string[];
   prompt: Prompt;
@@ -345,6 +361,9 @@ function objectiveLabel(o: ExpeditionObjectiveView): { label: string; orderBadge
   if (o.kind === "no-tricks") {
     return { label: "0 tricks", orderBadge: null };
   }
+  if (o.kind === "hidden") {
+    return { label: "?", orderBadge: null };
+  }
   return { label: `=${o.n} tricks`, orderBadge: null };
 }
 
@@ -378,9 +397,10 @@ function buildTrickPlayModel(
   play: { seatId: string; card: { id: string; identity: ExpeditionCardIdentityView }; burned?: boolean; countsAs?: ExpeditionCardIdentityView | null },
   isLed: boolean,
   pick: PickState = { targetable: false, selected: false },
-): TrickPlayModel {
+): ShownPlayModel {
   return {
     seatId: play.seatId,
+    hidden: false,
     isLed,
     burned: play.burned ?? false,
     countsAs: play.countsAs ?? null,
@@ -445,6 +465,7 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
     tricksWon,
     objectives,
     sources,
+    itemsHidden: !(view.yourSeatId !== null && seatId === view.yourSeatId) && (seatView?.items.concealed ?? false),
     reveals,
     targetable,
     selected,
@@ -458,8 +479,8 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
 function blockedReasonFor(camp: ExpeditionCampView, view: ExpeditionView): string {
   if (camp.campPhase !== "playing") return "Wait for the objectives to be picked";
   if (camp.currentActorSeatId !== view.yourSeatId) return "Not your turn yet";
-  const led = camp.currentTrick.plays[0]?.card.identity;
-  if (led !== undefined && led.kind === "standard") return `Must follow ${SUIT_GLYPH[led.suit]}`;
+  const led = ledSuit(camp);
+  if (led !== null) return `Must follow ${SUIT_GLYPH[led]}`;
   return "You can't play that card now";
 }
 
@@ -548,7 +569,11 @@ function buildTrick(camp: ExpeditionCampView | null, view: ExpeditionView, ui: L
   if (camp === null) return null;
   return {
     leaderSeatId: camp.currentTrick.leaderSeatId,
-    plays: camp.currentTrick.plays.map((p, i) => buildTrickPlayModel(p, i === 0, targetInfo(ui, view, "card", p.card.id))),
+    plays: camp.currentTrick.plays.map((p, i): TrickPlayModel =>
+      p.hidden
+        ? { seatId: p.seatId, hidden: true, suit: p.suit, objectId: faceDownTrickObjectId(p.seatId), isLed: i === 0 }
+        : buildTrickPlayModel(p, i === 0, targetInfo(ui, view, "card", p.card.id)),
+    ),
   };
 }
 
@@ -719,7 +744,7 @@ export function buildSceneModel(
     campIndex: focusCampIndex(view) ?? 0,
     topBar: buildTopBar(view, pickOrNull(ui, view, "supplies")),
     mods: buildModChips(view),
-    sky: buildSky(view) ?? { location: "jungle", precipitation: "none", strike: null, notice: null },
+    sky: buildSky(view) ?? { location: "jungle", precipitation: "none", haze: "none", flood: null, strike: null, notice: null },
     seats,
     hand,
     trick,

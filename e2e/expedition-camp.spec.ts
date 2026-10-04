@@ -64,9 +64,13 @@ interface SeatModel {
   handPick: { targetable: boolean; selected: boolean };
 }
 
+/** A face-down play (a Cave, the Night's lead) has no card, only its suit. */
 interface TrickPlayModel {
   seatId: string;
-  card: CardModel;
+  hidden: boolean;
+  card?: CardModel;
+  suit?: string;
+  objectId?: string;
 }
 
 interface Targeting {
@@ -338,7 +342,7 @@ async function runAbility(page: Page, chip: SourceChip): Promise<void> {
     const card = model.hand.find((c) => c.targetable);
     const seat = model.seats.find((s) => s.targetable && s.seatId !== leader) ?? model.seats.find((s) => s.targetable);
     const hand = model.seats.find((s) => s.handPick.targetable);
-    const played = model.trick?.plays.find((p) => p.card.targetable);
+    const played = model.trick?.plays.find((p) => p.card?.targetable);
     const option = model.tray?.options[0];
     const objective = model.faceUpObjectives.find((o) => o.targetable) ?? model.seats.flatMap((s) => s.objectives).find((o) => o.targetable);
     const progressed = (m: CampModel) => m.targeting === null || m.targeting.nextKind !== kindBefore || JSON.stringify(m.targeting) !== selectedBefore || JSON.stringify(m.tray) !== JSON.stringify(model.tray);
@@ -349,7 +353,7 @@ async function runAbility(page: Page, chip: SourceChip): Promise<void> {
     } else if (hand) {
       model = await clickUntilChanged<CampModel>(page, hand.handObjectId, progressed);
     } else if (played) {
-      model = await clickUntilChanged<CampModel>(page, played.card.objectId, progressed);
+      model = await clickUntilChanged<CampModel>(page, played.card!.objectId, progressed);
     } else if (model.boardPick?.targetable) {
       model = await clickUntilChanged<CampModel>(page, "board", progressed);
     } else if (model.topBar.suppliesPick?.targetable) {
@@ -804,4 +808,70 @@ test("a forced Thunderstorm: its chance on the top bar, a strike's alert, and th
   const lowest = m.lastTrick!.plays.reduce((low, play) => (strength(play) < strength(low) ? play : low));
   expect(m.lastTrick!.winnerSeatId).toBe(lowest.seatId);
   expect(m.sky.strike, "the strike stays on its trick; a new roll may strike the next").not.toBe(struck);
+});
+
+// ---------------------------------------------------------------------------
+// A forced Cave (needs the worker in dev mode, see dev-mode.spec.ts)
+// ---------------------------------------------------------------------------
+
+interface CaveModel {
+  sceneKey: SceneName;
+  youSeatId: string;
+  mods: { id: string }[];
+  trick: { plays: TrickPlayModel[] } | null;
+  lastTrick: { plays: TrickPlayModel[] } | null;
+}
+
+test("a forced Cave: teammates' cards lie face down showing only their suit, and flip when the trick completes", async ({ page }) => {
+  test.setTimeout(120_000);
+  await createExpeditionRoom(page, "Solo");
+  await page.getByTestId("dev-toggle").click();
+  const panel = page.getByTestId("dev-panel");
+  await panel.getByTestId("dev-add-bot").click();
+  await expect(panel.getByTestId("dev-result")).toHaveText(/^Bot 1 joined\./);
+  await panel.getByTestId("dev-add-bot").click();
+  await expect(panel.getByTestId("dev-result")).toHaveText(/^Bot 2 joined\./);
+  await page.getByTestId("start-game").click();
+  await waitForBridge(page);
+  const model = () => getModel<CaveModel>(page);
+
+  await panel.getByTestId("dev-field-jump-to-camp-camp").fill("2");
+  await panel.getByTestId("dev-field-jump-to-camp-stage").selectOption("camp");
+  await panel.getByTestId("dev-shortcut-jump-to-camp").click();
+  await expect.poll(async () => (await model()).sceneKey).toBe("camp");
+  await panel.getByTestId("dev-field-set-spec-location").selectOption("cave");
+  await panel.getByTestId("dev-field-set-spec-weather").selectOption("fair");
+  await panel.getByTestId("dev-shortcut-set-spec").click();
+  await expect.poll(async () => (await model()).mods.map((m) => m.id)).toEqual(["cave", "fair"]);
+
+  // One step at a time until a teammate's card is on the stump.
+  await panel.getByTestId("dev-autoplay-scope").selectOption("everyone");
+  await panel.getByTestId("dev-autoplay-steps").fill("1");
+  const botPlay = async () => {
+    const m = await model();
+    return m.trick?.plays.find((p) => p.seatId !== m.youSeatId) ?? null;
+  };
+  for (let step = 0; step < 12 && (await botPlay()) === null; step++) {
+    const before = JSON.stringify(await model());
+    await panel.getByTestId("dev-autoplay-run").click();
+    await expect.poll(async () => JSON.stringify(await model())).not.toBe(before);
+  }
+  const hidden = (await botPlay())!;
+  expect(hidden).toMatchObject({ hidden: true, objectId: `trick:face-down:${hidden.seatId}` });
+  expect(["spades", "hearts", "diamonds", "clubs", "joker"]).toContain(hidden.suit);
+  expect(hidden.card, "a face-down play carries no card").toBeUndefined();
+  expect(await page.evaluate((id) => window.__expeditionTest?.positionOf(id) ?? null, hidden.objectId)).not.toBeNull();
+  const now = await model();
+  const mine = now.trick!.plays.find((p) => p.seatId === now.youSeatId);
+  if (mine !== undefined) expect(mine).toMatchObject({ hidden: false, card: { label: expect.any(String) } });
+
+  // Finish the trick: every card in it shows on the last-trick pile.
+  for (let step = 0; step < 6 && ((await model()).lastTrick?.plays.length ?? 0) === 0; step++) {
+    const before = JSON.stringify(await model());
+    await panel.getByTestId("dev-autoplay-run").click();
+    await expect.poll(async () => JSON.stringify(await model())).not.toBe(before);
+  }
+  const last = (await model()).lastTrick!.plays;
+  expect(last).toHaveLength(3);
+  expect(last.find((p) => p.seatId === hidden.seatId)!.card!.label).toMatch(/^([2-9]|10|[JQKA])[♠♥♦♣]$|^(Sun|Moon)$/);
 });

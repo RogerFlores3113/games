@@ -31,7 +31,8 @@ files and identifiers involved.
 card reading `identityOf`, `isTrump` and `rankOf`, `trickWinner(plays,
 led)`, `legalPlays`, `burns(plays, led, winnerOf)`, `nextLeader`,
 `objectiveStatus` (base: `evaluateObjective`) and `goals` (camp-wide
-conditions; every one must be done). A full trick resolves once, in
+conditions, given every objective's composed status; every one must be
+done). A full trick resolves once, in
 `resolveTrick`: the led identity is what the lead counts as, burned plays
 leave the trick (and never count for an objective), and the winner is the
 highest trump kept, else the highest kept card following the led identity,
@@ -124,6 +125,10 @@ and boss) are `ModDef`s, stacked by `run/stack.ts`'s `campStack`. A body's
 toolkit ops (under the origin `{ kind: "mod" }`), `effect` is the layer an
 `add-modifier` from `on` switches on, `slots` reshapes the camp's
 objective slots, and `status` is public table state the view projects.
+The run hook `hides(run, viewer, subject)` keeps a current-trick play, an
+objective's kind and target, or a seat's unused items from a viewer (Cave,
+Night, Desert, Heavy fog); the view and the leak check both read it, so a
+new concealment needs no change to either.
 `ctx.roll(label, n)` and a reaction's `ctx.draw(n)` are seeded. A trick
 effect added with `deferIfFatal` (a Thunderstorm strike) waits one trick
 when, under the fully composed rules, it is what lost the camp
@@ -391,7 +396,8 @@ to turn it on. The web app shows the panel when `NODE_ENV` is `development`
   (`set-upgrade`, its own character's or none), set the camp's location and
   weather (`set-spec`, dealing a dealt camp again), move a card between
   hands, set an objective's owner.
-- Reveal all hands: a plain-text dump of every hand, objective and trick.
+- Reveal all hands: a plain-text dump of every hand, objective and trick,
+  naming the seats each concealed thing is hidden from.
 - State: the whole `RunState` as JSON. Edit and Apply; the worker parses it
   with `ExpeditionRunStateSchema` and then `dev/check.ts` (card conservation,
   known ids, seat alignment, item instances below `itemSerial`, equipped

@@ -62,11 +62,17 @@ export type ExpeditionRankedCardView = {
   countsAs: ExpeditionCardIdentityView | null;
 };
 
-export type ExpeditionTrickPlayView = { seatId: string; card: ExpeditionCardView; effectiveRank: number | null };
+/** A play whose card the viewer sees. */
+export type ExpeditionShownPlayView = { seatId: string; card: ExpeditionCardView; effectiveRank: number | null };
+
+/** A current-trick play: shown, or face down (a Cave, the Night's lead)
+ * with only the suit it follows as ("joker" for the Sun or Moon), never
+ * its rank or id. */
+export type ExpeditionTrickPlayView = (ExpeditionShownPlayView & { hidden: false }) | { seatId: string; hidden: true; suit: Suit | "joker" };
 
 /** A play as its trick was resolved: what it counted as, and whether it
- * burned. */
-export type ExpeditionCompletedPlayView = ExpeditionTrickPlayView & { countsAs: ExpeditionCardIdentityView | null; burned: boolean };
+ * burned. Completed plays are always face up. */
+export type ExpeditionCompletedPlayView = ExpeditionShownPlayView & { countsAs: ExpeditionCardIdentityView | null; burned: boolean };
 
 export type ExpeditionCompletedTrickView = {
   index: number;
@@ -109,6 +115,13 @@ export type ExpeditionObjectiveView =
       id: string;
       kind: "exactly-n";
       n: number;
+      ownerSeatId: string | null;
+      status: ExpeditionObjectiveStatusView;
+    }
+  /** Face down (a Desert's mirage): its kind and target are kept. */
+  | {
+      id: string;
+      kind: "hidden";
       ownerSeatId: string | null;
       status: ExpeditionObjectiveStatusView;
     };
@@ -206,7 +219,8 @@ export type ExpeditionSeatView = {
   seatId: string;
   characterId: string | null;
   upgradeId: string | null;
-  /** `concealed` stays false (and `backpack` shown) until fog lands. */
+  /** `concealed` under Heavy fog for every other seat: `equipped` lists
+   * only the items used this attempt and `backpack` is null. */
   items: { equipped: ExpeditionItemView[]; backpack: ExpeditionItemView[] | null; concealed: boolean };
   pool: { balance: number; max: number } | null;
   /** Every live source key with an active ability. */
@@ -266,7 +280,7 @@ export type ExpeditionVoteView = {
 export type ExpeditionPlanBossView = { at: number; tier: BossTier; bossId: string | null };
 
 /** Public table state of a camp modifier. Carries no card. */
-export type ExpeditionStatusPartView = { kind: "chance"; percent: number; strikesLeft: number } | { kind: "strike" };
+export type ExpeditionStatusPartView = { kind: "chance"; percent: number; strikesLeft: number } | { kind: "strike" } | { kind: "meter"; left: number; of: number };
 
 /** One layer of the camp's modifier stack, in fold order. */
 export type ExpeditionModView = { id: string; kind: ModKind; strength: Strength; status: ExpeditionStatusPartView[] };

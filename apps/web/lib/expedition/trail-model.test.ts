@@ -648,6 +648,7 @@ describe("crew", () => {
           { sourceKey: "guide", sourceId: "guide", name: "Machete" },
           { sourceKey: "trained-monkey", sourceId: "trained-monkey", name: "Trained Monkey" },
         ],
+        itemsHidden: false,
       },
       {
         seatId: "s3",
@@ -660,8 +661,20 @@ describe("crew", () => {
           { sourceKey: "medic", sourceId: "medic", name: "Triage" },
           { sourceKey: "bait", sourceId: "bait", name: "Bait" },
         ],
+        itemsHidden: false,
       },
-      { seatId: "s1", displayLabel: "Alice", isYou: false, connected: true, status: "waiting", character: "The Scout", sources: [{ sourceKey: "scout", sourceId: "scout", name: "Spyglass" }] },
+      { seatId: "s1", displayLabel: "Alice", isYou: false, connected: true, status: "waiting", character: "The Scout", sources: [{ sourceKey: "scout", sourceId: "scout", name: "Spyglass" }], itemsHidden: false },
+    ]);
+  });
+
+  it("marks a teammate's items hidden under fog, never your own", () => {
+    const fogged = (seat: ExpeditionView["seats"][number]) => ({ ...seat, items: { equipped: [], backpack: null, concealed: true } });
+    const view = makeView();
+    const rows = model({ ...view, seats: view.seats.map((seat) => (seat.seatId === "s2" ? seat : fogged(seat))) }).crew;
+    expect(rows.map((row) => [row.seatId, row.itemsHidden, row.sources.map((s) => s.sourceKey)])).toEqual([
+      ["s2", false, ["guide", "trained-monkey"]],
+      ["s3", true, ["medic"]],
+      ["s1", true, ["scout"]],
     ]);
   });
 

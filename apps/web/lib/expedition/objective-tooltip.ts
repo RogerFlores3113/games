@@ -26,6 +26,9 @@ export function objectiveTooltip(o: ExpeditionObjectiveView, holder: ObjectiveHo
     const card = cardLabel(o.target);
     title = o.order === "last" ? `Last ${card}` : `#${o.order} ${card}`;
     body = o.order === "last" ? `win ${card} in the final trick` : `win ${card} before the other numbered objectives`;
+  } else if (o.kind === "hidden") {
+    title = "Hidden objective";
+    body = "a mirage hides this objective until the first trick is won";
   } else if (o.kind === "no-tricks") {
     title = "No tricks";
     body = `${who} must win no tricks`;

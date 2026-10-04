@@ -43,6 +43,7 @@ const EXPEDITION_ERROR_CODES = [
 const CAMP_MODS = [
   { id: "jungle", kind: "location", strength: "full", status: [] },
   { id: "thunderstorm", kind: "weather", strength: "full", status: [{ kind: "chance", percent: 30, strikesLeft: 1 }, { kind: "strike" }] },
+  { id: "flooding", kind: "pairing", strength: "full", status: [{ kind: "meter", left: 3, of: 12 }] },
 ];
 const preview = { index: 2, location: "jungle", weather: "fair", pairing: null, event: "event", slotKinds: ["win-card", "ordered", "ordered"], bossId: null, shop: false };
 const noItems = { equipped: [], backpack: [], concealed: false };
@@ -166,6 +167,7 @@ const midAttempt = {
         { id: "o3", kind: "no-tricks", ownerSeatId: "seat-2", status: "done" },
         { id: "o4", kind: "exactly-n", n: 2, ownerSeatId: "seat-3", status: "failed" },
         { id: "o5", kind: "win-card", target: { kind: "joker", joker: "sun" }, ownerSeatId: "seat-2", status: "pending" },
+        { id: "o6", kind: "hidden", ownerSeatId: null, status: "pending" },
       ],
       goals: [{ id: "camouflage:seat-2", status: "done" }],
       discards: [{ card: { id: "card-9", identity: { kind: "standard", suit: "diamonds", rank: 4 } }, afterTrick: 1 }],
@@ -190,7 +192,10 @@ const midAttempt = {
       currentTrick: {
         index: 1,
         leaderSeatId: "seat-1",
-        plays: [{ seatId: "seat-1", card: { id: "card-4", identity: { kind: "standard", suit: "hearts", rank: 9 } }, effectiveRank: null }],
+        plays: [
+          { seatId: "seat-1", hidden: false, card: { id: "card-4", identity: { kind: "standard", suit: "hearts", rank: 9 } }, effectiveRank: null },
+          { seatId: "seat-2", hidden: true, suit: "joker" },
+        ],
       },
       campPhase: "playing",
       currentActorSeatId: "seat-2",
@@ -415,6 +420,26 @@ describe("ExpeditionViewSchema", () => {
     ["supplies -1", { ...midCampView, supplies: { count: -1, max: 4 } }],
     ["a stage tag that does not exist", { ...midCampView, stage: { tag: "fireside" } }],
     ["a modifier status carrying a card", { ...midCampView, stage: { ...midCampView.stage, mods: [{ id: "thunderstorm", kind: "weather", strength: "full", status: [{ kind: "strike", cardId: "card-1" }] }] } }],
+    [
+      "a face-down play carrying its card",
+      {
+        ...midCampView,
+        stage: {
+          ...midCampView.stage,
+          attempt: { ...midAttempt, camp: { ...midAttempt.camp, currentTrick: { index: 1, leaderSeatId: "seat-1", plays: [{ seatId: "seat-1", hidden: true, suit: "hearts", card: { id: "card-4", identity: { kind: "standard", suit: "hearts", rank: 9 } } }] } } },
+        },
+      },
+    ],
+    [
+      "a hidden objective carrying its target",
+      {
+        ...midCampView,
+        stage: {
+          ...midCampView.stage,
+          attempt: { ...midAttempt, camp: { ...midAttempt.camp, objectives: [{ id: "o6", kind: "hidden", ownerSeatId: null, status: "pending", target: { kind: "joker", joker: "sun" } }] } },
+        },
+      },
+    ],
     ["a modifier of an unknown kind", { ...midCampView, stage: { ...midCampView.stage, mods: [{ id: "x", kind: "volcano", strength: "full", status: [] }] } }],
     ["an effect with no origin", { ...midCampView, stage: { ...midCampView.stage, attempt: { ...midAttempt, effects: [{ sourceId: "bait", seatId: "seat-2", atTrick: 1, lasts: "trick", params: null }] } } }],
     ["a route option with a bad slot kind", { ...draftView, stage: { tag: "route", options: [{ id: "a", next: { ...preview, slotKinds: ["boss"] } }], ballots: [] } }],

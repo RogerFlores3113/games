@@ -1,6 +1,6 @@
 import type { ExpeditionModView, ExpeditionView, ModDisplay } from "@games/rules";
 import { MOD_DISPLAY } from "@games/rules";
-import { modObjectId } from "./expedition-ids";
+import { cardLabel, modObjectId, rankLabel } from "./expedition-ids";
 import type { Tooltip } from "./build-scene-model";
 import { modName } from "./view-access";
 
@@ -21,17 +21,25 @@ export interface ModChip {
   badge: string | null;
   /** Strikes still to come, drawn as bolts. */
   pips: number;
-  /** Something is happening now (a strike on this trick). */
+  /** The river's meter: tricks left of the tricks it gives. */
+  gauge: { left: number; of: number } | null;
+  /** Something is happening now (a strike on this trick, the river one
+   * trick from flooding). */
   alert: boolean;
 }
 
 export type Precipitation = "none" | "rain" | "storm";
+/** What hangs over the backdrop besides rain. */
+export type Haze = "none" | "night" | "fog";
 
 /** What the backdrop and the weather overlay draw. */
 export interface Sky {
   /** The location id, which names its backdrop. */
   location: string;
   precipitation: Precipitation;
+  haze: Haze;
+  /** How far the river has risen, 0 to 1; null without a flood. */
+  flood: number | null;
   /** Unique per strike, so its flash plays once however often the scene
    * redraws; null when no strike sits on the trick in play. */
   strike: string | null;
@@ -46,6 +54,11 @@ const PRECIPITATION: Readonly<Record<string, Precipitation>> = {
   thunderstorm: "storm",
 };
 
+const HAZE: Readonly<Record<string, Haze>> = {
+  night: "night",
+  fog: "fog",
+};
+
 const KIND_LABEL: Readonly<Record<ModDisplay["kind"], string>> = {
   location: "Location",
   weather: "Weather",
@@ -58,20 +71,45 @@ const KIND_LABEL: Readonly<Record<ModDisplay["kind"], string>> = {
 /** Camp modifiers that stop whispers, for the Whisper button's reason. */
 const WHISPER_BLOCKERS: readonly string[] = ["rain"];
 
-/** "Rain stops whispers" when a camp modifier is why; null otherwise. */
+/** "Blocked by Rain" when a camp modifier is why, short enough for the
+ * caption under the Whisper button; null otherwise. */
 export function whisperBlocker(view: ExpeditionView): string | null {
   const blocker = modsOf(view).find((mod) => WHISPER_BLOCKERS.includes(mod.id));
-  return blocker === undefined ? null : `${modDisplayName(blocker.id)} stops whispers`;
+  return blocker === undefined ? null : `Blocked by ${modDisplayName(blocker.id)}`;
 }
 
 export function modDisplayName(id: string): string {
   return MOD_DISPLAY[id]?.name ?? modName(id);
 }
 
-function chipFor(mod: ExpeditionModView): ModChip {
+/** The camp modifier whose removed cards the strip names. */
+const HEAT_ID = "magma";
+
+/** The heat's toll in a few characters: whole ranks gone, then single
+ * cards ("No 2s 3s 4♣"); null outside a dealt camp. */
+export function heatNote(view: ExpeditionView): string | null {
+  const removed = view.stage.tag === "camp" ? view.stage.attempt.camp.removedCards : null;
+  if (removed === null || removed.length === 0) return null;
+  const standard = removed.flatMap((card) => (card.kind === "standard" ? [card] : []));
+  const ranks = [...new Set(standard.map((card) => card.rank))].sort((a, b) => a - b);
+  const whole = ranks.filter((rank) => standard.filter((card) => card.rank === rank).length === 4);
+  const singles = standard.filter((card) => !whole.includes(card.rank)).map(cardLabel);
+  return `No ${[...whole.map((rank) => `${rankLabel(rank)}s`), ...singles].join(" ")}`;
+}
+
+function chipFor(mod: ExpeditionModView, view: ExpeditionView): ModChip {
   const strike = mod.status.some((part) => part.kind === "strike");
   const chance = mod.status.find((part) => part.kind === "chance");
-  const badge = strike ? "Lowest wins" : chance !== undefined && chance.percent > 0 ? `${chance.percent}%` : null;
+  const meter = mod.status.find((part) => part.kind === "meter");
+  const badge = strike
+    ? "Lowest wins"
+    : chance !== undefined && chance.percent > 0
+      ? `${chance.percent}%`
+      : meter !== undefined
+        ? meter.left === 0 ? "Flooded" : `${meter.left} left`
+        : mod.id === HEAT_ID
+          ? heatNote(view)
+          : null;
   return {
     id: mod.id,
     objectId: modObjectId(mod.id),
@@ -79,9 +117,11 @@ function chipFor(mod: ExpeditionModView): ModChip {
     name: modDisplayName(mod.id),
     badge,
     pips: chance?.strikesLeft ?? 0,
-    alert: strike,
+    gauge: meter === undefined ? null : { left: meter.left, of: meter.of },
+    alert: strike || (meter !== undefined && meter.left <= 1),
   };
 }
+
 
 function modsOf(view: ExpeditionView): ExpeditionModView[] {
   const stage = view.stage;
@@ -89,7 +129,7 @@ function modsOf(view: ExpeditionView): ExpeditionModView[] {
 }
 
 export function buildModChips(view: ExpeditionView): ModChip[] {
-  return modsOf(view).map(chipFor);
+  return modsOf(view).map((mod) => chipFor(mod, view));
 }
 
 export function buildSky(view: ExpeditionView): Sky | null {
@@ -97,9 +137,12 @@ export function buildSky(view: ExpeditionView): Sky | null {
   if (stage.tag !== "camp") return null;
   const struck = stage.mods.some((mod) => mod.status.some((part) => part.kind === "strike"));
   const trick = stage.attempt.camp.currentTrick.index;
+  const meter = stage.mods.flatMap((mod) => mod.status).find((part) => part.kind === "meter");
   return {
     location: stage.camp.location,
     precipitation: PRECIPITATION[stage.camp.weather] ?? "none",
+    haze: HAZE[stage.camp.weather] ?? "none",
+    flood: meter === undefined || meter.of === 0 ? null : (meter.of - meter.left) / meter.of,
     strike: struck ? `${stage.camp.index}:${stage.attempt.attemptNumber}:${trick}` : null,
     notice: struck ? STRIKE_NOTICE : null,
   };
@@ -110,9 +153,12 @@ export function buildSky(view: ExpeditionView): Sky | null {
 export function modTooltip(view: ExpeditionView, modId: string): Tooltip | null {
   const mod = modsOf(view).find((m) => m.id === modId);
   if (mod === undefined) return null;
-  const chip = chipFor(mod);
+  const chip = chipFor(mod, view);
   const chance = mod.status.find((part) => part.kind === "chance");
+  const meter = mod.status.find((part) => part.kind === "meter");
   const badges = [KIND_LABEL[mod.kind]];
   if (chance !== undefined) badges.push(chance.percent > 0 ? `${chance.percent}% next trick` : "No more strikes", `${chance.strikesLeft} ${chance.strikesLeft === 1 ? "strike" : "strikes"} left`);
+  if (meter !== undefined) badges.push(meter.left === 0 ? "The river has flooded" : `Floods after ${meter.left} more ${meter.left === 1 ? "trick" : "tricks"}`);
+  if (modId === HEAT_ID && chip.badge !== null) badges.push(chip.badge.replace(/^No /, "Burned: "));
   return { title: chip.name, text: MOD_DISPLAY[modId]?.text ?? "", badges, reason: null };
 }

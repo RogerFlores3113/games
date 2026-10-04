@@ -19,6 +19,7 @@ import { rulesFor } from "../run/compose";
 import { toExpeditionPlayerView } from "./view";
 import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "./view-leak-check";
 import type { RunState } from "../run/types";
+import type { CardIdentity } from "../state";
 import type { ExpeditionAttemptView, ExpeditionView } from "./view-types";
 
 const SEED = "0123456789abcdef0123456789abcdef";
@@ -338,5 +339,78 @@ describe("view-leak-check: canary suite", () => {
 
     const reasons = checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets });
     expect(reasons).toEqual([`structural:hidden-id:${otherCard.id}`]);
+  });
+});
+
+describe("view-leak-check: concealment canaries", () => {
+  /** Camp 2's loadout at `location` in `weather`. */
+  function loadoutAt(location: string, weather: string, items: Record<string, readonly string[]> = {}): RunState {
+    const run = setupRun({ seatIds: SEAT_IDS, seed: SEED, catalog: CATALOG, camp: 2, items });
+    if (run.stage.tag !== "loadout") throw new Error("expected a loadout");
+    return { ...run, stage: { ...run.stage, camp: { ...run.stage.camp, location, weather } } };
+  }
+
+  function leaks(state: RunState, seatId: string, view: unknown): string[] {
+    return checkExpeditionViewForLeaks({ view, serialized: JSON.stringify(view), secrets: secretsForExpeditionSeat(state, seatId, CATALOG, SEED) });
+  }
+
+  /** A Cave camp with the leader's card on the table, and a seat that sees it face down. */
+  function caveLead(): { state: RunState; viewer: string; card: { id: string; identity: CardIdentity } } {
+    const between = advanceTo(loadoutAt("cave", "fair"), "between-tricks", CATALOG);
+    const camp = attemptOf(between)!.camp;
+    const rules = rulesFor(between, CATALOG);
+    const leader = currentActorSeatId(camp, rules)!;
+    const card = rules.legalPlays(camp, leader)[0]!;
+    const result = applyRunAction(between, leader, { type: "play-card", cardId: card.id }, CATALOG);
+    if (!result.ok) throw new Error(result.error);
+    return { state: result.state, viewer: SEAT_IDS.find((s) => s !== leader)!, card };
+  }
+
+  const key = (identity: CardIdentity) => (identity.kind === "joker" ? `joker:${identity.joker}` : `standard:${identity.suit}:${identity.rank}`);
+
+  it("Canary J: a face-down play shown face up is flagged by its id and its identity", () => {
+    const { state, viewer, card } = caveLead();
+    const clean = toExpeditionPlayerView(state, viewer, CATALOG);
+    expect(leaks(state, viewer, clean)).toEqual([]);
+    const tampered = structuredClone(clean);
+    const trick = attemptViewOf(tampered).camp.currentTrick;
+    trick.plays = [{ seatId: trick.plays[0]!.seatId, hidden: false, card: { id: card.id, identity: card.identity }, effectiveRank: null }];
+    expect(leaks(state, viewer, tampered)).toEqual([`structural:hidden-id:${card.id}`, `typed:identity-count-exceeded:${key(card.identity)}`]);
+  });
+
+  it("Canary M: a public effect naming a face-down card is flagged", () => {
+    const { state, viewer, card } = caveLead();
+    const tampered = structuredClone(toExpeditionPlayerView(state, viewer, CATALOG));
+    attemptViewOf(tampered).effects.push({ origin: { kind: "seat", seatId: "p0", sourceId: "bait" }, atTrick: 0, lasts: "trick", params: { cardId: card.id } });
+    expect(leaks(state, viewer, tampered)).toEqual([`structural:hidden-id:${card.id}`]);
+  });
+
+  it("Canary K: the mirage's objective shown with its target is flagged", () => {
+    const state = advanceTo(loadoutAt("desert", "fair"), "objective-pick", CATALOG);
+    const clean = toExpeditionPlayerView(state, "p1", CATALOG);
+    expect(leaks(state, "p1", clean)).toEqual([]);
+    const objectives = attemptViewOf(clean).camp.objectives;
+    const at = objectives.findIndex((o) => o.kind === "hidden");
+    const real = attemptOf(state)!.camp.objectives[at]!;
+    if (real.kind !== "win-card") throw new Error(`expected a win-card objective under the mirage, got ${real.kind}`);
+    const tampered = structuredClone(clean);
+    attemptViewOf(tampered).camp.objectives[at] = { id: real.id, kind: "win-card", target: real.target, ownerSeatId: null, status: "pending" };
+    expect(leaks(state, "p1", tampered)).toEqual([`typed:identity-count-exceeded:${key(real.target)}`]);
+  });
+
+  it("Canary L: under fog another seat's backpack or unused item is flagged", () => {
+    const state = loadoutAt("jungle", "fog", { p0: ["bait", "parrot", "whetstone"] });
+    const clean = toExpeditionPlayerView(state, "p1", CATALOG);
+    expect(leaks(state, "p1", clean)).toEqual([]);
+    const p0 = state.seats[0]!;
+
+    const backpack = structuredClone(clean);
+    backpack.seats[0]!.items.backpack = [];
+    expect(leaks(state, "p1", backpack)).toEqual(["structural:fogged-backpack"]);
+
+    const equipped = structuredClone(clean);
+    const uid = p0.equipped[0]!;
+    equipped.seats[0]!.items.equipped = [{ uid, itemId: "bait", remaining: { kind: "uses", left: 1, of: 1 } }];
+    expect(leaks(state, "p1", equipped)).toEqual([`structural:hidden-id:${uid}`]);
   });
 });

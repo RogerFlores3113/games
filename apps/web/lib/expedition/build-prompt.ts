@@ -1,5 +1,5 @@
 import { CHARACTER_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
-import { attemptOf, whisperLog } from "./view-access";
+import { attemptOf, ledSuit, whisperLog } from "./view-access";
 import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
 import { cardLabel, rankLabel, SUIT_GLYPH } from "./expedition-ids";
 import type { LocalUiState } from "./local-ui";
@@ -40,6 +40,7 @@ function objectivePhrase(view: ExpeditionView, objectiveId: string): string {
   const o = attemptOf(view)?.camp.objectives.find((x) => x.id === objectiveId);
   if (o === undefined) return "an objective";
   if (o.kind === "win-card" || o.kind === "ordered") return `objective ${cardLabel(o.target)}`;
+  if (o.kind === "hidden") return "the hidden objective";
   return o.kind === "no-tricks" ? "the no-tricks objective" : `the exactly-${o.n} objective`;
 }
 
@@ -47,8 +48,8 @@ function cardPhrase(view: ExpeditionView, cardId: string): string {
   const camp = attemptOf(view)?.camp;
   const own = camp?.yourHand.find((c) => c.id === cardId);
   if (own !== undefined) return `your ${cardLabel(own.identity)}`;
-  const played = camp?.currentTrick.plays.find((p) => p.card.id === cardId);
-  return played === undefined ? "a card" : `the ${cardLabel(played.card.identity)}`;
+  const played = camp?.currentTrick.plays.find((p) => !p.hidden && p.card.id === cardId);
+  return played === undefined || played.hidden ? "a card" : `the ${cardLabel(played.card.identity)}`;
 }
 
 /** Names one picked target for the confirm line: "Bo", "Bo's hand", "your
@@ -185,10 +186,10 @@ function withTurnAbility(prompt: Prompt, names: string | null): Prompt {
 function followPrompt(camp: ExpeditionCampView): Prompt {
   const legal = new Set(camp.yourLegalCardIds);
   const everyCardLegal = camp.yourHand.every((c) => legal.has(c.id));
-  const led = camp.currentTrick.plays[0]?.card.identity;
-  if (led !== undefined && led.kind === "standard") {
-    const suit = SUIT_GLYPH[led.suit];
-    const holdsSuit = camp.yourHand.some((c) => c.identity.kind === "standard" && c.identity.suit === led.suit);
+  const led = ledSuit(camp);
+  if (led !== null) {
+    const suit = SUIT_GLYPH[led];
+    const holdsSuit = camp.yourHand.some((c) => c.identity.kind === "standard" && c.identity.suit === led);
     if (holdsSuit && !everyCardLegal) return { text: `Your turn: follow ${suit} (highlighted cards)`, tone: "your-move" };
     if (!holdsSuit && everyCardLegal) return { text: `Your turn: you have no ${suit}, play any card`, tone: "your-move" };
   }

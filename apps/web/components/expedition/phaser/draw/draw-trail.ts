@@ -30,7 +30,7 @@ import type {
 import { fitLabel, wrapWords } from "./text-fit";
 import { PANEL_ALPHA, button, coin, labelWidth, plate, setCoinFace, text, type Layer } from "./ui-kit";
 import { drawExplorer, drawGear, drawShop, type LoadoutHandlers } from "./draw-loadout";
-import { ICON_SIZE, modIcon } from "./draw-weather";
+import { ICON_SIZE, fogTile, modIcon } from "./draw-weather";
 
 export interface TrailHandlers extends LoadoutHandlers {
   /** A muster character card: picks that character. */
@@ -676,6 +676,7 @@ function drawCrewRow(ctx: Ctx, row: CrewRow, x: number, y: number, w: number): v
     layer.add(placeArt(scene, art, cursor + ART[art].w / 2, iconY));
     cursor += ART[art].w + 1;
   }
+  if (row.itemsHidden) layer.add(fogTile(scene, cursor, iconY - 8));
   layer.add(text(scene, x + w - labelWidth(row.character), iconY - 4, row.character, PALETTE.textDim));
 }
 

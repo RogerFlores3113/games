@@ -1,6 +1,6 @@
 // Full-information summary of a run for the dev panel. Seat ids stay raw.
 
-import { currentActorSeatId, checkCampOutcome } from "../camp";
+import { campGoals, currentActorSeatId, checkCampOutcome } from "../camp";
 import { cardLabel } from "../deck";
 import { describeObjective } from "../objectives";
 import { attemptOf } from "../run/attempt";
@@ -12,6 +12,7 @@ import { backpackOf } from "../run/usage";
 import { campStack, modCtx, pairingOf, specOf } from "../run/stack";
 import type { StatusPart } from "../content/mods/mod-def";
 import type { CampSpec } from "../run/route";
+import type { Concealable, RunRules } from "../run/run-rules";
 import type { Catalog, PerSeat, RunState } from "../run/types";
 import type { ResolvedPlay } from "../state";
 import type { DevInspectSection } from "../../adapter";
@@ -27,7 +28,20 @@ function specLabel(spec: CampSpec, catalog: Catalog): string {
 }
 
 function statusLabel(part: StatusPart): string {
-  return part.kind === "chance" ? `${part.percent}% next, ${part.strikesLeft} strikes left` : "strike on this trick";
+  switch (part.kind) {
+    case "chance":
+      return `${part.percent}% next, ${part.strikesLeft} strikes left`;
+    case "strike":
+      return "strike on this trick";
+    case "meter":
+      return `${part.left} of ${part.of} tricks before the flood`;
+  }
+}
+
+/** " (hidden from p1, p2)" for the seats `subject` is kept from, else "". */
+function hiddenNote(run: RunState, rules: RunRules, subject: Concealable): string {
+  const from = run.seatIds.filter((seatId) => rules.hides(run, seatId, subject));
+  return from.length === 0 ? "" : ` (hidden from ${from.join(", ")})`;
 }
 
 /** The camp's modifier stack in fold order with each layer's status, then
@@ -76,6 +90,7 @@ function stageLines(run: RunState, catalog: Catalog): string[] {
 
 export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[] {
   const vote = run.lastVote;
+  const rules = rulesFor(run, catalog);
   const sections: DevInspectSection[] = [
     {
       title: "Run",
@@ -94,14 +109,14 @@ export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[]
       lines: run.seats.map((s) => {
         const item = (uid: string) => `${s.items.find((i) => i.uid === uid)?.itemId ?? "?"} ${uid}`;
         const offer = s.offers[0]?.bundles.map((bundle) => bundle.join(" + ")).join(" | ") ?? "none";
-        return `${s.seatId}: ${s.characterId ?? "no character"}, upgrade ${s.upgradeId ?? "none"}, equipped [${s.equipped.map(item).join(", ")}], backpack [${backpackOf(s).map((i) => item(i.uid)).join(", ")}], offer ${offer}${s.offers.length > 1 ? ` (+${s.offers.length - 1} queued)` : ""}`;
+        return `${s.seatId}: ${s.characterId ?? "no character"}, upgrade ${s.upgradeId ?? "none"}, equipped [${s.equipped.map(item).join(", ")}], backpack [${backpackOf(s).map((i) => item(i.uid)).join(", ")}]${hiddenNote(run, rules, { kind: "loadout", seatId: s.seatId })}, offer ${offer}${s.offers.length > 1 ? ` (+${s.offers.length - 1} queued)` : ""}`;
       }),
     },
   ];
 
   const camp = attemptOf(run)?.camp;
   if (camp === undefined) return sections;
-  const rules = rulesFor(run, catalog);
+  const trick = camp.currentTrick;
 
   sections.push({
     title: "Hands",
@@ -111,15 +126,17 @@ export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[]
     title: "Objectives",
     lines: [
       `camp outcome: ${checkCampOutcome(camp, rules).status}`,
-      ...camp.objectives.map((o) => `${o.id}: ${describeObjective(o)}, owner ${o.ownerSeatId ?? "none"}, ${rules.objectiveStatus(camp, o)}`),
-      ...rules.goals(camp).map((g) => `goal ${g.id}: ${g.status}`),
+      ...camp.objectives.map(
+        (o) => `${o.id}: ${describeObjective(o)}, owner ${o.ownerSeatId ?? "none"}, ${rules.objectiveStatus(camp, o)}${hiddenNote(run, rules, { kind: "objective", objectiveId: o.id })}`,
+      ),
+      ...campGoals(camp, rules).map((g) => `goal ${g.id}: ${g.status}`),
     ],
   });
   sections.push({
     title: "Trick",
     lines: [
       `trick ${camp.currentTrick.index + 1} of ${camp.totalTricks}, ${camp.completedTricks.length} completed, leader ${camp.currentTrick.leaderSeatId}`,
-      `played: ${camp.currentTrick.plays.map((p) => `${p.seatId} ${cardLabel(p.card.identity)}`).join(", ") || "nothing"}`,
+      `played: ${trick.plays.map((p, position) => `${p.seatId} ${cardLabel(p.card.identity)}${hiddenNote(run, rules, { kind: "play", trickIndex: trick.index, position, seatId: p.seatId })}`).join(", ") || "nothing"}`,
       ...camp.completedTricks.map((t) => `trick ${t.index + 1}: ${t.plays.map(playLabel).join(", ")}, ${t.winnerSeatId} won`),
       `discards: ${camp.discards.map((d) => `${cardLabel(d.card.identity)} after trick ${d.afterTrick}`).join(", ") || "none"}`,
       `current actor: ${currentActorSeatId(camp, rules) ?? "none"}`,

@@ -41,8 +41,8 @@ describe("routeOptions", () => {
 
   it("draws every weighted location and weather, and fair about 80% of the time away from the clifftop", () => {
     const places = Array.from({ length: 400 }, (_, n) => routeOptions(draftAfter(`place-${n}`, "standard", 1), CATALOG)).flat().map((o) => o.next);
-    expect(new Set(places.map((p) => p.location))).toEqual(new Set(["clearing", "jungle", "clifftop"]));
-    expect(new Set(places.map((p) => p.weather))).toEqual(new Set(["fair", "rain", "thunderstorm"]));
+    expect(new Set(places.map((p) => p.location))).toEqual(new Set(["clearing", "jungle", "clifftop", "desert", "cave", "magma"]));
+    expect(new Set(places.map((p) => p.weather))).toEqual(new Set(["fair", "rain", "thunderstorm", "fog", "night"]));
     const fairShare = (location: string) => {
       const here = places.filter((p) => p.location === location);
       return here.filter((p) => p.weather === "fair").length / here.length;
@@ -54,7 +54,8 @@ describe("routeOptions", () => {
   });
 
   it("never draws a weight-0 def by weight, and falls back to fair when no weather is left", () => {
-    const calm = testCatalog({ mods: { rain: { ...CATALOG.mods.rain!, weight: 0 }, thunderstorm: { ...CATALOG.mods.thunderstorm!, weight: 0 } } });
+    const stormy = Object.values(CATALOG.mods).filter((def) => def.kind === "weather" && def.id !== "fair");
+    const calm = testCatalog({ mods: Object.fromEntries(stormy.map((def) => [def.id, { ...def, weight: 0 }])) });
     const weathers = Array.from({ length: 50 }, (_, n) => routeOptions(draftAfter(`calm-${n}`, "standard", 1), calm)).flat().map((o) => o.next.weather);
     expect(new Set(weathers)).toEqual(new Set(["fair"]));
   });

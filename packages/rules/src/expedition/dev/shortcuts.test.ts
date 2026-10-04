@@ -155,8 +155,12 @@ describe("dev shortcuts", () => {
   it("set-spec offers the camp's own location and weather first, and refuses outside a loadout or camp or with an unknown id", () => {
     const dealt = run("set-spec", run("jump-to-camp", fresh(), camp6), { location: "clifftop", weather: "rain" });
     const [location, weather] = DEV_SHORTCUTS["set-spec"].fields(dealt, CATALOG);
-    expect(location).toMatchObject({ name: "location", options: [{ value: "clifftop" }, { value: "clearing" }, { value: "jungle" }] });
-    expect(weather).toMatchObject({ name: "weather", options: [{ value: "rain" }, { value: "fair" }, { value: "thunderstorm" }] });
+    expect(location).toMatchObject({
+      name: "location",
+      options: [{ value: "clifftop" }, { value: "clearing" }, { value: "jungle" }, { value: "desert" }, { value: "cave" }, { value: "magma" }],
+    });
+    expect(weather).toMatchObject({ name: "weather", options: [{ value: "rain" }, { value: "fair" }, { value: "fog" }, { value: "thunderstorm" }, { value: "night" }] });
+    expect(() => run("set-spec", dealt, { location: "cave", weather: "night" })).toThrow("cave never has night");
     expect(() => run("set-spec", fresh(), { location: "jungle", weather: "rain" })).toThrow("set-spec works in a loadout or a camp");
     expect(() => run("set-spec", dealt, { location: "rain", weather: "rain" })).toThrow(/location must be one of/);
   });

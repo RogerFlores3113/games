@@ -151,9 +151,14 @@ export function createCamp(
 /** Any failed objective or goal makes the outcome failed; every objective
  * and goal done makes it succeeded; otherwise in_progress. Recomputed fresh
  * from state on every call — nothing cached. */
+/** The camp's goals, judged against every objective's composed status. */
+export function campGoals(state: CampState, rules: CoreRules = baseRules): readonly Goal[] {
+  return rules.goals(state, objectiveStatuses(state, rules));
+}
+
 export function checkCampOutcome(state: CampState, rules: CoreRules = baseRules): CampOutcome {
   const statuses = objectiveStatuses(state, rules);
-  const goals = rules.goals(state);
+  const goals = rules.goals(state, statuses);
   const failedObjectiveIds = statuses.filter((s) => s.status === "failed").map((s) => s.objectiveId);
   const failedGoalIds = goals.filter((g) => g.status === "failed").map((g) => g.id);
 

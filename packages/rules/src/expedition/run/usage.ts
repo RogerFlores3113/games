@@ -59,6 +59,12 @@ export function currentStamp(run: RunState): Stamp | null {
   return { camp: run.stage.camp.index, attempt: attempt.attemptNumber, trick: attempt.camp.completedTricks.length };
 }
 
+/** Whether the seat used `key` in the attempt being played; false outside a camp. */
+export function usedThisAttempt(run: RunState, seat: SeatRun, key: SourceKey): boolean {
+  const stamp = currentStamp(run);
+  return stamp !== null && seat.ledger.some((entry) => entry.kind === "used" && entry.sourceKey === key && entry.at.camp === stamp.camp && entry.at.attempt === stamp.attempt);
+}
+
 export function sameStamp(a: Stamp, b: Stamp): boolean {
   return a.camp === b.camp && a.attempt === b.attempt && a.trick === b.trick;
 }

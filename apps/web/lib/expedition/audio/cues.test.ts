@@ -96,12 +96,12 @@ describe("cuesFor", () => {
   });
 
   it("plays card-play when a card joins the current trick", () => {
-    const next = game({}, { currentTrick: { index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: club3, effectiveRank: null }] } });
+    const next = game({}, { currentTrick: { index: 0, leaderSeatId: "a", plays: [{ seatId: "a", hidden: false, card: club3, effectiveRank: null }] } });
     expect(cuesFor(game(), next)).toEqual(["sfx-card-play"]);
   });
 
   it("plays card-play once when the last card closes the trick", () => {
-    const prev = game({}, { currentTrick: { index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: club3, effectiveRank: null }] } });
+    const prev = game({}, { currentTrick: { index: 0, leaderSeatId: "a", plays: [{ seatId: "a", hidden: false, card: club3, effectiveRank: null }] } });
     const next = game({}, {
       completedTricks: [{ index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: club3, effectiveRank: null, countsAs: null, burned: false }, { seatId: "b", card: club4, effectiveRank: null, countsAs: null, burned: false }], winnerSeatId: "b" }],
       currentTrick: { index: 1, leaderSeatId: "b", plays: [] },

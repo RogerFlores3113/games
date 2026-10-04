@@ -122,13 +122,16 @@ export const TARGET_KINDS: { readonly [K in TargetKind]: TargetKindDef<K> } = {
   card: {
     kind: "card",
     describe: (spec) => (spec.where === "my-hand" ? "Pick a card in your hand" : "Pick a card on the table"),
-    choices: ({ camp, seatId }, spec) => {
+    choices: ({ run, camp, seatId, rules }, spec) => {
       if (camp === null) return [];
       if (spec.where === "board") {
-        return camp.currentTrick.plays.map((play) => ({
-          id: `card:${play.card.id}`,
-          target: { kind: "card", cardId: play.card.id, location: "board" },
-        }));
+        const trick = camp.currentTrick;
+        return trick.plays
+          .filter((play, position) => !rules.hides(run, seatId, { kind: "play", trickIndex: trick.index, position, seatId: play.seatId }))
+          .map((play) => ({
+            id: `card:${play.card.id}`,
+            target: { kind: "card", cardId: play.card.id, location: "board" },
+          }));
       }
       const own = camp.hands.find((hand) => hand.seatId === seatId)?.cards ?? [];
       return own.map((card) => ({ id: `card:${card.id}`, target: { kind: "card", cardId: card.id, location: "hand" } }));

@@ -101,6 +101,7 @@ export type ObjectiveSlot =
   | { readonly kind: "exactly-n"; readonly n: number };
 
 export type ObjectiveStatus = "pending" | "done" | "failed";
+export type ObjectiveStatusEntry = { readonly objectiveId: string; readonly status: ObjectiveStatus };
 
 /** A camp-wide condition a rule adds beside the objectives. A guard is done
  * until broken; a task is pending until achieved and failed once

@@ -45,6 +45,9 @@ export interface ExpeditionSeatSecrets {
   readonly foreignOffers: readonly string[];
   /** The number of attempt log entries this seat may legitimately see. */
   readonly visibleLogEntryCount: number;
+  /** Seats whose loadout is kept from this viewer (Heavy fog): their
+   * `items.backpack` must be null. */
+  readonly concealedSeatIds: readonly string[];
 }
 
 /** Keys a view object literal must never carry, at ANY nesting level. */
@@ -121,9 +124,9 @@ export function secretsForExpeditionSeat(
     counts[key] = (counts[key] ?? 0) + 1;
   };
 
+  const rules = rulesFor(state, catalog);
   const camp = attempt?.camp;
   if (camp !== undefined) {
-    const rules = rulesFor(state, catalog);
     for (const hand of camp.hands) {
       if (hand.seatId === seatId) {
         if (seated) {
@@ -151,13 +154,35 @@ export function secretsForExpeditionSeat(
         if (play.countsAs !== null) bump(play.countsAs);
       }
     }
-    for (const play of camp.currentTrick.plays) bump(play.card.identity);
+    // A face-down play's identity is not the viewer's, and its id is hidden
+    // unless the viewer was shown the card; a public effect naming it does
+    // not count, since the table can't see what it names.
+    const trick = camp.currentTrick;
+    trick.plays.forEach((play, position) => {
+      if (!rules.hides(state, seatId, { kind: "play", trickIndex: trick.index, position, seatId: play.seatId })) bump(play.card.identity);
+      else if (!revealedToViewer.has(play.card.id)) hiddenIds.push(play.card.id);
+    });
     for (const discard of camp.discards) bump(discard.card.identity);
 
     for (const identity of camp.removedCards) bump(identity);
 
     for (const objective of camp.objectives) {
+      if (rules.hides(state, seatId, { kind: "objective", objectiveId: objective.id })) continue;
       if (objective.kind === "win-card" || objective.kind === "ordered") bump(objective.target);
+    }
+  }
+
+  // Under fog another seat's items stay hidden until used this attempt.
+  const stamp = state.stage.tag === "camp" ? { camp: state.stage.camp.index, attempt: state.stage.attempt.attemptNumber } : null;
+  const concealedSeatIds: string[] = [];
+  for (const seat of state.seats) {
+    if (!rules.hides(state, seatId, { kind: "loadout", seatId: seat.seatId })) continue;
+    concealedSeatIds.push(seat.seatId);
+    const used = new Set(
+      seat.ledger.flatMap((entry) => (entry.kind === "used" && stamp !== null && entry.at.camp === stamp.camp && entry.at.attempt === stamp.attempt ? [entry.sourceKey] : [])),
+    );
+    for (const item of seat.items) {
+      if (!seat.equipped.includes(item.uid) || !used.has(item.uid)) hiddenIds.push(item.uid);
     }
   }
 
@@ -177,7 +202,7 @@ export function secretsForExpeditionSeat(
           (entry) => entry.audience === "public" || (seated && entry.audience.includes(seatId)),
         ).length;
 
-  return { hiddenIds, allowedIdentityCounts: counts, forbiddenTokens, ownDraft, foreignOffers, visibleLogEntryCount };
+  return { hiddenIds, allowedIdentityCounts: counts, forbiddenTokens, ownDraft, foreignOffers, visibleLogEntryCount, concealedSeatIds };
 }
 
 /** Recursively walks `subtree`, collecting structural leak reasons: any
@@ -274,6 +299,14 @@ export function checkExpeditionViewForLeaks(input: {
       if (log.length !== input.secrets.visibleLogEntryCount) {
         reasons.add("structural:log-entry-count");
       }
+    }
+  }
+
+  const seats = input.view !== null && typeof input.view === "object" ? (input.view as Record<string, unknown>).seats : undefined;
+  if (Array.isArray(seats)) {
+    for (const seat of seats as Record<string, unknown>[]) {
+      const items = seat.items as Record<string, unknown> | undefined;
+      if (input.secrets.concealedSeatIds.includes(String(seat.seatId)) && items?.backpack !== null) reasons.add("structural:fogged-backpack");
     }
   }
 

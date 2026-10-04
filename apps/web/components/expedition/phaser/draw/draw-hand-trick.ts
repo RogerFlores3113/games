@@ -23,11 +23,11 @@ import {
   seatSpots,
   type Point,
 } from "../layout";
-import { cardTextureKey } from "../card-packs/card-pack-def";
+import { cardBackTextureKey, cardTextureKey } from "../card-packs/card-pack-def";
 import { BOARD_ID, LAST_TRICK_ID, SUIT_GLYPH } from "../../../../lib/expedition/expedition-ids";
 import type { ExpeditionCardIdentityView } from "@games/rules";
 import type { ObjectIndex } from "../object-index";
-import type { CardModel, SceneModel } from "../../../../lib/expedition/build-scene-model";
+import type { CardModel, FaceDownPlayModel, SceneModel } from "../../../../lib/expedition/build-scene-model";
 import type { CampHandlers } from "./camp-handlers";
 import { others } from "./draw-seats";
 import { fitLabel } from "./text-fit";
@@ -145,19 +145,21 @@ export function drawTrick(
   trick.plays.forEach((play, i) => {
     const at = cardSpot(model, play.seatId);
     const container = scene.add.container(at.x, at.y);
-    container.add(scene.add.image(0, 0, cardTextureKey(model.cardPackId, play.card.label, "full")).setOrigin(0, 0));
+    if (play.hidden) container.add(faceDownCard(scene, model, play.suit));
+    else container.add(scene.add.image(0, 0, cardTextureKey(model.cardPackId, play.card.label, "full")).setOrigin(0, 0));
     if (play.isLed) {
       container.add(scene.add.rectangle(0, 0, CARD_W, CARD_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.sun)));
       container.add(platedText(scene, Math.floor((CARD_W - labelWidth("Led")) / 2), CARD_H - LABEL_CELL.h - 1, "Led", PALETTE.sun));
     }
-    if (play.card.targetable || play.card.selected) {
+    const pick = play.hidden ? null : play.card;
+    if (pick !== null && (pick.targetable || pick.selected)) {
       container.add(scene.add.rectangle(-1, -1, CARD_W + 2, CARD_H + 2, 0, 0).setOrigin(0, 0).setStrokeStyle(2, toPhaserColor(PALETTE.turn)));
     }
     container.setSize(CARD_W, CARD_H);
-    if (play.card.targetable) {
+    if (pick !== null && pick.targetable) {
       const hit = scene.add.zone(0, 0, CARD_W, CARD_H).setOrigin(0, 0);
       hit.setInteractive({ useHandCursor: true });
-      hit.on("pointerdown", () => handlers.onPick("card", play.card.id));
+      hit.on("pointerdown", () => handlers.onPick("card", pick.id));
       container.add(hit);
     }
     if (i >= previousPlayCount) {
@@ -172,8 +174,24 @@ export function drawTrick(
       });
     }
     layer.add(container);
-    index.register("camp", play.card.objectId, container);
+    index.register("camp", play.hidden ? play.objectId : play.card.objectId, container);
   });
+}
+
+const PIP = 14;
+
+/** A card played face down: its back, with the suit it follows as in a pip
+ * (a star for the Sun or Moon). */
+function faceDownCard(scene: Phaser.Scene, model: SceneModel, suit: FaceDownPlayModel["suit"]): Phaser.GameObjects.GameObject[] {
+  const x = Math.floor((CARD_W - PIP) / 2);
+  const y = Math.floor((CARD_H - PIP) / 2) - 3;
+  const glyph = suit === "joker" ? "*" : SUIT_GLYPH[suit];
+  const color = suit === "joker" ? PALETTE.sun : PALETTE.suitBigIndex[suit];
+  return [
+    scene.add.image(0, 0, cardBackTextureKey(model.cardPackId, "full")).setOrigin(0, 0),
+    scene.add.rectangle(x, y, PIP, PIP, toPhaserColor(PALETTE.cardFace)).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.cardEdge)),
+    text(scene, x + Math.floor((PIP - LABEL_CELL.w) / 2) + 1, y + Math.floor((PIP - LABEL_CELL.h) / 2) + 1, glyph, color),
+  ];
 }
 
 /** The whole trick as one target (Howler Call): the stump outlined, with a
