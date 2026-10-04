@@ -26,9 +26,12 @@ const c = toPhaserColor;
 export const SOURCE_ICON_IDS = [
   "jd", "jd.blend-in", "jd.free-spirit", "jd.rule-breaker",
   "businessman", "businessman.cash-out", "businessman.pop-up-shop", "businessman.buyout", "businessman.haggle",
+  "magician", "magician.double-act", "magician.misdirection", "magician.switcheroo",
+  "perfumist", "perfumist.turncoat", "perfumist.upside-down", "perfumist.smelling-salts",
   "cartographer", "cartographer.redraw", "cartographer.survey", "cartographer.treasure-map",
   "explorer", "explorer.second-wind", "explorer.true-form", "explorer.reshape",
   "leader", "leader.open-ears", "leader.delegate", "leader.momentum",
+  "hermit", "hermit.burden", "hermit.first-pick", "hermit.alms",
   "pack-rat", "pack-rat.quartermaster", "pack-rat.pack-animal", "pack-rat.sturdy-straps",
   "trained-monkey", "pack-mule", "parrot", "trail-map", "rain-poncho", "smoke-signal", "whetstone",
   "puffball", "bait", "camouflage", "rope-ladder", "heavy-pack", "mosquito-net",
@@ -38,7 +41,7 @@ export const SOURCE_ICON_IDS = [
 
 /** The characters, each a 64x80 seated silhouette under crew/<id>.png,
  * drawn bottom-centred. */
-export const CREW_IDS = ["jd", "businessman", "cartographer", "explorer", "leader", "pack-rat"] as const;
+export const CREW_IDS = ["jd", "businessman", "magician", "perfumist", "cartographer", "explorer", "leader", "hermit", "pack-rat"] as const;
 
 type SourceIconId = `source-${(typeof SOURCE_ICON_IDS)[number]}`;
 type CrewArtId = `crew-${(typeof CREW_IDS)[number]}`;

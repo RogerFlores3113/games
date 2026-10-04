@@ -1,0 +1,17 @@
+{
+  "id": "crew-magician",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "dark silhouette of a stage magician sitting cross-legged facing the viewer, tall top hat and a flowing cape, holding a fan of playing cards up in one hand, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background",
+    "width": 64,
+    "height": 80,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "basic shading",
+    "no_background": true,
+    "seed": 7
+  },
+  "job": "b668fa13-5e9d-479a-8187-37df31930f73",
+  "scale": 1,
+  "note": "natively transparent; used as downloaded"
+}

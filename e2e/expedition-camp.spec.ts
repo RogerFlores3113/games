@@ -23,7 +23,7 @@ const GATE_SKIP_ID = "gate-skip";
 const NAMES = ["Roger", "Bianca", "Sam"];
 /** Abilities whose every target step is a seat, a hand card or an objective:
  * the kinds this driver can click. */
-const DRIVABLE_ABILITIES = new Set(["explorer", "leader.delegate", "jd.free-spirit", "cartographer.redraw", "trail-map", "trained-monkey"]);
+const DRIVABLE_ABILITIES = new Set(["explorer", "hermit", "leader.delegate", "jd.free-spirit", "cartographer.redraw", "trail-map", "trained-monkey"]);
 
 interface CardModel {
   id: string;
@@ -329,7 +329,7 @@ async function runWhisper(pages: Page[], page: Page): Promise<void> {
 /** Runs the D-02 highlight-then-confirm ability flow on `page` for `chip`:
  * click it, walk `targeting.nextKind` clicking the first targetable hand
  * card, seat or objective the server offers (never the seat that already
- * leads, which the Machete refuses), then confirm and wait until that chip
+ * leads, which a leader-changing power would refuse), then confirm and wait until that chip
  * reports `spent`, or leaves with an item's last use. */
 async function runAbility(page: Page, chip: SourceChip): Promise<void> {
   const chipId = chip.objectId;
@@ -625,7 +625,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
       // Mid-muster reload.
       let hostFireside = await getModel<TrailView>(page);
       const offerIdsBefore = (draftOffer(hostFireside) ?? []).map((o) => o.sourceId).sort();
-      expect(offerIdsBefore).toHaveLength(6);
+      expect(offerIdsBefore).toHaveLength(9);
       await page.reload();
       await waitForBridge(page);
       hostFireside = await getModel<TrailView>(page);

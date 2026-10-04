@@ -1,7 +1,7 @@
 import { THUNDERSTORM } from "../../run/balance";
 import type { ActiveEffect, RunState } from "../../run/types";
-import type { CampState, TrickPlay } from "../../state";
-import { rankOf } from "../../trick";
+import type { CampState } from "../../state";
+import { lowestSeat } from "../helpers";
 import { defineMod, type StatusPart } from "./mod-def";
 
 const ID = "thunderstorm";
@@ -13,11 +13,6 @@ function strikesOf(run: RunState): readonly ActiveEffect[] {
 
 function chanceAt(trick: number): number {
   return Math.min(100, THUNDERSTORM.firstChance + THUNDERSTORM.perTrick * trick);
-}
-
-/** The lowest printed card wins; equal ranks go to the earliest play. */
-function lowestSeat(plays: readonly TrickPlay[]): string {
-  return plays.reduce((low, play) => (rankOf(play.card) < rankOf(low.card) ? play : low)).seatId;
 }
 
 /** The trick the next roll is for: trick 0 until every objective is

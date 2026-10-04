@@ -93,6 +93,21 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | source-message-bottle | sprites/sources/message-bottle.png | PixelLab generation, spec `prompts/source-message-bottle.json` | PixelLab ToS | 2026-10-04 |
 | source-first-aid-kit | sprites/sources/first-aid-kit.png | PixelLab generation, spec `prompts/source-first-aid-kit.json` | PixelLab ToS | 2026-10-04 |
 | source-signal-flare | sprites/sources/signal-flare.png | PixelLab generation, spec `prompts/source-signal-flare.json` | PixelLab ToS | 2026-10-04 |
+| crew-magician | sprites/crew/magician.png | PixelLab generation, spec `prompts/crew-magician.json` | PixelLab ToS | 2026-10-04 |
+| crew-perfumist | sprites/crew/perfumist.png | PixelLab generation, spec `prompts/crew-perfumist.json` | PixelLab ToS | 2026-10-04 |
+| crew-hermit | sprites/crew/hermit.png | PixelLab generation, spec `prompts/crew-hermit.json` | PixelLab ToS | 2026-10-04 |
+| source-magician | sprites/sources/magician.png | PixelLab generation, spec `prompts/source-magician.json` | PixelLab ToS | 2026-10-04 |
+| source-magician.double-act | sprites/sources/magician.double-act.png | PixelLab generation, spec `prompts/source-magician.double-act.json` | PixelLab ToS | 2026-10-04 |
+| source-magician.misdirection | sprites/sources/magician.misdirection.png | PixelLab generation, spec `prompts/source-magician.misdirection.json` | PixelLab ToS | 2026-10-04 |
+| source-magician.switcheroo | sprites/sources/magician.switcheroo.png | PixelLab generation, spec `prompts/source-magician.switcheroo.json` | PixelLab ToS | 2026-10-04 |
+| source-perfumist | sprites/sources/perfumist.png | PixelLab generation, spec `prompts/source-perfumist.json` | PixelLab ToS | 2026-10-04 |
+| source-perfumist.turncoat | sprites/sources/perfumist.turncoat.png | PixelLab generation, spec `prompts/source-perfumist.turncoat.json` | PixelLab ToS | 2026-10-04 |
+| source-perfumist.upside-down | sprites/sources/perfumist.upside-down.png | PixelLab generation, spec `prompts/source-perfumist.upside-down.json` | PixelLab ToS | 2026-10-04 |
+| source-perfumist.smelling-salts | sprites/sources/perfumist.smelling-salts.png | PixelLab generation, spec `prompts/source-perfumist.smelling-salts.json` | PixelLab ToS | 2026-10-04 |
+| source-hermit | sprites/sources/hermit.png | PixelLab generation, spec `prompts/source-hermit.json` | PixelLab ToS | 2026-10-04 |
+| source-hermit.burden | sprites/sources/hermit.burden.png | PixelLab generation, spec `prompts/source-hermit.burden.json` | PixelLab ToS | 2026-10-04 |
+| source-hermit.first-pick | sprites/sources/hermit.first-pick.png | PixelLab generation, spec `prompts/source-hermit.first-pick.json` | PixelLab ToS | 2026-10-04 |
+| source-hermit.alms | sprites/sources/hermit.alms.png | PixelLab generation, spec `prompts/source-hermit.alms.json` | PixelLab ToS | 2026-10-04 |
 
 ## Audio
 

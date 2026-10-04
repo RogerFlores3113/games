@@ -4,7 +4,7 @@ import type { RoomSeatInfo, SceneModel, SceneServerInput } from "./build-scene-m
 import { beginAbilityTargeting, selectTarget, setTooltipSource } from "./local-ui";
 import { createExpeditionSceneStore, type ExpeditionSceneStore } from "./expedition-scene-store";
 
-const SCOUT: ExpeditionAbilityView = {
+const EXPLORER: ExpeditionAbilityView = {
   sourceKey: "explorer",
   usableNow: true,
   reason: null,
@@ -59,7 +59,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
       { seatId: "s2", characterId: "explorer", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
       { seatId: "s3", characterId: "jd", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
     ],
-    yourAbilities: [SCOUT],
+    yourAbilities: [EXPLORER],
     history: [],
     lastVote: null,
     stage: {

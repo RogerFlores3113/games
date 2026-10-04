@@ -187,6 +187,12 @@ export const PICKER_SCENARIOS: Record<string, { sourceId: string; rewrite: Rewri
       return withAbility(next, "explorer", [{ kind: "card-value", prompt: "Pick a card in your hand to recount", choices }]);
     },
   },
+  board: {
+    sourceId: "perfumist.upside-down",
+    rewrite: (g) => withAbility(holding(playing(g, { plays: 2, window: "in-trick" }), "perfumist.upside-down", "perfumist", { kind: "uses", left: 1, of: 1 }), "perfumist.upside-down", [
+      { kind: "board", prompt: "Pick the trick on the table", choices: ["board"] },
+    ]),
+  },
   supplies: {
     sourceId: "first-aid-kit",
     rewrite: (g) => {

@@ -104,6 +104,18 @@ const NINE_ICONS = [
   ["message-bottle", "corked bottle with a note", 61],
   ["first-aid-kit", "red first aid kit", 50],
   ["signal-flare", "red signal flare", 62],
+  ["magician", "dark top hat with a red band", 2],
+  ["magician.double-act", "two theatre masks", 14],
+  ["magician.misdirection", "white glove pointing", 15],
+  ["magician.switcheroo", "card with two swapping arrows", 16],
+  ["perfumist", "pink perfume bottle with a bulb", 3],
+  ["perfumist.turncoat", "pink rose", 17],
+  ["perfumist.upside-down", "card with an arrow and a 1", 18],
+  ["perfumist.smelling-salts", "green bottle of salts", 19],
+  ["hermit", "hooded hermit with a staff", 6],
+  ["hermit.burden", "heavy sack", 28],
+  ["hermit.first-pick", "hand raising one finger", 29],
+  ["hermit.alms", "hand letting a coin fall", 30],
 ];
 
 /** Seated silhouettes behind the stump, one per character. */
@@ -118,6 +130,9 @@ const NINE_CREW = [
   ["explorer", "dark silhouette of a jungle explorer sitting cross-legged facing the viewer, pith helmet, a coiled rope over one shoulder, holding a compass up in one hand, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "d424936a-4ab5-4a3a-8181-45675ed48d63"],
   ["businessman", "dark silhouette of a wealthy businessman sitting cross-legged facing the viewer, bowler hat, suit with tie, holding a big leather briefcase upright on his lap with both hands, a gold coin glinting, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 11, "3234e29a-aacd-4c87-90ce-26870d519656"],
   ["pack-rat", "dark silhouette of a porter sitting cross-legged facing the viewer, carrying an enormous overstuffed backpack piled high with pots, rolled blankets and a lantern dangling off it, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "b5605be2-a09d-4c0b-8800-8ae6523c95e6"],
+  ["magician", "dark silhouette of a stage magician sitting cross-legged facing the viewer, tall top hat and a flowing cape, holding a fan of playing cards up in one hand, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "b668fa13-5e9d-479a-8187-37df31930f73"],
+  ["perfumist", "dark silhouette of a perfumer sitting cross-legged facing the viewer, long hair tied up with a flower, holding up a round perfume bottle with a squeeze bulb, a faint pink mist puff rising from it, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "4c3e4f23-fe74-45ec-aa58-9ccf1f776e1a"],
+  ["hermit", "dark silhouette of a hooded hermit monk sitting cross-legged in meditation facing the viewer, deep hood and long robe, hands resting together in the lap, a tall walking staff leaning beside, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "ce9e7f77-c878-4a3c-824a-9cb19f6a6dd6"],
   ["leader", "dark silhouette of an expedition leader sitting cross-legged facing the viewer, wide-brim hat, raising a megaphone to the mouth with one hand, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "2fe92e81-3308-421b-a7af-6cc8dd4e870a"],
 ];
 const crewSpec = (description, seed, job, note) => ({

@@ -1,0 +1,17 @@
+{
+  "id": "crew-hermit",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "dark silhouette of a hooded hermit monk sitting cross-legged in meditation facing the viewer, deep hood and long robe, hands resting together in the lap, a tall walking staff leaning beside, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background",
+    "width": 64,
+    "height": 80,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "basic shading",
+    "no_background": true,
+    "seed": 7
+  },
+  "job": "ce9e7f77-c878-4a3c-824a-9cb19f6a6dd6",
+  "scale": 1,
+  "note": "natively transparent; used as downloaded"
+}

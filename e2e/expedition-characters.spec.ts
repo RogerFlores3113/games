@@ -302,4 +302,64 @@ test.describe("the nine characters", () => {
     await clickUntilChanged<Trail>(page, options[1]!.reroll!.objectId, (m) => m.topBar.supplies === route.topBar.supplies - 1);
     await capture(page, "cartographer-rerolled");
   });
+
+  test("the Magician swaps a card for one picked from a teammate's fanned-out hand", async ({ page }) => {
+    test.setTimeout(180_000);
+    const panel = await soloTable(page, 2);
+    await campAs(page, panel, "magician", null);
+    await closePanel(page);
+    let model = await begin(page, "magician");
+    const card = model.hand.find((c) => c.targetable)!;
+    await clickHandCard<CampModel>(page, card.objectId, (m) => (m as unknown as { fan: unknown }).fan !== null);
+    const fan = (await getModel<{ fan: { rows: { name: string; places: { objectId: string; choiceId: string }[] }[] } }>(page)).fan;
+    expect(fan.rows.length).toBe(2);
+    await capture(page, "magician-fan");
+    const place = fan.rows[0]!.places[0]!;
+    await clickUntilChanged<CampModel>(page, place.objectId, (m) => m.targeting?.canConfirm === true);
+    model = await confirm(page, (m) => !m.hand.some((c) => c.id === card.id));
+    expect(sourceOf(model, "magician")!.charge.full).toBe("Used this camp");
+    await capture(page, "magician-swapped");
+  });
+
+  test("the Perfumist, leading, mists the next trick so every card returns to its hand", async ({ page }) => {
+    test.setTimeout(240_000);
+    const panel = await soloTable(page, 2);
+    let model = await campAs(page, panel, "perfumist", null);
+    // The first trick is yours to lead: the state editor hands you the lead.
+    const json = JSON.parse(await panel.getByTestId("dev-state-json").inputValue());
+    json.stage.attempt.camp.currentTrick.leaderSeatId = model.youSeatId;
+    await panel.getByTestId("dev-state-json").fill(JSON.stringify(json));
+    await panel.getByTestId("dev-apply-state").click();
+    await expect(panel.getByTestId("dev-result")).toHaveText(/^State loaded/);
+    const leading = (m: CampModel) => m.sceneKey === "camp" && (sourceOf(m, "perfumist")?.usable ?? false);
+    await expect.poll(async () => leading(await camp(page))).toBe(true);
+    model = await camp(page);
+    expect(leading(model), "you lead a trick").toBe(true);
+    await closePanel(page);
+    await begin(page, "perfumist");
+    model = await confirm(page, (m) => (m as unknown as { mist: boolean }).mist);
+    const hand = model.hand.length;
+    await openPanel(page);
+    await autoplay(panel, "everyone", 1);
+    await closePanel(page);
+    await capture(page, "perfumist-mist");
+    await openPanel(page);
+    await autoplay(panel, "everyone", 2);
+    await expect.poll(async () => (await getModel<{ mist: boolean }>(page)).mist).toBe(false);
+    expect((await camp(page)).hand.length).toBe(hand);
+  });
+
+  test("the Hermit drops an objective and takes the vow", async ({ page }) => {
+    test.setTimeout(180_000);
+    const panel = await soloTable(page, 2);
+    await campAs(page, panel, "hermit", "hermit.alms");
+    await closePanel(page);
+    let model = await begin(page, "hermit");
+    const mine = you(model).objectives.find((o) => o.targetable)!;
+    await clickUntilChanged<CampModel>(page, mine.objectId, (m) => m.targeting?.canConfirm === true);
+    model = await confirm(page, (m) => !you(m).objectives.some((o) => o.objectiveId === mine.objectiveId));
+    expect((you(model) as unknown as { bossMark: { label: string } | null }).bossMark).toEqual({ label: "vow", alert: false });
+    expect(sourceOf(model, "hermit.alms")!.usable).toBe(true);
+    await capture(page, "hermit-vow");
+  });
 });

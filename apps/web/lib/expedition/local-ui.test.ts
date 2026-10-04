@@ -22,7 +22,7 @@ import {
   type LocalUiState,
 } from "./local-ui";
 
-const SCOUT: ExpeditionAbilityView = {
+const EXPLORER: ExpeditionAbilityView = {
   sourceKey: "explorer",
   usableNow: true,
   reason: null,
@@ -69,7 +69,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
       { seatId: "p1", characterId: "leader", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
       { seatId: "p2", characterId: "jd", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
     ],
-    yourAbilities: [SCOUT, MONKEY, BAIT, PARROT],
+    yourAbilities: [EXPLORER, MONKEY, BAIT, PARROT],
     history: [],
     lastVote: null,
     stage: {
@@ -253,10 +253,10 @@ describe("choiceFor", () => {
   });
 
   it("maps the board and the supplies to their single ids", () => {
-    const howler: ExpeditionAbilityView = { sourceKey: "leader.delegate", usableNow: true, reason: null, steps: [{ kind: "board", prompt: "Pick the trick on the table", choices: ["board"] }] };
+    const upsideDown: ExpeditionAbilityView = { sourceKey: "perfumist.upside-down", usableNow: true, reason: null, steps: [{ kind: "board", prompt: "Pick the trick on the table", choices: ["board"] }] };
     const kit: ExpeditionAbilityView = { sourceKey: "explorer.reshape", usableNow: true, reason: null, steps: [{ kind: "supplies", prompt: "Pick the crew's supplies", choices: ["supplies"] }] };
-    const view = makeView({ yourAbilities: [howler, kit] });
-    expect(choiceFor(beginAbilityTargeting(initialLocalUi(), view, "leader.delegate"), view, "board", "")).toBe("board");
+    const view = makeView({ yourAbilities: [upsideDown, kit] });
+    expect(choiceFor(beginAbilityTargeting(initialLocalUi(), view, "perfumist.upside-down"), view, "board", "")).toBe("board");
     expect(choiceFor(beginAbilityTargeting(initialLocalUi(), view, "explorer.reshape"), view, "supplies", "")).toBe("supplies");
   });
 });

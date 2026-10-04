@@ -257,7 +257,7 @@ and `A` there are that camp's.
    conservation, a JSON round-trip, the per-seat leak check, the usage
    limits, and for an active item that its uses exhaust as declared, that a
    per-camp item resets on a replay, and that a spent instance leaves its
-   owner. Its first test (`has 6 characters, 2 powers, 17 upgrades and 17
+   owner. Its first test (`has 9 characters, 2 powers, 26 upgrades and 17
    items with unique ids`) counts the catalogue, so raise the item count and
    the id total there.
 5. Add its 16x16 icon as `apps/web/public/expedition/sprites/sources/<id>.png`

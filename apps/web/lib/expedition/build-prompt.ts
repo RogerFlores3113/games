@@ -86,6 +86,12 @@ export function describeChoice(view: ExpeditionView, choiceId: string, nameOf: (
     }
     case "option":
       return describeOption(raw, nameOf);
+    case "fan": {
+      const [seatId, place, cardId] = rest;
+      if (place !== "known") return `a card from ${nameOf(seatId ?? null)}'s hand`;
+      const identity = (attemptOf(view)?.reveals ?? []).find((r) => r.cardId === cardId)?.identity;
+      return identity === undefined ? `a card from ${nameOf(seatId ?? null)}'s hand` : `${nameOf(seatId ?? null)}'s ${cardLabel(identity)}`;
+    }
     case "board":
       return "this trick";
     case "supplies":

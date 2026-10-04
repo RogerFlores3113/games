@@ -64,6 +64,7 @@ export const PALETTE = {
   coin: "#D9A441", // brass purse coin, deliberately NOT --color-accent's gold
   coinEdge: "#7A4E16",
   coinShine: "#F6E3A6",
+  mist: "#F28DC0", // the Perfumist's pink mist
 } as const;
 
 /** Parses a "#rrggbb" string into Phaser's `0xrrggbb` integer form. */

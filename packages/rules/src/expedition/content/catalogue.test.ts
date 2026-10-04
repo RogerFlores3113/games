@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { toExpeditionPlayerView } from "../adapter/view";
-import { checkCampOutcome } from "../camp";
+import { checkCampOutcome, currentActorSeatId } from "../camp";
 import { evaluateObjective } from "../objectives";
 import type { CampState, CompletedTrick, ExpeditionCard, Objective, StandardIdentity, StandardRank, Suit } from "../state";
 import { trickWinner } from "../trick";
@@ -172,7 +172,7 @@ function clearableTable(spec: Spec): RunState {
 const playOut = (run: RunState) => play(play(play(run, "p0", "a"), "p1", "b"), "p2", "c");
 
 describe("J.D.", () => {
-  it("Beginner's Luck gives J.D. one random item when the length vote opens camp 1", () => {
+  it("Lucky Start gives J.D. one random item when the length vote opens camp 1", () => {
     let run = createRun({ seatIds: SEATS, seed: "beginner" });
     for (const [seatId, characterId] of [["p0", "jd"], ["p1", "leader"], ["p2", "explorer"]] as const) run = act(run, seatId, { type: "pick-character", characterId });
     for (const seatId of SEATS) run = act(run, seatId, { type: "vote", choice: "short" });
@@ -440,6 +440,116 @@ describe("Cartographer", () => {
       for (const offer of seat.offers.slice(1)) expect(offer.bundles.map((b) => b.length)).toEqual([1, 1, 1]);
     }
     expect(refusal(mapped, "p0", "cartographer.treasure-map", [])).toBe("ability_spent");
+  });
+});
+
+describe("Magician", () => {
+  const hands = { p0: [std("a", "spades", 9)], p1: [std("b1", "hearts", 5), std("b2", "hearts", 6)], p2: [std("c1", "clubs", 8), std("c2", "clubs", 9)] };
+
+  it("Card Trick swaps a card of yours for one from a teammate's fanned hand, once per camp", () => {
+    const run = use(table({ character: "magician", hands }), "p0", "magician", ["card:a", "fan:p1:0"]);
+    expect([handIds(run, "p0").length, ["b1", "b2"]].flat().length).toBe(3);
+    expect(["b1", "b2"]).toContain(handIds(run, "p0")[0]);
+    expect(handIds(run, "p1").sort()).toEqual(["a", ...["b1", "b2"].filter((id) => id !== handIds(run, "p0")[0])].sort());
+    expect(refusal(run, "p0", "magician", ["card:" + handIds(run, "p0")[0], "fan:p2:0"])).toBe("ability_spent");
+  });
+
+  it("Double Act adds two swaps that trade with whispers, one count for both", () => {
+    const start = table({ character: "magician", kit: ["magician.double-act"], hands });
+    expect([whisperAllowance(start)[0], remaining(start, "p0", "magician", CATALOG)]).toEqual([4, { kind: "whispers", left: 4 }]);
+    const swapped = use(start, "p0", "magician", ["card:a", "fan:p1:0"]);
+    expect([whisperAllowance(swapped)[0], remaining(swapped, "p0", "magician", CATALOG)]).toEqual([3, { kind: "whispers", left: 3 }]);
+    const whispered = whisper(swapped, "p0", "p2", handIds(swapped, "p0")[0]!);
+    expect(remaining(whispered, "p0", "magician", CATALOG)).toEqual({ kind: "whispers", left: 2 });
+  });
+
+  it("Misdirection swaps cards between two teammates' hands, from the Magician's two swaps", () => {
+    const run = use(table({ character: "magician", kit: ["magician.misdirection"], hands }), "p0", "magician.misdirection", ["fan:p1:0", "fan:p2:0"]);
+    expect(handIds(run, "p0")).toEqual(["a"]);
+    expect([handIds(run, "p1").filter((id) => id.startsWith("c")).length, handIds(run, "p2").filter((id) => id.startsWith("b")).length]).toEqual([1, 1]);
+    expect(remaining(run, "p0", "magician", CATALOG)).toEqual({ kind: "uses", left: 1, of: 2 });
+  });
+
+  it("Switcheroo spends both swaps to swap two players' open objectives", () => {
+    const objectives = [winCard("o1", ident("hearts", 9), "p1"), winCard("o2", ident("clubs", 3), "p2")];
+    const start = table({ character: "magician", kit: ["magician.switcheroo"], hands, objectives });
+    const run = use(start, "p0", "magician.switcheroo", ["seat:p1", "seat:p2"]);
+    expect([objectiveOf(run, "o1").ownerSeatId, objectiveOf(run, "o2").ownerSeatId]).toEqual(["p2", "p1"]);
+    expect(remaining(run, "p0", "magician", CATALOG)).toEqual({ kind: "uses", left: 0, of: 2 });
+    const swappedFirst = use(start, "p0", "magician", ["card:a", "fan:p1:0"]);
+    expect(refusal(swappedFirst, "p0", "magician.switcheroo", ["seat:p1", "seat:p2"])).toBe("ability_spent");
+  });
+});
+
+describe("Perfumist", () => {
+  it("Pink Mist, raised by the trick's leader, sends every card of the trick back to its hand", () => {
+    const start = table({ character: "perfumist", leader: "p0", totalTricks: 2, hands: { p0: [std("a", "spades", 9), std("a2", "spades", 2)], p1: [std("b", "spades", 6), std("b2", "spades", 3)], p2: [std("c", "spades", 4), std("c2", "spades", 5)] } });
+    const misted = use(start, "p0", "perfumist", []);
+    const after = play(play(play(misted, "p0", "a"), "p1", "b"), "p2", "c");
+    expect([camp(after).completedTricks, camp(after).voidedTricks.length, handIds(after, "p0").sort()]).toEqual([[], 1, ["a", "a2"]]);
+    expect(refusal(table({ character: "perfumist", leader: "p1" }), "p0", "perfumist", [])).toBe("ability_unavailable");
+  });
+
+  it("the Perfumist can't whisper until upgraded", () => {
+    expect(whisperAllowance(table({ character: "perfumist" }))[0]).toBe(0);
+    expect(whisperAllowance(table({ character: "perfumist", kit: ["perfumist.turncoat", "rain-poncho"] }))[0]).toBe(2);
+  });
+
+  it("Turncoat changes the led suit mid-trick, so the next players follow the new suit", () => {
+    const hands = { p0: [std("a", "spades", 9), std("h", "hearts", 5)], p1: [std("b", "spades", 12)], p2: [std("c", "spades", 4)] };
+    const led = play(table({ character: "perfumist", kit: ["perfumist.turncoat"], hands, leader: "p2" }), "p2", "c");
+    const turned = use(led, "p0", "perfumist.turncoat", ["option:hearts"]);
+    expect(rules(turned).legalPlays(camp(turned), "p0").map((c) => c.id)).toEqual(["h"]);
+    const done = play(play(turned, "p0", "h"), "p1", "b");
+    expect(camp(done).completedTricks[0]!.winnerSeatId).toBe("p0");
+  });
+
+  it("Upside Down makes the lowest card win this trick", () => {
+    const hands = { p0: [std("a", "spades", 3)], p1: [std("b", "spades", 12)], p2: [std("c", "spades", 9)] };
+    const led = play(table({ character: "perfumist", kit: ["perfumist.upside-down"], hands, leader: "p2" }), "p2", "c");
+    const flipped = use(led, "p0", "perfumist.upside-down", ["board"]);
+    expect(camp(play(play(flipped, "p0", "a"), "p1", "b")).completedTricks[0]!.winnerSeatId).toBe("p0");
+  });
+
+  it("Smelling Salts turns the trick that just failed the camp into a hallucination, once per run", () => {
+    const start = table({ character: "perfumist", kit: ["perfumist.smelling-salts"], hands: { p0: [std("a", "spades", 14)], p1: [std("b", "spades", 3)], p2: [std("c", "spades", 4)] }, objectives: [winCard("o1", ident("spades", 14), "p1")], totalTricks: 1, leader: "p0" });
+    const failed = playOut(start);
+    expect(currentWindow(failed, rules(failed))).toBe("rescue");
+    const saved = rescue(failed, "p0", "perfumist.smelling-salts", []);
+    expect([camp(saved).completedTricks, camp(saved).voidedTricks.length, rules(saved).objectiveStatus(camp(saved), objectiveOf(saved, "o1"))]).toEqual([[], 1, "pending"]);
+    expect(remaining(saved, "p0", "perfumist.smelling-salts", CATALOG)).toEqual({ kind: "uses", left: 0, of: 1 });
+  });
+});
+
+describe("Hermit", () => {
+  it("the vow drops one of the Hermit's objectives, and a trick the Hermit then wins fails the camp", () => {
+    const start = table({ character: "hermit", objectives: [winCard("mine", ident("hearts", 9), "p0"), PENDING], hands: { p0: [std("a", "spades", 14)], p1: [std("b", "spades", 3)], p2: [std("c", "spades", 4)] }, totalTricks: 2, leader: "p0" });
+    const vowed = use(start, "p0", "hermit", ["objective:mine"]);
+    expect(camp(vowed).objectives.map((o) => o.id)).toEqual(["pending"]);
+    expect(rules(vowed).goals(camp(vowed), [])).toEqual([{ id: "hermit:p0", status: "done" }]);
+    const won = playOut(vowed);
+    expect([won.stage.tag, won.history.at(-1)!.status]).toEqual(["loadout", "failed"]);
+    expect(refusal(table({ character: "hermit", objectives: [winCard("mine", ident("hearts", 9), "p0")], tricks: [WON_BY_P0] }), "p0", "hermit", ["objective:mine"])).toBe("ability_unavailable");
+  });
+
+  it("Burden starts each camp with an extra objective for the Hermit, and the vow drops two", () => {
+    const dealt = advanceTo(crew({ character: "hermit", kit: ["hermit.burden"] }), "objective-pick", CATALOG);
+    const plain = advanceTo(crew({ character: "hermit" }), "objective-pick", CATALOG);
+    expect([camp(dealt).objectives.filter((o) => o.ownerSeatId === "p0").length, camp(dealt).objectives.length - camp(plain).objectives.length]).toEqual([1, 1]);
+    expect(remaining(dealt, "p0", "hermit", CATALOG)).toEqual({ kind: "uses", left: 2, of: 2 });
+  });
+
+  it("First Pick takes the first objective of every camp", () => {
+    const picking = advanceTo(crew({ character: "hermit", kit: ["hermit.first-pick"] }), "objective-pick", CATALOG);
+    expect(currentActorSeatId(camp(picking), rules(picking))).toBe("p0");
+  });
+
+  it("Alms gives a teammate one more whisper for each objective the Hermit drops", () => {
+    const start = table({ character: "hermit", kit: ["hermit.alms"], objectives: [winCard("mine", ident("hearts", 9), "p0"), PENDING] });
+    expect(refusal(start, "p0", "hermit.alms", ["seat:p1"])).toBe("ability_unavailable");
+    const given = use(use(start, "p0", "hermit", ["objective:mine"]), "p0", "hermit.alms", ["seat:p1"]);
+    expect(whisperAllowance(given)).toEqual([2, 2, 1]);
+    expect(refusal(given, "p0", "hermit.alms", ["seat:p2"])).toBe("ability_unavailable");
   });
 });
 

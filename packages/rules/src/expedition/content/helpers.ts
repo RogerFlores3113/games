@@ -34,6 +34,11 @@ export function lowestOfLedSuit(plays: readonly TrickPlay[], led: CardIdentity):
   return following.reduce((low, play) => (rankOf(play.card) < rankOf(low.card) ? play : low)).seatId;
 }
 
+/** The lowest printed card wins; equal ranks go to the earliest play. */
+export function lowestSeat(plays: readonly TrickPlay[]): string {
+  return plays.reduce((low, play) => (rankOf(play.card) < rankOf(low.card) ? play : low)).seatId;
+}
+
 /** True while some objective-deck identity is still in a hand, so a failed
  * objective can become a fresh win-card objective. */
 export function freshObjectiveAvailable(camp: CampState | null): boolean {

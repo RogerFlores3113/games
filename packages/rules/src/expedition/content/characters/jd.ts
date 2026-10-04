@@ -8,7 +8,7 @@ export const jd = defineCharacter({
   id: "jd",
   name: "J.D.",
   theme: "The beginner's pick",
-  power: "Beginner's Luck",
+  power: "Lucky Start",
   text: "Start the run with an extra random item.",
   on: {
     "run-started": (ctx) => {

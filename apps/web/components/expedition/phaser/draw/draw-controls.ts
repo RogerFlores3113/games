@@ -12,6 +12,7 @@ import { CANCEL_ID, CONFIRM_ID, GATE_SKIP_ID, TRAY_MORE_ID, WHISPER_ID, gateUseO
 import type { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
 import { sourceArtId, type ArtId } from "../art/art-registry";
+import { cardBackTextureKey } from "../card-packs/card-pack-def";
 import { placeArt } from "../art/place-art";
 import type { CampHandlers } from "./camp-handlers";
 import { fitLabel, wrapWords } from "./text-fit";
@@ -289,6 +290,65 @@ function drawPopupShop(scene: Phaser.Scene, layer: Layer, model: SceneModel, ind
   if (shop.rows.length === 0) layer.add(text(scene, zone.x + 8, zone.y + 20, "Sold out until you refresh", PALETTE.textDim));
 }
 
+const FAN_ROW_H = MINI_H + 3;
+const FAN_STEP = 8;
+const FAN_NAME_W = 44;
+
+/** The Magician's picker: each teammate's hand fanned face down beside
+ * their name, then the cards you know from it face up; a click picks a
+ * place. A hand already picked from this use is dimmed. */
+function drawFanPicker(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
+  const fan = model.fan;
+  if (fan === null) return;
+  const h = 14 + fan.rows.length * FAN_ROW_H + 2;
+  const zone = { x: ZONES.stump.x - 32, y: ZONES.stump.y + ZONES.stump.h - h, w: ZONES.stump.w + 64, h };
+  layer.add(plate(scene, zone.x, zone.y, zone.w, zone.h).setAlpha(0.95).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
+  layer.add(text(scene, zone.x + 4, zone.y + 3, fitLabel(fan.title, Math.floor((zone.w - 8) / LABEL_CELL.w)), PALETTE.textDim));
+  fan.rows.forEach((row, r) => {
+    const y = zone.y + 14 + r * FAN_ROW_H;
+    layer.add(text(scene, zone.x + 4, y + Math.floor((MINI_H - LABEL_CELL.h) / 2), fitLabel(row.name, Math.floor((FAN_NAME_W - 4) / LABEL_CELL.w)), row.places.some((p) => p.targetable) ? PALETTE.text : PALETTE.textDim));
+    // Each card back's hit is the strip of it left showing; the last one, and a known card, is whole.
+    const pick = (place: { choiceId: string; objectId: string; selected: boolean; targetable: boolean }, x: number, hitW: number, art: Phaser.GameObjects.GameObject[]) => {
+      const container = scene.add.container(0, 0);
+      container.add(art);
+      if (place.selected) container.add(scene.add.rectangle(x, y, MINI_W, MINI_H, 0, 0).setOrigin(0, 0).setStrokeStyle(2, toPhaserColor(PALETTE.turn)));
+      if (!place.targetable && !place.selected) container.setAlpha(0.45);
+      const hit = scene.add.zone(x, y, hitW, MINI_H).setOrigin(0, 0);
+      if (place.targetable) {
+        hit.setInteractive({ useHandCursor: true });
+        hit.on("pointerdown", () => handlers.onTrayPick(place.choiceId));
+      }
+      container.add(hit);
+      container.setSize(MINI_W, MINI_H);
+      layer.add(container);
+      index.register("camp", place.objectId, hit);
+    };
+    let x = zone.x + FAN_NAME_W;
+    row.places.forEach((place, i) => {
+      const back = [
+        scene.add.image(x, y, cardBackTextureKey(model.cardPackId, "mini")).setOrigin(0, 0),
+        scene.add.rectangle(x, y, MINI_W, MINI_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.cardEdge)),
+      ];
+      pick(place, x, i === row.places.length - 1 ? MINI_W : FAN_STEP, back);
+      x += FAN_STEP;
+    });
+    x += MINI_W - FAN_STEP + 6;
+    for (const known of row.known) {
+      pick(known, x, MINI_W, [miniCard(scene, x, y, known.label, model.cardPackId)]);
+      x += MINI_W + 2;
+    }
+  });
+}
+
+/** The Perfumist's pink mist over a hallucinated trick. */
+function drawMist(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
+  if (!model.mist) return;
+  const zone = ZONES.stump;
+  layer.add(scene.add.ellipse(zone.x + zone.w / 2, zone.y + zone.h / 2, zone.w + 40, zone.h + 24, toPhaserColor(PALETTE.mist), 0.3));
+  const label = "Pink mist: every card goes back";
+  layer.add(platedText(scene, zone.x + Math.floor((zone.w - labelWidth(label)) / 2), zone.y + 2, label, PALETTE.mist));
+}
+
 export function drawControls(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   drawObjectivePool(scene, layer, model, index, handlers);
   drawActions(scene, layer, model, index, handlers);
@@ -297,7 +357,9 @@ export function drawControls(scene: Phaser.Scene, layer: Layer, model: SceneMode
 
 /** Overlays on the stump: drawn last so they cover the trick. */
 export function drawStumpOverlays(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
+  drawMist(scene, layer, model);
   drawBanner(scene, layer, model, index, handlers);
+  drawFanPicker(scene, layer, model, index, handlers);
   drawTray(scene, layer, model, index, handlers);
   drawPopupShop(scene, layer, model, index, handlers);
 }

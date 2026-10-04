@@ -220,6 +220,10 @@ test.describe("Expedition characters and abilities", () => {
         await click(rank.objectId);
         return [rank.choiceId];
       });
+      await use("board", async () => {
+        await click("board");
+        return ["board"];
+      });
       await use("supplies", async () => {
         await click("supplies");
         return ["supplies"];

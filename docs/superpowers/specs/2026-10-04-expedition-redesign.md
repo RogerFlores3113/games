@@ -1942,3 +1942,41 @@ How each of the nine fits (for unit 13):
   under it, sized for nine (`musterBoxes`, `layout.test.ts`).
 - e2e: the rescue tests give the host a Rope Ladder through the dev panel,
   since no base power rescues now.
+- Magician: Card Trick swaps a card of yours for a place in a teammate's
+  seeded fan (or a card you were shown). Any upgrade makes it two swaps a
+  camp. Double Act's swap takes a whisper (limit `whispers`) and its passive
+  adds two whispers less the swaps made, so one count serves both.
+  Misdirection is its own ability between two teammates' fans, sharing the
+  swaps; Switcheroo spends both (`shares`, `spends: 2`) to swap two
+  players' open objectives.
+- Perfumist: Pink Mist needs you to lead the trick it mists. The whisper
+  ban is a `foldsLast` passive, so no item or Delegate lifts it before an
+  upgrade. Turncoat changes what the lead card counts as (`identityOf`),
+  so a lead that was an objective's card is lost with it; a joker lead
+  cannot turn. Upside Down is the Thunderstorm's lowest-wins rule
+  (`lowestSeat` moved to `content/helpers.ts`). Smelling Salts voids the
+  last completed trick from rescue.
+- Hermit: the vow is an attempt effect adding the goal `hermit:<seat>`
+  (broken by any trick the Hermit wins); a second drop under Burden keeps
+  one goal. Burden adds the objective at `camp-dealt`, already the Hermit's.
+  Alms is its own ability, usable once per drop this camp: the owner's text
+  ("when you drop an objective, a teammate gets +1 whisper") needs a
+  teammate picked, and the drop's targets cannot depend on the upgrade.
+- Power names are the working titles the owner's doc left open, kept to 11
+  letters so the camp's kit chips show them whole: Lucky Start, Bottom
+  Line, Card Trick, Pink Mist, Mapmaker, Compass, Megaphone, Lone Vow, Big
+  Pack. Themes are shortened to fit a muster card where the owner's roles
+  ran long.
+- The leak check missed a case unit 12 opened: a card shown in a
+  hallucination and later played face down (Cave, Night) was flagged
+  because its id is hidden face down. Its id is public since the
+  hallucination, so the check now exempts it there too (found by the
+  worker's five-seat wiring run).
+- Web: the Magician's picker fans each teammate's hand face down over the
+  stump, one card back per place, then the cards you know face up; a hand
+  already picked from this use is dimmed (Misdirection). Pink mist hangs
+  over the stump while a misted trick is played. A seat under the vow
+  wears a "vow" mark. The Whisper button tells a Perfumist "No whispers
+  this camp" rather than "Used". Turncoat's suits come up in the pick tray.
+- `sources.contract.test.ts` loses its list of target kinds awaiting the
+  nine: the catalogue uses every kind.

@@ -28,6 +28,7 @@ import { buildModChips, buildSky, modTooltip, whisperBlocker, type ModChip, type
 import { bossBlockReason, bossHappenings, buildBoss, buildHelpers, latestGust, seatMarks, type BossHappening, type BossModel, type Gust, type SeatBossMark, type SeatNamer } from "./boss-model";
 import { buildTemplePath, type TemplePath } from "./temple-model";
 import { buildPopupShop, POPUP_SHOP, type PopupShopModel } from "./popup-shop-model";
+import { buildFanPicker, mistOver, vowMarks, type FanPicker } from "./character-marks";
 import { isSpent, liveSourceKeys, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, usesLabel, yourSourceId, type SourceKind, type UsesLabel } from "./source-text";
 
 const TORNADO_ID = "tornado";
@@ -309,6 +310,10 @@ export interface SceneModel {
   tray: { title: string; options: TrayOption[] } | null;
   /** The Businessman's Pop-up Shop while you are buying from it. */
   popupShop: PopupShopModel | null;
+  /** Teammates' hands fanned out while the Magician's swap is aimed. */
+  fan: FanPicker | null;
+  /** The Perfumist's pink mist hangs over this trick: it is a hallucination. */
+  mist: boolean;
   trayPage: number;
   /** The card being dragged onto the table; `legal` says whether the stump
    * accepts it. Null when no card is held. */
@@ -587,7 +592,8 @@ function whisperStatus(view: ExpeditionView, active: boolean): SceneModel["whisp
     reason = whisperBlocker(view) ?? "Blocked right now";
   } else if (mine.left === 0) {
     state = "used";
-    reason = "Used this camp";
+    const sent = whisperLog(view).some((entry) => entry.actorSeatId === view.yourSeatId);
+    reason = sent ? "Used this camp" : "No whispers this camp";
   } else if (attemptOf(view)?.window !== "between-tricks") {
     state = "wait-between-tricks";
     reason = "Between tricks";
@@ -821,7 +827,7 @@ export function buildSceneModel(
   const namer: SeatNamer = { name: (seatId) => roomSeatFor(roomSeats, seatId).displayLabel, isYou: (seatId) => seatId === view.yourSeatId };
   const boss = buildBoss(view, namer);
   const helpers = buildHelpers(view, namer);
-  const marks = seatMarks(boss, helpers);
+  const marks = { ...vowMarks(view), ...seatMarks(boss, helpers) };
   const seats = orderedSeatIds(view).map((seatId, ring) => seatModelFor(seatId, ring, view, roomSeats, ui, marks));
   const hand = buildHand(camp, view, ui);
   const trick = buildTrick(camp, view, ui);
@@ -869,6 +875,8 @@ export function buildSceneModel(
     boardPick: pickOrNull(ui, view, "board"),
     tray: buildTray(view, roomSeats, ui),
     popupShop: buildPopupShop(view, ui, (seatId) => roomSeatFor(roomSeats, seatId).displayLabel),
+    fan: buildFanPicker(view, ui, (seatId) => roomSeatFor(roomSeats, seatId).displayLabel),
+    mist: mistOver(view),
     trayPage: ui.trayPage,
     drag,
     targeting,

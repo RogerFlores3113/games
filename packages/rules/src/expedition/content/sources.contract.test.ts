@@ -14,7 +14,7 @@ import { applyRunAction } from "../run/stages/registry";
 import { TARGET_KINDS } from "../run/targets";
 import { campCardIds } from "../run/toolkit";
 import type { LedgerEntry, RunState } from "../run/types";
-import { currentStamp, defIdOf, limitOf, liveSourceKeys, remaining } from "../run/usage";
+import { currentStamp, defIdOf, limitOf, liveSourceKeys, remaining, shareOf } from "../run/usage";
 import type { CharacterDef, ItemDef, ItemUses, SourceDef } from "./source-def";
 
 const SOURCES: readonly SourceDef[] = Object.values(CATALOG.sources);
@@ -134,20 +134,16 @@ function withLedger(state: RunState, seatId: string, extra: readonly LedgerEntry
   return { ...state, seats: state.seats.map((s) => (s.seatId === seatId ? { ...s, ledger: [...s.ledger, ...extra] } : s)) };
 }
 
-/** Target kinds only characters still to be registered use: the Howler
- * Call's board waits for the Perfumist, unit 12's kinds for the rest. */
-const AWAITING_CHARACTERS = ["board", "fanned-card"];
-
 const USABLE = new Map<string, RunState>(ACTIVE_SOURCES.map((def) => [def.id, findUsable(def)]));
 
 describe("source shape", () => {
-  it("has 6 characters, 2 powers, 17 upgrades and 17 items with unique ids", () => {
+  it("has 9 characters, 2 powers, 26 upgrades and 17 items with unique ids", () => {
     const kinds = SOURCES.map((def) => def.kind);
-    expect(kinds.filter((k) => k === "character")).toHaveLength(6);
+    expect(kinds.filter((k) => k === "character")).toHaveLength(9);
     expect(kinds.filter((k) => k === "power")).toHaveLength(2);
-    expect(kinds.filter((k) => k === "upgrade")).toHaveLength(17);
+    expect(kinds.filter((k) => k === "upgrade")).toHaveLength(26);
     expect(kinds.filter((k) => k === "item")).toHaveLength(17);
-    expect(new Set(SOURCES.map((def) => def.id)).size).toBe(42);
+    expect(new Set(SOURCES.map((def) => def.id)).size).toBe(54);
   });
 
   it.each(SOURCES.map((def) => [def.id, def] as const))("%s: text is one plain sentence about the effect", (_id, def) => {
@@ -174,9 +170,9 @@ describe("source shape", () => {
     expect(Number.isInteger(def.price) && def.price > 0).toBe(true);
   });
 
-  it("the catalogue uses every target kind but those added for the nine characters", () => {
+  it("the catalogue uses every target kind", () => {
     const used = new Set(ACTIVE_SOURCES.flatMap((def) => def.active!.targets.map((spec) => spec.kind)));
-    expect([...used].sort()).toEqual(Object.keys(TARGET_KINDS).filter((kind) => !AWAITING_CHARACTERS.includes(kind)).sort());
+    expect([...used].sort()).toEqual(Object.keys(TARGET_KINDS).sort());
   });
 });
 
@@ -197,7 +193,7 @@ describe("each active source in play", () => {
     switch (left.kind) {
       case "uses":
         if (after.seats[0]!.items.some((item) => item.uid === key) || def.kind !== "item") {
-          expect(remaining(after, "p0", key, CATALOG)).toEqual({ kind: "uses", left: left.left - 1, of: left.of });
+          expect(remaining(after, "p0", key, CATALOG)).toEqual({ kind: "uses", left: left.left - shareOf(before.seats[0]!, key, CATALOG).spends, of: left.of });
         } else {
           expect(left.left).toBe(1);
         }

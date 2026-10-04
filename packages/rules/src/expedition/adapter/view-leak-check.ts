@@ -162,15 +162,16 @@ export function secretsForExpeditionSeat(
       }
     }
     // A face-down play's identity is not the viewer's, and its id is hidden
-    // unless the viewer was shown the card; a public effect naming it does
-    // not count, since the table can't see what it names.
+    // unless the viewer was shown the card, by a reveal or face up in a
+    // hallucination; a public effect naming it does not count, since the
+    // table can't see what it names.
     const trick = camp.currentTrick;
     trick.plays.forEach((play, position) => {
       if (!rules.hides(state, seatId, { kind: "play", trickIndex: trick.index, position, seatId: play.seatId })) {
         bump(play.card.identity);
         const identity = rules.identityOf(play.card);
         if (!identitiesEqual(identity, play.card.identity)) bump(identity);
-      } else if (!revealedToViewer.has(play.card.id)) hiddenIds.push(play.card.id);
+      } else if (!revealedToViewer.has(play.card.id) && !shownInVoided.has(play.card.id)) hiddenIds.push(play.card.id);
     });
     for (const discard of camp.discards) bump(discard.card.identity);
     // A hallucination was played face up; its cards are back in their hands.

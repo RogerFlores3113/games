@@ -670,7 +670,7 @@ describe("crew", () => {
         status: "waiting",
         character: "J.D.",
         sources: [
-          { sourceKey: "jd", sourceId: "jd", name: "Beginner's Luck" },
+          { sourceKey: "jd", sourceId: "jd", name: "Lucky Start" },
           { sourceKey: "bait", sourceId: "bait", name: "Bait" },
         ],
         itemsHidden: false,

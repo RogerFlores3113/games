@@ -815,12 +815,14 @@ describe("whisper status", () => {
     expect(model.whisper).toMatchObject({ shown: true, visible: false, state: "wait-between-tricks", reason: "Between tricks" });
   });
 
-  it("used: reads the rules' count, not the log", () => {
-    const model = buildSceneModel(server(whisperView({ yourWhisper: { allowed: true, left: 0 } })), ui(), "big-index");
-    expect(model.whisper).toMatchObject({ visible: false, used: true, state: "used", reason: "Used this camp", left: 0 });
+  it("used: reads the rules' count, and says used once you whispered, or that you have none (the Perfumist)", () => {
+    const used = buildSceneModel(server(whisperView({ yourWhisper: { allowed: true, left: 0 }, log: [{ actor: "s2", to: "s1" }] })), ui(), "big-index");
+    expect(used.whisper).toMatchObject({ visible: false, used: true, state: "used", reason: "Used this camp", left: 0 });
+    const none = buildSceneModel(server(whisperView({ yourWhisper: { allowed: true, left: 0 } })), ui(), "big-index");
+    expect(none.whisper).toMatchObject({ visible: false, state: "used", reason: "No whispers this camp" });
   });
 
-  it("a second Whisper (the Signaller) keeps the button ready after the first", () => {
+  it("a second Whisper (the Leader) keeps the button ready after the first", () => {
     const view = whisperView({ yourWhisper: { allowed: true, left: 1 }, log: [{ actor: "s2", to: "s1" }] });
     expect(buildSceneModel(server(view), ui(), "big-index").whisper).toMatchObject({ visible: true, state: "ready", left: 1 });
   });
