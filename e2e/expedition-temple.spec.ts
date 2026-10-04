@@ -169,12 +169,12 @@ test.describe("the temple", () => {
     model = await clickUntilChanged<CampModel>(page, target.objectId, (m) => m.targeting?.canConfirm === true);
     await capture(page, "temple-skip-targeting");
     model = await clickUntilChanged<CampModel>(page, "confirm", (m) => m.sceneKey !== "camp" || !objectives(m).some((o) => o.objectiveId === target.objectiveId));
-    // Dropping the last open objective clears the camp; otherwise the token shows spent on every seat.
+    // Dropping the last open objective clears the temple and wins the run; otherwise the token shows spent on every seat.
     if (model.sceneKey === "camp") {
       expect(skipOf(model)).toMatchObject({ charge: { full: "Used" }, usable: false });
       for (const seat of model.seats) expect(seat.sources.find((s) => s.sourceKey === "temple")?.charge.full).toBe("Used");
     } else {
-      expect(await getScene(page)).toBe("trail");
+      await expect.poll(() => getScene(page)).toBe("run-end");
     }
   });
 });

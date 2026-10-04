@@ -8,15 +8,18 @@ async function readyAtLoadout(page: Page): Promise<{ x: number; y: number }> {
   await createExpeditionRoom(page, "Solo");
   await page.getByTestId("dev-toggle").click();
   const panel = page.getByTestId("dev-panel");
-  await panel.getByTestId("dev-add-bot").dispatchEvent("click");
-  await expect(panel.getByTestId("dev-result")).toHaveText(/^Bot 1 joined\./);
-  await panel.getByTestId("dev-add-bot").dispatchEvent("click");
-  await expect(panel.getByTestId("dev-result")).toHaveText(/^Bot 2 joined\./);
+  // A dispatched click on a disabled button is dropped, and the panel stays disabled until the room answers.
+  for (const n of [1, 2]) {
+    await expect(panel.getByTestId("dev-add-bot")).toBeEnabled();
+    await panel.getByTestId("dev-add-bot").dispatchEvent("click");
+    await expect(panel.getByTestId("dev-result")).toHaveText(new RegExp(`^Bot ${n} joined\\.`));
+  }
   await page.getByTestId("start-game").click();
   await waitForBridge(page);
   await panel.getByTestId("dev-field-jump-to-camp-length").selectOption("standard");
   await panel.getByTestId("dev-field-jump-to-camp-camp").fill("3");
   await panel.getByTestId("dev-field-jump-to-camp-stage").selectOption("loadout");
+  await expect(panel.getByTestId("dev-shortcut-jump-to-camp")).toBeEnabled();
   await panel.getByTestId("dev-shortcut-jump-to-camp").dispatchEvent("click");
   await expect.poll(async () => gearOf(await getModel<TrailView>(page)) !== null).toBe(true);
   await page.getByTestId("dev-toggle").click();
