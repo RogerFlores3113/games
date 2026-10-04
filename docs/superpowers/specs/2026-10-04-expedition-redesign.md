@@ -1505,3 +1505,29 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
   adds helpers only in unit 10. `TORNADO` (every 3, 3 cards) joins `balance.ts`.
 - `RunState` is unchanged, so `ROOM_SCHEMA_VERSION` stays 11. Dev: `set-plan-boss` already listed
   every boss kind; a test sets a Long run's disaster and jumps to camp 6.
+- Web: the boss stands larger and in the camp's place. `ZONES.boss` and `ZONES.world` are folded
+  into one `world` column above the kit (6, 42, 96x100). In a boss camp the boss fills it, scaled to
+  fit (0.59 for the crocodile up to 0.98 for the capybara, against 0.5 before), and the campfire,
+  lantern and fireflies are hidden; in a plain camp they stand there as before. A taller, narrower
+  column with a trimmed kit was compared and dropped: the wide sprites shrank and the caption
+  crowded "Your kit". `layout.test.ts` checks every boss sprite fits. Checked at 3, 4 and 5 players
+  at 1280x720 and 1920x1080.
+- Web: each disaster has a caption and a one-line rule under the stump ("Gust in 2", "Quake in 1",
+  "Burns lowest", "Vaporizes top", "Moon rises", "Eats Bianca's", "River: 3 left"); rules are capped
+  at 60 characters, the ticker's width. The Locusts' next meal hangs a "next meal" mark on that seat.
+- Web: animations play once per key (the trick, the log entry) and never for what was already on the
+  table when the scene first drew. A burned card chars to ash where it lay; a vaporized one is hit by
+  a streak and flashes away; in the last-trick fan both are dimmed and crossed. A gust flies your sent
+  cards to the teammate on your right, the cards you got glow, and the sent cards stay in "Cards you
+  know" as "gust sent to <name>" until the next gust. Tornado reveals are not shown as cards you
+  showed. The latest gust's cards are the sender's tornado reveals after three per earlier gust,
+  which is exact: a gust with fewer than three cards in hand is always the last one. A quake shakes
+  the camera and slides ghost chips from old owners to new. Under a risen Blood Moon the sky turns
+  red and hand and stump cards wear a red-ringed badge with the suit they follow now. Each gust,
+  quake and locust meal shows a toast over the stump for about three seconds, with the eaten cards.
+  Monsoon reuses the Flooding chip, gauge and rising river.
+- e2e: `expedition-bosses.spec.ts` gains one test per disaster: jump to camp 6 of a Long run, set the
+  boss with `set-plan-boss`, and step autoplay until the state shows (a failed camp replays with
+  supplies topped up). The earthquake test depends on a camp surviving to its halfway trick under
+  random play, so it has an 800-step budget. The tour gains `camp-tornado` ... `camp-monsoon` from
+  rewritten views and `long-camp-6`, camp 6 of 8 reached through the dev jump.

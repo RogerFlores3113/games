@@ -45,6 +45,8 @@ export interface Sky {
   strike: string | null;
   /** Said under the stump while a strike sits on the trick. */
   notice: string | null;
+  /** The Blood Moon is up this trick: the sky turns red. */
+  bloodMoon: boolean;
 }
 
 export const STRIKE_NOTICE = "Lightning struck: the lowest card wins this trick";
@@ -81,6 +83,8 @@ export function whisperBlocker(view: ExpeditionView): string | null {
 export function modDisplayName(id: string): string {
   return MOD_DISPLAY[id]?.name ?? modName(id);
 }
+
+const BLOOD_MOON_ID = "blood-moon";
 
 /** The camp modifier whose removed cards the strip names. */
 const HEAT_ID = "magma";
@@ -145,6 +149,7 @@ export function buildSky(view: ExpeditionView): Sky | null {
     flood: meter === undefined || meter.of === 0 ? null : (meter.of - meter.left) / meter.of,
     strike: struck ? `${stage.camp.index}:${stage.attempt.attemptNumber}:${trick}` : null,
     notice: struck ? STRIKE_NOTICE : null,
+    bloodMoon: stage.mods.some((mod) => mod.id === BLOOD_MOON_ID && !mod.status.some((part) => part.kind === "alternating" && !part.activeNow)),
   };
 }
 

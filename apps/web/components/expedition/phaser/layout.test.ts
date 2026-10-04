@@ -187,10 +187,25 @@ describe("gearLayout", () => {
   });
 });
 
-describe("the boss zone", () => {
-  it("fits the longest boss caption on one line", async () => {
+describe("the boss in the world column", () => {
+  it("fits the longest boss caption on one line, and its rule on one ticker line", async () => {
     const { CAPTION_CHARS } = await import("./draw/draw-boss");
-    const { CAPTION_MAX_CHARS } = await import("../../../lib/expedition/boss-model");
+    const { CAPTION_MAX_CHARS, RULE_MAX_CHARS } = await import("../../../lib/expedition/boss-model");
     expect(CAPTION_CHARS).toBeGreaterThanOrEqual(CAPTION_MAX_CHARS);
+    expect(Math.floor((ZONES.ticker.w - 4) / 6)).toBeGreaterThanOrEqual(RULE_MAX_CHARS);
+  });
+
+  it("scales every boss sprite to stand inside the column, above its caption, the widest at 0.59", async () => {
+    const { bossScale, bossStage } = await import("./draw/draw-boss");
+    const { ART } = await import("./art/art-registry");
+    const stage = bossStage();
+    expect(rectContains(ZONES.world, stage)).toBe(true);
+    const sizes = Object.entries(ART).filter(([id]) => id.startsWith("boss-")).map(([id, art]) => {
+      const scale = bossScale(art.w, art.h);
+      return { id, fits: Math.round(art.w * scale) <= stage.w && Math.round(art.h * scale) <= stage.h, scale: Math.round(scale * 100) / 100 };
+    });
+    expect(sizes).toHaveLength(13);
+    expect(sizes.filter((s) => !s.fits)).toEqual([]);
+    expect(Math.min(...sizes.map((s) => s.scale))).toBe(0.59);
   });
 });

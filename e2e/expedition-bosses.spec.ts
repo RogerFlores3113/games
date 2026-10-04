@@ -5,8 +5,9 @@ import { clickHandCard, clickUntilChanged } from "./expedition-driver";
 import { createExpeditionRoom, getModel, getScene, waitForBridge } from "./expedition-helpers";
 
 // Needs the dev servers in dev mode (see dev-mode.spec.ts). Each animal boss
-// is set on camp 3 with the dev panel, played into the state that shows its
-// marks, and captured at 1280x720 and 1920x1080 when BOSS_SCREENSHOT_DIR is set.
+// is set on camp 3, and each disaster on camp 6 of a Long run, with the dev
+// panel, played into the state that shows it, and captured at 1280x720 and
+// 1920x1080 when BOSS_SCREENSHOT_DIR is set (a disaster also mid-animation).
 
 const SCREENSHOT_DIR = process.env.BOSS_SCREENSHOT_DIR;
 const SIZES = [
@@ -16,11 +17,19 @@ const SIZES = [
 
 interface BossModel { id: string; caption: string; rule: string; facingSeatId: string | null }
 interface Seat { seatId: string; objectId: string; isYou: boolean; targetable?: boolean; bossMark: { label: string; alert: boolean } | null }
+interface Happening { key: string; kind: string; text: string; cards: string[] }
 interface CampModel {
   sceneKey: string;
   boss: BossModel | null;
+  mods: { id: string; badge: string | null; gauge: { left: number; of: number } | null }[];
+  sky: { bloodMoon: boolean; flood: number | null };
+  happenings: Happening[];
+  gust: { cards: { label: string }[]; toSeatId: string } | null;
+  gustSent: { card: string; toName: string }[];
+  lastTrick: { burn: string; plays: { burned: boolean; card: { label: string } }[] } | null;
+  trick: { plays: { countsAs?: unknown }[] } | null;
   seats: Seat[];
-  hand: { objectId: string; playable: boolean; targetable?: boolean; blockedReason: string | null; label: string }[];
+  hand: { objectId: string; playable: boolean; targetable?: boolean; blockedReason: string | null; label: string; countsAs: { suit?: string } | null }[];
   faceUpObjectives: unknown[];
   whisper: { visible: boolean; active: boolean };
   targeting: { canConfirm: boolean } | null;
@@ -44,6 +53,7 @@ const LABELS: Readonly<Record<string, string>> = {
   "set-plan-boss": "Set a boss camp's boss",
   "force-camp": "Force the camp's outcome",
   "set-supplies": "Set supplies",
+  "give-item": "Give a seat an item",
 };
 
 /** Runs a dev shortcut and waits for its own answer and for the panel to
@@ -72,6 +82,44 @@ async function autoplay(panel: Locator, scope: "everyone" | "others", steps: num
   await panel.getByTestId("dev-autoplay-run").click();
   await expect(panel.getByTestId("dev-result")).toHaveText(/^Autoplay: /);
   await idle(panel);
+}
+
+/** Camp 6 of a Long run, the disaster camp, dealt under `boss`. */
+async function disasterCamp(panel: Locator, boss: string): Promise<void> {
+  await shortcut(panel, "jump-to-camp", { length: "long", camp: "6", stage: "camp" });
+  await shortcut(panel, "set-plan-boss", { camp: "6", boss });
+}
+
+/** Plays one autoplay step at a time until `done` holds, then shows the
+ * table without the dev panel for a moment, so the animation it set off is
+ * captured mid-flight. A camp that fails first is played again with a
+ * fresh deal, its supplies topped up so the run goes on. */
+async function stepUntil(page: Page, panel: Locator, name: string, done: (m: CampModel) => boolean, maxSteps = 80): Promise<CampModel> {
+  for (let step = 0; step < maxSteps; step++) {
+    const model = await camp(page);
+    if (model.sceneKey !== "camp") {
+      await shortcut(panel, "set-supplies", { supplies: "4" });
+      await autoplay(panel, "everyone", 3);
+      continue;
+    }
+    if (model.faceUpObjectives.length > 0) {
+      await pickAll(page, panel);
+      continue;
+    }
+    if (done(model)) {
+      if (SCREENSHOT_DIR) {
+        await page.getByTestId("dev-toggle").click();
+        await page.mouse.move(2, 2);
+        await page.waitForTimeout(120);
+        mkdirSync(SCREENSHOT_DIR, { recursive: true });
+        await page.screenshot({ path: `${SCREENSHOT_DIR}/${name}-fx-1280x720.png` });
+        await page.getByTestId("dev-toggle").click();
+      }
+      return model;
+    }
+    await autoplay(panel, "everyone", 1);
+  }
+  throw new Error(`stepUntil: ${name} never got there`);
 }
 
 /** Camp 3 dealt under `boss`. */
@@ -221,5 +269,95 @@ test.describe("animal bosses on the table", () => {
     const options = (await getModel<{ panel: { options: { next: { bossId: string | null; bossName: string | null } }[] } }>(page)).panel.options;
     expect(options.map((o) => [o.next.bossId, o.next.bossName])).toEqual(options.map(() => ["tiger", "Tiger"]));
     await capture(page, "route-tiger");
+  });
+});
+
+test.describe("disaster bosses on the table", () => {
+  test.beforeEach(async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 1280, height: 720 });
+  });
+
+  test("a tornado gust sends three of your cards to the teammate on your right", async ({ page }) => {
+    const panel = await soloTable(page);
+    await disasterCamp(panel, "tornado");
+    await pickAll(page, panel);
+    expect((await camp(page)).boss?.caption).toBe("Gust in 3");
+    const model = await stepUntil(page, panel, "tornado", (m) => m.gust !== null);
+    expect(model.gust!.cards).toHaveLength(3);
+    expect(model.gustSent.map((c) => c.card)).toEqual(model.gust!.cards.map((c) => c.label));
+    expect(model.happenings.at(-1)!.text).toMatch(/^A gust sent your \S+ \S+ \S+ to Bot 2$/);
+    await capture(page, "tornado");
+  });
+
+  test("the earthquake shakes the open objectives to new owners halfway through", async ({ page }) => {
+    // Random play often fails a camp before its halfway trick, and each failure replays it.
+    test.setTimeout(600_000);
+    const panel = await soloTable(page);
+    await disasterCamp(panel, "earthquake");
+    await pickAll(page, panel);
+    expect((await camp(page)).boss?.caption).toMatch(/^Quake in \d+$/);
+    const model = await stepUntil(page, panel, "earthquake", (m) => m.happenings.some((h) => h.kind === "quake"), 800);
+    expect(model.boss?.caption).toBe("Settled");
+    await capture(page, "earthquake");
+  });
+
+  test("the wildfire burns the lowest card of a trick", async ({ page }) => {
+    const panel = await soloTable(page);
+    await disasterCamp(panel, "wildfire");
+    await pickAll(page, panel);
+    const model = await stepUntil(page, panel, "wildfire", (m) => m.lastTrick !== null);
+    expect(model.lastTrick!.burn).toBe("burn");
+    expect(model.lastTrick!.plays.filter((p) => p.burned)).toHaveLength(1);
+    await capture(page, "wildfire");
+  });
+
+  test("the meteor vaporizes the card that would have won", async ({ page }) => {
+    const panel = await soloTable(page);
+    await disasterCamp(panel, "meteor");
+    await pickAll(page, panel);
+    const model = await stepUntil(page, panel, "meteor", (m) => m.lastTrick !== null);
+    expect(model.lastTrick!.burn).toBe("vaporize");
+    expect(model.lastTrick!.plays.filter((p) => p.burned)).toHaveLength(1);
+    await capture(page, "meteor");
+  });
+
+  test("the blood moon turns spades and clubs on its tricks, and the sky red", async ({ page }) => {
+    const panel = await soloTable(page);
+    await disasterCamp(panel, "blood-moon");
+    await pickAll(page, panel);
+    expect((await camp(page)).boss?.caption).toBe("Moon sets");
+    const model = await stepUntil(page, panel, "blood-moon", (m) => m.sky.bloodMoon && m.hand.some((c) => c.countsAs !== null) && (m.trick?.plays.length ?? 0) > 0);
+    expect(model.boss?.caption).toBe("Moon rises");
+    for (const card of model.hand.filter((c) => c.countsAs !== null)) {
+      expect([card.label.at(-1), card.countsAs!.suit]).toEqual(card.label.endsWith("♠") ? ["♠", "diamonds"] : ["♣", "hearts"]);
+    }
+    await capture(page, "blood-moon");
+  });
+
+  test("the locusts eat an item, and say so", async ({ page }) => {
+    const panel = await soloTable(page);
+    await disasterCamp(panel, "locusts");
+    await shortcut(panel, "give-item", { item: "rope-ladder" });
+    await pickAll(page, panel);
+    expect((await camp(page)).boss?.caption).toBe("Eats yours");
+    const model = await stepUntil(page, panel, "locusts", (m) => m.happenings.length > 0);
+    expect(model.happenings[0]!.text).toBe("Locusts ate your Rope Ladder");
+    await capture(page, "locusts");
+    const meal = await stepUntil(page, panel, "locusts-cards", (m) => m.happenings.some((h) => h.kind === "ate-cards"));
+    expect(meal.happenings.find((h) => h.kind === "ate-cards")!.cards).toHaveLength(3);
+    await capture(page, "locusts-cards");
+  });
+
+  test("the monsoon's river rises toward the flood", async ({ page }) => {
+    const panel = await soloTable(page);
+    await disasterCamp(panel, "monsoon");
+    await pickAll(page, panel);
+    const start = await camp(page);
+    const river = start.mods.find((m) => m.id === "monsoon")!;
+    expect(river.badge).toBe(`${river.gauge!.of} left`);
+    const model = await stepUntil(page, panel, "monsoon", (m) => (m.sky.flood ?? 0) >= 0.25, 60);
+    expect(model.boss?.caption).toMatch(/^River: \d+ left$/);
+    await capture(page, "monsoon");
   });
 });

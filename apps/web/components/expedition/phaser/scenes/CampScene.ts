@@ -18,6 +18,7 @@ import { drawBoardPick, drawDropTarget, drawHand, drawLastTrick, drawTrick } fro
 import { drawControls, drawStumpOverlays } from "../draw/draw-controls";
 import { drawWhispers } from "../draw/draw-whispers";
 import { drawBossCaption, placeBoss } from "../draw/draw-boss";
+import { BossFx } from "../draw/draw-boss-fx";
 import { bossObjectId } from "../../../../lib/expedition/boss-model";
 import { INTERACTABLE_REGISTRY } from "../interactables/registry";
 import { CARD_H, CARD_W, HAND_CARD_Y, INTERACTABLE_ANCHORS, ZONES, handFanXs, pointInRect, type Point } from "../layout";
@@ -203,7 +204,10 @@ export class CampScene extends Phaser.Scene {
   private backdropLocation: string | null = null;
   private bossLayer: Phaser.GameObjects.Container | null = null;
   private bossId: string | null = null;
+  /** The world's furniture, which steps aside while a boss stands there. */
+  private furniture: Phaser.GameObjects.Components.Visible[] = [];
   private weather: WeatherOverlay | null = null;
+  private fx: BossFx | null = null;
   private lastCardPackId: string | null = null;
   private previousModel: SceneModel | null = null;
   private dragLayer: Phaser.GameObjects.Container | null = null;
@@ -235,9 +239,11 @@ export class CampScene extends Phaser.Scene {
     this.backdropLayer = this.add.container(0, 0);
     this.backdropLocation = null;
 
+    this.furniture = [];
     for (const [id, def] of Object.entries(INTERACTABLE_REGISTRY)) {
       const anchor = INTERACTABLE_ANCHORS[id as keyof typeof INTERACTABLE_ANCHORS];
       const root = def.place(this, anchor);
+      if (pointInRect(ZONES.world, anchor)) this.furniture.push(root as Phaser.GameObjects.Container);
       root.on("pointerdown", () => def.onClick(this, root));
       this.index.register("camp", interactableObjectId(id), root as Phaser.GameObjects.Container);
     }
@@ -246,6 +252,7 @@ export class CampScene extends Phaser.Scene {
     this.bossLayer = this.add.container(0, 0);
     this.bossId = null;
     this.dynamicLayer = this.add.container(0, 0);
+    this.fx = new BossFx(this, this.add.container(0, 0), this.index);
     this.dragLayer = this.add.container(0, 0);
     this.weather = new WeatherOverlay(this, skyLayer, this.add.container(0, 0));
     const stump = ZONES.stump;
@@ -315,12 +322,14 @@ export class CampScene extends Phaser.Scene {
     if (this.bossLayer === null || this.bossId === id) return;
     placeBoss(this, this.bossLayer, model.boss, this.index, this.handlers);
     this.bossId = id;
+    for (const piece of this.furniture) piece.setVisible(id === null);
   }
 
   renderModel(model: SceneModel): void {
     if (this.dynamicLayer === null || this.unsubscribe === null) return;
     this.renderSky(model);
     this.renderBoss(model);
+    const chipsBefore = this.fx?.chipSpots(this.previousModel) ?? new Map();
     this.dynamicLayer.removeAll(true);
     drawCrowdAndStump(this, this.dynamicLayer, model, this.index, this.handlers);
     const span = drawTopBar(this, this.dynamicLayer, model.topBar, this.index, () => this.handlers.onPick("supplies", ""));
@@ -328,6 +337,8 @@ export class CampScene extends Phaser.Scene {
     drawPrompt(this, this.dynamicLayer, model.prompt);
     this.renderTable(model);
     drawTooltip(this, this.dynamicLayer, model.tooltip, ZONES.tooltip);
+    this.fx?.afterDraw();
+    this.fx?.play(model, this.previousModel, chipsBefore);
     this.previousModel = model;
   }
 

@@ -1,7 +1,8 @@
 /**
  * What has been whispered this camp. The `whispers` zone keeps the cards
  * teammates named to you (face up, labelled "from <Name>") and the cards you
- * named (labelled "to <Name>"). A ticker along the foot of the stump says,
+ * named (labelled "to <Name>"), and the cards the latest Tornado gust took
+ * from your hand. A ticker along the foot of the stump says,
  * to every seat, who whispered to whom.
  */
 import type Phaser from "phaser";
@@ -35,7 +36,8 @@ function cellsOf(model: SceneModel): Cell[] {
   const received = model.receivedWhispers.map((w) => ({ caption: "from", name: w.fromName, card: w.card, objectId: w.objectId, outline: PALETTE.turn }));
   const shown = model.shownCards.map((c) => ({ caption: c.sourceName, name: `${c.fromName} has`, card: c.card, objectId: c.objectId, outline: PALETTE.done }));
   const sent = model.sentWhispers.map((w) => ({ caption: "you sent to", name: w.toName, card: w.card, objectId: w.objectId, outline: PALETTE.sun }));
-  return [...received, ...shown, ...sent].reverse().slice(0, MAX_CELLS);
+  const gust = model.gustSent.map((w) => ({ caption: "gust sent to", name: w.toName, card: w.card, objectId: w.objectId, outline: PALETTE.destructive }));
+  return [...received, ...shown, ...sent, ...gust].reverse().slice(0, MAX_CELLS);
 }
 
 function drawCards(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex): void {

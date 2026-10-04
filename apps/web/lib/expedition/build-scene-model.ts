@@ -25,8 +25,10 @@ import { buildPrompt } from "./build-prompt";
 import type { ObjectiveHolder } from "./objective-tooltip";
 import { objectiveTooltip } from "./objective-tooltip";
 import { buildModChips, buildSky, modTooltip, whisperBlocker, type ModChip, type Sky } from "./weather-model";
-import { bossBlockReason, buildBoss, type BossModel, type SeatBossMark, type SeatNamer } from "./boss-model";
+import { bossBlockReason, bossHappenings, buildBoss, latestGust, type BossHappening, type BossModel, type Gust, type SeatBossMark, type SeatNamer } from "./boss-model";
 import { chargeText, isSpent, liveSourceKeys, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, type SourceKind } from "./source-text";
+
+const TORNADO_ID = "tornado";
 
 /**
  * D-12 boundary (spec §7.1): `buildSceneModel` renders `view.camp.
@@ -103,6 +105,9 @@ export interface CardModel {
   blockedReason: string | null;
   /** Being dragged: the fan keeps an empty slot for it. */
   dragging: boolean;
+  /** What the card counts as right now, when not its printed card (a Blood
+   * Moon trick): the suit it follows. */
+  countsAs: ExpeditionCardIdentityView | null;
 }
 
 export type ObjectiveKind = "win-card" | "ordered" | "no-tricks" | "exactly-n" | "hidden";
@@ -237,6 +242,13 @@ export interface FaceDownPlayModel {
 
 export type TrickPlayModel = ShownPlayModel | FaceDownPlayModel;
 
+export type BurnStyle = "burn" | "vaporize";
+
+/** The Meteor vaporizes the card it burns; anything else burns it. */
+function burnStyle(view: ExpeditionView): BurnStyle {
+  return view.stage.tag === "camp" && view.stage.mods.some((m) => m.id === "meteor") ? "vaporize" : "burn";
+}
+
 export interface SceneModel {
   sceneKey: "camp";
   cardPackId: CardPackId;
@@ -253,7 +265,9 @@ export interface SceneModel {
   seats: SeatModel[];
   hand: CardModel[];
   trick: { leaderSeatId: string; plays: TrickPlayModel[] } | null;
-  lastTrick: { leaderSeatId: string; winnerSeatId: string; plays: ShownPlayModel[]; open: boolean } | null;
+  /** `key` names the trick per camp and attempt; `burn` is how its burned
+   * card went: burned by fire, or vaporized by the Meteor. */
+  lastTrick: { key: string; leaderSeatId: string; winnerSeatId: string; plays: ShownPlayModel[]; open: boolean; burn: BurnStyle } | null;
   faceUpObjectives: ObjectiveChip[];
   removedCardLabels: string[];
   prompt: Prompt;
@@ -270,6 +284,12 @@ export interface SceneModel {
   shownCards: ShownCard[];
   /** Cards you named to teammates: your confirmation. */
   sentWhispers: SentWhisper[];
+  /** The cards the latest Tornado gust took from your hand. */
+  gustSent: SentWhisper[];
+  /** The latest gust, for its card flight; null before the first. */
+  gust: Gust | null;
+  /** What the disasters did this attempt, oldest first, for their toasts. */
+  happenings: BossHappening[];
   /** One line per Whisper this attempt, oldest first. Public: names only,
    * plus the card for a Whisper you sent. */
   whisperLog: string[];
@@ -421,6 +441,7 @@ function buildTrickPlayModel(
       lifted: false,
       blockedReason: null,
       dragging: false,
+      countsAs: play.countsAs ?? null,
     },
   };
 }
@@ -445,7 +466,7 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
   const objectives = objectivesForOwner(camp, seatId, view, ui);
 
   const reveals: MiniCard[] = (attemptOf(view)?.reveals ?? [])
-    .filter((r) => r.fromSeatId === seatId)
+    .filter((r) => r.fromSeatId === seatId && r.source !== TORNADO_ID)
     .map((r) => ({
       objectId: revealObjectId(r.identity),
       label: cardLabel(r.identity),
@@ -519,6 +540,7 @@ function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: Lo
       lifted: ui.hoveredCardId === c.id && dragged === null,
       blockedReason: playable ? null : blockedReasonFor(camp, view, c.identity),
       dragging: (ui.drag.phase === "dragging" || ui.drag.phase === "playing") && dragged === c.id,
+      countsAs: c.countsAs,
     };
   });
 }
@@ -545,7 +567,7 @@ function whisperStatus(view: ExpeditionView, active: boolean): SceneModel["whisp
 function buildWhispers(
   view: ExpeditionView,
   roomSeats: RoomSeatInfo[],
-): Pick<SceneModel, "receivedWhispers" | "sentWhispers" | "shownCards" | "whisperLog"> {
+): Pick<SceneModel, "receivedWhispers" | "sentWhispers" | "shownCards" | "whisperLog" | "gustSent"> {
   const you = view.yourSeatId;
   const nameOf = (seatId: string): string => roomSeatFor(roomSeats, seatId).displayLabel;
   const whisperReveals = (attemptOf(view)?.reveals ?? []).filter((r) => r.source === "whisper");
@@ -569,10 +591,12 @@ function buildWhispers(
   });
 
   const shownCards = (attemptOf(view)?.reveals ?? [])
-    .filter((r) => r.source !== "whisper")
+    .filter((r) => r.source !== "whisper" && r.source !== TORNADO_ID)
     .map((r) => ({ fromSeatId: r.fromSeatId, fromName: nameOf(r.fromSeatId), sourceName: sourceName(r.source), card: cardLabel(r.identity), objectId: revealObjectId(r.identity) }));
 
-  return { receivedWhispers, sentWhispers, shownCards, whisperLog: whisperLines };
+  const gust = latestGust(view);
+  const gustSent = gust === null ? [] : gust.cards.map((c) => ({ toSeatId: gust.toSeatId, toName: nameOf(gust.toSeatId), card: c.label, objectId: `reveal:${c.label}` }));
+  return { receivedWhispers, sentWhispers, shownCards, whisperLog: whisperLines, gustSent };
 }
 
 function buildTrick(camp: ExpeditionCampView | null, view: ExpeditionView, ui: LocalUiState): SceneModel["trick"] {
@@ -587,10 +611,12 @@ function buildTrick(camp: ExpeditionCampView | null, view: ExpeditionView, ui: L
   };
 }
 
-function buildLastTrick(camp: ExpeditionCampView | null, ui: LocalUiState): SceneModel["lastTrick"] {
-  if (camp === null || camp.completedTricks.length === 0) return null;
+function buildLastTrick(camp: ExpeditionCampView | null, view: ExpeditionView, ui: LocalUiState): SceneModel["lastTrick"] {
+  if (camp === null || camp.completedTricks.length === 0 || view.stage.tag !== "camp") return null;
   const last = camp.completedTricks[camp.completedTricks.length - 1]!;
   return {
+    key: `${view.stage.camp.index}:${view.stage.attempt.attemptNumber}:${last.index}`,
+    burn: burnStyle(view),
     leaderSeatId: last.leaderSeatId,
     winnerSeatId: last.winnerSeatId,
     plays: last.plays.map((p, i) => buildTrickPlayModel(p, i === 0)),
@@ -741,7 +767,7 @@ export function buildSceneModel(
   const seats = orderedSeatIds(view).map((seatId, ring) => seatModelFor(seatId, ring, view, roomSeats, ui, boss));
   const hand = buildHand(camp, view, ui);
   const trick = buildTrick(camp, view, ui);
-  const lastTrick = buildLastTrick(camp, ui);
+  const lastTrick = buildLastTrick(camp, view, ui);
   const faceUpObjectives = objectivesForOwner(camp, null, view, ui);
   const removedCardLabels = (camp?.removedCards ?? []).map((identity) => cardLabel(identity));
 
@@ -766,7 +792,7 @@ export function buildSceneModel(
     topBar: buildTopBar(view, pickOrNull(ui, view, "supplies")),
     mods: buildModChips(view),
     boss,
-    sky: buildSky(view) ?? { location: "jungle", precipitation: "none", haze: "none", flood: null, strike: null, notice: null },
+    sky: buildSky(view) ?? { location: "jungle", precipitation: "none", haze: "none", flood: null, strike: null, notice: null, bloodMoon: false },
     seats,
     hand,
     trick,
@@ -777,6 +803,8 @@ export function buildSceneModel(
     tooltip: buildTooltip(server, ui),
     whisper,
     ...buildWhispers(view, roomSeats),
+    gust: latestGust(view),
+    happenings: bossHappenings(view, namer),
     banner: ui.targeting === null ? buildBanner(view, roomSeats, ui) : null,
     boardPick: pickOrNull(ui, view, "board"),
     tray: buildTray(view, roomSeats, ui),

@@ -10,7 +10,6 @@ import { LABEL_CELL, SIGN_CELL, WORLD_SIGN_FONT } from "../font/font-keys";
 import { MUSTER_ZONES, ROUTE_ZONES, TRAIL_ZONES, rowBoxes, trailStopXs, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
 import { ART, crewArtId, modArtId, sourceArtId, type ArtId } from "../art/art-registry";
-import { BOSS_SCALE } from "./draw-boss";
 import type { ObjectIndex } from "../object-index";
 import type {
   BundleItem,
@@ -325,6 +324,9 @@ function objectiveChips(scene: Phaser.Scene, container: Phaser.GameObjects.Conta
   return cy + LINE + 2;
 }
 
+/** A boss portrait on a route card or the loadout is half its table size. */
+const PORTRAIT_SCALE = 0.5;
+
 /** The boss line: "No boss", the tier with its marker, or once revealed
  * the boss's portrait beside its name and tier. Returns the height used. */
 function bossLine(scene: Phaser.Scene, container: Phaser.GameObjects.Container, preview: CampPreview, x: number, y: number, room = Infinity): number {
@@ -333,15 +335,15 @@ function bossLine(scene: Phaser.Scene, container: Phaser.GameObjects.Container, 
     return LINE;
   }
   const art = preview.bossId === null ? null : modArtId({ id: preview.bossId, kind: "animal" });
-  const h = art === null ? 0 : Math.round(ART[art].h * BOSS_SCALE);
+  const h = art === null ? 0 : Math.round(ART[art].h * PORTRAIT_SCALE);
   if (art === null || preview.bossName === null || h > room) {
     const label = preview.bossName === null ? preview.boss : `${preview.bossName}, ${preview.boss.toLowerCase()}`;
     container.add(placeArt(scene, preview.boss === "The Temple" ? "temple" : "marker-boss", x + 8, y + 3));
     container.add(text(scene, x + 18, y, label, PALETTE.destructive));
     return LINE;
   }
-  const w = Math.round(ART[art].w * BOSS_SCALE);
-  container.add(placeArt(scene, art, x + Math.floor(w / 2), y + Math.floor(h / 2)).setScale(BOSS_SCALE));
+  const w = Math.round(ART[art].w * PORTRAIT_SCALE);
+  container.add(placeArt(scene, art, x + Math.floor(w / 2), y + Math.floor(h / 2)).setScale(PORTRAIT_SCALE));
   const textY = y + Math.max(0, Math.floor(h / 2) - LINE);
   container.add(text(scene, x + w + 4, textY, preview.bossName, PALETTE.destructive));
   container.add(text(scene, x + w + 4, textY + LINE, preview.boss, PALETTE.textDim));

@@ -216,6 +216,8 @@ const RIVER_LOW_Y = 300;
 const RIVER_HIGH_Y = 232;
 const RIVER_MS = 700;
 const FLASH_MS = 520;
+const BLOOD_MOON_ALPHA = 0.24;
+const MOON_MS = 600;
 
 function ensureDropTexture(scene: Phaser.Scene): void {
   if (scene.textures.exists(DROP_KEY)) return;
@@ -252,6 +254,7 @@ export class WeatherOverlay {
   private objects: Phaser.GameObjects.GameObject[] = [];
   private hazeObjects: Phaser.GameObjects.GameObject[] = [];
   private river: Phaser.GameObjects.Container | null = null;
+  private moon: Phaser.GameObjects.Rectangle | null = null;
   private readonly flashed = new Set<string>();
 
   constructor(
@@ -260,10 +263,25 @@ export class WeatherOverlay {
     private readonly top: Layer,
   ) {}
 
-  setSky(sky: Pick<Sky, "precipitation" | "haze" | "flood">): void {
+  setSky(sky: Pick<Sky, "precipitation" | "haze" | "flood" | "bloodMoon">): void {
     this.setHaze(sky.haze);
     this.setPrecipitation(sky.precipitation);
     this.setRiver(sky.flood);
+    this.setBloodMoon(sky.bloodMoon);
+  }
+
+  /** A red cast over the sky while the Blood Moon is up, fading in and out
+   * as it rises and sets. */
+  private setBloodMoon(up: boolean): void {
+    if (this.moon === null) {
+      this.moon = this.scene.add.rectangle(0, 0, STAGE.w, STAGE.h, toPhaserColor(PALETTE.destructive)).setOrigin(0, 0).setAlpha(0);
+      this.sky.add(this.moon);
+    }
+    const alpha = up ? BLOOD_MOON_ALPHA : 0;
+    if (this.moon.getData("target") === alpha) return;
+    this.moon.setData("target", alpha);
+    this.scene.tweens.killTweensOf(this.moon);
+    this.scene.tweens.add({ targets: this.moon, alpha, duration: MOON_MS, ease: "Sine.easeInOut" });
   }
 
   private setHaze(haze: Haze): void {

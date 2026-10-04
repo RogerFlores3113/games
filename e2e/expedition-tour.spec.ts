@@ -58,6 +58,7 @@ const RARE = [
   "run-end-won", "between-camps-draft", "vote-tie-length", "vote-tie-route", "shop", "camp-storm-strike", "camp-rain", "route-weather",
   "camp-cave", "camp-night", "camp-desert", "camp-fog", "camp-magma", "camp-flood", "loadout-fog",
   "camp-tiger", "camp-rats", "camp-snake", "camp-crocodile", "camp-capybara", "camp-beaver", "route-boss",
+  "camp-tornado", "camp-earthquake", "camp-wildfire", "camp-meteor", "camp-blood-moon", "camp-locusts", "camp-monsoon", "long-camp-6",
 ];
 
 interface Identity { kind: "standard" | "joker"; suit?: string; rank?: number; joker?: "sun" | "moon" }
@@ -582,12 +583,54 @@ function routeWeatherView(game: Game): Game {
   };
 }
 
-/** Mid-trick under an animal boss with `status`, its marks on the crew. */
-function bossView(boss: string, status: (you: string, mate: string) => Record<string, unknown>[]): (game: Game) => Game {
+/** Mid-trick under a boss with `status`, its marks on the crew; `edit`
+ * changes the attempt in place. */
+function bossView(
+  boss: string,
+  status: (you: string, mate: string) => Record<string, unknown>[],
+  kind: "animal" | "disaster" = "animal",
+  edit: (attempt: Record<string, unknown> & { camp: Record<string, unknown> }, game: Game) => void = () => {},
+  weather = "fair",
+): (game: Game) => Game {
   return (game) => {
     const mate = game.seats.find((s) => s.seatId !== game.yourSeatId)!.seatId;
-    return campIn(playing(game, { plays: 1, window: "in-trick" }), "jungle", "fair", [mod("jungle", "location"), mod("fair", "weather"), mod(boss, "animal", status(game.yourSeatId, mate))]);
+    const next = campIn(playing(game, { plays: 1, window: "in-trick" }), "jungle", weather, [mod("jungle", "location"), mod(weather, "weather"), mod(boss, kind, status(game.yourSeatId, mate))]);
+    edit((next.stage as CampStage).attempt as unknown as Record<string, unknown> & { camp: Record<string, unknown> }, next);
+    return next;
   };
+}
+
+type HandCard = { id: string; identity: { kind: string; suit?: string; rank?: number } };
+type CompletedTrick = { plays: { burned: boolean; card: HandCard }[] };
+
+/** The last completed trick with its lowest card burned (the Wildfire), or
+ * its highest (the Meteor's would-be winner). */
+function burnLast(highest: boolean) {
+  return (attempt: { camp: Record<string, unknown> }) => {
+    const last = (attempt.camp.completedTricks as CompletedTrick[]).at(-1)!;
+    const ranks = last.plays.map((p) => p.card.identity.rank ?? 0);
+    const at = ranks.indexOf(highest ? Math.max(...ranks) : Math.min(...ranks));
+    last.plays[at]!.burned = true;
+  };
+}
+
+const BLOOD: Readonly<Record<string, string>> = { spades: "diamonds", clubs: "hearts" };
+
+/** Spades count as diamonds and clubs as hearts, in hand and on the stump. */
+function bloodMoonUp(attempt: { camp: Record<string, unknown> }): void {
+  const turned = (card: HandCard) => (card.identity.suit !== undefined && BLOOD[card.identity.suit] ? { ...card.identity, suit: BLOOD[card.identity.suit] } : null);
+  for (const card of attempt.camp.yourHand as (HandCard & { countsAs: unknown })[]) card.countsAs = turned(card);
+  for (const play of (attempt.camp.currentTrick as { plays: { card?: HandCard; countsAs?: unknown }[] }).plays) if (play.card) play.countsAs = turned(play.card);
+}
+
+/** Just after a gust took your three highest cards to the seat on your right. */
+function gustBlew(attempt: Record<string, unknown> & { camp: Record<string, unknown> }, game: Game): void {
+  const hand = attempt.camp.yourHand as HandCard[];
+  const sent = hand.slice(-3);
+  attempt.camp.yourHand = hand.slice(0, -3);
+  attempt.camp.yourLegalCardIds = (attempt.camp.yourHand as HandCard[]).map((c) => c.id);
+  (attempt.log as Record<string, unknown>[]).push({ event: "gust", actorSeatId: null, subjectSeatIds: [], sourceId: "tornado", private: false });
+  attempt.reveals = [...(attempt.reveals as unknown[]), ...sent.map((c) => ({ cardId: c.id, fromSeatId: game.yourSeatId, source: "tornado", identity: c.identity, toSeatId: null }))];
 }
 
 const BOSS_VIEWS = [
@@ -597,6 +640,13 @@ const BOSS_VIEWS = [
   ["camp-crocodile", bossView("crocodile", (_you, mate) => [{ kind: "facing", seatId: mate }])],
   ["camp-capybara", bossView("capybara", () => [])],
   ["camp-beaver", bossView("beaver", () => [{ kind: "dam", suit: "hearts" }])],
+  ["camp-tornado", bossView("tornado", () => [{ kind: "countdown", tricks: 3 }], "disaster", gustBlew)],
+  ["camp-earthquake", bossView("earthquake", () => [{ kind: "countdown", tricks: 1 }], "disaster")],
+  ["camp-wildfire", bossView("wildfire", () => [], "disaster", burnLast(false))],
+  ["camp-meteor", bossView("meteor", () => [], "disaster", burnLast(true))],
+  ["camp-blood-moon", bossView("blood-moon", () => [{ kind: "alternating", activeNow: true }], "disaster", bloodMoonUp)],
+  ["camp-locusts", bossView("locusts", (_you, mate) => [{ kind: "swarm", seatId: mate }], "disaster")],
+  ["camp-monsoon", bossView("monsoon", () => [{ kind: "meter", left: 2, of: 14 }], "disaster", () => {}, "rain")],
 ] as const;
 
 /** A route vote into a revealed boss camp: three options, one with a
@@ -685,6 +735,35 @@ async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<v
   await capture(lengthTieView as (g: Game) => Game, "trail", "vote-tie-length", 2_000);
   await capture(routeTieView as (g: Game) => Game, "trail", "vote-tie-route", 2_000);
   if (!tour.has("run-end-won")) await capture(wonView as (g: Game) => Game, "run-end", "run-end-won-rewritten");
+  await longCamp6(host, tour, rewrite);
+}
+
+/** Camp 6 of a Long run, the disaster camp, reached with the dev panel's
+ * jump (it needs the worker in dev mode). The run's own plan names its
+ * disaster; a plan without one is given the Tornado. */
+async function longCamp6(host: Page, tour: Tour, rewrite: Rewriter): Promise<void> {
+  rewrite.current = (g) => g;
+  await host.reload();
+  await host.waitForFunction(() => window.__expeditionTest?.ready === true && window.__expeditionTest.scene !== null);
+  await host.getByTestId("dev-toggle").click();
+  const panel = host.getByTestId("dev-panel");
+  const run = async (id: string, fields: Record<string, string>, label: string): Promise<void> => {
+    for (const [name, value] of Object.entries(fields)) {
+      const field = panel.getByTestId(`dev-field-${id}-${name}`);
+      if ((await field.evaluate((el) => el.tagName)) === "SELECT") await field.selectOption(value);
+      else await field.fill(value);
+    }
+    await panel.getByTestId(`dev-shortcut-${id}`).click();
+    await expect(panel.getByTestId("dev-result")).toHaveText(new RegExp(`^${label}: done\\.`));
+  };
+  await run("jump-to-camp", { length: "long", camp: "6", stage: "camp" }, "Jump to camp");
+  await waitForScene(host, "camp", 30_000);
+  const boss = (await getModel<{ boss: { id: string } | null }>(host)).boss;
+  if (boss === null) await run("set-plan-boss", { camp: "6", boss: "tornado" }, "Set a boss camp's boss");
+  await host.getByTestId("dev-toggle").click();
+  await expect.poll(async () => (await getModel<CampModel & { boss: unknown }>(host)).campIndex).toBe(6);
+  await host.mouse.move(5, 5);
+  await tour.shot("long-camp-6");
 }
 
 test.describe("@tour Expedition UI tour", () => {

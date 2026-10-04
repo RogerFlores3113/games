@@ -25,8 +25,9 @@ export const SETTINGS_SAFE_ZONE: Rect = { x: 584, y: 0, w: 56, h: 56 };
 export const ZONES = {
   topBar: { x: 0, y: 0, w: 576, h: 22 },
   prompt: { x: 96, y: 24, w: 448, h: 16 },
-  boss: { x: 6, y: 42, w: 96, h: 58 },
-  world: { x: 8, y: 102, w: 92, h: 40 },
+  /** The left column above the kit: the campfire, or in a boss camp the
+   * boss in its place. */
+  world: { x: 6, y: 42, w: 96, h: 100 },
   crowd: { x: 104, y: 42, w: 432, h: 104 },
   whispers: { x: 540, y: 58, w: 92, h: 112 },
   kit: { x: 8, y: 146, w: 92, h: 126 },
@@ -223,8 +224,8 @@ export const INTERACTABLE_ANCHORS: {
   mascot: Point;
 } = {
   campfire: { x: 50, y: 120 },
-  fireflies: { x: 18, y: 116 },
-  lantern: { x: 86, y: 124 },
+  fireflies: { x: 30, y: 64 },
+  lantern: { x: 84, y: 70 },
   mascot: { x: 612, y: 338 },
 };
 

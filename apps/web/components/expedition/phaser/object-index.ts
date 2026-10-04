@@ -53,6 +53,21 @@ export class ObjectIndex {
     return x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height;
   }
 
+  /** `id`'s top-left in stage coordinates while it is on screen. */
+  positionOf(id: string): { x: number; y: number } | null {
+    const entry = this.byId.get(id);
+    if (entry === undefined || !entry.obj.active || !entry.obj.visible) return null;
+    const b = entry.obj.getBounds();
+    return { x: b.x, y: b.y };
+  }
+
+  /** Hides or shows `id`'s object, for an animation that stands in for it
+   * a moment. */
+  setVisible(id: string, visible: boolean): void {
+    const entry = this.byId.get(id);
+    if (entry !== undefined && entry.obj.active) entry.obj.visible = visible;
+  }
+
   entries(): ObjectIndexEntry[] {
     const out: ObjectIndexEntry[] = [];
     for (const [id, entry] of this.byId) {

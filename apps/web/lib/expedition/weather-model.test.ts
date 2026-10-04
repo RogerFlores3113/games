@@ -51,7 +51,7 @@ describe("buildModChips", () => {
 
 describe("buildSky", () => {
   it("rains under rain, storms under a thunderstorm, and is dry in fair weather", () => {
-    expect(buildSky(campView("rain", [RAIN]))).toEqual({ location: "clifftop", precipitation: "rain", haze: "none", flood: null, strike: null, notice: null });
+    expect(buildSky(campView("rain", [RAIN]))).toEqual({ location: "clifftop", precipitation: "rain", haze: "none", flood: null, strike: null, notice: null, bloodMoon: false });
     expect(buildSky(campView("thunderstorm", [STORM]))?.precipitation).toBe("storm");
     expect(buildSky(campView("fair", []))?.precipitation).toBe("none");
   });
@@ -64,7 +64,20 @@ describe("buildSky", () => {
       flood: null,
       strike: "2:1:4",
       notice: "Lightning struck: the lowest card wins this trick",
+      bloodMoon: false,
     });
+  });
+
+  it("turns red while the Blood Moon is up, and not on the tricks it sets", () => {
+    const moon = (activeNow: boolean): ExpeditionModView => ({ id: "blood-moon", kind: "disaster", strength: "full", status: [{ kind: "alternating", activeNow }] });
+    expect(buildSky(campView("fair", [moon(true)]))?.bloodMoon).toBe(true);
+    expect(buildSky(campView("fair", [moon(false)]))?.bloodMoon).toBe(false);
+  });
+
+  it("raises the Monsoon's river like Flooding's", () => {
+    const monsoon: ExpeditionModView = { id: "monsoon", kind: "disaster", strength: "full", status: [{ kind: "meter", left: 3, of: 12 }] };
+    expect(buildSky(campView("rain", [monsoon]))?.flood).toBe(0.75);
+    expect(buildModChips(campView("rain", [monsoon]))[0]).toMatchObject({ name: "Monsoon", badge: "3 left", gauge: { left: 3, of: 12 }, alert: false });
   });
 });
 

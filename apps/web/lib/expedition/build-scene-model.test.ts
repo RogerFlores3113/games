@@ -357,7 +357,7 @@ describe("drag and drop", () => {
   }
 
   it("names the suit you must follow for a card the server did not list as legal", () => {
-    const led = { seatId: "s1", hidden: false as const, card: { id: "led", identity: AS }, effectiveRank: null };
+    const led = { seatId: "s1", hidden: false as const, card: { id: "led", identity: AS }, effectiveRank: null, countsAs: null };
     const model = buildSceneModel(
       server(dragView({ currentActorSeatId: "s2", currentTrick: { index: 0, leaderSeatId: "s1", plays: [led] }, yourLegalCardIds: ["as"] })),
       ui(),
@@ -412,8 +412,8 @@ describe("trick and lastTrick", () => {
             index: 0,
             leaderSeatId: "s2",
             plays: [
-              { seatId: "s2", hidden: false, card: { id: "c1", identity: AS }, effectiveRank: null },
-              { seatId: "s3", hidden: false, card: { id: "c2", identity: KD }, effectiveRank: null },
+              { seatId: "s2", hidden: false, card: { id: "c1", identity: AS }, effectiveRank: null, countsAs: null },
+              { seatId: "s3", hidden: false, card: { id: "c2", identity: KD }, effectiveRank: null, countsAs: null },
             ],
           },
         }),
@@ -471,7 +471,7 @@ describe("trick and lastTrick", () => {
               ],
             },
           ],
-          currentTrick: { index: 1, leaderSeatId: "s2", plays: [{ seatId: "s2", hidden: false, card: { id: "c3", identity: TH }, effectiveRank: null }] },
+          currentTrick: { index: 1, leaderSeatId: "s2", plays: [{ seatId: "s2", hidden: false, card: { id: "c3", identity: TH }, effectiveRank: null, countsAs: null }] },
         }),
       },
     });
@@ -493,8 +493,8 @@ describe("trick and lastTrick", () => {
             index: 0,
             leaderSeatId: "s1",
             plays: [
-              { seatId: "s1", hidden: false, card: { id: "c1", identity: AS }, effectiveRank: null },
-              { seatId: "s3", hidden: false, card: { id: "c2", identity: KD }, effectiveRank: null },
+              { seatId: "s1", hidden: false, card: { id: "c1", identity: AS }, effectiveRank: null, countsAs: null },
+              { seatId: "s3", hidden: false, card: { id: "c2", identity: KD }, effectiveRank: null, countsAs: null },
             ],
           },
         }),
@@ -705,6 +705,61 @@ describe("reveals", () => {
     const reveal = model.seats.find((s) => s.seatId === "s1")!.reveals[0]!;
     expect(reveal.sourceTag).toBe("ability");
     expect(reveal.sourceName).toBe("Spyglass");
+  });
+});
+
+describe("disasters on the table", () => {
+  const disaster = (id: string, status: Extract<ExpeditionStageView, { tag: "camp" }>["mods"][number]["status"] = []) => ({ id, kind: "disaster" as const, strength: "full" as const, status });
+  const withMods = (view: ExpeditionView, mods: ReturnType<typeof disaster>[]): ExpeditionView => ({ ...view, stage: { ...(view.stage as Extract<ExpeditionStageView, { tag: "camp" }>), mods } });
+
+  it("a hand card under the Blood Moon says the suit it follows now; the trick's cards too", () => {
+    const view = makeView({
+      attempt: {
+        ...makeAttempt(),
+        camp: makeCamp({
+          yourHand: [
+            { id: "c-as", identity: AS, effectiveRank: null, countsAs: { kind: "standard", suit: "diamonds", rank: 14 } },
+            { id: "c-th", identity: TH, effectiveRank: null, countsAs: null },
+          ],
+          currentTrick: { index: 1, leaderSeatId: "s1", plays: [{ seatId: "s1", hidden: false, card: { id: "c3", identity: { kind: "standard", suit: "clubs", rank: 5 } }, effectiveRank: null, countsAs: { kind: "standard", suit: "hearts", rank: 5 } }] },
+        }),
+      },
+    });
+    const model = buildSceneModel(server(withMods(view, [disaster("blood-moon", [{ kind: "alternating", activeNow: true }])])), ui(), "big-index");
+    expect(model.hand.map((c) => [c.label, c.countsAs])).toEqual([
+      ["A♠", { kind: "standard", suit: "diamonds", rank: 14 }],
+      ["10♥", null],
+    ]);
+    expect(model.trick!.plays.map((p) => shown(p).countsAs)).toEqual([{ kind: "standard", suit: "hearts", rank: 5 }]);
+    expect(model.sky.bloodMoon).toBe(true);
+  });
+
+  it("keys the last trick per camp and attempt, and says the Meteor vaporizes what burns", () => {
+    const completed = [{ index: 3, leaderSeatId: "s1", winnerSeatId: "s3", plays: [{ seatId: "s1", card: { id: "c1", identity: AS }, effectiveRank: null, countsAs: null, burned: true }] }];
+    const view = makeView({ campIndex: 6, attempt: { ...makeAttempt(), attemptNumber: 2, camp: makeCamp({ completedTricks: completed }) } });
+    expect(buildSceneModel(server(withMods(view, [disaster("meteor")])), ui(), "big-index").lastTrick).toMatchObject({ key: "6:2:3", burn: "vaporize" });
+    expect(buildSceneModel(server(withMods(view, [disaster("wildfire")])), ui(), "big-index").lastTrick).toMatchObject({ key: "6:2:3", burn: "burn" });
+  });
+
+  it("lists a gust's cards as sent to the seat on your right, never as cards you showed", () => {
+    const view = makeView({
+      attempt: {
+        ...makeAttempt(),
+        log: [{ event: "gust", actorSeatId: null, subjectSeatIds: [], sourceId: "tornado", private: false }],
+        reveals: [
+          { cardId: "c1", fromSeatId: "s2", source: "tornado", identity: AS, toSeatId: null },
+          { cardId: "c2", fromSeatId: "s2", source: "tornado", identity: KD, toSeatId: null },
+        ],
+      },
+    });
+    const model = buildSceneModel(server(withMods(view, [disaster("tornado", [{ kind: "countdown", tricks: 3 }])])), ui(), "big-index");
+    expect(model.gustSent).toEqual([
+      { toSeatId: "s1", toName: "Alice", card: "A♠", objectId: "reveal:A♠" },
+      { toSeatId: "s1", toName: "Alice", card: "K♦", objectId: "reveal:K♦" },
+    ]);
+    expect(model.shownCards).toEqual([]);
+    expect(model.seats.every((s) => s.reveals.length === 0)).toBe(true);
+    expect(model.happenings).toEqual([{ key: "2:1:0", kind: "gust", text: "A gust sent your A♠ K♦ to Alice", cards: ["A♠", "K♦"] }]);
   });
 });
 
