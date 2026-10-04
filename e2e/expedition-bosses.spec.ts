@@ -243,13 +243,16 @@ test.describe("disaster bosses on the table", () => {
   });
 
   test("the earthquake shakes the open objectives to new owners halfway through", async ({ page }) => {
-    // Random play often fails a camp before its halfway trick, and each failure replays it.
-    test.setTimeout(600_000);
     const panel = await soloTable(page);
+    // A fixed seed whose camp autoplay plays past its halfway trick; dev/autoplay.test.ts pins it.
+    const state = JSON.parse(await panel.getByTestId("dev-state-json").inputValue());
+    await panel.getByTestId("dev-state-json").fill(JSON.stringify({ ...state, seed: "quake-8" }));
+    await panel.getByTestId("dev-apply-state").click();
+    await expect(panel.getByTestId("dev-result")).toHaveText(/^State loaded/);
     await disasterCamp(panel, "earthquake");
     await pickAll(page, panel);
     expect((await camp(page)).boss?.caption).toMatch(/^Quake in \d+$/);
-    const model = await stepUntil(page, panel, "earthquake", (m) => m.happenings.some((h) => h.kind === "quake"), 800);
+    const model = await stepUntil(page, panel, "earthquake", (m) => m.happenings.some((h) => h.kind === "quake"), 40);
     expect(model.boss?.caption).toBe("Settled");
     await capture(page, "earthquake");
   });

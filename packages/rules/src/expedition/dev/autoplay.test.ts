@@ -98,3 +98,27 @@ describe("botMove at the temple", () => {
     expect(botMove(noClubs.run, [noClubs.leader], CATALOG)).toEqual({ seatId: noClubs.leader, request: { type: "play-card", cardId: "s9" } });
   });
 });
+
+describe("the earthquake e2e's fixed seed", () => {
+  /** Long camp 6 under the Earthquake, played by autoplay for every seat
+   * until the quake or a settle. Returns the step the quake struck at. */
+  const quakeStep = (seed: string, seatIds: readonly string[]): number | null => {
+    let run: RunState = createRun({ seatIds, seed });
+    run = DEV_SHORTCUTS["jump-to-camp"].apply(run, { length: "long", camp: 6, stage: "camp" }, CATALOG);
+    run = DEV_SHORTCUTS["set-plan-boss"].apply(run, { camp: "6", boss: "earthquake" }, CATALOG);
+    for (let step = 0; step < 200 && run.stage.tag === "camp"; step++) {
+      if (run.stage.attempt.log.some((entry) => entry.event === "quake")) return step;
+      const move = botMove(run, seatIds, CATALOG);
+      if (move === null) return null;
+      const result = applyRunAction(run, move.seatId, move.request, CATALOG);
+      if (!result.ok) return null;
+      run = result.state;
+    }
+    return null;
+  };
+
+  it("reaches the quake under autoplay whatever the seat ids are", () => {
+    expect(quakeStep("quake-8", ["h", "b1", "b2"])).toBe(31);
+    expect(quakeStep("quake-8", ["V3kq", "aa0", "Zt7"])).toBe(31);
+  });
+});
