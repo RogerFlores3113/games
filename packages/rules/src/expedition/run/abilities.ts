@@ -7,6 +7,7 @@ import type { AdapterResult } from "../../adapter";
 import { shuffleWithSeed } from "../../shuffle";
 import { checkCampOutcome } from "../camp";
 import type { AbilityContext, ActiveAbility, SourceId } from "../content/source-def";
+import { attemptOf, withAttempt } from "./attempt";
 import { rulesFor } from "./compose";
 import { STREAMS, seededIndex } from "./rng";
 import type { RunRules } from "./run-rules";
@@ -28,14 +29,15 @@ function abilityContext<S extends readonly TargetSpec[]>(
   targets: readonly Target[],
   drawsAllowed: boolean,
 ): AbilityContext<S> {
-  const attempt = run.attempt;
-  if (attempt === null) throw new Error("abilities: no attempt in progress");
+  const attempt = attemptOf(run);
+  const stamp = currentStamp(run);
+  if (attempt === null || stamp === null) throw new Error("abilities: no attempt in progress");
   const camp = attempt.camp;
   const self = seat.seatId;
   let draw = 0;
   const nextStream = (): string => {
     if (!drawsAllowed) throw new Error(`abilities: "${sourceId}" drew randomness outside apply`);
-    return STREAMS.ability(run.campNumber, attempt.attemptNumber, self, seat.ledger.length, draw++);
+    return STREAMS.ability(stamp.camp, attempt.attemptNumber, self, seat.ledger.length, draw++);
   };
   const handOf = (seatId: string) => camp.hands.find((h) => h.seatId === seatId)?.cards ?? [];
   return {
@@ -76,7 +78,7 @@ function statusWith(run: RunState, seat: SeatRun, sourceId: SourceId, active: Ac
 }
 
 function scopeOf(run: RunState, seatId: string, rules: RunRules): SeatScope {
-  return { run, seatId, camp: run.attempt?.camp ?? null, rules };
+  return { run, seatId, camp: attemptOf(run)?.camp ?? null, rules };
 }
 
 /** null for a source with no active ability. `sourceId` must be live for the
@@ -93,8 +95,9 @@ export function abilityStatus(run: RunState, seatId: string, sourceId: SourceId,
 
 /** The camp's failed objective ids right now; [] with no attempt or no failure. */
 function failedObjectiveIds(run: RunState, rules: RunRules): readonly string[] {
-  if (run.attempt === null) return [];
-  const outcome = checkCampOutcome(run.attempt.camp, rules);
+  const camp = attemptOf(run)?.camp;
+  if (camp === undefined) return [];
+  const outcome = checkCampOutcome(camp, rules);
   return outcome.status === "failed" ? outcome.failedObjectiveIds : [];
 }
 
@@ -160,9 +163,9 @@ export function useAbility(
     const kit = limit.kind === "single-use" ? s.kit.filter((id) => id !== sourceId) : s.kit;
     return { ...s, kit, ledger: [...s.ledger, used] };
   });
-  const attempt = applied.attempt!;
+  const attempt = attemptOf(applied)!;
   const logEntry: LogEntry = { event: "use-ability", actorSeatId: seatId, subjectSeatIds: subjectSeatIds(resolved.targets), sourceId, audience: "public" };
-  return { ok: true, state: { ...applied, seats, attempt: { ...attempt, log: [...attempt.log, logEntry] } } };
+  return { ok: true, state: withAttempt({ ...applied, seats }, { ...attempt, log: [...attempt.log, logEntry] }) };
 }
 
 /** skip-window: in the open gated window, appends `passed` for each of the

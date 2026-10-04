@@ -4,7 +4,7 @@ import type { ExpeditionSceneStore } from "../../../../lib/expedition/expedition
 import type { SceneKey } from "../../../../lib/expedition/build-scene-model";
 import type { ObjectIndex } from "../object-index";
 import { CampScene } from "./CampScene";
-import { FiresideScene } from "./FiresideScene";
+import { TrailScene } from "./TrailScene";
 import { RunEndScene } from "./RunEndScene";
 
 export interface SceneDeps {
@@ -14,6 +14,6 @@ export interface SceneDeps {
 
 export const SCENE_FACTORIES: Record<SceneKey, (deps: SceneDeps) => Phaser.Scene> = {
   camp: (deps) => new CampScene(deps),
-  fireside: (deps) => new FiresideScene(deps),
+  trail: (deps) => new TrailScene(deps),
   "run-end": (deps) => new RunEndScene(deps),
 };

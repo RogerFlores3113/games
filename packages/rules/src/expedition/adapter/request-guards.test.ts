@@ -8,6 +8,8 @@ import type { RunAction } from "../run/types";
 
 const WELL_FORMED: readonly RunAction[] = [
   { type: "pick-character", characterId: "scout" },
+  { type: "vote", choice: "short" },
+  { type: "vote", choice: null },
   { type: "pick-draft", sourceId: "compass" },
   { type: "ready" },
   { type: "use-ability", sourceId: "spyglass", targets: ["seat-a", "seat-b"] },
@@ -19,7 +21,7 @@ const WELL_FORMED: readonly RunAction[] = [
 
 describe("parseRunAction: well-formed shapes", () => {
   for (const action of WELL_FORMED) {
-    it(`parses ${action.type}`, () => {
+    it(`parses ${JSON.stringify(action)}`, () => {
       const parsed = parseRunAction(action);
       expect(parsed).toEqual(action);
       expect(parsed).not.toBe(action);
@@ -32,6 +34,11 @@ describe("parseRunAction: well-formed shapes", () => {
     expect(parsed).not.toBe(request);
     expect(parsed.targets).not.toBe(request.targets);
     expect(parsed.targets).toEqual(["a", "b"]);
+  });
+
+  it("parses a vote to the literal action, a string choice or an abstention", () => {
+    expect(parseRunAction({ type: "vote", choice: "short" })).toEqual({ type: "vote", choice: "short" });
+    expect(parseRunAction({ type: "vote", choice: null })).toEqual({ type: "vote", choice: null });
   });
 
   it("accepts a target-free use-ability", () => {
@@ -57,6 +64,11 @@ describe("parseRunAction: rejects malformed input", () => {
     { type: "pick-character" },
     { type: "pick-character", characterId: 42 },
     { type: "pick-character", characterId: "scout", extra: true },
+    { type: "vote" },
+    { type: "vote", choice: 42 },
+    { type: "vote", choice: ["short"] },
+    { type: "vote", choice: undefined },
+    { type: "vote", choice: "short", extra: true },
     { type: "set-loadout", gearIds: ["a"] },
     { type: "use-gear", gearId: "spyglass", targets: [] },
     { type: "use-ability", sourceId: "spyglass" },
@@ -85,6 +97,7 @@ describe("parseRunAction: rejects malformed input", () => {
 describe("parseRunAction: property — never throws, exact key set on success", () => {
   const EXPECTED_KEYS: Readonly<Record<RunAction["type"], string[]>> = {
     "pick-character": ["type", "characterId"],
+    vote: ["type", "choice"],
     "pick-draft": ["type", "sourceId"],
     ready: ["type"],
     "use-ability": ["type", "sourceId", "targets"],

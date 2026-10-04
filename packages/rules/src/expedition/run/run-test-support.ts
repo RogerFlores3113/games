@@ -10,19 +10,23 @@
 // this helper must reproduce that same wrongness, not silently correct it.
 //
 // setupRun is a deliberate TEST SEAM: it assigns characters and kits
-// directly, skipping muster and drafts, so content/contract/property tests
-// can start a fixture already built.
+// directly and opens a camp's loadout, skipping muster, votes and drafts, so
+// content/contract/property tests can start a fixture already built.
 
 import { currentActorSeatId } from "../camp";
 import { rulesFor } from "./compose";
 import { buildCatalog } from "./catalog";
 import { abilityStatus } from "./abilities";
-import { createRun, runPhase, runStatus } from "./lifecycle";
-import { applyRunAction } from "./run-actions";
+import { createRun, openLoadout, runStatus } from "./lifecycle";
+import { campIndex, drawPlan } from "./plan";
+import { campSpecAt } from "./route";
+import { applyRunAction } from "./stages/registry";
+import { attemptOf } from "./attempt";
+import { RUN_LENGTHS } from "./balance";
 import { liveSourceIds } from "./usage";
 import { currentWindow, WINDOWS } from "./windows";
 import { defineCharacter, defineUpgrade, type CharacterDef, type ItemDef, type SourceId } from "../content/source-def";
-import type { Catalog, CampNumber, RunAction, RunState } from "./types";
+import type { Catalog, RunAction, RunLength, RunState } from "./types";
 
 function plainCharacter(n: number): CharacterDef {
   return defineCharacter({
@@ -59,15 +63,16 @@ export function testCatalog(parts: {
   });
 }
 
-/** Builds a fireside RunState past muster: each seat gets `characters[seat]`
- * or the catalogue's next unclaimed plain character, and `kits[seat]` as its
- * kit, with drafts cleared so a test can call `ready` at once.
- * `campNumber`/`supplies` default to createRun's values. */
+/** Builds a run at the loadout of camp `camp` (default 1) of a `length`
+ * (default standard) run: each seat gets `characters[seat]` or the
+ * catalogue's next unclaimed plain character, and `kits[seat]` as its kit,
+ * so a test can call `ready` at once. `supplies` defaults to createRun's. */
 export function setupRun(opts: {
   seatIds: readonly string[];
   seed: string;
   catalog: Catalog;
-  campNumber?: CampNumber;
+  length?: RunLength;
+  camp?: number;
   supplies?: number;
   characters?: Readonly<Record<string, string>>;
   kits?: Readonly<Record<string, readonly SourceId[]>>;
@@ -82,25 +87,23 @@ export function setupRun(opts: {
     return { ...seat, characterId, kit: [...(opts.kits?.[seat.seatId] ?? [])], draftOffer: null };
   });
 
-  return {
-    ...run,
-    campNumber: opts.campNumber ?? run.campNumber,
-    supplies: opts.supplies ?? run.supplies,
-    seats,
-  };
+  const length = opts.length ?? "standard";
+  return openLoadout(
+    { ...run, plan: drawPlan(length), supplies: opts.supplies ?? run.supplies, seats },
+    campSpecAt(opts.seed, length, campIndex(opts.camp ?? 1)),
+  );
 }
 
 /** Drives `run` forward through applyRunAction ONLY until `target` is
- * reached: readies every seat (throws if any seat's draft is still pending —
- * callers must resolve drafts first, or use setupRun which clears them),
- * which deals the camp; for "between-tricks" the current actor then picks
- * their first unowned objective, repeatedly, until the window opens. Throws
- * on any rejected action or if the run ends first. */
+ * reached: from a loadout, readies every seat, which deals the camp; for
+ * "between-tricks" the current actor then picks their first unowned
+ * objective, repeatedly, until the window opens. Throws on any rejected
+ * action or if the run ends first. */
 export function advanceTo(run: RunState, target: "objective-pick" | "between-tricks", catalog: Catalog): RunState {
   let next = run;
 
   for (const seatId of next.seatIds) {
-    if (runPhase(next) !== "fireside") break;
+    if (next.stage.tag !== "loadout") break;
     const result = applyRunAction(next, seatId, { type: "ready" }, catalog);
     if (!result.ok) {
       throw new Error(`advanceTo: ready rejected for seat "${seatId}": ${result.error}`);
@@ -109,8 +112,8 @@ export function advanceTo(run: RunState, target: "objective-pick" | "between-tri
   }
 
   if (target === "objective-pick") {
-    if (runPhase(next) !== "camp") {
-      throw new Error(`advanceTo: expected camp phase for "objective-pick", got runPhase ${runPhase(next)}`);
+    if (next.stage.tag !== "camp") {
+      throw new Error(`advanceTo: expected a camp for "objective-pick", got stage ${next.stage.tag}`);
     }
     return next;
   }
@@ -120,10 +123,11 @@ export function advanceTo(run: RunState, target: "objective-pick" | "between-tri
   for (;;) {
     const rules = rulesFor(next, catalog);
     if (currentWindow(next, rules) === "between-tricks") return next;
-    if (next.attempt === null) {
+    const attempt = attemptOf(next);
+    if (attempt === null) {
       throw new Error("advanceTo: run left the camp before reaching between-tricks");
     }
-    const camp = next.attempt.camp;
+    const camp = attempt.camp;
     const actorSeatId = currentActorSeatId(camp, rules);
     if (actorSeatId === null) {
       throw new Error("advanceTo: camp was decided before reaching between-tricks");
@@ -169,32 +173,43 @@ function abilityCandidates(run: RunState, catalog: Catalog): Array<{ seatId: str
   );
 }
 
-/** Every candidate action for every seat at `run`'s current phase, kept only
- * if `applyRunAction` itself accepts it (T-03-24 discipline: legality is
- * decided ONLY by the real transition, never re-derived here). */
+/** Every candidate action for every seat at `run`'s current stage, kept
+ * only if `applyRunAction` itself accepts it (T-03-24 discipline: legality
+ * is decided ONLY by the real transition, never re-derived here). Votes are
+ * offered only to seats without a ballot, so a random driver cannot change
+ * its mind forever. */
 export function enumerateLegalRunActions(
   run: RunState,
   catalog: Catalog,
 ): Array<{ seatId: string; action: RunAction }> {
-  const phase = runPhase(run);
+  const stage = run.stage;
   const candidates: Array<{ seatId: string; action: RunAction }> = [];
+  const votes = (ballots: Readonly<Record<string, unknown>>, choices: readonly string[]): void => {
+    for (const seat of run.seats) {
+      if (Object.hasOwn(ballots, seat.seatId)) continue;
+      for (const choice of [...choices, null]) candidates.push({ seatId: seat.seatId, action: { type: "vote", choice } });
+    }
+  };
 
-  if (phase === "muster") {
+  if (stage.tag === "muster") {
     for (const seat of run.seats) {
       for (const characterId of Object.keys(catalog.characters)) {
         candidates.push({ seatId: seat.seatId, action: { type: "pick-character", characterId } });
       }
-      candidates.push({ seatId: seat.seatId, action: { type: "ready" } });
     }
-  } else if (phase === "fireside") {
+    votes(stage.ballots, Object.keys(RUN_LENGTHS));
+  } else if (stage.tag === "route") {
+    votes(stage.ballots, stage.options.map((o) => o.id));
+  } else if (stage.tag === "draft") {
     for (const seat of run.seats) {
       for (const sourceId of seat.draftOffer ?? []) {
         candidates.push({ seatId: seat.seatId, action: { type: "pick-draft", sourceId } });
       }
-      candidates.push({ seatId: seat.seatId, action: { type: "ready" } });
     }
-  } else if (phase === "camp" && run.attempt !== null) {
-    const camp = run.attempt.camp;
+  } else if (stage.tag === "loadout" || stage.tag === "event") {
+    for (const seat of run.seats) candidates.push({ seatId: seat.seatId, action: { type: "ready" } });
+  } else if (stage.tag === "camp") {
+    const camp = stage.attempt.camp;
     const rules = rulesFor(run, catalog);
     const actorSeatId = currentActorSeatId(camp, rules);
 

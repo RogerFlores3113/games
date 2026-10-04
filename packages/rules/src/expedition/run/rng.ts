@@ -1,46 +1,52 @@
-// A1 (Phase 10, Plan 02): the run carries only its `seed` string (see
-// run/types.ts's RunState); it never carries a mutable generator state.
-// Every draw derives a FRESH sfc32 stream by a unique name, via
-// seedToRngState(seed, stream) in ../../shuffle.ts. This is a labeled
-// deviation from spec §6.5's "carried generator" wording: it removes the
-// entire "forgot to persist the advanced generator state" bug class,
-// because there is no advanced state to forget to save in the first place.
+// A1: the run carries only its `seed` string, never generator state. Every
+// draw derives a fresh sfc32 stream by a unique name, via
+// seedToRngState(seed, stream) in ../../shuffle.ts.
 //
-// STREAMS is the SINGLE builder for every run-level draw-site name (the
-// table is reproduced in run/types.ts's header so both files stay in
-// sync). Two draws must never share a stream name; rng.test.ts proves this
-// pairwise-distinct over the full camp/attempt/seat/use-index/draw grid.
-//
-// seededIndex is the single seeded-draw primitive every later plan uses for
-// a 0..n-1 pick (ability draws and camp 5's trick-count
-// kind/N draws). It never falls back to Math.random.
+// STREAMS is the single builder for every run-level draw-site name. Two
+// draws never share a name; rng.test.ts proves it pairwise over a grid of
+// every builder's arguments.
 
 import { nextRandom, seedToRngState } from "../../shuffle";
 
-export function attemptSeed(seed: string, campNumber: number, attemptNumber: number): string {
-  return `${seed}:camp${campNumber}:attempt${attemptNumber}`;
+export function attemptSeed(seed: string, campIndex: number, attemptNumber: number): string {
+  return `${seed}:camp${campIndex}:attempt${attemptNumber}`;
 }
 
+export type RouteField = "event" | "mix";
+
 export const STREAMS = {
-  draftUpgrade(campNumber: number, seatId: string): string {
-    return `expedition-draft:camp${campNumber}:seat${seatId}:upgrade`;
+  lengthVote(): string {
+    return "expedition-vote:length";
   },
-  draftItems(campNumber: number, seatId: string): string {
-    return `expedition-draft:camp${campNumber}:seat${seatId}:items`;
+  /** `nextCamp` is the camp the route leads to. */
+  routeVote(nextCamp: number): string {
+    return `expedition-vote:route:camp${nextCamp}`;
   },
-  trickCountKind(campNumber: number, attemptNumber: number): string {
-    return `expedition-trickcount-kind:camp${campNumber}:attempt${attemptNumber}`;
+  routeCount(nextCamp: number): string {
+    return `expedition-route:camp${nextCamp}:count`;
   },
-  trickCountN(campNumber: number, attemptNumber: number): string {
-    return `expedition-trickcount-n:camp${campNumber}:attempt${attemptNumber}`;
+  /** `reroll` stays 0 until a character can reroll routes. */
+  routeField(nextCamp: number, reroll: number, option: number, field: RouteField): string {
+    return `expedition-route:camp${nextCamp}:reroll${reroll}:option${option}:${field}`;
   },
-  ability(campNumber: number, attemptNumber: number, seatId: string, useIndex: number, draw: number): string {
-    return `expedition-ability:camp${campNumber}:attempt${attemptNumber}:seat${seatId}:use${useIndex}:draw${draw}`;
+  draftUpgrade(clearedCamp: number, seatId: string): string {
+    return `expedition-draft:camp${clearedCamp}:seat${seatId}:upgrade`;
+  },
+  draftItems(clearedCamp: number, seatId: string): string {
+    return `expedition-draft:camp${clearedCamp}:seat${seatId}:items`;
+  },
+  trickCountKind(campIndex: number, attemptNumber: number): string {
+    return `expedition-trickcount-kind:camp${campIndex}:attempt${attemptNumber}`;
+  },
+  trickCountN(campIndex: number, attemptNumber: number): string {
+    return `expedition-trickcount-n:camp${campIndex}:attempt${attemptNumber}`;
+  },
+  ability(campIndex: number, attemptNumber: number, seatId: string, useIndex: number, draw: number): string {
+    return `expedition-ability:camp${campIndex}:attempt${attemptNumber}:seat${seatId}:use${useIndex}:draw${draw}`;
   },
 };
 
-/** Seeded 0..n-1 draw. Throws for a non-positive-integer n, matching the
- * "opaque id only" contract callers rely on elsewhere in this package. */
+/** Seeded 0..n-1 draw. Throws for a non-positive-integer n. */
 export function seededIndex(seed: string, stream: string, n: number): number {
   if (!Number.isInteger(n) || n <= 0) {
     throw new Error(`seededIndex: n must be a positive integer, got ${n}`);

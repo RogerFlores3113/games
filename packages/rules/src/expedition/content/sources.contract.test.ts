@@ -8,12 +8,12 @@ import { toExpeditionPlayerView } from "../adapter/view";
 import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "../adapter/view-leak-check";
 import { abilityStatus, useAbility } from "../run/abilities";
 import { CATALOG } from "../run/catalog";
-import { runPhase } from "../run/lifecycle";
-import { applyRunAction } from "../run/run-actions";
+import { attemptOf, withAttempt } from "../run/attempt";
 import { driveRun, enumerateLegalRunActions, replayRun, setupRun } from "../run/run-test-support";
+import { applyRunAction } from "../run/stages/registry";
 import { TARGET_KINDS } from "../run/targets";
 import { campCardIds } from "../run/toolkit";
-import type { CampNumber, LedgerEntry, RunState } from "../run/types";
+import type { LedgerEntry, RunState } from "../run/types";
 import { currentStamp, liveSourceIds, remaining } from "../run/usage";
 import { resolveTuned, type CharacterDef, type Owner, type SourceDef } from "./source-def";
 
@@ -48,7 +48,7 @@ function lcg(seed: number): () => number {
 /** A crew where p0 holds `def` (its character and upgrades, or the item)
  * and every seat carries every item, so whispers, failures and wins happen
  * under as many rule layers as possible. */
-function crewFor(def: SourceDef, seed: string, campNumber: CampNumber = 1): RunState {
+function crewFor(def: SourceDef, seed: string, camp = 1): RunState {
   const character = characterFor(def);
   const others = Object.keys(CATALOG.characters).filter((id) => id !== character?.id);
   const characters: Record<string, string> = { p0: character?.id ?? others.shift()! };
@@ -59,7 +59,7 @@ function crewFor(def: SourceDef, seed: string, campNumber: CampNumber = 1): RunS
     seatIds: SEATS,
     seed,
     catalog: CATALOG,
-    campNumber,
+    camp,
     supplies: 2,
     characters,
     kits,
@@ -72,8 +72,8 @@ function findUsable(def: SourceDef): RunState {
   for (let attempt = 0; attempt < 60; attempt++) {
     const next = lcg(attempt * 7919 + def.id.length);
     let state = crewFor(def, `${def.id}-${attempt}`, attempt % 2 === 0 ? 1 : 3);
-    for (let step = 0; step < 400 && runPhase(state) !== "ended"; step++) {
-      const status = state.attempt === null ? null : abilityStatus(state, "p0", def.id, CATALOG);
+    for (let step = 0; step < 400 && state.stage.tag !== "ended"; step++) {
+      const status = attemptOf(state) === null ? null : abilityStatus(state, "p0", def.id, CATALOG);
       if (status?.usable) return state;
       const legal = enumerateLegalRunActions(state, CATALOG).filter(
         (c) => !(c.seatId === "p0" && c.action.type === "use-ability" && c.action.sourceId === def.id),
@@ -149,7 +149,7 @@ describe("each active source in play", () => {
   it.each(ACTIVE_SOURCES.map((def) => [def.id, def] as const))("%s: has effect if and only if a use adds a modifier", (id, def) => {
     const before = USABLE.get(id)!;
     const after = useFirst(before, id);
-    const added = after.attempt!.effects.length - before.attempt!.effects.length;
+    const added = attemptOf(after)!.effects.length - attemptOf(before)!.effects.length;
     expect(added > 0).toBe(def.active!.effect !== undefined);
   });
 
@@ -209,7 +209,7 @@ describe("each active source in play", () => {
     if (left.kind !== "uses") return;
     const at = currentStamp(state)!;
     const replayed = withLedger(
-      { ...state, attempt: { ...state.attempt!, attemptNumber: at.attempt + 1 } },
+      withAttempt(state, { ...attemptOf(state)!, attemptNumber: at.attempt + 1 }),
       "p0",
       Array.from({ length: left.of }, () => ({ kind: "used", sourceId: id, at, poolCost: 0 }) as const),
     );
@@ -258,10 +258,10 @@ describe("random runs with the whole catalogue", () => {
   it("conserves every card within an attempt", () => {
     for (const driven of DRIVEN) {
       for (let i = 1; i < driven.states.length; i++) {
-        const before = driven.states[i - 1]!.attempt?.camp;
-        const after = driven.states[i]!.attempt?.camp;
-        if (before && after && driven.states[i - 1]!.attempt!.attemptNumber === driven.states[i]!.attempt!.attemptNumber) {
-          expect(campCardIds(after)).toEqual(campCardIds(before));
+        const before = attemptOf(driven.states[i - 1]!);
+        const after = attemptOf(driven.states[i]!);
+        if (before && after && before.attemptNumber === after.attemptNumber) {
+          expect(campCardIds(after.camp)).toEqual(campCardIds(before.camp));
         }
       }
     }

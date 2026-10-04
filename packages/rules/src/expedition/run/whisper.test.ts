@@ -12,6 +12,9 @@ import { campPhase, createCamp, currentActorSeatId } from "../camp";
 import { baseRules } from "../rules";
 import type { CampState } from "../state";
 import { ability, defineItem } from "../content/source-def";
+import { attemptOf, withAttempt } from "./attempt";
+import { campIndex } from "./plan";
+import { campSpecAt } from "./route";
 import { baseRunHooks, type RunRules } from "./run-rules";
 import { testCatalog } from "./run-test-support";
 import type { ActiveEffect, AttemptState, Catalog, RunState, SeatRun } from "./types";
@@ -71,26 +74,35 @@ function makeSeats(): readonly SeatRun[] {
   return SEAT_IDS.map((seatId) => ({ seatId, characterId: "plain-1", kit: [], draftOffer: null, ledger: [] }));
 }
 
-/** A run whose attempt holds `camp`; no attempt at all when camp is null. */
+/** A run in camp 2 whose attempt holds `camp`; at the loadout, with no
+ * attempt, when camp is null. */
 function makeRun(input: {
   camp: CampState | null;
   effects?: readonly ActiveEffect[];
-  campNumber?: 1 | 2 | 3 | 4 | 5 | 6;
   log?: AttemptState["log"];
   seed?: string;
 }): RunState {
-  const attempt: AttemptState | null =
-    input.camp === null ? null : { attemptNumber: 1, effects: input.effects ?? [], reveals: [], log: input.log ?? [], camp: input.camp };
+  const seed = input.seed ?? "whisper-seed";
+  const spec = campSpecAt(seed, "standard", campIndex(2));
+  const stage: RunState["stage"] =
+    input.camp === null
+      ? { tag: "loadout", camp: spec, ready: {} }
+      : {
+          tag: "camp",
+          camp: spec,
+          attempt: { attemptNumber: 1, effects: input.effects ?? [], reveals: [], log: input.log ?? [], camp: input.camp },
+        };
 
   return {
-    seed: input.seed ?? "whisper-seed",
+    seed,
     seatIds: [...SEAT_IDS],
-    campNumber: input.campNumber ?? 2,
-    supplies: 10,
     seats: makeSeats(),
-    readySeatIds: [],
-    attempt,
+    purse: 0,
+    supplies: 3,
+    plan: { length: "standard", bosses: [] },
     history: [],
+    lastVote: null,
+    stage,
   };
 }
 
@@ -101,14 +113,14 @@ function emptyCatalog(): Catalog {
 describe("whisperLegality", () => {
   it("rejects during objective-pick with wrong_window", () => {
     const run = makeRun({ camp: freshCamp() });
-    const actor = currentActorSeatId(run.attempt!.camp, CORE_RULES)!;
+    const actor = currentActorSeatId(attemptOf(run)!.camp, CORE_RULES)!;
     const target = SEAT_IDS.find((s) => s !== actor)!;
-    const cardId = run.attempt!.camp.hands.find((h) => h.seatId === actor)!.cards[0]!.id;
+    const cardId = attemptOf(run)!.camp.hands.find((h) => h.seatId === actor)!.cards[0]!.id;
     const result = whisperLegality(run, actor, target, cardId, emptyCatalog());
     expect(result).toEqual({ legal: false, reason: "wrong_window" });
   });
 
-  it("rejects at the fireside (attempt null) with wrong_phase", () => {
+  it("rejects at the loadout (no attempt) with wrong_phase", () => {
     const run = makeRun({ camp: null });
     const result = whisperLegality(run, "p0", "p1", "anything", emptyCatalog());
     expect(result).toEqual({ legal: false, reason: "wrong_phase" });
@@ -181,10 +193,10 @@ describe("applyWhisper", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.state.attempt!.reveals).toEqual([
+    expect(attemptOf(result.state)!.reveals).toEqual([
       { cardId, fromSeatId: "p0", audience: ["p1"], source: "whisper", targetSeatId: "p1" },
     ]);
-    expect(result.state.attempt!.log).toEqual([
+    expect(attemptOf(result.state)!.log).toEqual([
       { event: "whisper", actorSeatId: "p0", subjectSeatIds: ["p1"], sourceId: null, audience: "public" },
     ]);
     expect(whispersUsedBy(result.state, "p0")).toBe(1);
@@ -242,7 +254,7 @@ describe("applyWhisper", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.state.attempt!.reveals[0]!.audience).toEqual(["p0", "p1", "p2"]);
+    expect(attemptOf(result.state)!.reveals[0]!.audience).toEqual(["p0", "p1", "p2"]);
   });
 
   it("the whisper stays in attempt.reveals after further tricks are played (COMM-02 within the camp)", () => {
@@ -254,9 +266,9 @@ describe("applyWhisper", () => {
     expect(whispered.ok).toBe(true);
     if (!whispered.ok) return;
 
-    const afterTrick = playOneTrick(whispered.state.attempt!.camp);
-    const finalRun: RunState = { ...whispered.state, attempt: { ...whispered.state.attempt!, camp: afterTrick } };
+    const afterTrick = playOneTrick(attemptOf(whispered.state)!.camp);
+    const finalRun = withAttempt(whispered.state, { ...attemptOf(whispered.state)!, camp: afterTrick });
 
-    expect(finalRun.attempt!.reveals).toEqual([{ cardId, fromSeatId: "p0", audience: ["p1"], source: "whisper", targetSeatId: "p1" }]);
+    expect(attemptOf(finalRun)!.reveals).toEqual([{ cardId, fromSeatId: "p0", audience: ["p1"], source: "whisper", targetSeatId: "p1" }]);
   });
 });

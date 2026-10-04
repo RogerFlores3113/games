@@ -53,8 +53,8 @@ const CampStateSchema = z.strictObject({
   discards: z.array(z.strictObject({ card: CardSchema, afterTrick: z.number().int().min(0) })),
 });
 
-const CampNumberSchema = z.literal([1, 2, 3, 4, 5, 6]);
-const StampSchema = z.strictObject({ camp: CampNumberSchema, attempt: z.number().int().min(1), trick: z.number().int().min(0) });
+const CampIndexSchema = z.number().int().min(1).transform((n) => n as number & { readonly __brand: "CampIndex" });
+const StampSchema = z.strictObject({ camp: CampIndexSchema, attempt: z.number().int().min(1), trick: z.number().int().min(0) });
 
 const LedgerEntrySchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("used"), sourceId: z.string().min(1), at: StampSchema, poolCost: z.number().int().min(0) }),
@@ -97,11 +97,49 @@ const AttemptSchema = z.strictObject({
   camp: CampStateSchema,
 });
 
+const RunLengthSchema = z.enum(["short", "standard", "long"]);
+
+const ObjectiveSlotSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("win-card"), fixed: CardIdentitySchema.optional() }),
+  z.strictObject({ kind: z.literal("ordered"), order: z.union([z.number().int().min(1), z.literal("last")]) }),
+  z.strictObject({ kind: z.literal("no-tricks") }),
+  z.strictObject({ kind: z.literal("exactly-n"), n: z.number().int().min(0) }),
+  z.strictObject({ kind: z.literal("trick-count") }),
+]);
+
+const CampSpecSchema = z.strictObject({
+  index: CampIndexSchema,
+  location: z.string().min(1),
+  weather: z.string().min(1),
+  event: z.string().min(1).nullable(),
+  slots: z.array(ObjectiveSlotSchema),
+});
+
+const RouteChoiceSchema = z.enum(["a", "b", "c"]);
+const RouteOptionSchema = z.strictObject({ id: RouteChoiceSchema, next: CampSpecSchema });
+
+const PerSeatSchema = <T extends z.ZodType>(value: T) => z.record(z.string().min(1), value);
+const ReadySchema = PerSeatSchema(z.literal(true));
+
+const StageSchema = z.discriminatedUnion("tag", [
+  z.strictObject({ tag: z.literal("muster"), ballots: PerSeatSchema(RunLengthSchema.nullable()) }),
+  z.strictObject({ tag: z.literal("loadout"), camp: CampSpecSchema, ready: ReadySchema }),
+  z.strictObject({ tag: z.literal("camp"), camp: CampSpecSchema, attempt: AttemptSchema }),
+  z.strictObject({ tag: z.literal("draft"), cleared: CampIndexSchema, payout: z.number().int().min(0) }),
+  z.strictObject({ tag: z.literal("route"), from: CampIndexSchema, options: z.array(RouteOptionSchema), ballots: PerSeatSchema(RouteChoiceSchema.nullable()) }),
+  z.strictObject({ tag: z.literal("event"), route: RouteOptionSchema, ready: ReadySchema }),
+  z.strictObject({ tag: z.literal("ended"), result: z.enum(["won", "lost"]) }),
+]);
+
+const VoteResultSchema = z.strictObject({
+  tally: z.array(z.strictObject({ choice: z.string().min(1), votes: z.number().int().min(0) })),
+  tied: z.array(z.string().min(1)).nullable(),
+  winner: z.string().min(1),
+});
+
 export const ExpeditionRunStateSchema = z.strictObject({
   seed: z.string().min(1),
   seatIds: z.array(z.string().min(1)),
-  campNumber: CampNumberSchema,
-  supplies: z.number().int().min(0),
   seats: z.array(
     z.strictObject({
       seatId: z.string().min(1),
@@ -111,15 +149,24 @@ export const ExpeditionRunStateSchema = z.strictObject({
       ledger: z.array(LedgerEntrySchema),
     }),
   ),
-  readySeatIds: z.array(z.string().min(1)),
-  attempt: AttemptSchema.nullable(),
+  purse: z.number().int().min(0),
+  supplies: z.number().int().min(0),
+  plan: z
+    .strictObject({
+      length: RunLengthSchema,
+      bosses: z.array(z.strictObject({ at: CampIndexSchema, tier: z.enum(["animal", "disaster", "temple"]), modId: z.string().min(1).nullable() })),
+    })
+    .nullable(),
   history: z.array(
     z.strictObject({
-      campNumber: CampNumberSchema,
-      attemptNumber: z.number().int().min(1),
-      status: z.enum(["succeeded", "failed"]),
+      camp: CampIndexSchema,
+      attempt: z.number().int().min(1),
+      status: z.enum(["cleared", "failed"]),
       suppliesSpent: z.number().int().min(0),
+      coins: z.number().int().min(0),
     }),
   ),
+  lastVote: z.strictObject({ topic: z.enum(["length", "route"]), result: VoteResultSchema }).nullable(),
+  stage: StageSchema,
 });
 export type ExpeditionRunStateWire = z.infer<typeof ExpeditionRunStateSchema>;

@@ -13,8 +13,10 @@
 import { describe, expect, it } from "vitest";
 import { createCamp } from "./camp";
 import { describeObjective, evaluateObjective, OBJECTIVE_KINDS } from "./objectives";
-import { objectiveSlotsFor } from "./run/balance";
-import type { CampNumber } from "./run/types";
+import { objectiveSlotsFor, RUN_LENGTHS } from "./run/balance";
+import { campIndex } from "./run/plan";
+import { campSpecAt } from "./run/route";
+import type { RunLength } from "./run/types";
 import type { ObjectiveKind, ObjectiveSlot, ObjectiveStatus } from "./state";
 
 const SEAT_IDS = ["p0", "p1", "p2"];
@@ -61,17 +63,19 @@ for (const [id, def] of Object.entries(OBJECTIVE_KINDS)) {
   });
 }
 
-describe("every ObjectiveSlot kind the BALANCE_TABLE can produce is registered", () => {
-  it("objectiveSlotsFor over camps 1..6 and 20 seeds only ever produces a registered kind", () => {
-    const campNumbers: readonly CampNumber[] = [1, 2, 3, 4, 5, 6];
+describe("every ObjectiveSlot kind a camp spec can produce is registered", () => {
+  it("objectiveSlotsFor over every camp of every run length and 20 seeds only ever produces a registered kind", () => {
+    const lengths: readonly RunLength[] = ["short", "standard", "long"];
     const registryKeys = new Set(Object.keys(OBJECTIVE_KINDS));
 
     for (let i = 0; i < 20; i++) {
       const seed = `${SEED}-balance-${i}`;
-      for (const campNumber of campNumbers) {
-        const slots = objectiveSlotsFor(seed, campNumber, 1);
-        for (const slot of slots) {
-          expect(registryKeys.has(slot.kind)).toBe(true);
+      for (const length of lengths) {
+        for (let k = 1; k <= RUN_LENGTHS[length].camps; k++) {
+          const spec = campSpecAt(seed, length, campIndex(k));
+          for (const slot of objectiveSlotsFor(seed, spec, 1)) {
+            expect(registryKeys.has(slot.kind)).toBe(true);
+          }
         }
       }
     }

@@ -1,4 +1,5 @@
 import type { ExpeditionView } from "@games/rules";
+import { attemptOf } from "../view-access";
 import type { SfxId } from "./sound-bank";
 
 /**
@@ -11,27 +12,27 @@ import type { SfxId } from "./sound-bank";
 type Game = ExpeditionView;
 
 function attemptKey(g: Game): string {
-  return `${g.campNumber}:${g.attempt?.attemptNumber ?? 0}`;
+  return g.stage.tag === "camp" ? `${g.stage.camp.index}:${g.stage.attempt.attemptNumber}` : "none";
 }
 
 function sameAttempt(prev: Game, next: Game): boolean {
-  return prev.attempt !== null && next.attempt !== null && attemptKey(prev) === attemptKey(next);
+  return attemptOf(prev) !== null && attemptOf(next) !== null && attemptKey(prev) === attemptKey(next);
 }
 
 function totalPlays(g: Game): number {
-  const camp = g.attempt?.camp;
+  const camp = attemptOf(g)?.camp;
   if (!camp) return 0;
   return camp.completedTricks.reduce((n, t) => n + t.plays.length, 0) + camp.currentTrick.plays.length;
 }
 
 function logCount(g: Game, pred: (event: string) => boolean): number {
-  return g.attempt?.log.filter((e) => pred(e.event)).length ?? 0;
+  return attemptOf(g)?.log.filter((e) => pred(e.event)).length ?? 0;
 }
 
 function statusChanged(prev: Game, next: Game, to: "done" | "failed"): boolean {
-  const before = new Map(prev.attempt?.camp?.objectives.map((o) => [o.id, o.status]) ?? []);
+  const before = new Map(attemptOf(prev)?.camp.objectives.map((o) => [o.id, o.status]) ?? []);
   return (
-    next.attempt?.camp?.objectives.some((o) => {
+    attemptOf(next)?.camp.objectives.some((o) => {
       const was = before.get(o.id);
       return was !== undefined && was !== to && o.status === to;
     }) ?? false
@@ -39,7 +40,7 @@ function statusChanged(prev: Game, next: Game, to: "done" | "failed"): boolean {
 }
 
 function ownedObjectiveIds(g: Game): Set<string> {
-  return new Set(g.attempt?.camp?.objectives.filter((o) => o.ownerSeatId !== null).map((o) => o.id) ?? []);
+  return new Set(attemptOf(g)?.camp.objectives.filter((o) => o.ownerSeatId !== null).map((o) => o.id) ?? []);
 }
 
 /** Your character and kit: a pick at muster or at a draft changes it. */
@@ -49,9 +50,9 @@ function ownKit(g: Game): string {
 }
 
 function newDeal(prev: Game, next: Game): boolean {
-  const nextHasCamp = next.attempt?.camp != null;
+  const nextHasCamp = attemptOf(next)?.camp != null;
   if (!nextHasCamp) return false;
-  return prev.attempt?.camp == null || attemptKey(prev) !== attemptKey(next);
+  return attemptOf(prev)?.camp == null || attemptKey(prev) !== attemptKey(next);
 }
 
 const RULES: ReadonlyArray<{ cue: SfxId; when: (prev: Game, next: Game) => boolean }> = [
@@ -69,15 +70,15 @@ const RULES: ReadonlyArray<{ cue: SfxId; when: (prev: Game, next: Game) => boole
   { cue: "sfx-objective-failed", when: (p, n) => statusChanged(p, n, "failed") },
   { cue: "sfx-whisper", when: (p, n) => sameAttempt(p, n) && logCount(n, (e) => e === "whisper") > logCount(p, (e) => e === "whisper") },
   { cue: "sfx-power", when: (p, n) => sameAttempt(p, n) && logCount(n, (e) => e === "use-ability") > logCount(p, (e) => e === "use-ability") },
-  { cue: "sfx-supply-lost", when: (p, n) => n.supplies < p.supplies },
+  { cue: "sfx-supply-lost", when: (p, n) => n.supplies.count < p.supplies.count },
   {
     cue: "sfx-camp-cleared",
     when: (p, n) =>
-      (n.history.length > p.history.length && n.history[n.history.length - 1]?.status === "succeeded") ||
+      (n.history.length > p.history.length && n.history[n.history.length - 1]?.status === "cleared") ||
       (p.runStatus === "in_progress" && n.runStatus === "won"),
   },
   { cue: "sfx-run-lost", when: (p, n) => p.runStatus === "in_progress" && n.runStatus === "lost" },
-  { cue: "sfx-equip", when: (p, n) => n.attempt === null && ownKit(p) !== ownKit(n) },
+  { cue: "sfx-equip", when: (p, n) => attemptOf(n) === null && ownKit(p) !== ownKit(n) },
 ];
 
 export function cuesFor(prev: Game | null, next: Game | null): SfxId[] {

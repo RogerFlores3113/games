@@ -9,8 +9,9 @@ import type { CampState, Objective, StandardIdentity, TrickPlay } from "../state
 import { toExpeditionPlayerView } from "../adapter/view";
 import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "../adapter/view-leak-check";
 import { CATALOG } from "./catalog";
+import { attemptOf, withAttempt } from "./attempt";
 import { rulesFor } from "./compose";
-import { applyRunAction } from "./run-actions";
+import { applyRunAction } from "./stages/registry";
 import { advanceTo, setupRun } from "./run-test-support";
 import { TARGET_KINDS, choicesFor, resolveTargets, stepsFor, type SeatScope, type TargetSpec } from "./targets";
 import type { RunState } from "./types";
@@ -39,16 +40,16 @@ const SPECS: readonly TargetSpec[] = [
 ];
 
 function scopeFor(run: RunState, seatId: string): SeatScope {
-  return { run, seatId, camp: run.attempt?.camp ?? null, rules: rulesFor(run, CATALOG) };
+  return { run, seatId, camp: attemptOf(run)?.camp ?? null, rules: rulesFor(run, CATALOG) };
 }
 
 function playOne(run: RunState): RunState {
-  const camp = run.attempt!.camp;
+  const camp = attemptOf(run)!.camp;
   const rules = rulesFor(run, CATALOG);
   const actor = currentActorSeatId(camp, rules)!;
   const played = applyCampAction(camp, actor, { type: "play-card", cardId: rules.legalPlays(camp, actor)[0]!.id }, rules);
   if (!played.ok) throw new Error(played.error);
-  return { ...run, attempt: { ...run.attempt!, camp: played.state } };
+  return withAttempt(run, { ...attemptOf(run)!, camp: played.state });
 }
 
 function standardTarget(play: TrickPlay): StandardIdentity | null {
@@ -60,18 +61,18 @@ function standardTarget(play: TrickPlay): StandardIdentity | null {
  * and unclaimed. */
 function richState(playerCount: 3 | 4 | 5): RunState {
   const seatIds = Array.from({ length: playerCount }, (_, i) => `p${i}`);
-  let run = advanceTo(setupRun({ seatIds, seed: SEED, catalog: CATALOG, campNumber: 2 }), "between-tricks", CATALOG);
+  let run = advanceTo(setupRun({ seatIds, seed: SEED, catalog: CATALOG, camp: 2 }), "between-tricks", CATALOG);
   seatIds.forEach((seatId, i) => {
-    const cardId = run.attempt!.camp.hands.find((h) => h.seatId === seatId)!.cards[0]!.id;
+    const cardId = attemptOf(run)!.camp.hands.find((h) => h.seatId === seatId)!.cards[0]!.id;
     const whispered = applyRunAction(run, seatId, { type: "whisper", targetSeatId: seatIds[(i + 1) % playerCount]!, cardId }, CATALOG);
     if (!whispered.ok) throw new Error(whispered.error);
     run = whispered.state;
   });
   const perSeat = seatIds.map((seatId): Objective => ({ id: `obj-${seatId}`, kind: "exactly-n", n: 1, ownerSeatId: seatId }));
-  run = { ...run, attempt: { ...run.attempt!, camp: { ...run.attempt!.camp, objectives: perSeat } } };
+  run = withAttempt(run, { ...attemptOf(run)!, camp: { ...attemptOf(run)!.camp, objectives: perSeat } });
   for (let i = 0; i <= playerCount; i++) run = playOne(run);
 
-  const camp: CampState = run.attempt!.camp;
+  const camp: CampState = attemptOf(run)!.camp;
   const trick = camp.completedTricks[0]!;
   const winner = trick.winnerSeatId;
   const loser = seatIds.find((id) => id !== winner)!;
@@ -83,7 +84,7 @@ function richState(playerCount: 3 | 4 | 5): RunState {
     { id: "obj-open", kind: "win-card", target: inHand, ownerSeatId: null },
     ...perSeat,
   ];
-  return { ...run, attempt: { ...run.attempt!, camp: { ...camp, objectives } } };
+  return withAttempt(run, { ...attemptOf(run)!, camp: { ...camp, objectives } });
 }
 
 describe("target-kind registry", () => {
@@ -93,7 +94,7 @@ describe("target-kind registry", () => {
 
   it("offers the expected choices on a concrete 3-player table", () => {
     const run = richState(3);
-    const camp = run.attempt!.camp;
+    const camp = attemptOf(run)!.camp;
     const winner = camp.completedTricks[0]!.winnerSeatId;
     const loser = ["p0", "p1", "p2"].find((id) => id !== winner)!;
     const ids = (seatId: string, spec: TargetSpec) => choicesFor(scopeFor(run, seatId), spec).map((c) => c.id);
@@ -110,7 +111,7 @@ describe("target-kind registry", () => {
     expect(ids("p0", { kind: "completed-objective" })).toEqual(["objective:obj-done"]);
     expect(ids("p0", { kind: "board" })).toEqual(["board"]);
     expect(choicesFor(scopeFor(run, "p0"), { kind: "supplies" })).toEqual([
-      { id: "supplies", target: { kind: "supplies", current: 3, max: 3 } },
+      { id: "supplies", target: { kind: "supplies", current: 3, max: 4 } },
     ]);
     const failed = choicesFor(scopeFor(run, "p0"), { kind: "failed-objective" });
     expect(failed.map((c) => [c.id, c.target.kind === "failed-objective" && c.target.cardWinnerSeatId])).toEqual([
@@ -120,7 +121,7 @@ describe("target-kind registry", () => {
 
   it("card-value offers each other rank within the spread, inside 2..14", () => {
     const run = richState(3);
-    const own = run.attempt!.camp.hands.find((h) => h.seatId === "p0")!.cards;
+    const own = attemptOf(run)!.camp.hands.find((h) => h.seatId === "p0")!.cards;
     const card = own.find((c) => c.identity.kind === "standard")!;
     const rank = (card.identity as StandardIdentity).rank;
     const ids = choicesFor(scopeFor(run, "p0"), { kind: "card-value", spread: 2 }).map((c) => c.id).filter((id) => id.startsWith(`value:${card.id}:`));
@@ -134,7 +135,7 @@ describe("target-kind registry", () => {
     expect(resolveTargets(scope, [{ kind: "supplies" }], []).ok).toBe(false);
     expect(resolveTargets(scope, [{ kind: "supplies" }], ["supplies"])).toEqual({
       ok: true,
-      targets: [{ kind: "supplies", current: 3, max: 3 }],
+      targets: [{ kind: "supplies", current: 3, max: 4 }],
     });
   });
 

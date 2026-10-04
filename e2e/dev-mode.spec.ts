@@ -26,10 +26,11 @@ test("one player fills an Expedition table with bots, jumps to the final camp an
   await waitForBridge(page);
 
   await panel.getByTestId("dev-shortcut-jump-to-final-camp").click();
-  await expect(panel.getByTestId("dev-result")).toHaveText(/^Jump to the final camp: done\. \(6:0:in_progress\)$/);
+  await expect(panel.getByTestId("dev-result")).toHaveText(/^Jump to the final camp: done\. \(0:in_progress\)$/);
 
   await panel.getByTestId("dev-reveal").check();
-  await expect(panel.getByTestId("dev-inspect")).toContainText("camp 6, attempt 1");
+  await expect(panel.getByTestId("dev-inspect")).toContainText("stage camp, status in_progress, standard run of 6 camps");
+  await expect(panel.getByTestId("dev-inspect")).toContainText("attempt 1");
   await expect(panel.getByTestId("dev-inspect")).toContainText("Bot 1:");
 
   await panel.getByTestId("dev-autoplay-scope").selectOption("everyone");
@@ -66,15 +67,19 @@ test("a saved snapshot loads into a fresh room, and a broken state edit is refus
   const panel = page.getByTestId("dev-panel");
   await panel.getByTestId("dev-field-jump-to-camp-camp").fill("4");
   await panel.getByTestId("dev-shortcut-jump-to-camp").click();
-  await expect(panel.getByTestId("dev-result")).toHaveText(/^Jump to camp: done\. \(4:0:in_progress\)$/);
+  await expect(panel.getByTestId("dev-result")).toHaveText(/^Jump to camp: done\. \(0:in_progress\)$/);
+  await panel.getByTestId("dev-reveal").check();
+  await expect(panel.getByTestId("dev-inspect")).toContainText("camp 4: jungle");
   await panel.getByTestId("dev-snapshot-name").fill("camp four");
   await panel.getByTestId("dev-snapshot-save").click();
   await expect(panel.getByTestId("dev-snapshot-list")).toContainText("camp four");
 
   await soloTableWithBots();
-  await expect(panel.getByTestId("dev-result")).toHaveText(/\(1:0:in_progress\)$/);
+  await expect(panel.getByTestId("dev-result")).toHaveText(/\(0:in_progress\)$/);
   await panel.getByTestId("dev-snapshot-list").getByRole("button", { name: "Load" }).click();
-  await expect(panel.getByTestId("dev-result")).toHaveText(/^State loaded \(seats renamed to this room's\)\. \(4:0:in_progress\)$/);
+  await expect(panel.getByTestId("dev-result")).toHaveText(/^State loaded \(seats renamed to this room's\)\. \(0:in_progress\)$/);
+  await panel.getByTestId("dev-reveal").check();
+  await expect(panel.getByTestId("dev-inspect")).toContainText("camp 4: jungle");
 
   const json = await panel.getByTestId("dev-state-json").inputValue();
   await panel.getByTestId("dev-state-json").fill(json.replace(/"supplies": \d+/, '"supplies": -2'));

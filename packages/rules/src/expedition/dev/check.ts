@@ -2,7 +2,9 @@
 // answers "could the real engine have produced this?" as readable problems.
 
 import { buildFullDeck, cardLabel } from "../deck";
-import { FINAL_CAMP } from "../run/balance";
+import { SUPPLIES_MAX } from "../run/balance";
+import { attemptOf } from "../run/attempt";
+import { campCount } from "../run/plan";
 import type { Catalog, RunState } from "../run/types";
 
 function duplicates(values: readonly string[]): string[] {
@@ -38,18 +40,39 @@ function checkCrew(run: RunState, catalog: Catalog, problems: string[]): void {
   for (const id of duplicates(characterIds)) problems.push(`character ${id} is held by more than one seat`);
 }
 
+function checkPerSeat(run: RunState, what: string, keys: readonly string[], problems: string[]): void {
+  for (const id of keys) if (!run.seatIds.includes(id)) problems.push(`${what} holds unknown seat ${id}`);
+}
+
+function checkSpecIndex(run: RunState, what: string, index: number, problems: string[]): void {
+  const count = run.plan === null ? 0 : campCount(run.plan);
+  if (!Number.isInteger(index) || index < 1 || index > count) problems.push(`${what} is camp ${index}, outside the plan's camps 1 to ${count}`);
+}
+
 function checkRunFields(run: RunState, problems: string[]): void {
-  for (const id of run.readySeatIds) if (!run.seatIds.includes(id)) problems.push(`ready list holds unknown seat ${id}`);
-  for (const id of duplicates(run.readySeatIds)) problems.push(`ready list holds ${id} more than once`);
-  if (!Number.isInteger(run.supplies) || run.supplies < 0) problems.push(`supplies must be a non-negative integer, got ${run.supplies}`);
-  if (run.campNumber > FINAL_CAMP) problems.push(`camp ${run.campNumber} is past the final camp ${FINAL_CAMP}`);
-  for (const entry of run.history) {
-    if (entry.campNumber > FINAL_CAMP) problems.push(`history holds camp ${entry.campNumber}, past the final camp ${FINAL_CAMP}`);
+  if (!Number.isInteger(run.supplies) || run.supplies < 0 || run.supplies > SUPPLIES_MAX) problems.push(`supplies must be a whole number from 0 to ${SUPPLIES_MAX}, got ${run.supplies}`);
+  if (!Number.isInteger(run.purse) || run.purse < 0) problems.push(`the purse must be a non-negative whole number, got ${run.purse}`);
+  const stage = run.stage;
+  if ((run.plan === null) !== (stage.tag === "muster")) problems.push(stage.tag === "muster" ? "a run in muster has no plan yet" : `a run at ${stage.tag} needs a plan`);
+  if (run.plan !== null) for (const entry of run.history) checkSpecIndex(run, "a history entry", entry.camp, problems);
+  switch (stage.tag) {
+    case "muster":
+    case "route":
+      checkPerSeat(run, "the ballots", Object.keys(stage.ballots), problems);
+      break;
+    case "loadout":
+    case "event":
+      checkPerSeat(run, "the ready list", Object.keys(stage.ready), problems);
+      break;
   }
+  if (stage.tag === "loadout" || stage.tag === "camp") checkSpecIndex(run, "the loadout or camp", stage.camp.index, problems);
+  if (stage.tag === "route") for (const option of stage.options) checkSpecIndex(run, `route ${option.id}`, option.next.index, problems);
+  if (stage.tag === "event") checkSpecIndex(run, "the chosen route", stage.route.next.index, problems);
+  if (stage.tag === "draft" && run.plan !== null && stage.cleared >= campCount(run.plan)) problems.push(`a draft after camp ${stage.cleared} has no camp to lead to`);
 }
 
 function checkCamp(run: RunState, problems: string[]): void {
-  const camp = run.attempt?.camp;
+  const camp = attemptOf(run)?.camp;
   if (camp === undefined) return;
   const sameSeats = camp.seatIds.length === run.seatIds.length && camp.seatIds.every((id, i) => id === run.seatIds[i]);
   if (!sameSeats) problems.push("camp seats differ from the run's seats");

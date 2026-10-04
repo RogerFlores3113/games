@@ -1,5 +1,5 @@
 // Whole-run fast-check simulation properties (RUN-07): arbitrary seeds, 3/4/5
-// players, random starting camps,
+// players, short/standard/long runs, random starting camps,
 // random characters and kits drawn from the production CATALOG, driven by
 // random bots through driveRun, which applies every step through the real
 // applyRunAction transition (the only dispatcher in the run layer).
@@ -20,10 +20,12 @@ import { toExpeditionPlayerView } from "../adapter/view";
 import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "../adapter/view-leak-check";
 import { CATALOG } from "./catalog";
 import { rulesFor } from "./compose";
+import { attemptOf } from "./attempt";
+import { RUN_LENGTHS, SUPPLIES_MAX } from "./balance";
 import { createRun, runStatus } from "./lifecycle";
 import { advanceTo, driveRun, replayRun, setupRun } from "./run-test-support";
 import { campCardIds } from "./toolkit";
-import type { CampNumber, RunState } from "./types";
+import type { RunLength, RunState } from "./types";
 import { currentWindow } from "./windows";
 
 const CHARACTER_IDS = Object.keys(CATALOG.characters);
@@ -39,20 +41,24 @@ type RunInput = {
   seatIds: string[];
   seed: string;
   choices: number[];
-  startCamp: CampNumber;
+  length: RunLength;
+  startCamp: number;
   characters: Record<string, string>;
   kits: Record<string, string[]>;
 };
 
 const choicesArb = fc.array(fc.nat({ max: 1000 }), { minLength: 1, maxLength: 64 });
 
-const runInputArb: fc.Arbitrary<RunInput> = fc.constantFrom(3, 4, 5).chain((seatCount) => {
+const lengthArb = fc.constantFrom<RunLength>("short", "standard", "long");
+
+const runInputArb: fc.Arbitrary<RunInput> = fc.tuple(fc.constantFrom(3, 4, 5), lengthArb).chain(([seatCount, length]) => {
   const seatIds = seatIdsFor(seatCount);
   return fc
     .record({
       seed: fc.string({ minLength: 1 }),
       choices: choicesArb,
-      startCamp: fc.constantFrom<CampNumber>(1, 2, 3, 4, 5, 6),
+      length: fc.constant(length),
+      startCamp: fc.integer({ min: 1, max: RUN_LENGTHS[length].camps }),
       crew: fc.shuffledSubarray(CHARACTER_IDS, { minLength: seatCount, maxLength: seatCount }),
       picks: fc.tuple(...seatIds.map(() => fc.subarray(KIT_POOL, { maxLength: 4 }))),
     })
@@ -71,7 +77,8 @@ function build(input: RunInput): RunState {
     seatIds: input.seatIds,
     seed: input.seed,
     catalog: CATALOG,
-    campNumber: input.startCamp,
+    length: input.length,
+    camp: input.startCamp,
     characters: input.characters,
     kits: input.kits,
   });
@@ -84,7 +91,7 @@ function checkRun(states: readonly RunState[]): void {
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);
 
     expect(state.supplies).toBeGreaterThanOrEqual(0);
-    expect(state.supplies).toBeLessThanOrEqual(3);
+    expect(state.supplies).toBeLessThanOrEqual(SUPPLIES_MAX);
 
     // Every draft offer excludes sources the seat already holds (RUN-04).
     for (const seat of state.seats) {
@@ -98,10 +105,11 @@ function checkRun(states: readonly RunState[]): void {
       leakViewsChecked++;
     }
 
-    if (state.attempt !== null) {
-      const ids = campCardIds(state.attempt.camp);
+    const attempt = attemptOf(state);
+    if (attempt !== null && state.stage.tag === "camp") {
+      const ids = campCardIds(attempt.camp);
       expect(new Set(ids).size).toBe(ids.length);
-      const key = `${state.campNumber}:${state.attempt.attemptNumber}`;
+      const key = `${state.stage.camp.index}:${attempt.attemptNumber}`;
       const first = firstDealtIdsByAttempt.get(key);
       if (first === undefined) firstDealtIdsByAttempt.set(key, ids);
       else expect(ids).toEqual(first);
@@ -110,6 +118,7 @@ function checkRun(states: readonly RunState[]): void {
 
   for (const entry of states[states.length - 1]!.history) {
     if (entry.status === "failed") expect(entry.suppliesSpent).toBeGreaterThanOrEqual(1);
+    else expect(entry.suppliesSpent).toBe(0);
   }
 }
 
@@ -129,7 +138,7 @@ describe("property: whole-run simulation (RUN-07)", () => {
     expect(leakViewsChecked).toBeGreaterThan(0);
   });
 
-  it("drives a run from muster through every draft to the end without throwing, replaying identically", () => {
+  it("drives a run from muster through the length vote, drafts and routes to the end without throwing, replaying identically", () => {
     fc.assert(
       fc.property(fc.constantFrom(3, 4, 5), fc.string({ minLength: 1 }), choicesArb, (seatCount, seed, choices) => {
         const initial = createRun({ seatIds: seatIdsFor(seatCount), seed });
@@ -141,6 +150,9 @@ describe("property: whole-run simulation (RUN-07)", () => {
         // Every seat holds a distinct character once past muster.
         const crew = states[states.length - 1]!.seats.map((s) => s.characterId);
         expect(new Set(crew).size).toBe(seatCount);
+        const last = states[states.length - 1]!;
+        expect(last.plan).not.toBeNull();
+        expect(last.history.every((entry) => entry.camp <= RUN_LENGTHS[last.plan!.length].camps)).toBe(true);
       }),
       { numRuns: 10 },
     );
@@ -157,7 +169,7 @@ describe("property: whole-run simulation (RUN-07)", () => {
 
   it("gives different attempt-1 camp-1 hands for at least one of 20 distinct seed pairs (seed sensitivity, A1)", () => {
     const seatIds = seatIdsFor(4);
-    const handsFor = (seed: string) => advanceTo(setupRun({ seatIds, seed, catalog: CATALOG }), "objective-pick", CATALOG).attempt!.camp.hands;
+    const handsFor = (seed: string) => attemptOf(advanceTo(setupRun({ seatIds, seed, catalog: CATALOG }), "objective-pick", CATALOG))!.camp.hands;
 
     let sawDifference = false;
     for (let i = 0; i < 20 && !sawDifference; i++) {

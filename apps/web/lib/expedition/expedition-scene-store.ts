@@ -3,8 +3,8 @@ import type { RunAction } from "@games/rules";
 import type { CardPackId } from "./card-pack-ids";
 import type { SceneKey, SceneModel, SceneServerInput } from "./build-scene-model";
 import { buildSceneModel, sceneKeyFor } from "./build-scene-model";
-import type { FiresideModel } from "./fireside-model";
-import { buildFiresideModel } from "./fireside-model";
+import type { TrailModel } from "./trail-model";
+import { buildTrailModel } from "./trail-model";
 import type { RunEndModel } from "./run-end-model";
 import { buildRunEndModel } from "./run-end-model";
 import type { LocalUiState } from "./local-ui";
@@ -24,7 +24,7 @@ import { confirmTargeting as confirmTargetingUi, initialLocalUi, reconcileLocalU
  */
 
 /** What the active scene draws, tagged by its scene key. */
-export type ActiveModel = SceneModel | FiresideModel | RunEndModel;
+export type ActiveModel = SceneModel | TrailModel | RunEndModel;
 
 export interface ExpeditionSceneState {
   server: SceneServerInput | null;
@@ -68,7 +68,7 @@ function rebuild(
   const sceneKey = sceneKeyFor(server.game);
   const builders: Record<SceneKey, () => ActiveModel> = {
     camp: () => buildSceneModel(server, localUi, cardPackId, reconnecting),
-    fireside: () => buildFiresideModel(server, localUi, reconnecting),
+    trail: () => buildTrailModel(server, localUi, reconnecting),
     "run-end": () => buildRunEndModel(server),
   };
   return { sceneKey, model: builders[sceneKey]() };

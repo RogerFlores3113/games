@@ -81,7 +81,7 @@ describe("dev-room: autoplay", () => {
   it("everyone-scope autoplay from the final camp plays the run to its end", () => {
     const input = devInput();
     const room = applyDevCommand(startedWithBots(2), "host", { kind: "shortcut", id: "jump-to-final-camp", params: {} }, input).state;
-    expect(devStateFrame(room)!.milestone).toBe("6:0:in_progress");
+    expect(devStateFrame(room)!.milestone).toBe("0:in_progress");
     const outcome = applyDevCommand(room, "host", { kind: "autoplay", scope: "everyone", maxSteps: 5000, stopAtMilestone: false }, input);
     expect(outcome.reply.message).toMatch(/^Autoplay: \d+ steps, stopped because the game is over\.$/);
     expect(outcome.state.status).toBe("ended");
@@ -89,7 +89,7 @@ describe("dev-room: autoplay", () => {
 
   it("others-scope autoplay stops at the requester's own turn in the camp", () => {
     const input = devInput();
-    const room = applyDevCommand(startedWithBots(2), "host", { kind: "shortcut", id: "jump-to-camp", params: { camp: 1 } }, input).state;
+    const room = applyDevCommand(startedWithBots(2), "host", { kind: "shortcut", id: "jump-to-camp", params: { length: "standard", camp: 1, stage: "camp" } }, input).state;
     const outcome = applyDevCommand(room, "host", { kind: "autoplay", scope: "others", maxSteps: 5000, stopAtMilestone: false }, input);
     expect(outcome.reply.message).toMatch(/stopped because waiting on a seat autoplay does not control\.$/);
     expect(devStateFrame(outcome.state)!.inspect.find((section) => section.title === "Trick")!.lines).toContain("current actor: host");
@@ -133,22 +133,22 @@ describe("dev-room: shortcuts and states", () => {
     const ended = applyDevCommand(startedWithBots(2), "host", { kind: "shortcut", id: "end-run", params: { outcome: "won" } }, input);
     expect(ended.reply).toEqual({ ok: true, message: "End the run: done." });
     expect(ended.state.status).toBe("ended");
-    const revived = applyDevCommand(ended.state, "host", { kind: "shortcut", id: "jump-to-camp", params: { camp: 2 } }, input);
+    const revived = applyDevCommand(ended.state, "host", { kind: "shortcut", id: "jump-to-camp", params: { length: "standard", camp: 2, stage: "camp" } }, input);
     expect(revived.state.status).toBe("in_progress");
-    expect(devStateFrame(revived.state)!.milestone).toBe("2:0:in_progress");
+    expect(devStateFrame(revived.state)!.milestone).toBe("0:in_progress");
   });
 
   it("passes a shortcut's readable refusal through unchanged", () => {
     const room = startedWithBots(2);
     expect(applyDevCommand(room, "host", { kind: "shortcut", id: "set-supplies", params: { supplies: -1 } }, devInput())).toEqual({
       state: room,
-      reply: { ok: false, message: "supplies must be a whole number from 0 to 99" },
+      reply: { ok: false, message: "supplies must be a whole number from 0 to 4" },
     });
   });
 
   it("round-trips a snapshot through load-state and renames another room's seats", () => {
     const input = devInput();
-    const source = applyDevCommand(startedWithBots(2), "host", { kind: "shortcut", id: "jump-to-camp", params: { camp: 4 } }, input).state;
+    const source = applyDevCommand(startedWithBots(2), "host", { kind: "shortcut", id: "jump-to-camp", params: { length: "long", camp: 4, stage: "camp" } }, input).state;
     const saved = JSON.parse(JSON.stringify(devStateFrame(source)!.game)) as { seatIds: string[] };
 
     let other = lobbyWithHost();
@@ -163,7 +163,8 @@ describe("dev-room: shortcuts and states", () => {
     const loaded = applyDevCommand(started.state, "host", { kind: "load-state", state: saved }, input);
     expect(loaded.reply).toEqual({ ok: true, message: "State loaded (seats renamed to this room's)." });
     expect((loaded.state.game as { seatIds: string[] }).seatIds).toEqual(["host", "seat-x", "seat-y"]);
-    expect(devStateFrame(loaded.state)!.milestone).toBe("4:0:in_progress");
+    expect(devStateFrame(loaded.state)!.milestone).toBe("0:in_progress");
+    expect(devStateFrame(loaded.state)!.inspect[0]!.lines[0]).toBe("stage camp, status in_progress, long run of 8 camps");
     expect(toSeatView(loaded.state, "seat-x").game).not.toBeNull();
   });
 
@@ -178,11 +179,11 @@ describe("dev-room: shortcuts and states", () => {
 
   it("rejects a state that breaks card conservation", () => {
     const input = devInput();
-    const room = applyDevCommand(startedWithBots(2), "host", { kind: "shortcut", id: "jump-to-camp", params: { camp: 1 } }, input).state;
+    const room = applyDevCommand(startedWithBots(2), "host", { kind: "shortcut", id: "jump-to-camp", params: { length: "standard", camp: 1, stage: "camp" } }, input).state;
     const game = JSON.parse(JSON.stringify(room.game)) as {
-      attempt: { camp: { hands: { cards: { identity: unknown }[] }[] } };
+      stage: { attempt: { camp: { hands: { cards: { identity: unknown }[] }[] } } };
     };
-    const hands = game.attempt.camp.hands;
+    const hands = game.stage.attempt.camp.hands;
     hands[1]!.cards[0]!.identity = hands[0]!.cards[0]!.identity;
     const outcome = applyDevCommand(room, "host", { kind: "load-state", state: game }, input);
     expect(outcome.reply.ok).toBe(false);

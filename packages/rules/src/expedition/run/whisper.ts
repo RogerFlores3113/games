@@ -30,6 +30,7 @@
 
 import { findOwnCard } from "../legality";
 import { currentWindow } from "./windows";
+import { attemptOf, withAttempt } from "./attempt";
 import { rulesFor } from "./compose";
 import type { Catalog, LogEntry, Reveal, RunError, RunState } from "./types";
 import type { AdapterResult } from "../../adapter";
@@ -38,8 +39,9 @@ import type { AdapterResult } from "../../adapter";
  * actorSeatId is `seatId`. Returns 0 with no attempt in progress — there is
  * nothing to derive from. */
 export function whispersUsedBy(run: RunState, seatId: string): number {
-  if (run.attempt === null) return 0;
-  return run.attempt.log.filter((entry) => entry.event === "whisper" && entry.actorSeatId === seatId).length;
+  const attempt = attemptOf(run);
+  if (attempt === null) return 0;
+  return attempt.log.filter((entry) => entry.event === "whisper" && entry.actorSeatId === seatId).length;
 }
 
 /** Guard order (COMM-01): wrong_phase (no attempt) -> wrong_window (must be between tricks, D-13: no grace period)
@@ -53,7 +55,8 @@ export function whisperLegality(
   cardId: string,
   catalog: Catalog,
 ): { legal: true } | { legal: false; reason: RunError } {
-  if (run.attempt === null) {
+  const attempt = attemptOf(run);
+  if (attempt === null) {
     return { legal: false, reason: "wrong_phase" };
   }
   const rules = rulesFor(run, catalog);
@@ -69,7 +72,7 @@ export function whisperLegality(
   if (targetSeatId === actorSeatId || !run.seatIds.includes(targetSeatId)) {
     return { legal: false, reason: "invalid_target" };
   }
-  if (findOwnCard(run.attempt.camp, actorSeatId, cardId) === null) {
+  if (findOwnCard(attempt.camp, actorSeatId, cardId) === null) {
     return { legal: false, reason: "card_not_in_hand" };
   }
   return { legal: true };
@@ -95,7 +98,7 @@ export function applyWhisper(
     throw new Error("whisper: whisperAudience returned an empty or invalid audience");
   }
 
-  const attempt = run.attempt!; // legality already proved attempt !== null
+  const attempt = attemptOf(run)!; // legality already proved there is one
 
   const reveal: Reveal = {
     cardId: action.cardId,
@@ -112,15 +115,5 @@ export function applyWhisper(
     audience: "public",
   };
 
-  return {
-    ok: true,
-    state: {
-      ...run,
-      attempt: {
-        ...attempt,
-        reveals: [...attempt.reveals, reveal],
-        log: [...attempt.log, logEntry],
-      },
-    },
-  };
+  return { ok: true, state: withAttempt(run, { ...attempt, reveals: [...attempt.reveals, reveal], log: [...attempt.log, logEntry] }) };
 }

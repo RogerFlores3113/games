@@ -10,7 +10,10 @@ import { isTrump, trickWinner } from "../trick";
 import { currentActorSeatId } from "../camp";
 import { winnerExcluding } from "../content/helpers";
 import { composeRules, ruleLayersFor, rulesFor } from "./compose";
-import { applyRunAction } from "./run-actions";
+import { attemptOf } from "./attempt";
+import { campIndex } from "./plan";
+import { campSpecAt } from "./route";
+import { applyRunAction } from "./stages/registry";
 import { advanceTo, setupRun, testCatalog } from "./run-test-support";
 import type { RuleModifier } from "./run-rules";
 import type { AttemptState, Catalog, RunState, SeatRun } from "./types";
@@ -21,18 +24,22 @@ function seat(seatId: string, overrides: Partial<SeatRun> = {}): SeatRun {
   return { seatId, characterId: null, kit: [], draftOffer: null, ledger: [], ...overrides };
 }
 
-function makeRun(overrides: Partial<RunState> = {}): RunState {
-  const seatIds = overrides.seatIds ?? ["p0", "p1", "p2"];
+/** A run at camp 2: in its attempt when `attempt` is given, else at its loadout. */
+function makeRun(overrides: Partial<RunState> & { attempt?: AttemptState } = {}): RunState {
+  const { attempt, ...rest } = overrides;
+  const seatIds = rest.seatIds ?? ["p0", "p1", "p2"];
+  const spec = campSpecAt("test-seed", "standard", campIndex(2));
   return {
     seed: "test-seed",
     seatIds,
-    campNumber: 2,
+    purse: 0,
     supplies: 3,
     seats: seatIds.map((id) => seat(id)),
-    readySeatIds: [],
-    attempt: null,
+    plan: { length: "standard", bosses: [] },
     history: [],
-    ...overrides,
+    lastVote: null,
+    stage: attempt === undefined ? { tag: "loadout", camp: spec, ready: {} } : { tag: "camp", camp: spec, attempt },
+    ...rest,
   };
 }
 
@@ -207,7 +214,6 @@ describe("rulesFor / ruleLayersFor", () => {
 
   it("applies a kit passive only for its owner", () => {
     const run = makeRun({
-      campNumber: 4,
       seats: [seat("p0"), seat("p1", { kit: ["whisper-plus-2"] }), seat("p2")],
       attempt: makeAttempt(),
     });
@@ -239,13 +245,13 @@ describe("rulesFor / ruleLayersFor", () => {
   });
 
   it("applies an attempt effect through its source's active.effect", () => {
-    const run = makeRun({ campNumber: 2, attempt: makeAttempt({ effects: [effect] }) });
+    const run = makeRun({ attempt: makeAttempt({ effects: [effect] }) });
     expect(rulesFor(run, catalog).whispersPerCamp(run, "p0")).toBe(2);
   });
 
   it("recomputes on every call, with no cache (T-10-08)", () => {
-    const withoutEffect = makeRun({ campNumber: 2, attempt: makeAttempt({ effects: [] }) });
-    const withEffect = makeRun({ campNumber: 2, attempt: makeAttempt({ effects: [effect] }) });
+    const withoutEffect = makeRun({ attempt: makeAttempt({ effects: [] }) });
+    const withEffect = makeRun({ attempt: makeAttempt({ effects: [effect] }) });
     expect(rulesFor(withoutEffect, catalog).whispersPerCamp(withoutEffect, "p0")).toBe(1);
     expect(rulesFor(withEffect, catalog).whispersPerCamp(withEffect, "p0")).toBe(2);
   });
@@ -316,7 +322,6 @@ describe("layer order", () => {
   const catalog = testCatalog({ characters: { "char-0": char0, "char-1": char1 }, items: { "item-a": itemA, "item-b": itemB, fx } });
 
   const run = makeRun({
-    campNumber: 3,
     seats: [
       seat("p0", { characterId: "char-0", kit: ["char-0.a", "item-b", "item-a"] }),
       seat("p1", { characterId: "char-1", kit: ["item-a"] }),
@@ -388,7 +393,7 @@ describe("trick-scoped effects", () => {
     let run = used.state;
     for (let i = 0; i < 3; i++) {
       const rules = rulesFor(run, catalog);
-      const camp = run.attempt!.camp;
+      const camp = attemptOf(run)!.camp;
       const actor = currentActorSeatId(camp, rules)!;
       const played = applyRunAction(run, actor, { type: "play-card", cardId: rules.legalPlays(camp, actor)[0]!.id }, catalog);
       if (!played.ok) throw new Error(played.error);
@@ -400,8 +405,8 @@ describe("trick-scoped effects", () => {
   it("a trick-scoped effect bends exactly one trick", () => {
     const { afterUse, afterTrick } = useThenPlayOneTrick("sit-out-trick");
     expect(rulesFor(afterUse, catalog).trickWinner(probe, probe[0]!.card.identity)).toBe("p2");
-    expect(afterTrick.attempt!.camp.completedTricks[0]!.winnerSeatId).not.toBe("p0");
-    expect(afterTrick.attempt!.camp.completedTricks).toHaveLength(1);
+    expect(attemptOf(afterTrick)!.camp.completedTricks[0]!.winnerSeatId).not.toBe("p0");
+    expect(attemptOf(afterTrick)!.camp.completedTricks).toHaveLength(1);
     expect(rulesFor(afterTrick, catalog).trickWinner(probe, probe[0]!.card.identity)).toBe("p0");
   });
 

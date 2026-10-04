@@ -1209,3 +1209,45 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
   the counted suit (or S/M for a joker) in that suit's colour. A rank change is not drawn; unit 13
   (True Form) may need the full label. The pip sits inside the card's fan column, so neighbours
   never overlap.
+
+### Implementation notes (unit 3)
+
+- `StageDef` is `{ on, advance }`: `on` maps each accepted action type to its handler, so the
+  accepted list and the dispatch cannot drift. Any other type is refused `wrong_stage` before a
+  handler runs, as the spec's `accepts` intended. `applyRunAction` lives in `run/stages/registry.ts`
+  and `run/run-actions.ts` is deleted.
+- Pieces the spec places in later units are left out rather than stubbed: `itemSerial`, the
+  loadout's `stock`, `CampPreviewView.pairing` and `.shop`, and `horizon` (every planned boss is
+  `modId: null`, so nothing can leak yet; unit 8 adds the gate). `drawPlan(length)` takes no seed
+  or catalogue, and the temple tier is also `null` until unit 10 registers the temple; the web
+  names boss camps from the plan's tier ("Animal boss", "Disaster boss", "The Temple").
+  `slotKindsFor(spec)` reads the spec alone until unit 5 adds stack layers. `RouteField` is
+  `event | mix` until unit 5 draws locations and weather.
+- The draft keeps today's single-pick offer: `SeatRun.draftOffer`, `pick-draft { sourceId }`, and
+  the draft stage view's `yourOffer: string[] | null`. `no_draft_pending` and `not_offered` stay
+  until unit 4; `draft_pending` and `character_pending` are gone (muster has no `ready`).
+- `run/route.ts` adds `campSpecAt(seed, length, k)`: camp k's spec as route "a" would give it.
+  The dev jump and `setupRun` use it so a mid-run fixture has a real spec and mix.
+- `run/attempt.ts` (`attemptOf`, `withAttempt`) is the one read and write path for the attempt on
+  the camp stage; usage, windows, abilities, whisper, toolkit, compose and the view go through it.
+- The dev `milestone` is `${history.length}:${runStatus}`, not the stage tag and index. The panel's
+  "End of camp" autoplay stop compares milestones, and a tag-based string would stop it at every
+  vote and ready; this one changes only when a camp settles or the run ends. Bots abstain from
+  votes so the human's ballot decides; an everyone-scope autoplay therefore resolves votes by the
+  flip. `force-camp` takes `cleared | failed` and, from muster, a draft, a route or an event,
+  deals the camp the run is heading to. `jump-to-camp` lists the run's own length first because
+  the panel preselects a choice field's first option.
+- `checkGameEnd`'s `campReached` is the last settled camp's index. The view's history drops
+  `suppliesSpent` as specified, so the failed-camp prompt names no supply count.
+- The schema mirrors `CampIndex` with a zod transform to the brand, so the worker's
+  `[ExpeditionRunStateWire] extends [RunState]` assertion holds. `ROOM_SCHEMA_VERSION` is 9.
+- Web: the fireside scene is the trail scene (`SceneKey` "trail", `TRAIL_ZONES`, `ROUTE_ZONES`).
+  The muster drops its Ready button for a length ballot row (three cards with a mini trail of
+  boss and temple markers, voters named on each); the route vote takes the full panel width.
+  The vote that just resolved is shown on the event (route) and on camp 1's first loadout
+  (length) with a tally of pips; a tie spins a coin through the tied choices (faces are the
+  route letter, or the camp count since Short and Standard share an initial) and lands on the
+  winner. The flip's start is kept in scene time per vote, so a redraw mid-flip continues it.
+  The top bar shows supplies of their cap, the purse as a coin, and the camp with its boss.
+  Before camp 4 the route cards are identical (one location, one weather, one event), as the
+  spec expected.

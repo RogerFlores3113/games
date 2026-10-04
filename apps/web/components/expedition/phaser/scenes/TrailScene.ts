@@ -1,36 +1,39 @@
 /**
- * The fireside between camps: redraws every zone from the store's fireside
- * model whenever it changes. Clicks only dispatch a request literal or a
- * `local-ui.ts` hover change; the worker decides whether a character pick,
- * draft pick or Ready is legal.
+ * The trail before, between and after camps: redraws every zone from the
+ * store's trail model whenever it changes. Clicks only dispatch a request
+ * literal or a `local-ui.ts` hover change; the worker decides whether a
+ * pick, vote or Ready is legal.
  */
 import Phaser from "phaser";
 import { ensurePixelFonts } from "../font/pixel-font";
 import { preloadArt, placeArt } from "../art/place-art";
-import { FIRESIDE_ZONES, STAGE } from "../layout";
+import { STAGE, TRAIL_ZONES } from "../layout";
 import { drawPrompt, drawTooltip, drawTopBar } from "../draw/draw-table";
-import { drawFireside, type FiresideHandlers } from "../draw/draw-fireside";
+import { drawTrailScene, type FlipClock, type TrailHandlers } from "../draw/draw-trail";
 import { draftObjectId, kitObjectId } from "../../../../lib/expedition/expedition-ids";
-import type { FiresideModel } from "../../../../lib/expedition/fireside-model";
+import type { TrailModel } from "../../../../lib/expedition/trail-model";
 import { setTooltipSource } from "../../../../lib/expedition/local-ui";
 import type { ObjectIndex } from "../object-index";
 import type { SceneDeps } from "./scene-registry";
 
-function firesideModel(store: SceneDeps["store"]): FiresideModel | null {
+function trailModel(store: SceneDeps["store"]): TrailModel | null {
   const model = store.getState().model;
-  return model?.sceneKey === "fireside" ? model : null;
+  return model?.sceneKey === "trail" ? model : null;
 }
 
-function buildHandlers(store: SceneDeps["store"]): FiresideHandlers {
+function buildHandlers(store: SceneDeps["store"]): TrailHandlers {
   return {
     onDraft(sourceId) {
-      const model = firesideModel(store);
+      const model = trailModel(store);
       if (model === null) return;
-      if (model.muster !== null) {
-        if (model.muster.some((c) => c.characterId === sourceId && c.pickable)) store.getState().dispatch({ type: "pick-character", characterId: sourceId });
+      if (model.panel.kind === "muster") {
+        if (model.panel.characters.some((c) => c.characterId === sourceId && c.pickable)) store.getState().dispatch({ type: "pick-character", characterId: sourceId });
         return;
       }
-      if (model.draft.kind === "offer") store.getState().dispatch({ type: "pick-draft", sourceId });
+      if (model.panel.kind === "draft" && model.panel.draft.kind === "offer") store.getState().dispatch({ type: "pick-draft", sourceId });
+    },
+    onVote(choice) {
+      store.getState().dispatch({ type: "vote", choice });
     },
     onReady() {
       store.getState().dispatch({ type: "ready" });
@@ -43,15 +46,16 @@ function buildHandlers(store: SceneDeps["store"]): FiresideHandlers {
   };
 }
 
-export class FiresideScene extends Phaser.Scene {
+export class TrailScene extends Phaser.Scene {
   private readonly sceneStore: SceneDeps["store"];
   private readonly index: ObjectIndex;
-  private readonly handlers: FiresideHandlers;
+  private readonly handlers: TrailHandlers;
+  private readonly flips: FlipClock = new Map();
   private unsubscribe: (() => void) | null = null;
   private layer: Phaser.GameObjects.Container | null = null;
 
   constructor(deps: SceneDeps) {
-    super("fireside");
+    super("trail");
     this.sceneStore = deps.store;
     this.index = deps.index;
     this.handlers = buildHandlers(deps.store);
@@ -76,7 +80,7 @@ export class FiresideScene extends Phaser.Scene {
     const teardown = () => {
       this.unsubscribe?.();
       this.unsubscribe = null;
-      this.index.clearScene("fireside");
+      this.index.clearScene("trail");
     };
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, teardown);
     this.events.once(Phaser.Scenes.Events.DESTROY, teardown);
@@ -84,15 +88,16 @@ export class FiresideScene extends Phaser.Scene {
 
   private renderModel(): void {
     if (this.layer === null || this.unsubscribe === null) return;
-    const model = firesideModel(this.sceneStore);
+    const model = trailModel(this.sceneStore);
     if (model === null) return;
     this.tweens.killAll();
+    this.time.removeAllEvents();
     this.layer.removeAll(true);
-    this.index.clearScene("fireside");
+    this.index.clearScene("trail");
     drawTopBar(this, this.layer, model.topBar);
     drawPrompt(this, this.layer, model.prompt);
-    drawFireside(this, this.layer, model, this.index, this.handlers);
-    if (model.muster === null) drawTooltip(this, this.layer, model.tooltip, FIRESIDE_ZONES.tooltip);
+    drawTrailScene(this, this.layer, model, this.index, this.handlers, this.flips);
+    if (model.panel.kind !== "muster") drawTooltip(this, this.layer, model.tooltip, TRAIL_ZONES.tooltip);
   }
 
   /** A redraw replaces the hovered object and Phaser never sends the stale

@@ -1,4 +1,5 @@
 import { CHARACTER_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
+import { attemptOf } from "./view-access";
 import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
 import { cardLabel, rankLabel, SUIT_GLYPH } from "./expedition-ids";
 import type { LocalUiState } from "./local-ui";
@@ -32,18 +33,18 @@ function shortName(name: string): string {
 }
 
 function identityOf(view: ExpeditionView, cardId: string): ExpeditionCardIdentityView | null {
-  return view.attempt?.camp?.yourHand.find((c) => c.id === cardId)?.identity ?? null;
+  return attemptOf(view)?.camp.yourHand.find((c) => c.id === cardId)?.identity ?? null;
 }
 
 function objectivePhrase(view: ExpeditionView, objectiveId: string): string {
-  const o = view.attempt?.camp?.objectives.find((x) => x.id === objectiveId);
+  const o = attemptOf(view)?.camp.objectives.find((x) => x.id === objectiveId);
   if (o === undefined) return "an objective";
   if (o.kind === "win-card" || o.kind === "ordered") return `objective ${cardLabel(o.target)}`;
   return o.kind === "no-tricks" ? "the no-tricks objective" : `the exactly-${o.n} objective`;
 }
 
 function cardPhrase(view: ExpeditionView, cardId: string): string {
-  const camp = view.attempt?.camp;
+  const camp = attemptOf(view)?.camp;
   const own = camp?.yourHand.find((c) => c.id === cardId);
   if (own !== undefined) return `your ${cardLabel(own.identity)}`;
   const played = camp?.currentTrick.plays.find((p) => p.card.id === cardId);
@@ -65,7 +66,7 @@ export function describeChoice(view: ExpeditionView, choiceId: string, nameOf: (
     case "objective":
       return objectivePhrase(view, raw);
     case "whisper": {
-      const entry = (view.attempt?.log ?? []).filter((l) => l.event === "whisper")[Number(raw)];
+      const entry = (attemptOf(view)?.log ?? []).filter((l) => l.event === "whisper")[Number(raw)];
       if (entry === undefined) return "a whisper";
       const to = entry.subjectSeatIds[0] ?? null;
       const who = (id: string | null): string => (id === view.yourSeatId ? "you" : nameOf(id));
@@ -124,8 +125,8 @@ function targetingPrompt(view: ExpeditionView, ui: LocalUiState, nameOf: (seatId
 
 /** During a rescue: the table waits on these seats. */
 function gatePrompt(view: ExpeditionView, nameOf: (seatId: string | null) => string): Prompt | null {
-  if (view.attempt?.window !== "rescue") return null;
-  const pending = view.attempt.pendingSeatIds;
+  if (attemptOf(view)?.window !== "rescue") return null;
+  const pending = attemptOf(view)!.pendingSeatIds;
   if (view.yourSeatId !== null && pending.includes(view.yourSeatId)) {
     const ability = view.yourAbilities.find((a) => a.usableNow && SOURCE_DISPLAY[a.sourceId]?.active?.window === "rescue");
     const name = ability === undefined ? "an ability" : sourceName(ability.sourceId);
@@ -223,7 +224,7 @@ export function buildPrompt(
   const gate = gatePrompt(view, nameOf);
   if (gate !== null) return gate;
 
-  const camp = view.attempt?.camp ?? null;
+  const camp = attemptOf(view)?.camp ?? null;
   if (camp === null) return { text: "Dealing the cards…", tone: "waiting" };
 
   if (camp.campPhase === "ended") return campOverPrompt(camp, nameOf);
@@ -244,30 +245,49 @@ function nameList(names: string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
-/** The fireside prompt: the last camp's result on arrival, then draft, pack,
- * and who the crew is still waiting for. */
-export function buildFiresidePrompt(view: ExpeditionView, seats: readonly PromptSeat[], opts: { reconnecting: boolean }): Prompt {
+/** The trail between camps, by stage: what you still owe, then who the
+ * crew is waiting for. */
+export function buildTrailPrompt(view: ExpeditionView, seats: readonly PromptSeat[], opts: { reconnecting: boolean }): Prompt {
   if (opts.reconnecting) return { text: "Reconnecting…", tone: "alert" };
   const nameOf = (seatId: string): string => shortName(seats.find((s) => s.seatId === seatId)?.displayLabel ?? "Someone");
+  const waitingFor = (seatIds: readonly string[], done: string): Prompt => {
+    if (seatIds.length === 0) return { text: done, tone: "waiting" };
+    const text = `Waiting for ${nameList(seatIds.map(nameOf))}`;
+    return { text: text.length <= PROMPT_MAX_CHARS ? text : `Waiting for ${seatIds.length} teammates`, tone: "waiting" };
+  };
   const you = view.seats.find((s) => s.seatId === view.yourSeatId);
-  if (you === undefined) return { text: `The crew is getting ready for camp ${view.campNumber}`, tone: "waiting" };
+  const stage = view.stage;
+  const voted = (ballots: readonly { seatId: string }[], seatId: string) => ballots.some((b) => b.seatId === seatId);
 
-  const last = view.history.at(-1);
-  if (you.characterId === null) return { text: "Choose your explorer", tone: "your-move" };
-  if (view.yourDraftOffer !== null) {
-    if (last?.status === "succeeded") return { text: `Camp ${last.campNumber} cleared! Take one`, tone: "your-move" };
-    return { text: "Take one to bring along", tone: "your-move" };
-  }
-  if (!you.ready) {
-    if (last?.status === "failed") {
-      const spent = `-${last.suppliesSpent} ${last.suppliesSpent === 1 ? "supply" : "supplies"}`;
-      return { text: `Camp ${last.campNumber} failed: ${spent}. Try again: Ready`, tone: "alert" };
+  switch (stage.tag) {
+    case "muster": {
+      if (you !== undefined && you.characterId === null && !voted(stage.ballots, you.seatId)) return { text: "Pick your explorer and vote on the run length", tone: "your-move" };
+      if (you !== undefined && you.characterId === null) return { text: "Pick your explorer", tone: "your-move" };
+      if (you !== undefined && !voted(stage.ballots, you.seatId)) return { text: "Vote on how long the expedition runs", tone: "your-move" };
+      return waitingFor(view.seats.filter((s) => s.characterId === null || !voted(stage.ballots, s.seatId)).map((s) => s.seatId), "Setting out…");
     }
-    const name = CHARACTER_DISPLAY[you.characterId]?.name ?? you.characterId;
-    return { text: `${name}, set out when Ready`, tone: "your-move" };
+    case "draft":
+      if (stage.yourOffer !== null) return { text: `Camp ${stage.cleared} cleared! +${stage.payout} coins. Take one`, tone: "your-move" };
+      return waitingFor(stage.pendingSeatIds, "Choosing the route…");
+    case "route": {
+      const next = stage.options[0]?.next.index ?? 0;
+      if (you !== undefined && !voted(stage.ballots, you.seatId)) return { text: `Vote on the route to camp ${next}`, tone: "your-move" };
+      return waitingFor(view.seats.filter((s) => !voted(stage.ballots, s.seatId)).map((s) => s.seatId), "Setting off…");
+    }
+    case "event":
+      if (you !== undefined && !stage.readySeatIds.includes(you.seatId)) return { text: "Something on the trail. Continue when ready", tone: "your-move" };
+      return waitingFor(view.seats.filter((s) => !stage.readySeatIds.includes(s.seatId)).map((s) => s.seatId), "Moving on…");
+    case "loadout": {
+      const last = view.history.at(-1);
+      if (you !== undefined && !stage.readySeatIds.includes(you.seatId)) {
+        if (last?.camp === stage.camp.index && last.status === "failed") return { text: `Camp ${last.camp} failed. Set out to try again`, tone: "alert" };
+        const name = you.characterId === null ? "Crew" : (CHARACTER_DISPLAY[you.characterId]?.name ?? you.characterId);
+        return { text: `${name}, set out for camp ${stage.camp.index} when ready`, tone: "your-move" };
+      }
+      return waitingFor(view.seats.filter((s) => !stage.readySeatIds.includes(s.seatId)).map((s) => s.seatId), "Setting out…");
+    }
+    case "camp":
+    case "ended":
+      return { text: "", tone: "info" };
   }
-  const waiting = view.seats.filter((s) => !s.ready).map((s) => nameOf(s.seatId));
-  if (waiting.length === 0) return { text: "Setting out…", tone: "waiting" };
-  const text = `Waiting for ${nameList(waiting)}`;
-  return { text: text.length <= PROMPT_MAX_CHARS ? text : `Waiting for ${waiting.length} teammates`, tone: "waiting" };
 }

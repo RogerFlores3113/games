@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ExpeditionAbilityView, ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
-import { buildFiresidePrompt, buildPrompt, describeChoice, PROMPT_MAX_CHARS, type Prompt, type PromptSeat } from "./build-prompt";
+import type { ExpeditionAbilityView, ExpeditionAttemptView, ExpeditionCampPreviewView, ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionStageView, ExpeditionView } from "@games/rules";
+import { buildPrompt, buildTrailPrompt, describeChoice, PROMPT_MAX_CHARS, type Prompt, type PromptSeat } from "./build-prompt";
 import { initialLocalUi, type LocalUiState } from "./local-ui";
 
 const H7: ExpeditionCardIdentityView = { kind: "standard", suit: "hearts", rank: 7 };
@@ -37,31 +37,41 @@ function camp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampView {
   };
 }
 
-function view(campView: ExpeditionCampView | null, overrides: Partial<ExpeditionView> = {}): ExpeditionView {
+const PREVIEW: ExpeditionCampPreviewView = { index: 1, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null };
+
+function withAttempt(v: ExpeditionView, patch: Partial<ExpeditionAttemptView>): ExpeditionView {
+  if (v.stage.tag !== "camp") throw new Error("fixture is not in a camp");
+  return { ...v, stage: { ...v.stage, attempt: { ...v.stage.attempt, ...patch } } };
+}
+
+function view(campView: ExpeditionCampView, overrides: Partial<ExpeditionView> = {}): ExpeditionView {
   return {
     yourSeatId: "me",
-    runPhase: "camp",
     runStatus: "in_progress",
-    campNumber: 1,
-    supplies: 3,
-    seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: "scout", kit: [], ready: true, draftPending: false, pool: null, usage: [] })),
-    yourDraftOffer: null,
+    length: "standard",
+    campCount: 6,
+    purse: 0,
+    supplies: { count: 3, max: 5 },
+    plan: [],
+    seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: "scout", kit: [], pool: null, usage: [] })),
     yourAbilities: [],
     history: [],
-    attempt:
-      campView === null
-        ? null
-        : {
-            attemptNumber: 1,
-            window: null,
-            pendingSeatIds: [],
-            rescue: null,
-            effects: [],
-            reveals: [],
-            log: [],
-            yourWhisper: { allowed: true, left: 1 },
-            camp: campView,
-          },
+    lastVote: null,
+    stage: {
+      tag: "camp",
+      camp: PREVIEW,
+      attempt: {
+        attemptNumber: 1,
+        window: null,
+        pendingSeatIds: [],
+        rescue: null,
+        effects: [],
+        reveals: [],
+        log: [],
+        yourWhisper: { allowed: true, left: 1 },
+        camp: campView,
+      },
+    },
     ...overrides,
   };
 }
@@ -98,7 +108,7 @@ const LONG_STEP: ExpeditionAbilityView = {
 
 function rescue(pending: string[], abilities: ExpeditionAbilityView[] = [MEDIC]): ExpeditionView {
   const base = view(camp({ campPhase: "ended", currentActorSeatId: null }), { yourAbilities: abilities });
-  return { ...base, attempt: { ...base.attempt!, window: "rescue", pendingSeatIds: pending, rescue: { failedObjectiveIds: ["o1"] } } };
+  return withAttempt(base, { window: "rescue", pendingSeatIds: pending, rescue: { failedObjectiveIds: ["o1"] } });
 }
 
 function ui(overrides: Partial<LocalUiState> = {}): LocalUiState {
@@ -346,10 +356,7 @@ describe("describeChoice", () => {
       currentTrick: { index: 3, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "c4", identity: C4 }, effectiveRank: null }] },
     }),
   );
-  const withLog: ExpeditionView = {
-    ...v,
-    attempt: { ...v.attempt!, log: [{ event: "whisper", actorSeatId: "ana", subjectSeatIds: ["me"], sourceId: null, private: false }] },
-  };
+  const withLog = withAttempt(v, { log: [{ event: "whisper", actorSeatId: "ana", subjectSeatIds: ["me"], sourceId: null, private: false }] });
 
   it.each([
     ["seat:bo", "Bo"],
@@ -374,43 +381,91 @@ describe("describeChoice", () => {
   });
 });
 
-describe("buildFiresidePrompt", () => {
-  function fireside(overrides: Partial<ExpeditionView> = {}, ready: Record<string, boolean> = {}): ExpeditionView {
-    const base = view(null, { runPhase: "fireside", attempt: null, campNumber: 2, ...overrides });
-    return { ...base, seats: base.seats.map((s) => ({ ...s, ready: ready[s.seatId] ?? false })) };
-  }
-  const cleared = [{ campNumber: 1, attemptNumber: 1, status: "succeeded" as const, suppliesSpent: 0 }];
-  const failed = [{ campNumber: 2, attemptNumber: 1, status: "failed" as const, suppliesSpent: 1 }];
-  const at = (v: ExpeditionView, reconnecting = false): Prompt => buildFiresidePrompt(v, SEATS, { reconnecting });
+describe("buildTrailPrompt", () => {
+  const SEAT_IDS = SEATS.map((s) => s.seatId);
+  const trail = (stage: ExpeditionStageView, overrides: Partial<ExpeditionView> = {}): ExpeditionView => ({
+    ...view(camp(), overrides),
+    stage,
+  });
+  const at = (v: ExpeditionView, seats: PromptSeat[] = SEATS, reconnecting = false): Prompt => buildTrailPrompt(v, seats, { reconnecting });
+  const withCharacter = (characterId: string | null): Partial<ExpeditionView> => ({
+    seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: s.seatId === "me" ? characterId : "scout", kit: [], pool: null, usage: [] })),
+  });
+  const failedCamp3 = [{ camp: 3, attempt: 1, status: "failed" as const, coins: 0 }];
 
-  const muster = (characterId: string | null, ready: Record<string, boolean> = {}): ExpeditionView => {
-    const base = fireside({ runPhase: "muster" }, ready);
-    return { ...base, seats: base.seats.map((s) => (s.seatId === "me" ? { ...s, characterId } : s)) };
-  };
-
-  it("asks you to pick a character at muster", () => {
-    expect(at(muster(null))).toEqual({ text: "Choose your explorer", tone: "your-move" });
+  it("at muster asks for an explorer and a length vote when both are owed", () => {
+    const v = trail({ tag: "muster", ballots: [] }, withCharacter(null));
+    expect(at(v)).toEqual({ text: "Pick your explorer and vote on the run length", tone: "your-move" });
   });
 
-  it("opens the run with the first draft", () => {
-    expect(at(fireside({ yourDraftOffer: ["trained-monkey"] }))).toEqual({ text: "Take one to bring along", tone: "your-move" });
+  it("at muster asks only for the explorer once you have voted", () => {
+    const v = trail({ tag: "muster", ballots: [{ seatId: "me", choice: "short" }] }, withCharacter(null));
+    expect(at(v)).toEqual({ text: "Pick your explorer", tone: "your-move" });
   });
 
-  it("announces a cleared camp with the draft", () => {
-    expect(at(fireside({ yourDraftOffer: ["trained-monkey"], history: cleared }))).toEqual({ text: "Camp 1 cleared! Take one", tone: "your-move" });
+  it("at muster asks only for the vote once you have an explorer", () => {
+    const v = trail({ tag: "muster", ballots: [{ seatId: "ana", choice: "short" }] }, withCharacter("guide"));
+    expect(at(v)).toEqual({ text: "Vote on how long the expedition runs", tone: "your-move" });
   });
 
-  it("tells you to set out once the pick is made", () => {
-    expect(at(fireside({ history: cleared }))).toEqual({ text: "The Scout, set out when Ready", tone: "your-move" });
+  it("at muster names who is still choosing or voting once you are done", () => {
+    const v = trail({ tag: "muster", ballots: [{ seatId: "me", choice: "short" }, { seatId: "bo", choice: null }] }, withCharacter("guide"));
+    expect(at(v)).toEqual({ text: "Waiting for Ana", tone: "waiting" });
   });
 
-  it("announces a failed camp and its supply cost", () => {
-    expect(at(fireside({ history: failed }))).toEqual({ text: "Camp 2 failed: -1 supply. Try again: Ready", tone: "alert" });
+  it("at muster says Setting out once every seat has a character and a ballot", () => {
+    const ballots = SEAT_IDS.map((seatId) => ({ seatId, choice: "short" }));
+    expect(at(trail({ tag: "muster", ballots }))).toEqual({ text: "Setting out…", tone: "waiting" });
   });
 
-  it("names who the crew is waiting for once you are ready", () => {
-    expect(at(fireside({}, { me: true }))).toEqual({ text: "Waiting for Ana and Bo", tone: "waiting" });
-    expect(at(fireside({}, { me: true, ana: true }))).toEqual({ text: "Waiting for Bo", tone: "waiting" });
+  it("at the draft announces the cleared camp, its payout and the pick", () => {
+    const v = trail({ tag: "draft", cleared: 1, payout: 8, yourOffer: ["trained-monkey"], pendingSeatIds: ["me", "bo"] });
+    expect(at(v)).toEqual({ text: "Camp 1 cleared! +8 coins. Take one", tone: "your-move" });
+  });
+
+  it("at the draft names who the crew is waiting for once you have picked", () => {
+    const v = trail({ tag: "draft", cleared: 1, payout: 8, yourOffer: null, pendingSeatIds: ["ana", "bo"] });
+    expect(at(v)).toEqual({ text: "Waiting for Ana and Bo", tone: "waiting" });
+  });
+
+  it("at the draft says Choosing the route once nobody is pending", () => {
+    const v = trail({ tag: "draft", cleared: 1, payout: 8, yourOffer: null, pendingSeatIds: [] });
+    expect(at(v)).toEqual({ text: "Choosing the route…", tone: "waiting" });
+  });
+
+  it("at the route vote asks for your vote with the camp it leads to", () => {
+    const v = trail({ tag: "route", options: [{ id: "a", next: { ...PREVIEW, index: 3 } }, { id: "b", next: { ...PREVIEW, index: 3 } }], ballots: [{ seatId: "ana", choice: "a" }] });
+    expect(at(v)).toEqual({ text: "Vote on the route to camp 3", tone: "your-move" });
+  });
+
+  it("at the route vote names who has not voted once you have", () => {
+    const v = trail({ tag: "route", options: [{ id: "a", next: { ...PREVIEW, index: 3 } }], ballots: [{ seatId: "me", choice: "a" }, { seatId: "ana", choice: "a" }] });
+    expect(at(v)).toEqual({ text: "Waiting for Bo", tone: "waiting" });
+  });
+
+  it("at an event asks you to continue", () => {
+    const v = trail({ tag: "event", event: "storm", next: { ...PREVIEW, index: 4 }, readySeatIds: ["ana"] });
+    expect(at(v)).toEqual({ text: "Something on the trail. Continue when ready", tone: "your-move" });
+  });
+
+  it("at an event names who is not ready once you are", () => {
+    const v = trail({ tag: "event", event: "storm", next: { ...PREVIEW, index: 4 }, readySeatIds: ["me", "ana"] });
+    expect(at(v)).toEqual({ text: "Waiting for Bo", tone: "waiting" });
+  });
+
+  it("at the loadout tells you to set out by your character", () => {
+    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 2 }, readySeatIds: [] }, { history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }] });
+    expect(at(v)).toEqual({ text: "The Scout, set out for camp 2 when ready", tone: "your-move" });
+  });
+
+  it("at the loadout after a failure tells you to try the camp again", () => {
+    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 3 }, readySeatIds: [] }, { history: failedCamp3 });
+    expect(at(v)).toEqual({ text: "Camp 3 failed. Set out to try again", tone: "alert" });
+  });
+
+  it("at the loadout names who is not ready once you are", () => {
+    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 3 }, readySeatIds: ["me"] }, { history: failedCamp3 });
+    expect(at(v)).toEqual({ text: "Waiting for Ana and Bo", tone: "waiting" });
   });
 
   it("counts teammates when their names overflow the line", () => {
@@ -421,12 +476,12 @@ describe("buildFiresidePrompt", () => {
       { seatId: "cy", displayLabel: "Cyprianus" },
       { seatId: "di", displayLabel: "Dionysia" },
     ];
-    const base = fireside({}, { me: true });
-    const five = { ...base, seats: long.map((s) => ({ seatId: s.seatId, characterId: "scout", kit: [], ready: s.seatId === "me", draftPending: false, pool: null, usage: [] })) };
-    expect(buildFiresidePrompt(five, long, { reconnecting: false })).toEqual({ text: "Waiting for 4 teammates", tone: "waiting" });
+    const base = trail({ tag: "loadout", camp: PREVIEW, readySeatIds: ["me"] });
+    const five = { ...base, seats: long.map((s) => ({ seatId: s.seatId, characterId: "scout", kit: [], pool: null, usage: [] })) };
+    expect(at(five, long)).toEqual({ text: "Waiting for 4 teammates", tone: "waiting" });
   });
 
   it("says Reconnecting while the socket is down", () => {
-    expect(at(fireside(), true)).toEqual({ text: "Reconnecting…", tone: "alert" });
+    expect(at(trail({ tag: "loadout", camp: PREVIEW, readySeatIds: [] }), SEATS, true)).toEqual({ text: "Reconnecting…", tone: "alert" });
   });
 });

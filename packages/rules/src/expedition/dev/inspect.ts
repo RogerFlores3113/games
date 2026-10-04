@@ -3,9 +3,13 @@
 import { currentActorSeatId, checkCampOutcome } from "../camp";
 import { cardLabel } from "../deck";
 import { describeObjective } from "../objectives";
+import { attemptOf } from "../run/attempt";
+import { SUPPLIES_MAX } from "../run/balance";
 import { rulesFor } from "../run/compose";
-import { runPhase, runStatus } from "../run/lifecycle";
-import type { Catalog, RunState } from "../run/types";
+import { runStatus } from "../run/lifecycle";
+import { campCount } from "../run/plan";
+import type { CampSpec } from "../run/route";
+import type { Catalog, PerSeat, RunState } from "../run/types";
 import type { ResolvedPlay } from "../state";
 import type { DevInspectSection } from "../../adapter";
 
@@ -14,26 +18,55 @@ function playLabel(play: ResolvedPlay): string {
   return `${play.seatId} ${cardLabel(play.card.identity)}${countsAs}${play.burned ? " (burned)" : ""}`;
 }
 
+function specLabel(spec: CampSpec): string {
+  return `camp ${spec.index}: ${spec.location}, ${spec.weather}, event ${spec.event ?? "none"}, slots [${spec.slots.map((s) => s.kind).join(", ")}]`;
+}
+
+function perSeat<V>(run: RunState, values: PerSeat<V>): string {
+  return run.seatIds.map((seatId) => `${seatId} ${Object.hasOwn(values, seatId) ? String(values[seatId] ?? "abstain") : "-"}`).join(", ");
+}
+
+function stageLines(run: RunState): string[] {
+  const stage = run.stage;
+  switch (stage.tag) {
+    case "muster":
+      return [`length ballots: ${perSeat(run, stage.ballots)}`];
+    case "loadout":
+      return [specLabel(stage.camp), `ready: ${perSeat(run, stage.ready)}`];
+    case "camp":
+      return [specLabel(stage.camp), `attempt ${stage.attempt.attemptNumber}`];
+    case "draft":
+      return [`cleared camp ${stage.cleared}, paid ${stage.payout}`];
+    case "route":
+      return [...stage.options.map((o) => `route ${o.id}: ${specLabel(o.next)}`), `route ballots: ${perSeat(run, stage.ballots)}`];
+    case "event":
+      return [`event ${stage.route.next.event ?? "none"} on route ${stage.route.id}`, specLabel(stage.route.next), `ready: ${perSeat(run, stage.ready)}`];
+    case "ended":
+      return [`run ${stage.result}`];
+  }
+}
+
 export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[] {
+  const vote = run.lastVote;
   const sections: DevInspectSection[] = [
     {
       title: "Run",
       lines: [
-        `camp ${run.campNumber}, attempt ${run.attempt?.attemptNumber ?? "none"}, supplies ${run.supplies}`,
-        `phase ${runPhase(run)}, status ${runStatus(run)}`,
-        `history: ${run.history.map((h) => `${h.campNumber}.${h.attemptNumber} ${h.status}`).join(", ") || "empty"}`,
+        `stage ${run.stage.tag}, status ${runStatus(run)}, ${run.plan === null ? "no plan yet" : `${run.plan.length} run of ${campCount(run.plan)} camps`}`,
+        `supplies ${run.supplies} of ${SUPPLIES_MAX}, purse ${run.purse}`,
+        `bosses: ${run.plan?.bosses.map((b) => `${b.tier} at ${b.at} (${b.modId ?? "none drawn"})`).join(", ") || "none"}`,
+        `history: ${run.history.map((h) => `${h.camp}.${h.attempt} ${h.status}${h.coins > 0 ? ` +${h.coins}` : ""}`).join(", ") || "empty"}`,
+        `last vote: ${vote === null ? "none" : `${vote.topic} -> ${vote.result.winner}${vote.result.tied === null ? "" : ` (flip between ${vote.result.tied.join(", ")})`}`}`,
+        ...stageLines(run),
       ],
     },
     {
       title: "Crew",
-      lines: run.seats.map(
-        (s) =>
-          `${s.seatId}: ${s.characterId ?? "no character"}, kit [${s.kit.join(", ")}], offer [${(s.draftOffer ?? []).join(", ")}], ${run.readySeatIds.includes(s.seatId) ? "ready" : "not ready"}`,
-      ),
+      lines: run.seats.map((s) => `${s.seatId}: ${s.characterId ?? "no character"}, kit [${s.kit.join(", ")}], offer [${(s.draftOffer ?? []).join(", ")}]`),
     },
   ];
 
-  const camp = run.attempt?.camp;
+  const camp = attemptOf(run)?.camp;
   if (camp === undefined) return sections;
   const rules = rulesFor(run, catalog);
 

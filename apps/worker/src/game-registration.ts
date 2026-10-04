@@ -88,14 +88,14 @@ function mapExpeditionError(error: RunError): GameErrorDetail {
       return { gameId: EXPEDITION_GAME_ID, code: "not_a_seat" };
     case "run_over":
       return { gameId: EXPEDITION_GAME_ID, code: "run_over" };
+    case "wrong_stage":
+      return { gameId: EXPEDITION_GAME_ID, code: "wrong_stage" };
+    case "not_a_choice":
+      return { gameId: EXPEDITION_GAME_ID, code: "not_a_choice" };
     case "unknown_character":
       return { gameId: EXPEDITION_GAME_ID, code: "unknown_character" };
     case "character_taken":
       return { gameId: EXPEDITION_GAME_ID, code: "character_taken" };
-    case "character_pending":
-      return { gameId: EXPEDITION_GAME_ID, code: "character_pending" };
-    case "draft_pending":
-      return { gameId: EXPEDITION_GAME_ID, code: "draft_pending" };
     case "no_draft_pending":
       return { gameId: EXPEDITION_GAME_ID, code: "no_draft_pending" };
     case "not_offered":

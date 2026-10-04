@@ -1,4 +1,5 @@
 import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionObjectiveView, ExpeditionTargetKind, ExpeditionView } from "@games/rules";
+import { attemptOf, campHeadline, focusCampIndex } from "./view-access";
 import { SOURCE_DISPLAY } from "@games/rules";
 import type { CardPackId } from "./card-pack-ids";
 import {
@@ -54,11 +55,14 @@ export interface SceneServerInput {
   hostSeatId: string | null;
 }
 
-export type SceneKey = "camp" | "fireside" | "run-end";
+export type SceneKey = "camp" | "trail" | "run-end";
 
-/** The top bar's readouts, shared by the camp and fireside scenes. */
+/** The top bar's readouts, shared by the camp and trail scenes. */
 export interface TopBar {
   supplies: number;
+  suppliesMax: number;
+  /** The crew's shared coins. */
+  purse: number;
   camp: string;
   /** The supply crates as an ability target (Field Kit); null outside
    * targeting. */
@@ -80,9 +84,6 @@ export interface Tooltip {
   badges: string[];
   reason: string | null;
 }
-
-export const BOSS_CAMP_NUMBERS: readonly number[] = [3, 6];
-export const FINAL_CAMP_NUMBER = 6;
 
 export interface CardModel {
   id: string;
@@ -217,9 +218,8 @@ export interface SceneModel {
   sceneKey: "camp";
   cardPackId: CardPackId;
   youSeatId: string | null;
-  runPhase: ExpeditionView["runPhase"];
-  campNumber: number;
-  supplies: number;
+  /** The camp being played. */
+  campIndex: number;
   topBar: TopBar;
   seats: SeatModel[];
   hand: CardModel[];
@@ -257,9 +257,9 @@ export interface SceneModel {
 }
 
 export function sceneKeyFor(game: ExpeditionView): SceneKey {
-  if (game.runPhase === "ended") return "run-end";
-  if (game.runPhase === "fireside" || game.runPhase === "muster") return "fireside";
-  return "camp";
+  if (game.stage.tag === "ended") return "run-end";
+  if (game.stage.tag === "camp") return "camp";
+  return "trail";
 }
 
 // ---------------------------------------------------------------------------
@@ -391,13 +391,13 @@ function buildTrickPlayModel(
 
 function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiState): SeatModel {
   const room = roomSeatFor(roomSeats, seatId);
-  const camp = view.attempt?.camp ?? null;
+  const camp = attemptOf(view)?.camp ?? null;
   const handSize = camp?.handSizes.find((h) => h.seatId === seatId)?.size ?? 0;
   const tricksWon = camp === null ? 0 : camp.completedTricks.filter((t) => t.winnerSeatId === seatId).length;
   const isExpeditionLeader = camp !== null && camp.expeditionLeaderSeatId === seatId;
 
   let mayAct = false;
-  const pending = view.attempt?.pendingSeatIds ?? [];
+  const pending = attemptOf(view)?.pendingSeatIds ?? [];
   if (pending.length > 0) {
     mayAct = pending.includes(seatId);
   } else if (camp !== null) {
@@ -409,7 +409,7 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
   const sources = liveIds.map((id) => sourceChipFor(id, seatId, view, ui));
   const objectives = objectivesForOwner(camp, seatId, view, ui);
 
-  const reveals: MiniCard[] = (view.attempt?.reveals ?? [])
+  const reveals: MiniCard[] = (attemptOf(view)?.reveals ?? [])
     .filter((r) => r.fromSeatId === seatId)
     .map((r) => ({
       objectId: revealObjectId(r.identity),
@@ -483,9 +483,9 @@ function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: Lo
 }
 
 function whisperStatus(view: ExpeditionView, active: boolean): SceneModel["whisper"] {
-  const camp = view.attempt?.camp ?? null;
+  const camp = attemptOf(view)?.camp ?? null;
   const shown = view.yourSeatId !== null && camp !== null && camp.campPhase === "playing";
-  const mine = view.attempt?.yourWhisper ?? { allowed: true, left: 1 };
+  const mine = attemptOf(view)?.yourWhisper ?? { allowed: true, left: 1 };
   let state: WhisperState = "ready";
   let reason: string | null = null;
   if (!mine.allowed) {
@@ -494,7 +494,7 @@ function whisperStatus(view: ExpeditionView, active: boolean): SceneModel["whisp
   } else if (mine.left === 0) {
     state = "used";
     reason = "Used this camp";
-  } else if (view.attempt?.window !== "between-tricks") {
+  } else if (attemptOf(view)?.window !== "between-tricks") {
     state = "wait-between-tricks";
     reason = "Between tricks";
   }
@@ -507,7 +507,7 @@ function buildWhispers(
 ): Pick<SceneModel, "receivedWhispers" | "sentWhispers" | "shownCards" | "whisperLog"> {
   const you = view.yourSeatId;
   const nameOf = (seatId: string): string => roomSeatFor(roomSeats, seatId).displayLabel;
-  const whisperReveals = (view.attempt?.reveals ?? []).filter((r) => r.source === "whisper");
+  const whisperReveals = (attemptOf(view)?.reveals ?? []).filter((r) => r.source === "whisper");
   const mineSent = whisperReveals.filter((r) => r.fromSeatId === you);
 
   const receivedWhispers = whisperReveals
@@ -518,7 +518,7 @@ function buildWhispers(
   );
 
   let sentSoFar = 0;
-  const whisperLog = (view.attempt?.log ?? [])
+  const whisperLog = (attemptOf(view)?.log ?? [])
     .filter((l) => l.event === "whisper")
     .map((l) => {
       const to = l.subjectSeatIds[0] ?? "";
@@ -529,7 +529,7 @@ function buildWhispers(
       return `${nameOf(l.actorSeatId)} whispered to ${to === you ? "you" : nameOf(to)}`;
     });
 
-  const shownCards = (view.attempt?.reveals ?? [])
+  const shownCards = (attemptOf(view)?.reveals ?? [])
     .filter((r) => r.source !== "whisper")
     .map((r) => ({ fromSeatId: r.fromSeatId, fromName: nameOf(r.fromSeatId), sourceName: sourceName(r.source), card: cardLabel(r.identity), objectId: revealObjectId(r.identity) }));
 
@@ -555,23 +555,21 @@ function buildLastTrick(camp: ExpeditionCampView | null, ui: LocalUiState): Scen
   };
 }
 
-function buildTopBar(view: ExpeditionView, ui: LocalUiState): TopBar {
-  const camp = BOSS_CAMP_NUMBERS.includes(view.campNumber)
-    ? `Camp ${view.campNumber} of ${FINAL_CAMP_NUMBER} - Boss camp`
-    : `Camp ${view.campNumber} of ${FINAL_CAMP_NUMBER}`;
-  return { supplies: view.supplies, camp, suppliesPick: pickOrNull(ui, view, "supplies") };
+/** Supplies of their cap, the purse, and which camp of how many. */
+export function buildTopBar(view: ExpeditionView, suppliesPick: PickState | null = null): TopBar {
+  return { supplies: view.supplies.count, suppliesMax: view.supplies.max, purse: view.purse, camp: campHeadline(view), suppliesPick };
 }
 
 function buildTooltip(server: SceneServerInput, ui: LocalUiState): Tooltip | null {
   const { game: view, roomSeats } = server;
   const drag = ui.drag;
   if (drag.phase === "returning" && drag.reason !== null) {
-    const held = view.attempt?.camp?.yourHand.find((c) => c.id === drag.cardId);
+    const held = attemptOf(view)?.camp.yourHand.find((c) => c.id === drag.cardId);
     const name = held === undefined ? "that card" : cardLabel(held.identity);
     return { title: `Can't play ${name}`, text: "", badges: [], reason: drag.reason };
   }
   if (ui.tooltipObjectiveId !== null) {
-    const o = view.attempt?.camp?.objectives.find((x) => x.id === ui.tooltipObjectiveId);
+    const o = attemptOf(view)?.camp.objectives.find((x) => x.id === ui.tooltipObjectiveId);
     if (o === undefined) return null;
     const holder: ObjectiveHolder =
       o.ownerSeatId === null
@@ -602,8 +600,8 @@ function objectiveName(o: ExpeditionObjectiveView, view: ExpeditionView, roomSea
 }
 
 function buildBanner(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiState): Banner | null {
-  if (view.attempt?.window !== "rescue") return null;
-  const pending = view.attempt?.pendingSeatIds ?? [];
+  if (attemptOf(view)?.window !== "rescue") return null;
+  const pending = attemptOf(view)?.pendingSeatIds ?? [];
   const you = view.yourSeatId;
   const youPending = you !== null && pending.includes(you);
   const uses = youPending
@@ -613,8 +611,8 @@ function buildBanner(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalU
     : [];
   const others = pending.filter((id) => id !== you).map((id) => roomSeatFor(roomSeats, id).displayLabel);
   const useNames = uses.map((u) => u.name).join(" or ");
-  const objectives = view.attempt?.camp?.objectives ?? [];
-  const failed = (view.attempt?.rescue?.failedObjectiveIds ?? []).flatMap((id) => {
+  const objectives = attemptOf(view)?.camp.objectives ?? [];
+  const failed = (attemptOf(view)?.rescue?.failedObjectiveIds ?? []).flatMap((id) => {
     const o = objectives.find((x) => x.id === id);
     return o === undefined ? [] : [objectiveName(o, view, roomSeats)];
   });
@@ -638,8 +636,8 @@ function buildTray(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiS
   const option = (choiceId: string, label: string, cards: string[] = []): TrayOption => ({ choiceId, objectId: pickObjectId(choiceId), label, cards });
 
   if (step.kind === "whisper") {
-    const whispers = (view.attempt?.log ?? []).filter((l) => l.event === "whisper");
-    const known = (view.attempt?.reveals ?? []).filter((r) => r.source === "whisper");
+    const whispers = (attemptOf(view)?.log ?? []).filter((l) => l.event === "whisper");
+    const known = (attemptOf(view)?.reveals ?? []).filter((r) => r.source === "whisper");
     return {
       title: step.prompt,
       options: step.choices.map((id) => {
@@ -654,7 +652,7 @@ function buildTray(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiS
     };
   }
   if (step.kind === "won-trick") {
-    const tricks = view.attempt?.camp?.completedTricks ?? [];
+    const tricks = attemptOf(view)?.camp.completedTricks ?? [];
     return {
       title: step.prompt,
       options: step.choices.map((id) => {
@@ -668,7 +666,7 @@ function buildTray(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiS
     const choices = valueChoices(ui, view);
     if (choices.length === 0) return null;
     const cardId = ui.targeting?.mode === "ability" ? ui.targeting.valueCardId : null;
-    const held = view.attempt?.camp?.yourHand.find((c) => c.id === cardId);
+    const held = attemptOf(view)?.camp.yourHand.find((c) => c.id === cardId);
     const title = held === undefined ? "Count it as" : `Count ${cardLabel(held.identity)} as`;
     return { title, options: choices.map((id) => option(id, rankLabel(Number(id.split(":")[2])))) };
   }
@@ -682,7 +680,7 @@ export function buildSceneModel(
   reconnecting = false,
 ): SceneModel {
   const { game: view, roomSeats } = server;
-  const camp = view.attempt?.camp ?? null;
+  const camp = attemptOf(view)?.camp ?? null;
 
   const seats = orderedSeatIds(view).map((seatId, ring) => seatModelFor(seatId, ring, view, roomSeats, ui));
   const hand = buildHand(camp, view, ui);
@@ -708,10 +706,8 @@ export function buildSceneModel(
     sceneKey: "camp",
     cardPackId,
     youSeatId: view.yourSeatId,
-    runPhase: view.runPhase,
-    campNumber: view.campNumber,
-    supplies: view.supplies,
-    topBar: buildTopBar(view, ui),
+    campIndex: focusCampIndex(view) ?? 0,
+    topBar: buildTopBar(view, pickOrNull(ui, view, "supplies")),
     seats,
     hand,
     trick,

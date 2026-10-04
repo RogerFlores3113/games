@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ExpeditionAbilityView, ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionObjectiveView, ExpeditionView } from "@games/rules";
+import type { ExpeditionAbilityView, ExpeditionAttemptView, ExpeditionCampView, ExpeditionStageView, ExpeditionCardIdentityView, ExpeditionObjectiveView, ExpeditionView } from "@games/rules";
 import { initialLocalUi } from "./local-ui";
 import type { LocalUiState } from "./local-ui";
 import { cardLabel, handObjectId, objectiveObjectId, seatObjectId, sourceObjectId, trickObjectId, WHISPER_ID } from "./expedition-ids";
@@ -46,39 +46,52 @@ function makeCamp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampVi
 }
 
 function seat(seatId: string, characterId: string | null, kit: string[] = []): ExpeditionView["seats"][number] {
-  return { seatId, characterId, kit, ready: true, draftPending: false, pool: null, usage: [] };
+  return { seatId, characterId, kit, pool: null, usage: [] };
 }
 
 function ability(sourceId: string, step?: { kind: ExpeditionAbilityView["steps"][number]["kind"]; choices: string[] }, usableNow = true, reason: string | null = null): ExpeditionAbilityView {
   return { sourceId, usableNow, reason, steps: usableNow && step ? [{ kind: step.kind, prompt: "Pick one", choices: step.choices }] : [] };
 }
 
-function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
+type ViewOverrides = Partial<ExpeditionView> & { attempt?: ExpeditionAttemptView; campIndex?: number };
+
+function makeAttempt(): ExpeditionAttemptView {
+  return {
+    attemptNumber: 1,
+    window: null,
+    pendingSeatIds: [],
+    rescue: null,
+    effects: [],
+    reveals: [],
+    log: [],
+    yourWhisper: { allowed: true, left: 1 },
+    camp: makeCamp(),
+  };
+}
+
+function attemptOf(view: ExpeditionView): ExpeditionAttemptView {
+  if (view.stage.tag !== "camp") throw new Error("fixture is not in a camp");
+  return view.stage.attempt;
+}
+
+function makeView({ attempt, campIndex = 2, ...overrides }: ViewOverrides = {}): ExpeditionView {
   return {
     yourSeatId: "s2",
-    runPhase: "camp",
     runStatus: "in_progress",
-    campNumber: 2,
-    supplies: 5,
+    length: "standard",
+    campCount: 6,
+    purse: 0,
+    supplies: { count: 5, max: 5 },
+    plan: [],
     seats: [
       seat("s1", "guide"),
       seat("s2", "scout"),
       seat("s3", "medic"),
     ],
-    yourDraftOffer: null,
     yourAbilities: [],
     history: [],
-    attempt: {
-      attemptNumber: 1,
-      window: null,
-      pendingSeatIds: [],
-      rescue: null,
-      effects: [],
-      reveals: [],
-      log: [],
-      yourWhisper: { allowed: true, left: 1 },
-      camp: makeCamp(),
-    },
+    lastVote: null,
+    stage: { tag: "camp", camp: { index: campIndex, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null }, attempt: attempt ?? makeAttempt() },
     ...overrides,
   };
 }
@@ -92,15 +105,18 @@ function ui(overrides: Partial<LocalUiState> = {}): LocalUiState {
 }
 
 describe("sceneKeyFor", () => {
-  it("maps the fireside and the ended run to their own scenes", () => {
-    expect(sceneKeyFor(makeView({ runPhase: "fireside" }))).toBe("fireside");
-    expect(sceneKeyFor(makeView({ runPhase: "ended" }))).toBe("run-end");
-  });
-  it("maps muster to the fireside scene", () => {
-    expect(sceneKeyFor(makeView({ runPhase: "muster" }))).toBe("fireside");
-  });
-  it("maps camp to camp", () => {
-    expect(sceneKeyFor(makeView({ runPhase: "camp" }))).toBe("camp");
+  const preview = { index: 1, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null };
+  const stages: [ExpeditionStageView, string][] = [
+    [{ tag: "muster", ballots: [] }, "trail"],
+    [{ tag: "loadout", camp: preview, readySeatIds: [] }, "trail"],
+    [{ tag: "draft", cleared: 1, payout: 8, yourOffer: null, pendingSeatIds: [] }, "trail"],
+    [{ tag: "route", options: [], ballots: [] }, "trail"],
+    [{ tag: "event", event: "storm", next: preview, readySeatIds: [] }, "trail"],
+    [{ tag: "camp", camp: preview, attempt: makeAttempt() }, "camp"],
+    [{ tag: "ended", result: "won" }, "run-end"],
+  ];
+  it.each(stages)("maps the %j stage to the %s scene", (stage, key) => {
+    expect(sceneKeyFor(makeView({ stage }))).toBe(key);
   });
 });
 
@@ -321,7 +337,7 @@ describe("drag and drop", () => {
   ];
   function dragView(patch: Partial<ExpeditionCampView>): ExpeditionView {
     return makeView({
-      attempt: { ...makeView().attempt!, camp: makeCamp({ yourHand: cards, yourLegalCardIds: ["as"], ...patch }) },
+      attempt: { ...makeAttempt(), camp: makeCamp({ yourHand: cards, yourLegalCardIds: ["as"], ...patch }) },
     });
   }
 
@@ -394,7 +410,7 @@ describe("trick and lastTrick", () => {
     expect(model.trick!.plays[1]!.isLed).toBe(false);
     expect(model.trick!.plays[0]!.card.objectId).toBe(trickObjectId(AS));
 
-    const noAttempt = makeView({ runPhase: "fireside", attempt: null });
+    const noAttempt = makeView({ stage: { tag: "loadout", camp: { index: 2, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null }, readySeatIds: [] } });
     const model2 = buildSceneModel(server(noAttempt), ui(), "big-index");
     expect(model2.trick).toBeNull();
   });
@@ -427,7 +443,7 @@ describe("trick and lastTrick", () => {
   it("lastTrick plays carry burned and counts-as; the current trick's never do", () => {
     const view = makeView({
       attempt: {
-        ...makeView().attempt!,
+        ...makeAttempt(),
         camp: makeCamp({
           completedTricks: [
             {
@@ -456,7 +472,7 @@ describe("trick and lastTrick", () => {
     const view = makeView({
       yourAbilities: [ability("bait", { kind: "card", choices: ["card:c2"] })],
       attempt: {
-        ...makeView().attempt!,
+        ...makeAttempt(),
         camp: makeCamp({
           currentTrick: {
             index: 0,
@@ -482,20 +498,29 @@ describe("trick and lastTrick", () => {
   });
 });
 
-describe("HUD: supplies and campNumber", () => {
-  it("copies supplies and campNumber verbatim", () => {
-    const model = buildSceneModel(server(makeView({ supplies: 7, campNumber: 4 })), ui(), "big-index");
-    expect(model.supplies).toBe(7);
-    expect(model.campNumber).toBe(4);
-  });
-
-  it("topBar names the camp and flags boss camps", () => {
-    expect(buildSceneModel(server(makeView({ campNumber: 2, supplies: 2 })), ui(), "big-index").topBar).toEqual({
+describe("HUD: top bar", () => {
+  it("shows supplies against their cap, the purse, and the camp label", () => {
+    const view = makeView({ campIndex: 2, supplies: { count: 2, max: 5 }, purse: 11 });
+    expect(buildSceneModel(server(view), ui(), "big-index").topBar).toEqual({
       supplies: 2,
+      suppliesMax: 5,
+      purse: 11,
       camp: "Camp 2 of 6",
       suppliesPick: null,
     });
-    expect(buildSceneModel(server(makeView({ campNumber: 3 })), ui(), "big-index").topBar.camp).toBe("Camp 3 of 6 - Boss camp");
+  });
+
+  it("names the focus camp as the model's campIndex", () => {
+    expect(buildSceneModel(server(makeView({ campIndex: 4 })), ui(), "big-index").campIndex).toBe(4);
+  });
+
+  it("labels a planned boss camp by its tier", () => {
+    const plan = [
+      { at: 3, tier: "animal" as const, bossId: null },
+      { at: 6, tier: "temple" as const, bossId: null },
+    ];
+    expect(buildSceneModel(server(makeView({ campIndex: 3, plan })), ui(), "big-index").topBar.camp).toBe("Camp 3 of 6 - Animal boss");
+    expect(buildSceneModel(server(makeView({ campIndex: 6, plan })), ui(), "big-index").topBar.camp).toBe("Camp 6 of 6 - The Temple");
   });
 });
 
@@ -646,7 +671,7 @@ describe("reveals", () => {
 function whisperView(opts: {
   window?: "between-tricks" | null;
   yourWhisper?: { allowed: boolean; left: number };
-  reveals?: NonNullable<ExpeditionView["attempt"]>["reveals"];
+  reveals?: ExpeditionAttemptView["reveals"];
   log?: { actor: string; to: string }[];
 }): ExpeditionView {
   return makeView({
@@ -672,7 +697,7 @@ describe("whisper status", () => {
   });
 
   it("not shown at all outside the playing phase", () => {
-    const view = makeView({ attempt: { ...makeView().attempt!, camp: makeCamp({ campPhase: "objective-pick" }) } });
+    const view = makeView({ attempt: { ...makeAttempt(), camp: makeCamp({ campPhase: "objective-pick" }) } });
     expect(buildSceneModel(server(view), ui(), "big-index").whisper.shown).toBe(false);
   });
 
@@ -732,7 +757,6 @@ describe("whispers on the table", () => {
 describe("banner", () => {
   function gated(pending: string[], abilities: ExpeditionView["yourAbilities"], objectives: ExpeditionObjectiveView[] = []): ExpeditionView {
     return makeView({
-      runPhase: "camp",
       yourAbilities: abilities,
       attempt: {
         attemptNumber: 1,
@@ -768,7 +792,7 @@ describe("banner", () => {
 
   it("is null while no gated window is open, and while you are targeting", () => {
     expect(buildSceneModel(server(makeView()), ui(), "big-index").banner).toBeNull();
-    const between = makeView({ attempt: { ...makeView().attempt!, window: "between-tricks" } });
+    const between = makeView({ attempt: { ...makeAttempt(), window: "between-tricks" } });
     expect(buildSceneModel(server(between), ui(), "big-index").banner).toBeNull();
     const view = gated(["s2"], [ability("medic", { kind: "failed-objective", choices: ["objective:o1"] })], [failedKd("s2")]);
     expect(buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceId: "medic", selected: [], valueCardId: null } }), "big-index").banner).toBeNull();
@@ -776,8 +800,8 @@ describe("banner", () => {
 });
 
 describe("pick tray", () => {
-  const withSteps = (sourceId: string, step: { kind: ExpeditionAbilityView["steps"][number]["kind"]; choices: string[] }, attempt: Partial<NonNullable<ExpeditionView["attempt"]>> = {}): ExpeditionView =>
-    makeView({ yourAbilities: [ability(sourceId, step)], attempt: { ...makeView().attempt!, ...attempt } });
+  const withSteps = (sourceId: string, step: { kind: ExpeditionAbilityView["steps"][number]["kind"]; choices: string[] }, attempt: Partial<ExpeditionAttemptView> = {}): ExpeditionView =>
+    makeView({ yourAbilities: [ability(sourceId, step)], attempt: { ...makeAttempt(), ...attempt } });
   const aiming = (sourceId: string, valueCardId: string | null = null): LocalUiState => ui({ targeting: { mode: "ability", sourceId, selected: [], valueCardId } });
 
   it("lists whispers by who sent them to whom, with the card when you know it", () => {
@@ -873,7 +897,7 @@ describe("charges and shown cards", () => {
   it("cards an ability showed you are listed with the source and the hand they came from", () => {
     const view = makeView({
       attempt: {
-        ...makeView().attempt!,
+        ...makeAttempt(),
         reveals: [
           { cardId: "c1", fromSeatId: "s1", source: "scout", identity: KD, toSeatId: null },
           { cardId: "c2", fromSeatId: "s3", source: "whisper", identity: AS, toSeatId: "s2" },
@@ -939,7 +963,7 @@ describe("targeting", () => {
     const view = makeView({
       yourAbilities: [ability("trained-monkey", { kind: "card", choices: ["card:c-as"] })],
       attempt: {
-        ...makeView().attempt!,
+        ...makeAttempt(),
         camp: makeCamp({ yourHand: [{ id: "c-as", identity: AS, effectiveRank: null, countsAs: null }, { id: "c-kd", identity: KD, effectiveRank: null, countsAs: null }], yourLegalCardIds: ["c-as", "c-kd"] }),
       },
     });
@@ -954,7 +978,7 @@ describe("targeting", () => {
     const view = makeView({
       yourAbilities: [ability("cartographer", { kind: "objective", choices: ["objective:o3"] })],
       attempt: {
-        ...makeView().attempt!,
+        ...makeAttempt(),
         camp: makeCamp({
           objectives: [
             { id: "o3", kind: "no-tricks", ownerSeatId: null, status: "pending" },

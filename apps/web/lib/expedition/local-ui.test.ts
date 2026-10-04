@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ExpeditionAbilityView, ExpeditionView } from "@games/rules";
+import type { ExpeditionAbilityView, ExpeditionAttemptView, ExpeditionView } from "@games/rules";
 import {
   beginAbilityTargeting,
   beginWhisper,
@@ -47,19 +47,24 @@ const PARROT: ExpeditionAbilityView = {
 function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
   const base: ExpeditionView = {
     yourSeatId: "p0",
-    runPhase: "camp",
     runStatus: "in_progress",
-    campNumber: 1,
-    supplies: 3,
+    length: "standard",
+    campCount: 6,
+    purse: 0,
+    supplies: { count: 3, max: 5 },
+    plan: [],
     seats: [
-      { seatId: "p0", characterId: "scout", kit: ["trained-monkey", "bait"], ready: true, draftPending: false, pool: null, usage: [] },
-      { seatId: "p1", characterId: "guide", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
-      { seatId: "p2", characterId: "medic", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
+      { seatId: "p0", characterId: "scout", kit: ["trained-monkey", "bait"], pool: null, usage: [] },
+      { seatId: "p1", characterId: "guide", kit: [], pool: null, usage: [] },
+      { seatId: "p2", characterId: "medic", kit: [], pool: null, usage: [] },
     ],
-    yourDraftOffer: null,
     yourAbilities: [SCOUT, MONKEY, BAIT, PARROT],
     history: [],
-    attempt: {
+    lastVote: null,
+    stage: {
+      tag: "camp",
+      camp: { index: 1, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null },
+      attempt: {
       attemptNumber: 1,
       window: "between-tricks",
       pendingSeatIds: [],
@@ -95,15 +100,26 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
         campPhase: "playing",
         currentActorSeatId: "p0",
       },
+      },
     },
   };
   return deepFreeze({ ...base, ...overrides });
 }
 
-const handWithoutC1 = (view: ExpeditionView) => ({
-  ...view.attempt!,
-  camp: { ...view.attempt!.camp!, yourHand: [{ id: "c2", identity: { kind: "standard" as const, suit: "spades" as const, rank: 10 as const }, effectiveRank: null, countsAs: null }] },
-});
+function attemptOf(view: ExpeditionView): ExpeditionAttemptView {
+  if (view.stage.tag !== "camp") throw new Error("fixture is not in a camp");
+  return view.stage.attempt;
+}
+
+function withAttempt(view: ExpeditionView, patch: Partial<ExpeditionAttemptView>): ExpeditionView {
+  if (view.stage.tag !== "camp") throw new Error("fixture is not in a camp");
+  return deepFreeze({ ...view, stage: { ...view.stage, attempt: { ...view.stage.attempt, ...patch } } });
+}
+
+const handWithoutC1 = (view: ExpeditionView): ExpeditionView =>
+  withAttempt(view, {
+    camp: { ...attemptOf(view).camp, yourHand: [{ id: "c2", identity: { kind: "standard" as const, suit: "spades" as const, rank: 10 as const }, effectiveRank: null, countsAs: null }] },
+  });
 
 function deepFreeze<T>(value: T): T {
   if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
@@ -320,7 +336,7 @@ describe("beginWhisper", () => {
   });
 
   it("is a no-op outside the between-tricks window", () => {
-    const view = makeView({ attempt: { ...makeView().attempt!, window: "objective-pick" } });
+    const view = withAttempt(makeView(), { window: "objective-pick" });
     const ui = freeze(initialLocalUi());
     expect(beginWhisper(ui, view)).toBe(ui);
   });
@@ -357,7 +373,7 @@ describe("reconcileLocalUi", () => {
   it("clears a whisper targeting when the window is no longer between-tricks", () => {
     const view1 = makeView();
     let ui = freeze(beginWhisper(freeze(initialLocalUi()), view1));
-    const view2 = makeView({ attempt: { ...view1.attempt!, window: "objective-pick" } });
+    const view2 = withAttempt(view1, { window: "objective-pick" });
     ui = reconcileLocalUi(ui, view2);
     expect(ui.targeting).toBeNull();
   });
@@ -394,21 +410,21 @@ describe("reconcileLocalUi", () => {
     const view1 = makeView();
     let ui = freeze(beginWhisper(freeze(initialLocalUi()), view1));
     ui = freeze(selectTarget(ui, view1, "card:c1"));
-    const next = reconcileLocalUi(ui, makeView({ attempt: handWithoutC1(view1) }));
+    const next = reconcileLocalUi(ui, handWithoutC1(view1));
     expect(next.targeting).toEqual({ mode: "whisper", selected: [] });
   });
 
   it("clears hoveredCardId if that card left the hand", () => {
     const view1 = makeView();
     let ui = freeze(setHoveredCard(freeze(initialLocalUi()), "c1"));
-    ui = reconcileLocalUi(ui, makeView({ attempt: handWithoutC1(view1) }));
+    ui = reconcileLocalUi(ui, handWithoutC1(view1));
     expect(ui.hoveredCardId).toBeNull();
   });
 
   it("cancels a drag whose card left the hand", () => {
     const view1 = makeView();
     const ui = freeze({ ...initialLocalUi(), drag: { phase: "dragging" as const, cardId: "c1", legal: true, reason: null } });
-    const view2 = makeView({ attempt: handWithoutC1(view1) });
+    const view2 = handWithoutC1(view1);
     expect(reconcileLocalUi(ui, view2).drag).toEqual({ phase: "idle" });
     expect(reconcileLocalUi(ui, view1).drag).toEqual(ui.drag);
   });

@@ -11,7 +11,8 @@
 
 import { trickContaining } from "../objectives";
 import type { CampState, CompletedTrick, Objective, ObjectiveStatus, StandardRank } from "../state";
-import { STARTING_SUPPLIES } from "./balance";
+import { SUPPLIES_MAX } from "./balance";
+import { attemptOf } from "./attempt";
 import type { RunRules } from "./run-rules";
 import type { RunState } from "./types";
 
@@ -87,7 +88,7 @@ function objectivesWithStatus(scope: SeatScope, status: ObjectiveStatus): readon
 /** Whisper reveals in log order; the ordinal counts whispers only, matching
  * the public log, never another source's reveal. */
 function whispers(run: RunState): readonly { ordinal: number; fromSeatId: string; toSeatIds: readonly string[] }[] {
-  const reveals = run.attempt?.reveals ?? [];
+  const reveals = attemptOf(run)?.reveals ?? [];
   return reveals
     .filter((reveal) => reveal.source === "whisper")
     .map((reveal, ordinal) => ({ ordinal, fromSeatId: reveal.fromSeatId, toSeatIds: reveal.audience }));
@@ -210,7 +211,7 @@ export const TARGET_KINDS: { readonly [K in TargetKind]: TargetKindDef<K> } = {
   supplies: {
     kind: "supplies",
     describe: () => "Pick the crew's supplies",
-    choices: ({ run }) => [{ id: "supplies", target: { kind: "supplies", current: run.supplies, max: STARTING_SUPPLIES } }],
+    choices: ({ run }) => [{ id: "supplies", target: { kind: "supplies", current: run.supplies, max: SUPPLIES_MAX } }],
   },
 };
 

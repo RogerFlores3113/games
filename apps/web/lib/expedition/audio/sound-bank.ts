@@ -61,13 +61,13 @@ export const SOUND_BANK: Record<SoundId, SoundSpec> = {
 
 export const SOUND_IDS = Object.keys(SOUND_BANK) as SoundId[];
 
-/** The loops that should be sounding in a scene. Camp and fireside get the
+/** The loops that should be sounding in a scene. Camp and trail get the
  * full bed. A finished run keeps the ambience and drops the music. */
-export function loopsForScene(sceneKey: "camp" | "fireside" | "run-end" | null): LoopId[] {
+export function loopsForScene(sceneKey: "camp" | "trail" | "run-end" | null): LoopId[] {
   switch (sceneKey) {
     case "camp":
       return ["music-camp", "amb-jungle"];
-    case "fireside":
+    case "trail":
       return ["music-camp", "amb-fire"];
     case "run-end":
       return ["amb-fire"];

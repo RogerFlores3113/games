@@ -3,11 +3,14 @@
 // When RunState is redesigned, this file and check.ts are what change.
 
 import { cardLabel } from "../deck";
-import { FINAL_CAMP } from "../run/balance";
-import { recordCampFailure, recordCampSuccess, runStatus, startAttempt } from "../run/lifecycle";
+import { RUN_LENGTHS, SUPPLIES_MAX } from "../run/balance";
+import { attemptOf, withAttempt } from "../run/attempt";
+import { dealCamp, openLoadout, runStatus, settleCamp } from "../run/lifecycle";
 import { rulesFor } from "../run/compose";
+import { campIndex, drawPlan } from "../run/plan";
+import { campSpecAt } from "../run/route";
 import { applyToolkitOps } from "../run/toolkit";
-import type { CampNumber, Catalog, RunState } from "../run/types";
+import type { Catalog, RunAt, RunLength, RunState } from "../run/types";
 import { describeObjective } from "../objectives";
 import type { DevField, DevOption, DevParams } from "../../adapter";
 
@@ -37,6 +40,9 @@ function readChoice(params: DevParams, name: string, options: readonly DevOption
 const opts = (values: readonly string[]): DevOption[] => values.map((value) => ({ value, label: value }));
 const seatOptions = (run: RunState): DevOption[] => opts(run.seatIds);
 const nonCharacterSourceIds = (catalog: Catalog): string[] => Object.keys(catalog.sources).filter((id) => !Object.hasOwn(catalog.characters, id));
+const LENGTHS = Object.keys(RUN_LENGTHS) as RunLength[];
+const MAX_CAMPS = Math.max(...LENGTHS.map((length) => RUN_LENGTHS[length].camps));
+const lengthOf = (run: RunState): RunLength => run.plan?.length ?? "standard";
 
 function requireInProgress(run: RunState): void {
   if (runStatus(run) !== "in_progress") throw new Error(`the run is already ${runStatus(run)}`);
@@ -55,50 +61,81 @@ function assignCharacters(run: RunState, catalog: Catalog): RunState {
     if (characterId === undefined) throw new Error("the catalogue has no unclaimed character left");
     return { ...s, characterId };
   });
-  return { ...run, seats };
+  return { ...run, seats: seats.map((s) => ({ ...s, draftOffer: null })) };
 }
 
-function toFireside(run: RunState, catalog: Catalog): RunState {
-  const crewed = assignCharacters(run, catalog);
-  return { ...crewed, seats: crewed.seats.map((s) => ({ ...s, draftOffer: null })), readySeatIds: [...crewed.seatIds] };
+/** The loadout of camp `k` in a run of `length`. */
+function loadoutAt(run: RunState, length: RunLength, k: number, catalog: Catalog): RunAt<"loadout"> {
+  if (k > RUN_LENGTHS[length].camps) throw new Error(`a ${length} run has ${RUN_LENGTHS[length].camps} camps, not ${k}`);
+  const crewed: RunState = { ...assignCharacters(run, catalog), plan: drawPlan(length), supplies: Math.max(run.supplies, 1) };
+  return openLoadout({ ...crewed, history: crewed.history.filter((h) => h.camp < k) }, campSpecAt(run.seed, length, campIndex(k)));
 }
 
-function jumpToCamp(run: RunState, camp: CampNumber, catalog: Catalog): RunState {
-  const fireside = toFireside(run, catalog);
-  return startAttempt(
-    { ...fireside, campNumber: camp, supplies: Math.max(fireside.supplies, 1), history: fireside.history.filter((h) => h.campNumber < camp), attempt: null },
-    catalog,
-  );
+function jumpToCamp(run: RunState, length: RunLength, k: number, stage: "loadout" | "camp", catalog: Catalog): RunState {
+  const loadout = loadoutAt(run, length, k, catalog);
+  return stage === "loadout" ? loadout : dealCamp(loadout, catalog);
 }
 
-function ensureAttempt(run: RunState, catalog: Catalog): RunState {
+/** The camp the run is in, or the one it is heading to, dealt. */
+function toCamp(run: RunState, catalog: Catalog): RunAt<"camp"> {
   requireInProgress(run);
-  return run.attempt !== null ? run : startAttempt(toFireside(run, catalog), catalog);
+  const stage = run.stage;
+  switch (stage.tag) {
+    case "camp":
+      return run as RunAt<"camp">;
+    case "loadout":
+      return dealCamp(run as RunAt<"loadout">, catalog);
+    case "event":
+      return dealCamp(openLoadout(run, stage.route.next), catalog);
+    case "muster":
+      return dealCamp(loadoutAt(run, lengthOf(run), 1, catalog), catalog);
+    case "draft":
+      return dealCamp(loadoutAt(run, lengthOf(run), stage.cleared + 1, catalog), catalog);
+    case "route":
+      return dealCamp(loadoutAt(run, lengthOf(run), stage.from + 1, catalog), catalog);
+    case "ended":
+      throw new Error("the run is over");
+  }
 }
 
 function allCardHolders(run: RunState): { readonly id: string; readonly label: string; readonly seatId: string }[] {
-  return (run.attempt?.camp.hands ?? []).flatMap((h) => h.cards.map((c) => ({ id: c.id, label: `${cardLabel(c.identity)} (in ${h.seatId})`, seatId: h.seatId })));
+  return (attemptOf(run)?.camp.hands ?? []).flatMap((h) => h.cards.map((c) => ({ id: c.id, label: `${cardLabel(c.identity)} (in ${h.seatId})`, seatId: h.seatId })));
 }
 
 function objectiveOptions(run: RunState): DevOption[] {
-  return (run.attempt?.camp.objectives ?? []).map((o) => ({ value: o.id, label: `${describeObjective(o)} (${o.id})` }));
+  return (attemptOf(run)?.camp.objectives ?? []).map((o) => ({ value: o.id, label: `${describeObjective(o)} (${o.id})` }));
 }
 
-const campField: DevField = { name: "camp", label: "Camp", kind: "number", min: 1, max: FINAL_CAMP, initial: FINAL_CAMP };
+/** The run's own length first, since the panel preselects the first option. */
+const lengthField = (run: RunState): DevField => ({
+  name: "length",
+  label: "Run length",
+  kind: "choice",
+  options: opts([lengthOf(run), ...LENGTHS.filter((length) => length !== lengthOf(run))]),
+});
 const seatField = (run: RunState): DevField => ({ name: "seat", label: "Seat", kind: "choice", options: seatOptions(run) });
+const STAGE_OPTIONS = opts(["camp", "loadout"]);
 
 export const DEV_SHORTCUTS = {
   "jump-to-camp": {
     label: "Jump to camp",
     group: "Run",
-    fields: () => [campField],
-    apply: (run, params, catalog) => jumpToCamp(run, readNumber(params, "camp", 1, FINAL_CAMP) as CampNumber, catalog),
+    fields: (run) => [
+      lengthField(run),
+      { name: "camp", label: "Camp", kind: "number", min: 1, max: MAX_CAMPS, initial: 1 },
+      { name: "stage", label: "Arrive at", kind: "choice", options: STAGE_OPTIONS },
+    ],
+    apply: (run, params, catalog) => {
+      const length = readChoice(params, "length", opts(LENGTHS)) as RunLength;
+      const stage = readChoice(params, "stage", STAGE_OPTIONS) as "loadout" | "camp";
+      return jumpToCamp(run, length, readNumber(params, "camp", 1, RUN_LENGTHS[length].camps), stage, catalog);
+    },
   },
   "jump-to-final-camp": {
     label: "Jump to the final camp",
     group: "Run",
     fields: () => [],
-    apply: (run, _params, catalog) => jumpToCamp(run, FINAL_CAMP, catalog),
+    apply: (run, _params, catalog) => jumpToCamp(run, lengthOf(run), RUN_LENGTHS[lengthOf(run)].camps, "camp", catalog),
   },
   "end-run": {
     label: "End the run",
@@ -107,25 +144,33 @@ export const DEV_SHORTCUTS = {
     apply: (run, params, catalog) => {
       const outcome = readChoice(params, "outcome", opts(["won", "lost"]));
       requireInProgress(run);
-      if (outcome === "won") return recordCampSuccess(jumpToCamp(run, FINAL_CAMP, catalog), catalog);
-      return recordCampFailure(ensureAttempt({ ...run, supplies: 1 }, catalog), catalog);
+      if (outcome === "won") {
+        const final = jumpToCamp(run, lengthOf(run), RUN_LENGTHS[lengthOf(run)].camps, "camp", catalog) as RunAt<"camp">;
+        return settleCamp(final, "cleared", catalog);
+      }
+      return settleCamp(toCamp({ ...run, supplies: 1 }, catalog), "failed", catalog);
     },
   },
   "force-camp": {
     label: "Force the camp's outcome",
     group: "Camp",
-    fields: () => [{ name: "outcome", label: "Outcome", kind: "choice", options: opts(["succeeded", "failed"]) }],
+    fields: () => [{ name: "outcome", label: "Outcome", kind: "choice", options: opts(["cleared", "failed"]) }],
     apply: (run, params, catalog) => {
-      const outcome = readChoice(params, "outcome", opts(["succeeded", "failed"]));
-      const attempting = ensureAttempt(run, catalog);
-      return outcome === "succeeded" ? recordCampSuccess(attempting, catalog) : recordCampFailure(attempting, catalog);
+      const outcome = readChoice(params, "outcome", opts(["cleared", "failed"])) as "cleared" | "failed";
+      return settleCamp(toCamp(run, catalog), outcome, catalog);
     },
   },
   "set-supplies": {
     label: "Set supplies",
     group: "Run",
-    fields: (run) => [{ name: "supplies", label: "Supplies", kind: "number", min: 0, max: 99, initial: run.supplies }],
-    apply: (run, params) => ({ ...run, supplies: readNumber(params, "supplies", 0, 99) }),
+    fields: (run) => [{ name: "supplies", label: "Supplies", kind: "number", min: 0, max: SUPPLIES_MAX, initial: run.supplies }],
+    apply: (run, params) => ({ ...run, supplies: readNumber(params, "supplies", 0, SUPPLIES_MAX) }),
+  },
+  "set-purse": {
+    label: "Set the purse",
+    group: "Run",
+    fields: (run) => [{ name: "purse", label: "Coins", kind: "number", min: 0, max: 999, initial: run.purse }],
+    apply: (run, params) => ({ ...run, purse: readNumber(params, "purse", 0, 999) }),
   },
   "set-character": {
     label: "Set a seat's character",
@@ -173,7 +218,7 @@ export const DEV_SHORTCUTS = {
       { name: "to", label: "To", kind: "choice", options: seatOptions(run) },
     ],
     apply: (run, params, catalog) => {
-      if (run.attempt === null) throw new Error("there is no dealt camp to move cards in");
+      if (attemptOf(run) === null) throw new Error("there is no dealt camp to move cards in");
       const holders = allCardHolders(run);
       const cardId = readChoice(params, "card", holders.map((c) => ({ value: c.id, label: c.label })));
       const to = readChoice(params, "to", seatOptions(run));
@@ -190,13 +235,13 @@ export const DEV_SHORTCUTS = {
       { name: "seat", label: "Owner", kind: "choice", options: [...seatOptions(run), { value: "none", label: "none" }] },
     ],
     apply: (run, params) => {
-      const attempt = run.attempt;
+      const attempt = attemptOf(run);
       if (attempt === null) throw new Error("there is no dealt camp with objectives");
       const camp = attempt.camp;
       const objectiveId = readChoice(params, "objective", objectiveOptions(run));
       const seat = readChoice(params, "seat", [...seatOptions(run), { value: "none", label: "none" }]);
       const objectives = camp.objectives.map((o) => (o.id === objectiveId ? { ...o, ownerSeatId: seat === "none" ? null : seat } : o));
-      return { ...run, attempt: { ...attempt, camp: { ...camp, objectives } } };
+      return withAttempt(run, { ...attempt, camp: { ...camp, objectives } });
     },
   },
 } satisfies Readonly<Record<string, ShortcutDef>>;

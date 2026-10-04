@@ -9,25 +9,27 @@ import { expeditionGame } from "./adapter";
 import { toExpeditionPlayerView } from "./view";
 import { currentActorSeatId } from "../camp";
 import { rulesFor } from "../run/compose";
+import { attemptOf, withAttempt } from "../run/attempt";
 import { createRun } from "../run/lifecycle";
+import { campIndex } from "../run/plan";
 import { CATALOG } from "../run/catalog";
 import { advanceTo, driveRun, setupRun } from "../run/run-test-support";
 import type { RunAction, RunState } from "../run/types";
 
 const SEED = "cccccccccccccccccccccccccccccccc";
 
-function fixtures(): Record<string, RunState> {
+function fixtures(supplies?: number): Record<string, RunState> {
   const fresh = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
   const rescue = failedFirstTrick(
-    advanceTo(setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, campNumber: 3, kits: { p0: ["rope-ladder"] } }), "between-tricks", CATALOG),
+    advanceTo(setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, camp: 3, supplies, kits: { p0: ["rope-ladder"] } }), "between-tricks", CATALOG),
   );
   const objectivePick = advanceTo(
-    setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, campNumber: 2 }),
+    setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, camp: 2 }),
     "objective-pick",
     CATALOG,
   );
   const betweenTricks = advanceTo(
-    setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, campNumber: 2 }),
+    setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, camp: 2 }),
     "between-tricks",
     CATALOG,
   );
@@ -37,13 +39,13 @@ function fixtures(): Record<string, RunState> {
 /** Gives every seat a no-tricks objective and plays one trick, so its winner's
  * objective fails and the rescue window opens. */
 function failedFirstTrick(run: RunState): RunState {
-  const camp = run.attempt!.camp;
+  const camp = attemptOf(run)!.camp;
   const objectives = camp.seatIds.map((seatId) => ({ id: `duck-${seatId}`, kind: "no-tricks" as const, ownerSeatId: seatId }));
-  let next: RunState = { ...run, attempt: { ...run.attempt!, camp: { ...camp, objectives } } };
+  let next = withAttempt(run, { ...attemptOf(run)!, camp: { ...camp, objectives } });
   for (let i = 0; i < run.seatIds.length; i++) {
     const rules = rulesFor(next, CATALOG);
-    const actor = currentActorSeatId(next.attempt!.camp, rules)!;
-    const played = expeditionGame.applyAction(next, actor, { type: "play-card", cardId: rules.legalPlays(next.attempt!.camp, actor)[0]!.id });
+    const actor = currentActorSeatId(attemptOf(next)!.camp, rules)!;
+    const played = expeditionGame.applyAction(next, actor, { type: "play-card", cardId: rules.legalPlays(attemptOf(next)!.camp, actor)[0]!.id });
     if (!played.ok) throw new Error(played.error);
     next = played.state;
   }
@@ -52,6 +54,7 @@ function failedFirstTrick(run: RunState): RunState {
 
 const WELL_SHAPED_NONSENSE_ARB = fc.oneof(
   fc.record({ type: fc.constant("pick-character" as const), characterId: fc.string() }),
+  fc.record({ type: fc.constant("vote" as const), choice: fc.option(fc.string(), { nil: null }) }),
   fc.record({ type: fc.constant("pick-draft" as const), sourceId: fc.string() }),
   fc.record({ type: fc.constant("ready" as const) }),
   fc.record({
@@ -100,9 +103,9 @@ describe("expeditionGame: identity and createInitialState", () => {
 });
 
 describe("expeditionGame: applyAction accepts valid actions and never mutates state", () => {
-  it("picking a character then readying from every seat is accepted and starts an attempt", () => {
+  it("picking characters and voting a length from every seat is accepted and opens the first camp's loadout", () => {
     let state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
-    expect(state.attempt).toBeNull();
+    expect(state.stage).toEqual({ tag: "muster", ballots: {} });
     const characterIds = Object.keys(CATALOG.characters);
     state.seatIds.forEach((seatId, i) => {
       const result = expeditionGame.applyAction(state, seatId, { type: "pick-character", characterId: characterIds[i] });
@@ -112,17 +115,23 @@ describe("expeditionGame: applyAction accepts valid actions and never mutates st
     expect(state.seats.map((s) => s.characterId)).toEqual(characterIds.slice(0, 3));
     for (const seatId of state.seatIds) {
       const snapshotBefore = structuredClone(state);
-      const result = expeditionGame.applyAction(state, seatId, { type: "ready" });
+      const result = expeditionGame.applyAction(state, seatId, { type: "vote", choice: "short" });
       expect(result.ok).toBe(true);
       expect(state).toEqual(snapshotBefore);
       if (result.ok) state = result.state;
     }
-    expect(state.attempt).not.toBeNull();
+    expect(state.stage.tag).toBe("loadout");
+    expect(state.plan?.length).toBe("short");
   });
 
-  it("readying before a character is picked is rejected with character_pending", () => {
+  it("readying at muster is rejected with wrong_stage", () => {
     const state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
-    expect(expeditionGame.applyAction(state, "p0", { type: "ready" })).toEqual({ ok: false, error: "character_pending" });
+    expect(expeditionGame.applyAction(state, "p0", { type: "ready" })).toEqual({ ok: false, error: "wrong_stage" });
+  });
+
+  it("a vote for a length that does not exist is rejected with not_a_choice", () => {
+    const state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
+    expect(expeditionGame.applyAction(state, "p0", { type: "vote", choice: "epic" })).toEqual({ ok: false, error: "not_a_choice" });
   });
 
   it("a removed action shape is rejected as invalid_action", () => {
@@ -169,12 +178,28 @@ describe("expeditionGame: autoPassRequest", () => {
     expect(expeditionGame.autoPassRequest!(betweenTricks!, "p0")).toBeNull();
   });
 
+  it("names an abstention for a seat that has not voted at muster, and null once it has", () => {
+    const fresh = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
+    const voted = expeditionGame.applyAction(fresh, "p1", { type: "vote", choice: "long" });
+    if (!voted.ok) throw new Error(voted.error);
+    expect(expeditionGame.autoPassRequest!(voted.state, "p0")).toEqual({ type: "vote", choice: null });
+    expect(expeditionGame.autoPassRequest!(voted.state, "p1")).toBeNull();
+  });
+
+  it("names an abstention for a seat that has not voted on a route", () => {
+    const base = setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, camp: 2 });
+    const spec = base.stage.tag === "loadout" ? base.stage.camp : null;
+    const route: RunState = { ...base, stage: { tag: "route", from: campIndex(1), options: [{ id: "a", next: spec! }, { id: "b", next: spec! }], ballots: { p2: "b" } } };
+    expect(expeditionGame.autoPassRequest!(route, "p0")).toEqual({ type: "vote", choice: null });
+    expect(expeditionGame.autoPassRequest!(route, "p2")).toBeNull();
+  });
+
   it("is a request the game accepts, which moves the window on", () => {
     const { rescue } = fixtures();
     const passed = expeditionGame.applyAction(rescue!, "p0", expeditionGame.autoPassRequest!(rescue!, "p0"));
     if (!passed.ok) throw new Error(passed.error);
-    expect(passed.state.attempt).toBeNull();
-    expect(passed.state.history).toEqual([{ campNumber: 3, attemptNumber: 1, status: "failed", suppliesSpent: 1 }]);
+    expect(passed.state.stage.tag).toBe("loadout");
+    expect(passed.state.history).toEqual([{ camp: 3, attempt: 1, status: "failed", suppliesSpent: 1, coins: 0 }]);
     expect(expeditionGame.autoPassRequest!(passed.state, "p0")).toBeNull();
   });
 });
@@ -185,26 +210,21 @@ describe("expeditionGame: checkGameEnd", () => {
     expect(expeditionGame.checkGameEnd(state)).toBeNull();
   });
 
-  it("returns a lost result once supplies reach 0", () => {
-    const state = setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, supplies: 0 });
-    expect(expeditionGame.checkGameEnd(state)).toEqual({
-      outcome: "lost",
-      campReached: state.campNumber,
-      suppliesLeft: 0,
-    });
+  it("returns a lost result once a failure spends the last supply", () => {
+    const { rescue } = fixtures(1);
+    const passed = expeditionGame.applyAction(rescue!, "p0", { type: "skip-window" });
+    if (!passed.ok) throw new Error(passed.error);
+    expect(expeditionGame.checkGameEnd(passed.state)).toEqual({ outcome: "lost", campReached: 3, suppliesLeft: 0 });
   });
 
-  it("returns a won result once history ends with camp 6 succeeded", () => {
-    const base = setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, campNumber: 6 });
+  it("returns a won result once the final camp is cleared", () => {
+    const base = setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, camp: 6 });
     const state: RunState = {
       ...base,
-      history: [...base.history, { campNumber: 6, attemptNumber: 1, status: "succeeded", suppliesSpent: 0 }],
+      history: [{ camp: campIndex(6), attempt: 1, status: "cleared", suppliesSpent: 0, coins: 5 }],
+      stage: { tag: "ended", result: "won" },
     };
-    expect(expeditionGame.checkGameEnd(state)).toEqual({
-      outcome: "won",
-      campReached: 6,
-      suppliesLeft: state.supplies,
-    });
+    expect(expeditionGame.checkGameEnd(state)).toEqual({ outcome: "won", campReached: 6, suppliesLeft: 3 });
   });
 });
 
@@ -217,7 +237,7 @@ describe("expeditionGame: whole-run replay through applyAction", () => {
 
   for (const { seatIds, seed } of cases) {
     it(`drives a whole ${seatIds.length}-seat run to a non-null end result`, () => {
-      const initial = setupRun({ seatIds, seed, catalog: CATALOG });
+      const initial = createRun({ seatIds, seed });
       const choices = Array.from({ length: 500 }, (_, i) => i);
       const { log } = driveRun(initial, choices, CATALOG);
 

@@ -1,76 +1,39 @@
-// Phase 10 run-layer type contract (Plan 02). This is the single type
-// contract every later Phase 10 plan compiles against — do not rename a
-// field without updating those plans.
+// The run layer's type contract.
 //
-// DERIVE, DON'T CACHE: run phase, run status, a source's remaining uses, a
-// pool's balance, the next attempt number and a seat's remaining whisper
-// count are all computable
-// from RunState and are deliberately NOT stored fields here. This mirrors
-// Phase 9's CampState discipline (no stored phase/outcome/tricks-won).
+// DERIVE, DON'T CACHE: run status, a source's remaining uses, a pool's
+// balance, the next attempt number and a seat's remaining whisper count are
+// computed from RunState, never stored. Purse, supplies and history are
+// stored plainly: every reader wants the number, and four writers is few.
 //
-// RESET-ON-REPLAY CONTRACT (research A4): everything inside AttemptState
-// (effects, reveals, log, camp) is reset to a fresh attempt on every
-// replay (RUN-06). RunState's top-level fields — seatIds, campNumber,
-// supplies, seats (character, kit, draft offers, ledgers), readySeatIds,
-// history — persist across a replay and across
-// camps; only `attempt` is torn down and rebuilt. Per-camp limits need no
-// reset: they count ledger entries stamped with the current (camp, attempt).
+// THE STAGE IS THE PHASE: each stage carries the data that exists only
+// there (ballots, route options, the dealt attempt), so stale data from an
+// earlier stage is unrepresentable. A replay builds a fresh AttemptState;
+// ledgers live on the seats and need no reset, since per-camp limits count
+// by (camp, attempt) stamp.
 //
-// A1 (labeled deviation from spec §6.5's "carried generator"): RunState
-// carries only the run's `seed` string, never a shuffle.ts-style generator
-// state tuple. Every draw derives a FRESH stream by a unique name via
-// run/rng.ts's STREAMS builder. This removes the "forgot to persist the
-// advanced generator state" bug class entirely — there is no mutable
-// generator state to forget to save.
+// A1: RunState carries only the run's `seed` string, never generator state.
+// Every draw derives a fresh stream by a unique name (run/rng.ts's STREAMS).
 //
-// A1 STREAM-NAME TABLE (reproduced here so every later plan draws from the
-// same names; run/rng.ts's STREAMS is the single builder that realizes it):
-//   - draft upgrade slot: "expedition-draft:camp{N}:seat{seatId}:upgrade"
-//   - draft item slots:   "expedition-draft:camp{N}:seat{seatId}:items"
-//   - attempt deal seed:   "{seed}:camp{N}:attempt{A}"
-//   - trick-count kind:    "expedition-trickcount-kind:camp{N}:attempt{A}"
-//   - trick-count N:       "expedition-trickcount-n:camp{N}:attempt{A}"
-//   - ability draws:       "expedition-ability:camp{N}:attempt{A}:seat{id}:use{k}:draw{j}"
-//     where k = the seat's ledger length before the use and j counts draws
-//     inside one `apply`.
-// The rule: two draws never share a stream name. A draft happens AT MOST
-// ONCE per camp number per run (it only follows a CLEAR, D-01), so its
-// names deliberately omit the attempt number. Every ability draw
-// carries camp, attempt, seat, the seat's use index k and a draw counter j,
-// so repeated uses never collide.
-//
-// PRIVACY NOTES (for Phase 11's toPlayerView, not implemented here):
-//   - `seed` must NEVER be projected to any client; it is the root of every
-//     RNG stream and its exposure would let a client predict future draws.
-//   - `SeatRun.draftOffer` is OWNER-ONLY (RUN-04); Phase 11 redaction is a
-//     per-seat field lookup, not a filter over a shared list.
-//   - `SeatRun.ledger` is never projected raw; views show only what usage.ts
-//     folds from it.
-//   - `Reveal.audience` is the ONLY list of seats allowed to see a reveal's
-//     card identity (COMM-02); a reveal not addressed to a seat must never
-//     appear in that seat's view.
-//   - WR-03 RULING (Phase 11, Plan 01): a reveal pins a card's IDENTITY plus
-//     the seat that held it AT REVEAL TIME; it never follows the card. If
-//     Trained Monkey (or any toolkit move/swap op) later relocates the
-//     card, `fromSeatId` stays exactly as recorded and the per-seat view
-//     never re-derives the card's current holder — telling the audience
-//     where the card went would disclose another seat's hand contents that
-//     no reveal addressed to them (COMM-03). Reveals are not invalidated
-//     when their card moves; the audience cannot un-learn an identity it
-//     was already shown.
-//
-// ABILITY TARGETS: `use-ability` targets are a flat `readonly string[]` of
-// choice ids, order-matched positionally to the ability's target specs
-// (run/targets.ts resolves them).
+// PRIVACY: `seed` is never projected. `SeatRun.draftOffer` is owner-only.
+// `SeatRun.ledger` is never projected raw. `Reveal.audience` is the only list
+// of seats that may see a reveal's card; a reveal pins the identity and the
+// holder at reveal time and never follows the card (WR-03).
 
 import type { CampError, CampState } from "../state";
 import type { CharacterDef, EffectParams, ItemDef, SourceDef, SourceId } from "../content/source-def";
+import type { RunPlan } from "./plan";
+import type { CampSpec, RouteChoice, RouteOption } from "./route";
+import type { VoteRecord } from "./vote";
 
-export type CampNumber = 1 | 2 | 3 | 4 | 5 | 6;
-export type BossCampNumber = 3 | 6;
+export type RunLength = "short" | "standard" | "long";
+/** 1-based camp position in a run. Minted only by plan.ts's `campIndex`. */
+export type CampIndex = number & { readonly __brand: "CampIndex" };
+export type SeatId = string;
+/** Each seat writes only its own key. */
+export type PerSeat<T> = Readonly<Partial<Record<SeatId, T>>>;
 
 /** When a ledger entry happened. `trick` is completedTricks.length. */
-export type Stamp = { readonly camp: CampNumber; readonly attempt: number; readonly trick: number };
+export type Stamp = { readonly camp: CampIndex; readonly attempt: number; readonly trick: number };
 
 export type LedgerEntry =
   | { readonly kind: "used"; readonly sourceId: SourceId; readonly at: Stamp; readonly poolCost: number } // 0 unless a pool limit
@@ -78,16 +41,16 @@ export type LedgerEntry =
   | { readonly kind: "regained"; readonly amount: number; readonly at: Stamp }; // pool regain on a clear
 
 export type SeatRun = {
-  readonly seatId: string;
-  readonly characterId: string | null; // PUBLIC; null only during muster; unique in the crew
+  readonly seatId: SeatId;
+  readonly characterId: string | null; // PUBLIC; null only in muster; unique in the crew
   readonly kit: readonly SourceId[]; // PUBLIC; upgrades and items in draft order; single-use items leave on use
-  readonly draftOffer: readonly SourceId[] | null; // PRIVATE to seatId (RUN-04); null = no draft due
+  readonly draftOffer: readonly SourceId[] | null; // PRIVATE to seatId; null = no pick due
   readonly ledger: readonly LedgerEntry[]; // never projected raw; append-only; survives replays
 };
 
 export type Reveal = {
   readonly cardId: string;
-  readonly fromSeatId: string; // hand holding the card when revealed; pinned forever (WR-03 ruling above — never re-derived after the card moves)
+  readonly fromSeatId: string; // the hand holding the card when revealed; pinned forever (WR-03)
   readonly audience: readonly string[]; // the ONLY seats a view may show this card to
   readonly source: string; // "whisper" or the source id (e.g. "scout")
   readonly targetSeatId?: string; // whispers only: the seat the whisperer named, public in the log anyway
@@ -112,38 +75,54 @@ export type ActiveEffect<P extends EffectParams = EffectParams> = {
 };
 
 export type AttemptState = {
-  readonly attemptNumber: number; // 1-based per campNumber
+  readonly attemptNumber: number; // 1-based per camp index
   readonly effects: readonly ActiveEffect[]; // mid-camp modifiers (add-modifier), this attempt only
   readonly reveals: readonly Reveal[]; // COMM-02: cleared with the attempt
   readonly log: readonly LogEntry[];
   readonly camp: CampState;
 };
 
+/** One per decided attempt. `coins` is the payout of a clear, 0 on a failure. */
 export type CampResult = {
-  readonly campNumber: CampNumber;
-  readonly attemptNumber: number;
-  readonly status: "succeeded" | "failed";
+  readonly camp: CampIndex;
+  readonly attempt: number;
+  readonly status: "cleared" | "failed";
   readonly suppliesSpent: number;
+  readonly coins: number;
 };
+
+export type Stage =
+  | { readonly tag: "muster"; readonly ballots: PerSeat<RunLength | null> } // null abstains
+  | { readonly tag: "loadout"; readonly camp: CampSpec; readonly ready: PerSeat<true> }
+  | { readonly tag: "camp"; readonly camp: CampSpec; readonly attempt: AttemptState }
+  | { readonly tag: "draft"; readonly cleared: CampIndex; readonly payout: number }
+  | { readonly tag: "route"; readonly from: CampIndex; readonly options: readonly RouteOption[]; readonly ballots: PerSeat<RouteChoice | null> }
+  | { readonly tag: "event"; readonly route: RouteOption; readonly ready: PerSeat<true> }
+  | { readonly tag: "ended"; readonly result: "won" | "lost" };
+export type StageTag = Stage["tag"];
 
 export type RunState = {
-  readonly seed: string; // A1 root of every RNG stream; a view must NEVER project it
-  readonly seatIds: readonly string[];
-  readonly campNumber: CampNumber;
-  readonly supplies: number;
-  readonly seats: readonly SeatRun[]; // same order as seatIds
-  readonly readySeatIds: readonly string[]; // D-07 (pure data; disconnect handling is the room layer's)
-  readonly attempt: AttemptState | null; // null = muster, fireside (or run over)
+  readonly seed: string; // A1 root of every RNG stream; never projected
+  readonly seatIds: readonly SeatId[];
+  readonly seats: readonly SeatRun[]; // seatIds order
+  readonly purse: number; // shared coins, >= 0
+  readonly supplies: number; // 0..SUPPLIES_MAX
+  readonly plan: RunPlan | null; // null only in muster
   readonly history: readonly CampResult[];
+  readonly lastVote: VoteRecord | null; // the latest resolved vote, for the flip the table sees
+  readonly stage: Stage;
 };
 
+/** The run narrowed to one stage. Stage handlers take this and never re-check the tag. */
+export type RunAt<T extends StageTag> = RunState & { readonly stage: Extract<Stage, { tag: T }> };
+
 export type RunStatus = "in_progress" | "won" | "lost";
-export type RunPhase = "muster" | "fireside" | "camp" | "ended";
 
 export type RunAction =
-  | { readonly type: "pick-character"; readonly characterId: string }
-  | { readonly type: "pick-draft"; readonly sourceId: string }
-  | { readonly type: "ready" }
+  | { readonly type: "pick-character"; readonly characterId: string } // muster
+  | { readonly type: "vote"; readonly choice: string | null } // muster, route; null abstains
+  | { readonly type: "pick-draft"; readonly sourceId: string } // draft
+  | { readonly type: "ready" } // loadout, event
   | { readonly type: "use-ability"; readonly sourceId: string; readonly targets: readonly string[] }
   | { readonly type: "skip-window" }
   | { readonly type: "whisper"; readonly targetSeatId: string; readonly cardId: string }
@@ -154,10 +133,10 @@ export type RunError =
   | CampError
   | "not_a_seat"
   | "run_over"
+  | "wrong_stage"
+  | "not_a_choice"
   | "unknown_character"
   | "character_taken"
-  | "character_pending"
-  | "draft_pending"
   | "no_draft_pending"
   | "not_offered"
   | "already_ready"
@@ -177,3 +156,7 @@ export type Catalog = {
   /** Every character, every character's upgrades and every item, by id. */
   readonly sources: Readonly<Record<SourceId, SourceDef>>;
 };
+
+export type { CampSpec, RouteChoice, RouteOption } from "./route";
+export type { RunPlan } from "./plan";
+export type { VoteRecord } from "./vote";

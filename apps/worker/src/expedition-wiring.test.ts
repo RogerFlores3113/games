@@ -70,7 +70,8 @@ function targetCombos(steps: readonly { choices: readonly string[] }[]): string[
 
 /** Every candidate action for `seatId`, built ONLY from `view` (the seat's
  * own projected view — bots never read room.game to decide) and the public
- * character list. Priority order: pick-character, pick-draft, ready,
+ * character list. Priority order: pick-character, pick-draft, a vote
+ * (a short run at muster, route a between camps), ready,
  * use-ability (targets from the server's own step choices), whisper,
  * skip-window, pick-objective, play-card. `applyGameAction` (called by the
  * caller) is the sole arbiter of legality — a candidate here is a GUESS,
@@ -83,9 +84,12 @@ function buildCandidates(view: ExpeditionViewWire, seatId: string): RunAction[] 
     if (!taken.has(characterId)) candidates.push({ type: "pick-character", characterId });
   }
 
-  for (const sourceId of view.yourDraftOffer ?? []) {
-    candidates.push({ type: "pick-draft", sourceId });
+  const stage = view.stage;
+  if (stage.tag === "draft") {
+    for (const sourceId of stage.yourOffer ?? []) candidates.push({ type: "pick-draft", sourceId });
   }
+  if (stage.tag === "muster") candidates.push({ type: "vote", choice: "short" });
+  if (stage.tag === "route") candidates.push({ type: "vote", choice: stage.options[0]!.id });
 
   candidates.push({ type: "ready" });
 
@@ -97,7 +101,7 @@ function buildCandidates(view: ExpeditionViewWire, seatId: string): RunAction[] 
   }
 
   const teammateIds = view.seats.map((seat) => seat.seatId).filter((id) => id !== seatId);
-  const camp = view.attempt?.camp ?? null;
+  const camp = stage.tag === "camp" ? stage.attempt.camp : null;
   const ownCardIds = camp !== null ? camp.yourHand.map((card) => card.id) : [];
 
   for (const teammateId of teammateIds) {
@@ -160,9 +164,10 @@ function driveExpeditionRoomToEnd(seatCount: number, seed: string, counters: Run
       expect(reasons, `leak at step ${step} for viewer "${viewerId}": ${JSON.stringify(reasons)}`).toEqual([]);
 
       const gameView = projected.game as ExpeditionViewWire;
-      counters.phaseCounts[gameView.runPhase] = (counters.phaseCounts[gameView.runPhase] ?? 0) + 1;
-      if (gameView.attempt !== null && gameView.attempt.reveals.length > 0) counters.revealViews++;
-      if (gameView.attempt?.log.some((entry) => entry.event === "use-ability")) counters.abilityUseViews++;
+      const attempt = gameView.stage.tag === "camp" ? gameView.stage.attempt : null;
+      counters.phaseCounts[gameView.stage.tag] = (counters.phaseCounts[gameView.stage.tag] ?? 0) + 1;
+      if (attempt !== null && attempt.reveals.length > 0) counters.revealViews++;
+      if (attempt?.log.some((entry) => entry.event === "use-ability")) counters.abilityUseViews++;
     }
 
     let committed = false;
@@ -186,7 +191,7 @@ function driveExpeditionRoomToEnd(seatCount: number, seed: string, counters: Run
     if (!committed) {
       const anyView = projectSeatView(room, seatIds[0]!)?.game as ExpeditionViewWire | undefined;
       throw new Error(
-        `no seat had an accepted candidate at step ${step}, runPhase ${anyView?.runPhase ?? "unknown"} (${seatCount} seats, seed ${seed})`,
+        `no seat had an accepted candidate at step ${step}, stage ${anyView?.stage.tag ?? "unknown"} (${seatCount} seats, seed ${seed})`,
       );
     }
 
@@ -260,9 +265,9 @@ describe("Expedition full room-layer runs: lobby -> in_progress -> ended (COMM-0
     }
   }
 
-  it("non-vacuity: views were checked in muster, fireside and camp phases, with at least one reveal and one ability use reaching the wire across all six runs", () => {
+  it("non-vacuity: views were checked in muster, loadout and camp stages, with at least one reveal and one ability use reaching the wire across all six runs", () => {
     expect(counters.phaseCounts["muster"] ?? 0, "expected muster views to be checked").toBeGreaterThan(0);
-    expect(counters.phaseCounts["fireside"] ?? 0, "expected fireside views to be checked").toBeGreaterThan(0);
+    expect(counters.phaseCounts["loadout"] ?? 0, "expected loadout views to be checked").toBeGreaterThan(0);
     expect(counters.phaseCounts["camp"] ?? 0, "expected camp views to be checked").toBeGreaterThan(0);
     expect(counters.revealViews, "expected at least one checked view with a non-empty reveals list").toBeGreaterThan(0);
     expect(counters.abilityUseViews, "expected at least one checked view logging an ability use").toBeGreaterThan(0);

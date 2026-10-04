@@ -1,7 +1,7 @@
 // The real Expedition GameAdapter (Phase 11, Plan 03, COMM-03/ENG-03).
 // `expeditionGame` is a thin delegation layer over the Phase 10 run engine,
 // mirroring hanabi/adapter.ts's discipline exactly: every method is a
-// one-line call into an existing module (run/lifecycle.ts, run/run-actions.ts,
+// one-line call into an existing module (run/lifecycle.ts, run/stages/registry.ts,
 // ./view.ts) — no rule logic lives in this file. `toExpeditionPlayerView` is
 // the ONLY exit point from state, matching adapter.ts's file-level invariant
 // #3; this file adds no whole-state serializer. `applyAction` never wraps
@@ -12,7 +12,8 @@
 
 import type { AdapterResult, GameAdapter } from "../../adapter";
 import { createRun, runStatus } from "../run/lifecycle";
-import { applyRunAction } from "../run/run-actions";
+import { applyRunAction } from "../run/stages/registry";
+import { attemptOf } from "../run/attempt";
 import { CATALOG } from "../run/catalog";
 import { gatedPendingSeatIds } from "../run/windows";
 import { expeditionDevHooks } from "../dev/hooks";
@@ -28,6 +29,7 @@ export type ExpeditionConfig = null;
  * Hanabi's `{ score, reason, band? }`. */
 export type ExpeditionEndResult = {
   readonly outcome: "won" | "lost";
+  /** The index of the last camp the crew settled. */
   readonly campReached: number;
   readonly suppliesLeft: number;
 };
@@ -52,10 +54,14 @@ export const expeditionGame: GameAdapter<RunState, RunAction, ExpeditionConfig, 
   checkGameEnd(state): ExpeditionEndResult | null {
     const status = runStatus(state);
     if (status === "in_progress") return null;
-    return { outcome: status, campReached: state.campNumber, suppliesLeft: state.supplies };
+    return { outcome: status, campReached: state.history.at(-1)?.camp ?? 0, suppliesLeft: state.supplies };
   },
 
+  /** A seat with no ballot abstains; a seat a gated window waits on passes. */
   autoPassRequest(state, seatId) {
+    const stage = state.stage;
+    if ((stage.tag === "muster" || stage.tag === "route") && !Object.hasOwn(stage.ballots, seatId)) return { type: "vote", choice: null };
+    if (attemptOf(state) === null) return null;
     return gatedPendingSeatIds(state, CATALOG).includes(seatId) ? { type: "skip-window" } : null;
   },
 

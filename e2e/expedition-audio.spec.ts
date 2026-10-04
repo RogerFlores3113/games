@@ -1,15 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import {
-  clickHandCard,
-  clickUntilChanged,
-  draftOffer,
-  isReady,
-  pickDraftOffer,
-  waitForScene,
-  type FiresideView,
-} from "./expedition-driver";
-import { getModel, getScene, startExpeditionGame, waitForBridge } from "./expedition-helpers";
+import { clickHandCard, clickUntilChanged, trailToCamp, waitForScene } from "./expedition-driver";
+import { getModel, startExpeditionGame, waitForBridge } from "./expedition-helpers";
 
 interface CampView {
   sceneKey: string;
@@ -22,18 +14,6 @@ async function cues(page: Page): Promise<string[]> {
   return page.evaluate(() => (window.__expeditionTest as unknown as { cues(): string[] }).cues());
 }
 
-async function pickAndReady(page: Page): Promise<void> {
-  await waitForScene(page, "fireside");
-  const model = await getModel<FiresideView>(page);
-  const offer = draftOffer(model);
-  if (offer !== null) {
-    await clickUntilChanged<FiresideView>(page, pickDraftOffer(offer).objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
-  }
-  if ((await getScene(page)) === "fireside") {
-    await clickUntilChanged<FiresideView>(page, "ready", (m) => isReady(m) || m.sceneKey === "camp", { perAttemptTimeoutMs: 15_000 });
-  }
-}
-
 test("state changes ask for sounds, and a refresh mid-game asks for none", async ({ browser, page }) => {
   test.setTimeout(180_000);
   const { pages, contexts } = await startExpeditionGame(browser, page, ["Ada", "Bo", "Cy"]);
@@ -41,7 +21,7 @@ test("state changes ask for sounds, and a refresh mid-game asks for none", async
     const host = pages[0]!;
     expect(await cues(host)).toEqual([]);
 
-    for (const p of pages) await pickAndReady(p);
+    await trailToCamp(pages, { length: "short" });
     expect(await cues(host)).toContain("sfx-equip");
     for (const p of pages) await waitForScene(p, "camp");
     await expect.poll(() => cues(host)).toContain("sfx-card-deal");

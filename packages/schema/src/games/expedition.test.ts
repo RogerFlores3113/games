@@ -18,10 +18,10 @@ const EXPEDITION_ERROR_CODES = [
   "invalid_action",
   "not_a_seat",
   "run_over",
+  "wrong_stage",
+  "not_a_choice",
   "unknown_character",
   "character_taken",
-  "character_pending",
-  "draft_pending",
   "no_draft_pending",
   "not_offered",
   "already_ready",
@@ -36,19 +36,26 @@ const EXPEDITION_ERROR_CODES = [
   "nothing_to_skip",
 ] as const;
 
-const firesideView = {
+const preview = { index: 2, location: "jungle", weather: "fair", event: "event", slotKinds: ["win-card", "ordered", "ordered"], bossId: null };
+
+const header = {
   yourSeatId: "seat-1",
-  runPhase: "fireside",
   runStatus: "in_progress",
-  campNumber: 1,
-  supplies: 3,
+  length: "standard",
+  campCount: 6,
+  purse: 8,
+  supplies: { count: 3, max: 4 },
+  plan: [{ at: 3, tier: "animal", bossId: null }, { at: 6, tier: "temple", bossId: null }],
+  lastVote: { topic: "length", tally: [{ choice: "short", votes: 1 }, { choice: "standard", votes: 1 }, { choice: "long", votes: 0 }], tied: ["short", "standard"], winner: "standard" },
+};
+
+const draftView = {
+  ...header,
   seats: [
     {
       seatId: "seat-1",
       characterId: "botanist",
       kit: [],
-      ready: true,
-      draftPending: true,
       pool: { balance: 2, max: 3 },
       usage: [{ sourceId: "botanist", remaining: { kind: "pool", balance: 2, max: 3, cost: 1 } }],
     },
@@ -56,8 +63,6 @@ const firesideView = {
       seatId: "seat-2",
       characterId: "scout",
       kit: ["bait"],
-      ready: false,
-      draftPending: false,
       pool: null,
       usage: [
         { sourceId: "scout", remaining: { kind: "uses", left: 1, of: 1 } },
@@ -65,24 +70,18 @@ const firesideView = {
       ],
     },
   ],
-  yourDraftOffer: ["botanist.greenhouse", "bait", "parrot"],
   yourAbilities: [{ sourceId: "botanist", usableNow: false, reason: "Usable between tricks", steps: [] }],
-  history: [],
-  attempt: null,
+  history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }],
+  stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: ["botanist.greenhouse", "bait", "parrot"], pendingSeatIds: ["seat-1"] },
 };
 
-const midCampView = {
-  yourSeatId: "seat-1",
-  runPhase: "camp",
-  runStatus: "in_progress",
-  campNumber: 2,
-  supplies: 5,
-  seats: [
-    { seatId: "seat-1", characterId: "guide", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
-    { seatId: "seat-2", characterId: "medic", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
-    { seatId: "seat-3", characterId: "signaller", kit: [], ready: false, draftPending: true, pool: null, usage: [] },
-  ],
-  yourDraftOffer: null,
+const campSeats = [
+  { seatId: "seat-1", characterId: "guide", kit: [], pool: null, usage: [] },
+  { seatId: "seat-2", characterId: "medic", kit: [], pool: null, usage: [] },
+  { seatId: "seat-3", characterId: "signaller", kit: [], pool: null, usage: [] },
+];
+
+const midCampFields = {
   yourAbilities: [
     {
       sourceId: "guide",
@@ -91,8 +90,10 @@ const midCampView = {
       steps: [{ kind: "player", prompt: "Pick a player", choices: ["seat:seat-1", "seat:seat-2", "seat:seat-3"] }],
     },
   ],
-  history: [{ campNumber: 1, attemptNumber: 1, status: "succeeded", suppliesSpent: 2 }],
-  attempt: {
+  history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }],
+};
+
+const midAttempt = {
     attemptNumber: 1,
     window: "between-tricks",
     pendingSeatIds: [],
@@ -168,12 +169,17 @@ const midCampView = {
       campPhase: "playing",
       currentActorSeatId: "seat-2",
     },
-  },
 };
 
+function campWith(attempt: unknown) {
+  return { ...header, seats: campSeats, ...midCampFields, stage: { tag: "camp", camp: preview, attempt } };
+}
+
+const midCampView = campWith(midAttempt);
+
 describe("ExpeditionViewSchema", () => {
-  it("accepts a full fireside fixture", () => {
-    expect(ExpeditionViewSchema.safeParse(firesideView).success).toBe(true);
+  it("accepts a full draft fixture", () => {
+    expect(ExpeditionViewSchema.safeParse(draftView).success).toBe(true);
   });
 
   it("accepts a full mid-camp fixture", () => {
@@ -181,22 +187,39 @@ describe("ExpeditionViewSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it.each([
+    ["loadout", { tag: "loadout", camp: preview, readySeatIds: ["seat-2"] }],
+    ["route", { tag: "route", options: [{ id: "a", next: preview }, { id: "b", next: { ...preview, slotKinds: ["win-card", "trick-count"] } }], ballots: [{ seatId: "seat-1", choice: "b" }] }],
+    ["event", { tag: "event", event: "event", next: preview, readySeatIds: [] }],
+    ["ended", { tag: "ended", result: "won" }],
+  ])("accepts a %s stage", (_name, stage) => {
+    expect(ExpeditionViewSchema.safeParse({ ...draftView, stage }).success).toBe(true);
+  });
+
   it("accepts a muster view and a rescue pause", () => {
-    const muster = { ...firesideView, runPhase: "muster", seats: [{ ...firesideView.seats[0], characterId: null, pool: null, usage: [] }] };
+    const muster = {
+      ...draftView,
+      length: null,
+      campCount: null,
+      plan: [],
+      lastVote: null,
+      seats: [{ ...draftView.seats[0], characterId: null, pool: null, usage: [] }],
+      stage: { tag: "muster", ballots: [{ seatId: "seat-1", choice: "long" }, { seatId: "seat-2", choice: null }] },
+    };
     expect(ExpeditionViewSchema.safeParse(muster).success).toBe(true);
-    const rescue = { ...midCampView, attempt: { ...midCampView.attempt, window: "rescue", pendingSeatIds: ["seat-2"], rescue: { failedObjectiveIds: ["o4"] } } };
+    const rescue = campWith({ ...midAttempt, window: "rescue", pendingSeatIds: ["seat-2"], rescue: { failedObjectiveIds: ["o4"] } } );
     expect(ExpeditionViewSchema.safeParse(rescue).success).toBe(true);
   });
 
   it.each([
-    ["extra top-level key seed", { ...firesideView, seed: "abc123" }],
+    ["extra top-level key seed", { ...draftView, seed: "abc123" }],
     [
       "extra key objectiveDeck on camp",
       {
         ...midCampView,
         attempt: {
-          ...midCampView.attempt,
-          camp: { ...midCampView.attempt.camp, objectiveDeck: [] },
+          ...midAttempt,
+          camp: { ...midAttempt.camp, objectiveDeck: [] },
         },
       },
     ],
@@ -205,9 +228,9 @@ describe("ExpeditionViewSchema", () => {
       {
         ...midCampView,
         attempt: {
-          ...midCampView.attempt,
+          ...midAttempt,
           camp: {
-            ...midCampView.attempt.camp,
+            ...midAttempt.camp,
             handSizes: [{ seatId: "seat-1", size: 2, cards: [] }],
           },
         },
@@ -218,9 +241,9 @@ describe("ExpeditionViewSchema", () => {
       {
         ...midCampView,
         attempt: {
-          ...midCampView.attempt,
+          ...midAttempt,
           camp: {
-            ...midCampView.attempt.camp,
+            ...midAttempt.camp,
             yourHand: [{ id: "card-1", identity: { kind: "standard", suit: "spades", rank: 14 }, effectiveRank: null, faceUp: true }],
           },
         },
@@ -231,7 +254,7 @@ describe("ExpeditionViewSchema", () => {
       {
         ...midCampView,
         attempt: {
-          ...midCampView.attempt,
+          ...midAttempt,
           log: [{ event: "whisper", actorSeatId: "seat-1", subjectSeatIds: [], sourceId: null, private: false, audience: "public" }],
         },
       },
@@ -239,24 +262,24 @@ describe("ExpeditionViewSchema", () => {
     [
       "seats entry carrying draftOffer",
       {
-        ...firesideView,
-        seats: [{ ...firesideView.seats[0], draftOffer: ["bait"] }],
+        ...draftView,
+        seats: [{ ...draftView.seats[0], draftOffer: ["bait"] }],
       },
     ],
-    ["seats entry carrying ledger", { ...firesideView, seats: [{ ...firesideView.seats[0], ledger: [] }] }],
-    ["yourGear from the gear era", { ...firesideView, yourGear: [] }],
+    ["seats entry carrying ledger", { ...draftView, seats: [{ ...draftView.seats[0], ledger: [] }] }],
+    ["yourGear from the gear era", { ...draftView, yourGear: [] }],
     [
       "ability step of an unknown kind",
-      { ...firesideView, yourAbilities: [{ sourceId: "x", usableNow: true, reason: null, steps: [{ kind: "teammate", prompt: "p", choices: [] }] }] },
+      { ...draftView, yourAbilities: [{ sourceId: "x", usableNow: true, reason: null, steps: [{ kind: "teammate", prompt: "p", choices: [] }] }] },
     ],
     [
       "joker identity carrying suit",
       {
         ...midCampView,
         attempt: {
-          ...midCampView.attempt,
+          ...midAttempt,
           camp: {
-            ...midCampView.attempt.camp,
+            ...midAttempt.camp,
             yourHand: [{ id: "card-2", identity: { kind: "joker", joker: "sun", suit: "spades" }, effectiveRank: null }],
           },
         },
@@ -267,9 +290,9 @@ describe("ExpeditionViewSchema", () => {
       {
         ...midCampView,
         attempt: {
-          ...midCampView.attempt,
+          ...midAttempt,
           camp: {
-            ...midCampView.attempt.camp,
+            ...midAttempt.camp,
             yourHand: [{ id: "card-1", identity: { kind: "standard", suit: "spades", rank: 15 }, effectiveRank: null }],
           },
         },
@@ -280,9 +303,9 @@ describe("ExpeditionViewSchema", () => {
       {
         ...midCampView,
         attempt: {
-          ...midCampView.attempt,
+          ...midAttempt,
           camp: {
-            ...midCampView.attempt.camp,
+            ...midAttempt.camp,
             yourHand: [{ id: "card-1", identity: { kind: "standard", suit: "spades", rank: 1 }, effectiveRank: null }],
           },
         },
@@ -293,8 +316,8 @@ describe("ExpeditionViewSchema", () => {
       {
         ...midCampView,
         attempt: {
-          ...midCampView.attempt,
-          camp: { ...midCampView.attempt.camp, playerCount: 6 },
+          ...midAttempt,
+          camp: { ...midAttempt.camp, playerCount: 6 },
         },
       },
     ],
@@ -302,7 +325,7 @@ describe("ExpeditionViewSchema", () => {
       "window passive",
       {
         ...midCampView,
-        attempt: { ...midCampView.attempt, window: "passive" },
+        attempt: { ...midAttempt, window: "passive" },
       },
     ],
     [
@@ -310,9 +333,9 @@ describe("ExpeditionViewSchema", () => {
       {
         ...midCampView,
         attempt: {
-          ...midCampView.attempt,
+          ...midAttempt,
           camp: {
-            ...midCampView.attempt.camp,
+            ...midAttempt.camp,
             objectives: [{ id: "o1", kind: "win-card", ownerSeatId: "seat-1", status: "pending" }],
           },
         },
@@ -323,9 +346,9 @@ describe("ExpeditionViewSchema", () => {
       {
         ...midCampView,
         attempt: {
-          ...midCampView.attempt,
+          ...midAttempt,
           camp: {
-            ...midCampView.attempt.camp,
+            ...midAttempt.camp,
             objectives: [
               {
                 id: "o3",
@@ -339,8 +362,10 @@ describe("ExpeditionViewSchema", () => {
         },
       },
     ],
-    ["campNumber 7", { ...midCampView, campNumber: 7 }],
-    ["supplies -1", { ...midCampView, supplies: -1 }],
+    ["camp index 0", { ...midCampView, stage: { ...midCampView.stage, camp: { ...preview, index: 0 } } }],
+    ["supplies -1", { ...midCampView, supplies: { count: -1, max: 4 } }],
+    ["a stage tag that does not exist", { ...midCampView, stage: { tag: "fireside" } }],
+    ["a route option with a bad slot kind", { ...draftView, stage: { tag: "route", options: [{ id: "a", next: { ...preview, slotKinds: ["boss"] } }], ballots: [] } }],
   ])("rejects: %s", (_name, input) => {
     expect(ExpeditionViewSchema.safeParse(input).success).toBe(false);
   });

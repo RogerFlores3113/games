@@ -61,6 +61,9 @@ export const PALETTE = {
   moon: "#C9CDD6", // pale silver
   done: "#4CAF6D", // green, completed-objective marker
   glow: "#E2F58C", // firefly light
+  coin: "#D9A441", // brass purse coin, deliberately NOT --color-accent's gold
+  coinEdge: "#7A4E16",
+  coinShine: "#F6E3A6",
 } as const;
 
 /** Parses a "#rrggbb" string into Phaser's `0xrrggbb` integer form. */

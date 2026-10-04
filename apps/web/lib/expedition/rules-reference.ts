@@ -36,7 +36,8 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       id: "goal",
       heading: "Goal",
       paragraphs: [
-        "Clear 6 camps. A camp is cleared when every objective is done.",
+        "Before camp 1 the crew votes on the run: Short (4 camps), Standard (6) or Long (8). Clear every camp to reach the temple. A camp is cleared when every objective is done.",
+        "A cleared camp pays coins into the crew's purse. Then everyone drafts, the crew votes on the route to the next camp, and an event waits on the trail. A tied vote is settled by a coin flip.",
         "A failed camp costs a supply and is replayed with a fresh deal. Run out of supplies and the run ends.",
       ],
       items: [],

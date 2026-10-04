@@ -26,10 +26,11 @@ export function ownerOf(seat: SeatRun): Owner {
   return { seatId: seat.seatId, hasUpgrade: (upgradeId) => seat.kit.includes(upgradeId) };
 }
 
-/** The stamp a ledger entry written now would carry; null with no attempt. */
+/** The stamp a ledger entry written now would carry; null outside a camp. */
 export function currentStamp(run: RunState): Stamp | null {
-  if (run.attempt === null) return null;
-  return { camp: run.campNumber, attempt: run.attempt.attemptNumber, trick: run.attempt.camp.completedTricks.length };
+  if (run.stage.tag !== "camp") return null;
+  const attempt = run.stage.attempt;
+  return { camp: run.stage.camp.index, attempt: attempt.attemptNumber, trick: attempt.camp.completedTricks.length };
 }
 
 export function sameStamp(a: Stamp, b: Stamp): boolean {

@@ -10,6 +10,10 @@ import { resolveTuned, type ActiveAbility, type CharacterDef, type Owner, type S
 import { CATALOG } from "../run/catalog";
 import type { TargetKind } from "../run/targets";
 import { WINDOWS, type ActiveWindow } from "../run/windows";
+import { RUN_LENGTHS } from "../run/balance";
+import type { BossTier } from "../run/plan";
+import type { RunLength } from "../run/types";
+import { EVENTS } from "../content/events/registry";
 
 export type ExpeditionTargetKind = TargetKind;
 export type ExpeditionActiveWindow = ActiveWindow;
@@ -109,4 +113,27 @@ export const CHARACTER_DISPLAY: Readonly<Record<string, CharacterDisplay>> = Obj
       upgradeIds: def.upgrades.map((upgrade) => upgrade.id),
     },
   ]),
+);
+
+export type RunLengthDisplay = {
+  id: RunLength;
+  name: string;
+  camps: number;
+  bossCamps: { at: number; tier: BossTier }[];
+};
+
+function lengthDisplay(id: RunLength, name: string): RunLengthDisplay {
+  return { id, name, camps: RUN_LENGTHS[id].camps, bossCamps: RUN_LENGTHS[id].bossCamps.map((b) => ({ at: b.at, tier: b.tier })) };
+}
+
+export const RUN_LENGTH_DISPLAY: Readonly<Record<RunLength, RunLengthDisplay>> = {
+  short: lengthDisplay("short", "Short"),
+  standard: lengthDisplay("standard", "Standard"),
+  long: lengthDisplay("long", "Long"),
+};
+
+export type EventDisplay = { id: string; name: string; text: string };
+
+export const EVENT_DISPLAY: Readonly<Record<string, EventDisplay>> = Object.fromEntries(
+  Object.values(EVENTS).map((def) => [def.id, { id: def.id, name: def.name, text: def.text }]),
 );

@@ -40,26 +40,37 @@ export const ZONES = {
 
 export type ZoneId = keyof typeof ZONES;
 
-/** The fireside between camps. The trail stops short of the settings safe
- * zone in the top-right corner. */
-export const FIRESIDE_ZONES = {
+/** The trail between camps: the draft, the event and the loadout. The trail
+ * map stops short of the settings safe zone in the top-right corner. */
+export const TRAIL_ZONES = {
   topBar: { x: 0, y: 0, w: 576, h: 22 },
   prompt: { x: 96, y: 24, w: 448, h: 16 },
   trail: { x: 16, y: 44, w: 568, h: 64 },
-  draft: { x: 16, y: 112, w: 400, h: 144 },
+  panel: { x: 16, y: 112, w: 400, h: 144 },
   crew: { x: 424, y: 112, w: 200, h: 144 },
   tooltip: { x: 16, y: 258, w: 608, h: 24 },
   backpack: { x: 16, y: 284, w: 448, h: 72 },
   ready: { x: 472, y: 284, w: 152, h: 72 },
 } as const satisfies Record<string, Rect>;
 
-/** The muster before camp 1: six character cards, the crew and Ready. */
+/** The route vote: the options take the panel and crew row. */
+export const ROUTE_ZONES = {
+  topBar: TRAIL_ZONES.topBar,
+  prompt: TRAIL_ZONES.prompt,
+  trail: TRAIL_ZONES.trail,
+  routes: { x: 16, y: 112, w: 608, h: 144 },
+  tooltip: TRAIL_ZONES.tooltip,
+  backpack: TRAIL_ZONES.backpack,
+  ready: TRAIL_ZONES.ready,
+} as const satisfies Record<string, Rect>;
+
+/** The muster before camp 1: the characters, the crew and the length vote. */
 export const MUSTER_ZONES = {
   topBar: { x: 0, y: 0, w: 576, h: 22 },
   prompt: { x: 96, y: 24, w: 448, h: 16 },
-  cards: { x: 8, y: 58, w: 624, h: 244 },
-  crew: { x: 8, y: 306, w: 456, h: 50 },
-  ready: { x: 472, y: 306, w: 152, h: 50 },
+  cards: { x: 8, y: 56, w: 624, h: 236 },
+  crew: { x: 8, y: 296, w: 132, h: 60 },
+  lengths: { x: 144, y: 296, w: 488, h: 60 },
 } as const satisfies Record<string, Rect>;
 
 /** The end of the run: the outcome, the per-camp strip, and the restart. */
@@ -73,7 +84,8 @@ export const RUN_END_ZONES = {
 /** Every scene's zone table, for the disjointness test. */
 export const SCENE_ZONES: Readonly<Record<string, Readonly<Record<string, Rect>>>> = {
   camp: ZONES,
-  fireside: FIRESIDE_ZONES,
+  trail: TRAIL_ZONES,
+  route: ROUTE_ZONES,
   muster: MUSTER_ZONES,
   "run-end": RUN_END_ZONES,
 };
@@ -216,13 +228,13 @@ export const INTERACTABLE_ANCHORS: {
 };
 
 // ---------------------------------------------------------------------------
-// Fireside
+// Trail
 // ---------------------------------------------------------------------------
 
-/** Trail stops: the six camps then the temple, evenly spaced along the trail
- * zone. Returns each stop's centre x. */
+/** Trail stops, evenly spaced along the trail zone. Returns each stop's
+ * centre x. */
 export function trailStopXs(count: number): number[] {
-  const zone = FIRESIDE_ZONES.trail;
+  const zone = TRAIL_ZONES.trail;
   const step = zone.w / count;
   return Array.from({ length: count }, (_, i) => Math.round(zone.x + step * (i + 0.5)));
 }

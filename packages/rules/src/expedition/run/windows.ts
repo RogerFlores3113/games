@@ -5,6 +5,7 @@
 
 import { campPhase, checkCampOutcome, currentActorSeatId } from "../camp";
 import { pendingSourceIds } from "./abilities";
+import { attemptOf } from "./attempt";
 import { rulesFor } from "./compose";
 import type { RunRules } from "./run-rules";
 import type { Catalog, RunState } from "./types";
@@ -20,7 +21,7 @@ export type WindowDef = {
 };
 
 function playingTrickSize(run: RunState, rules: RunRules): number | null {
-  const camp = run.attempt?.camp;
+  const camp = attemptOf(run)?.camp;
   if (camp === undefined || campPhase(camp, rules) !== "playing") return null;
   return camp.currentTrick.plays.length;
 }
@@ -32,7 +33,10 @@ export const WINDOWS: { readonly [W in ActiveWindow]: WindowDef } = {
     id: "objective-pick",
     phrase: "While picking objectives",
     gated: false,
-    isOpen: (run, rules) => run.attempt !== null && campPhase(run.attempt.camp, rules) === "objective-pick",
+    isOpen: (run, rules) => {
+      const camp = attemptOf(run)?.camp;
+      return camp !== undefined && campPhase(camp, rules) === "objective-pick";
+    },
     mayAct: anySeat,
   },
   "between-tricks": {
@@ -48,7 +52,7 @@ export const WINDOWS: { readonly [W in ActiveWindow]: WindowDef } = {
     phrase: "On your turn",
     gated: false,
     isOpen: (run, rules) => (playingTrickSize(run, rules) ?? 0) > 0,
-    mayAct: (run, rules, seatId) => currentActorSeatId(run.attempt!.camp, rules) === seatId,
+    mayAct: (run, rules, seatId) => currentActorSeatId(attemptOf(run)!.camp, rules) === seatId,
   },
   rescue: {
     id: "rescue",
@@ -56,8 +60,9 @@ export const WINDOWS: { readonly [W in ActiveWindow]: WindowDef } = {
     gated: true,
     // Only failed objectives open it; a failed goal never does.
     isOpen: (run, rules) => {
-      if (run.attempt === null) return false;
-      const outcome = checkCampOutcome(run.attempt.camp, rules);
+      const camp = attemptOf(run)?.camp;
+      if (camp === undefined) return false;
+      const outcome = checkCampOutcome(camp, rules);
       return outcome.status === "failed" && outcome.failedObjectiveIds.length > 0 && outcome.failedGoalIds.length === 0;
     },
     mayAct: anySeat,

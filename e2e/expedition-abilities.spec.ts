@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { clickHandCard, clickUntilChanged, draftOffer, isReady, pickDraftOffer, waitForScene, type FiresideView, type MusterCard } from "./expedition-driver";
+import { clickHandCard, clickUntilChanged, draftOffer, trailToCamp, waitForScene, type MusterCard, type TrailView } from "./expedition-driver";
 import { getModel, getScene, startExpeditionGame } from "./expedition-helpers";
 import { PICKER_SCENARIOS, rewriteViews, type Game } from "./expedition-scenarios";
 
@@ -28,15 +28,12 @@ interface CampModel {
 }
 
 async function musterPick(page: Page, characterId: string): Promise<void> {
-  await waitForScene(page, "fireside");
-  await clickUntilChanged<FiresideView>(page, `draft:${characterId}`, (m) => draftOffer(m) === null);
+  await waitForScene(page, "trail");
+  await clickUntilChanged<TrailView>(page, `draft:${characterId}`, (m) => draftOffer(m) === null);
 }
 
 async function readyAll(pages: Page[]): Promise<void> {
-  for (const p of pages) {
-    if ((await getScene(p)) === "camp") continue;
-    await clickUntilChanged<FiresideView>(p, "ready", (m) => isReady(m) || m.sceneKey === "camp", { perAttemptTimeoutMs: 15_000 });
-  }
+  await trailToCamp(pages, { length: "short" });
   for (const p of pages) await waitForScene(p, "camp");
 }
 
@@ -51,13 +48,9 @@ async function playUntilRescue(host: Page, pages: Page[]): Promise<boolean> {
   for (let step = 0; step < 600; step++) {
     const model = await getModel<CampModel>(host);
     if (model.sceneKey !== "camp") {
-      if (model.sceneKey !== "fireside") return false;
-      const fm = await getModel<FiresideView>(host);
-      expect(fm.lastResult?.status, "a failed camp always asks the Medic first").toBe("succeeded");
-      for (const p of pages) {
-        const offer = draftOffer(await getModel<FiresideView>(p));
-        if (offer) await clickUntilChanged<FiresideView>(p, pickDraftOffer(offer).objectId, (m) => draftOffer(m) === null);
-      }
+      if (model.sceneKey !== "trail") return false;
+      const fm = await getModel<TrailView>(host);
+      expect(fm.panel?.kind, "a failed camp always asks the Medic first").not.toBe("loadout");
       await readyAll(pages);
       continue;
     }
@@ -88,9 +81,13 @@ test.describe("Expedition characters and abilities", () => {
     try {
       await musterPick(pages[0]!, "medic");
       await expect
-        .poll(async () => ((await getModel<FiresideView>(pages[1]!)).muster ?? []).find((c) => c.characterId === "medic")?.takenBy)
+        .poll(async () => {
+          const panel = (await getModel<TrailView>(pages[1]!)).panel;
+          return (panel?.kind === "muster" ? panel.characters : []).find((c) => c.characterId === "medic")?.takenBy;
+        })
         .toBe("Roger");
-      const own = (await getModel<FiresideView>(pages[0]!)).muster!.find((c: MusterCard) => c.characterId === "medic")!;
+      const panel = (await getModel<TrailView>(pages[0]!)).panel!;
+      const own = (panel.kind === "muster" ? panel.characters : []).find((c: MusterCard) => c.characterId === "medic")!;
       expect(own).toMatchObject({ yours: true, takenBy: "You", pickable: false });
       await musterPick(pages[1]!, "scout");
       await musterPick(pages[2]!, "botanist");
@@ -109,10 +106,14 @@ test.describe("Expedition characters and abilities", () => {
       await readyAll(pages);
       const rw = await rewriteViews(page);
 
-      rw.current = (g: Game) => ({ ...g, runPhase: "fireside", attempt: null, yourDraftOffer: ["guide.pathfinder", "bait", "parrot"], history: [{ campNumber: 1, attemptNumber: 1, status: "succeeded", suppliesSpent: 0 }] });
+      rw.current = (g: Game) => ({
+        ...g,
+        stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: ["guide.pathfinder", "bait", "parrot"], pendingSeatIds: [g.yourSeatId] },
+        history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }],
+      });
       await page.reload();
-      await waitForScene(page, "fireside");
-      const offer = draftOffer(await getModel<FiresideView>(page))!;
+      await waitForScene(page, "trail");
+      const offer = draftOffer(await getModel<TrailView>(page))!;
       expect(offer.map((o) => o.sourceId)).toEqual(["guide.pathfinder", "bait", "parrot"]);
       rw.sent.length = 0;
       await clickUntilChanged(page, "draft:bait", () => rw.sent.length > 0);

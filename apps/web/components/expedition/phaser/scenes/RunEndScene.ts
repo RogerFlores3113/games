@@ -107,7 +107,7 @@ export class RunEndScene extends Phaser.Scene {
       const art = placeArt(this, marker, cx, zone.y + 14);
       if (camp.attempts === 0) art.setAlpha(0.5);
       layer.add(art);
-      layer.add(centred(this, cx, zone.y + 28, camp.boss ? `Camp ${camp.campNumber} boss` : `Camp ${camp.campNumber}`));
+      layer.add(centred(this, cx, zone.y + 28, camp.boss ? `Camp ${camp.index} boss` : `Camp ${camp.index}`));
       layer.add(centred(this, cx, zone.y + 28 + LABEL_CELL.h + 3, camp.caption, camp.attempts === 0 ? PALETTE.textDim : PALETTE.text));
       const status = campStatus(camp);
       if (status.label !== "") layer.add(centred(this, cx, zone.y + 28 + (LABEL_CELL.h + 3) * 2, status.label, status.color));

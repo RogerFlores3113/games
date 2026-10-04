@@ -5,6 +5,7 @@ import { rankOf } from "../trick";
 import type { CampState, CardIdentity, TrickPlay } from "../state";
 import type { CoreRules } from "../rules";
 import type { RuleModifier } from "../run/run-rules";
+import { attemptOf } from "../run/attempt";
 import type { RunState } from "../run/types";
 
 /** The previous trickWinner, decided as if the excluded plays were never
@@ -47,7 +48,7 @@ export function hasPendingObjective(camp: CampState, seatId: string, rules: Core
 
 /** This attempt's whispers by `fromSeatId` that named `toSeatId`. */
 export function whisperedTo(run: RunState, fromSeatId: string, toSeatId: string): boolean {
-  return (run.attempt?.log ?? []).some(
+  return (attemptOf(run)?.log ?? []).some(
     (entry) => entry.event === "whisper" && entry.actorSeatId === fromSeatId && entry.subjectSeatIds.includes(toSeatId),
   );
 }
@@ -63,7 +64,7 @@ export function extraWhisper(seatId: string | null): RuleModifier {
  * after `seatId` played it. A card that moves to another hand reads its
  * printed rank there, so the private change neither follows nor leaks. */
 export function shiftedRank(run: RunState, seatId: string, cardId: string, rank: number): RuleModifier {
-  const camp = run.attempt?.camp ?? null;
+  const camp = attemptOf(run)?.camp ?? null;
   if (camp === null || !heldOrPlayedBy(camp, seatId, cardId)) return {};
   return { rankOf: (prev) => (card) => (card.id === cardId ? rank : prev(card)) };
 }

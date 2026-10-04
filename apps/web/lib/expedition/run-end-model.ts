@@ -1,11 +1,11 @@
 import type { SceneServerInput } from "./build-scene-model";
-import { BOSS_CAMP_NUMBERS, FINAL_CAMP_NUMBER } from "./build-scene-model";
+import { plannedBossAt } from "./view-access";
 
 /** The end of a run: won at the temple or turned back on the trail, with
  * how many tries each camp took. A pure display transform of the view. */
 
 export interface RunEndCamp {
-  campNumber: number;
+  index: number;
   attempts: number;
   cleared: boolean;
   boss: boolean;
@@ -18,6 +18,7 @@ export interface RunEndModel {
   outcome: "won" | "lost";
   campReached: number;
   supplies: number;
+  purse: number;
   headline: string;
   detail: string;
   history: RunEndCamp[];
@@ -31,27 +32,28 @@ function plural(n: number, one: string, many: string): string {
 export function buildRunEndModel(server: SceneServerInput): RunEndModel {
   const view = server.game;
   const outcome = view.runStatus === "won" ? "won" : "lost";
-  const history = Array.from({ length: FINAL_CAMP_NUMBER }, (_, i): RunEndCamp => {
-    const campNumber = i + 1;
-    const results = view.history.filter((h) => h.campNumber === campNumber);
+  const campCount = view.campCount ?? Math.max(0, ...view.history.map((h) => h.camp));
+  const history = Array.from({ length: campCount }, (_, i): RunEndCamp => {
+    const index = i + 1;
+    const results = view.history.filter((h) => h.camp === index);
     return {
-      campNumber,
+      index,
       attempts: results.length,
-      cleared: results.some((h) => h.status === "succeeded"),
-      boss: BOSS_CAMP_NUMBERS.includes(campNumber),
+      cleared: results.some((h) => h.status === "cleared"),
+      boss: plannedBossAt(view, index) !== null,
       caption: results.length === 0 ? "not reached" : plural(results.length, "try", "tries"),
     };
   });
+  const campReached = view.history.at(-1)?.camp ?? 0;
+  const coins = view.purse === 0 ? "" : ` and ${plural(view.purse, "coin", "coins")}`;
   return {
     sceneKey: "run-end",
     outcome,
-    campReached: outcome === "won" ? FINAL_CAMP_NUMBER : view.campNumber,
-    supplies: view.supplies,
-    headline: outcome === "won" ? "The expedition reached the temple!" : `The expedition turned back at camp ${view.campNumber}`,
-    detail:
-      outcome === "won"
-        ? `Cleared all ${FINAL_CAMP_NUMBER} camps with ${plural(view.supplies, "supply", "supplies")} left`
-        : "Out of supplies",
+    campReached,
+    supplies: view.supplies.count,
+    purse: view.purse,
+    headline: outcome === "won" ? "The expedition reached the temple!" : `The expedition turned back at camp ${campReached}`,
+    detail: outcome === "won" ? `Cleared all ${campCount} camps with ${plural(view.supplies.count, "supply", "supplies")}${coins} left` : "Out of supplies",
     history,
     isHost: view.yourSeatId !== null && view.yourSeatId === server.hostSeatId,
   };

@@ -1,107 +1,52 @@
-// Phase 10 balance table (Plan 03, RUN-01, D-14, D-15).
-//
-// D-14/D-15: camp 5's trick-count slot is a normal face-up objective slot,
-// taken in the same clockwise pick order as every other objective (matching
-// Phase 9's A-TRICKCOUNT). It is not a special mid-camp draw; it is resolved
-// ONCE per attempt, before objective picking begins, by objectiveSlotsFor
-// replacing the table's "trick-count" placeholder with a concrete
-// ObjectiveSlot (either { kind: "no-tricks" } or { kind: "exactly-n", n }).
-//
-// The resolution is deterministic per (seed, campNumber, attemptNumber) and
-// draws ONLY through run/rng.ts's STREAMS.trickCountKind / STREAMS.trickCountN
-// (A1) — never an ad-hoc stream name — so it composes correctly with every
-// other seeded draw in the run and is reproducible for replay/debugging.
-//
-// Every tunable number for the run's ramp lives in this one file
-// (STARTING_SUPPLIES, FINAL_CAMP, BOSS_CAMPS, DRAFT_OFFER_SIZE,
-// TRICK_COUNT_N_RANGE, BALANCE_TABLE) so a balance pass (BAL-01, Phase 15)
-// touches only this file, never compose.ts, camp.ts or actions.ts.
-//
-// TRICK_COUNT_N_RANGE is an A6 placeholder: the specific [min, max] bounds
-// are a provisional guess pending owner playtesting in Phase 15, not a
-// spec-derived constant.
+// Every tunable number of the run lives in this one file, so a balance pass
+// touches nothing else. Numbers the owner did not fix are placeholders.
 
-import type { CampNumber, BossCampNumber } from "./types";
-import type { ObjectiveSlot } from "../state";
+import type { CampState, ObjectiveSlot } from "../state";
+import type { BossTier } from "./plan";
 import { STREAMS, seededIndex } from "./rng";
+import type { CampSpec, SlotTemplate } from "./route";
+import type { RunLength } from "./types";
 
-export const STARTING_SUPPLIES = 3;
-export const FINAL_CAMP: CampNumber = 6;
-export const BOSS_CAMPS: readonly BossCampNumber[] = [3, 6];
-export const DRAFT_OFFER_SIZE = 3;
+export const RUN_LENGTHS: Readonly<Record<RunLength, { readonly camps: number; readonly bossCamps: readonly { readonly at: number; readonly tier: BossTier }[] }>> = {
+  short: { camps: 4, bossCamps: [{ at: 4, tier: "temple" }] },
+  standard: { camps: 6, bossCamps: [{ at: 3, tier: "animal" }, { at: 6, tier: "temple" }] },
+  long: { camps: 8, bossCamps: [{ at: 3, tier: "animal" }, { at: 6, tier: "disaster" }, { at: 8, tier: "temple" }] },
+};
 
-// A6 placeholder (Phase 15 tuning target): camp 5's exactly-n draw picks N
-// uniformly from this inclusive range when the RNG doesn't choose no-tricks.
+/** Seat objectives per camp, before boss and temple slot layers. */
+export const OBJECTIVE_RAMP: Readonly<Record<RunLength, readonly number[]>> = {
+  short: [2, 3, 4, 3],
+  standard: [2, 3, 3, 4, 4, 4],
+  long: [2, 3, 3, 4, 4, 4, 5, 4],
+};
+
+/** Ordered pairs and trick-count slots appear from this camp on. */
+export const MIX_FROM_CAMP = 4;
+
+export const SUPPLIES_START = 3;
+export const SUPPLIES_MAX = 4;
+
+export const PAYOUT = { base: 5, perUnplayedTrick: 1, unplayedCap: 3 } as const;
+
+export const ROUTE_OPTIONS = { min: 2, max: 3 } as const;
+
+/** Placeholder: an exactly-n slot draws N uniformly from this range. */
 export const TRICK_COUNT_N_RANGE = { min: 2, max: 4 } as const;
 
-export type BalanceSlot = ObjectiveSlot | { readonly kind: "trick-count" };
+/** Coins a cleared camp pays: the base plus a bonus per trick left unplayed. */
+export function payoutFor(camp: CampState): number {
+  const unplayed = camp.totalTricks - camp.completedTricks.length;
+  return PAYOUT.base + PAYOUT.perUnplayedTrick * Math.min(PAYOUT.unplayedCap, unplayed);
+}
 
-export type CampBalanceEntry = {
-  readonly slots: readonly BalanceSlot[];
-  readonly isBossCamp: boolean;
-};
-
-// Spec §4.3 camp ramp: 2/3/3/4/4/5 objective slots for camps 1-6; camps 3
-// and 6 are boss camps; camps 4 and 6 each carry an ordered ①② pair; camp 5
-// carries one trick-count placeholder alongside three win-card slots.
-export const BALANCE_TABLE: Readonly<Record<CampNumber, CampBalanceEntry>> = {
-  1: {
-    slots: [{ kind: "win-card" }, { kind: "win-card" }],
-    isBossCamp: false,
-  },
-  2: {
-    slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }],
-    isBossCamp: false,
-  },
-  3: {
-    slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }],
-    isBossCamp: true,
-  },
-  4: {
-    slots: [
-      { kind: "ordered", order: 1 },
-      { kind: "ordered", order: 2 },
-      { kind: "win-card" },
-      { kind: "win-card" },
-    ],
-    isBossCamp: false,
-  },
-  5: {
-    slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }, { kind: "trick-count" }],
-    isBossCamp: false,
-  },
-  6: {
-    slots: [
-      { kind: "ordered", order: 1 },
-      { kind: "ordered", order: 2 },
-      { kind: "win-card" },
-      { kind: "win-card" },
-      { kind: "win-card" },
-    ],
-    isBossCamp: true,
-  },
-};
-
-function resolveTrickCountSlot(seed: string, campNumber: number, attemptNumber: number): ObjectiveSlot {
-  const kindIndex = seededIndex(seed, STREAMS.trickCountKind(campNumber, attemptNumber), 2);
-  if (kindIndex === 0) {
-    return { kind: "no-tricks" };
-  }
+function resolveTrickCountSlot(seed: string, spec: CampSpec, attemptNumber: number): ObjectiveSlot {
+  if (seededIndex(seed, STREAMS.trickCountKind(spec.index, attemptNumber), 2) === 0) return { kind: "no-tricks" };
   const { min, max } = TRICK_COUNT_N_RANGE;
-  const n = min + seededIndex(seed, STREAMS.trickCountN(campNumber, attemptNumber), max - min + 1);
-  return { kind: "exactly-n", n };
+  return { kind: "exactly-n", n: min + seededIndex(seed, STREAMS.trickCountN(spec.index, attemptNumber), max - min + 1) };
 }
 
-/** Resolves BALANCE_TABLE[campNumber]'s slots into concrete ObjectiveSlots
- * for createCamp. Only camp 5's "trick-count" placeholder is resolved (via
- * the seeded RNG, D-14); every other slot passes through unchanged. */
-export function objectiveSlotsFor(seed: string, campNumber: CampNumber, attemptNumber: number): ObjectiveSlot[] {
-  return BALANCE_TABLE[campNumber].slots.map((slot): ObjectiveSlot => {
-    if (slot.kind === "trick-count") {
-      return resolveTrickCountSlot(seed, campNumber, attemptNumber);
-    }
-    return slot;
-  });
+/** The spec's slots for one attempt: a trick-count slot resolves afresh per
+ * attempt, so a replay keeps the mix but not the count. */
+export function objectiveSlotsFor(seed: string, spec: CampSpec, attemptNumber: number): ObjectiveSlot[] {
+  return spec.slots.map((slot: SlotTemplate): ObjectiveSlot => (slot.kind === "trick-count" ? resolveTrickCountSlot(seed, spec, attemptNumber) : slot));
 }
-
-export type { CampNumber } from "./types";

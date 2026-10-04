@@ -61,14 +61,24 @@ export type {
   ExpeditionCampView,
   ExpeditionAttemptView,
   ExpeditionLogEntryView,
+  ExpeditionStageView,
+  ExpeditionCampPreviewView,
+  ExpeditionBallotView,
+  ExpeditionVoteView,
+  ExpeditionPlanBossView,
+  ExpeditionCampResultView,
+  ExpeditionRunLengthView,
+  ExpeditionSlotKindView,
 } from "./expedition/adapter/view-types";
 export type { RunState } from "./expedition/run/types";
 export type { RunAction } from "./expedition/run/types";
 export type { RunError } from "./expedition/run/types";
 export { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "./expedition/adapter/view-leak-check";
 export type { ExpeditionSeatSecrets } from "./expedition/adapter/view-leak-check";
-export { SOURCE_DISPLAY, CHARACTER_DISPLAY } from "./expedition/adapter/catalog-display";
+export { SOURCE_DISPLAY, CHARACTER_DISPLAY, RUN_LENGTH_DISPLAY, EVENT_DISPLAY } from "./expedition/adapter/catalog-display";
 export type {
+  RunLengthDisplay,
+  EventDisplay,
   SourceDisplay,
   SourceActiveDisplay,
   CharacterDisplay,

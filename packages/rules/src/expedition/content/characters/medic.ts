@@ -1,4 +1,4 @@
-import { STARTING_SUPPLIES } from "../../run/balance";
+import { SUPPLIES_MAX } from "../../run/balance";
 import { ability, defineCharacter, defineUpgrade } from "../source-def";
 
 export const medic = defineCharacter({
@@ -41,7 +41,7 @@ export const medic = defineCharacter({
         window: "between-tricks",
         limit: { kind: "per-run", times: 1 },
         targets: [{ kind: "supplies" }],
-        canUse: (ctx) => (ctx.run.supplies < STARTING_SUPPLIES ? true : "Supplies are full"),
+        canUse: (ctx) => (ctx.run.supplies < SUPPLIES_MAX ? true : "Supplies are full"),
         apply: () => [{ op: "adjust-supplies", delta: 1 }],
       }),
     }),

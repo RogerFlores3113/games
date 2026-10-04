@@ -1,85 +1,61 @@
-// Tests for run/balance.ts (Plan 10-03, RUN-01, D-14, D-15).
-
 import { describe, expect, it } from "vitest";
 import { createCamp } from "../camp";
-import { BALANCE_TABLE, TRICK_COUNT_N_RANGE, objectiveSlotsFor } from "./balance";
-import type { CampNumber } from "./types";
-
-const ALL_CAMPS: CampNumber[] = [1, 2, 3, 4, 5, 6];
-const EXPECTED_SLOT_COUNTS: Record<CampNumber, number> = { 1: 2, 2: 3, 3: 3, 4: 4, 5: 4, 6: 5 };
+import type { CampState } from "../state";
+import { RUN_LENGTHS, TRICK_COUNT_N_RANGE, objectiveSlotsFor, payoutFor } from "./balance";
+import { campIndex } from "./plan";
+import { campSpecAt, type CampSpec } from "./route";
+import type { RunLength } from "./types";
 
 function seatIds(n: number): string[] {
   return Array.from({ length: n }, (_, i) => `p${i}`);
 }
 
-describe("BALANCE_TABLE", () => {
-  it("has 2/3/3/4/4/5 slots for camps 1..6", () => {
-    for (const camp of ALL_CAMPS) {
-      expect(BALANCE_TABLE[camp].slots.length).toBe(EXPECTED_SLOT_COUNTS[camp]);
-    }
-  });
+const trickCountSpec: CampSpec = { index: campIndex(5), location: "jungle", weather: "fair", event: "event", slots: [{ kind: "win-card" }, { kind: "trick-count" }] };
 
-  it("marks only camps 3 and 6 as boss camps", () => {
-    for (const camp of ALL_CAMPS) {
-      expect(BALANCE_TABLE[camp].isBossCamp).toBe(camp === 3 || camp === 6);
-    }
-  });
+describe("payoutFor", () => {
+  const camp = (totalTricks: number, completed: number): CampState =>
+    ({ totalTricks, completedTricks: Array.from({ length: completed }, (_, index) => ({ index, leaderSeatId: "p0", plays: [], winnerSeatId: "p0" })) }) as unknown as CampState;
 
-  it("camps 4 and 6 contain ordered slots with order 1 and 2", () => {
-    for (const camp of [4, 6] as const) {
-      const orders = BALANCE_TABLE[camp].slots.filter((s) => s.kind === "ordered").map((s) => (s as { order: number }).order);
-      expect(orders).toEqual([1, 2]);
-    }
-  });
-
-  it("camp 5 contains exactly one trick-count placeholder", () => {
-    const trickCountSlots = BALANCE_TABLE[5].slots.filter((s) => s.kind === "trick-count");
-    expect(trickCountSlots.length).toBe(1);
+  it("pays 5 plus one per unplayed trick, at most 3", () => {
+    expect(payoutFor(camp(18, 18))).toBe(5);
+    expect(payoutFor(camp(18, 16))).toBe(7);
+    expect(payoutFor(camp(18, 3))).toBe(8);
   });
 });
 
 describe("objectiveSlotsFor", () => {
-  it("passes non-camp-5 slots through unchanged", () => {
-    for (const camp of [1, 2, 3, 4, 6] as const) {
-      const resolved = objectiveSlotsFor("seed-a", camp, 1);
-      expect(resolved).toEqual(BALANCE_TABLE[camp].slots);
-    }
+  it("passes win-card and ordered slots through unchanged", () => {
+    const spec: CampSpec = { ...trickCountSpec, slots: [{ kind: "ordered", order: 1 }, { kind: "ordered", order: 2 }, { kind: "win-card" }] };
+    expect(objectiveSlotsFor("seed-a", spec, 1)).toEqual([{ kind: "ordered", order: 1 }, { kind: "ordered", order: 2 }, { kind: "win-card" }]);
   });
 
-  it("resolves camp 5's placeholder to no-tricks or exactly-n within TRICK_COUNT_N_RANGE", () => {
-    const resolved = objectiveSlotsFor("seed-a", 5, 1);
-    expect(resolved.length).toBe(4);
-    const resolvedSlot = resolved[3]!;
-    expect(["no-tricks", "exactly-n"]).toContain(resolvedSlot.kind);
-    if (resolvedSlot.kind === "exactly-n") {
-      expect(resolvedSlot.n).toBeGreaterThanOrEqual(TRICK_COUNT_N_RANGE.min);
-      expect(resolvedSlot.n).toBeLessThanOrEqual(TRICK_COUNT_N_RANGE.max);
-    }
-  });
-
-  it("is deterministic per (seed, attemptNumber)", () => {
-    const a = objectiveSlotsFor("seed-b", 5, 2);
-    const b = objectiveSlotsFor("seed-b", 5, 2);
-    expect(a).toEqual(b);
-  });
-
-  it("yields both no-tricks and exactly-n across 200 seeds", () => {
+  it("resolves a trick-count slot to no-tricks or exactly-n within TRICK_COUNT_N_RANGE, both occurring", () => {
     const kinds = new Set<string>();
     for (let i = 0; i < 200; i++) {
-      const resolved = objectiveSlotsFor(`seed-${i}`, 5, 1);
-      kinds.add(resolved[3]!.kind);
+      const resolved = objectiveSlotsFor(`seed-${i}`, trickCountSpec, 1)[1]!;
+      kinds.add(resolved.kind);
+      if (resolved.kind === "exactly-n") {
+        expect(resolved.n).toBeGreaterThanOrEqual(TRICK_COUNT_N_RANGE.min);
+        expect(resolved.n).toBeLessThanOrEqual(TRICK_COUNT_N_RANGE.max);
+      }
     }
-    expect(kinds.has("no-tricks")).toBe(true);
-    expect(kinds.has("exactly-n")).toBe(true);
+    expect([...kinds].sort()).toEqual(["exactly-n", "no-tricks"]);
   });
 
-  it("produces slot lists valid for createCamp at 3, 4 and 5 seats, for every camp", () => {
-    for (const players of [3, 4, 5]) {
-      for (const camp of ALL_CAMPS) {
-        const slots = objectiveSlotsFor(`seed-players${players}`, camp, 1);
-        expect(() =>
-          createCamp({ seatIds: seatIds(players), seed: `seed-players${players}-camp${camp}`, objectiveSlots: slots }),
-        ).not.toThrow();
+  it("is deterministic per (seed, attempt) and redrawn for another attempt", () => {
+    expect(objectiveSlotsFor("seed-b", trickCountSpec, 2)).toEqual(objectiveSlotsFor("seed-b", trickCountSpec, 2));
+    const byAttempt = new Set(Array.from({ length: 20 }, (_, a) => JSON.stringify(objectiveSlotsFor("seed-b", trickCountSpec, a + 1))));
+    expect(byAttempt.size).toBeGreaterThan(1);
+  });
+
+  it("every camp of every length deals at 3, 4 and 5 seats", () => {
+    for (const length of Object.keys(RUN_LENGTHS) as RunLength[]) {
+      for (let k = 1; k <= RUN_LENGTHS[length].camps; k++) {
+        for (const players of [3, 4, 5]) {
+          const seed = `deal-${length}-${k}-${players}`;
+          const slots = objectiveSlotsFor(seed, campSpecAt(seed, length, campIndex(k)), 1);
+          expect(createCamp({ seatIds: seatIds(players), seed, objectiveSlots: slots }).objectives).toHaveLength(slots.length);
+        }
       }
     }
   });

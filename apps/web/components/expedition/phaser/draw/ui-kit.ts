@@ -103,6 +103,28 @@ export function button(
   return container;
 }
 
+/** A brass coin of radius `r` centred on (cx, cy), with a one-letter face.
+ * The container scales on x to spin; `setCoinFace` turns it over. */
+export function coin(scene: Phaser.Scene, cx: number, cy: number, r: number, face = ""): Phaser.GameObjects.Container {
+  const container = scene.add.container(Math.round(cx), Math.round(cy));
+  const g = scene.add.graphics();
+  g.fillStyle(toPhaserColor(PALETTE.coinEdge), 1);
+  g.fillCircle(0, 0, r);
+  g.fillStyle(toPhaserColor(PALETTE.coin), 1);
+  g.fillCircle(0, 0, r - 1);
+  g.fillStyle(toPhaserColor(PALETTE.coinShine), 1);
+  g.fillRect(-r + 2, -r + 2, 2, 2);
+  container.add(g);
+  container.add(scene.add.bitmapText(-Math.floor(LABEL_CELL.w / 2) + 1, -Math.floor(LABEL_CELL.h / 2), WORLD_LABEL_FONT, "").setTint(toPhaserColor(PALETTE.coinEdge)));
+  setCoinFace(container, face);
+  return container;
+}
+
+/** Shows the first letter of `face` on a coin from `coin`. */
+export function setCoinFace(coinContainer: Phaser.GameObjects.Container, face: string): void {
+  (coinContainer.list[1] as Phaser.GameObjects.BitmapText).setText(Array.from(face)[0] ?? "");
+}
+
 const STATUS_GLYPH: Readonly<Record<ObjectiveChip["status"], { glyph: string; color: string } | null>> = {
   pending: null,
   done: { glyph: "✓", color: PALETTE.done },

@@ -21,10 +21,10 @@ export const DRAFT_PREFERENCE = [
   "whetstone",
 ];
 
-export type SceneName = "camp" | "fireside" | "run-end";
+export type SceneName = "camp" | "trail" | "run-end";
 
-/** The fireside model fields the drivers read (mirrors
- * apps/web/lib/expedition/fireside-model.ts). Optional because a click can
+/** The trail model fields the drivers read (mirrors
+ * apps/web/lib/expedition/trail-model.ts). Optional because a click can
  * move the page on to another scene before the predicate runs. */
 export interface DraftTile {
   sourceId: string;
@@ -41,33 +41,105 @@ export interface MusterCard {
   takenBy: string | null;
 }
 
-export interface FiresideView {
+export interface VoteOption {
+  id: string;
+  objectId: string;
+  yours: boolean;
+  voters: string[];
+}
+
+export type TrailPanel =
+  | { kind: "muster"; characters: MusterCard[]; lengths: VoteOption[] }
+  | { kind: "draft"; heading: string; draft: { kind: "offer"; items: DraftTile[] } | { kind: "taken" | "none" } }
+  | { kind: "route"; options: VoteOption[] }
+  | { kind: "event" }
+  | { kind: "loadout" };
+
+export interface TrailView {
   sceneKey?: string;
-  /** The six characters while the crew musters. */
-  muster?: MusterCard[] | null;
-  draft?: { kind: "offer"; items: DraftTile[] } | { kind: "taken" | "none" };
+  panel?: TrailPanel;
   kit?: { sourceId: string; objectId: string; name: string }[] | null;
-  ready?: { state: "blocked" | "open" | "done" } | null;
-  lastResult?: { campNumber: number; status: "succeeded" | "failed" } | null;
+  ready?: { state: "open" | "done"; label: string } | null;
+  vote?: { title: string; winner: string; flip: unknown } | null;
 }
 
 /** What you may pick now: the free characters at muster until yours is
  * picked, then a draft offer after a cleared camp. */
-export function draftOffer(m: FiresideView): DraftTile[] | null {
-  if (m.muster != null) {
-    if (m.muster.some((c) => c.yours)) return null;
-    return m.muster.filter((c) => c.pickable).map((c) => ({ sourceId: c.characterId, objectId: c.objectId, name: c.name }));
+export function draftOffer(m: TrailView): DraftTile[] | null {
+  const panel = m.panel;
+  if (panel?.kind === "muster") {
+    if (panel.characters.some((c) => c.yours)) return null;
+    return panel.characters.filter((c) => c.pickable).map((c) => ({ sourceId: c.characterId, objectId: c.objectId, name: c.name }));
   }
-  return m.draft?.kind === "offer" ? m.draft.items : null;
+  return panel?.kind === "draft" && panel.draft.kind === "offer" ? panel.draft.items : null;
+}
+
+/** The muster's lengths or the route options, while this page has not voted. */
+export function openVote(m: TrailView): VoteOption[] | null {
+  const panel = m.panel;
+  const options = panel?.kind === "muster" ? panel.lengths : panel?.kind === "route" ? panel.options : null;
+  if (options === null || options.some((o) => o.yours)) return null;
+  return options;
 }
 
 /** Your character, then your kit. */
-export function kitIds(m: FiresideView): string[] {
+export function kitIds(m: TrailView): string[] {
   return (m.kit ?? []).map((k) => k.sourceId);
 }
 
-export function isReady(m: FiresideView): boolean {
+export function isReady(m: TrailView): boolean {
   return m.ready?.state === "done";
+}
+
+export interface TrailChoices {
+  /** Draft picks and characters, most wanted first. */
+  preference?: readonly string[];
+  /** The run length this page votes for at muster. */
+  length?: "short" | "standard" | "long";
+}
+
+/** Does the next thing this page owes in the trail scene, in stage order:
+ * picks a character or a draft offer, votes (the given length, else the
+ * first option), or readies. False when the page waits on the crew or has
+ * left the trail. */
+export async function trailStep(page: Page, choices: TrailChoices = {}): Promise<boolean> {
+  if ((await getModel<TrailView>(page)).sceneKey !== "trail") return false;
+  await waitForScene(page, "trail");
+  const model = await getModel<TrailView>(page);
+  const offer = draftOffer(model);
+  if (offer !== null && offer.length > 0) {
+    const pick = pickDraftOffer(offer, choices.preference);
+    await clickUntilChanged<TrailView>(page, pick.objectId, (m) => m.sceneKey !== "trail" || draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
+    return true;
+  }
+  const vote = openVote(model);
+  if (vote !== null) {
+    const choice = vote.find((o) => o.id === choices.length) ?? vote[0]!;
+    await clickUntilChanged<TrailView>(page, choice.objectId, (m) => m.sceneKey !== "trail" || openVote(m) === null, { perAttemptTimeoutMs: 15_000 });
+    return true;
+  }
+  if (model.ready?.state === "open") {
+    await clickUntilChanged<TrailView>(page, "ready", (m) => m.sceneKey !== "trail" || isReady(m) || m.panel?.kind !== model.panel?.kind, { perAttemptTimeoutMs: 15_000 });
+    return true;
+  }
+  return false;
+}
+
+/** Does everything this page owes in the trail until it waits on the crew
+ * or leaves the trail. */
+export async function walkTrail(page: Page, choices: TrailChoices = {}): Promise<void> {
+  for (let step = 0; step < 12 && (await trailStep(page, choices)); step++);
+}
+
+/** Walks every page through the trail until every page is in a camp (or the
+ * run ended). */
+export async function trailToCamp(pages: readonly Page[], choices: TrailChoices = {}): Promise<void> {
+  for (let round = 0; round < 8; round++) {
+    for (const p of pages) await walkTrail(p, choices);
+    const scenes = await Promise.all(pages.map((p) => getModel<TrailView>(p).then((m) => m.sceneKey)));
+    if (scenes.every((scene) => scene !== "trail")) return;
+  }
+  throw new Error("trailToCamp: the crew never left the trail");
 }
 
 /** Waits until the bridge's `scene` (not `model`) reports `expected`. */

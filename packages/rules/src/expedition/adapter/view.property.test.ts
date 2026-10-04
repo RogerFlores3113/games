@@ -22,7 +22,9 @@ import { createRun } from "../run/lifecycle";
 import { driveRun, setupRun } from "../run/run-test-support";
 import { toExpeditionPlayerView } from "./view";
 import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "./view-leak-check";
-import type { CampNumber, RunState } from "../run/types";
+import { RUN_LENGTHS } from "../run/balance";
+import { campIndex } from "../run/plan";
+import type { RunLength, RunState } from "../run/types";
 
 const ITEM_IDS = Object.keys(ITEMS);
 
@@ -34,7 +36,8 @@ type RunInput = {
   seatIds: string[];
   seed: string;
   choices: number[];
-  startCamp: CampNumber;
+  length: RunLength;
+  startCamp: number;
   kits: Record<string, string[]>;
 };
 
@@ -49,14 +52,15 @@ function kitsArb(seatIds: readonly string[]): fc.Arbitrary<Record<string, string
 // fc.stringMatching(/^[0-9a-f]{32}$/) (this file's own requirement, so the
 // forbidden-token seed scan is always live).
 const runInputArb: fc.Arbitrary<RunInput> = fc
-  .constantFrom(3, 4, 5)
-  .chain((seatCount) => {
+  .tuple(fc.constantFrom(3, 4, 5), fc.constantFrom<RunLength>("short", "standard", "long"))
+  .chain(([seatCount, length]) => {
     const seatIds = seatIdsFor(seatCount);
     return fc.record({
       seatIds: fc.constant(seatIds),
       seed: fc.stringMatching(/^[0-9a-f]{32}$/),
       choices: fc.array(fc.nat({ max: 1000 }), { minLength: 1, maxLength: 64 }),
-      startCamp: fc.constantFrom<CampNumber>(1, 2, 3, 4, 5, 6),
+      length: fc.constant(length),
+      startCamp: fc.integer({ min: 1, max: RUN_LENGTHS[length].camps }),
       kits: kitsArb(seatIds),
     });
   });
@@ -86,10 +90,10 @@ function assertNoLeaksAt(state: RunState, seed: string): void {
     expect(reasons).toEqual([]);
 
     counters.viewChecks++;
-    if (view.attempt !== null && view.attempt.reveals.length > 0) counters.revealViewChecks++;
-    if (view.yourDraftOffer !== null) counters.draftOfferChecks++;
+    if (view.stage.tag === "camp" && view.stage.attempt.reveals.length > 0) counters.revealViewChecks++;
+    if (view.stage.tag === "draft" && view.stage.yourOffer !== null) counters.draftOfferChecks++;
     if (id === "spectator") counters.unseatedChecks++;
-    if (view.runPhase === "muster") counters.musterChecks++;
+    if (view.stage.tag === "muster") counters.musterChecks++;
   }
 }
 
@@ -104,18 +108,19 @@ const DETERMINISTIC_CHOICES = [0, 1, 2, 3, 5, 8, 13, 21];
 const examples: RunInput[] = [3, 4, 5].map((seatCount) => {
   const seatIds = seatIdsFor(seatCount);
   const kits: Record<string, string[]> = Object.fromEntries(seatIds.map((seatId, i) => [seatId, i === 1 ? ["rain-poncho"] : []]));
-  return { seatIds, seed: DETERMINISTIC_SEED, choices: DETERMINISTIC_CHOICES, startCamp: 3 as CampNumber, kits };
+  return { seatIds, seed: DETERMINISTIC_SEED, choices: DETERMINISTIC_CHOICES, length: "standard" as const, startCamp: 3, kits };
 });
 
 describe("property: whole-run per-seat leak checker (COMM-03/ENG-03)", () => {
   it("no seat's view, nor an unseated viewer's view, ever leaks another seat's card at any step of a whole simulated run", () => {
     fc.assert(
-      fc.property(runInputArb, ({ seatIds, seed, choices, startCamp, kits }) => {
+      fc.property(runInputArb, ({ seatIds, seed, choices, length, startCamp, kits }) => {
         const initial = setupRun({
           seatIds,
           seed,
           catalog: CATALOG,
-          campNumber: startCamp,
+          length,
+          camp: startCamp,
           characters: { [seatIds[0]!]: "scout" },
           kits,
         });
@@ -129,10 +134,11 @@ describe("property: whole-run per-seat leak checker (COMM-03/ENG-03)", () => {
 
   it("draft-offer coverage: every seat holding a real private draft offer leaks nothing (3, 4 and 5 seats)", () => {
     for (const seatCount of [3, 4, 5]) {
-      const base = setupRun({ seatIds: seatIdsFor(seatCount), seed: DETERMINISTIC_SEED, catalog: CATALOG, campNumber: 2 });
+      const base = setupRun({ seatIds: seatIdsFor(seatCount), seed: DETERMINISTIC_SEED, catalog: CATALOG, camp: 2 });
       const state: RunState = {
         ...base,
         seats: base.seats.map((seat) => ({ ...seat, draftOffer: draftOfferFor(DETERMINISTIC_SEED, 2, seat, CATALOG) })),
+        stage: { tag: "draft", cleared: campIndex(2), payout: 5 },
       };
       expect(state.seats.every((seat) => seat.draftOffer !== null)).toBe(true);
       assertNoLeaksAt(state, DETERMINISTIC_SEED);
@@ -142,7 +148,7 @@ describe("property: whole-run per-seat leak checker (COMM-03/ENG-03)", () => {
   it("muster coverage: a fresh run still choosing characters leaks nothing (3, 4 and 5 seats)", () => {
     for (const seatCount of [3, 4, 5]) {
       const state = createRun({ seatIds: seatIdsFor(seatCount), seed: DETERMINISTIC_SEED });
-      expect(toExpeditionPlayerView(state, "seat-0", CATALOG).runPhase).toBe("muster");
+      expect(toExpeditionPlayerView(state, "seat-0", CATALOG).stage.tag).toBe("muster");
       assertNoLeaksAt(state, DETERMINISTIC_SEED);
     }
   });

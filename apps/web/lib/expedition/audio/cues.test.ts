@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { ExpeditionView } from "@games/rules";
+import type { ExpeditionAttemptView, ExpeditionView } from "@games/rules";
 import { cuesFor } from "./cues";
 
-type Camp = NonNullable<NonNullable<ExpeditionView["attempt"]>["camp"]>;
+type Attempt = ExpeditionAttemptView;
+type Camp = Attempt["camp"];
 type Obj = Camp["objectives"][number];
+type Log = Attempt["log"];
 
 const club3 = { id: "c3", identity: { kind: "standard", suit: "clubs", rank: 3 } } as const;
 const club4 = { id: "c4", identity: { kind: "standard", suit: "clubs", rank: 4 } } as const;
+
+const preview = { index: 1, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null };
 
 function objective(id: string, status: Obj["status"], ownerSeatId: string | null = null): Obj {
   return { id, kind: "no-tricks", ownerSeatId, status };
@@ -32,31 +36,44 @@ function camp(over: Partial<Camp> = {}): Camp {
   };
 }
 
-function game(over: Partial<ExpeditionView> = {}, campOver: Partial<Camp> = {}, log: ExpeditionView["attempt"] extends infer A ? (A extends { log: infer L } ? L : never) : never = []): ExpeditionView {
+function seat(seatId: string, characterId: string | null, kit: string[] = []): ExpeditionView["seats"][number] {
+  return { seatId, characterId, kit, pool: null, usage: [] };
+}
+
+function game(over: Partial<ExpeditionView> = {}, campOver: Partial<Camp> = {}, log: Log = [], attemptNumber = 1): ExpeditionView {
   return {
     yourSeatId: "a",
-    runPhase: "camp",
     runStatus: "in_progress",
-    campNumber: 1,
-    supplies: 5,
-    seats: [{ seatId: "a", characterId: "scout", kit: [], ready: true, draftPending: false, pool: null, usage: [] }],
-    yourDraftOffer: null,
+    length: "standard",
+    campCount: 6,
+    purse: 0,
+    supplies: { count: 5, max: 5 },
+    plan: [],
+    seats: [seat("a", "scout")],
     yourAbilities: [],
     history: [],
-    attempt: {
-      attemptNumber: 1,
-      window: null,
-      pendingSeatIds: [],
-      rescue: null,
-      effects: [],
-      reveals: [],
-      log,
-      yourWhisper: { allowed: true, left: 1 },
-      camp: camp(campOver),
+    lastVote: null,
+    stage: {
+      tag: "camp",
+      camp: preview,
+      attempt: {
+        attemptNumber,
+        window: null,
+        pendingSeatIds: [],
+        rescue: null,
+        effects: [],
+        reveals: [],
+        log,
+        yourWhisper: { allowed: true, left: 1 },
+        camp: camp(campOver),
+      },
     },
     ...over,
   };
 }
+
+const loadout: ExpeditionView["stage"] = { tag: "loadout", camp: preview, readySeatIds: [] };
+const draft: ExpeditionView["stage"] = { tag: "draft", cleared: 1, payout: 8, yourOffer: null, pendingSeatIds: [] };
 
 describe("cuesFor", () => {
   it("is silent on the first snapshot", () => {
@@ -82,12 +99,8 @@ describe("cuesFor", () => {
   });
 
   it("plays card-deal when a camp attempt begins, and again on a retry", () => {
-    const fireside = game({ runPhase: "fireside", attempt: null });
-    expect(cuesFor(fireside, game())).toEqual(["sfx-card-deal"]);
-
-    const retry = game();
-    retry.attempt!.attemptNumber = 2;
-    expect(cuesFor(game(), retry)).toEqual(["sfx-card-deal"]);
+    expect(cuesFor(game({ stage: loadout }), game())).toEqual(["sfx-card-deal"]);
+    expect(cuesFor(game(), game({}, {}, [], 2))).toEqual(["sfx-card-deal"]);
   });
 
   it("plays objective-done and objective-failed on status transitions", () => {
@@ -116,32 +129,24 @@ describe("cuesFor", () => {
   });
 
   it("plays supply-lost when supplies drop and the camp is cleared in the same step", () => {
-    const next = game({ supplies: 4, runPhase: "fireside", attempt: null, history: [{ campNumber: 1, attemptNumber: 1, status: "succeeded", suppliesSpent: 1 }] });
+    const next = game({ supplies: { count: 4, max: 5 }, stage: draft, history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }] });
     expect(cuesFor(game(), next)).toEqual(["sfx-supply-lost", "sfx-camp-cleared"]);
   });
 
   it("plays run-lost when the run is lost", () => {
-    expect(cuesFor(game(), game({ runStatus: "lost", runPhase: "ended" }))).toEqual(["sfx-run-lost"]);
+    expect(cuesFor(game(), game({ runStatus: "lost", stage: { tag: "ended", result: "lost" } }))).toEqual(["sfx-run-lost"]);
   });
 
-  it("plays equip when your character or kit changes at the fireside or muster", () => {
-    const fireside = (characterId: string | null, kit: string[]) =>
-      game({ runPhase: "fireside", attempt: null, seats: [{ seatId: "a", characterId, kit, ready: false, draftPending: false, pool: null, usage: [] }] });
-    expect(cuesFor(fireside(null, []), fireside("scout", []))).toEqual(["sfx-equip"]);
-    expect(cuesFor(fireside("scout", []), fireside("scout", ["bait"]))).toEqual(["sfx-equip"]);
-    expect(cuesFor(fireside("scout", ["bait"]), fireside("scout", ["bait"]))).toEqual([]);
+  it("plays equip when your character or kit changes at the trail or muster", () => {
+    const onTrail = (characterId: string | null, kit: string[]) => game({ stage: draft, seats: [seat("a", characterId, kit)] });
+    expect(cuesFor(onTrail(null, []), onTrail("scout", []))).toEqual(["sfx-equip"]);
+    expect(cuesFor(onTrail("scout", []), onTrail("scout", ["bait"]))).toEqual(["sfx-equip"]);
+    expect(cuesFor(onTrail("scout", ["bait"]), onTrail("scout", ["bait"]))).toEqual([]);
   });
 
   it("does not play equip for a teammate's kit change", () => {
-    const fireside = (mateKit: string[]) =>
-      game({
-        runPhase: "fireside",
-        attempt: null,
-        seats: [
-          { seatId: "a", characterId: "scout", kit: [], ready: false, draftPending: false, pool: null, usage: [] },
-          { seatId: "b", characterId: "guide", kit: mateKit, ready: false, draftPending: false, pool: null, usage: [] },
-        ],
-      });
-    expect(cuesFor(fireside([]), fireside(["bait"]))).toEqual([]);
+    const onTrail = (mateKit: string[]) =>
+      game({ stage: draft, seats: [seat("a", "scout"), seat("b", "guide", mateKit)] });
+    expect(cuesFor(onTrail([]), onTrail(["bait"]))).toEqual([]);
   });
 });

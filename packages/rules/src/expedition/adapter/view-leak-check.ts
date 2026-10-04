@@ -22,8 +22,9 @@
 
 import { identitiesEqual } from "../deck";
 import { CATALOG } from "../run/catalog";
+import { attemptOf } from "../run/attempt";
 import { rulesFor } from "../run/compose";
-import type { Catalog, RunState } from "../run/types";
+import type { AttemptState, Catalog, RunState } from "../run/types";
 import type { CardIdentity } from "../state";
 
 export interface ExpeditionSeatSecrets {
@@ -44,15 +45,7 @@ export interface ExpeditionSeatSecrets {
 }
 
 /** Keys a view object literal must never carry, at ANY nesting level. */
-export const FORBIDDEN_VIEW_KEYS = [
-  "seed",
-  "objectiveDeck",
-  "draftOffer",
-  "hands",
-  "audience",
-  "ledger",
-  "readySeatIds",
-] as const;
+export const FORBIDDEN_VIEW_KEYS = ["seed", "objectiveDeck", "draftOffer", "hands", "audience", "ledger"] as const;
 
 function identityKey(identity: CardIdentity): string {
   return identity.kind === "joker" ? `joker:${identity.joker}` : `standard:${identity.suit}:${identity.rank}`;
@@ -72,7 +65,7 @@ function typedKeyFromObj(obj: Record<string, unknown>): string | null {
  * the in-progress trick and the discards. Mirrors view.ts's findCardIdentity exactly
  * (this file must not call view.ts, so it is re-derived here, independently,
  * from RunState). Returns null (never throws) when not found. */
-function findCardIdentity(camp: NonNullable<RunState["attempt"]>["camp"], cardId: string): CardIdentity | null {
+function findCardIdentity(camp: AttemptState["camp"], cardId: string): CardIdentity | null {
   for (const hand of camp.hands) {
     const card = hand.cards.find((c) => c.id === cardId);
     if (card !== undefined) return card.identity;
@@ -106,13 +99,14 @@ export function secretsForExpeditionSeat(
   // view's `reveals` array carries one entry per such reveal, not one per
   // distinct card — so the allowed COUNT must bump once per matching
   // reveal, not once per distinct card id.
-  const revealsToViewer = state.attempt !== null && seated ? state.attempt.reveals.filter((r) => r.audience.includes(seatId) || (r.source === "whisper" && r.fromSeatId === seatId)) : [];
+  const attempt = attemptOf(state);
+  const revealsToViewer = attempt !== null && seated ? attempt.reveals.filter((r) => r.audience.includes(seatId) || (r.source === "whisper" && r.fromSeatId === seatId)) : [];
   const revealedToViewer = new Set(revealsToViewer.map((r) => r.cardId));
   // An effect the viewer may read names only ids its owner picked from their
   // own hand or the table; the owner keeps knowing that id after the card
   // moves (a Herb Tonic'd card swapped away), as with a reveal.
   const namedByVisibleEffects = new Set(
-    (state.attempt?.effects ?? [])
+    (attempt?.effects ?? [])
       .filter((effect) => effect.audience === "public" || (seated && effect.seatId === seatId))
       .flatMap((effect) => Object.values(effect.params).filter((value): value is string => typeof value === "string")),
   );
@@ -124,7 +118,7 @@ export function secretsForExpeditionSeat(
     counts[key] = (counts[key] ?? 0) + 1;
   };
 
-  const camp = state.attempt?.camp;
+  const camp = attempt?.camp;
   if (camp !== undefined) {
     const rules = rulesFor(state, catalog);
     for (const hand of camp.hands) {
@@ -169,9 +163,9 @@ export function secretsForExpeditionSeat(
     seated && ownSeat !== undefined && ownSeat.draftOffer !== null ? ownSeat.draftOffer : null;
 
   const visibleLogEntryCount =
-    state.attempt === null
+    attempt === null
       ? 0
-      : state.attempt.log.filter(
+      : attempt.log.filter(
           (entry) => entry.audience === "public" || (seated && entry.audience.includes(seatId)),
         ).length;
 
@@ -254,15 +248,16 @@ export function checkExpeditionViewForLeaks(input: {
     }
   }
 
-  if (input.view !== null && typeof input.view === "object" && "yourDraftOffer" in input.view) {
-    const viewDraftOffer = (input.view as Record<string, unknown>).yourDraftOffer;
+  const stage = input.view !== null && typeof input.view === "object" ? (input.view as Record<string, unknown>).stage : undefined;
+  if (stage !== null && typeof stage === "object" && "yourOffer" in stage) {
+    const viewDraftOffer = (stage as Record<string, unknown>).yourOffer;
     if (JSON.stringify(viewDraftOffer) !== JSON.stringify(input.secrets.ownDraftOffer)) {
       reasons.add("structural:draft-offer-mismatch");
     }
   }
 
-  if (input.view !== null && typeof input.view === "object") {
-    const attempt = (input.view as Record<string, unknown>).attempt;
+  if (stage !== null && typeof stage === "object") {
+    const attempt = (stage as Record<string, unknown>).attempt;
     if (attempt !== null && typeof attempt === "object" && Array.isArray((attempt as Record<string, unknown>).log)) {
       const log = (attempt as Record<string, unknown>).log as unknown[];
       if (log.length !== input.secrets.visibleLogEntryCount) {

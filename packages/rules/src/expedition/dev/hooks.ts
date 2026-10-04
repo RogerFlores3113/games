@@ -31,7 +31,9 @@ export const expeditionDevHooks: GameDevHooks<RunState> = {
 
   botMove: (run, seatIds) => botMove(run, seatIds, CATALOG),
 
-  milestone: (run) => `${run.campNumber}:${run.history.length}:${runStatus(run)}`,
+  // Changes exactly when a camp settles or the run ends, so autoplay's "end
+  // of camp" stop plays through votes, drafts and readies to the next settle.
+  milestone: (run) => `${run.history.length}:${runStatus(run)}`,
 
   inspect: (run) => inspectRun(run, CATALOG),
 };

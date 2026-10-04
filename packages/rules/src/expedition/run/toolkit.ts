@@ -12,7 +12,8 @@
 import { identitiesEqual } from "../deck";
 import type { CoreRules } from "../rules";
 import type { CampState, Objective } from "../state";
-import { STARTING_SUPPLIES } from "./balance";
+import { SUPPLIES_MAX } from "./balance";
+import { attemptOf, withAttempt } from "./attempt";
 import type { EffectParams, SourceId } from "../content/source-def";
 import type { ActiveEffect, AttemptState, LogEntry, Reveal, RunState } from "./types";
 
@@ -65,14 +66,14 @@ function assertAudience(run: RunState, audience: readonly string[], opName: stri
 /** Supplies are run-level; every other op changes only the attempt. */
 function applyOp(run: RunState, actorSeatId: string, sourceId: SourceId, op: ToolkitOp, rules: CoreRules): RunState {
   if (op.op === "adjust-supplies") {
-    // The crew keeps at least one supply and never exceeds the start.
+    // The crew keeps at least one supply and never exceeds the cap.
     const supplies = run.supplies + op.delta;
-    if (!Number.isInteger(op.delta) || supplies < 1 || supplies > STARTING_SUPPLIES) {
-      throw new Error(`toolkit: adjust-supplies: ${run.supplies} + ${op.delta} leaves [1, ${STARTING_SUPPLIES}]`);
+    if (!Number.isInteger(op.delta) || supplies < 1 || supplies > SUPPLIES_MAX) {
+      throw new Error(`toolkit: adjust-supplies: ${run.supplies} + ${op.delta} leaves [1, ${SUPPLIES_MAX}]`);
     }
     return { ...run, supplies };
   }
-  return { ...run, attempt: applyAttemptOp(run, run.attempt!, actorSeatId, sourceId, op, rules) };
+  return withAttempt(run, applyAttemptOp(run, attemptOf(run)!, actorSeatId, sourceId, op, rules));
 }
 
 function applyAttemptOp(
@@ -311,18 +312,19 @@ function applyAttemptOp(
  * corrupting state. `rules` are the camp's composed rules before the ops,
  * which the objective guards read. */
 export function applyToolkitOps(run: RunState, actorSeatId: string, sourceId: SourceId, ops: readonly ToolkitOp[], rules: CoreRules): RunState {
-  if (run.attempt === null) {
+  const attempt = attemptOf(run);
+  if (attempt === null) {
     throw new Error("toolkit: applyToolkitOps: no attempt in progress");
   }
 
-  const beforeIds = campCardIds(run.attempt.camp);
+  const beforeIds = campCardIds(attempt.camp);
 
   let next = run;
   for (const op of ops) {
     next = applyOp(next, actorSeatId, sourceId, op, rules);
   }
 
-  const afterIds = campCardIds(next.attempt!.camp);
+  const afterIds = campCardIds(attemptOf(next)!.camp);
   if (afterIds.length !== beforeIds.length || afterIds.some((id, i) => id !== beforeIds[i])) {
     throw new Error("toolkit: card conservation violated");
   }

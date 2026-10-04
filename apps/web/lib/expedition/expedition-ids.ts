@@ -89,6 +89,16 @@ export function draftObjectId(sourceId: string): string {
   return `draft:${sourceId}`;
 }
 
+/** A run length on the muster's ballot. */
+export function lengthObjectId(lengthId: string): string {
+  return `length:${lengthId}`;
+}
+
+/** A route option on the route vote. */
+export function routeObjectId(routeId: string): string {
+  return `route:${routeId}`;
+}
+
 export function kitObjectId(sourceId: string): string {
   return `kit:${sourceId}`;
 }

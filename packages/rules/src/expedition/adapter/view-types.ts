@@ -16,10 +16,11 @@
 //   - audience-filtered reveals and log: `attempt.reveals`, `attempt.log`
 //     (never carries an `audience` key — see (c))
 //   - public characters, kits, pools and usage: `seats[]`
-//   - own draft offer only: `yourDraftOffer` (never any other seat's)
+//   - own draft offer only: the draft stage's `yourOffer` (never any other seat's)
 //   - own abilities with server-computed target choices: `yourAbilities`
 //   - removed cards: `camp.removedCards`
-//   - supplies/camp/phase: `supplies`, `campNumber`, `runPhase`, `runStatus`
+//   - the run header: `length`, `campCount`, `purse`, `supplies`, `plan`,
+//     `history`, `lastVote`, `runStatus`; the stage and its data: `stage`
 //
 // (c) Deliberately ABSENT keys, at every nesting level in this file: `seed`,
 // `objectiveDeck`, any other seat's `draftOffer`, any `ledger`, `audience`.
@@ -38,6 +39,9 @@
 import type { StandardRank, Suit } from "../state";
 import type { TargetKind } from "../run/targets";
 import type { ActiveWindow } from "../run/windows";
+import type { BossTier } from "../run/plan";
+import type { SlotTemplate } from "../run/route";
+import type { RunLength } from "../run/types";
 
 export type ExpeditionCardIdentityView =
   | { kind: "standard"; suit: Suit; rank: StandardRank }
@@ -190,14 +194,12 @@ export type ExpeditionRemainingView =
   | { kind: "supplies"; cost: number };
 
 // Deliberately no `draftOffer`/`ledger` keys for any seat: a seat's
-// character, kit, pool and per-source usage are public; its draft offer is
-// a boolean here and the viewer's own offer is `yourDraftOffer`.
+// character, kit, pool and per-source usage are public; the viewer's own
+// draft offer is the draft stage's `yourOffer`.
 export type ExpeditionSeatView = {
   seatId: string;
   characterId: string | null;
   kit: string[];
-  ready: boolean;
-  draftPending: boolean;
   pool: { balance: number; max: number } | null;
   /** Every live source with an active ability. */
   usage: { sourceId: string; remaining: ExpeditionRemainingView }[];
@@ -208,19 +210,57 @@ export type ExpeditionAbilityStepView = { kind: TargetKind; prompt: string; choi
 /** The viewer's own abilities. `steps` is [] unless usableNow. */
 export type ExpeditionAbilityView = { sourceId: string; usableNow: boolean; reason: string | null; steps: ExpeditionAbilityStepView[] };
 
-export type ExpeditionCampResultView = { campNumber: number; attemptNumber: number; status: "succeeded" | "failed"; suppliesSpent: number };
+export type ExpeditionCampResultView = { camp: number; attempt: number; status: "cleared" | "failed"; coins: number };
+
+export type ExpeditionRunLengthView = RunLength;
+export type ExpeditionSlotKindView = SlotTemplate["kind"];
+
+/** A camp as a preview shows it: before the deal, on a route card, or
+ * during play. `bossId` is null for a plain camp or a boss not drawn. */
+export type ExpeditionCampPreviewView = {
+  index: number;
+  location: string;
+  weather: string;
+  event: string | null;
+  slotKinds: ExpeditionSlotKindView[];
+  bossId: string | null;
+};
+
+/** A seat's public ballot; `choice` null abstains. Seats yet to vote are absent. */
+export type ExpeditionBallotView = { seatId: string; choice: string | null };
+
+export type ExpeditionVoteView = {
+  topic: "length" | "route";
+  tally: { choice: string; votes: number }[];
+  /** The tied choices a seeded flip settled; null for a clear majority. */
+  tied: string[] | null;
+  winner: string;
+};
+
+export type ExpeditionPlanBossView = { at: number; tier: BossTier; bossId: string | null };
+
+export type ExpeditionStageView =
+  | { tag: "muster"; ballots: ExpeditionBallotView[] }
+  | { tag: "loadout"; camp: ExpeditionCampPreviewView; readySeatIds: string[] }
+  | { tag: "camp"; camp: ExpeditionCampPreviewView; attempt: ExpeditionAttemptView }
+  | { tag: "draft"; cleared: number; payout: number; yourOffer: string[] | null; pendingSeatIds: string[] }
+  | { tag: "route"; options: { id: string; next: ExpeditionCampPreviewView }[]; ballots: ExpeditionBallotView[] }
+  | { tag: "event"; event: string; next: ExpeditionCampPreviewView; readySeatIds: string[] }
+  | { tag: "ended"; result: "won" | "lost" };
 
 // Deliberately no `seed` key anywhere in this type: the run's RNG root must
 // never be projected to any client (T-11-03).
 export type ExpeditionView = {
   yourSeatId: string | null;
-  runPhase: "muster" | "fireside" | "camp" | "ended";
   runStatus: "in_progress" | "won" | "lost";
-  campNumber: number;
-  supplies: number;
+  length: ExpeditionRunLengthView | null;
+  campCount: number | null;
+  purse: number;
+  supplies: { count: number; max: number };
+  plan: ExpeditionPlanBossView[];
   seats: ExpeditionSeatView[];
-  yourDraftOffer: string[] | null;
   yourAbilities: ExpeditionAbilityView[];
   history: ExpeditionCampResultView[];
-  attempt: ExpeditionAttemptView | null;
+  lastVote: ExpeditionVoteView | null;
+  stage: ExpeditionStageView;
 };

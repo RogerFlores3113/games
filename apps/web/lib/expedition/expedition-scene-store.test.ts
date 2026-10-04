@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ExpeditionAbilityView, ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
+import type { ExpeditionAbilityView, ExpeditionCampView, ExpeditionStageView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
 import type { RoomSeatInfo, SceneModel, SceneServerInput } from "./build-scene-model";
 import { beginAbilityTargeting, selectTarget, setTooltipSource } from "./local-ui";
 import { createExpeditionSceneStore, type ExpeditionSceneStore } from "./expedition-scene-store";
@@ -48,36 +48,45 @@ function makeCamp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampVi
 function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
   return {
     yourSeatId: "s2",
-    runPhase: "camp",
     runStatus: "in_progress",
-    campNumber: 2,
-    supplies: 5,
+    length: "standard",
+    campCount: 6,
+    purse: 0,
+    supplies: { count: 5, max: 5 },
+    plan: [],
     seats: [
-      { seatId: "s1", characterId: "guide", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
-      { seatId: "s2", characterId: "scout", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
-      { seatId: "s3", characterId: "medic", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
+      { seatId: "s1", characterId: "guide", kit: [], pool: null, usage: [] },
+      { seatId: "s2", characterId: "scout", kit: [], pool: null, usage: [] },
+      { seatId: "s3", characterId: "medic", kit: [], pool: null, usage: [] },
     ],
-    yourDraftOffer: null,
     yourAbilities: [SCOUT],
     history: [],
-    attempt: {
-      attemptNumber: 1,
-      window: "between-tricks",
-      pendingSeatIds: [],
-      rescue: null,
-      effects: [],
-      reveals: [],
-      log: [],
-      yourWhisper: { allowed: true, left: 1 },
-      camp: makeCamp(),
+    lastVote: null,
+    stage: {
+      tag: "camp",
+      camp: { index: 2, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null },
+      attempt: {
+        attemptNumber: 1,
+        window: "between-tricks",
+        pendingSeatIds: [],
+        rescue: null,
+        effects: [],
+        reveals: [],
+        log: [],
+        yourWhisper: { allowed: true, left: 1 },
+        camp: makeCamp(),
+      },
     },
     ...overrides,
   };
 }
 
-function fireside(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
-  return makeView({ runPhase: "fireside", attempt: null, ...overrides });
+function onTrail(stage: ExpeditionStageView, overrides: Partial<ExpeditionView> = {}): ExpeditionView {
+  return makeView({ stage, ...overrides });
 }
+
+const draftOffer: ExpeditionStageView = { tag: "draft", cleared: 1, payout: 8, yourOffer: ["trained-monkey"], pendingSeatIds: ["s2"] };
+const ended: ExpeditionStageView = { tag: "ended", result: "lost" };
 
 function server(view: ExpeditionView, seats = roomSeats()): SceneServerInput {
   return { game: view, roomSeats: seats, hostSeatId: "s1" };
@@ -107,17 +116,17 @@ describe("createExpeditionSceneStore", () => {
     expect(campModel(store).cardPackId).toBe("big-index");
   });
 
-  it("setServer with a fireside view builds the fireside model", () => {
+  it("setServer with a draft view builds the trail model", () => {
     const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
-    store.getState().setServer(server(fireside({ yourDraftOffer: ["trained-monkey"] })));
+    store.getState().setServer(server(onTrail(draftOffer)));
     const state = store.getState();
-    expect(state.sceneKey).toBe("fireside");
-    expect(state.model).toMatchObject({ sceneKey: "fireside", prompt: { text: "Take one to bring along", tone: "your-move" } });
+    expect(state.sceneKey).toBe("trail");
+    expect(state.model).toMatchObject({ sceneKey: "trail", prompt: { text: "Camp 1 cleared! +8 coins. Take one", tone: "your-move" } });
   });
 
   it("setServer with an ended run builds the run-end model", () => {
     const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
-    store.getState().setServer(server(makeView({ runPhase: "ended", runStatus: "lost", attempt: null })));
+    store.getState().setServer(server(makeView({ runStatus: "lost", stage: ended })));
     expect(store.getState().sceneKey).toBe("run-end");
     expect(store.getState().model).toMatchObject({ sceneKey: "run-end", outcome: "lost", isHost: false });
   });
@@ -125,7 +134,7 @@ describe("createExpeditionSceneStore", () => {
   it("restartLobby calls onRestartLobby, except while reconnecting", () => {
     const restarts: string[] = [];
     const store = createExpeditionSceneStore({ onAction: vi.fn(), onRestartLobby: () => restarts.push("restart"), cardPackId: "big-index" });
-    store.getState().setServer(server(makeView({ runPhase: "ended", runStatus: "lost", attempt: null })));
+    store.getState().setServer(server(makeView({ runStatus: "lost", stage: ended })));
     store.getState().setReconnecting(true);
     store.getState().restartLobby();
     expect(restarts).toEqual([]);
@@ -188,13 +197,13 @@ describe("createExpeditionSceneStore", () => {
 
   it("updateLocalUi keeps the same model when the UI is unchanged, and rebuilds it when it changes", () => {
     const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
-    store.getState().setServer(server(fireside({ yourDraftOffer: ["trained-monkey"] })));
+    store.getState().setServer(server(onTrail(draftOffer)));
     store.getState().updateLocalUi((ui) => setTooltipSource(ui, "trained-monkey"));
     const hovered = store.getState().model;
     store.getState().updateLocalUi((ui) => setTooltipSource(ui, "trained-monkey"));
     expect(store.getState().model).toBe(hovered);
     store.getState().updateLocalUi((ui) => setTooltipSource(ui, null));
-    expect(store.getState().model).toMatchObject({ sceneKey: "fireside", tooltip: null });
+    expect(store.getState().model).toMatchObject({ sceneKey: "trail", tooltip: null });
   });
 
   it("updateLocalUi is a no-op when server is null", () => {

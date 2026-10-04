@@ -1,4 +1,5 @@
 import { IDLE_DRAG, gestureCardId, type DragState } from "./card-drag";
+import { attemptOf } from "./view-access";
 import type { ExpeditionAbilityStepView, ExpeditionTargetKind, ExpeditionView, RunAction } from "@games/rules";
 
 /**
@@ -61,7 +62,7 @@ export function initialLocalUi(): LocalUiState {
 }
 
 function currentHandIds(view: ExpeditionView): string[] {
-  return view.attempt?.camp?.yourHand.map((c) => c.id) ?? [];
+  return attemptOf(view)?.camp.yourHand.map((c) => c.id) ?? [];
 }
 
 function whisperSteps(view: ExpeditionView): ExpeditionAbilityStepView[] {
@@ -142,7 +143,7 @@ export function beginAbilityTargeting(ui: LocalUiState, view: ExpeditionView, so
 /** Begins Whisper targeting (a card, then a teammate). A no-op unless it is
  * currently the between-tricks window and the viewer holds a seat. */
 export function beginWhisper(ui: LocalUiState, view: ExpeditionView): LocalUiState {
-  if (view.attempt?.window !== "between-tricks" || view.yourSeatId === null) return ui;
+  if (attemptOf(view)?.window !== "between-tricks" || view.yourSeatId === null) return ui;
   return { ...ui, targeting: { mode: "whisper", selected: [] } };
 }
 
@@ -205,7 +206,7 @@ export function reconcileLocalUi(ui: LocalUiState, view: ExpeditionView): LocalU
     const stillOpen =
       targeting.mode === "ability"
         ? view.yourAbilities.some((a) => a.sourceId === targeting.sourceId && a.usableNow)
-        : view.attempt?.window === "between-tricks";
+        : attemptOf(view)?.window === "between-tricks";
     if (!stillOpen) {
       next = { ...next, targeting: null };
     } else {

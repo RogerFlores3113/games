@@ -2,7 +2,7 @@
 //
 // COMPOSITION ORDER: base -> each seat's live passives
 // (seat order, then [character, ...kit] order) -> active effects (in the
-// order stored on attempt.effects). Every layer's RuleModifier maps the PREVIOUS
+// order stored on the attempt's effects). Every layer's RuleModifier maps the PREVIOUS
 // layer's answer to its own, per hook (run-rules.ts's own header repeats
 // this contract; this file is what actually folds it).
 //
@@ -32,6 +32,7 @@ import { cardReading, isTrump } from "../trick";
 import { HOOK_NAMES, baseRunHooks, type HookName, type RuleModifier, type RunRules } from "./run-rules";
 import type { Catalog, RunState } from "./types";
 import { liveSourceIds, ownerOf, sourceDef } from "./usage";
+import { attemptOf } from "./attempt";
 
 const CARD_HOOKS = ["identityOf", "isTrump", "rankOf"] as const;
 type CardHook = (typeof CARD_HOOKS)[number];
@@ -87,9 +88,10 @@ export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
     }
   }
 
-  if (run.attempt !== null) {
-    const trickIndex = run.attempt.camp.currentTrick.index;
-    for (const effect of run.attempt.effects) {
+  const attempt = attemptOf(run);
+  if (attempt !== null) {
+    const trickIndex = attempt.camp.currentTrick.index;
+    for (const effect of attempt.effects) {
       // A trick-scoped effect bends only the trick it was stamped with:
       // applyCampAction resolves trickWinner while currentTrick.index still
       // equals atTrick, and the next trick's index drops the layer.

@@ -230,13 +230,12 @@ const RemainingViewSchema = z.discriminatedUnion("kind", [
 ]);
 
 // Deliberately no `draftOffer`/`ledger` keys for any seat: character, kit,
-// pool and per-source usage are public; a seat's draft is a boolean here.
+// pool and per-source usage are public; the viewer's own draft offer is the
+// draft stage's `yourOffer`.
 const SeatViewSchema = z.strictObject({
   seatId: z.string().min(1),
   characterId: z.string().min(1).nullable(),
   kit: z.array(z.string().min(1)),
-  ready: z.boolean(),
-  draftPending: z.boolean(),
   pool: z.strictObject({ balance: z.number().int(), max: z.number().int().min(0) }).nullable(),
   usage: z.array(z.strictObject({ sourceId: z.string().min(1), remaining: RemainingViewSchema })),
 });
@@ -255,32 +254,76 @@ const AbilityViewSchema = z.strictObject({
   steps: z.array(AbilityStepViewSchema),
 });
 
+const CampIndexSchema = z.number().int().min(1);
+
 const CampResultViewSchema = z.strictObject({
-  // Plain ranged number (not a union of literals), matching the top-level
-  // `campNumber` field's convention below and `ExpeditionCampResultView`'s
-  // `campNumber: number` — a literal-union inferred type here would make
-  // `ExpeditionView` (whose history entries carry plain `number`) fail the
-  // compile-time `[ExpeditionView] extends [ExpeditionViewWire]` assertion
-  // in game-registration.ts (found via that assertion, Plan 11-06).
-  campNumber: z.number().int().min(1).max(6),
-  attemptNumber: z.number().int().min(1),
-  status: z.enum(["succeeded", "failed"]),
-  suppliesSpent: z.number().int().min(0),
+  camp: CampIndexSchema,
+  attempt: z.number().int().min(1),
+  status: z.enum(["cleared", "failed"]),
+  coins: z.number().int().min(0),
 });
+
+const RunLengthSchema = z.enum(["short", "standard", "long"]);
+
+const CampPreviewViewSchema = z.strictObject({
+  index: CampIndexSchema,
+  location: z.string().min(1),
+  weather: z.string().min(1),
+  event: z.string().min(1).nullable(),
+  slotKinds: z.array(z.enum(["win-card", "ordered", "no-tricks", "exactly-n", "trick-count"])),
+  bossId: z.string().min(1).nullable(),
+});
+
+const BallotViewSchema = z.strictObject({ seatId: z.string().min(1), choice: z.string().min(1).nullable() });
+
+const VoteViewSchema = z.strictObject({
+  topic: z.enum(["length", "route"]),
+  tally: z.array(z.strictObject({ choice: z.string().min(1), votes: z.number().int().min(0) })),
+  tied: z.array(z.string().min(1)).nullable(),
+  winner: z.string().min(1),
+});
+
+const PlanBossViewSchema = z.strictObject({
+  at: CampIndexSchema,
+  tier: z.enum(["animal", "disaster", "temple"]),
+  bossId: z.string().min(1).nullable(),
+});
+
+const StageViewSchema = z.discriminatedUnion("tag", [
+  z.strictObject({ tag: z.literal("muster"), ballots: z.array(BallotViewSchema) }),
+  z.strictObject({ tag: z.literal("loadout"), camp: CampPreviewViewSchema, readySeatIds: z.array(z.string().min(1)) }),
+  z.strictObject({ tag: z.literal("camp"), camp: CampPreviewViewSchema, attempt: AttemptViewSchema }),
+  z.strictObject({
+    tag: z.literal("draft"),
+    cleared: CampIndexSchema,
+    payout: z.number().int().min(0),
+    yourOffer: z.array(z.string().min(1)).nullable(),
+    pendingSeatIds: z.array(z.string().min(1)),
+  }),
+  z.strictObject({
+    tag: z.literal("route"),
+    options: z.array(z.strictObject({ id: z.string().min(1), next: CampPreviewViewSchema })),
+    ballots: z.array(BallotViewSchema),
+  }),
+  z.strictObject({ tag: z.literal("event"), event: z.string().min(1), next: CampPreviewViewSchema, readySeatIds: z.array(z.string().min(1)) }),
+  z.strictObject({ tag: z.literal("ended"), result: z.enum(["won", "lost"]) }),
+]);
 
 // Deliberately no `seed` key anywhere in this schema: the run's RNG root
 // must never be projected to any client (T-11-03/T-11-09).
 export const ExpeditionViewSchema = z.strictObject({
   yourSeatId: z.string().min(1).nullable(),
-  runPhase: z.enum(["muster", "fireside", "camp", "ended"]),
   runStatus: z.enum(["in_progress", "won", "lost"]),
-  campNumber: z.number().int().min(1).max(6),
-  supplies: z.number().int().min(0),
+  length: RunLengthSchema.nullable(),
+  campCount: z.number().int().min(1).nullable(),
+  purse: z.number().int().min(0),
+  supplies: z.strictObject({ count: z.number().int().min(0), max: z.number().int().min(1) }),
+  plan: z.array(PlanBossViewSchema),
   seats: z.array(SeatViewSchema),
-  yourDraftOffer: z.array(z.string().min(1)).nullable(),
   yourAbilities: z.array(AbilityViewSchema),
   history: z.array(CampResultViewSchema),
-  attempt: AttemptViewSchema.nullable(),
+  lastVote: VoteViewSchema.nullable(),
+  stage: StageViewSchema,
 });
 
 export type ExpeditionViewWire = z.infer<typeof ExpeditionViewSchema>;

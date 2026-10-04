@@ -46,20 +46,50 @@ card or was discarded, and fails if never played by the final trick.
   two upgrades; `content/items/<id>.ts` is one item. Each folder has a
   `registry.ts` (`CHARACTERS`, `ITEMS`). `content/helpers.ts` holds shared
   effect helpers (`winnerExcluding`, `freshObjectiveAvailable`).
-- **`run/`**: the six-camp run on top of Core. `run/types.ts` (`RunState`,
-  `SeatRun` with its `ledger`, `RunAction`, `Catalog`), `run/lifecycle.ts`
-  (muster, `startAttempt`, which deals at once, rescue-aware
-  `settleIfDecided`), `run/run-actions.ts` (`applyRunAction`, the single run-level
-  transition), `run/abilities.ts` (`abilityStatus`, `useAbility`,
-  `passWindow`), `run/targets.ts` (`TARGET_KINDS`, `resolveTargets`,
-  `stepsFor`), `run/windows.ts` (`WINDOWS`, `currentWindow`,
-  `gatedPendingSeatIds`), `run/usage.ts` (`remaining`, `poolBalance`,
-  `liveSourceIds`), `run/compose.ts` (`rulesFor`, the rule layers), `run/run-rules.ts`
-  (`RunHooks`, `HOOK_NAMES`), `run/toolkit.ts` (`ToolkitOp`,
-  `applyToolkitOps`, the only mutation surface for abilities),
-  `run/draft.ts`, `run/whisper.ts`, `run/balance.ts` (the tunable ramp),
-  `run/rng.ts` (`STREAMS`, `seededIndex`) and `run/catalog.ts`'s `CATALOG`
-  (`{ characters, items }` plus the flattened `sources` index).
+- **`run/`**: the staged run on top of Core. `run/types.ts` (`RunState`,
+  its `Stage` union and `RunAt<T>`, `SeatRun` with its `ledger`,
+  `RunAction`, `Catalog`), `run/stages/` (`registry.ts`'s `STAGES` and
+  `applyRunAction`, the single run-level transition, plus one file per
+  stage: muster, loadout, camp, draft, route, event), `run/lifecycle.ts`
+  (`createRun`, `runStatus`, `dealCamp`, `settleCamp`), `run/plan.ts`
+  (`RunPlan`, `campIndex`, `drawPlan`), `run/route.ts` (`CampSpec`,
+  `firstCampSpec`, `routeOptions`), `run/vote.ts` (`tally`),
+  `run/attempt.ts` (`attemptOf`, `withAttempt`), `run/abilities.ts`
+  (`abilityStatus`, `useAbility`, `passWindow`), `run/targets.ts`
+  (`TARGET_KINDS`, `resolveTargets`, `stepsFor`), `run/windows.ts`
+  (`WINDOWS`, `currentWindow`, `gatedPendingSeatIds`), `run/usage.ts`
+  (`remaining`, `poolBalance`, `liveSourceIds`), `run/compose.ts`
+  (`rulesFor`, the rule layers), `run/run-rules.ts` (`RunHooks`,
+  `HOOK_NAMES`), `run/toolkit.ts` (`ToolkitOp`, `applyToolkitOps`, the only
+  mutation surface for abilities), `run/draft.ts`, `run/whisper.ts`,
+  `run/balance.ts` (every tunable number), `run/rng.ts` (`STREAMS`,
+  `seededIndex`) and `run/catalog.ts`'s `CATALOG` (`{ characters, items }`
+  plus the flattened `sources` index). `content/events/` holds `EVENTS`.
+
+**The run loop.** A run is a stored stage, and `applyRunAction` is the one
+transition: it refuses an action type the stage does not accept
+(`wrong_stage`), runs the stage's handler, then advances stage by stage
+until the tag stops changing.
+
+1. **Muster.** Each seat sends `pick-character` and `vote { choice }`
+   ("short", "standard", "long", or null to abstain). A ballot may change
+   until the vote resolves. The last missing input resolves it (majority,
+   else a seeded coin flip recorded in `lastVote`), draws the plan and opens
+   the loadout for camp 1 (the Jungle, fair weather).
+2. **Loadout.** Each seat sends `ready`; the last one deals the camp.
+3. **Camp.** Play as before. A decided camp settles unless a rescue is
+   pending.
+4. **Settle.** A failure costs supplies and reopens the loadout for the same
+   camp spec with a fresh deal; 0 supplies ends the run. A clear pays
+   `5 + min(3, unplayed tricks)` into the shared purse and deals every seat
+   a private draft offer, or wins the run at the final camp.
+5. **Draft.** Each seat with an offer sends `pick-draft`.
+6. **Route.** Each seat votes over 2 or 3 options to the next camp.
+7. **Event.** A stub with no effect yet. Each seat sends `ready`, then the
+   next camp's loadout opens.
+
+A disconnected seat's ballot is cast as an abstention by the worker's
+auto-pass after the existing grace.
 
 **Layering order** (`run/compose.ts`): **base, then per seat (seat order)
 each live source's passive in `[character, ...kit]` order, then each live
@@ -85,12 +115,17 @@ draw derives a fresh, uniquely named stream via `run/rng.ts`'s `STREAMS`:
 
 | Draw | Stream name |
 |---|---|
-| Draft, upgrade slot | `expedition-draft:camp{N}:seat{id}:upgrade` |
-| Draft, item slots | `expedition-draft:camp{N}:seat{id}:items` |
-| Attempt deal seed | `{seed}:camp{N}:attempt{A}` |
-| Ability draws (`ctx.randomCards`, `ctx.randomIndex`) | `expedition-ability:camp{N}:attempt{A}:seat{id}:use{k}:draw{j}` |
+| Length vote tie | `expedition-vote:length` |
+| Route vote tie | `expedition-vote:route:camp{k}` (k = the next camp) |
+| Route option count | `expedition-route:camp{k}:count` |
+| Route option field | `expedition-route:camp{k}:reroll{r}:option{i}:{event\|mix}` |
+| Draft, upgrade slot | `expedition-draft:camp{k}:seat{id}:upgrade` (k = the cleared camp) |
+| Draft, item slots | `expedition-draft:camp{k}:seat{id}:items` |
+| Attempt deal seed | `{seed}:camp{k}:attempt{A}` |
+| Trick-count kind and N | `expedition-trickcount-{kind\|n}:camp{k}:attempt{A}` |
+| Ability draws (`ctx.randomCards`, `ctx.randomIndex`) | `expedition-ability:camp{k}:attempt{A}:seat{id}:use{u}:draw{j}` |
 
-`k` is the seat's ledger length before the use and `j` counts draws inside
+`u` is the seat's ledger length before the use and `j` counts draws inside
 one `apply`; the context builds both, so an ability never names a stream.
 
 ## Add an item
@@ -173,7 +208,7 @@ that card can't win this one trick.
    for every eligible seat to use or pass), `isOpen(run, rules)` and
    `mayAct(run, rules, seatId)`. The `isOpen` predicates must stay mutually
    exclusive: `currentWindow` assumes at most one is open.
-2. A gated window needs a hold in `run/lifecycle.ts`'s `settleIfDecided`
+2. A gated window needs a hold in `run/stages/camp.ts`'s `settleIfDecided`
    (rescue holds the settle) and is passed with `skip-window`.
    `gatedPendingSeatIds` already counts any gated window.
 3. The web client shows a gated window as the banner on the stump
@@ -292,11 +327,14 @@ to turn it on. The web app shows the panel when `NODE_ENV` is `development`
 - Lobby: "Add bot" seats a bot (a seat nobody connects to). Two bots plus you
   is a legal Expedition table.
 - Autoplay: pick who it plays for (bots, everyone but me, everyone) and when
-  it stops (your decision, or the end of the current camp), with a step cap.
+  it stops (your decision, or the next camp to settle), with a step cap.
+  Bots abstain from votes, so your ballot decides.
   "Bots act automatically" re-runs bot autoplay after every change.
-- Shortcuts: jump to a camp, jump to the final camp, end the run won or lost,
-  force the camp to succeed or fail, set supplies, set a seat's character or
-  kit, give a source, move a card between hands, set an objective's owner.
+- Shortcuts: jump to a camp of a chosen run length (arriving at its
+  loadout or dealt), jump to the final camp, end the run won or lost, force
+  the camp to clear or fail (through the real settle), set supplies, set the
+  purse, set a seat's character or kit, give a source, move a card between
+  hands, set an objective's owner.
 - Reveal all hands: a plain-text dump of every hand, objective and trick.
 - State: the whole `RunState` as JSON. Edit and Apply; the worker parses it
   with `ExpeditionRunStateSchema` and then `dev/check.ts` (card conservation,
@@ -330,7 +368,7 @@ whichever shortcuts touch the changed fields.
   window, the next attempt number, every seat's remaining Whisper count and
   every source's remaining uses are *computed* from `CampState`/`RunState`
   and the seat ledgers on every call (`campPhase`, `checkCampOutcome`,
-  `currentActorSeatId`, `currentWindow`, `runPhase`, `runStatus`,
+  `currentActorSeatId`, `currentWindow`, `runStatus`,
   `nextAttemptNumber`, `whispersUsedBy`, `remaining`). None is a stored
   field; rescue is not a stored mode. A composed `RunRules` value is likewise never cached
   (`run/compose.ts`'s `rulesFor` recomputes fresh every call); this is what
@@ -353,7 +391,7 @@ whichever shortcuts touch the changed fields.
   literal, at any nesting level — since it is the root of every RNG stream
   and its exposure would let a client predict future draws. `SeatRun.draftOffer`
   is likewise redacted to a plain per-seat conditional lookup: a viewer's
-  `yourDraftOffer` is their own offer or `null`, never another seat's. Both
+  draft stage's `yourOffer` is their own offer or `null`, never another seat's. Both
   are proven redacted by `adapter/view.property.test.ts`'s whole-run
   per-seat leak property (COMM-03/ENG-03).
 - **A reveal pins identity only (WR-03).** A `Reveal` shows the card's

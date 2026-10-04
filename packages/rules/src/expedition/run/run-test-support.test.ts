@@ -5,9 +5,12 @@
 import { describe, expect, it } from "vitest";
 import { ability, defineItem } from "../content/source-def";
 import { rulesFor } from "./compose";
-import { createRun, runPhase, runStatus } from "./lifecycle";
-import { applyRunAction } from "./run-actions";
+import { attemptOf } from "./attempt";
+import { createRun, runStatus } from "./lifecycle";
+import { campIndex } from "./plan";
+import { applyRunAction } from "./stages/registry";
 import { advanceTo, driveRun, enumerateLegalRunActions, replayRun, setupRun, testCatalog } from "./run-test-support";
+import type { RunState } from "./types";
 import { currentWindow } from "./windows";
 
 const ITEMS = {
@@ -44,26 +47,32 @@ const catalog = testCatalog({ items: ITEMS });
 const SEAT_IDS = ["p0", "p1", "p2"];
 
 describe("setupRun", () => {
-  it("builds a fireside RunState with the given campNumber, cleared drafts, assigned characters and the requested kit", () => {
+  it("builds a RunState at the loadout of the given camp, with cleared drafts, assigned characters and the requested kit", () => {
     const run = setupRun({
       seatIds: SEAT_IDS,
       seed: "setup-seed",
       catalog,
-      campNumber: 4,
+      camp: 4,
       characters: { p0: "plain-3" },
       kits: { p0: ["item-passive"] },
     });
 
-    expect(run.campNumber).toBe(4);
+    expect(run.stage.tag).toBe("loadout");
+    expect(run.stage.tag === "loadout" && run.stage.camp.index).toBe(4);
+    expect(run.plan).toEqual({ length: "standard", bosses: [{ at: 3, tier: "animal", modId: null }, { at: 6, tier: "temple", modId: null }] });
     expect(run.supplies).toBe(3);
-    expect(runPhase(run)).toBe("fireside");
     expect(run.seats.map((s) => s.draftOffer)).toEqual([null, null, null]);
     expect(run.seats.map((s) => s.characterId)).toEqual(["plain-3", "plain-1", "plain-2"]);
     expect(run.seats.map((s) => s.kit)).toEqual([["item-passive"], [], []]);
   });
 
   it("honors a supplies override", () => {
-    expect(setupRun({ seatIds: SEAT_IDS, seed: "s", catalog, supplies: 7 }).supplies).toBe(7);
+    expect(setupRun({ seatIds: SEAT_IDS, seed: "s", catalog, supplies: 2 }).supplies).toBe(2);
+  });
+
+  it("plans a run of the requested length", () => {
+    const run = setupRun({ seatIds: SEAT_IDS, seed: "s", catalog, length: "short" });
+    expect(run.plan).toEqual({ length: "short", bosses: [{ at: 4, tier: "temple", modId: null }] });
   });
 
   it("throws when the catalogue has too few characters for the crew", () => {
@@ -76,13 +85,13 @@ describe("setupRun", () => {
 describe("advanceTo", () => {
   it("reaches objective-pick once every seat readies", () => {
     const result = advanceTo(setupRun({ seatIds: SEAT_IDS, seed: "adv-3", catalog }), "objective-pick", catalog);
-    expect(runPhase(result)).toBe("camp");
+    expect(result.stage.tag).toBe("camp");
     expect(currentWindow(result, rulesFor(result, catalog))).toBe("objective-pick");
   });
 
   it("reaches between-tricks by picking every seat's first unowned objective", () => {
     const result = advanceTo(setupRun({ seatIds: SEAT_IDS, seed: "adv-4", catalog }), "between-tricks", catalog);
-    expect(runPhase(result)).toBe("camp");
+    expect(result.stage.tag).toBe("camp");
     expect(currentWindow(result, rulesFor(result, catalog))).toBe("between-tricks");
   });
 });
@@ -107,15 +116,47 @@ describe("enumerateLegalRunActions", () => {
     );
   });
 
-  it("at the fireside with a draft pending, offers its pick-drafts and no ready for that seat", () => {
-    const base = setupRun({ seatIds: SEAT_IDS, seed: "enum-3", catalog });
-    const run = { ...base, seats: base.seats.map((s) => (s.seatId === "p0" ? { ...s, draftOffer: ["item-passive", "item-between"] } : s)) };
-    const candidates = enumerateLegalRunActions(run, catalog);
-    expect(candidates.filter((c) => c.seatId === "p0").map((c) => c.action)).toEqual([
-      { type: "pick-draft", sourceId: "item-passive" },
-      { type: "pick-draft", sourceId: "item-between" },
+  it("at muster, offers each seat without a ballot a vote per length and an abstention", () => {
+    const base = createRun({ seatIds: SEAT_IDS, seed: "enum-votes" });
+    const run = { ...base, stage: { tag: "muster" as const, ballots: { p1: "long" as const } } };
+    const votes = enumerateLegalRunActions(run, catalog).filter((c) => c.action.type === "vote");
+    expect(votes.filter((c) => c.seatId === "p1")).toEqual([]);
+    expect(votes.filter((c) => c.seatId === "p0").map((c) => c.action)).toEqual([
+      { type: "vote", choice: "short" },
+      { type: "vote", choice: "standard" },
+      { type: "vote", choice: "long" },
+      { type: "vote", choice: null },
     ]);
-    expect(candidates.filter((c) => c.action.type === "ready").map((c) => c.seatId)).toEqual(["p1", "p2"]);
+  });
+
+  it("at the draft, offers a seat its own pick-drafts and nothing to a seat with no offer", () => {
+    const base = setupRun({ seatIds: SEAT_IDS, seed: "enum-3", catalog });
+    const run: RunState = {
+      ...base,
+      seats: base.seats.map((s) => (s.seatId === "p0" ? { ...s, draftOffer: ["item-passive", "item-between"] } : s)),
+      stage: { tag: "draft", cleared: campIndex(1), payout: 5 },
+    };
+    const candidates = enumerateLegalRunActions(run, catalog);
+    expect(candidates.map((c) => [c.seatId, c.action])).toEqual([
+      ["p0", { type: "pick-draft", sourceId: "item-passive" }],
+      ["p0", { type: "pick-draft", sourceId: "item-between" }],
+    ]);
+  });
+
+  it("at a route, offers each seat a vote per option and an abstention", () => {
+    const base = setupRun({ seatIds: SEAT_IDS, seed: "enum-route", catalog });
+    const next = base.stage.tag === "loadout" ? base.stage.camp : null;
+    const run: RunState = {
+      ...base,
+      stage: { tag: "route", from: campIndex(1), options: [{ id: "a", next: next! }, { id: "b", next: next! }], ballots: { p0: "a" } },
+    };
+    const votes = enumerateLegalRunActions(run, catalog);
+    expect(votes.filter((c) => c.seatId === "p0")).toEqual([]);
+    expect(votes.filter((c) => c.seatId === "p2").map((c) => c.action)).toEqual([
+      { type: "vote", choice: "a" },
+      { type: "vote", choice: "b" },
+      { type: "vote", choice: null },
+    ]);
   });
 
   it("at objective-pick, offers use-ability for an objective-pick item targeting only unclaimed objectives", () => {
@@ -124,7 +165,7 @@ describe("enumerateLegalRunActions", () => {
         seatIds: SEAT_IDS,
         seed: "enum-objpick",
         catalog,
-        campNumber: 2,
+        camp: 2,
         kits: Object.fromEntries(SEAT_IDS.map((seatId) => [seatId, ["item-objpick"]])),
       }),
       "objective-pick",
@@ -132,7 +173,7 @@ describe("enumerateLegalRunActions", () => {
     );
     const uses = enumerateLegalRunActions(run, catalog).filter((c) => c.action.type === "use-ability");
     expect(uses.length).toBeGreaterThan(0);
-    const camp = run.attempt!.camp!;
+    const camp = attemptOf(run)!.camp;
     for (const candidate of uses) {
       if (candidate.action.type !== "use-ability") continue;
       expect(candidate.action.sourceId).toBe("item-objpick");
@@ -164,7 +205,7 @@ describe("driveRun / replayRun", () => {
     const run = createRun({ seatIds: SEAT_IDS, seed: "drive-seed" });
     const { states, log } = driveRun(run, [3, 1, 4, 1, 5, 9, 2, 6], catalog);
 
-    expect(runPhase(states[0]!)).toBe("muster");
+    expect(states[0]!.stage.tag).toBe("muster");
     expect(states.length).toBe(log.length + 1);
     expect(["won", "lost"]).toContain(runStatus(states[states.length - 1]!));
     expect(replayRun(states[0]!, log, catalog)).toEqual(states);
@@ -186,6 +227,6 @@ describe("driveRun / replayRun", () => {
 
   it("replayRun throws when an action in the log is refused", () => {
     const run = createRun({ seatIds: SEAT_IDS, seed: "bad-log" });
-    expect(() => replayRun(run, [{ seatId: "p0", action: { type: "ready" } }], catalog)).toThrow(/character_pending/);
+    expect(() => replayRun(run, [{ seatId: "p0", action: { type: "ready" } }], catalog)).toThrow(/wrong_stage/);
   });
 });

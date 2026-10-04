@@ -12,16 +12,23 @@ import { trickWinner } from "../trick";
 import { useAbility } from "../run/abilities";
 import { CATALOG } from "../run/catalog";
 import { rulesFor } from "../run/compose";
-import { applyRunAction } from "../run/run-actions";
+import { attemptOf, withAttempt } from "../run/attempt";
 import { advanceTo, setupRun, testCatalog } from "../run/run-test-support";
+import { applyRunAction } from "../run/stages/registry";
 import { resolvedPlay } from "../test-support";
 import { defineItem } from "./source-def";
 import { campCardIds } from "../run/toolkit";
-import type { CampNumber, RunAction, RunState } from "../run/types";
+import type { RunAction, RunState } from "../run/types";
+import type { ExpeditionAttemptView, ExpeditionView } from "../adapter/view-types";
 import { poolBalance, remaining } from "../run/usage";
 import { currentWindow, gatedPendingSeatIds } from "../run/windows";
 
 const SEATS = ["p0", "p1", "p2"] as const;
+
+function attemptViewOf(view: ExpeditionView): ExpeditionAttemptView {
+  if (view.stage.tag !== "camp") throw new Error(`expected the camp stage, got ${view.stage.tag}`);
+  return view.stage.attempt;
+}
 const FILLERS = ["scout", "guide", "botanist", "medic", "cartographer"];
 
 const std = (id: string, suit: Suit, rank: StandardRank): ExpeditionCard => ({ id, identity: { kind: "standard", suit, rank } });
@@ -50,7 +57,7 @@ const WON_BY_P1 = trick(0, "p0", [["p0", std("x", "spades", 9)], ["p1", Y12], ["
 type Spec = {
   character?: string;
   kit?: readonly string[];
-  campNumber?: CampNumber;
+  camp?: number;
   supplies?: number;
   hands?: Partial<Record<(typeof SEATS)[number], ExpeditionCard[]>>;
   objectives?: Objective[];
@@ -67,7 +74,7 @@ function crew(spec: Spec): RunState {
     seatIds: SEATS,
     seed: "catalogue",
     catalog: CATALOG,
-    ...(spec.campNumber === undefined ? {} : { campNumber: spec.campNumber }),
+    ...(spec.camp === undefined ? {} : { camp: spec.camp }),
     ...(spec.supplies === undefined ? {} : { supplies: spec.supplies }),
     characters: { p0: character, p1: p1!, p2: p2! },
     kits: { p0: spec.kit ?? [] },
@@ -77,7 +84,7 @@ function crew(spec: Spec): RunState {
 /** A run between tricks whose camp is exactly the spec's. */
 function table(spec: Spec = {}): RunState {
   const run = advanceTo(crew(spec), "between-tricks", CATALOG);
-  const camp = run.attempt!.camp;
+  const camp = attemptOf(run)!.camp;
   const hands = {
     p0: [std("a", "spades", 9)],
     p1: [std("b", "spades", 6)],
@@ -94,7 +101,7 @@ function table(spec: Spec = {}): RunState {
     totalTricks: spec.totalTricks ?? 3,
     currentTrick: { index: tricks.length, leaderSeatId: spec.leader ?? tricks.at(-1)?.winnerSeatId ?? "p0", plays: [] },
   };
-  return { ...run, attempt: { ...run.attempt!, camp: built } };
+  return withAttempt(run, { ...attemptOf(run)!, camp: built });
 }
 
 /** A failed win-card objective owned by p1 whose card p0 won, with one
@@ -129,12 +136,12 @@ const refusal = (run: RunState, seatId: string, sourceId: string, targets: reado
   return result.ok ? "ok" : result.error;
 };
 
-const camp = (run: RunState): CampState => run.attempt!.camp;
+const camp = (run: RunState): CampState => attemptOf(run)!.camp;
 const handIds = (run: RunState, seatId: string) => camp(run).hands.find((h) => h.seatId === seatId)!.cards.map((c) => c.id);
 const rules = (run: RunState) => rulesFor(run, CATALOG);
 const whisperAllowance = (run: RunState) => SEATS.map((seatId) => rules(run).whispersPerCamp(run, seatId));
 const objectiveOf = (run: RunState, id: string) => camp(run).objectives.find((o) => o.id === id)!;
-const revealsFor = (run: RunState, seatId: string) => toExpeditionPlayerView(run, seatId, CATALOG).attempt!.reveals;
+const revealsFor = (run: RunState, seatId: string) => attemptViewOf(toExpeditionPlayerView(run, seatId, CATALOG)).reveals;
 const balance = (run: RunState, seatId = "p0") => poolBalance(run.seats.find((s) => s.seatId === seatId)!, CATALOG);
 
 /** A camp one trick from clearing: p0 wins with the spades 14 and owns that objective. */
@@ -157,7 +164,7 @@ describe("Scout", () => {
 
   it("Spyglass reveals exactly one card of the target's hand to the user only", () => {
     const run = use(table({ character: "scout", hands }), "p0", "scout", ["hand:p1"]);
-    const [reveal, ...rest] = run.attempt!.reveals;
+    const [reveal, ...rest] = attemptOf(run)!.reveals;
     expect(rest).toEqual([]);
     expect(reveal).toMatchObject({ fromSeatId: "p1", audience: ["p0"], source: "scout" });
     expect(["b1", "b2", "b3"]).toContain(reveal!.cardId);
@@ -170,7 +177,7 @@ describe("Scout", () => {
 
   it("Keen Eye makes Spyglass reveal two distinct cards", () => {
     const run = use(table({ character: "scout", kit: ["scout.keen-eye"], hands }), "p0", "scout", ["hand:p1"]);
-    const ids = run.attempt!.reveals.map((r) => r.cardId);
+    const ids = attemptOf(run)!.reveals.map((r) => r.cardId);
     expect(ids).toHaveLength(2);
     expect(new Set(ids).size).toBe(2);
     expect(ids.every((id) => ["b1", "b2", "b3"].includes(id))).toBe(true);
@@ -252,7 +259,7 @@ describe("Botanist", () => {
     expect(evaluateObjective(camp(run), objectiveOf(run, "o1"))).toBe("pending");
     expect(camp(run).objectiveDeck).toEqual([]);
     expect(balance(run)).toBe(0);
-    expect(run.attempt).not.toBeNull();
+    expect(run.stage.tag).toBe("camp");
   });
 
   it("Antidote drops the failed objective when no fresh one can be drawn, without asking hidden hands first", () => {
@@ -303,7 +310,7 @@ describe("Medic", () => {
   it("Field Kit restores a supply and is refused at full supplies", () => {
     const run = use(table({ character: "medic", kit: ["medic.field-kit"], supplies: 2 }), "p0", "medic.field-kit", ["supplies"]);
     expect(run.supplies).toBe(3);
-    expect(refusal(table({ character: "medic", kit: ["medic.field-kit"], supplies: 3 }), "p0", "medic.field-kit", ["supplies"])).toBe(
+    expect(refusal(table({ character: "medic", kit: ["medic.field-kit"], supplies: 4 }), "p0", "medic.field-kit", ["supplies"])).toBe(
       "ability_unavailable",
     );
   });
@@ -333,13 +340,13 @@ describe("Signaller", () => {
     const run = whisper(start, "p0", "p1", "a");
     expect(whisperAllowance(run)).toEqual([2, 2, 1]);
     const heard = whisper(whisper(run, "p1", "p2", "b"), "p1", "p0", "b");
-    expect(heard.attempt!.log.filter((e) => e.event === "whisper" && e.actorSeatId === "p1")).toHaveLength(2);
+    expect(attemptOf(heard)!.log.filter((e) => e.event === "whisper" && e.actorSeatId === "p1")).toHaveLength(2);
   });
 });
 
 describe("Cartographer", () => {
   it("Redraw replaces an unclaimed card objective's target with the deck's next card", () => {
-    const start = advanceTo(crew({ character: "cartographer", campNumber: 2 }), "objective-pick", CATALOG);
+    const start = advanceTo(crew({ character: "cartographer", camp: 2 }), "objective-pick", CATALOG);
     const before = camp(start);
     const open = before.objectives.find((o) => o.ownerSeatId === null && o.kind === "win-card")!;
     const run = use(start, "p0", "cartographer", [`objective:${open.id}`]);
@@ -385,7 +392,7 @@ describe("items", () => {
     const swapped = use(honed, "p0", "trained-monkey", ["card:a5", "hand:p1"]);
     expect(handIds(swapped, "p1")).toEqual(["a5"]);
     expect(rules(swapped).rankOf(sharpened)).toBe(5);
-    const p1Hand = toExpeditionPlayerView(swapped, "p1", CATALOG).attempt!.camp!.yourHand;
+    const p1Hand = attemptViewOf(toExpeditionPlayerView(swapped, "p1", CATALOG)).camp.yourHand;
     expect(p1Hand.map((card) => [card.id, card.effectiveRank])).toEqual([["a5", null]]);
   });
 
@@ -495,13 +502,13 @@ describe("items", () => {
     expect(camp(hidden).objectives.map((o) => o.id)).toEqual(["pending"]);
     expect(campOutcome(hidden)).toEqual({ status: "in_progress" });
 
-    const exposed = { ...hidden, attempt: { ...hidden.attempt!, camp: { ...camp(hidden), completedTricks: [WON_BY_P0] } } };
+    const exposed = withAttempt(hidden, { ...attemptOf(hidden)!, camp: { ...camp(hidden), completedTricks: [WON_BY_P0] } });
     expect(campOutcome(exposed)).toEqual({ status: "failed", failedObjectiveIds: [], failedGoalIds: ["camouflage:p0"] });
     expect(currentWindow(exposed, rules(exposed))).not.toBe("rescue");
 
     const failed = playOut(hidden);
-    expect(failed.attempt).toBeNull();
-    expect(failed.history.at(-1)).toMatchObject({ campNumber: 1, status: "failed", suppliesSpent: 1 });
+    expect(failed.stage.tag).toBe("loadout");
+    expect(failed.history.at(-1)).toMatchObject({ camp: 1, status: "failed", suppliesSpent: 1 });
     expect(failed.supplies).toBe(2);
   });
 

@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { draftOffer, isReady, kitIds, pickDraftOffer, type FiresideView, type SceneName } from "./expedition-driver";
+import { draftOffer, kitIds, pickDraftOffer, trailToCamp, walkTrail, type TrailView, type SceneName } from "./expedition-driver";
 import { clickObject, getModel, getScene, hoverObject, startExpeditionGame, waitForBridge } from "./expedition-helpers";
 
 /**
@@ -18,7 +18,6 @@ import { clickObject, getModel, getScene, hoverObject, startExpeditionGame, wait
 
 const WHISPER_ID = "whisper";
 const CONFIRM_ID = "confirm";
-const READY_ID = "ready";
 const LAST_TRICK_ID = "last-trick";
 const GATE_SKIP_ID = "gate-skip";
 const NAMES = ["Roger", "Bianca", "Sam"];
@@ -169,11 +168,11 @@ async function clickUntilChanged<T>(
   for (let attempt = 0; attempt < attempts; attempt++) {
     // A prior attempt's click (or, for the very first attempt, some other
     // page's own click a moment ago — e.g. the last teammate readying up
-    // advances the whole room past the fireside) may have already
+    // advances the whole room past the trail) may have already
     // satisfied the expected condition even though its own poll window
     // expired first, or before we ever click at all. Check before touching
     // the object, since a legitimately-satisfied state can make the object
-    // disappear entirely (a played card leaves the hand; every fireside id
+    // disappear entirely (a played card leaves the hand; every trail id
     // disappears once the room moves on to camp), which would otherwise
     // look like a missing target rather than a race already won.
     const already = await getModel<T>(page);
@@ -229,41 +228,11 @@ async function dragHandCardToStump(page: Page, objectId: string, whileHeld?: () 
 // reachCamp / stepCamp — shared full-camp driver helpers
 // ---------------------------------------------------------------------------
 
-/** Drives every page in `pages` from muster or a fresh (or replayed)
- * fireside to the camp scene: picks a character or draft offer by
- * preference, readies up, and waits until every page's scene is "camp". */
+/** Drives every page in `pages` through the trail (muster, draft, route
+ * vote, event, loadout) to the camp scene, and waits until every page's
+ * scene is "camp". */
 async function reachCamp(pages: Page[]): Promise<void> {
-  for (const page of pages) {
-    // The store's model can update to the fireside model slightly before
-    // the camp scene's DESTROY and the fireside scene's create() finish
-    // the Phaser scene switch (two independently-timed reactions to the
-    // same server view). Wait for the SCENE itself, not just the model, so
-    // the ids we are about to click ("draft:<id>", "ready", ...) are
-    // registered by the time we look for them.
-    await waitForScene(page, "fireside", 60_000);
-    const offer = draftOffer(await getModel<FiresideView>(page));
-    if (offer === null) continue;
-    const pick = pickDraftOffer(offer);
-    await clickUntilChanged<FiresideView>(page, pick.objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
-  }
-
-  for (const page of pages) {
-    // Another page's own "ready" click a moment ago may have already made
-    // every seat ready (this page's own readiness was already true from
-    // its own earlier pass), which the server can advance out of the
-    // fireside before we get here. In that case there is nothing left for
-    // THIS page to click — it has already arrived at camp.
-    if ((await getScene(page)) === "camp") continue;
-    const model = await getModel<FiresideView>(page);
-    if (isReady(model)) continue;
-    // Once every seat is ready the room advances straight past the
-    // fireside (possibly from another page's own "ready" click landing a
-    // moment after this one), so "ready" itself vanishes — accept either
-    // this page's own readiness, or the scene having already moved on to
-    // "camp", as success.
-    await clickUntilChanged<FiresideView>(page, READY_ID, (m) => isReady(m) || m.sceneKey === "camp", { perAttemptTimeoutMs: 15_000 });
-  }
-
+  await trailToCamp(pages, { length: "short" });
   for (const page of pages) {
     await waitForScene(page, "camp", 60_000);
   }
@@ -499,7 +468,7 @@ async function stepCamp(pages: Page[], state: DriveState): Promise<void> {
       }
       const playedCardId = playable.id;
       // Playing the trick's final card can end the camp outright (success
-      // or failure), moving the scene straight to the fireside — at
+      // or failure), moving the scene straight to the trail — at
       // which point `hand` no longer exists on the model at all. Accept
       // that scene transition as success too, alongside the ordinary
       // "card left the hand" case.
@@ -546,7 +515,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
           await assertDimmingInvariant(pages);
         }
         if (!campOver) {
-          throw new Error(`camp ${camps} did not reach the fireside within 400 driver passes`);
+          throw new Error(`camp ${camps} did not reach the trail within 400 driver passes`);
         }
         if (state.whisperDone && state.abilityDone) {
           resolved = true;
@@ -563,11 +532,11 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
       expect(state.whisperDone).toBe(true);
       expect(state.abilityDone).toBe(true);
 
-      const finalModels = await Promise.all(pages.map((p) => getModel<FiresideView>(p)));
+      const finalModels = await Promise.all(pages.map((p) => getModel<TrailView & { trail?: unknown }>(p)));
       for (const m of finalModels) {
-        expect(m.lastResult).not.toBeNull();
+        expect(m.sceneKey).not.toBe("camp");
       }
-      const serialized = finalModels.map((m) => JSON.stringify(m.lastResult));
+      const serialized = finalModels.map((m) => JSON.stringify([m.panel?.kind, m.trail]));
       expect(serialized.every((s) => s === serialized[0])).toBe(true);
     } finally {
       for (const context of contexts) await context.close();
@@ -650,30 +619,29 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
 
     try {
       // Mid-muster reload.
-      let hostFireside = await getModel<FiresideView>(page);
+      let hostFireside = await getModel<TrailView>(page);
       const offerIdsBefore = (draftOffer(hostFireside) ?? []).map((o) => o.sourceId).sort();
       expect(offerIdsBefore).toHaveLength(6);
       await page.reload();
       await waitForBridge(page);
-      hostFireside = await getModel<FiresideView>(page);
+      hostFireside = await getModel<TrailView>(page);
       expect((draftOffer(hostFireside) ?? []).map((o) => o.sourceId).sort()).toEqual(offerIdsBefore);
 
       // Pick a character, then reload.
       const offer = draftOffer(hostFireside);
       if (offer === null) throw new Error("host has no character offer after reload");
       const pick = pickDraftOffer(offer);
-      await clickUntilChanged<FiresideView>(page, pick.objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
+      await clickUntilChanged<TrailView>(page, pick.objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
 
       await page.reload();
       await waitForBridge(page);
-      const afterPickReload = await getModel<FiresideView>(page);
+      const afterPickReload = await getModel<TrailView>(page);
       expect(draftOffer(afterPickReload)).toBeNull();
       expect(kitIds(afterPickReload)).toEqual([pick.sourceId]);
 
-      // Ready the host, drive the other two through the fireside, reach camp.
-      await clickUntilChanged<FiresideView>(page, READY_ID, (m) => isReady(m) || m.sceneKey === "camp", { perAttemptTimeoutMs: 15_000 });
-      await reachCamp(pages.slice(1));
-      await waitForScene(page, "camp", 60_000);
+      // Vote on the host, walk everyone through the trail, reach camp.
+      await walkTrail(page, { length: "short" });
+      await reachCamp(pages);
 
       // Drive until the host sees an open window, then reload mid-window.
       const state: DriveState = { whisperDone: false, abilityDone: false, lastTrickChecked: false };

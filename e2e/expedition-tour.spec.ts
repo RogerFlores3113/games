@@ -8,11 +8,12 @@ import {
   clickHandCard,
   clickUntilChanged,
   draftOffer,
-  isReady,
-  pickDraftOffer,
+  openVote,
+  trailStep,
+  walkTrail,
   waitForScene,
-  type FiresideView,
   type SceneName,
+  type TrailView,
 } from "./expedition-driver";
 import { clickObject, getModel, getScene, hoverObject, startExpeditionGame } from "./expedition-helpers";
 import { PICKER_SCENARIOS, rescue, rewriteViews, type Game } from "./expedition-scenarios";
@@ -48,19 +49,19 @@ const NEW_EXPEDITION_ID = "run-end:new-expedition";
 
 /** Phases scripted play reaches often enough to keep starting new runs for. */
 const WANTED = [
-  "muster", "muster-picked", "objective-pick", "trick-led", "mid-trick", "ability-targeting", "whisper-targeting", "whisper-sent", "whisper-received",
-  "last-trick-glance", "objective-hover", "fireside-after-fail", "between-camps-draft", "between-camps-kit", "next-camp",
-  "run-end-lost", "run-end-guest",
+  "muster", "muster-picked", "muster-voted", "loadout-first", "objective-pick", "trick-led", "mid-trick", "ability-targeting", "whisper-targeting",
+  "whisper-sent", "whisper-received", "last-trick-glance", "objective-hover", "loadout-after-fail", "between-camps-draft", "route-vote",
+  "route-voted", "event", "loadout", "next-camp", "run-end-lost", "run-end-guest",
 ];
 /** Phases play rarely reaches; each is also captured from a rewritten view. */
-const RARE = ["run-end-won", "between-camps-draft"];
+const RARE = ["run-end-won", "between-camps-draft", "vote-tie-length", "vote-tie-route"];
 
 interface Identity { kind: "standard" | "joker"; suit?: string; rank?: number; joker?: "sun" | "moon" }
 interface Card { id: string; objectId: string; label: string; identity: Identity; playable: boolean }
 interface Chip { objectId: string; label?: string; status?: string; pickable?: boolean; objectiveId?: string; usable?: boolean; sourceId?: string }
 interface CampModel {
   sceneKey: SceneName;
-  campNumber: number;
+  campIndex: number;
   seats: { seatId: string; objectId: string; isYou: boolean; mayAct: boolean; targetable?: boolean; sources: Chip[]; objectives: Chip[] }[];
   hand: (Card & { targetable?: boolean })[];
   receivedWhispers: unknown[];
@@ -107,33 +108,56 @@ class Tour {
 }
 
 // ---------------------------------------------------------------------------
-// Fireside
+// Trail
 // ---------------------------------------------------------------------------
 
-function firesideNames(m: FiresideView): { draft: string; kit: string; ready: string } {
-  if (m.lastResult == null) return { draft: "muster", kit: "muster-picked", ready: "muster-ready" };
-  if (m.lastResult.status === "succeeded") {
-    return { draft: "between-camps-draft", kit: "between-camps-kit", ready: "between-camps-ready" };
+interface TrailStopView { state: string; caption: string }
+
+function trailPhase(m: TrailView & { trail?: TrailStopView[] | null }): string {
+  switch (m.panel?.kind) {
+    case "muster":
+      return draftOffer(m) !== null ? "muster" : openVote(m) !== null ? "muster-picked" : "muster-voted";
+    case "draft":
+      return "between-camps-draft";
+    case "route":
+      return openVote(m) !== null ? "route-vote" : "route-voted";
+    case "event":
+      return "event";
+    case "loadout":
+      if ((m.trail ?? []).some((stop) => stop.state === "here" && stop.caption.startsWith("try"))) return "loadout-after-fail";
+      return m.vote != null ? "loadout-first" : "loadout";
+    default:
+      return "trail";
   }
-  return { draft: "fireside-after-fail-draft", kit: "fireside-after-fail", ready: "fireside-after-fail-ready" };
 }
 
-async function fireside(page: Page, tour: Tour | null): Promise<void> {
-  await waitForScene(page, "fireside", 60_000);
-  let model = await getModel<FiresideView>(page);
-  const names = firesideNames(model);
-  const offer = draftOffer(model);
-  if (offer !== null) {
-    await hoverObject(page, offer[0]!.objectId);
-    await tour?.shot(names.draft);
-    await page.mouse.move(5, 5);
-    const pick = pickDraftOffer(offer, DRAFT_PREFERENCE);
-    model = await clickUntilChanged<FiresideView>(page, pick.objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
+/** Walks one page through what it owes in the trail, capturing each new
+ * phase first when `tour` is given. */
+async function trail(page: Page, tour: Tour | null): Promise<void> {
+  for (let step = 0; step < 12; step++) {
+    const model = await getModel<TrailView>(page);
+    if (model.sceneKey !== "trail") return;
+    await waitForScene(page, "trail", 60_000);
+    if (tour !== null) {
+      const offer = draftOffer(model);
+      if (offer !== null && model.panel?.kind === "draft") await hoverObject(page, offer[0]!.objectId);
+      await tour.shot(trailPhase(await getModel<TrailView>(page)));
+      await page.mouse.move(5, 5);
+    }
+    if (!(await trailStep(page, { length: "short", preference: DRAFT_PREFERENCE }))) return;
   }
-  if ((await getScene(page)) !== "fireside" || isReady(model)) return;
-  await tour?.shot(names.kit);
-  await clickUntilChanged<FiresideView>(page, READY_ID, (m) => isReady(m) || m.sceneKey === "camp", { perAttemptTimeoutMs: 15_000 });
-  await tour?.shot(names.ready);
+}
+
+/** Walks every page through the trail until every page is in a camp or the
+ * run is over. */
+async function trailRound(pages: Page[], tour: Tour): Promise<void> {
+  for (let round = 0; round < 8; round++) {
+    await trail(pages[0]!, tour);
+    for (const guest of pages.slice(1)) await walkTrail(guest, { length: "short", preference: DRAFT_PREFERENCE });
+    const scenes = await Promise.all(pages.map((p) => getModel<TrailView>(p).then((m) => m.sceneKey)));
+    if (scenes.every((scene) => scene !== "trail")) return;
+  }
+  throw new Error("trailRound: the crew never left the trail");
 }
 
 // ---------------------------------------------------------------------------
@@ -307,10 +331,9 @@ async function stepPage(page: Page, isHost: boolean, tour: Tour): Promise<void> 
 async function playRun(pages: Page[], tour: Tour, deadline: number, rewrite: Rewriter): Promise<"won" | "lost" | null> {
   const host = pages[0]!;
   for (;;) {
-    await fireside(host, tour);
-    for (const guest of pages.slice(1)) await fireside(guest, null);
+    await trailRound(pages, tour);
     for (const p of pages) await waitForScene(p, "camp", 60_000);
-    if ((await getModel<CampModel>(host)).campNumber >= 2) await tour.shot("next-camp");
+    if ((await getModel<CampModel>(host)).campIndex >= 2) await tour.shot("next-camp");
     if (!tour.has("picker-self")) await capturePickers(host, tour, rewrite);
 
     for (let pass = 0; pass < 400; pass++) {
@@ -345,26 +368,41 @@ async function newExpedition(pages: Page[]): Promise<void> {
   await clickObject(host, NEW_EXPEDITION_ID);
   await expect(host.getByTestId("start-game")).toBeVisible({ timeout: 15_000 });
   await host.getByTestId("start-game").click();
-  for (const p of pages) await waitForScene(p, "fireside", 60_000);
+  for (const p of pages) await waitForScene(p, "trail", 60_000);
 }
 
-const h = (campNumber: number, attemptNumber: number, status: "succeeded" | "failed") => ({
-  campNumber,
-  attemptNumber,
-  status,
-  suppliesSpent: status === "failed" ? 1 : 0,
-});
+const h = (camp: number, attempt: number, status: "cleared" | "failed") => ({ camp, attempt, status, coins: status === "cleared" ? 7 : 0 });
+
+const PREVIEW = { index: 2, location: "jungle", weather: "fair", event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: null };
 
 function wonView(game: Game): Game {
   return {
     ...game,
-    runPhase: "ended",
     runStatus: "won",
-    campNumber: 6,
-    supplies: 2,
-    yourDraftOffer: null,
-    attempt: null,
-    history: [h(1, 1, "succeeded"), h(2, 1, "failed"), h(2, 2, "succeeded"), h(3, 1, "succeeded"), h(4, 1, "succeeded"), h(5, 1, "succeeded"), h(6, 1, "succeeded")],
+    supplies: { count: 2, max: 4 },
+    purse: 42,
+    stage: { tag: "ended", result: "won" },
+    history: [h(1, 1, "cleared"), h(2, 1, "failed"), h(2, 2, "cleared"), h(3, 1, "cleared"), h(4, 1, "cleared")],
+  };
+}
+
+/** The event after a three-way route tie, mid coin flip. */
+function routeTieView(game: Game): Game {
+  return {
+    ...game,
+    history: [h(1, 1, "cleared")],
+    lastVote: { topic: "route", tally: [{ choice: "a", votes: 1 }, { choice: "b", votes: 1 }, { choice: "c", votes: 1 }], tied: ["a", "b", "c"], winner: "b" },
+    stage: { tag: "event", event: "event", next: PREVIEW, readySeatIds: [] },
+  };
+}
+
+/** Camp 1's loadout after a Short/Standard tie on the length. */
+function lengthTieView(game: Game): Game {
+  return {
+    ...game,
+    history: [],
+    lastVote: { topic: "length", tally: [{ choice: "short", votes: 1 }, { choice: "standard", votes: 1 }, { choice: "long", votes: 0 }], tied: ["short", "standard"], winner: "standard" },
+    stage: { tag: "loadout", camp: { ...PREVIEW, index: 1, event: null, slotKinds: ["win-card", "win-card"] }, readySeatIds: [] },
   };
 }
 
@@ -400,25 +438,27 @@ async function capturePickers(host: Page, tour: Tour, rewrite: Rewriter): Promis
 }
 
 async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<void> {
+  const capture = async (fn: (g: Game) => Game, scene: SceneName, name: string, settleMs = 0): Promise<void> => {
+    rewrite.current = fn;
+    await host.reload();
+    await waitForScene(host, scene, 30_000);
+    await host.waitForTimeout(settleMs);
+    await tour.shot(name);
+  };
   if (!tour.has("between-camps-draft")) {
-    rewrite.current = (g) => ({
-      ...g,
-      runPhase: "fireside",
-      attempt: null,
-      yourDraftOffer: [g.seats.find((s) => s.seatId === g.yourSeatId)?.characterId === "guide" ? "guide.pathfinder" : "scout.keen-eye", "bait", "smoke-signal"],
-      seats: g.seats.map((s) => (s.seatId === g.yourSeatId ? { ...s, characterId: s.characterId ?? "scout", draftPending: true, ready: false } : s)),
-      history: [{ campNumber: 1, attemptNumber: 1, status: "succeeded", suppliesSpent: 0 }],
-    });
-    await host.reload();
-    await waitForScene(host, "fireside", 30_000);
-    await tour.shot("between-camps-draft-rewritten");
+    await capture(
+      (g) => ({
+        ...g,
+        history: [h(1, 1, "cleared")],
+        stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: [g.seats.find((s) => s.seatId === g.yourSeatId)?.characterId === "guide" ? "guide.pathfinder" : "scout.keen-eye", "bait", "smoke-signal"], pendingSeatIds: [g.yourSeatId] },
+      }),
+      "trail",
+      "between-camps-draft-rewritten",
+    );
   }
-  if (!tour.has("run-end-won")) {
-    rewrite.current = wonView as (g: Game) => Game;
-    await host.reload();
-    await waitForScene(host, "run-end", 30_000);
-    await tour.shot("run-end-won-rewritten");
-  }
+  await capture(lengthTieView as (g: Game) => Game, "trail", "vote-tie-length", 2_000);
+  await capture(routeTieView as (g: Game) => Game, "trail", "vote-tie-route", 2_000);
+  if (!tour.has("run-end-won")) await capture(wonView as (g: Game) => Game, "run-end", "run-end-won-rewritten");
 }
 
 test.describe("@tour Expedition UI tour", () => {
@@ -446,7 +486,7 @@ test.describe("@tour Expedition UI tour", () => {
         await captureRare(page, tour, rewrite);
       } finally {
         const notes: string[] = [];
-        if (!tour.has("between-camps-draft")) notes.push(`no camp was cleared in ${outcomes.length} run(s), so the fireside after a cleared camp was not reached`);
+        if (!tour.has("between-camps-draft")) notes.push(`no camp was cleared in ${outcomes.length} run(s), so the draft after a cleared camp was not reached`);
         if (!tour.has("run-end-won")) notes.push("no run was won; run-end-won-rewritten shows the won screen from a rewritten view");
         const total = tour.write({
           size: size.name,

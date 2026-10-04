@@ -32,6 +32,12 @@ function parsePickCharacter(record: Record<string, unknown>): RunAction | null {
   return { type: "pick-character", characterId: record.characterId };
 }
 
+function parseVote(record: Record<string, unknown>): RunAction | null {
+  if (!hasExactKeys(record, ["type", "choice"])) return null;
+  if (typeof record.choice !== "string" && record.choice !== null) return null;
+  return { type: "vote", choice: record.choice };
+}
+
 function parsePickDraft(record: Record<string, unknown>): RunAction | null {
   if (!hasExactKeys(record, ["type", "sourceId"])) return null;
   if (typeof record.sourceId !== "string") return null;
@@ -86,6 +92,8 @@ export function parseRunAction(request: unknown): RunAction | null {
   switch (type) {
     case "pick-character":
       return parsePickCharacter(request);
+    case "vote":
+      return parseVote(request);
     case "pick-draft":
       return parsePickDraft(request);
     case "ready":
