@@ -113,6 +113,10 @@ export const SeatSchema = z.object({
    * the wire. Optional/nullable so rooms persisted before this field existed
    * still parse (same precedent as `lastAppliedActionId`). */
   lastAppliedRoomActionId: z.string().nullable().optional(),
+  /** A dev-mode bot seat (no player behind it). It never connects, so it
+   * stays `connected: false` with `disconnectedAt: null`, which keeps the
+   * lobby release and absent-seat pass timers off it. Server-only. */
+  bot: z.boolean().optional(),
 });
 export type Seat = z.infer<typeof SeatSchema>;
 

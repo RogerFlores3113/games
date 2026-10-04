@@ -219,9 +219,48 @@ describe("closed unions", () => {
   it("ClientMessageSchema and ServerMessageSchema are both discriminated unions with the expected member counts", () => {
     // Owner request (2026-09-18): +2 client members (`delete_room`,
     // `restart_lobby`) and +1 server member (`room_closed`) — see
-    // messages.ts's doc comments on each for why they exist.
-    expect(ClientMessageSchema.options).toHaveLength(7);
-    expect(ServerMessageSchema.options).toHaveLength(6);
+    // messages.ts's doc comments on each for why they exist. Dev mode adds
+    // `dev` (client) and `dev_state`/`dev_result` (server), see dev.ts.
+    expect(ClientMessageSchema.options).toHaveLength(8);
+    expect(ServerMessageSchema.options).toHaveLength(8);
+  });
+});
+
+describe("dev messages (dev.ts)", () => {
+  it("parses each dev command kind", () => {
+    const commands = [
+      { kind: "snapshot" },
+      { kind: "load-state", state: { anything: 1 } },
+      { kind: "shortcut", id: "jump-to-camp", params: { camp: 6 } },
+      { kind: "autoplay", scope: "everyone", maxSteps: 500, stopAtMilestone: true },
+      { kind: "add-bot" },
+    ];
+    for (const command of commands) {
+      expect(parseClientMessage(JSON.stringify({ type: "dev", command }))).toEqual({ ok: true, message: { type: "dev", command } });
+    }
+  });
+
+  it("refuses an unknown command, an extra key and an unbounded autoplay", () => {
+    for (const command of [
+      { kind: "delete-everything" },
+      { kind: "snapshot", seatId: "x" },
+      { kind: "autoplay", scope: "bots", maxSteps: 1_000_000, stopAtMilestone: false },
+      { kind: "autoplay", scope: "me", maxSteps: 5, stopAtMilestone: false },
+    ]) {
+      expect(parseClientMessage(JSON.stringify({ type: "dev", command }))).toEqual({ ok: false, reason: "bad_request" });
+    }
+  });
+
+  it("encodes dev_state and dev_result frames", () => {
+    const state: ServerMessage = {
+      type: "dev_state",
+      game: { campNumber: 6 },
+      shortcuts: [{ id: "x", label: "X", group: "Run", fields: [{ name: "n", label: "N", kind: "number", min: 0, max: 1, initial: 0 }] }],
+      inspect: [{ title: "Hands", lines: ["a: 7♠"] }],
+      milestone: "6:0:in_progress",
+    };
+    expect(JSON.parse(encodeServerMessage(state))).toEqual(state);
+    expect(encodeServerMessage({ type: "dev_result", ok: false, message: "no" })).toBe('{"type":"dev_result","ok":false,"message":"no"}');
   });
 });
 

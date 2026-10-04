@@ -6,3 +6,4 @@ export * from "./constants";
 export * from "./room";
 export * from "./messages";
 export * from "./create-room";
+export * from "./dev";

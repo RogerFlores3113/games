@@ -8,6 +8,7 @@ import {
 } from "./room";
 import { HanabiErrorCodeSchema } from "./games/hanabi-errors";
 import { ExpeditionErrorCodeSchema } from "./games/expedition-errors";
+import { DevMessageSchema, DevResultMessageSchema, DevStateMessageSchema } from "./dev";
 
 // ---------------------------------------------------------------------------
 // Client -> Server
@@ -113,6 +114,7 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
   LeaveMessageSchema,
   DeleteRoomMessageSchema,
   RestartLobbyMessageSchema,
+  DevMessageSchema,
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 
@@ -189,6 +191,8 @@ export const ServerMessageSchema = z.discriminatedUnion("type", [
   SupersededMessageSchema,
   RoomClosedMessageSchema,
   ErrorMessageSchema,
+  DevStateMessageSchema,
+  DevResultMessageSchema,
 ]);
 export type ServerMessage = z.infer<typeof ServerMessageSchema>;
 

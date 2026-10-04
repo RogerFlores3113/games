@@ -282,3 +282,6 @@ export const EXPEDITION_GAME_ID = "expedition" as const;
 // MGR-03: Expedition has no settings in v2.0.
 export const ExpeditionConfigSchema = z.null();
 export type ExpeditionConfigWire = z.infer<typeof ExpeditionConfigSchema>;
+
+export { ExpeditionRunStateSchema } from "./expedition-state";
+export type { ExpeditionRunStateWire } from "./expedition-state";
