@@ -21,7 +21,9 @@ describe("dev shortcuts", () => {
     expect(jumped.stage.tag === "camp" && jumped.stage.camp.index).toBe(6);
     expect(jumped.plan?.length).toBe("standard");
     expect(attemptOf(jumped)?.attemptNumber).toBe(1);
-    expect(attemptOf(jumped)?.camp.objectives).toHaveLength(4);
+    // The temple: four seat objectives, the Sun, and the capybara's one more at half strength.
+    expect(campStack(jumped, CATALOG).map((layer) => `${layer.def.id}:${layer.strength}`)).toEqual(["magma:full", "fair:full", "temple:full", "capybara:half"]);
+    expect(attemptOf(jumped)?.camp.objectives).toHaveLength(6);
     expect(jumped.history).toEqual([]);
     expect(checkRunState(jumped, CATALOG)).toEqual([]);
   });
@@ -34,7 +36,8 @@ describe("dev shortcuts", () => {
 
     const short = run("jump-to-camp", fresh(), { length: "short", camp: 4, stage: "camp" });
     expect([short.stage.tag, short.stage.tag === "camp" && short.stage.camp.index, short.plan?.length]).toEqual(["camp", 4, "short"]);
-    expect(attemptOf(short)?.camp.objectives).toHaveLength(3);
+    expect(attemptOf(short)?.camp.objectives.map((o) => o.kind)).toEqual(["win-card", "win-card", "no-tricks", "win-card"]);
+    expect(attemptOf(short)?.camp.objectives[3]).toMatchObject({ kind: "win-card", target: { kind: "joker", joker: "sun" } });
   });
 
   it("jump-to-camp refuses a camp past the length's last", () => {

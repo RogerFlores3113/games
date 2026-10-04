@@ -1,6 +1,5 @@
 // The run's plan: its length and its boss camps, drawn once at the length
-// vote. A tier whose pool is empty (the temple until it lands) plans null,
-// and its camp plays plain.
+// vote. A tier whose pool is empty plans null, and its camp plays plain.
 
 import { RUN_LENGTHS } from "./balance";
 import { STREAMS, seededIndex } from "./rng";
@@ -24,7 +23,7 @@ export function bossPool(tier: BossTier, catalog: Catalog): readonly string[] {
 }
 
 function drawBoss(seed: string, tier: BossTier, catalog: Catalog): string | null {
-  if (tier === "temple") return null;
+  if (tier === "temple") return Object.values(catalog.mods).find((def) => def.kind === "temple")?.id ?? null;
   const pool = bossPool(tier, catalog);
   return pool.length === 0 ? null : pool[seededIndex(seed, STREAMS.plannedBoss(tier), pool.length)]!;
 }
@@ -40,6 +39,13 @@ export function campCount(plan: RunPlan): number {
 
 export function bossAt(plan: RunPlan, at: CampIndex): PlannedBoss | null {
   return plan.bosses.find((boss) => boss.at === at) ?? null;
+}
+
+/** At the temple: every earlier planned boss, in order. Short none, Standard
+ * one, Long two. [] at any other camp. */
+export function helpersFor(plan: RunPlan, at: CampIndex): readonly PlannedBoss[] {
+  if (bossAt(plan, at)?.tier !== "temple") return [];
+  return plan.bosses.filter((boss) => boss.at < at && boss.modId !== null);
 }
 
 export function isFinalCamp(plan: RunPlan, at: CampIndex): boolean {
@@ -67,7 +73,8 @@ export function horizon(run: RunState): number {
   }
 }
 
-/** The boss id the crew may see: null beyond the horizon. */
+/** The boss id the crew may see: null beyond the horizon. The temple is no
+ * secret: its tier already names it. */
 export function visibleBossId(run: RunState, boss: PlannedBoss): string | null {
-  return boss.at <= horizon(run) ? boss.modId : null;
+  return boss.tier === "temple" || boss.at <= horizon(run) ? boss.modId : null;
 }

@@ -253,6 +253,7 @@ const RemainingViewSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("uses"), left: z.number().int().min(0), of: z.number().int().min(1) }),
   z.strictObject({ kind: z.literal("pool"), balance: z.number().int(), max: z.number().int().min(0), cost: z.number().int().min(0) }),
   z.strictObject({ kind: z.literal("supplies"), cost: z.number().int().min(0) }),
+  z.strictObject({ kind: z.literal("crew"), left: z.number().int().min(0), earned: z.number().int().min(0) }),
 ]);
 
 // `remaining` is null for a passive item.
@@ -353,6 +354,7 @@ const StatusPartViewSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("countdown"), tricks: z.number().int().min(1) }),
   z.strictObject({ kind: z.literal("alternating"), activeNow: z.boolean() }),
   z.strictObject({ kind: z.literal("swarm"), seatId: z.string().min(1).nullable() }),
+  z.strictObject({ kind: z.literal("path"), plates: z.array(z.union([SuitSchema, z.literal("sun")])).min(1), pressed: z.number().int().min(0) }),
 ]);
 
 const ModViewSchema = z.strictObject({

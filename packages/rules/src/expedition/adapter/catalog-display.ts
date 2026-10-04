@@ -6,7 +6,7 @@
 // This file lives under adapter/ because purity.test.ts's Core fence forbids
 // top-level files from importing ./run.
 
-import { resolveTuned, type CharacterDef, type ItemUses, type Owner, type Rarity, type SourceDef, type UsageLimit } from "../content/source-def";
+import { resolveTuned, windowsOf, type ActiveAbility, type CharacterDef, type ItemAbility, type ItemUses, type Owner, type Rarity, type SourceDef, type UsageLimit } from "../content/source-def";
 import { CATALOG } from "../run/catalog";
 import type { TargetKind } from "../run/targets";
 import { WINDOWS, type ActiveWindow } from "../run/windows";
@@ -20,8 +20,8 @@ export type ExpeditionTargetKind = TargetKind;
 export type ExpeditionActiveWindow = ActiveWindow;
 
 export type SourceActiveDisplay = {
-  window: ActiveWindow;
-  /** Badge text, e.g. "Between tricks". */
+  windows: ActiveWindow[];
+  /** Badge text, e.g. "Between tricks", or "Between tricks or when an objective fails". */
   windowPhrase: string;
   /** Badge text for the base limit, e.g. "1 per camp", "1 herb". */
   limitBadge: string;
@@ -41,8 +41,9 @@ export type SourceDisplay = {
   id: string;
   name: string;
   text: string;
-  kind: "character" | "upgrade" | "item";
-  /** The character a power or upgrade belongs to; null for items. */
+  /** "grant": an ability a camp modifier gives every seat, keyed by the modifier's id. */
+  kind: "character" | "upgrade" | "item" | "grant";
+  /** The character a power or upgrade belongs to; null for items and grants. */
   characterId: string | null;
   /** null for a source with no active ability. */
   active: SourceActiveDisplay | null;
@@ -93,12 +94,24 @@ function limitBadge(limit: UsageLimit, character: CharacterDef | null): string {
     }
     case "supplies":
       return `${limit.cost} ${limit.cost === 1 ? "supply" : "supplies"}`;
+    case "crew-tokens":
+      return "Crew token";
   }
 }
 
 function badgeOf(def: SourceDef, character: CharacterDef | null): string {
   if (def.kind === "item") return def.uses === undefined ? "" : usesBadge(def.uses);
   return def.active === undefined ? "" : limitBadge(resolveTuned(def.active.limit, BASE_OWNER), character);
+}
+
+function activeDisplay(active: ItemAbility, limitBadge: string): SourceActiveDisplay {
+  const windows = [...windowsOf(active)];
+  return {
+    windows,
+    windowPhrase: windows.map((w, i) => (i === 0 ? WINDOWS[w].phrase : WINDOWS[w].phrase.toLowerCase())).join(" or "),
+    limitBadge,
+    targets: active.targets.map((spec) => spec.kind),
+  };
 }
 
 function toSourceDisplay(def: SourceDef): SourceDisplay {
@@ -109,15 +122,7 @@ function toSourceDisplay(def: SourceDef): SourceDisplay {
     text: def.text,
     kind: def.kind,
     characterId: character?.id ?? null,
-    active:
-      def.active === undefined
-        ? null
-        : {
-            window: def.active.window,
-            windowPhrase: WINDOWS[def.active.window].phrase,
-            limitBadge: badgeOf(def, character),
-            targets: def.active.targets.map((spec) => spec.kind),
-          },
+    active: def.active === undefined ? null : activeDisplay(def.active, badgeOf(def, character)),
     passive: def.passive !== undefined,
     item:
       def.kind === "item"
@@ -126,9 +131,16 @@ function toSourceDisplay(def: SourceDef): SourceDisplay {
   };
 }
 
-export const SOURCE_DISPLAY: Readonly<Record<string, SourceDisplay>> = Object.fromEntries(
-  Object.values(CATALOG.sources).map((def) => [def.id, toSourceDisplay(def)]),
-);
+function toGrantDisplay(id: string, grant: ActiveAbility & { readonly name: string; readonly text: string }): SourceDisplay {
+  const active = activeDisplay(grant, limitBadge(resolveTuned(grant.limit, BASE_OWNER), null));
+  return { id, name: grant.name, text: grant.text, kind: "grant", characterId: null, active, passive: false, item: null };
+}
+
+/** Every source by id, and every camp modifier's granted ability by the modifier's id. */
+export const SOURCE_DISPLAY: Readonly<Record<string, SourceDisplay>> = Object.fromEntries([
+  ...Object.values(CATALOG.sources).map((def) => [def.id, toSourceDisplay(def)] as const),
+  ...Object.values(CATALOG.mods).flatMap((def) => (def.full.grants === undefined ? [] : [[def.id, toGrantDisplay(def.id, def.full.grants)] as const])),
+]);
 
 export const CHARACTER_DISPLAY: Readonly<Record<string, CharacterDisplay>> = Object.fromEntries(
   Object.values(CATALOG.characters).map((def) => [

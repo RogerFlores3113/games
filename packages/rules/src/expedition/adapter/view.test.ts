@@ -76,7 +76,7 @@ describe("toExpeditionPlayerView", () => {
 
     expect(view.stage).toMatchObject({ tag: "loadout", yourSlots: 2, shop: null, readySeatIds: ["p1"], camp: { index: 2, shop: false } });
     expect([view.length, view.campCount, view.purse, view.supplies]).toEqual(["standard", 6, 0, { count: 3, max: 4 }]);
-    expect(view.plan).toEqual([{ at: 3, tier: "animal", bossId: null }, { at: 6, tier: "temple", bossId: null }]);
+    expect(view.plan).toEqual([{ at: 3, tier: "animal", bossId: null }, { at: 6, tier: "temple", bossId: "temple" }]);
   });
 
   it("loadout and camp: the camp's modifier stack in fold order with each layer's public status, and the preview's pairing", () => {

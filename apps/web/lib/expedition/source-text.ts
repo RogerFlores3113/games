@@ -6,7 +6,7 @@ import { CHARACTER_DISPLAY, SOURCE_DISPLAY, type ExpeditionRemainingView, type E
  * badges from the def, never repeated in the sentence.
  */
 
-export type SourceKind = "character" | "upgrade" | "item";
+export type SourceKind = "character" | "upgrade" | "item" | "grant";
 
 /** The def id behind a source key: an item instance's item, else the key
  * itself (a character or an upgrade id). */
@@ -79,6 +79,8 @@ export function chargeText(sourceId: string, remaining: ExpeditionRemainingView 
       return `${remaining.balance}/${remaining.max} ${poolUnit(sourceId)}`;
     case "supplies":
       return `${remaining.cost} ${remaining.cost === 1 ? "supply" : "supplies"}`;
+    case "crew":
+      return remaining.earned === 0 ? "not earned" : remaining.left === 0 ? "used" : `${remaining.left} left`;
   }
 }
 
@@ -87,5 +89,6 @@ export function isSpent(remaining: ExpeditionRemainingView | null): boolean {
   if (remaining === null) return false;
   if (remaining.kind === "uses") return remaining.left === 0;
   if (remaining.kind === "pool") return remaining.balance < remaining.cost;
+  if (remaining.kind === "crew") return remaining.left === 0;
   return false;
 }

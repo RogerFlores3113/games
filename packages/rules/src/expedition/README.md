@@ -129,7 +129,11 @@ backpack item is not live: no passive, no ability.
 `rules(ctx)` answers the engine's questions, `on` reacts to an event with
 toolkit ops (under the origin `{ kind: "mod" }`), `effect` is the layer an
 `add-modifier` from `on` switches on, `slots` reshapes the camp's
-objective slots, and `status` is public table state the view projects.
+objective slots, `status` is public table state the view projects, and
+`grants` is an ability every seat may use while the def is in play, keyed
+by the def's id (the temple's skip, a crew token: one use for the whole
+crew, earned by winning the Sun). At the temple the stack also carries every
+earlier planned boss at half strength (its `half` body), in the order faced.
 The run hook `hides(run, viewer, subject)` keeps a current-trick play, an
 objective's kind and target, or a seat's unused items from a viewer (Cave,
 Night, Desert, Heavy fog); the view and the leak check both read it, so a
@@ -147,7 +151,8 @@ when, under the fully composed rules, it is what lost the camp
 (`run/stages/camp.ts`).
 
 **Source keys.** A seat acts through a key: its character id, its upgrade
-id, or an item instance's uid (`it7`, minted from `RunState.itemSerial`).
+id, an item instance's uid (`it7`, minted from `RunState.itemSerial`), or
+the id of a camp modifier that grants an ability (`abilityKeys`).
 The ledger, `use-ability`, `abilityStatus`, `remaining` and the view's
 `yourAbilities` and `usage` are keyed by it, so two copies of one item keep
 separate uses. An effect's `origin` carries the seat, the key and the def

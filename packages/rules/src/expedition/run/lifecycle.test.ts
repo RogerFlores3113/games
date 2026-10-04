@@ -86,7 +86,7 @@ describe("muster and the length vote", () => {
     run = act(run, "p1", { type: "vote", choice: "long" }, catalog);
     expect(run.stage.tag).toBe("muster");
     run = act(run, "p2", { type: "vote", choice: "short" }, catalog);
-    expect(run.plan).toEqual({ length: "long", bosses: [{ at: 3, tier: "animal", modId: "beaver" }, { at: 6, tier: "disaster", modId: "locusts" }, { at: 8, tier: "temple", modId: null }] });
+    expect(run.plan).toEqual({ length: "long", bosses: [{ at: 3, tier: "animal", modId: "beaver" }, { at: 6, tier: "disaster", modId: "locusts" }, { at: 8, tier: "temple", modId: "temple" }] });
     expect(run.lastVote).toEqual({ topic: "length", result: { tally: [{ choice: "short", votes: 1 }, { choice: "standard", votes: 0 }, { choice: "long", votes: 2 }], tied: null, winner: "long" } });
     expect(run.stage).toEqual({
       tag: "loadout",

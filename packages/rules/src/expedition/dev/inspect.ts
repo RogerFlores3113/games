@@ -49,6 +49,8 @@ function statusLabel(part: StatusPart): string {
       return part.activeNow ? "active this trick" : "resting this trick";
     case "swarm":
       return part.seatId === null ? "eats a card from every hand next" : `eats an item of ${part.seatId} next`;
+    case "path":
+      return `plates ${part.plates.map((plate, i) => (i < part.pressed ? `[${plate}]` : plate)).join(" > ")}, ${part.pressed} pressed`;
   }
 }
 

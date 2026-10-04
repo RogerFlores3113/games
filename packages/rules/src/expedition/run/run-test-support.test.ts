@@ -66,7 +66,7 @@ describe("setupRun", () => {
 
     expect(run.stage.tag).toBe("loadout");
     expect(run.stage.tag === "loadout" && run.stage.camp.index).toBe(4);
-    expect(run.plan).toEqual({ length: "standard", bosses: [{ at: 3, tier: "animal", modId: "crocodile" }, { at: 6, tier: "temple", modId: null }] });
+    expect(run.plan).toEqual({ length: "standard", bosses: [{ at: 3, tier: "animal", modId: "crocodile" }, { at: 6, tier: "temple", modId: "temple" }] });
     expect(run.supplies).toBe(3);
     expect(run.seats.map((s) => s.offers)).toEqual([[], [], []]);
     expect(run.seats.map((s) => s.characterId)).toEqual(["plain-3", "plain-1", "plain-2"]);
@@ -82,7 +82,7 @@ describe("setupRun", () => {
 
   it("plans a run of the requested length", () => {
     const run = setupRun({ seatIds: SEAT_IDS, seed: "s", catalog, length: "short" });
-    expect(run.plan).toEqual({ length: "short", bosses: [{ at: 4, tier: "temple", modId: null }] });
+    expect(run.plan).toEqual({ length: "short", bosses: [{ at: 4, tier: "temple", modId: "temple" }] });
   });
 
   it("throws when the catalogue has too few characters for the crew", () => {

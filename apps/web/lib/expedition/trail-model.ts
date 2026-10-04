@@ -4,7 +4,7 @@ import type { Prompt } from "./build-prompt";
 import { buildTrailPrompt } from "./build-prompt";
 import type { SceneServerInput, Tooltip, TopBar } from "./build-scene-model";
 import { buildTopBar } from "./build-scene-model";
-import { characterName, chargeText, liveSourceKeys, sourceBadges, sourceIdOfKey, sourceKind, sourceName, sourceRulesText } from "./source-text";
+import { characterName, chargeText, liveSourceKeys, sourceBadges, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, type SourceKind } from "./source-text";
 import { bundleItemObjectId, bundleObjectId, draftObjectId, kitObjectId, lengthObjectId, READY_ID, routeObjectId } from "./expedition-ids";
 import { buildGear, buildShop, type Gear, type ShopPanel } from "./loadout-model";
 import type { LocalUiState } from "./local-ui";
@@ -161,7 +161,7 @@ export interface KitItem {
   sourceId: string;
   objectId: string;
   name: string;
-  kind: "character" | "upgrade" | "item";
+  kind: SourceKind;
   /** What is left: "2/3 herbs", "1 left", "always on". */
   charge: string;
 }

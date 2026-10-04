@@ -19,7 +19,10 @@ export type UsageLimit =
   | { readonly kind: "per-camp"; readonly times: number } // counted by (camp, attempt) stamp; a replay is a fresh camp
   | { readonly kind: "per-run"; readonly times: number } // counted over the whole ledger; survives replays
   | { readonly kind: "pool"; readonly cost: number } // the owner's character pool; characters and upgrades only
-  | { readonly kind: "supplies"; readonly cost: number }; // the crew's supplies; never spends the last one
+  | { readonly kind: "supplies"; readonly cost: number } // the crew's supplies; never spends the last one
+  /** Shared by the crew: earned this attempt minus every seat's uses this
+   * attempt. `locked` is the reason shown while none was earned. */
+  | { readonly kind: "crew-tokens"; earned(run: RunState, rules: RunRules): number; readonly locked: string };
 
 /** What an ability or passive knows about its holder. Derived from SeatRun. */
 export type Owner = { readonly seatId: string; hasUpgrade(upgradeId: SourceId): boolean };
@@ -48,7 +51,8 @@ export type AbilityContext<S extends readonly TargetSpec[]> = {
 };
 
 export type ActiveAbility<S extends readonly TargetSpec[] = readonly TargetSpec[], P extends EffectParams = EffectParams> = {
-  readonly window: ActiveWindow;
+  /** One window, or several the ability may fire in. */
+  readonly window: ActiveWindow | readonly ActiveWindow[];
   readonly limit: Tuned<UsageLimit>;
   readonly targets: S;
   /** Target-free availability, checked after window and limit. true or a player-facing reason. */
@@ -136,6 +140,10 @@ export function defineCharacter(
       { ...second, characterId: def.id },
     ],
   };
+}
+
+export function windowsOf(active: { readonly window: ActiveWindow | readonly ActiveWindow[] }): readonly ActiveWindow[] {
+  return typeof active.window === "string" ? [active.window] : active.window;
 }
 
 export function resolveTuned<T>(value: Tuned<T>, owner: Owner): T {

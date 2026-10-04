@@ -19,12 +19,15 @@ import fc from "fast-check";
 import { toExpeditionPlayerView } from "../adapter/view";
 import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "../adapter/view-leak-check";
 import { checkRunState } from "../dev/check";
+import { DEV_SHORTCUTS } from "../dev/shortcuts";
 import { CATALOG } from "./catalog";
 import { rulesFor } from "./compose";
 import { attemptOf } from "./attempt";
 import { RUN_LENGTHS, SUPPLIES_MAX } from "./balance";
 import { createRun, runStatus } from "./lifecycle";
-import { advanceTo, driveRun, replayRun, setupRun } from "./run-test-support";
+import { advanceTo, driveRun, enumerateLegalRunActions, replayRun, setupRun } from "./run-test-support";
+import { campStack, specOf } from "./stack";
+import { applyRunAction } from "./stages/registry";
 import { campCardIds } from "./toolkit";
 import type { RunLength, RunState } from "./types";
 import { defIdOf } from "./usage";
@@ -220,4 +223,52 @@ describe("property: whole-run simulation (RUN-07)", () => {
     expect(rescueUses).toBeGreaterThan(0);
     expect(inTrickUses).toBeGreaterThan(0);
   }, WHOLE_RUN_TIMEOUT_MS);
+
+  it("plays a Long run camp by camp to the temple, where both earlier bosses return at half strength, and the run ends", () => {
+    let temples = 0;
+    fc.assert(
+      fc.property(fc.constantFrom(3, 4, 5), fc.string({ minLength: 1 }), choicesArb, (seatCount, seed, choices) => {
+        const states = playLongRun(setupRun({ seatIds: seatIdsFor(seatCount), seed, catalog: CATALOG, length: "long" }), choices);
+        const last = states.at(-1)!;
+        expect(runStatus(last)).not.toBe("in_progress");
+        checkRun(states);
+
+        const [animal, disaster] = last.plan!.bosses;
+        const temple = states.find((state) => state.stage.tag === "camp" && state.stage.camp.index === 8);
+        expect(temple).toBeDefined();
+        expect(campStack(temple!, CATALOG).slice(-3).map((layer) => `${layer.def.id}:${layer.strength}`)).toEqual(["temple:full", `${animal!.modId}:half`, `${disaster!.modId}:half`]);
+        expect(last.history.map((h) => h.camp).filter((camp, i, all) => all.indexOf(camp) === i)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+        temples++;
+      }),
+      { numRuns: 4 },
+    );
+    expect(temples).toBe(4);
+  }, 120_000);
 });
+
+/** Random legal play through every camp of a Long run. Before the temple a
+ * camp failed twice, or a failure that would end the run, is cleared by the
+ * dev shortcut instead, so the run always reaches the temple; the temple is
+ * played until the run ends. */
+function playLongRun(initial: RunState, choices: readonly number[]): RunState[] {
+  const states = [initial];
+  let state = initial;
+  const forceClear = (run: RunState) => DEV_SHORTCUTS["force-camp"].apply(run, { outcome: "cleared" }, CATALOG);
+  for (let step = 0; runStatus(state) === "in_progress"; step++) {
+    if (step > 20_000) throw new Error("playLongRun exceeded its step bound");
+    const spec = specOf(state);
+    const beforeTemple = spec !== null && spec.index < 8;
+    if (state.stage.tag === "loadout" && beforeTemple && state.history.filter((h) => h.camp === spec.index && h.status === "failed").length >= 2) {
+      state = forceClear(state);
+    } else {
+      const legal = enumerateLegalRunActions(state, CATALOG);
+      if (legal.length === 0) throw new Error(`playLongRun: no legal action at ${state.stage.tag}`);
+      const picked = legal[choices[step % choices.length]! % legal.length]!;
+      const result = applyRunAction(state, picked.seatId, picked.action, CATALOG);
+      if (!result.ok) throw new Error(`playLongRun: enumerated action refused: ${result.error}`);
+      state = beforeTemple && runStatus(result.state) === "lost" ? forceClear(state) : result.state;
+    }
+    states.push(state);
+  }
+  return states;
+}

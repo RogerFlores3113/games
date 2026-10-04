@@ -25,6 +25,7 @@ import { rats } from "./rats";
 import { snake } from "./snake";
 import { steam } from "./steam";
 import { thunderstorm } from "./thunderstorm";
+import { temple } from "./temple";
 import { tiger } from "./tiger";
 import { tornado } from "./tornado";
 import { wildfire } from "./wildfire";
@@ -56,4 +57,5 @@ export const MODS = {
   "blood-moon": bloodMoon,
   locusts,
   monsoon,
+  temple,
 } satisfies Readonly<Record<string, ModDef>>;

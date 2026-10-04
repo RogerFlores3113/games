@@ -4,12 +4,14 @@
 // `rules` for a question the engine asks, `on` for something that happens
 // at a moment (returning toolkit ops), `effect` for the layer an
 // `add-modifier` from `on` switches on, `slots` for the camp's objective
-// slots, and `status` for public table state.
+// slots, `status` for public table state, and `grants` for an ability every
+// seat may use while the def is in play.
 
 import type { RuleModifier, RunRules } from "../../run/run-rules";
 import type { EngineEvent, EngineEventType } from "../../run/react";
 import type { CampSpec, SlotTemplate } from "../../run/route";
 import type { ToolkitOp } from "../../run/toolkit";
+import type { ActiveAbility } from "../source-def";
 import type { ActiveEffect, RunState } from "../../run/types";
 import type { CampState, Suit } from "../../state";
 
@@ -53,7 +55,11 @@ export type StatusPart =
   | { readonly kind: "bitten"; readonly seatId: string; readonly tricksLeft: number } // Snake: a bite counting this trick
   | { readonly kind: "countdown"; readonly tricks: number } // Tornado, Earthquake: tricks to finish, this one included, before it strikes
   | { readonly kind: "alternating"; readonly activeNow: boolean } // Blood Moon and the half bodies: whether it acts on this trick
-  | { readonly kind: "swarm"; readonly seatId: string | null }; // Locusts: whose item they eat next; null: a card from every hand
+  | { readonly kind: "swarm"; readonly seatId: string | null } // Locusts: whose item they eat next; null: a card from every hand
+  | { readonly kind: "path"; readonly plates: readonly (Suit | "sun")[]; readonly pressed: number }; // Temple: the plates in order, the first `pressed` pressed
+
+/** An ability every seat may use, keyed by the granting def's id. */
+export type Grant = ActiveAbility & { readonly name: string; readonly text: string };
 
 export type ModBody = {
   readonly rules?: (ctx: ModCtx) => RuleModifier;
@@ -62,6 +68,7 @@ export type ModBody = {
   readonly effect?: (effect: ActiveEffect, ctx: ModCtx) => RuleModifier;
   readonly slots?: (prev: readonly SlotTemplate[]) => readonly SlotTemplate[];
   readonly status?: (ctx: ModCtx) => readonly StatusPart[];
+  readonly grants?: Grant;
 };
 
 type DefBase<K extends ModKind> = {

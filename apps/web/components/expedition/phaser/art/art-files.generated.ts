@@ -77,6 +77,7 @@ export const ART_FILES: readonly string[] = [
   "sources/signaller.loud-call.png",
   "sources/signaller.png",
   "sources/smoke-signal.png",
+  "sources/temple.png",
   "sources/trail-map.png",
   "sources/trained-monkey.png",
   "sources/whetstone.png",

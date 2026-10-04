@@ -38,7 +38,7 @@ import { campStack, modCtx, pairingOf, specOf, type StackLayer } from "../run/st
 import type { StatusPart } from "../content/mods/mod-def";
 import { whispersUsedBy } from "../run/whisper";
 import { abilityStatus } from "../run/abilities";
-import { activeOfKey, backpackOf, itemOf, liveSourceKeys, poolBalance, remaining, usedThisAttempt, type Remaining } from "../run/usage";
+import { abilityKeys, activeOfKey, backpackOf, itemOf, liveSourceKeys, poolBalance, remaining, usedThisAttempt, type Remaining } from "../run/usage";
 import { upgradeOffers, type StockEntry } from "../run/shop";
 import { currentWindow, gatedPendingSeatIds } from "../run/windows";
 import type { RunRules } from "../run/run-rules";
@@ -256,6 +256,8 @@ function toRemainingView(left: Remaining): ExpeditionRemainingView {
       return { kind: "pool", balance: left.balance, max: left.max, cost: left.cost };
     case "supplies":
       return { kind: "supplies", cost: left.cost };
+    case "crew":
+      return { kind: "crew", left: left.left, earned: left.earned };
   }
 }
 
@@ -288,7 +290,7 @@ function toSeatView(state: RunState, seat: SeatRun, viewerSeatId: string, rules:
 }
 
 function toAbilityViews(state: RunState, seat: SeatRun, catalog: Catalog): ExpeditionAbilityView[] {
-  return liveSourceKeys(seat).flatMap((sourceKey) => {
+  return abilityKeys(state, seat, catalog).flatMap((sourceKey) => {
     const status = abilityStatus(state, seat.seatId, sourceKey, catalog);
     if (status === null) return [];
     return [
@@ -362,6 +364,8 @@ function toStatusPartView(part: StatusPart): ExpeditionStatusPartView {
       return { kind: "alternating", activeNow: part.activeNow };
     case "swarm":
       return { kind: "swarm", seatId: part.seatId };
+    case "path":
+      return { kind: "path", plates: [...part.plates], pressed: part.pressed };
   }
 }
 

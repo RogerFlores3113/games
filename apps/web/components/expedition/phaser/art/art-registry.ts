@@ -30,6 +30,7 @@ export const SOURCE_ICON_IDS = [
   "signaller.loud-call", "signaller.call-and-response", "cartographer.detour", "cartographer.landmark",
   "trained-monkey", "pack-mule", "parrot", "trail-map", "rain-poncho", "smoke-signal", "whetstone",
   "puffball", "bait", "camouflage", "rope-ladder", "heavy-pack", "mosquito-net",
+  "temple",
 ] as const;
 
 /** The six characters, each a 64x80 seated silhouette under crew/<id>.png,

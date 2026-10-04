@@ -2,7 +2,7 @@
 // a new entry is covered with no edit here. Each body's channels are
 // checked against the engine's hook and event lists, and each def is forced
 // into the stack of a camp played by a seeded random walk through the real
-// dispatcher at 3, 4 and 5 players.
+// dispatcher at 3, 4 and 5 players; each boss also as a temple helper.
 
 import { describe, expect, it } from "vitest";
 import { toExpeditionPlayerView } from "../../adapter/view";
@@ -17,7 +17,7 @@ import { campStack, modCtx, specOf } from "../../run/stack";
 import { applyRunAction } from "../../run/stages/registry";
 import { campCardIds } from "../../run/toolkit";
 import type { Catalog, RunAction, RunAt, RunState } from "../../run/types";
-import { bodyOf, type ModBody, type ModCtx, type ModDef, type ModKind } from "./mod-def";
+import { bodyOf, type ModBody, type ModCtx, type ModDef, type ModKind, type Strength } from "./mod-def";
 import { MODS } from "./registry";
 
 const DEFS: readonly ModDef[] = Object.values(MODS);
@@ -34,8 +34,9 @@ function catalogFor(def: ModDef): Catalog {
 }
 
 /** Camp 2's loadout with `def` in its stack: as its location or weather,
- * through a pairing, or as its planned boss. */
-function forced(def: ModDef, players: number, seed: string): RunAt<"loadout"> {
+ * through a pairing, as its planned boss, or as the helper at half strength
+ * of a temple at camp 2 (a boss planned for camp 1). */
+function forced(def: ModDef, players: number, seed: string, strength: Strength = "full"): RunAt<"loadout"> {
   const seatIds = ["p0", "p1", "p2", "p3", "p4"].slice(0, players);
   const run = setupRun({ seatIds, seed, catalog: catalogFor(def), camp: 2, characters: {} }) as RunAt<"loadout">;
   const spec = run.stage.camp;
@@ -45,7 +46,12 @@ function forced(def: ModDef, players: number, seed: string): RunAt<"loadout"> {
       : def.kind === "weather"
         ? { ...spec, weather: def.id }
         : { ...spec, location: "jungle", weather: "fair" };
-  const plan = isBoss(def) || def.kind === "temple" ? { ...run.plan!, bosses: [{ at: campIndex(2), tier: def.kind === "temple" ? ("temple" as const) : (def.kind as "animal" | "disaster"), modId: def.id }] } : run.plan;
+  const tier = def.kind === "temple" ? ("temple" as const) : (def.kind as "animal" | "disaster");
+  const bosses =
+    strength === "half"
+      ? [{ at: campIndex(1), tier, modId: def.id }, { at: campIndex(2), tier: "temple" as const, modId: "temple" }]
+      : [{ at: campIndex(2), tier, modId: def.id }];
+  const plan = isBoss(def) || def.kind === "temple" ? { ...run.plan!, bosses } : run.plan;
   return { ...run, plan, stage: { ...run.stage, camp } };
 }
 
@@ -122,11 +128,12 @@ describe.each(DEFS.map((def) => [def.id, def] as const))("camp modifier %s", (id
     }
   });
 
-  it.each([3, 4, 5])("plays a camp at %i players: conserved, JSON-safe, deterministic, leak-free, with a stable status", (players) => {
+  const strengths: readonly Strength[] = isBoss(def) ? ["full", "half"] : ["full"];
+  it.each(strengths.flatMap((strength) => [3, 4, 5].map((players) => [players, strength] as const)))("plays a camp at %i players at %s strength: conserved, JSON-safe, deterministic, leak-free, with a stable status", (players, strength) => {
     const catalog = catalogFor(def);
-    for (const seed of [1, 2]) {
-      const start = forced(def, players, `${id}-${players}-${seed}`);
-      expect(campStack(start, catalog).map((layer) => layer.def.id)).toContain(id);
+    for (const seed of strength === "full" ? [1, 2] : [3]) {
+      const start = forced(def, players, `${id}-${players}-${seed}`, strength);
+      expect(campStack(start, catalog).map((layer) => `${layer.def.id}:${layer.strength}`)).toContain(`${id}:${strength}`);
       const { states, log } = playCamp(start, catalog, seed * 7919 + players);
       expect(states.at(-1)!.history.length).toBe(1);
 

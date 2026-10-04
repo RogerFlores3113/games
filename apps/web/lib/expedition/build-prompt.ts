@@ -129,7 +129,7 @@ function gatePrompt(view: ExpeditionView, nameOf: (seatId: string | null) => str
   if (attemptOf(view)?.window !== "rescue") return null;
   const pending = attemptOf(view)!.pendingSeatIds;
   if (view.yourSeatId !== null && pending.includes(view.yourSeatId)) {
-    const ability = view.yourAbilities.find((a) => a.usableNow && SOURCE_DISPLAY[yourSourceId(view, a.sourceKey)]?.active?.window === "rescue");
+    const ability = view.yourAbilities.find((a) => a.usableNow && SOURCE_DISPLAY[yourSourceId(view, a.sourceKey)]?.active?.windows.includes("rescue"));
     const name = ability === undefined ? "an ability" : sourceName(yourSourceId(view, ability.sourceKey));
     return { text: `An objective failed: rescue it with ${name}, or pass`, tone: "your-move" };
   }
@@ -172,7 +172,7 @@ function campOverPrompt(camp: ExpeditionCampView, nameOf: (seatId: string | null
 function onYourTurnNames(view: ExpeditionView): string | null {
   const names = view.yourAbilities
     .map((a) => ({ usable: a.usableNow, sourceId: yourSourceId(view, a.sourceKey) }))
-    .filter((a) => a.usable && SOURCE_DISPLAY[a.sourceId]?.active?.window === "in-trick")
+    .filter((a) => a.usable && SOURCE_DISPLAY[a.sourceId]?.active?.windows.includes("in-trick"))
     .map((a) => sourceName(a.sourceId));
   return names.length === 0 ? null : names.join(" or ");
 }

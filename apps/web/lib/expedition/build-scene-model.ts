@@ -687,7 +687,7 @@ function buildBanner(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalU
   const uses = youPending
     ? view.yourAbilities
         .map((a) => sourceChipFor(a.sourceKey, you, view, ui))
-        .filter((chip) => chip.usable && SOURCE_DISPLAY[chip.sourceId]?.active?.window === "rescue")
+        .filter((chip) => chip.usable && SOURCE_DISPLAY[chip.sourceId]?.active?.windows.includes("rescue"))
     : [];
   const others = pending.filter((id) => id !== you).map((id) => roomSeatFor(roomSeats, id).displayLabel);
   const useNames = uses.map((u) => u.name).join(" or ");

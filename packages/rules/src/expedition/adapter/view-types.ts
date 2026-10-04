@@ -208,7 +208,9 @@ export type ExpeditionAttemptView = {
 export type ExpeditionRemainingView =
   | { kind: "uses"; left: number; of: number }
   | { kind: "pool"; balance: number; max: number; cost: number }
-  | { kind: "supplies"; cost: number };
+  | { kind: "supplies"; cost: number }
+  /** A crew token (the temple's skip): `left` of `earned` this attempt. */
+  | { kind: "crew"; left: number; earned: number };
 
 /** One owned item instance. `remaining` is null for a passive item. */
 export type ExpeditionItemView = { uid: string; itemId: string; remaining: ExpeditionRemainingView | null };
@@ -293,7 +295,8 @@ export type ExpeditionStatusPartView =
   | { kind: "bitten"; seatId: string; tricksLeft: number }
   | { kind: "countdown"; tricks: number }
   | { kind: "alternating"; activeNow: boolean }
-  | { kind: "swarm"; seatId: string | null };
+  | { kind: "swarm"; seatId: string | null }
+  | { kind: "path"; plates: (Suit | "sun")[]; pressed: number };
 
 /** One layer of the camp's modifier stack, in fold order. */
 export type ExpeditionModView = { id: string; kind: ModKind; strength: Strength; status: ExpeditionStatusPartView[] };

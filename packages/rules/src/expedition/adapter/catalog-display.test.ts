@@ -8,8 +8,21 @@ import { CATALOG } from "../run/catalog";
 import { CHARACTER_DISPLAY, MOD_DISPLAY, SOURCE_DISPLAY } from "./catalog-display";
 
 describe("SOURCE_DISPLAY", () => {
-  it("has exactly one entry per source in the catalogue", () => {
-    expect(Object.keys(SOURCE_DISPLAY).sort()).toEqual(Object.keys(CATALOG.sources).sort());
+  it("has exactly one entry per source in the catalogue, plus the temple's granted skip", () => {
+    expect(Object.keys(SOURCE_DISPLAY).sort()).toEqual([...Object.keys(CATALOG.sources), "temple"].sort());
+  });
+
+  it("shows a granted ability under its modifier's id, with every window it fires in", () => {
+    expect(SOURCE_DISPLAY.temple).toEqual({
+      id: "temple",
+      name: "Skip",
+      text: "Drop one open objective.",
+      kind: "grant",
+      characterId: null,
+      active: { windows: ["between-tricks", "rescue"], windowPhrase: "Between tricks or when an objective fails", limitBadge: "Crew token", targets: ["objective"] },
+      passive: false,
+      item: null,
+    });
   });
 
   it("carries a character's name, text, kind, window phrase, limit badge and target kinds", () => {
@@ -19,7 +32,7 @@ describe("SOURCE_DISPLAY", () => {
       text: "See a random card in a teammate's hand.",
       kind: "character",
       characterId: "scout",
-      active: { window: "between-tricks", windowPhrase: "Between tricks", limitBadge: "1 per camp", targets: ["hand"] },
+      active: { windows: ["between-tricks"], windowPhrase: "Between tricks", limitBadge: "1 per camp", targets: ["hand"] },
       passive: false,
       item: null,
     });

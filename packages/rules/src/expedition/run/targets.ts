@@ -36,7 +36,7 @@ type SpecParams = {
   player: { readonly who: "teammate" | "anyone" };
   hand: {};
   card: { readonly where: "my-hand" | "board" };
-  objective: { readonly whose: "unclaimed" | "mine" };
+  objective: { readonly whose: "unclaimed" | "mine" | "open" };
   "completed-objective": {};
   "failed-objective": {};
   whisper: { readonly which: "sent" | "received" | "overheard" };
@@ -139,11 +139,15 @@ export const TARGET_KINDS: { readonly [K in TargetKind]: TargetKindDef<K> } = {
   },
   objective: {
     kind: "objective",
-    describe: (spec) => (spec.whose === "unclaimed" ? "Pick a face-up objective" : "Pick one of your open objectives"),
-    choices: (scope, spec) =>
-      objectivesWithStatus(scope, "pending")
-        .filter((o) => (spec.whose === "unclaimed" ? o.ownerSeatId === null : o.ownerSeatId === scope.seatId))
-        .map((objective) => ({ id: `objective:${objective.id}`, target: { kind: "objective", objective } })),
+    describe: (spec) => (spec.whose === "unclaimed" ? "Pick a face-up objective" : spec.whose === "mine" ? "Pick one of your open objectives" : "Pick an open objective"),
+    choices: (scope, spec) => {
+      // "open": anyone's taken objective that is not done, failed ones included.
+      const candidates =
+        spec.whose === "open"
+          ? (scope.camp?.objectives ?? []).filter((o) => o.ownerSeatId !== null && scope.rules.objectiveStatus(scope.camp!, o) !== "done")
+          : objectivesWithStatus(scope, "pending").filter((o) => (spec.whose === "unclaimed" ? o.ownerSeatId === null : o.ownerSeatId === scope.seatId));
+      return candidates.map((objective) => ({ id: `objective:${objective.id}`, target: { kind: "objective", objective } }));
+    },
   },
   "completed-objective": {
     kind: "completed-objective",

@@ -2,13 +2,15 @@
 // the view, the route preview and the leak check all read.
 //
 // Fold order: the location (unless a pairing cancels it), the weather
-// (unless cancelled), the pairing's added def, then the planned boss.
+// (unless cancelled), the pairing's added def, the planned boss or the
+// temple, then at the temple each earlier boss at half strength, in the
+// order the crew faced them.
 
 import { bodyOf, type ModBody, type ModCtx, type ModDef, type ModId, type Strength } from "../content/mods/mod-def";
 import type { PairingRule } from "../content/mods/pairings";
 import type { CampSpec, SlotTemplate } from "./route";
 import { attemptOf, nextAttemptNumber } from "./attempt";
-import { bossAt } from "./plan";
+import { bossAt, helpersFor } from "./plan";
 import { STREAMS, seededIndex } from "./rng";
 import type { Catalog, RunState } from "./types";
 
@@ -41,10 +43,13 @@ export function stackFor(run: RunState, spec: CampSpec, catalog: Catalog): reado
   if (result?.adds != null) ids.push(result.adds);
   const boss = run.plan === null ? null : bossAt(run.plan, spec.index)?.modId ?? null;
   if (boss !== null) ids.push(boss);
-  return ids.map((id) => {
-    const def = modDef(catalog, id);
-    return { def, strength: "full", body: bodyOf(def, "full") };
-  });
+  const helpers = run.plan === null ? [] : helpersFor(run.plan, spec.index).map((helper) => helper.modId!);
+  return [...ids.map((id) => layerOf(catalog, id, "full")), ...helpers.map((id) => layerOf(catalog, id, "half"))];
+}
+
+function layerOf(catalog: Catalog, id: ModId, strength: Strength): StackLayer {
+  const def = modDef(catalog, id);
+  return { def, strength, body: bodyOf(def, strength) };
 }
 
 /** The spec of the loadout or camp the run is at; null in every other stage. */

@@ -192,7 +192,7 @@ export function secretsForExpeditionSeat(
 
   // A planned boss is a secret until a route preview leads the crew to its camp.
   for (const boss of state.plan?.bosses ?? []) {
-    if (boss.modId !== null && boss.at > horizon(state)) hiddenIds.push(boss.modId);
+    if (boss.modId !== null && boss.tier !== "temple" && boss.at > horizon(state)) hiddenIds.push(boss.modId);
   }
 
   const forbiddenTokens = seed !== undefined ? [seed] : [];

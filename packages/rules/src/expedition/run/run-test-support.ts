@@ -25,7 +25,7 @@ import { campSpecAt } from "./route";
 import { applyRunAction } from "./stages/registry";
 import { attemptOf } from "./attempt";
 import { RUN_LENGTHS } from "./balance";
-import { liveSourceKeys } from "./usage";
+import { abilityKeys } from "./usage";
 import { upgradeOffers } from "./shop";
 import { currentWindow, WINDOWS } from "./windows";
 import { defineCharacter, defineItem, defineUpgrade, type CharacterDef, type ItemDef, type Rarity } from "../content/source-def";
@@ -183,7 +183,7 @@ function cartesian(pools: readonly (readonly string[])[]): string[][] {
  * built from the engine's own step choices (the first few per step). */
 function abilityCandidates(run: RunState, catalog: Catalog): Array<{ seatId: string; action: RunAction }> {
   return run.seats.flatMap((seat) =>
-    liveSourceKeys(seat).flatMap((sourceKey) => {
+    abilityKeys(run, seat, catalog).flatMap((sourceKey) => {
       const status = abilityStatus(run, seat.seatId, sourceKey, catalog);
       if (status === null || !status.usable) return [];
       return cartesian(status.steps.map((step) => step.choices.slice(0, 4))).map((targets) => ({

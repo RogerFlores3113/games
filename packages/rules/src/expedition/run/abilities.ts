@@ -6,7 +6,7 @@
 import type { AdapterResult } from "../../adapter";
 import { shuffleWithSeed } from "../../shuffle";
 import { checkCampOutcome } from "../camp";
-import type { AbilityContext, ItemAbility } from "../content/source-def";
+import { windowsOf, type AbilityContext, type ItemAbility } from "../content/source-def";
 import { attemptOf, withAttempt } from "./attempt";
 import { rulesFor } from "./compose";
 import { STREAMS, seededIndex } from "./rng";
@@ -14,7 +14,7 @@ import type { RunRules } from "./run-rules";
 import { resolveTargets, stepsFor, type AbilityStep, type SeatScope, type Target, type TargetSpec } from "./targets";
 import { applyToolkitOps, type ToolkitOp } from "./toolkit";
 import type { Catalog, LedgerEntry, LogEntry, RunError, RunState, SeatRun, SourceKey } from "./types";
-import { activeOfKey, currentStamp, defIdOf, limitBlock, liveSourceKeys, ownerOf, remaining, sameStamp, seatOf, spendsInstance, type Remaining } from "./usage";
+import { abilityKeys, abilityOf, currentStamp, defIdOf, limitBlock, ownerOf, remaining, sameStamp, seatOf, spendsInstance, type Remaining } from "./usage";
 import { WINDOWS, currentWindow, type ActiveWindow } from "./windows";
 
 export type AbilityStatus =
@@ -59,8 +59,9 @@ function abilityContext<S extends readonly TargetSpec[]>(
 function statusWith(run: RunState, seat: SeatRun, key: SourceKey, active: ItemAbility, catalog: Catalog, rules: RunRules): AbilityStatus {
   const left = remaining(run, seat.seatId, key, catalog);
   const window = currentWindow(run, rules);
-  if (window !== active.window || !WINDOWS[window].mayAct(run, rules, seat.seatId)) {
-    return { usable: false, error: "wrong_window", reason: `Usable ${WINDOWS[active.window].phrase.toLowerCase()}`, remaining: left };
+  const windows = windowsOf(active);
+  if (window === null || !windows.includes(window) || !WINDOWS[window].mayAct(run, rules, seat.seatId)) {
+    return { usable: false, error: "wrong_window", reason: `Usable ${windows.map((w) => WINDOWS[w].phrase.toLowerCase()).join(" or ")}`, remaining: left };
   }
   const blocked = limitBlock(run, left);
   if (blocked !== null) return { usable: false, error: blocked.error, reason: blocked.reason, remaining: left };
@@ -83,8 +84,8 @@ function scopeOf(run: RunState, seatId: string, rules: RunRules): SeatScope {
  * choice (ability_unavailable). */
 export function abilityStatus(run: RunState, seatId: string, key: SourceKey, catalog: Catalog): AbilityStatus | null {
   const seat = seatOf(run, seatId);
-  if (!liveSourceKeys(seat).includes(key)) throw new Error(`abilityStatus: "${key}" is not live for "${seatId}"`);
-  const active = activeOfKey(seat, key, catalog);
+  if (!abilityKeys(run, seat, catalog).includes(key)) throw new Error(`abilityStatus: "${key}" is not live for "${seatId}"`);
+  const active = abilityOf(run, seat, key, catalog);
   if (active === undefined) return null;
   return statusWith(run, seat, key, active, catalog, rulesFor(run, catalog));
 }
@@ -104,9 +105,9 @@ export function pendingSourceKeys(run: RunState, seatId: string, window: ActiveW
   const seat = seatOf(run, seatId);
   const stamp = currentStamp(run);
   const failed = failedObjectiveIds(run, rules);
-  return liveSourceKeys(seat).filter((key) => {
-    const active = activeOfKey(seat, key, catalog);
-    if (active === undefined || active.window !== window) return false;
+  return abilityKeys(run, seat, catalog).filter((key) => {
+    const active = abilityOf(run, seat, key, catalog);
+    if (active === undefined || !windowsOf(active).includes(window)) return false;
     const passed = seat.ledger.some(
       (entry) =>
         entry.kind === "passed" &&
@@ -135,8 +136,8 @@ export function useAbility(
   catalog: Catalog,
 ): AdapterResult<RunState, RunError> {
   const seat = seatOf(run, seatId);
-  if (!liveSourceKeys(seat).includes(key)) return { ok: false, error: "not_owned" };
-  const active = activeOfKey(seat, key, catalog);
+  if (!abilityKeys(run, seat, catalog).includes(key)) return { ok: false, error: "not_owned" };
+  const active = abilityOf(run, seat, key, catalog);
   if (active === undefined) return { ok: false, error: "ability_unavailable" };
 
   const rules = rulesFor(run, catalog);
