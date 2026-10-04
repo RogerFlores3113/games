@@ -113,6 +113,9 @@ export interface CampPreview {
   objectives: string[];
   /** "Animal boss", "The Temple"; null for a plain camp. */
   boss: string | null;
+  /** The boss's id and name once a route preview has revealed it. */
+  bossId: string | null;
+  bossName: string | null;
 }
 
 export interface RouteCard {
@@ -256,6 +259,8 @@ export function campPreview(view: View, camp: ExpeditionCampPreviewView): CampPr
     event: camp.event === null ? null : (EVENT_DISPLAY[camp.event]?.name ?? modName(camp.event)),
     objectives: objectiveLabels(camp.slotKinds),
     boss: bossLabel(view, camp.index),
+    bossId: camp.bossId,
+    bossName: camp.bossId === null ? null : modDisplayName(camp.bossId),
   };
 }
 

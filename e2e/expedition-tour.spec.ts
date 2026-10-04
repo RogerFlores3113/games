@@ -57,6 +57,7 @@ const WANTED = [
 const RARE = [
   "run-end-won", "between-camps-draft", "vote-tie-length", "vote-tie-route", "shop", "camp-storm-strike", "camp-rain", "route-weather",
   "camp-cave", "camp-night", "camp-desert", "camp-fog", "camp-magma", "camp-flood", "loadout-fog",
+  "camp-tiger", "camp-rats", "camp-snake", "camp-crocodile", "camp-capybara", "camp-beaver", "route-boss",
 ];
 
 interface Identity { kind: "standard" | "joker"; suit?: string; rank?: number; joker?: "sun" | "moon" }
@@ -581,6 +582,43 @@ function routeWeatherView(game: Game): Game {
   };
 }
 
+/** Mid-trick under an animal boss with `status`, its marks on the crew. */
+function bossView(boss: string, status: (you: string, mate: string) => Record<string, unknown>[]): (game: Game) => Game {
+  return (game) => {
+    const mate = game.seats.find((s) => s.seatId !== game.yourSeatId)!.seatId;
+    return campIn(playing(game, { plays: 1, window: "in-trick" }), "jungle", "fair", [mod("jungle", "location"), mod("fair", "weather"), mod(boss, "animal", status(game.yourSeatId, mate))]);
+  };
+}
+
+const BOSS_VIEWS = [
+  ["camp-tiger", bossView("tiger", (_you, mate) => [{ kind: "streak", seatId: mate, count: 2 }])],
+  ["camp-rats", bossView("rats", () => [])],
+  ["camp-snake", bossView("snake", (you) => [{ kind: "bitten", seatId: you, tricksLeft: 2 }])],
+  ["camp-crocodile", bossView("crocodile", (_you, mate) => [{ kind: "facing", seatId: mate }])],
+  ["camp-capybara", bossView("capybara", () => [])],
+  ["camp-beaver", bossView("beaver", () => [{ kind: "dam", suit: "hearts" }])],
+] as const;
+
+/** A route vote into a revealed boss camp: three options, one with a
+ * pairing, so the narrowest card falls back to a one-line boss. */
+function routeBossView(game: Game): Game {
+  const next = (location: string, weather: string, pairing: string | null) => ({ ...PREVIEW, index: 3, location, weather, pairing, bossId: "crocodile", shop: true });
+  return {
+    ...game,
+    plan: [{ at: 3, tier: "animal", bossId: "crocodile" }, { at: 6, tier: "temple", bossId: null }],
+    history: [h(1, 1, "cleared"), h(2, 1, "cleared")],
+    stage: {
+      tag: "route",
+      options: [
+        { id: "a", next: next("clearing", "fair", null) },
+        { id: "b", next: next("magma", "rain", "steam") },
+        { id: "c", next: next("cave", "fog", null) },
+      ],
+      ballots: [],
+    },
+  };
+}
+
 /** Opens each target kind's picker from a rewritten camp, and the rescue
  * window from both sides, and captures them. */
 type Rewriter = { current: (g: Game) => Game };
@@ -614,7 +652,7 @@ async function capturePickers(host: Page, tour: Tour, rewrite: Rewriter): Promis
   await tour.shot("camp-storm-strike");
   await reloadTo(rainView);
   await tour.shot("camp-rain");
-  for (const [name, view] of [["camp-cave", caveView], ["camp-night", nightView], ["camp-desert", desertView], ["camp-fog", fogView], ["camp-magma", magmaView], ["camp-flood", floodView]] as const) {
+  for (const [name, view] of [["camp-cave", caveView], ["camp-night", nightView], ["camp-desert", desertView], ["camp-fog", fogView], ["camp-magma", magmaView], ["camp-flood", floodView], ...BOSS_VIEWS] as const) {
     await reloadTo(view);
     await tour.shot(name);
   }
@@ -642,6 +680,7 @@ async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<v
   }
   await capture(shopView, "trail", "shop");
   await capture(routeWeatherView, "trail", "route-weather");
+  await capture(routeBossView as (g: Game) => Game, "trail", "route-boss");
   await capture(fogLoadoutView, "trail", "loadout-fog");
   await capture(lengthTieView as (g: Game) => Game, "trail", "vote-tie-length", 2_000);
   await capture(routeTieView as (g: Game) => Game, "trail", "vote-tie-route", 2_000);

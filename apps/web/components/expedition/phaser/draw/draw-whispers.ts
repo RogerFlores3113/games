@@ -11,6 +11,7 @@ import { MINI_H, MINI_W, ZONES } from "../layout";
 import type { ObjectIndex } from "../object-index";
 import type { SceneModel } from "../../../../lib/expedition/build-scene-model";
 import { fitLabel } from "./text-fit";
+import { truncateLabel } from "../font/glyphs-5x7";
 import { PANEL_ALPHA, labelWidth, miniCard, plate, platedText, text, type Layer } from "./ui-kit";
 
 const CELL_H = 23;
@@ -56,18 +57,24 @@ function drawCards(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: 
   });
 }
 
-/** The newest whispers under the stump; a lightning strike on the trick
- * in play takes the bottom line. */
+/** The newest whispers under the stump. The boss's rule and a lightning
+ * strike on the trick in play are pinned to the bottom lines. */
 function drawTicker(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
-  const notice = model.sky.notice;
-  const lines = [...model.whisperLog, ...(notice === null ? [] : [notice])].slice(-TICKER_LINES);
+  const pinned = [
+    ...(model.boss === null || model.boss.rule === "" ? [] : [{ line: model.boss.rule, color: model.boss.alert ? PALETTE.destructive : PALETTE.sun }]),
+    ...(model.sky.notice === null ? [] : [{ line: model.sky.notice, color: PALETTE.coin }]),
+  ].slice(-TICKER_LINES);
+  const room = TICKER_LINES - pinned.length;
+  const whispers = room === 0 ? [] : model.whisperLog.slice(-room);
+  const lines = [...whispers.map((line, i) => ({ line, color: i === whispers.length - 1 && pinned.length === 0 ? PALETTE.text : PALETTE.textDim })), ...pinned];
   const zone = ZONES.ticker;
-  lines.forEach((line, i) => {
+  const chars = Math.floor((zone.w - 4) / LABEL_CELL.w);
+  lines.forEach(({ line, color }, i) => {
     const age = lines.length - 1 - i;
+    const shown = truncateLabel(line, chars);
     const y = zone.y + zone.h - TICKER_LINE_H * (age + 1) + 1;
-    const x = zone.x + Math.floor((zone.w - labelWidth(line)) / 2);
-    const color = notice !== null && age === 0 ? PALETTE.coin : age === 0 ? PALETTE.text : PALETTE.textDim;
-    layer.add(platedText(scene, x, y, line, color));
+    const x = zone.x + Math.floor((zone.w - labelWidth(shown)) / 2);
+    layer.add(platedText(scene, x, y, shown, color));
   });
 }
 

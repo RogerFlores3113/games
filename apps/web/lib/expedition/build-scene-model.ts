@@ -25,6 +25,7 @@ import { buildPrompt } from "./build-prompt";
 import type { ObjectiveHolder } from "./objective-tooltip";
 import { objectiveTooltip } from "./objective-tooltip";
 import { buildModChips, buildSky, modTooltip, whisperBlocker, type ModChip, type Sky } from "./weather-model";
+import { bossBlockReason, buildBoss, type BossModel, type SeatBossMark, type SeatNamer } from "./boss-model";
 import { chargeText, isSpent, liveSourceKeys, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, type SourceKind } from "./source-text";
 
 /**
@@ -190,6 +191,8 @@ export interface SeatModel {
   /** The seat's hand as a whole, for a hand pick. */
   handObjectId: string;
   handPick: PickState;
+  /** What the boss has marked this seat with: watched, a streak, a bite. */
+  bossMark: SeatBossMark | null;
 }
 
 /** One option of the pick tray on the stump: a whisper, a won trick, or a
@@ -243,6 +246,8 @@ export interface SceneModel {
   topBar: TopBar;
   /** The camp's modifiers in fold order, on the top bar. */
   mods: ModChip[];
+  /** The boss on the table; null for a plain camp. */
+  boss: BossModel | null;
   /** The location's backdrop and what the weather draws over it. */
   sky: Sky;
   seats: SeatModel[];
@@ -420,7 +425,7 @@ function buildTrickPlayModel(
   };
 }
 
-function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiState): SeatModel {
+function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiState, boss: BossModel | null): SeatModel {
   const room = roomSeatFor(roomSeats, seatId);
   const camp = attemptOf(view)?.camp ?? null;
   const handSize = camp?.handSizes.find((h) => h.seatId === seatId)?.size ?? 0;
@@ -471,15 +476,20 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
     selected,
     handObjectId: seatHandObjectId(seatId),
     handPick: targetInfo(ui, view, "hand", seatId),
+    bossMark: boss?.marks[seatId] ?? null,
   };
 }
 
 /** Why a card the server did not list as legal can't be played; phrases
  * the server's answer and never recomputes it. */
-function blockedReasonFor(camp: ExpeditionCampView, view: ExpeditionView): string {
+function blockedReasonFor(camp: ExpeditionCampView, view: ExpeditionView, card: ExpeditionCardIdentityView): string {
   if (camp.campPhase !== "playing") return "Wait for the objectives to be picked";
   if (camp.currentActorSeatId !== view.yourSeatId) return "Not your turn yet";
   const led = ledSuit(camp);
+  const legal = camp.yourHand.filter((c) => camp.yourLegalCardIds.includes(c.id));
+  const following = led !== null && legal.some((c) => c.identity.kind === "standard" && c.identity.suit === led);
+  const boss = following ? null : bossBlockReason(view, card, legal.length);
+  if (boss !== null) return boss;
   if (led !== null) return `Must follow ${SUIT_GLYPH[led]}`;
   return "You can't play that card now";
 }
@@ -507,7 +517,7 @@ function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: Lo
       targetable,
       selected,
       lifted: ui.hoveredCardId === c.id && dragged === null,
-      blockedReason: playable ? null : blockedReasonFor(camp, view),
+      blockedReason: playable ? null : blockedReasonFor(camp, view, c.identity),
       dragging: (ui.drag.phase === "dragging" || ui.drag.phase === "playing") && dragged === c.id,
     };
   });
@@ -590,7 +600,16 @@ function buildLastTrick(camp: ExpeditionCampView | null, ui: LocalUiState): Scen
 
 /** Supplies of their cap, the purse, and which camp of how many. */
 export function buildTopBar(view: ExpeditionView, suppliesPick: PickState | null = null): TopBar {
-  return { supplies: view.supplies.count, suppliesMax: view.supplies.max, purse: view.purse, camp: campHeadline(view), suppliesPick };
+  return { supplies: view.supplies.count, suppliesMax: view.supplies.max, purse: view.purse, camp: campLabel(view), suppliesPick };
+}
+
+/** In a boss camp the strip's chip names the boss, so the label says only
+ * which camp of how many. */
+function campLabel(view: ExpeditionView): string {
+  const stage = view.stage;
+  const index = focusCampIndex(view);
+  const bossChip = stage.tag === "camp" && stage.mods.some((m) => m.kind === "animal" || m.kind === "disaster");
+  return bossChip && index !== null && view.campCount !== null ? `Camp ${index} of ${view.campCount}` : campHeadline(view);
 }
 
 function buildTooltip(server: SceneServerInput, ui: LocalUiState): Tooltip | null {
@@ -717,7 +736,9 @@ export function buildSceneModel(
   const { game: view, roomSeats } = server;
   const camp = attemptOf(view)?.camp ?? null;
 
-  const seats = orderedSeatIds(view).map((seatId, ring) => seatModelFor(seatId, ring, view, roomSeats, ui));
+  const namer: SeatNamer = { name: (seatId) => roomSeatFor(roomSeats, seatId).displayLabel, isYou: (seatId) => seatId === view.yourSeatId };
+  const boss = buildBoss(view, namer);
+  const seats = orderedSeatIds(view).map((seatId, ring) => seatModelFor(seatId, ring, view, roomSeats, ui, boss));
   const hand = buildHand(camp, view, ui);
   const trick = buildTrick(camp, view, ui);
   const lastTrick = buildLastTrick(camp, ui);
@@ -744,6 +765,7 @@ export function buildSceneModel(
     campIndex: focusCampIndex(view) ?? 0,
     topBar: buildTopBar(view, pickOrNull(ui, view, "supplies")),
     mods: buildModChips(view),
+    boss,
     sky: buildSky(view) ?? { location: "jungle", precipitation: "none", haze: "none", flood: null, strike: null, notice: null },
     seats,
     hand,

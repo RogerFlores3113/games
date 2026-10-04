@@ -9,7 +9,8 @@ import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL, SIGN_CELL, WORLD_SIGN_FONT } from "../font/font-keys";
 import { MUSTER_ZONES, ROUTE_ZONES, TRAIL_ZONES, rowBoxes, trailStopXs, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
-import { ART, crewArtId, sourceArtId, type ArtId } from "../art/art-registry";
+import { ART, crewArtId, modArtId, sourceArtId, type ArtId } from "../art/art-registry";
+import { BOSS_SCALE } from "./draw-boss";
 import type { ObjectIndex } from "../object-index";
 import type {
   BundleItem,
@@ -324,13 +325,27 @@ function objectiveChips(scene: Phaser.Scene, container: Phaser.GameObjects.Conta
   return cy + LINE + 2;
 }
 
-function bossLine(scene: Phaser.Scene, container: Phaser.GameObjects.Container, boss: string | null, x: number, y: number): void {
-  if (boss === null) {
+/** The boss line: "No boss", the tier with its marker, or once revealed
+ * the boss's portrait beside its name and tier. Returns the height used. */
+function bossLine(scene: Phaser.Scene, container: Phaser.GameObjects.Container, preview: CampPreview, x: number, y: number, room = Infinity): number {
+  if (preview.boss === null) {
     container.add(text(scene, x, y, "No boss", PALETTE.textDim));
-    return;
+    return LINE;
   }
-  container.add(placeArt(scene, boss === "The Temple" ? "temple" : "marker-boss", x + 8, y + 3));
-  container.add(text(scene, x + 18, y, boss, PALETTE.destructive));
+  const art = preview.bossId === null ? null : modArtId({ id: preview.bossId, kind: "animal" });
+  const h = art === null ? 0 : Math.round(ART[art].h * BOSS_SCALE);
+  if (art === null || preview.bossName === null || h > room) {
+    const label = preview.bossName === null ? preview.boss : `${preview.bossName}, ${preview.boss.toLowerCase()}`;
+    container.add(placeArt(scene, preview.boss === "The Temple" ? "temple" : "marker-boss", x + 8, y + 3));
+    container.add(text(scene, x + 18, y, label, PALETTE.destructive));
+    return LINE;
+  }
+  const w = Math.round(ART[art].w * BOSS_SCALE);
+  container.add(placeArt(scene, art, x + Math.floor(w / 2), y + Math.floor(h / 2)).setScale(BOSS_SCALE));
+  const textY = y + Math.max(0, Math.floor(h / 2) - LINE);
+  container.add(text(scene, x + w + 4, textY, preview.bossName, PALETTE.destructive));
+  container.add(text(scene, x + w + 4, textY + LINE, preview.boss, PALETTE.textDim));
+  return Math.max(h, 2 * LINE);
 }
 
 function drawPreview(ctx: Ctx, preview: CampPreview, zone: Rect, heading: string): void {
@@ -342,7 +357,7 @@ function drawPreview(ctx: Ctx, preview: CampPreview, zone: Rect, heading: string
   y += 2;
   container.add(text(scene, 8, y, "Objectives", PALETTE.textDim));
   y = objectiveChips(scene, container, preview.objectives, 8, y + LINE, w);
-  bossLine(scene, container, preview.boss, 8, y + 2);
+  bossLine(scene, container, preview, 8, y + 2);
   layer.add(container);
 }
 
@@ -550,12 +565,13 @@ function drawRouteCard(ctx: Ctx, card: RouteCard, x: number, y: number, w: numbe
     cy += LINE + 3;
   }
   cy = objectiveChips(scene, body, card.next.objectives, 6, cy + 2, inner);
-  bossLine(scene, body, card.next.boss, 6, cy);
+  const below = 4 + 4 + LINE + (card.yours || card.votable ? LINE : 0) + 3;
+  const bossH = bossLine(scene, body, card.next, 6, cy, ROUTE_ZONES.routes.h - cy - below);
   if (card.next.shop) {
     const label = "Shop";
     chip(scene, body, w - 6 - labelWidth(label) - 4, cy, label, PALETTE.coinEdge, PALETTE.coinShine);
   }
-  cy += LINE + 4;
+  cy += bossH + 4;
 
   const chars = Math.floor(inner / LABEL_CELL.w);
   body.add(scene.add.rectangle(4, cy, w - 8, 1, toPhaserColor(PALETTE.plateEdge)).setOrigin(0, 0));
@@ -623,7 +639,7 @@ function drawEvent(ctx: Ctx, event: Extract<TrailPanel, { kind: "event" }>): voi
   const next = scene.add.container(main.x, y + LINE);
   const after = placeRows(scene, next, event.next, 8, 0, main.w - 16);
   layer.add(next);
-  bossLine(scene, next, event.next.boss, 8, after + 2);
+  bossLine(scene, next, event.next, 8, after + 2);
   if (ctx.model.vote !== null) drawVoteResult(ctx, ctx.model.vote, vote);
 }
 

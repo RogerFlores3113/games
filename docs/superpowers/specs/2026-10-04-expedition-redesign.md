@@ -1416,3 +1416,57 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
   now requires. The tour gains `camp-cave`, `camp-night`, `camp-desert`, `camp-fog`,
   `camp-magma`, `camp-flood` and `loadout-fog` from rewritten views, and its bot reads a face-down
   lead's suit.
+
+### Implementation notes (unit 8)
+
+- `drawPlan(seed, length, catalog)` draws each animal or disaster boss camp from its tier's pool
+  (registered defs with weight above 0, ids sorted, one `seededIndex` on `expedition-plan:{tier}`).
+  The disaster pool is empty until unit 9 and the temple tier stays null until unit 10, so those
+  camps still plan null. `horizon(run)` and `visibleBossId` live in `run/plan.ts`; the view gates
+  the header's `plan` and every camp preview through them, the leak check adds each planned boss
+  beyond the horizon to `hiddenIds`, and `FORBIDDEN_VIEW_KEYS` gains `bosses`.
+- Deviation: `openLoadout` cuts every equipped set to the camp's composed `itemSlots`, the last
+  items going back to the backpack. The spec left a carried set over the slots for `ready` to
+  refuse; a player arriving at a Rats camp would then press Set out and be refused, and bots
+  (which never equip) would stall the table. `ready` still re-checks.
+- Tiger: the streak is the last winner's run of consecutive wins. The leader pounced on is the
+  last winner on a streak of two or more, before the lead, so a third win in a row pounces again.
+  The forced card is `roll("t{i}")` over the previous layer's legal plays, so it composes with
+  other `legalPlays` layers. Status `streak` appears from one win.
+- Beaver reads the printed suit: a `rules(ctx)` layer cannot ask the composed `identityOf`. A
+  Beaver helper under Blood Moon (unit 10) would dam by printed suit.
+- Snake: the bite is an attempt-long mod effect with params `{ seatId, from, through }`; it fails
+  only card objectives (`win-card`, `ordered`) owned by the bitten seat and won by them in the
+  span. Whispers happen only between tricks, so `from` is the next trick played.
+- Crocodile's goal id is `crocodile`; Rats' half body takes a slot from `seatIds[0]` and
+  `seatIds[1]`; the Capybara adds win-card slots. The contract test still drives full bodies only
+  (half bodies are shape-checked, as in unit 5) until the temple stacks helpers.
+- `RunState` is unchanged, so `ROOM_SCHEMA_VERSION` stays 11. Status parts gain `facing`, `dam`,
+  `streak` and `bitten`, mirrored in the schema.
+- Dev: `set-plan-boss` (Run group) sets an animal or disaster camp's boss or none, re-opening
+  that camp if the run is at it (a dealt camp is dealt again). `jump-to-camp` keeps the run's own
+  plan when the length matches, so a boss set first survives the jump. `check.ts` flags a planned
+  boss whose kind is not its tier; `inspect.ts` labels the new status parts and marks a boss not
+  yet revealed.
+- Web: the camp's `world` zone is split: `boss` (6, 42, 96x58, wide enough for a 15-character caption) above, `world` (8, 102, 92x40)
+  with the campfire, and the lantern and fireflies moved down into it. The boss sprite is drawn
+  at half size (the art is 96-160 px on a 640x360 stage) in its own layer, rebuilt only when the
+  boss changes, so its idle bob survives redraws; hovering it shows the boss's rules. Under it a
+  caption reads its state ("Watching Bianca", "Dam: ♥ hearts", "Pounce: Bot 1", "Bit you",
+  "-1 item slot", "+2 objectives"). The Crocodile's gaze arrow sits inside the boss zone and points
+  at the watched seat's plate. A boss mark ("watched", "streak 2", "bitten 2") hangs under a
+  teammate's plate or sits in your own name row; an alert mark outlines the plate in red.
+- Deviation: the boss's one-line rule is pinned to the ticker under the stump ("Crocodile: if
+  Bianca wins this trick, the camp is lost"), not the top-bar strip. At 1280x720 the strip's free
+  span (about 219 stage px) is already filled by three chip names. The strip now drops readings,
+  then every name but the boss's, before it would overflow; in a boss camp the top bar's camp
+  label drops the tier ("Camp 3 of 6"), since the chip names the boss. Both fix an overlap of the
+  strip with the camp label that a third chip exposed.
+- Web: a dammed card's reason is "The beaver dams ♠", a pounced lead's "The tiger picked your
+  lead" (a follow-suit reason wins when the player can follow). Route cards, the event panel and
+  the loadout preview show a revealed boss's portrait with its name and tier; a route card too
+  short for the portrait falls back to one line ("Crocodile, animal boss").
+- e2e: `expedition-bosses.spec.ts` sets each boss with the dev panel and plays into the state
+  that shows it (the crocodile camp plays to its settle); with `BOSS_SCREENSHOT_DIR` it captures
+  each at 1280x720 and 1920x1080. The tour gains `camp-tiger`, `camp-rats`, `camp-snake`,
+  `camp-crocodile`, `camp-capybara`, `camp-beaver` and `route-boss` from rewritten views.

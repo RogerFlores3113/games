@@ -148,12 +148,14 @@ describe("stumpRowXs", () => {
 });
 
 describe("INTERACTABLE_ANCHORS", () => {
-  it("places the campfire, fireflies and lantern in the world zone and the mascot in the actions zone", () => {
+  it("places the campfire, fireflies and lantern in the world zone, clear of the boss, and the mascot in the actions zone", () => {
     const at = (p: { x: number; y: number }): Rect => ({ x: p.x, y: p.y, w: 1, h: 1 });
     expect(rectContains(ZONES.world, at(INTERACTABLE_ANCHORS.campfire))).toBe(true);
     expect(rectContains(ZONES.world, at(INTERACTABLE_ANCHORS.fireflies))).toBe(true);
     expect(rectContains(ZONES.world, at(INTERACTABLE_ANCHORS.lantern))).toBe(true);
     expect(rectContains(ZONES.actions, at(INTERACTABLE_ANCHORS.mascot))).toBe(true);
+    const lanternWithRope = { x: INTERACTABLE_ANCHORS.lantern.x - 8, y: INTERACTABLE_ANCHORS.lantern.y - 20, w: 16, h: 28 };
+    expect(rectContains(ZONES.world, lanternWithRope)).toBe(true);
   });
 });
 
@@ -182,5 +184,13 @@ describe("gearLayout", () => {
     expect(geo.slots.findIndex((r) => pointInRect(r, { x: 60, y: 325 }))).toBe(1);
     expect(pointInRect(geo.packArea, { x: 300, y: 320 })).toBe(true);
     expect(pointInRect(geo.packArea, { x: 60, y: 320 })).toBe(false);
+  });
+});
+
+describe("the boss zone", () => {
+  it("fits the longest boss caption on one line", async () => {
+    const { CAPTION_CHARS } = await import("./draw/draw-boss");
+    const { CAPTION_MAX_CHARS } = await import("../../../lib/expedition/boss-model");
+    expect(CAPTION_CHARS).toBeGreaterThanOrEqual(CAPTION_MAX_CHARS);
   });
 });

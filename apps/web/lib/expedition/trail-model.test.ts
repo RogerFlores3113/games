@@ -325,7 +325,7 @@ describe("draft", () => {
 
 describe("route", () => {
   const options: Extract<ExpeditionStageView, { tag: "route" }>["options"] = [
-    { id: "a", next: preview(3, { event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: "jaguar", shop: false }) },
+    { id: "a", next: preview(3, { event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: "tiger", shop: false }) },
     { id: "b", next: preview(3, { location: "river-delta", weather: "storm", slotKinds: ["ordered", "ordered", "win-card", "trick-count"], shop: true }) },
   ];
   const routeView = (ballots: { seatId: string; choice: string | null }[], over: Partial<ExpeditionView> = {}): ExpeditionView =>
@@ -348,7 +348,7 @@ describe("route", () => {
           id: "a",
           objectId: "route:a",
           label: "Route A",
-          next: { title: "Camp 3 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", weatherId: "fair", pairing: null, event: "Event", objectives: ["3 cards to win"], boss: "Animal boss" },
+          next: { title: "Camp 3 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", weatherId: "fair", pairing: null, event: "Event", objectives: ["3 cards to win"], boss: "Animal boss", bossId: "tiger", bossName: "Tiger" },
           voters: ["You", "Alice"],
           yours: true,
           votable: true,
@@ -357,7 +357,7 @@ describe("route", () => {
           id: "b",
           objectId: "route:b",
           label: "Route B",
-          next: { title: "Camp 3 of 6", shop: true, location: "River Delta", weather: "Storm", locationId: "river-delta", weatherId: "storm", pairing: null, event: null, objectives: ["1 card to win", "Win 2 in order", "A trick count"], boss: "Animal boss" },
+          next: { title: "Camp 3 of 6", shop: true, location: "River Delta", weather: "Storm", locationId: "river-delta", weatherId: "storm", pairing: null, event: null, objectives: ["1 card to win", "Win 2 in order", "A trick count"], boss: "Animal boss", bossId: null, bossName: null },
           voters: [],
           yours: false,
           votable: true,
@@ -385,14 +385,14 @@ describe("event and loadout panels", () => {
       kind: "event",
       name: "Event",
       text: "Nothing happens here yet.",
-      next: { title: "Camp 4 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", weatherId: "fair", pairing: null, event: "Event", objectives: ["2 cards to win"], boss: null },
+      next: { title: "Camp 4 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", weatherId: "fair", pairing: null, event: "Event", objectives: ["2 cards to win"], boss: null, bossId: null, bossName: null },
     });
   });
 
   it("shows the camp the crew is about to start in the loadout, with your gear and no shop", () => {
     expect(model(makeView()).panel).toEqual({
       kind: "loadout",
-      next: { title: "Camp 2 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", weatherId: "fair", pairing: null, event: null, objectives: ["2 cards to win"], boss: null },
+      next: { title: "Camp 2 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", weatherId: "fair", pairing: null, event: null, objectives: ["2 cards to win"], boss: null, bossId: null, bossName: null },
       gear: {
         equipped: ["trained-monkey"],
         slots: [

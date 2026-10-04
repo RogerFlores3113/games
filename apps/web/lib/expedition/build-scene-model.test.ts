@@ -537,6 +537,31 @@ describe("HUD: top bar", () => {
     expect(buildSceneModel(server(makeView({ campIndex: 3, plan })), ui(), "big-index").topBar.camp).toBe("Camp 3 of 6 - Animal boss");
     expect(buildSceneModel(server(makeView({ campIndex: 6, plan })), ui(), "big-index").topBar.camp).toBe("Camp 6 of 6 - The Temple");
   });
+
+  it("puts the boss on the table: the chip names it, its mark sits on the watched seat, and a dammed card says why", () => {
+    const plan = [{ at: 3, tier: "animal" as const, bossId: "crocodile" }];
+    const base = makeView({ campIndex: 3, plan });
+    const croc = { id: "crocodile", kind: "animal" as const, strength: "full" as const, status: [{ kind: "facing" as const, seatId: "s3" }] };
+    const view = { ...base, stage: { ...base.stage, mods: [croc] } } as ExpeditionView;
+    const model = buildSceneModel(server(view), ui(), "big-index");
+    expect(model.topBar.camp).toBe("Camp 3 of 6");
+    expect(model.boss).toMatchObject({ id: "crocodile", caption: "Watching Cara", facingSeatId: "s3" });
+    expect(model.seats.map((s) => [s.seatId, s.bossMark])).toEqual([
+      ["s2", null],
+      ["s3", { label: "watched", alert: true }],
+      ["s1", null],
+    ]);
+
+    const beaver = { id: "beaver", kind: "animal" as const, strength: "full" as const, status: [{ kind: "dam" as const, suit: "spades" as const }] };
+    const attempt = makeAttempt();
+    const camp = makeCamp({ currentActorSeatId: "s2", yourHand: [{ id: "c-as", identity: AS, effectiveRank: null, countsAs: null }, { id: "c-th", identity: TH, effectiveRank: null, countsAs: null }], yourLegalCardIds: ["c-th"] });
+    const dammed = { ...base, stage: { ...base.stage, mods: [beaver], attempt: { ...attempt, camp } } } as ExpeditionView;
+    const hand = buildSceneModel(server(dammed), ui(), "big-index").hand;
+    expect(hand.map((c) => [c.label, c.blockedReason])).toEqual([
+      ["A♠", "The beaver dams ♠"],
+      ["10♥", null],
+    ]);
+  });
 });
 
 describe("source chips", () => {

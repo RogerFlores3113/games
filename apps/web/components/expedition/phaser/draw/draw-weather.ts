@@ -96,11 +96,23 @@ const PIP_W = 4;
 const GAUGE_W = 18;
 const GAUGE_H = 6;
 
-function chipWidth(chip: ModChip, withBadge: boolean): number {
+/** How much of a chip fits: its reading, its name, or its icon alone. */
+type ChipFit = "badge" | "name" | "icon";
+const FITS: readonly ChipFit[] = ["badge", "name", "icon"];
+
+/** A boss keeps its name longest: it is the camp's headline. */
+function fitOf(chip: ModChip, tier: ChipFit): ChipFit {
+  const boss = chip.kind === "animal" || chip.kind === "disaster" || chip.kind === "temple";
+  return tier === "icon" && boss ? "name" : tier;
+}
+
+function chipWidth(chip: ModChip, fit: ChipFit): number {
+  const withBadge = fit === "badge";
+  const name = fit === "icon" ? 0 : CHIP_PAD + labelWidth(chip.name);
   const badge = withBadge && chip.badge !== null ? CHIP_GAP + labelWidth(chip.badge) : 0;
   const pips = withBadge && chip.pips > 0 ? CHIP_GAP + chip.pips * (PIP_W + 1) - 1 : 0;
   const gauge = chip.gauge !== null ? CHIP_GAP + GAUGE_W : 0;
-  return CHIP_PAD + ICON_SIZE + CHIP_PAD + labelWidth(chip.name) + badge + pips + gauge + CHIP_PAD;
+  return CHIP_PAD + ICON_SIZE + name + badge + pips + gauge + CHIP_PAD;
 }
 
 /** The river's meter: the water risen so far, the dry part above it. */
@@ -129,19 +141,21 @@ export interface StripHandlers {
 }
 
 /** The camp's modifiers as chips centred in the top bar's free span
- * [left, right): icon, name, and a live reading. A chip's reading is
- * dropped first when the span is too narrow. */
+ * [left, right): icon, name, and a live reading. When the span is too
+ * narrow the readings go first, then every name but the boss's. */
 export function drawModStrip(scene: Phaser.Scene, layer: Layer, chips: ModChip[], span: { left: number; right: number }, index: ObjectIndex, handlers: StripHandlers): void {
   if (chips.length === 0) return;
   const room = span.right - span.left;
-  const full = chips.reduce((w, chip) => w + chipWidth(chip, true), 0) + CHIP_GAP * (chips.length - 1);
-  const withBadges = full <= room;
-  const total = withBadges ? full : chips.reduce((w, chip) => w + chipWidth(chip, false), 0) + CHIP_GAP * (chips.length - 1);
+  const totalAt = (tier: ChipFit) => chips.reduce((w, chip) => w + chipWidth(chip, fitOf(chip, tier)), 0) + CHIP_GAP * (chips.length - 1);
+  const tier = FITS.find((t) => totalAt(t) <= room) ?? "icon";
+  const total = totalAt(tier);
   const zone = ZONES.topBar;
   const y = zone.y + Math.floor((zone.h - CHIP_H) / 2);
   let x = span.left + Math.max(0, Math.floor((room - total) / 2));
   for (const chip of chips) {
-    const w = chipWidth(chip, withBadges);
+    const fit = fitOf(chip, tier);
+    const withBadges = fit === "badge";
+    const w = chipWidth(chip, fit);
     const container = scene.add.container(x, y);
     const back = plate(scene, 0, 0, w, CHIP_H, chip.alert ? PALETTE.stump : PALETTE.plate);
     back.setStrokeStyle(1, toPhaserColor(chip.alert ? PALETTE.coin : PALETTE.plateEdge));
@@ -149,8 +163,10 @@ export function drawModStrip(scene: Phaser.Scene, layer: Layer, chips: ModChip[]
     container.add(modIcon(scene, chip.id, chip.kind, CHIP_PAD, Math.floor((CHIP_H - ICON_SIZE) / 2)));
     const textY = Math.floor((CHIP_H - LABEL_CELL.h) / 2);
     let cx = CHIP_PAD + ICON_SIZE + CHIP_PAD;
-    container.add(text(scene, cx, textY, chip.name));
-    cx += labelWidth(chip.name);
+    if (fit !== "icon") {
+      container.add(text(scene, cx, textY, chip.name));
+      cx += labelWidth(chip.name);
+    }
     if (withBadges && chip.badge !== null) {
       cx += CHIP_GAP;
       container.add(text(scene, cx, textY, chip.badge, chip.alert ? PALETTE.coinShine : PALETTE.sun));

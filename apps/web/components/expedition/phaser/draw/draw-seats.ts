@@ -10,10 +10,11 @@ import { LABEL_CELL } from "../font/font-keys";
 import { MINI_H, PLATE_H, SILHOUETTE_H, STUMP_ART_AT, ZONES, plateRect, seatSpots, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
 import { ART, crewArtId, sourceArtId } from "../art/art-registry";
-import { mateSourceObjectId, seatFogObjectId, seatObjectId, sourceObjectId } from "../../../../lib/expedition/expedition-ids";
+import { mateSourceObjectId, seatFogObjectId, seatMarkObjectId, seatObjectId, sourceObjectId } from "../../../../lib/expedition/expedition-ids";
 import { fogTile } from "./draw-weather";
 import type { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel, SeatModel, SourceChip } from "../../../../lib/expedition/build-scene-model";
+import type { SeatBossMark } from "../../../../lib/expedition/boss-model";
 import type { CampHandlers } from "./camp-handlers";
 import { fitLabel } from "./text-fit";
 import { DIM_ALPHA, PANEL_ALPHA, labelWidth, objectiveItem, objectiveItemWidth, plate, text, type Layer } from "./ui-kit";
@@ -169,11 +170,33 @@ function drawSilhouette(ctx: Ctx, layer: Layer, seat: SeatModel, spot: { x: numb
   layer.add(sprite);
 }
 
+const MARK_H = LABEL_CELL.h + 2;
+
+function markColor(mark: SeatBossMark): string {
+  return mark.alert ? PALETTE.destructive : PALETTE.sun;
+}
+
+/** A boss's mark on a teammate, hung under their plate over the
+ * silhouette's head. */
+function drawMark(ctx: Ctx, layer: Layer, seat: SeatModel, box: Rect): void {
+  const mark = seat.bossMark;
+  if (mark === null) return;
+  const w = labelWidth(mark.label) + 4;
+  const x = Math.round(box.x + (box.w - w) / 2);
+  const y = box.y + box.h + 1;
+  const tag = plate(ctx.scene, x, y, w, MARK_H, PALETTE.plate).setStrokeStyle(1, toPhaserColor(markColor(mark)));
+  layer.add(tag);
+  layer.add(text(ctx.scene, x + 2, y + 1, mark.label, markColor(mark)));
+  ctx.index.register("camp", seatMarkObjectId(seat.seatId), tag);
+}
+
 function drawPlate(ctx: Ctx, layer: Layer, seat: SeatModel, box: Rect): void {
   const { scene, model } = ctx;
   const group = scene.add.container(0, 0);
   layer.add(group);
-  group.add(plate(scene, box.x, box.y, box.w, box.h).setAlpha(PANEL_ALPHA));
+  const back = plate(scene, box.x, box.y, box.w, box.h).setAlpha(PANEL_ALPHA);
+  if (seat.bossMark?.alert) back.setStrokeStyle(1, toPhaserColor(PALETTE.destructive));
+  group.add(back);
   const x0 = box.x + 2;
   const iw = box.w - 4;
 
@@ -214,7 +237,19 @@ export function drawPlates(scene: Phaser.Scene, layer: Layer, model: SceneModel,
   const ctx: Ctx = { scene, model, index, handlers };
   const mates = others(model);
   const spots = seatSpots(mates.length);
-  mates.forEach((seat, i) => drawPlate(ctx, layer, seat, plateRect(spots, i)));
+  mates.forEach((seat, i) => {
+    drawPlate(ctx, layer, seat, plateRect(spots, i));
+    drawMark(ctx, layer, seat, plateRect(spots, i));
+  });
+}
+
+/** Where a seat sits on screen: a teammate's plate, or your own panel. */
+export function seatRect(model: SceneModel, seatId: string): Rect | null {
+  const you = model.seats.find((s) => s.isYou);
+  if (you?.seatId === seatId) return ZONES.you;
+  const mates = others(model);
+  const i = mates.findIndex((s) => s.seatId === seatId);
+  return i === -1 ? null : plateRect(seatSpots(mates.length), i);
 }
 
 function drawYou(ctx: Ctx, layer: Layer, seat: SeatModel): void {
@@ -222,11 +257,14 @@ function drawYou(ctx: Ctx, layer: Layer, seat: SeatModel): void {
   const group = scene.add.container(0, 0);
   layer.add(group);
   const z = ZONES.you;
-  group.add(plate(scene, z.x, z.y, z.w, z.h).setAlpha(PANEL_ALPHA));
+  const back = plate(scene, z.x, z.y, z.w, z.h).setAlpha(PANEL_ALPHA);
+  if (seat.bossMark?.alert) back.setStrokeStyle(1, toPhaserColor(PALETTE.destructive));
+  group.add(back);
   const x0 = z.x + 2;
   const iw = z.w - 4;
 
-  nameRow(ctx, group, seat, { x: x0, y: z.y + 2, w: iw, h: ROW_H }, null);
+  const mark = seat.bossMark === null ? null : { value: seat.bossMark.label, color: markColor(seat.bossMark) };
+  nameRow(ctx, group, seat, { x: x0, y: z.y + 2, w: iw, h: ROW_H }, mark);
 
   const tricksY = z.y + 17;
   const trickIcon = ART["icon-tricks"];

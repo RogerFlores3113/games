@@ -149,6 +149,11 @@ export function gateUseObjectId(sourceId: string): string {
 }
 
 /** A camp modifier's chip on the top bar. */
+/** A boss's mark hung under a teammate's plate. */
+export function seatMarkObjectId(seatId: string): string {
+  return `seat-mark:${seatId}`;
+}
+
 export function modObjectId(modId: string): string {
   return `mod:${modId}`;
 }

@@ -17,6 +17,8 @@ import { preloadArt } from "../art/place-art";
 import { drawBoardPick, drawDropTarget, drawHand, drawLastTrick, drawTrick } from "../draw/draw-hand-trick";
 import { drawControls, drawStumpOverlays } from "../draw/draw-controls";
 import { drawWhispers } from "../draw/draw-whispers";
+import { drawBossCaption, placeBoss } from "../draw/draw-boss";
+import { bossObjectId } from "../../../../lib/expedition/boss-model";
 import { INTERACTABLE_REGISTRY } from "../interactables/registry";
 import { CARD_H, CARD_W, HAND_CARD_Y, INTERACTABLE_ANCHORS, ZONES, handFanXs, pointInRect, type Point } from "../layout";
 import { PALETTE, toPhaserColor } from "../palette";
@@ -199,6 +201,8 @@ export class CampScene extends Phaser.Scene {
   private dynamicLayer: Phaser.GameObjects.Container | null = null;
   private backdropLayer: Phaser.GameObjects.Container | null = null;
   private backdropLocation: string | null = null;
+  private bossLayer: Phaser.GameObjects.Container | null = null;
+  private bossId: string | null = null;
   private weather: WeatherOverlay | null = null;
   private lastCardPackId: string | null = null;
   private previousModel: SceneModel | null = null;
@@ -239,6 +243,8 @@ export class CampScene extends Phaser.Scene {
     }
 
     const skyLayer = this.add.container(0, 0);
+    this.bossLayer = this.add.container(0, 0);
+    this.bossId = null;
     this.dynamicLayer = this.add.container(0, 0);
     this.dragLayer = this.add.container(0, 0);
     this.weather = new WeatherOverlay(this, skyLayer, this.add.container(0, 0));
@@ -302,9 +308,19 @@ export class CampScene extends Phaser.Scene {
     this.weather?.flash(model.sky.strike);
   }
 
+  /** The boss sprite is rebuilt only when the boss changes, so its idle
+   * bob is not restarted by every redraw. */
+  private renderBoss(model: SceneModel): void {
+    const id = model.boss?.id ?? null;
+    if (this.bossLayer === null || this.bossId === id) return;
+    placeBoss(this, this.bossLayer, model.boss, this.index, this.handlers);
+    this.bossId = id;
+  }
+
   renderModel(model: SceneModel): void {
     if (this.dynamicLayer === null || this.unsubscribe === null) return;
     this.renderSky(model);
+    this.renderBoss(model);
     this.dynamicLayer.removeAll(true);
     drawCrowdAndStump(this, this.dynamicLayer, model, this.index, this.handlers);
     const span = drawTopBar(this, this.dynamicLayer, model.topBar, this.index, () => this.handlers.onPick("supplies", ""));
@@ -326,6 +342,7 @@ export class CampScene extends Phaser.Scene {
     if (this.sceneStore.getState().localUi.drag.phase === "idle") this.dropOrigin = null;
     drawLastTrick(this, layer, model, this.index, this.handlers);
     drawWhispers(this, layer, model, this.index);
+    drawBossCaption(this, layer, model);
     drawControls(this, layer, model, this.index, this.handlers);
     drawBoardPick(this, layer, model, this.index, this.handlers);
     drawStumpOverlays(this, layer, model, this.index, this.handlers);
@@ -470,6 +487,6 @@ export class CampScene extends Phaser.Scene {
     if (ui.tooltipMateSource !== null && !over(mateSourceObjectId(ui.tooltipMateSource.seatId, ui.tooltipMateSource.sourceKey))) {
       this.handlers.onMateSourceHover(null);
     }
-    if (ui.tooltipModId !== null && !over(modObjectId(ui.tooltipModId))) this.handlers.onModHover(null);
+    if (ui.tooltipModId !== null && !over(modObjectId(ui.tooltipModId)) && !over(bossObjectId(ui.tooltipModId))) this.handlers.onModHover(null);
   }
 }
