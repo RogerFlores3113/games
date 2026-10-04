@@ -32,6 +32,8 @@ export type ItemDisplay = {
   price: number;
   /** "Single use", "Once per camp", "2 charges"; null for a passive item. */
   uses: string | null;
+  /** How the uses come back, for phrasing what is left; null for a passive item. */
+  usesKind: ItemUses["kind"] | null;
 };
 
 export type SourceDisplay = {
@@ -116,7 +118,10 @@ function toSourceDisplay(def: SourceDef): SourceDisplay {
             targets: def.active.targets.map((spec) => spec.kind),
           },
     passive: def.passive !== undefined,
-    item: def.kind === "item" ? { rarity: def.rarity, price: def.price, uses: def.uses === undefined ? null : usesBadge(def.uses) } : null,
+    item:
+      def.kind === "item"
+        ? { rarity: def.rarity, price: def.price, uses: def.uses === undefined ? null : usesBadge(def.uses), usesKind: def.uses?.kind ?? null }
+        : null,
   };
 }
 

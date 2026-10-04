@@ -94,6 +94,31 @@ export function bundleObjectId(bundle: number): string {
   return `bundle:${bundle}`;
 }
 
+/** One item of a draft bundle, for its rules on hover. */
+export function bundleItemObjectId(bundle: number, item: number): string {
+  return `bundle-item:${bundle}:${item}`;
+}
+
+/** One of your item slots in the loadout, by its index. */
+export function slotObjectId(slot: number): string {
+  return `slot:${slot}`;
+}
+
+/** An item instance in your backpack, by its uid. */
+export function packObjectId(uid: string): string {
+  return `pack:${uid}`;
+}
+
+/** A shop entry's buy button, by its stock id (`supplies`, `item0`, `upgrade:<id>`). */
+export function shopObjectId(stockId: string): string {
+  return `shop:${stockId}`;
+}
+
+/** A shop entry's name and icon, for its rules on hover. */
+export function shopInfoObjectId(stockId: string): string {
+  return `shop-info:${stockId}`;
+}
+
 /** A run length on the muster's ballot. */
 export function lengthObjectId(lengthId: string): string {
   return `length:${lengthId}`;
@@ -118,6 +143,8 @@ export function interactableObjectId(id: string): string {
 }
 
 export const READY_ID = "ready";
+export const PACK_PREV_ID = "pack-page:prev";
+export const PACK_NEXT_ID = "pack-page:next";
 export const BOARD_ID = "board";
 export const TRAY_MORE_ID = "pick:more";
 export const SUPPLIES_ID = "supplies";

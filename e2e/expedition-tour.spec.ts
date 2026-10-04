@@ -54,7 +54,7 @@ const WANTED = [
   "route-voted", "event", "loadout", "next-camp", "run-end-lost", "run-end-guest",
 ];
 /** Phases play rarely reaches; each is also captured from a rewritten view. */
-const RARE = ["run-end-won", "between-camps-draft", "vote-tie-length", "vote-tie-route"];
+const RARE = ["run-end-won", "between-camps-draft", "vote-tie-length", "vote-tie-route", "shop"];
 
 interface Identity { kind: "standard" | "joker"; suit?: string; rank?: number; joker?: "sun" | "moon" }
 interface Card { id: string; objectId: string; label: string; identity: Identity; playable: boolean }
@@ -373,7 +373,7 @@ async function newExpedition(pages: Page[]): Promise<void> {
 
 const h = (camp: number, attempt: number, status: "cleared" | "failed") => ({ camp, attempt, status, coins: status === "cleared" ? 7 : 0 });
 
-const PREVIEW = { index: 2, location: "jungle", weather: "fair", event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: null };
+const PREVIEW = { index: 2, location: "jungle", weather: "fair", event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: null, shop: false };
 
 function wonView(game: Game): Game {
   return {
@@ -402,7 +402,57 @@ function lengthTieView(game: Game): Game {
     ...game,
     history: [],
     lastVote: { topic: "length", tally: [{ choice: "short", votes: 1 }, { choice: "standard", votes: 1 }, { choice: "long", votes: 0 }], tied: ["short", "standard"], winner: "standard" },
-    stage: { tag: "loadout", camp: { ...PREVIEW, index: 1, event: null, slotKinds: ["win-card", "win-card"] }, readySeatIds: [] },
+    stage: { tag: "loadout", camp: { ...PREVIEW, index: 1, event: null, slotKinds: ["win-card", "win-card"] }, yourSlots: 2, shop: null, readySeatIds: [] },
+  };
+}
+
+const uses = (left: number, of: number) => ({ kind: "uses", left, of });
+
+/** The loadout before camp 3's animal boss: one item equipped and two in
+ * the backpack, the shop with supplies, an item a teammate bought, and the
+ * Scout's upgrades just out of reach. */
+function shopView(game: Game): Game {
+  const mate = game.seats.find((s) => s.seatId !== game.yourSeatId)!.seatId;
+  return {
+    ...game,
+    purse: 7,
+    supplies: { count: 3, max: 4 },
+    history: [h(1, 1, "cleared"), h(2, 1, "cleared")],
+    seats: game.seats.map((s) =>
+      s.seatId !== game.yourSeatId
+        ? s
+        : {
+            ...s,
+            characterId: "scout",
+            upgradeId: null,
+            items: {
+              equipped: [{ uid: "it91", itemId: "rain-poncho", remaining: uses(2, 2) }],
+              backpack: [
+                { uid: "it92", itemId: "trail-map", remaining: uses(1, 1) },
+                { uid: "it93", itemId: "parrot", remaining: uses(1, 1) },
+              ],
+              concealed: false,
+            },
+          },
+    ),
+    stage: {
+      tag: "loadout",
+      camp: { ...PREVIEW, index: 3, event: null, bossId: null, shop: true },
+      yourSlots: 2,
+      shop: {
+        stock: [
+          { stockId: "supplies", what: { kind: "supplies" }, price: 6, soldTo: null },
+          { stockId: "item0", what: { kind: "item", itemId: "smoke-signal" }, price: 5, soldTo: mate },
+          { stockId: "item1", what: { kind: "item", itemId: "whetstone" }, price: 2, soldTo: null },
+          { stockId: "item2", what: { kind: "item", itemId: "camouflage" }, price: 4, soldTo: null },
+        ],
+        yourUpgrades: [
+          { stockId: "upgrade:scout.keen-eye", upgradeId: "scout.keen-eye", price: 8 },
+          { stockId: "upgrade:scout.eavesdrop", upgradeId: "scout.eavesdrop", price: 8 },
+        ],
+      },
+      readySeatIds: [],
+    },
   };
 }
 
@@ -456,6 +506,7 @@ async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<v
       "between-camps-draft-rewritten",
     );
   }
+  await capture(shopView, "trail", "shop");
   await capture(lengthTieView as (g: Game) => Game, "trail", "vote-tie-length", 2_000);
   await capture(routeTieView as (g: Game) => Game, "trail", "vote-tie-route", 2_000);
   if (!tour.has("run-end-won")) await capture(wonView as (g: Game) => Game, "run-end", "run-end-won-rewritten");

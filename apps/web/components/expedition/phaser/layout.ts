@@ -239,6 +239,47 @@ export function trailStopXs(count: number): number[] {
   return Array.from({ length: count }, (_, i) => Math.round(zone.x + step * (i + 0.5)));
 }
 
+// ---------------------------------------------------------------------------
+// Loadout gear: your slots, then the backpack grid, in the backpack zone
+// ---------------------------------------------------------------------------
+
+export const GEAR_HEADER_H = 13;
+export const GEAR_SLOT_W = 112;
+export const PACK_COLS = 3;
+export const PACK_ROWS = 2;
+const GEAR_TILE_MAX_H = 22;
+const GEAR_GAP = 3;
+
+export interface GearLayout {
+  slotArea: Rect;
+  slots: Rect[];
+  packArea: Rect;
+  /** One cell per backpack item shown on a page, row by row. */
+  pack: Rect[];
+}
+
+/** Where each slot and backpack cell sits. The scene draws with it and
+ * hit-tests drops with it, so a drop lands where the tile is drawn. */
+export function gearLayout(slotCount: number): GearLayout {
+  const zone = TRAIL_ZONES.backpack;
+  const top = zone.y + GEAR_HEADER_H;
+  const h = zone.y + zone.h - 3 - top;
+  const slotArea = { x: zone.x + 4, y: top, w: GEAR_SLOT_W, h };
+  const n = Math.max(1, slotCount);
+  const slotH = Math.min(GEAR_TILE_MAX_H, Math.floor((h - (n - 1) * 2) / n));
+  const slots = Array.from({ length: slotCount }, (_, i) => ({ x: slotArea.x, y: top + i * (slotH + 2), w: GEAR_SLOT_W, h: slotH }));
+  const packX = slotArea.x + GEAR_SLOT_W + 8;
+  const packArea = { x: packX, y: top, w: zone.x + zone.w - 4 - packX, h };
+  const cellW = Math.floor((packArea.w - (PACK_COLS - 1) * GEAR_GAP) / PACK_COLS);
+  const pack = Array.from({ length: PACK_COLS * PACK_ROWS }, (_, i) => ({
+    x: packX + (i % PACK_COLS) * (cellW + GEAR_GAP),
+    y: top + Math.floor(i / PACK_COLS) * (GEAR_TILE_MAX_H + GEAR_GAP),
+    w: cellW,
+    h: GEAR_TILE_MAX_H,
+  }));
+  return { slotArea, slots, packArea, pack };
+}
+
 /** `count` equal boxes with `gap` between them, filling at most `maxW` px
  * and never wider than `maxBox` each. Returns each box's left x and width. */
 export function rowBoxes(x: number, maxW: number, count: number, gap: number, maxBox: number): { x: number; w: number }[] {

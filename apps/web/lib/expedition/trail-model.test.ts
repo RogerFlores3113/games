@@ -263,19 +263,20 @@ describe("draft", () => {
     expect(panel(at(draftStage({ cleared: 3, payout: 12 }))).heading).toBe("Camp 3 cleared: +12 coins");
   });
 
-  it("offers each bundle as one card naming its items, with their text and uses", () => {
-    expect(panel(at(draftStage({ yourOffer: { bundles: [["rain-poncho", "bait"], ["heavy-pack"]] } }))).draft).toEqual({
+  it("offers each bundle as one card naming its items, with their text, uses and rarity", () => {
+    expect(panel(at(draftStage({ yourOffer: { bundles: [["rain-poncho", "trail-map"], ["heavy-pack"]] } }))).draft).toEqual({
       kind: "offer",
       bundles: [
         {
           bundle: 0,
-          itemIds: ["rain-poncho", "bait"],
+          itemIds: ["rain-poncho", "trail-map"],
           sourceId: "rain-poncho",
           objectId: "bundle:0",
-          name: "Rain Poncho + Bait",
-          ribbon: "Bundle 1",
-          text: "Whisper once more this camp. A card on the table can't win this trick.",
-          badges: ["Rain Poncho: 2 charges", "Bait: Single use"],
+          name: "Rain Poncho + Trail Map",
+          items: [
+            { itemId: "rain-poncho", objectId: "bundle-item:0:0", name: "Rain Poncho", text: "Whisper once more this camp.", uses: "2 charges", rare: false },
+            { itemId: "trail-map", objectId: "bundle-item:0:1", name: "Trail Map", text: "Swap all your open objectives with a teammate's.", uses: "Single use", rare: true },
+          ],
         },
         {
           bundle: 1,
@@ -283,16 +284,34 @@ describe("draft", () => {
           sourceId: "heavy-pack",
           objectId: "bundle:1",
           name: "Heavy Pack",
-          ribbon: "Bundle 2",
-          text: "You may whisper once more each camp, but a failed camp costs 1 more supply.",
-          badges: ["Heavy Pack: Always"],
+          items: [
+            {
+              itemId: "heavy-pack",
+              objectId: "bundle-item:1:0",
+              name: "Heavy Pack",
+              text: "You may whisper once more each camp, but a failed camp costs 1 more supply.",
+              uses: "Always on",
+              rare: false,
+            },
+          ],
         },
       ],
     });
   });
 
-  it("shows the newest item once the pick is made", () => {
-    expect(panel(at(draftStage())).draft).toEqual({ kind: "taken", sourceId: "trained-monkey", name: "Trained Monkey" });
+  it("names the bundle you just took", () => {
+    const p = model(at(draftStage()), ui({ takenBundle: ["bait", "parrot"] })).panel;
+    expect(p.kind === "draft" && p.draft).toEqual({
+      kind: "taken",
+      items: [
+        { sourceId: "bait", name: "Bait" },
+        { sourceId: "parrot", name: "Parrot" },
+      ],
+    });
+  });
+
+  it("shows the newest item once the pick is made, after a refresh forgot the bundle", () => {
+    expect(panel(at(draftStage())).draft).toEqual({ kind: "taken", items: [{ sourceId: "trained-monkey", name: "Trained Monkey" }] });
   });
 
   it("says nothing is left when the pick is made and the kit is empty", () => {
@@ -307,7 +326,7 @@ describe("draft", () => {
 describe("route", () => {
   const options: Extract<ExpeditionStageView, { tag: "route" }>["options"] = [
     { id: "a", next: preview(3, { event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: "jaguar", shop: false }) },
-    { id: "b", next: preview(3, { location: "river-delta", weather: "storm", slotKinds: ["ordered", "ordered", "win-card", "trick-count"] }) },
+    { id: "b", next: preview(3, { location: "river-delta", weather: "storm", slotKinds: ["ordered", "ordered", "win-card", "trick-count"], shop: true }) },
   ];
   const routeView = (ballots: { seatId: string; choice: string | null }[], over: Partial<ExpeditionView> = {}): ExpeditionView =>
     at({ tag: "route", options, ballots }, over);
@@ -322,7 +341,7 @@ describe("route", () => {
           id: "a",
           objectId: "route:a",
           label: "Route A",
-          next: { title: "Camp 3 of 6", location: "Jungle", weather: "Fair", event: "Event", objectives: ["3 cards to win"], boss: "Animal boss" },
+          next: { title: "Camp 3 of 6", shop: false, location: "Jungle", weather: "Fair", event: "Event", objectives: ["3 cards to win"], boss: "Animal boss" },
           voters: ["You", "Alice"],
           yours: true,
           votable: true,
@@ -331,7 +350,7 @@ describe("route", () => {
           id: "b",
           objectId: "route:b",
           label: "Route B",
-          next: { title: "Camp 3 of 6", location: "River Delta", weather: "Storm", event: null, objectives: ["1 card to win", "Win 2 in order", "A trick count"], boss: "Animal boss" },
+          next: { title: "Camp 3 of 6", shop: true, location: "River Delta", weather: "Storm", event: null, objectives: ["1 card to win", "Win 2 in order", "A trick count"], boss: "Animal boss" },
           voters: [],
           yours: false,
           votable: true,
@@ -359,14 +378,112 @@ describe("event and loadout panels", () => {
       kind: "event",
       name: "Event",
       text: "Nothing happens here yet.",
-      next: { title: "Camp 4 of 6", location: "Jungle", weather: "Fair", event: "Event", objectives: ["2 cards to win"], boss: null },
+      next: { title: "Camp 4 of 6", shop: false, location: "Jungle", weather: "Fair", event: "Event", objectives: ["2 cards to win"], boss: null },
     });
   });
 
-  it("shows the camp the crew is about to start in the loadout", () => {
+  it("shows the camp the crew is about to start in the loadout, with your gear and no shop", () => {
     expect(model(makeView()).panel).toEqual({
       kind: "loadout",
-      next: { title: "Camp 2 of 6", location: "Jungle", weather: "Fair", event: null, objectives: ["2 cards to win"], boss: null },
+      next: { title: "Camp 2 of 6", shop: false, location: "Jungle", weather: "Fair", event: null, objectives: ["2 cards to win"], boss: null },
+      gear: {
+        equipped: ["trained-monkey"],
+        slots: [
+          {
+            index: 0,
+            objectId: "slot:0",
+            item: { uid: "trained-monkey", itemId: "trained-monkey", objectId: "slot:0", name: "Trained Monkey", uses: "Always on", rare: false },
+          },
+          { index: 1, objectId: "slot:1", item: null },
+        ],
+        backpack: [],
+        page: 0,
+        locked: false,
+      },
+      shop: null,
+    });
+  });
+});
+
+describe("loadout gear and shop", () => {
+  const gearPanel = (view: ExpeditionView, local: LocalUiState = ui()) => {
+    const p = model(view, local).panel;
+    if (p.kind !== "loadout") throw new Error(`expected the loadout panel, got ${p.kind}`);
+    return p;
+  };
+  const shop: NonNullable<Extract<ExpeditionStageView, { tag: "loadout" }>["shop"]> = {
+    stock: [
+      { stockId: "supplies", what: { kind: "supplies" }, price: 6, soldTo: null },
+      { stockId: "item0", what: { kind: "item", itemId: "smoke-signal" }, price: 5, soldTo: "s1" },
+    ],
+    yourUpgrades: [{ stockId: "upgrade:guide.pathfinder", upgradeId: "guide.pathfinder", price: 8 }],
+  };
+  const shopView = (over: Partial<ExpeditionView> = {}, readySeatIds: string[] = []) =>
+    at({ tag: "loadout", camp: preview(3, { shop: true }), yourSlots: 2, shop, readySeatIds }, over);
+
+  it("lists the backpack with what is left of each item, and the page asked for", () => {
+    const seats = seatsWith({
+      items: {
+        equipped: [],
+        backpack: [
+          { uid: "it4", itemId: "rain-poncho", remaining: { kind: "uses", left: 1, of: 2 } },
+          { uid: "it5", itemId: "parrot", remaining: { kind: "uses", left: 0, of: 1 } },
+        ],
+        concealed: false,
+      },
+    });
+    const gear = gearPanel(makeView({ seats }), ui({ packPage: 1 })).gear!;
+    expect(gear.backpack).toEqual([
+      { uid: "it4", itemId: "rain-poncho", objectId: "pack:it4", name: "Rain Poncho", uses: "1 of 2 charges", rare: false },
+      { uid: "it5", itemId: "parrot", objectId: "pack:it5", name: "Parrot", uses: "Used this camp", rare: false },
+    ]);
+    expect(gear.slots.map((s) => s.item)).toEqual([null, null]);
+    expect(gear.page).toBe(1);
+  });
+
+  it("locks the gear once you are ready, and has none for a spectator", () => {
+    expect(gearPanel(shopView({}, ["s2"])).gear!.locked).toBe(true);
+    expect(gearPanel(shopView({ yourSeatId: null })).gear).toBeNull();
+  });
+
+  it("opens the shop before a boss camp with the purse, the cap, sold items and your upgrades", () => {
+    expect(gearPanel(shopView({ purse: 7 })).shop).toEqual({
+      purse: 7,
+      entries: [
+        {
+          stockId: "supplies",
+          objectId: "shop:supplies",
+          infoId: null,
+          sourceId: null,
+          name: "Supplies 3 of 5",
+          detail: "One per failed camp",
+          rare: false,
+          price: 6,
+          buy: { kind: "buy" },
+        },
+        {
+          stockId: "item0",
+          objectId: "shop:item0",
+          infoId: "shop-info:item0",
+          sourceId: "smoke-signal",
+          name: "Smoke Signal",
+          detail: "Rare item",
+          rare: true,
+          price: null,
+          buy: { kind: "status", label: "Sold to Alice" },
+        },
+        {
+          stockId: "upgrade:guide.pathfinder",
+          objectId: "shop:upgrade:guide.pathfinder",
+          infoId: "shop-info:upgrade:guide.pathfinder",
+          sourceId: "guide.pathfinder",
+          name: "Pathfinder",
+          detail: "Upgrade, +1 whisper",
+          rare: false,
+          price: 8,
+          buy: { kind: "disabled", reason: "Need 1 more" },
+        },
+      ],
     });
   });
 });
@@ -580,7 +697,7 @@ describe("tooltip", () => {
 
 describe("prompt", () => {
   it("greets a cleared camp with the draft", () => {
-    expect(model(at(draftStage({ yourOffer: { bundles: [["trained-monkey"]] } }))).prompt).toEqual({ text: "Camp 1 cleared! +8 coins. Take one", tone: "your-move" });
+    expect(model(at(draftStage({ yourOffer: { bundles: [["trained-monkey"]] } }))).prompt).toEqual({ text: "Camp 1 cleared! +8 coins. Take a bundle", tone: "your-move" });
   });
 
   it("says Reconnecting while the socket is down", () => {

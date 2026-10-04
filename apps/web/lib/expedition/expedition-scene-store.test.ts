@@ -121,7 +121,7 @@ describe("createExpeditionSceneStore", () => {
     store.getState().setServer(server(onTrail(draftOffer)));
     const state = store.getState();
     expect(state.sceneKey).toBe("trail");
-    expect(state.model).toMatchObject({ sceneKey: "trail", prompt: { text: "Camp 1 cleared! +8 coins. Take one", tone: "your-move" } });
+    expect(state.model).toMatchObject({ sceneKey: "trail", prompt: { text: "Camp 1 cleared! +8 coins. Take a bundle", tone: "your-move" } });
   });
 
   it("setServer with an ended run builds the run-end model", () => {

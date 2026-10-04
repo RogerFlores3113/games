@@ -38,15 +38,36 @@ export interface VoteOption {
   voters: string[];
 }
 
+export interface GearTile {
+  uid: string;
+  itemId: string;
+  objectId: string;
+}
+
+export interface Gear {
+  equipped: string[];
+  slots: { objectId: string; item: GearTile | null }[];
+  backpack: GearTile[];
+  locked: boolean;
+}
+
+export interface ShopEntry {
+  stockId: string;
+  objectId: string;
+  price: number | null;
+  buy: { kind: "buy" } | { kind: "disabled"; reason: string } | { kind: "status"; label: string };
+}
+
 export type TrailPanel =
   | { kind: "muster"; characters: MusterCard[]; lengths: VoteOption[] }
   | { kind: "draft"; heading: string; draft: { kind: "offer"; bundles: DraftTile[] } | { kind: "taken" | "none" } }
   | { kind: "route"; options: VoteOption[] }
   | { kind: "event" }
-  | { kind: "loadout" };
+  | { kind: "loadout"; gear: Gear | null; shop: { purse: number; entries: ShopEntry[] } | null };
 
 export interface TrailView {
   sceneKey?: string;
+  topBar?: { supplies: number; purse: number };
   panel?: TrailPanel;
   kit?: { sourceId: string; objectId: string; name: string }[] | null;
   ready?: { state: "open" | "done"; label: string } | null;
@@ -130,6 +151,66 @@ export async function trailToCamp(pages: readonly Page[], choices: TrailChoices 
     if (scenes.every((scene) => scene !== "trail")) return;
   }
   throw new Error("trailToCamp: the crew never left the trail");
+}
+
+/** Your slots and backpack in the loadout; null elsewhere or for a spectator. */
+export function gearOf(m: TrailView): Gear | null {
+  return m.panel?.kind === "loadout" ? m.panel.gear : null;
+}
+
+export function shopEntry(m: TrailView, stockId: string): ShopEntry | null {
+  return m.panel?.kind === "loadout" ? (m.panel.shop?.entries.find((e) => e.stockId === stockId) ?? null) : null;
+}
+
+const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((uid, i) => uid === b[i]);
+
+/** Taps one of your items: an equipped one goes back to the backpack, a
+ * backpack one fills the next free slot. Returns the model once the
+ * equipped set changed. */
+export async function tapGear(page: Page, uid: string): Promise<TrailView> {
+  const before = gearOf(await getModel<TrailView>(page));
+  if (before === null) throw new Error("tapGear: not in a loadout");
+  return clickUntilChanged<TrailView>(page, objectIdOfItem(before, uid), (m) => !sameSet(gearOf(m)?.equipped ?? [], before.equipped));
+}
+
+function objectIdOfItem(gear: Gear, uid: string): string {
+  const tile = [...gear.slots.flatMap((s) => (s.item === null ? [] : [s.item])), ...gear.backpack].find((t) => t.uid === uid);
+  if (tile === undefined) throw new Error(`no item ${uid} in your slots or backpack`);
+  return tile.objectId;
+}
+
+/** Drags one of your items onto `targetId` (a `slot:<n>`, or any backpack
+ * tile) with real mouse moves, and returns the model once the equipped set
+ * changed. */
+export async function dragGear(page: Page, uid: string, targetId: string): Promise<TrailView> {
+  const before = gearOf(await getModel<TrailView>(page));
+  if (before === null) throw new Error("dragGear: not in a loadout");
+  const at = (id: string) => page.evaluate((i) => window.__expeditionTest?.objects()[i] ?? null, id);
+  const from = await at(objectIdOfItem(before, uid));
+  const to = await at(targetId);
+  if (from === null || to === null) throw new Error(`dragGear: ${uid} or ${targetId} is not on screen`);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  for (let step = 1; step <= 8; step++) {
+    await page.mouse.move(from.x + ((to.x - from.x) * step) / 8, from.y + ((to.y - from.y) * step) / 8);
+    await page.waitForTimeout(30);
+  }
+  await page.mouse.up();
+  let model = await getModel<TrailView>(page);
+  for (let poll = 0; poll < 50 && sameSet(gearOf(model)?.equipped ?? [], before.equipped); poll++) {
+    await page.waitForTimeout(100);
+    model = await getModel<TrailView>(page);
+  }
+  return model;
+}
+
+/** Buys a shop entry and returns the model once the purse paid for it. */
+export async function buyStock(page: Page, stockId: string): Promise<TrailView> {
+  const before = await getModel<TrailView>(page);
+  const entry = shopEntry(before, stockId);
+  if (entry === null || entry.buy.kind !== "buy") throw new Error(`buyStock: ${stockId} is not for sale (${JSON.stringify(entry?.buy)})`);
+  const purse = before.topBar?.purse ?? 0;
+  return clickUntilChanged<TrailView>(page, entry.objectId, (m) => (m.topBar?.purse ?? purse) === purse - (entry.price ?? 0));
 }
 
 /** Waits until the bridge's `scene` (not `model`) reports `expected`. */

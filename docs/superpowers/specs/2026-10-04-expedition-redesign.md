@@ -1294,3 +1294,30 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
   is no equip or shop UI yet (part B); the loadout's kit lists the equipped items.
 - e2e: the rewritten-view scenarios give the item under test the uid `it90`
   (`scenarioKey`); `DRAFT_PREFERENCE` lost its upgrades, since upgrades are never drafted.
+- Web (part B): the loadout keeps the trail map. Its panel is a compact camp preview (no event
+  row) beside one side card: the length vote on camp 1's first loadout, the shop before a boss
+  camp, or else "Your explorer" (the character's power and the upgrade, with their rules). The
+  backpack zone holds your slots (`slot:<n>`) and a 3 by 2 backpack grid (`pack:<uid>`), paged
+  by `pack-page:prev` and `pack-page:next`. `gearLayout` in `layout.ts` places both and is also
+  the drop hit test. A tap unequips, or fills the next free slot; while the slots are full a tap
+  does nothing and the header says to drag. A drop on a full slot swaps, and slot onto slot
+  swaps the two. Every change is one `equip` built by `equipAfter`
+  (`lib/expedition/loadout-model.ts`); nothing is applied before the server answers. Once you
+  are ready the tiles stop moving and the header says so.
+- Web: each shop row has the icon, name, a detail line (the supplies' cap, the item's rarity,
+  "Upgrade, +1 whisper"), the price and Buy (`shop:<stockId>`). A row that can't be bought shows
+  a dimmed button with the reason ("Need 2 more", "Full", "Locked"), or a status with no price
+  ("Sold to Bob", "Owned"). Hovering the name (`shop-info:<stockId>`) shows the rules. The
+  bought upgrade stays listed as Owned.
+- Web: a draft bundle is one card: per item its icon, name, two lines of text, a uses chip and
+  a blue Rare tag; hovering an item (`bundle-item:<n>:<i>`) shows its full rules, and one "Take
+  bundle" button (`bundle:<n>`) picks it. The taken panel names the bundle from local UI memory
+  (`takenBundle`); after a refresh it names only the newest item, since the view keeps no record
+  of the pick. `ItemDisplay` gains `usesKind`, so the web can say "Used this camp" or "1 of 2
+  charges".
+- Web: route cards are as tall as their content. The event reads "On the way" with a chip, and a
+  route to a boss camp shows a Shop chip.
+- Phaser hit-tests mouse presses on the window, so a real click on a DOM control drawn over the
+  canvas also presses the canvas button under it (seen: a dev panel shortcut pressed Set out).
+  `expedition-loadout.spec.ts` presses dev buttons with a DOM click event. The underlying issue
+  is not fixed.

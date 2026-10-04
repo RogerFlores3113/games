@@ -56,10 +56,14 @@ export interface LocalUiState {
   drag: DragState;
   /** Which page of the pick tray is showing. */
   trayPage: number;
+  /** The items of the bundle you just took, to name them once the offer is gone. */
+  takenBundle: string[] | null;
+  /** Which page of your backpack the loadout shows. */
+  packPage: number;
 }
 
 export function initialLocalUi(): LocalUiState {
-  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipSourceId: null, tooltipObjectiveId: null, tooltipMateSource: null, drag: IDLE_DRAG, trayPage: 0 };
+  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipSourceId: null, tooltipObjectiveId: null, tooltipMateSource: null, drag: IDLE_DRAG, trayPage: 0, takenBundle: null, packPage: 0 };
 }
 
 function currentHandIds(view: ExpeditionView): string[] {

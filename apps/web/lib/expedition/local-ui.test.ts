@@ -156,6 +156,8 @@ describe("initialLocalUi", () => {
       tooltipMateSource: null,
       drag: { phase: "idle" },
       trayPage: 0,
+      takenBundle: null,
+      packPage: 0,
     });
   });
 });

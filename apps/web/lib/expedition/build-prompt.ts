@@ -270,7 +270,7 @@ export function buildTrailPrompt(view: ExpeditionView, seats: readonly PromptSea
       return waitingFor(view.seats.filter((s) => s.characterId === null || !voted(stage.ballots, s.seatId)).map((s) => s.seatId), "Setting out…");
     }
     case "draft":
-      if (stage.yourOffer !== null) return { text: `Camp ${stage.cleared} cleared! +${stage.payout} coins. Take one`, tone: "your-move" };
+      if (stage.yourOffer !== null) return { text: `Camp ${stage.cleared} cleared! +${stage.payout} coins. Take a bundle`, tone: "your-move" };
       return waitingFor(stage.pendingSeatIds, "Choosing the route…");
     case "route": {
       const next = stage.options[0]?.next.index ?? 0;
@@ -284,6 +284,7 @@ export function buildTrailPrompt(view: ExpeditionView, seats: readonly PromptSea
       const last = view.history.at(-1);
       if (you !== undefined && !stage.readySeatIds.includes(you.seatId)) {
         if (last?.camp === stage.camp.index && last.status === "failed") return { text: `Camp ${last.camp} failed. Set out to try again`, tone: "alert" };
+        if (stage.shop !== null) return { text: `The shop is open. Set out for camp ${stage.camp.index} when ready`, tone: "your-move" };
         const name = you.characterId === null ? "Crew" : (CHARACTER_DISPLAY[you.characterId]?.name ?? you.characterId);
         return { text: `${name}, set out for camp ${stage.camp.index} when ready`, tone: "your-move" };
       }

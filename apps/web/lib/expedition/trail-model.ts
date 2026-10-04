@@ -5,7 +5,8 @@ import { buildTrailPrompt } from "./build-prompt";
 import type { SceneServerInput, Tooltip, TopBar } from "./build-scene-model";
 import { buildTopBar } from "./build-scene-model";
 import { characterName, chargeText, liveSourceKeys, sourceBadges, sourceIdOfKey, sourceKind, sourceName, sourceRulesText } from "./source-text";
-import { bundleObjectId, draftObjectId, kitObjectId, lengthObjectId, READY_ID, routeObjectId } from "./expedition-ids";
+import { bundleItemObjectId, bundleObjectId, draftObjectId, kitObjectId, lengthObjectId, READY_ID, routeObjectId } from "./expedition-ids";
+import { buildGear, buildShop, type Gear, type ShopPanel } from "./loadout-model";
 import type { LocalUiState } from "./local-ui";
 import { bossLabel, focusCampIndex, modName, plannedBossAt } from "./view-access";
 
@@ -28,20 +29,29 @@ export interface TrailStop {
   caption: string;
 }
 
+/** One item of a draft bundle. */
+export interface BundleItem {
+  itemId: string;
+  /** Hovered for the item's full rules. */
+  objectId: string;
+  name: string;
+  text: string;
+  /** "Single use", "Once per camp", "2 charges", "Always on". */
+  uses: string;
+  rare: boolean;
+}
+
 /** One bundle of a draft offer: its items arrive together. */
 export interface DraftBundle {
   bundle: number;
   itemIds: string[];
-  /** The first item, for the card's art. */
+  /** The first item. */
   sourceId: string;
+  /** The bundle's Take button. */
   objectId: string;
   /** "Bait + Parrot". */
   name: string;
-  /** "Bundle 1". */
-  ribbon: string;
-  text: string;
-  /** Each item's uses: ["Bait: Single use", "Parrot: Once per camp"]. */
-  badges: string[];
+  items: BundleItem[];
 }
 
 /** One of the characters at muster. */
@@ -87,6 +97,8 @@ export interface MusterCrewRow {
 /** A camp as a route card or the loadout shows it. */
 export interface CampPreview {
   title: string;
+  /** A boss camp: its loadout opens the shop. */
+  shop: boolean;
   location: string;
   weather: string;
   /** The event's name on the way there; null at camp 1. */
@@ -121,7 +133,8 @@ export interface VoteResult {
 
 export type DraftPanel =
   | { kind: "offer"; bundles: DraftBundle[] }
-  | { kind: "taken"; sourceId: string; name: string }
+  /** What you took, as the bundle's items; after a refresh, the newest item. */
+  | { kind: "taken"; items: { sourceId: string; name: string }[] }
   | { kind: "none"; text: string };
 
 export type TrailPanel =
@@ -129,7 +142,8 @@ export type TrailPanel =
   | { kind: "draft"; heading: string; draft: DraftPanel }
   | { kind: "route"; options: RouteCard[] }
   | { kind: "event"; name: string; text: string; next: CampPreview }
-  | { kind: "loadout"; next: CampPreview };
+  /** `gear` is null for a spectator; `shop` is open before a boss camp. */
+  | { kind: "loadout"; next: CampPreview; gear: Gear | null; shop: ShopPanel | null };
 
 /** One of your live sources: `sourceKey` is what you act through, and
  * `sourceId` the def it names. */
@@ -225,6 +239,7 @@ function objectiveLabels(slotKinds: readonly string[]): string[] {
 export function campPreview(view: View, camp: ExpeditionCampPreviewView): CampPreview {
   return {
     title: view.campCount === null ? `Camp ${camp.index}` : `Camp ${camp.index} of ${view.campCount}`,
+    shop: camp.shop,
     location: modName(camp.location),
     weather: modName(camp.weather),
     event: camp.event === null ? null : (EVENT_DISPLAY[camp.event]?.name ?? modName(camp.event)),
@@ -297,19 +312,28 @@ function bundleFor(itemIds: readonly string[], bundle: number): DraftBundle {
     sourceId: itemIds[0] ?? "",
     objectId: bundleObjectId(bundle),
     name: itemIds.map(sourceName).join(" + "),
-    ribbon: `Bundle ${bundle + 1}`,
-    text: itemIds.map((id) => SOURCE_DISPLAY[id]?.text ?? "").join(" "),
-    badges: itemIds.map((id) => `${sourceName(id)}: ${SOURCE_DISPLAY[id]?.item?.uses ?? "Always"}`),
+    items: itemIds.map((itemId, i) => {
+      const display = SOURCE_DISPLAY[itemId];
+      return {
+        itemId,
+        objectId: bundleItemObjectId(bundle, i),
+        name: sourceName(itemId),
+        text: display?.text ?? "",
+        uses: display?.item?.uses ?? "Always on",
+        rare: display?.item?.rarity === "rare",
+      };
+    }),
   };
 }
 
-function buildDraft(view: View, yourOffer: { bundles: string[][] } | null): DraftPanel {
+function buildDraft(view: View, yourOffer: { bundles: string[][] } | null, taken: readonly string[] | null): DraftPanel {
   const you = view.seats.find((s) => s.seatId === view.yourSeatId);
   if (you === undefined) return { kind: "none", text: "The crew is choosing" };
   if (yourOffer !== null) return { kind: "offer", bundles: yourOffer.bundles.map(bundleFor) };
+  if (taken !== null && taken.length > 0) return { kind: "taken", items: taken.map((sourceId) => ({ sourceId, name: sourceName(sourceId) })) };
   // Instances mint in order, so the newest is the last one taken.
-  const taken = [...you.items.equipped, ...(you.items.backpack ?? [])].sort((a, b) => Number(a.uid.slice(2)) - Number(b.uid.slice(2))).at(-1);
-  return taken === undefined ? { kind: "none", text: "Nothing left to take" } : { kind: "taken", sourceId: taken.itemId, name: sourceName(taken.itemId) };
+  const newest = [...you.items.equipped, ...(you.items.backpack ?? [])].sort((a, b) => Number(a.uid.slice(2)) - Number(b.uid.slice(2))).at(-1);
+  return newest === undefined ? { kind: "none", text: "Nothing left to take" } : { kind: "taken", items: [{ sourceId: newest.itemId, name: sourceName(newest.itemId) }] };
 }
 
 function buildRoutes(server: SceneServerInput, stage: Extract<View["stage"], { tag: "route" }>): RouteCard[] {
@@ -326,14 +350,29 @@ function buildRoutes(server: SceneServerInput, stage: Extract<View["stage"], { t
   }));
 }
 
-function buildPanel(server: SceneServerInput): TrailPanel {
+function buildLoadout(server: SceneServerInput, stage: Extract<View["stage"], { tag: "loadout" }>, ui: LocalUiState): TrailPanel {
+  const view = server.game;
+  const you = view.seats.find((s) => s.seatId === view.yourSeatId);
+  const ready = you !== undefined && stage.readySeatIds.includes(you.seatId);
+  return {
+    kind: "loadout",
+    next: campPreview(view, stage.camp),
+    gear: you === undefined ? null : buildGear(you, stage.yourSlots, ready, ui.packPage),
+    shop:
+      stage.shop === null
+        ? null
+        : buildShop({ shop: stage.shop, purse: view.purse, supplies: view.supplies, you, ready, nameOf: (seatId) => (seatId === view.yourSeatId ? "you" : nameOf(server, seatId)) }),
+  };
+}
+
+function buildPanel(server: SceneServerInput, ui: LocalUiState): TrailPanel {
   const view = server.game;
   const stage = view.stage;
   switch (stage.tag) {
     case "muster":
       return buildMuster(server, stage.ballots);
     case "draft":
-      return { kind: "draft", heading: `Camp ${stage.cleared} cleared: +${stage.payout} coins`, draft: buildDraft(view, stage.yourOffer) };
+      return { kind: "draft", heading: `Camp ${stage.cleared} cleared: +${stage.payout} coins`, draft: buildDraft(view, stage.yourOffer, ui.takenBundle) };
     case "route":
       return { kind: "route", options: buildRoutes(server, stage) };
     case "event": {
@@ -341,8 +380,9 @@ function buildPanel(server: SceneServerInput): TrailPanel {
       return { kind: "event", name: event?.name ?? modName(stage.event), text: event?.text ?? "", next: campPreview(view, stage.next) };
     }
     case "loadout":
+      return buildLoadout(server, stage, ui);
     case "camp":
-      return { kind: "loadout", next: campPreview(view, stage.camp) };
+      return { kind: "loadout", next: campPreview(view, stage.camp), gear: null, shop: null };
     case "ended":
       return { kind: "draft", heading: "", draft: { kind: "none", text: "" } };
   }
@@ -470,7 +510,7 @@ export function buildTrailModel(server: SceneServerInput, ui: LocalUiState, reco
     topBar: buildTopBar(view),
     prompt: buildTrailPrompt(view, roomSeats, { reconnecting }),
     trail: buildTrail(view),
-    panel: buildPanel(server),
+    panel: buildPanel(server, ui),
     kit: buildKit(view),
     crew: buildCrew(server),
     ready: buildReady(view),

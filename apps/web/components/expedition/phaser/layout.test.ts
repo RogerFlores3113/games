@@ -16,6 +16,8 @@ import {
   SILHOUETTE_H,
   SILHOUETTE_W,
   YOUR_CARD_AT,
+  TRAIL_ZONES,
+  gearLayout,
   pointInRect,
   rectContains,
   rectsIntersect,
@@ -161,5 +163,24 @@ describe("pointInRect (the drop test)", () => {
     expect(pointInRect(ZONES.stump, { x: 192, y: 148 })).toBe(true);
     expect(pointInRect(ZONES.stump, { x: 448, y: 180 })).toBe(false);
     expect(pointInRect(ZONES.stump, { x: 320, y: 300 })).toBe(false);
+  });
+});
+
+describe("gearLayout", () => {
+  it("keeps every slot and backpack cell inside the backpack zone, none overlapping, for 1 to 3 slots", () => {
+    for (const slots of [1, 2, 3]) {
+      const geo = gearLayout(slots);
+      const cells = [...geo.slots, ...geo.pack];
+      expect(cells.every((cell) => rectContains(TRAIL_ZONES.backpack, cell))).toBe(true);
+      for (let i = 0; i < cells.length; i++) for (let j = i + 1; j < cells.length; j++) expect(rectsIntersect(cells[i]!, cells[j]!)).toBe(false);
+      expect(geo.slots.map((s) => s.h)).toEqual(Array(slots).fill(slots === 3 ? 17 : 22));
+    }
+  });
+
+  it("drops onto the slot under the pointer, and the backpack beside the slots", () => {
+    const geo = gearLayout(2);
+    expect(geo.slots.findIndex((r) => pointInRect(r, { x: 60, y: 325 }))).toBe(1);
+    expect(pointInRect(geo.packArea, { x: 300, y: 320 })).toBe(true);
+    expect(pointInRect(geo.packArea, { x: 60, y: 320 })).toBe(false);
   });
 });

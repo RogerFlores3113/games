@@ -420,7 +420,7 @@ describe("buildTrailPrompt", () => {
 
   it("at the draft announces the cleared camp, its payout and the pick", () => {
     const v = trail({ tag: "draft", cleared: 1, payout: 8, yourOffer: { bundles: [["trained-monkey"]] }, pendingSeatIds: ["me", "bo"] });
-    expect(at(v)).toEqual({ text: "Camp 1 cleared! +8 coins. Take one", tone: "your-move" });
+    expect(at(v)).toEqual({ text: "Camp 1 cleared! +8 coins. Take a bundle", tone: "your-move" });
   });
 
   it("at the draft names who the crew is waiting for once you have picked", () => {
