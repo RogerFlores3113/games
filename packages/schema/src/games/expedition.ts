@@ -264,10 +264,11 @@ const AttemptViewSchema = z.strictObject({
 
 const RemainingViewSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("uses"), left: z.number().int().min(0), of: z.number().int().min(1) }),
-  z.strictObject({ kind: z.literal("pool"), balance: z.number().int(), max: z.number().int().min(0), cost: z.number().int().min(0) }),
   z.strictObject({ kind: z.literal("supplies"), cost: z.number().int().min(0) }),
   z.strictObject({ kind: z.literal("crew"), left: z.number().int().min(0), earned: z.number().int().min(0) }),
   z.strictObject({ kind: z.literal("coins"), cost: z.number().int().min(0) }),
+  z.strictObject({ kind: z.literal("unlimited") }),
+  z.strictObject({ kind: z.literal("whispers"), left: z.number().int().min(0) }),
 ]);
 
 // `remaining` is null for a passive item.
@@ -278,7 +279,7 @@ const ItemViewSchema = z.strictObject({
 });
 
 // Deliberately no `offers`/`ledger` keys for any seat: character, upgrade,
-// items, pool and per-source usage are public; the viewer's own draft offer
+// items and per-source usage are public; the viewer's own draft offer
 // is the draft stage's `yourOffer`.
 const SeatViewSchema = z.strictObject({
   seatId: z.string().min(1),
@@ -289,7 +290,6 @@ const SeatViewSchema = z.strictObject({
     backpack: z.array(ItemViewSchema).nullable(),
     concealed: z.boolean(),
   }),
-  pool: z.strictObject({ balance: z.number().int(), max: z.number().int().min(0) }).nullable(),
   usage: z.array(z.strictObject({ sourceKey: z.string().min(1), remaining: RemainingViewSchema })),
 });
 

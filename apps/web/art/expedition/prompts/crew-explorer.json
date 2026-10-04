@@ -1,0 +1,17 @@
+{
+  "id": "crew-explorer",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "dark silhouette of a jungle explorer sitting cross-legged facing the viewer, pith helmet, a coiled rope over one shoulder, holding a compass up in one hand, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background",
+    "width": 64,
+    "height": 80,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "basic shading",
+    "no_background": true,
+    "seed": 7
+  },
+  "job": "d424936a-4ab5-4a3a-8181-45675ed48d63",
+  "scale": 1,
+  "note": "natively transparent; used as downloaded"
+}

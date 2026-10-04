@@ -26,18 +26,9 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | mascot-flop | sprites/camp/mascot-flop.png | PixelLab generation (red panda object, v3 animation), spec `prompts/mascot-flop.json` | PixelLab ToS | 2026-10-02 |
 | trail-map | sprites/fireside/trail-map.png | PixelLab generation, spec `prompts/trail-map.json` | PixelLab ToS | 2026-10-02 |
 | stump-table | sprites/camp/stump-table.png | PixelLab generation, spec `prompts/stump-table.json`; backdrop keyed out offline | PixelLab ToS | 2026-10-03 |
-| source-scout | sprites/sources/scout.png | PixelLab generation, spec `prompts/source-scout.json` | PixelLab ToS | 2026-10-03 |
-| source-guide | sprites/sources/guide.png | PixelLab generation, spec `prompts/source-guide.json` | PixelLab ToS | 2026-10-03 |
-| source-botanist | sprites/sources/botanist.png | PixelLab generation, spec `prompts/source-botanist.json` | PixelLab ToS | 2026-10-03 |
 | source-medic | sprites/sources/medic.png | PixelLab generation, spec `prompts/source-medic.json` | PixelLab ToS | 2026-10-03 |
 | source-signaller | sprites/sources/signaller.png | PixelLab generation, spec `prompts/source-signaller.json` | PixelLab ToS | 2026-10-03 |
 | source-cartographer | sprites/sources/cartographer.png | PixelLab generation, spec `prompts/source-cartographer.json` | PixelLab ToS | 2026-10-03 |
-| source-scout.keen-eye | sprites/sources/scout.keen-eye.png | PixelLab generation, spec `prompts/source-scout.keen-eye.json` | PixelLab ToS | 2026-10-03 |
-| source-scout.eavesdrop | sprites/sources/scout.eavesdrop.png | PixelLab generation, spec `prompts/source-scout.eavesdrop.json` | PixelLab ToS | 2026-10-03 |
-| source-guide.pathfinder | sprites/sources/guide.pathfinder.png | PixelLab generation, spec `prompts/source-guide.pathfinder.json` | PixelLab ToS | 2026-10-03 |
-| source-guide.howler-call | sprites/sources/guide.howler-call.png | PixelLab generation, spec `prompts/source-guide.howler-call.json` | PixelLab ToS | 2026-10-03 |
-| source-botanist.greenhouse | sprites/sources/botanist.greenhouse.png | PixelLab generation, spec `prompts/source-botanist.greenhouse.json` | PixelLab ToS | 2026-10-03 |
-| source-botanist.antidote | sprites/sources/botanist.antidote.png | PixelLab generation, spec `prompts/source-botanist.antidote.json` | PixelLab ToS | 2026-10-03 |
 | source-medic.rally | sprites/sources/medic.rally.png | PixelLab generation, spec `prompts/source-medic.rally.json` | PixelLab ToS | 2026-10-03 |
 | source-medic.field-kit | sprites/sources/medic.field-kit.png | PixelLab generation, spec `prompts/source-medic.field-kit.json` | PixelLab ToS | 2026-10-03 |
 | source-signaller.loud-call | sprites/sources/signaller.loud-call.png | PixelLab generation, spec `prompts/source-signaller.loud-call.json` | PixelLab ToS | 2026-10-03 |
@@ -57,9 +48,6 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | source-rope-ladder | sprites/sources/rope-ladder.png | PixelLab generation, spec `prompts/source-rope-ladder.json` | PixelLab ToS | 2026-10-03 |
 | source-heavy-pack | sprites/sources/heavy-pack.png | PixelLab generation, spec `prompts/source-heavy-pack.json` | PixelLab ToS | 2026-10-03 |
 | source-mosquito-net | sprites/sources/mosquito-net.png | PixelLab generation, spec `prompts/source-mosquito-net.json` | PixelLab ToS | 2026-10-03 |
-| crew-scout | sprites/crew/scout.png | PixelLab generation, spec `prompts/crew-scout.json`; alpha thresholded locally | PixelLab ToS | 2026-10-03 |
-| crew-guide | sprites/crew/guide.png | PixelLab generation, spec `prompts/crew-guide.json`; alpha thresholded locally | PixelLab ToS | 2026-10-03 |
-| crew-botanist | sprites/crew/botanist.png | PixelLab generation, spec `prompts/crew-botanist.json`; alpha thresholded locally | PixelLab ToS | 2026-10-03 |
 | crew-medic | sprites/crew/medic.png | PixelLab generation, spec `prompts/crew-medic.json`; alpha thresholded locally | PixelLab ToS | 2026-10-03 |
 | crew-signaller | sprites/crew/signaller.png | PixelLab generation, spec `prompts/crew-signaller.json`; alpha thresholded locally | PixelLab ToS | 2026-10-03 |
 | crew-cartographer | sprites/crew/cartographer.png | PixelLab generation, spec `prompts/crew-cartographer.json`; alpha thresholded locally | PixelLab ToS | 2026-10-03 |
@@ -82,6 +70,21 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | bg-clifftop | sprites/locations/bg-clifftop.png | PixelLab generation, spec `prompts/bg-clifftop.json` | PixelLab ToS | 2026-10-04 |
 | bg-clearing | sprites/locations/bg-clearing.png | PixelLab generation, spec `prompts/bg-clearing.json` | PixelLab ToS | 2026-10-04 |
 | bg-temple | sprites/locations/bg-temple.png | PixelLab generation, spec `prompts/bg-temple.json` | PixelLab ToS | 2026-10-04 |
+| crew-jd | sprites/crew/jd.png | PixelLab generation, spec `prompts/crew-jd.json` | PixelLab ToS | 2026-10-04 |
+| crew-leader | sprites/crew/leader.png | PixelLab generation, spec `prompts/crew-leader.json` | PixelLab ToS | 2026-10-04 |
+| crew-explorer | sprites/crew/explorer.png | PixelLab generation, spec `prompts/crew-explorer.json` | PixelLab ToS | 2026-10-04 |
+| source-jd | sprites/sources/jd.png | PixelLab generation, spec `prompts/source-jd.json` | PixelLab ToS | 2026-10-04 |
+| source-jd.blend-in | sprites/sources/jd.blend-in.png | PixelLab generation, spec `prompts/source-jd.blend-in.json` | PixelLab ToS | 2026-10-04 |
+| source-jd.free-spirit | sprites/sources/jd.free-spirit.png | PixelLab generation, spec `prompts/source-jd.free-spirit.json` | PixelLab ToS | 2026-10-04 |
+| source-jd.rule-breaker | sprites/sources/jd.rule-breaker.png | PixelLab generation, spec `prompts/source-jd.rule-breaker.json` | PixelLab ToS | 2026-10-04 |
+| source-leader | sprites/sources/leader.png | PixelLab generation, spec `prompts/source-leader.json` | PixelLab ToS | 2026-10-04 |
+| source-leader.open-ears | sprites/sources/leader.open-ears.png | PixelLab generation, spec `prompts/source-leader.open-ears.json` | PixelLab ToS | 2026-10-04 |
+| source-leader.delegate | sprites/sources/leader.delegate.png | PixelLab generation, spec `prompts/source-leader.delegate.json` | PixelLab ToS | 2026-10-04 |
+| source-leader.momentum | sprites/sources/leader.momentum.png | PixelLab generation, spec `prompts/source-leader.momentum.json` | PixelLab ToS | 2026-10-04 |
+| source-explorer | sprites/sources/explorer.png | PixelLab generation, spec `prompts/source-explorer.json` | PixelLab ToS | 2026-10-04 |
+| source-explorer.second-wind | sprites/sources/explorer.second-wind.png | PixelLab generation, spec `prompts/source-explorer.second-wind.json` | PixelLab ToS | 2026-10-04 |
+| source-explorer.true-form | sprites/sources/explorer.true-form.png | PixelLab generation, spec `prompts/source-explorer.true-form.json` | PixelLab ToS | 2026-10-04 |
+| source-explorer.reshape | sprites/sources/explorer.reshape.png | PixelLab generation, spec `prompts/source-explorer.reshape.json` | PixelLab ToS | 2026-10-04 |
 
 ## Audio
 

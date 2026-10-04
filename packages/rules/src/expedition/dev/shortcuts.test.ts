@@ -86,8 +86,8 @@ describe("dev shortcuts", () => {
   });
 
   it("set-character refuses a character another seat holds", () => {
-    const crewed = run("set-character", fresh(), { seat: "a", character: "scout" });
-    expect(() => run("set-character", crewed, { seat: "b", character: "scout" })).toThrow("scout already belongs to a");
+    const crewed = run("set-character", fresh(), { seat: "a", character: "explorer" });
+    expect(() => run("set-character", crewed, { seat: "b", character: "explorer" })).toThrow("explorer already belongs to a");
   });
 
   it("give-item mints an instance, equipped while a slot is free, and refuses a non-item", () => {
@@ -99,15 +99,15 @@ describe("dev shortcuts", () => {
     ]);
     expect(given.seats[0]!.equipped).toEqual(["it0", "it1"]);
     expect(given.itemSerial).toBe(3);
-    expect(() => run("give-item", fresh(), { seat: "a", item: "scout" })).toThrow("item must be one of:");
+    expect(() => run("give-item", fresh(), { seat: "a", item: "explorer" })).toThrow("item must be one of:");
   });
 
   it("set-upgrade sets or clears an upgrade of the seat's own character only", () => {
-    const scout = run("set-character", fresh(), { seat: "a", character: "scout" });
-    const upgraded = run("set-upgrade", scout, { seat: "a", upgrade: "scout.keen-eye" });
-    expect(upgraded.seats[0]!.upgradeId).toBe("scout.keen-eye");
+    const explorer = run("set-character", fresh(), { seat: "a", character: "explorer" });
+    const upgraded = run("set-upgrade", explorer, { seat: "a", upgrade: "explorer.reshape" });
+    expect(upgraded.seats[0]!.upgradeId).toBe("explorer.reshape");
     expect(run("set-upgrade", upgraded, { seat: "a", upgrade: "none" }).seats[0]!.upgradeId).toBeNull();
-    expect(() => run("set-upgrade", scout, { seat: "a", upgrade: "guide.pathfinder" })).toThrow("guide.pathfinder belongs to guide, not a's scout");
+    expect(() => run("set-upgrade", explorer, { seat: "a", upgrade: "leader.delegate" })).toThrow("leader.delegate belongs to leader, not a's explorer");
   });
 
   it("set-supplies sets supplies within bounds", () => {

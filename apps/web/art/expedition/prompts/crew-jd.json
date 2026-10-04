@@ -1,0 +1,17 @@
+{
+  "id": "crew-jd",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "dark silhouette of an ordinary tourist sitting cross-legged facing the viewer, baseball cap, t-shirt, a camera hanging on a strap around the neck, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background",
+    "width": 64,
+    "height": 80,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "basic shading",
+    "no_background": true,
+    "seed": 7
+  },
+  "job": "a796eb43-bbaf-47fd-9ff2-58a274a7bca3",
+  "scale": 1,
+  "note": "natively transparent; used as downloaded"
+}

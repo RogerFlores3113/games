@@ -1,0 +1,17 @@
+{
+  "id": "crew-leader",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "dark silhouette of an expedition leader sitting cross-legged facing the viewer, wide-brim hat, raising a megaphone to the mouth with one hand, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background",
+    "width": 64,
+    "height": 80,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "basic shading",
+    "no_background": true,
+    "seed": 7
+  },
+  "job": "2fe92e81-3308-421b-a7af-6cc8dd4e870a",
+  "scale": 1,
+  "note": "natively transparent; used as downloaded"
+}

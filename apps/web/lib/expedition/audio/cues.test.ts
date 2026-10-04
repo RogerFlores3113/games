@@ -47,7 +47,7 @@ function kitOf(kit: readonly string[]): Pick<ExpeditionView["seats"][number], "u
 }
 
 function seat(seatId: string, characterId: string | null, kit: string[] = []): ExpeditionView["seats"][number] {
-  return { seatId, characterId, ...kitOf(kit), pool: null, usage: [] };
+  return { seatId, characterId, ...kitOf(kit), usage: [] };
 }
 
 function game(over: Partial<ExpeditionView> = {}, campOver: Partial<Camp> = {}, log: Log = [], attemptNumber = 1): ExpeditionView {
@@ -59,7 +59,7 @@ function game(over: Partial<ExpeditionView> = {}, campOver: Partial<Camp> = {}, 
     purse: 0,
     supplies: { count: 5, max: 5 },
     plan: [],
-    seats: [seat("a", "scout")],
+    seats: [seat("a", "explorer")],
     yourAbilities: [],
     history: [],
     lastVote: null,
@@ -134,7 +134,7 @@ describe("cuesFor", () => {
   it("plays whisper and power for new log entries of those events", () => {
     const entry = (event: string, sourceId: string | null = null) => ({ event, actorSeatId: "a", subjectSeatIds: ["b"], sourceId, private: false });
     expect(cuesFor(game(), game({}, {}, [entry("whisper")]))).toEqual(["sfx-whisper"]);
-    expect(cuesFor(game(), game({}, {}, [entry("use-ability", "scout")]))).toEqual(["sfx-power"]);
+    expect(cuesFor(game(), game({}, {}, [entry("use-ability", "explorer")]))).toEqual(["sfx-power"]);
     const had = game({}, {}, [entry("whisper")]);
     expect(cuesFor(had, game({}, {}, [entry("whisper")]))).toEqual([]);
   });
@@ -150,14 +150,14 @@ describe("cuesFor", () => {
 
   it("plays equip when your character or kit changes at the trail or muster", () => {
     const onTrail = (characterId: string | null, kit: string[]) => game({ stage: draft, seats: [seat("a", characterId, kit)] });
-    expect(cuesFor(onTrail(null, []), onTrail("scout", []))).toEqual(["sfx-equip"]);
-    expect(cuesFor(onTrail("scout", []), onTrail("scout", ["bait"]))).toEqual(["sfx-equip"]);
-    expect(cuesFor(onTrail("scout", ["bait"]), onTrail("scout", ["bait"]))).toEqual([]);
+    expect(cuesFor(onTrail(null, []), onTrail("explorer", []))).toEqual(["sfx-equip"]);
+    expect(cuesFor(onTrail("explorer", []), onTrail("explorer", ["bait"]))).toEqual(["sfx-equip"]);
+    expect(cuesFor(onTrail("explorer", ["bait"]), onTrail("explorer", ["bait"]))).toEqual([]);
   });
 
   it("does not play equip for a teammate's kit change", () => {
     const onTrail = (mateKit: string[]) =>
-      game({ stage: draft, seats: [seat("a", "scout"), seat("b", "guide", mateKit)] });
+      game({ stage: draft, seats: [seat("a", "explorer"), seat("b", "leader", mateKit)] });
     expect(cuesFor(onTrail([]), onTrail(["bait"]))).toEqual([]);
   });
 });

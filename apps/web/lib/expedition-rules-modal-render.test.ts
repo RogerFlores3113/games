@@ -12,7 +12,7 @@ const source = readFileSync(
 );
 const partial: Pick<ExpeditionView, "yourSeatId" | "seats"> = {
   yourSeatId: "s1",
-  seats: [{ seatId: "s1", characterId: "scout", upgradeId: null, items: { equipped: [{ uid: "it0", itemId: "bait", remaining: null }], backpack: [], concealed: false }, pool: null, usage: [] }],
+  seats: [{ seatId: "s1", characterId: "explorer", upgradeId: null, items: { equipped: [{ uid: "it0", itemId: "bait", remaining: null }], backpack: [], concealed: false }, usage: [] }],
 };
 const game = partial as ExpeditionView;
 
@@ -35,7 +35,7 @@ describe("expedition-rules-modal-render", () => {
 
   it("renders your character and kit from the view", () => {
     const markup = render({ open: true, game });
-    expect(markup).toContain("Spyglass (The Scout)");
+    expect(markup).toContain("Compass (The Explorer)");
     expect(markup).toContain(SOURCE_DISPLAY.bait!.name);
   });
 

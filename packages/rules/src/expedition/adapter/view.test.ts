@@ -40,7 +40,7 @@ describe("toExpeditionPlayerView", () => {
     expect(view.runStatus).toBe("in_progress");
     expect([view.length, view.campCount, view.plan, view.lastVote]).toEqual([null, null, [], null]);
     expect(view.seats).toEqual(
-      SEATS.map((seatId) => ({ seatId, characterId: null, upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] })),
+      SEATS.map((seatId) => ({ seatId, characterId: null, upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] })),
     );
     expect(view.yourAbilities).toEqual([]);
     expect(JSON.stringify(view).includes(seed)).toBe(false);
@@ -48,7 +48,7 @@ describe("toExpeditionPlayerView", () => {
 
   it("draft: the viewer's head offer only, pendingSeatIds names the seats still to pick, seed absent from JSON", () => {
     const seed = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    const base = setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG, camp: 2, characters: { p0: "scout" } });
+    const base = setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG, camp: 2, characters: { p0: "explorer" } });
     const offer = draftOfferFor(seed, campIndex(2), base.seats[0]!, 0, CATALOG);
     const queued = draftOfferFor(seed, campIndex(2), base.seats[0]!, 1, CATALOG);
     const run: RunState = {
@@ -64,7 +64,7 @@ describe("toExpeditionPlayerView", () => {
     expect(other.stage).toEqual({ tag: "draft", cleared: 2, payout: 6, yourOffer: null, pendingSeatIds: ["p0"] });
     expect(JSON.stringify(own).includes(seed)).toBe(false);
     expect(JSON.stringify(own).includes(JSON.stringify(queued.bundles))).toBe(false);
-    for (const seat of other.seats) expect(Object.keys(seat).sort()).toEqual(["characterId", "items", "pool", "seatId", "upgradeId", "usage"]);
+    for (const seat of other.seats) expect(Object.keys(seat).sort()).toEqual(["characterId", "items", "seatId", "upgradeId", "usage"]);
   });
 
   it("loadout: previews the camp, lists the seats that readied, and closes the shop before a plain camp", () => {
@@ -102,7 +102,7 @@ describe("toExpeditionPlayerView", () => {
   });
 
   it("loadout before a boss camp: the shared stock, and only the viewer's own character's upgrades while it has none", () => {
-    const run = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3, characters: { p0: "scout", p1: "guide" }, upgrades: { p1: "guide.pathfinder" } });
+    const run = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3, characters: { p0: "explorer", p1: "leader" }, upgrades: { p1: "leader.delegate" } });
     const stock = run.stage.tag === "loadout" ? run.stage.stock! : [];
     const own = toExpeditionPlayerView(run, "p0", CATALOG);
 
@@ -110,8 +110,9 @@ describe("toExpeditionPlayerView", () => {
     expect(own.stage.tag === "loadout" && own.stage.shop).toEqual({
       stock: stock.map((e) => ({ stockId: e.stockId, what: e.what, price: e.price, soldTo: null })),
       yourUpgrades: [
-        { stockId: "upgrade:scout.keen-eye", upgradeId: "scout.keen-eye", price: 8 },
-        { stockId: "upgrade:scout.eavesdrop", upgradeId: "scout.eavesdrop", price: 8 },
+        { stockId: "upgrade:explorer.second-wind", upgradeId: "explorer.second-wind", price: 8 },
+        { stockId: "upgrade:explorer.true-form", upgradeId: "explorer.true-form", price: 8 },
+        { stockId: "upgrade:explorer.reshape", upgradeId: "explorer.reshape", price: 8 },
       ],
     });
     expect(stock.map((e) => e.stockId)).toEqual(["supplies", "item0", "item1", "item2"]);
@@ -124,9 +125,9 @@ describe("toExpeditionPlayerView", () => {
     const seed = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     let run = createRun({ seatIds: [...SEATS], seed });
     const steps = [
-      ["p0", { type: "pick-character", characterId: "scout" }],
-      ["p1", { type: "pick-character", characterId: "signaller" }],
-      ["p2", { type: "pick-character", characterId: "medic" }],
+      ["p0", { type: "pick-character", characterId: "explorer" }],
+      ["p1", { type: "pick-character", characterId: "leader" }],
+      ["p2", { type: "pick-character", characterId: "jd" }],
       ["p0", { type: "vote", choice: "long" }],
       ["p1", { type: "vote", choice: null }],
     ] as const;
@@ -162,13 +163,13 @@ describe("toExpeditionPlayerView", () => {
     expect([view.runStatus, view.stage, view.supplies]).toEqual(["lost", { tag: "ended", result: "lost" }, { count: 0, max: 4 }]);
   });
 
-  it("seats[] carry each seat's public character, upgrade, equipped and backpack items, pool and usage by key", () => {
+  it("seats[] carry each seat's public character, upgrade, equipped and backpack items, and usage by key", () => {
     const run = setupRun({
       seatIds: [...SEATS],
       seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       catalog: CATALOG,
-      characters: { p0: "botanist", p1: "scout", p2: "signaller" },
-      upgrades: { p0: "botanist.greenhouse" },
+      characters: { p0: "explorer", p1: "jd", p2: "leader" },
+      upgrades: { p0: "explorer.second-wind", p1: "jd.free-spirit" },
       items: { p0: ["rain-poncho", "heavy-pack", "parrot"] },
     });
 
@@ -176,8 +177,8 @@ describe("toExpeditionPlayerView", () => {
 
     expect(seats[0]).toEqual({
       seatId: "p0",
-      characterId: "botanist",
-      upgradeId: "botanist.greenhouse",
+      characterId: "explorer",
+      upgradeId: "explorer.second-wind",
       items: {
         equipped: [
           { uid: "it0", itemId: "rain-poncho", remaining: { kind: "uses", left: 2, of: 2 } },
@@ -186,14 +187,13 @@ describe("toExpeditionPlayerView", () => {
         backpack: [{ uid: "it2", itemId: "parrot", remaining: { kind: "uses", left: 1, of: 1 } }],
         concealed: false,
       },
-      pool: { balance: 2, max: 3 },
       usage: [
-        { sourceKey: "botanist", remaining: { kind: "pool", balance: 2, max: 3, cost: 1 } },
+        { sourceKey: "explorer", remaining: { kind: "uses", left: 2, of: 2 } },
         { sourceKey: "it0", remaining: { kind: "uses", left: 2, of: 2 } },
       ],
     });
-    expect(seats[1]).toMatchObject({ characterId: "scout", upgradeId: null, pool: null, usage: [{ sourceKey: "scout", remaining: { kind: "uses", left: 1, of: 1 } }] });
-    expect(seats[2]).toMatchObject({ characterId: "signaller", pool: null, usage: [] });
+    expect(seats[1]).toMatchObject({ characterId: "jd", upgradeId: "jd.free-spirit", usage: [{ sourceKey: "jd.free-spirit", remaining: { kind: "uses", left: 1, of: 1 } }] });
+    expect(seats[2]).toMatchObject({ characterId: "leader", usage: [] });
   });
 
   it("dealt face-up camp: own hand full identity, correct handSizes, objectives carry status, no other seat's card id leaks", () => {
@@ -374,20 +374,20 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
 
   it("yourAbilities: a usable ability lists its steps' choices, an unusable one a reason and no steps", () => {
     const run = advanceTo(
-      setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG, characters: { p0: "scout", p1: "signaller" }, items: { p0: ["rope-ladder"] } }),
+      setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG, characters: { p0: "leader", p1: "jd" }, upgrades: { p0: "leader.delegate" }, items: { p0: ["rope-ladder"] } }),
       "between-tricks",
       CATALOG,
     );
 
     const abilities = toExpeditionPlayerView(run, "p0", CATALOG).yourAbilities;
 
-    expect(abilities.map((a) => a.sourceKey)).toEqual(["scout", "it0"]);
-    const [scout, ladder] = abilities;
-    expect(scout).toEqual({
-      sourceKey: "scout",
+    expect(abilities.map((a) => a.sourceKey)).toEqual(["leader.delegate", "it0"]);
+    const [delegate, ladder] = abilities;
+    expect(delegate).toEqual({
+      sourceKey: "leader.delegate",
       usableNow: true,
       reason: null,
-      steps: [{ kind: "hand", prompt: "Pick a teammate's hand", choices: ["hand:p1", "hand:p2"] }],
+      steps: [{ kind: "player", prompt: "Pick a teammate", choices: ["seat:p1", "seat:p2"] }],
     });
     expect(ladder).toEqual({ sourceKey: "it0", usableNow: false, reason: "Usable when an objective fails", steps: [] });
     expect(toExpeditionPlayerView(run, "p1", CATALOG).yourAbilities).toEqual([]);
@@ -395,18 +395,19 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
 
   it("yourAbilities: a spent ability reports why it cannot be used", () => {
     const start = advanceTo(
-      setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG, characters: { p0: "scout" } }),
+      setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG, characters: { p0: "explorer" } }),
       "between-tricks",
       CATALOG,
     );
-    const used = applyRunAction(start, "p0", { type: "use-ability", sourceKey: "scout", targets: ["hand:p1"] }, CATALOG);
+    const choice = toExpeditionPlayerView(start, "p0", CATALOG).yourAbilities[0]!.steps[0]!.choices[0]!;
+    const used = applyRunAction(start, "p0", { type: "use-ability", sourceKey: "explorer", targets: [choice] }, CATALOG);
     if (!used.ok) throw new Error(used.error);
 
     const view = toExpeditionPlayerView(used.state, "p0", CATALOG);
 
-    expect(view.yourAbilities).toEqual([{ sourceKey: "scout", usableNow: false, reason: "Already used", steps: [] }]);
-    expect(view.seats[0]!.usage).toEqual([{ sourceKey: "scout", remaining: { kind: "uses", left: 0, of: 1 } }]);
-    expect(attemptViewOf(view).reveals.map((r) => r.source)).toEqual(["scout"]);
+    expect(view.yourAbilities).toEqual([{ sourceKey: "explorer", usableNow: false, reason: "Already used", steps: [] }]);
+    expect(view.seats[0]!.usage).toEqual([{ sourceKey: "explorer", remaining: { kind: "uses", left: 0, of: 1 } }]);
+    expect(attemptViewOf(view).effects.map((e) => e.origin)).toEqual([{ kind: "seat", seatId: "p0", sourceId: "explorer" }]);
   });
 
   it("effect params: shown to the owner of an owner-audience effect, null for everyone else; public params shown to all", () => {

@@ -53,7 +53,7 @@ function view(campView: ExpeditionCampView, overrides: Partial<ExpeditionView> =
     purse: 0,
     supplies: { count: 3, max: 5 },
     plan: [],
-    seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: "scout", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] })),
+    seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: "explorer", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] })),
     yourAbilities: [],
     history: [],
     lastVote: null,
@@ -77,9 +77,9 @@ function view(campView: ExpeditionCampView, overrides: Partial<ExpeditionView> =
   };
 }
 
-const MEDIC: ExpeditionAbilityView = { sourceKey: "medic", usableNow: true, reason: null, steps: [] };
-const SCOUT: ExpeditionAbilityView = {
-  sourceKey: "scout",
+const FREE_SPIRIT: ExpeditionAbilityView = { sourceKey: "jd.free-spirit", usableNow: true, reason: null, steps: [] };
+const GLANCE: ExpeditionAbilityView = {
+  sourceKey: "explorer",
   usableNow: true,
   reason: null,
   steps: [{ kind: "hand", prompt: "Pick a teammate's hand", choices: ["hand:ana", "hand:bo"] }],
@@ -94,8 +94,8 @@ const MONKEY: ExpeditionAbilityView = {
   ],
 };
 
-const TONIC: ExpeditionAbilityView = {
-  sourceKey: "botanist",
+const COMPASS: ExpeditionAbilityView = {
+  sourceKey: "explorer",
   usableNow: true,
   reason: null,
   steps: [{ kind: "card-value", prompt: "Pick a card in your hand to recount", choices: ["value:h7:6", "value:h7:8"] }],
@@ -107,7 +107,7 @@ const LONG_STEP: ExpeditionAbilityView = {
   steps: [{ kind: "card", prompt: "Pick one of your cards to swap with a teammate now", choices: ["card:h7"] }],
 };
 
-function rescue(pending: string[], abilities: ExpeditionAbilityView[] = [MEDIC]): ExpeditionView {
+function rescue(pending: string[], abilities: ExpeditionAbilityView[] = [FREE_SPIRIT]): ExpeditionView {
   const base = view(camp({ campPhase: "ended", currentActorSeatId: null }), { yourAbilities: abilities });
   return withAttempt(base, { window: "rescue", pendingSeatIds: pending, rescue: { failedObjectiveIds: ["o1"] } });
 }
@@ -121,7 +121,7 @@ const canWhisper = { reconnecting: false, whisperAvailable: true };
 
 const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   ["reconnecting beats everything", view(camp()), ui(), { reconnecting: true, whisperAvailable: true }, { text: "Reconnecting…", tone: "alert" }],
-  ["rescue, you are pending", rescue(["me"]), ui(), playing, { text: "An objective failed: rescue it with Triage, or pass", tone: "your-move" }],
+  ["rescue, you are pending", rescue(["me"]), ui(), playing, { text: "An objective failed: rescue it with Free Spirit, or pass", tone: "your-move" }],
   ["rescue, waiting on a teammate", rescue(["bo"]), ui(), playing, { text: "An objective failed: waiting for Bo", tone: "waiting" }],
   [
     "objective pick, your pick",
@@ -203,43 +203,43 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   ],
   [
     "ability, first step",
-    view(camp(), { yourAbilities: [SCOUT] }),
-    ui({ targeting: { mode: "ability", sourceKey: "scout", selected: [], valueCardId: null } }),
+    view(camp(), { yourAbilities: [GLANCE] }),
+    ui({ targeting: { mode: "ability", sourceKey: "explorer", selected: [], heldId: null } }),
     playing,
-    { text: "Spyglass: Pick a teammate's hand", tone: "your-move" },
+    { text: "Compass: Pick a teammate's hand", tone: "your-move" },
   ],
   [
     "ability with no steps, ready to confirm",
     view(camp(), { yourAbilities: [{ sourceKey: "bait", usableNow: true, reason: null, steps: [] }] }),
-    ui({ targeting: { mode: "ability", sourceKey: "bait", selected: [], valueCardId: null } }),
+    ui({ targeting: { mode: "ability", sourceKey: "bait", selected: [], heldId: null } }),
     playing,
     { text: "Use Bait? Confirm or Cancel", tone: "your-move" },
   ],
   [
     "Trained Monkey, second step",
     view(camp(), { yourAbilities: [MONKEY] }),
-    ui({ targeting: { mode: "ability", sourceKey: "trained-monkey", selected: ["card:h7"], valueCardId: null } }),
+    ui({ targeting: { mode: "ability", sourceKey: "trained-monkey", selected: ["card:h7"], heldId: null } }),
     playing,
     { text: "Trained Monkey: Pick a teammate", tone: "your-move" },
   ],
   [
     "Trained Monkey, ready to confirm",
     view(camp(), { yourAbilities: [MONKEY] }),
-    ui({ targeting: { mode: "ability", sourceKey: "trained-monkey", selected: ["card:h7", "seat:bo"], valueCardId: null } }),
+    ui({ targeting: { mode: "ability", sourceKey: "trained-monkey", selected: ["card:h7", "seat:bo"], heldId: null } }),
     playing,
     { text: "Use Trained Monkey on your 7♥ and Bo? Confirm or Cancel", tone: "your-move" },
   ],
   [
-    "Herb Tonic, a held card waits for its rank",
-    view(camp(), { yourAbilities: [TONIC] }),
-    ui({ targeting: { mode: "ability", sourceKey: "botanist", selected: [], valueCardId: "h7" } }),
+    "Compass, a held card waits for its rank",
+    view(camp(), { yourAbilities: [COMPASS] }),
+    ui({ targeting: { mode: "ability", sourceKey: "explorer", selected: [], heldId: "h7" } }),
     playing,
-    { text: "Herb Tonic: pick the rank 7♥ counts as", tone: "your-move" },
+    { text: "Compass: pick the rank 7♥ counts as", tone: "your-move" },
   ],
   [
     "a step prompt too long for the line drops the source name",
     view(camp(), { yourAbilities: [LONG_STEP] }),
-    ui({ targeting: { mode: "ability", sourceKey: "trained-monkey", selected: [], valueCardId: null } }),
+    ui({ targeting: { mode: "ability", sourceKey: "trained-monkey", selected: [], heldId: null } }),
     playing,
     { text: "Pick one of your cards to swap with a teammate now", tone: "your-move" },
   ],
@@ -390,7 +390,7 @@ describe("buildTrailPrompt", () => {
   });
   const at = (v: ExpeditionView, seats: PromptSeat[] = SEATS, reconnecting = false): Prompt => buildTrailPrompt(v, seats, { reconnecting });
   const withCharacter = (characterId: string | null): Partial<ExpeditionView> => ({
-    seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: s.seatId === "me" ? characterId : "scout", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] })),
+    seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: s.seatId === "me" ? characterId : "explorer", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] })),
   });
   const failedCamp3 = [{ camp: 3, attempt: 1, status: "failed" as const, coins: 0 }];
 
@@ -405,12 +405,12 @@ describe("buildTrailPrompt", () => {
   });
 
   it("at muster asks only for the vote once you have an explorer", () => {
-    const v = trail({ tag: "muster", ballots: [{ seatId: "ana", choice: "short" }] }, withCharacter("guide"));
+    const v = trail({ tag: "muster", ballots: [{ seatId: "ana", choice: "short" }] }, withCharacter("leader"));
     expect(at(v)).toEqual({ text: "Vote on how long the expedition runs", tone: "your-move" });
   });
 
   it("at muster names who is still choosing or voting once you are done", () => {
-    const v = trail({ tag: "muster", ballots: [{ seatId: "me", choice: "short" }, { seatId: "bo", choice: null }] }, withCharacter("guide"));
+    const v = trail({ tag: "muster", ballots: [{ seatId: "me", choice: "short" }, { seatId: "bo", choice: null }] }, withCharacter("leader"));
     expect(at(v)).toEqual({ text: "Waiting for Ana", tone: "waiting" });
   });
 
@@ -456,7 +456,7 @@ describe("buildTrailPrompt", () => {
 
   it("at the loadout tells you to set out by your character", () => {
     const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 2 }, mods: [], yourSlots: 2, shop: null, readySeatIds: [] }, { history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }] });
-    expect(at(v)).toEqual({ text: "The Scout, set out for camp 2 when ready", tone: "your-move" });
+    expect(at(v)).toEqual({ text: "The Explorer, set out for camp 2 when ready", tone: "your-move" });
   });
 
   it("at the loadout after a failure tells you to try the camp again", () => {
@@ -478,7 +478,7 @@ describe("buildTrailPrompt", () => {
       { seatId: "di", displayLabel: "Dionysia" },
     ];
     const base = trail({ tag: "loadout", camp: PREVIEW, mods: [], yourSlots: 2, shop: null, readySeatIds: ["me"] });
-    const five = { ...base, seats: long.map((s) => ({ seatId: s.seatId, characterId: "scout", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] })) };
+    const five = { ...base, seats: long.map((s) => ({ seatId: s.seatId, characterId: "explorer", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] })) };
     expect(at(five, long)).toEqual({ text: "Waiting for 4 teammates", tone: "waiting" });
   });
 

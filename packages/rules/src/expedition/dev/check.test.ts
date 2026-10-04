@@ -43,8 +43,8 @@ describe("checkRunState", () => {
 
   it("names a duplicate character", () => {
     const run = createRun({ seatIds: SEATS, seed: "check" });
-    const seats = run.seats.map((s) => ({ ...s, characterId: "scout" }));
-    expect(checkRunState({ ...run, seats }, CATALOG)).toEqual(["character scout is held by more than one seat"]);
+    const seats = run.seats.map((s) => ({ ...s, characterId: "explorer" }));
+    expect(checkRunState({ ...run, seats }, CATALOG)).toEqual(["character explorer is held by more than one seat"]);
   });
 
   it("passes items given through the shortcut, and flags each broken instance, equipped set and upgrade", () => {
@@ -52,7 +52,7 @@ describe("checkRunState", () => {
     expect(checkRunState(given, CATALOG)).toEqual([]);
     const seats = given.seats.map((s) =>
       s.seatId === "a"
-        ? { ...s, items: [...s.items, { uid: "it7", itemId: "nope" }, { uid: "x1", itemId: "bait" }], equipped: ["it0", "it0", "it9", "x1"], upgradeId: "guide.pathfinder" }
+        ? { ...s, items: [...s.items, { uid: "it7", itemId: "nope" }, { uid: "x1", itemId: "bait" }], equipped: ["it0", "it0", "it9", "x1"], upgradeId: "leader.momentum" }
         : s.seatId === "b"
           ? { ...s, items: [...s.items, { uid: "it0", itemId: "bait" }], offers: [{ kind: "standard" as const, bundles: [["bait", "ghost"]] }] }
           : s,
@@ -63,7 +63,7 @@ describe("checkRunState", () => {
       "a: item uid x1 is not it<n> below itemSerial 2",
       "a: it0 is equipped twice",
       "a: equipped it9 is not owned",
-      "a: upgrade guide.pathfinder is not one of its character's",
+      "a: upgrade leader.momentum is not one of its character's",
       "b: draft offer holds unknown item ghost",
       "item uid it0 is owned more than once",
     ]);

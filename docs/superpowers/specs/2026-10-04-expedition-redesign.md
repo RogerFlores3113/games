@@ -1850,3 +1850,47 @@ How each of the nine fits (for unit 13):
 | Pack Rat | Pack Animal | camp window, `item` targets, `swap-slots` |
 | Pack Rat | Sturdy Straps | `freeUse` passive over the attempt's ledger |
 | Every upgrade | +1 whisper | base `whispersPerCamp` (unit 4) |
+
+### Implementation notes (unit 13)
+
+- A base power that acts in more than one window or on different targets
+  is split into powers: `CharacterDef.powers` holds `PowerDef`s (kind
+  `power`, id `<character>.<name>`), each its own source key, live whenever
+  the seat is that character (`liveSourceKeys(seat, catalog)`). Characters
+  have two or three upgrades (`defineCharacter` takes either).
+- `UsageLimit` loses `pool` and gains `unlimited`, `whispers` (usable while
+  the seat has a whisper left; the ability's own layer takes it through
+  `whispersPerCamp`) and `shares { of, spends }` (counts against another of
+  the seat's sources; Reshape spends the Compass's use). `CoinCost` gains
+  `rules` and `catalog`. The ledger's `used` entry loses `poolCost` and
+  `regained` is deleted, so `ROOM_SCHEMA_VERSION` is 14. The view's
+  remaining gains `unlimited` and `whispers` and loses `pool`; seats lose
+  `pool`; `CHARACTER_DISPLAY` loses `pool` and gains `powerIds`.
+- J.D.: Beginner's Luck grants one item drawn like a one-item draft on
+  `run-started`; the hidden luck is a passive adding 5 to
+  `normalWeatherChance` (never projected). Blend In answers `affectsSeat`
+  false for a planned animal boss, a temple helper included. Free Spirit is
+  an attempt effect that evaluates every ordered objective as a win-card,
+  usable while picking, between tricks or in rescue, so it can save an
+  ordered objective already failed by order. Rule Breaker makes the whole
+  hand legal for its user this trick.
+- Leader: Megaphone is one extra whisper. Open Ears adds the Leader to the
+  audience of each teammate's first whisper of an attempt. Delegate (limit
+  `whispers`) moves one whisper per use to a teammate who can whisper.
+  Momentum is `foldsLast`: 2 plus one per trick won; the reading the doc
+  asks the owner to confirm, with the upgrade's own +1 counted among the
+  bonuses that no longer apply.
+- Explorer: the Compass works between tricks or on your turn. True Form is
+  recorded in the effect's params at the use, so an upgrade bought later
+  does not change a card recounted earlier. A recounted rank now wears a
+  badge on the hand card ("8♠"), and a counted-as badge or pip shows the
+  rank whenever it changed (the unit 2 note).
+- Tests: `setupRun` gives unnamed seats quiet characters first (Explorer,
+  Magician, Hermit, J.D.) so counts stay the base rules'. The sources
+  contract walks camps 1, 3 and 4 (Free Spirit needs an ordered objective)
+  and finds stage-window abilities too. Its whole-catalogue runs rotate the
+  characters and upgrades across the three seeds.
+- Web: an objective-value step holds an objective and offers its ranks in
+  the tray, as a card-value step does with a hand card (`RANK_STEPS` in
+  `local-ui.ts`). The muster card drops the power's icon when a long name
+  (Beginner's Luck) would not fit beside it.

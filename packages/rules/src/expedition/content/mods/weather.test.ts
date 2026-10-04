@@ -203,7 +203,7 @@ describe("Heavy fog", () => {
     const run = loadoutIn("fog", items);
     const seatOf = (viewer: string, seatId: string) => toExpeditionPlayerView(run, viewer, CATALOG).seats.find((s) => s.seatId === seatId)!;
     expect(seatOf("p1", "p0").items).toEqual({ equipped: [], backpack: null, concealed: true });
-    expect(seatOf("p1", "p0").usage.map((u) => u.sourceKey)).toEqual(["scout"]);
+    expect(seatOf("p1", "p0").usage.map((u) => u.sourceKey)).toEqual(["explorer"]);
     expect(seatOf("p0", "p0").items).toMatchObject({ equipped: [{ itemId: "smoke-signal" }, { itemId: "bait" }], backpack: [], concealed: false });
   });
 
@@ -214,6 +214,6 @@ describe("Heavy fog", () => {
     if (!used.ok) throw new Error(used.error);
     const seen = toExpeditionPlayerView(used.state, "p2", CATALOG).seats[0]!;
     expect(seen.items).toEqual({ equipped: [{ uid, itemId: "smoke-signal", remaining: { kind: "uses", left: 1, of: 2 } }], backpack: null, concealed: true });
-    expect(seen.usage.map((u) => u.sourceKey)).toEqual(["scout", uid]);
+    expect(seen.usage.map((u) => u.sourceKey)).toEqual(["explorer", uid]);
   });
 });

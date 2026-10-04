@@ -105,7 +105,7 @@ function sourceReactions(run: RunState, event: SourceEvent, key: string, catalog
   let current = run;
   for (const seatId of run.seatIds) {
     const seat = run.seats.find((s) => s.seatId === seatId)!;
-    for (const sourceKey of liveSourceKeys(seat)) {
+    for (const sourceKey of liveSourceKeys(seat, catalog)) {
       const def = defOfKey(seat, sourceKey, catalog);
       const handler = (def.kind === "item" ? undefined : def.on?.[event.type]) as ((ctx: SourceReactionCtx) => readonly ToolkitOp[]) | undefined;
       if (handler === undefined) continue;

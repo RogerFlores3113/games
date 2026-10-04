@@ -300,7 +300,7 @@ function drawYou(ctx: Ctx, layer: Layer, seat: SeatModel): void {
 
 const KIT_ROW_H = 18;
 /** Items on bark; a camp's gift to the crew (the temple's skip) on moss. */
-const KIT_ROW_FACE: Readonly<Record<SourceChip["kind"], string>> = { character: PALETTE.stump, upgrade: PALETTE.stump, item: PALETTE.bark, grant: PALETTE.moss };
+const KIT_ROW_FACE: Readonly<Record<SourceChip["kind"], string>> = { character: PALETTE.stump, power: PALETTE.stump, upgrade: PALETTE.stump, item: PALETTE.bark, grant: PALETTE.moss };
 const KIT_ROW_GAP = 1;
 
 function kitRow(ctx: Ctx, layer: Layer, chip: SourceChip, x: number, y: number, w: number): void {

@@ -89,8 +89,8 @@ test.describe("Expedition characters and abilities", () => {
       const panel = (await getModel<TrailView>(pages[0]!)).panel!;
       const own = (panel.kind === "muster" ? panel.characters : []).find((c: MusterCard) => c.characterId === "medic")!;
       expect(own).toMatchObject({ yours: true, takenBy: "You", pickable: false });
-      await musterPick(pages[1]!, "scout");
-      await musterPick(pages[2]!, "botanist");
+      await musterPick(pages[1]!, "explorer");
+      await musterPick(pages[2]!, "jd");
       await readyAll(pages);
       expect(await getScene(pages[0]!)).toBe("camp");
     } finally {
@@ -102,7 +102,7 @@ test.describe("Expedition characters and abilities", () => {
     test.setTimeout(240_000);
     const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
     try {
-      for (const [i, id] of ["guide", "scout", "botanist"].entries()) await musterPick(pages[i]!, id);
+      for (const [i, id] of ["leader", "explorer", "jd"].entries()) await musterPick(pages[i]!, id);
       await readyAll(pages);
       const rw = await rewriteViews(page);
 
@@ -154,10 +154,11 @@ test.describe("Expedition characters and abilities", () => {
       rw.current = PICKER_SCENARIOS.hand!.rewrite;
       await page.reload();
       await waitForScene(page, "camp");
-      await clickUntilChanged<CampModel>(page, "source:scout", (m) => m.targeting !== null);
+      const handKey = scenarioKey(PICKER_SCENARIOS.hand!.sourceId);
+      await clickUntilChanged<CampModel>(page, `source:${handKey}`, (m) => m.targeting !== null);
       await page.keyboard.press("Escape");
       await expect.poll(async () => (await getModel<CampModel>(page)).targeting, { message: "Esc cancels" }).toBeNull();
-      await clickUntilChanged<CampModel>(page, "source:scout", (m) => m.targeting !== null);
+      await clickUntilChanged<CampModel>(page, `source:${handKey}`, (m) => m.targeting !== null);
       const stumpPoint = (await page.evaluate(() => window.__expeditionTest?.pagePoint({ x: 320, y: 120 }) ?? null))!;
       await page.mouse.click(stumpPoint.x, stumpPoint.y, { button: "right" });
       await expect.poll(async () => (await getModel<CampModel>(page)).targeting, { message: "right-click cancels" }).toBeNull();
@@ -208,10 +209,6 @@ test.describe("Expedition characters and abilities", () => {
         await click(rank.objectId);
         return [rank.choiceId];
       });
-      await use("board", async () => {
-        await click("board");
-        return ["board"];
-      });
       await use("supplies", async () => {
         await click("supplies");
         return ["supplies"];
@@ -225,7 +222,7 @@ test.describe("Expedition characters and abilities", () => {
     test.setTimeout(300_000);
     const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
     try {
-      for (const [i, id] of ["medic", "scout", "guide"].entries()) await musterPick(pages[i]!, id);
+      for (const [i, id] of ["medic", "explorer", "leader"].entries()) await musterPick(pages[i]!, id);
       await readyAll(pages);
 
       expect(await playUntilRescue(page, pages), "an objective failed and the Medic was asked to rescue it").toBe(true);
@@ -256,7 +253,7 @@ test.describe("Expedition characters and abilities", () => {
     test.setTimeout(300_000);
     const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
     try {
-      for (const [i, id] of ["medic", "scout", "guide"].entries()) await musterPick(pages[i]!, id);
+      for (const [i, id] of ["medic", "explorer", "leader"].entries()) await musterPick(pages[i]!, id);
       await readyAll(pages);
       expect(await playUntilRescue(page, pages), "an objective failed and the Medic was asked to rescue it").toBe(true);
       const bianca = pages[1]!;

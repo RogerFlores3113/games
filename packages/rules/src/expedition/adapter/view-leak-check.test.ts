@@ -199,7 +199,7 @@ describe("view-leak-check: canary suite", () => {
     const secrets = secretsForExpeditionSeat(state, "p0", CATALOG, SEED);
 
     const leaky = structuredClone(view);
-    (leaky.seats[1] as unknown as Record<string, unknown>).ledger = [{ kind: "used", sourceKey: "scout" }];
+    (leaky.seats[1] as unknown as Record<string, unknown>).ledger = [{ kind: "used", sourceKey: "explorer" }];
 
     const reasons = checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets });
     expect(reasons).toContain("structural:forbidden-key:ledger");

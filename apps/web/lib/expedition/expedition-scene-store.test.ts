@@ -5,7 +5,7 @@ import { beginAbilityTargeting, selectTarget, setTooltipSource } from "./local-u
 import { createExpeditionSceneStore, type ExpeditionSceneStore } from "./expedition-scene-store";
 
 const SCOUT: ExpeditionAbilityView = {
-  sourceKey: "scout",
+  sourceKey: "explorer",
   usableNow: true,
   reason: null,
   steps: [{ kind: "hand", prompt: "Pick a teammate's hand", choices: ["hand:s1", "hand:s3"] }],
@@ -55,9 +55,9 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     supplies: { count: 5, max: 5 },
     plan: [],
     seats: [
-      { seatId: "s1", characterId: "guide", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
-      { seatId: "s2", characterId: "scout", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
-      { seatId: "s3", characterId: "medic", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
+      { seatId: "s1", characterId: "leader", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
+      { seatId: "s2", characterId: "explorer", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
+      { seatId: "s3", characterId: "jd", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
     ],
     yourAbilities: [SCOUT],
     history: [],
@@ -184,7 +184,7 @@ describe("createExpeditionSceneStore", () => {
     const store = createExpeditionSceneStore({ onAction, cardPackId: "big-index" });
     store.getState().setServer(server(makeView()));
 
-    store.getState().updateLocalUi((ui, v) => beginAbilityTargeting(ui, v, "scout"));
+    store.getState().updateLocalUi((ui, v) => beginAbilityTargeting(ui, v, "explorer"));
     store.getState().confirmTargeting();
     expect(onAction).not.toHaveBeenCalled();
 
@@ -192,7 +192,7 @@ describe("createExpeditionSceneStore", () => {
     store.getState().confirmTargeting();
 
     expect(onAction).toHaveBeenCalledTimes(1);
-    expect(onAction).toHaveBeenCalledWith({ type: "use-ability", sourceKey: "scout", targets: ["hand:s1"] });
+    expect(onAction).toHaveBeenCalledWith({ type: "use-ability", sourceKey: "explorer", targets: ["hand:s1"] });
     expect(store.getState().localUi.targeting).toBeNull();
   });
 
@@ -219,10 +219,10 @@ describe("createExpeditionSceneStore", () => {
     const store = createExpeditionSceneStore({ onAction, cardPackId: "big-index" });
     const view = makeView();
     store.getState().setServer(server(view));
-    store.getState().updateLocalUi((ui, v) => beginAbilityTargeting(ui, v, "scout"));
+    store.getState().updateLocalUi((ui, v) => beginAbilityTargeting(ui, v, "explorer"));
     expect(store.getState().localUi.targeting).not.toBeNull();
 
-    const nextView = makeView({ yourAbilities: [{ sourceKey: "scout", usableNow: false, reason: "Already used this camp", steps: [] }] });
+    const nextView = makeView({ yourAbilities: [{ sourceKey: "explorer", usableNow: false, reason: "Already used this camp", steps: [] }] });
     store.getState().setServer(server(nextView));
     expect(store.getState().localUi.targeting).toBeNull();
   });

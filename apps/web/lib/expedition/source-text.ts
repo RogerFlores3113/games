@@ -6,7 +6,7 @@ import { CHARACTER_DISPLAY, SOURCE_DISPLAY, type ExpeditionRemainingView, type E
  * badges from the def, never repeated in the sentence.
  */
 
-export type SourceKind = "character" | "upgrade" | "item" | "grant";
+export type SourceKind = "character" | "power" | "upgrade" | "item" | "grant";
 
 /** The def id behind a source key: an item instance's item, else the key
  * itself (a character or an upgrade id). */
@@ -20,13 +20,14 @@ export function yourSourceId(view: ExpeditionView, key: string): string {
   return sourceIdOfKey(view.seats.find((s) => s.seatId === view.yourSeatId), key);
 }
 
-/** The keys a seat acts through: its character, its upgrade, then its
- * equipped item instances. */
+/** The keys a seat acts through: its character and the character's further
+ * powers, its upgrade, then its equipped item instances. */
 export function liveSourceKeys(seat: ExpeditionSeatView): string[] {
-  return [...(seat.characterId === null ? [] : [seat.characterId]), ...(seat.upgradeId === null ? [] : [seat.upgradeId]), ...seat.items.equipped.map((item) => item.uid)];
+  const powers = seat.characterId === null ? [] : (CHARACTER_DISPLAY[seat.characterId]?.powerIds ?? []);
+  return [...(seat.characterId === null ? [] : [seat.characterId]), ...powers, ...(seat.upgradeId === null ? [] : [seat.upgradeId]), ...seat.items.equipped.map((item) => item.uid)];
 }
 
-/** A source as it acts: a character is its base power ("Spyglass"), an
+/** A source as it acts: a character is its base power ("Compass"), an
  * upgrade or item its own name. */
 export function sourceName(sourceId: string): string {
   return CHARACTER_DISPLAY[sourceId]?.power ?? SOURCE_DISPLAY[sourceId]?.name ?? sourceId;
@@ -59,13 +60,6 @@ export function sourceRulesText(sourceId: string): SourceRules | null {
   const display = SOURCE_DISPLAY[sourceId];
   if (display === undefined) return null;
   return { title: sourceName(sourceId), text: display.text, badges: sourceBadges(sourceId) };
-}
-
-function poolUnit(sourceId: string): string {
-  const display = SOURCE_DISPLAY[sourceId];
-  const characterId = display?.characterId ?? null;
-  const pool = characterId === null ? null : CHARACTER_DISPLAY[characterId]?.pool;
-  return (pool?.name ?? "uses").toLowerCase();
 }
 
 /** What is left of a source, the one wording every screen uses: `full`
@@ -101,8 +95,6 @@ export function usesLabel(sourceId: string, remaining: ExpeditionRemainingView |
         default:
           return both(remaining.left === 0 ? "Used" : `${remaining.left} left`);
       }
-    case "pool":
-      return both(`${remaining.balance}/${remaining.max} ${poolUnit(sourceId)}`);
     case "supplies": {
       const supplies = `${remaining.cost} ${remaining.cost === 1 ? "supply" : "supplies"}`;
       return both(`Costs ${supplies}`, supplies);
@@ -113,6 +105,10 @@ export function usesLabel(sourceId: string, remaining: ExpeditionRemainingView |
       const coins = `${remaining.cost} ${remaining.cost === 1 ? "coin" : "coins"}`;
       return both(remaining.cost === 0 ? "Free" : `Costs ${coins}`, coins);
     }
+    case "unlimited":
+      return both("No limit");
+    case "whispers":
+      return both(remaining.left === 0 ? "No whispers left" : `${remaining.left} ${remaining.left === 1 ? "whisper" : "whispers"} left`, remaining.left === 0 ? "Used" : `${remaining.left} left`);
   }
 }
 
@@ -120,7 +116,7 @@ export function usesLabel(sourceId: string, remaining: ExpeditionRemainingView |
 export function isSpent(remaining: ExpeditionRemainingView | null): boolean {
   if (remaining === null) return false;
   if (remaining.kind === "uses") return remaining.left === 0;
-  if (remaining.kind === "pool") return remaining.balance < remaining.cost;
+  if (remaining.kind === "whispers") return remaining.left === 0;
   if (remaining.kind === "crew") return remaining.left === 0;
   return false;
 }

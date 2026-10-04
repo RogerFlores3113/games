@@ -106,8 +106,9 @@ export interface CardModel {
   blockedReason: string | null;
   /** Being dragged: the fan keeps an empty slot for it. */
   dragging: boolean;
-  /** What the card counts as right now, when not its printed card (a Blood
-   * Moon trick): the suit it follows. */
+  /** What the card counts as right now, when not its printed card: the
+   * suit it follows on a Blood Moon trick, the card True Form made it, or
+   * the rank the Compass or a Whetstone gave it. */
   countsAs: ExpeditionCardIdentityView | null;
 }
 
@@ -287,7 +288,7 @@ export interface SceneModel {
   whisper: { shown: boolean; visible: boolean; used: boolean; active: boolean; state: WhisperState; reason: string | null; left: number };
   /** Cards teammates named to you, kept face up for the attempt. */
   receivedWhispers: ReceivedWhisper[];
-  /** Cards an ability showed you: "Spyglass: Bob holds 7♥". */
+  /** Cards an ability showed you, and who held each. */
   shownCards: ShownCard[];
   /** Cards you named to teammates: your confirmation. */
   sentWhispers: SentWhisper[];
@@ -429,17 +430,26 @@ function objectivesForOwner(camp: ExpeditionCampView | null, ownerSeatId: string
   return camp.objectives.filter((o) => o.ownerSeatId === ownerSeatId).map((o) => buildObjectiveChip(o, camp, view, ui));
 }
 
+/** What a card counts as, for its badge: the identity it counts as, else
+ * its printed card at the rank it now has, else null. */
+function shownAs(identity: ExpeditionCardIdentityView, countsAs: ExpeditionCardIdentityView | null, effectiveRank: number | null): ExpeditionCardIdentityView | null {
+  if (countsAs !== null) return countsAs;
+  if (effectiveRank === null || identity.kind !== "standard") return null;
+  return { ...identity, rank: effectiveRank as typeof identity.rank };
+}
+
 function buildTrickPlayModel(
-  play: { seatId: string; card: { id: string; identity: ExpeditionCardIdentityView }; burned?: boolean; countsAs?: ExpeditionCardIdentityView | null },
+  play: { seatId: string; card: { id: string; identity: ExpeditionCardIdentityView }; burned?: boolean; countsAs?: ExpeditionCardIdentityView | null; effectiveRank?: number | null },
   isLed: boolean,
   pick: PickState = { targetable: false, selected: false },
 ): ShownPlayModel {
+  const countsAs = shownAs(play.card.identity, play.countsAs ?? null, play.effectiveRank ?? null);
   return {
     seatId: play.seatId,
     hidden: false,
     isLed,
     burned: play.burned ?? false,
-    countsAs: play.countsAs ?? null,
+    countsAs,
     card: {
       id: play.card.id,
       identity: play.card.identity,
@@ -452,7 +462,7 @@ function buildTrickPlayModel(
       lifted: false,
       blockedReason: null,
       dragging: false,
-      countsAs: play.countsAs ?? null,
+      countsAs,
     },
   };
 }
@@ -558,7 +568,7 @@ function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: Lo
       lifted: ui.hoveredCardId === c.id && dragged === null,
       blockedReason: playable ? null : blockedReasonFor(camp, view, c.identity),
       dragging: (ui.drag.phase === "dragging" || ui.drag.phase === "playing") && dragged === c.id,
-      countsAs: c.countsAs,
+      countsAs: shownAs(c.identity, c.countsAs, c.effectiveRank),
     };
   });
 }
@@ -765,13 +775,18 @@ function buildTray(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiS
       }),
     };
   }
-  if (step.kind === "card-value") {
+  if (step.kind === "card-value" || step.kind === "objective-value") {
     const choices = valueChoices(ui, view);
     if (choices.length === 0) return null;
-    const cardId = ui.targeting?.mode === "ability" ? ui.targeting.valueCardId : null;
-    const held = attemptOf(view)?.camp.yourHand.find((c) => c.id === cardId);
-    const title = held === undefined ? "Count it as" : `Count ${cardLabel(held.identity)} as`;
-    return { title, options: choices.map((id) => option(id, rankLabel(Number(id.split(":")[2])))) };
+    const heldId = ui.targeting?.mode === "ability" ? ui.targeting.heldId : null;
+    const options = choices.map((id) => option(id, rankLabel(Number(id.split(":")[2]))));
+    if (step.kind === "objective-value") {
+      const objective = attemptOf(view)?.camp.objectives.find((o) => o.id === heldId);
+      const target = objective !== undefined && "target" in objective ? objective.target : null;
+      return { title: target === null ? "Shift it to" : `Shift ${cardLabel(target)} to`, options };
+    }
+    const held = attemptOf(view)?.camp.yourHand.find((c) => c.id === heldId);
+    return { title: held === undefined ? "Count it as" : `Count ${cardLabel(held.identity)} as`, options };
   }
   return null;
 }

@@ -27,6 +27,10 @@ const LABELS: Readonly<Record<string, string>> = {
   "move-card": "Move a card to another hand",
   "set-objective-owner": "Set an objective's owner",
   "set-spec": "Set the camp's location and weather",
+  "set-character": "Set a seat's character",
+  "set-upgrade": "Set a seat's upgrade",
+  "set-purse": "Set the purse",
+  "queue-offer": "Queue a special draft offer",
 };
 
 /** Runs a dev shortcut and waits for its own answer and for the panel to

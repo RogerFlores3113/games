@@ -1,5 +1,5 @@
-// The production CATALOG: the six characters (with their upgrades), the
-// thirteen items and the camp modifiers. buildCatalog flattens every source
+// The production CATALOG: the characters (with their powers and upgrades),
+// the items and the camp modifiers. buildCatalog flattens every source
 // into one index; tests build their own catalogues through it.
 
 import { CHARACTERS } from "../content/characters/registry";
@@ -23,6 +23,7 @@ export function buildCatalog(parts: {
   };
   for (const character of Object.values(parts.characters)) {
     add(character);
+    for (const power of character.powers) add(power);
     for (const upgrade of character.upgrades) add(upgrade);
   }
   for (const item of Object.values(parts.items)) add(item);

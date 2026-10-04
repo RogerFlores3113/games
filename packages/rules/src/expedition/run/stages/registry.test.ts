@@ -257,7 +257,7 @@ describe("applyRunAction: skip-window and use-ability", () => {
   it("using a between-tricks item records a use keyed by its uid, stamped with the trick", () => {
     const state = ok(applyRunAction(betweenRun(), "p0", { type: "use-ability", sourceKey: "it0", targets: [] }, catalog));
     expect(state.stage.tag).toBe("camp");
-    expect(state.seats[0]!.ledger).toEqual([{ kind: "used", sourceKey: "it0", at: { camp: 1, attempt: 1, trick: 0 }, poolCost: 0 }]);
+    expect(state.seats[0]!.ledger).toEqual([{ kind: "used", sourceKey: "it0", at: { camp: 1, attempt: 1, trick: 0 } }]);
   });
 
   it("refuses the item's def id as a key: abilities are used through the instance", () => {

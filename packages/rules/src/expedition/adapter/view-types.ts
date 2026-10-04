@@ -15,7 +15,7 @@
 //   - every objective, public: `camp.objectives`
 //   - audience-filtered reveals and log: `attempt.reveals`, `attempt.log`
 //     (never carries an `audience` key — see (c))
-//   - public characters, upgrades, items, pools and usage: `seats[]`
+//   - public characters, upgrades, items and usage: `seats[]`
 //   - own head draft offer only: the draft stage's `yourOffer` (never any other seat's)
 //   - own abilities with server-computed target choices: `yourAbilities`
 //   - removed cards: `camp.removedCards`
@@ -210,18 +210,20 @@ export type ExpeditionAttemptView = {
 
 export type ExpeditionRemainingView =
   | { kind: "uses"; left: number; of: number }
-  | { kind: "pool"; balance: number; max: number; cost: number }
   | { kind: "supplies"; cost: number }
   /** A crew token (the temple's skip): `left` of `earned` this attempt. */
   | { kind: "crew"; left: number; earned: number }
   /** Coins from the purse: the least a use costs, before its targets. */
-  | { kind: "coins"; cost: number };
+  | { kind: "coins"; cost: number }
+  | { kind: "unlimited" }
+  /** The seat's whispers left this camp, which a use takes from. */
+  | { kind: "whispers"; left: number };
 
 /** One owned item instance. `remaining` is null for a passive item. */
 export type ExpeditionItemView = { uid: string; itemId: string; remaining: ExpeditionRemainingView | null };
 
 // Deliberately no `offers`/`ledger` keys for any seat: a seat's character,
-// upgrade, items, pool and per-source usage are public; the viewer's own
+// upgrade, items and per-source usage are public; the viewer's own
 // draft offer is the draft stage's `yourOffer`.
 export type ExpeditionSeatView = {
   seatId: string;
@@ -230,7 +232,6 @@ export type ExpeditionSeatView = {
   /** `concealed` under Heavy fog for every other seat: `equipped` lists
    * only the items used this attempt and `backpack` is null. */
   items: { equipped: ExpeditionItemView[]; backpack: ExpeditionItemView[] | null; concealed: boolean };
-  pool: { balance: number; max: number } | null;
   /** Every live source key with an active ability, and every ability a
    * camp modifier grants the crew (the temple's skip, under "temple"). */
   usage: { sourceKey: string; remaining: ExpeditionRemainingView }[];

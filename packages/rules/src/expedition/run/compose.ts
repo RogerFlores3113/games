@@ -97,7 +97,7 @@ function effectLayer(run: RunState, effect: ActiveEffect, catalog: Catalog): Rul
 function passiveLayers(run: RunState, catalog: Catalog, last: boolean): RuleModifier[] {
   return run.seats.flatMap((seat) => {
     const owner = ownerOf(seat);
-    return liveSourceKeys(seat).flatMap((key) => {
+    return liveSourceKeys(seat, catalog).flatMap((key) => {
       const passive = defOfKey(seat, key, catalog).passive;
       return passive === undefined || (passive.foldsLast === true) !== last ? [] : [passive.modifier(owner)];
     });

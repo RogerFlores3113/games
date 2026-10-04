@@ -121,7 +121,7 @@ describe("property: whole-run per-seat leak checker (COMM-03/ENG-03)", () => {
           catalog: CATALOG,
           length,
           camp: startCamp,
-          characters: { [seatIds[0]!]: "scout" },
+          characters: { [seatIds[0]!]: "explorer" },
           items,
         });
 

@@ -24,7 +24,7 @@ import {
   type Point,
 } from "../layout";
 import { cardBackTextureKey, cardTextureKey } from "../card-packs/card-pack-def";
-import { BOARD_ID, LAST_TRICK_ID, SUIT_GLYPH } from "../../../../lib/expedition/expedition-ids";
+import { BOARD_ID, LAST_TRICK_ID, SUIT_GLYPH, rankLabel } from "../../../../lib/expedition/expedition-ids";
 import type { ExpeditionCardIdentityView } from "@games/rules";
 import type { ObjectIndex } from "../object-index";
 import type { BurnStyle, CardModel, FaceDownPlayModel, SceneModel } from "../../../../lib/expedition/build-scene-model";
@@ -98,7 +98,7 @@ function drawHandCard(
   const image = scene.add.image(x, y, cardTextureKey(model.cardPackId, card.label, "full")).setOrigin(0, 0);
   image.setAlpha(card.dimmed ? DIM_ALPHA : 1);
   layer.add(image);
-  if (card.countsAs !== null) layer.add(countsAsBadge(scene, x + Math.floor((CARD_W - BADGE) / 2), y + BADGE_Y, card.countsAs).map((o) => o.setAlpha(card.dimmed ? DIM_ALPHA : 1)));
+  if (card.countsAs !== null) layer.add(countsAsBadge(scene, x, y + BADGE_Y, card.identity, card.countsAs).map((o) => o.setAlpha(card.dimmed ? DIM_ALPHA : 1)));
 
   if (card.targetable) {
     layer.add(scene.add.rectangle(x, y - HAND_MARKER_H - 1, strip - 2, HAND_MARKER_H, toPhaserColor(PALETTE.turn)).setOrigin(0, 0));
@@ -148,7 +148,7 @@ export function drawTrick(
     const container = scene.add.container(at.x, at.y);
     if (play.hidden) container.add(faceDownCard(scene, model, play.suit));
     else container.add(scene.add.image(0, 0, cardTextureKey(model.cardPackId, play.card.label, "full")).setOrigin(0, 0));
-    if (!play.hidden && play.countsAs !== null) container.add(countsAsBadge(scene, Math.floor((CARD_W - BADGE) / 2), BADGE_Y, play.countsAs));
+    if (!play.hidden && play.countsAs !== null) container.add(countsAsBadge(scene, 0, BADGE_Y, play.card.identity, play.countsAs));
     if (play.isLed) {
       container.add(scene.add.rectangle(0, 0, CARD_W, CARD_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.sun)));
       container.add(platedText(scene, Math.floor((CARD_W - labelWidth("Led")) / 2), CARD_H - LABEL_CELL.h - 1, "Led", PALETTE.sun));
@@ -185,14 +185,25 @@ const BADGE = 13;
 /** Over the card's centre pip, clear of its corner index and the Led tag. */
 const BADGE_Y = 16;
 
-/** A card that follows another suit right now (a Blood Moon trick): its
- * centre pip covered by the suit it counts as, ringed in red. */
-function countsAsBadge(scene: Phaser.Scene, x: number, y: number, countsAs: ExpeditionCardIdentityView): (Phaser.GameObjects.Rectangle | Phaser.GameObjects.BitmapText)[] {
-  const glyph = countsAs.kind === "joker" ? (countsAs.joker === "sun" ? "S" : "M") : SUIT_GLYPH[countsAs.suit];
+/** What a card counts as, in a pip: the suit, with the rank too when the
+ * rank changed (True Form), or the joker's initial. */
+function countsAsText(printed: ExpeditionCardIdentityView, countsAs: ExpeditionCardIdentityView): string {
+  if (countsAs.kind === "joker") return countsAs.joker === "sun" ? "S" : "M";
+  const sameRank = printed.kind === "standard" && printed.rank === countsAs.rank;
+  return sameRank ? SUIT_GLYPH[countsAs.suit] : `${rankLabel(countsAs.rank)}${SUIT_GLYPH[countsAs.suit]}`;
+}
+
+/** A card that counts as another right now (a Blood Moon trick, True Form):
+ * its centre pip covered by what it counts as, ringed in red, centred on a
+ * card whose left edge is `cardX`. */
+function countsAsBadge(scene: Phaser.Scene, cardX: number, y: number, printed: ExpeditionCardIdentityView, countsAs: ExpeditionCardIdentityView): (Phaser.GameObjects.Rectangle | Phaser.GameObjects.BitmapText)[] {
+  const label = countsAsText(printed, countsAs);
   const color = countsAs.kind === "joker" ? PALETTE.sun : PALETTE.suitBigIndex[countsAs.suit];
+  const w = Math.max(BADGE, labelWidth(label) + 4);
+  const x = cardX + Math.floor((CARD_W - w) / 2);
   return [
-    scene.add.rectangle(x, y, BADGE, BADGE, toPhaserColor(PALETTE.cardFace)).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.destructive)),
-    text(scene, x + Math.floor((BADGE - LABEL_CELL.w) / 2) + 1, y + Math.floor((BADGE - LABEL_CELL.h) / 2) + 1, glyph, color),
+    scene.add.rectangle(x, y, w, BADGE, toPhaserColor(PALETTE.cardFace)).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.destructive)),
+    text(scene, x + Math.floor((w - labelWidth(label)) / 2) + 1, y + Math.floor((BADGE - LABEL_CELL.h) / 2) + 1, label, color),
   ];
 }
 
@@ -210,7 +221,7 @@ function faceDownCard(scene: Phaser.Scene, model: SceneModel, suit: FaceDownPlay
   ];
 }
 
-/** The whole trick as one target (Howler Call): the stump outlined, with a
+/** The whole trick as one target (a board pick): the stump outlined, with a
  * label, clickable anywhere. */
 export function drawBoardPick(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   const pick = model.boardPick;
@@ -231,14 +242,14 @@ export function drawBoardPick(scene: Phaser.Scene, layer: Layer, model: SceneMod
   index.register("camp", BOARD_ID, container);
 }
 
-/** A completed play that counted as another card wears that card's suit
- * (or joker initial) in a pip under it, inside its own fan column. */
-function countsAsPip(scene: Phaser.Scene, x: number, y: number, countsAs: ExpeditionCardIdentityView): Phaser.GameObjects.GameObject[] {
-  const glyph = countsAs.kind === "joker" ? (countsAs.joker === "sun" ? "S" : "M") : SUIT_GLYPH[countsAs.suit];
+/** A completed play that counted as another card wears what it counted as
+ * in a pip under it, inside its own fan column. */
+function countsAsPip(scene: Phaser.Scene, x: number, y: number, printed: ExpeditionCardIdentityView, countsAs: ExpeditionCardIdentityView): Phaser.GameObjects.GameObject[] {
+  const label = countsAsText(printed, countsAs);
   const color = countsAs.kind === "joker" ? PALETTE.sun : PALETTE.suitBigIndex[countsAs.suit];
-  const w = LABEL_CELL.w + 2;
+  const w = labelWidth(label) + 2;
   const px = x + Math.floor((MINI_W - w) / 2);
-  return [plate(scene, px, y, w, LABEL_CELL.h + 1), text(scene, px + 1, y, glyph, color)];
+  return [plate(scene, px, y, w, LABEL_CELL.h + 1), text(scene, px + 1, y, label, color)];
 }
 
 /** Below the mini card's rank, so the card still reads. */
@@ -272,7 +283,7 @@ export function drawLastTrick(scene: Phaser.Scene, layer: Layer, model: SceneMod
     const x = left + FAN_STEP * i;
     panel.add(miniCard(scene, x, fanY, play.card.label, model.cardPackId).setAlpha(play.burned ? DIM_ALPHA : 1));
     if (play.burned) panel.add(burnMark(scene, x, fanY, last.burn));
-    if (play.countsAs !== null) panel.add(countsAsPip(scene, x, fanY + MINI_H + 4, play.countsAs));
+    if (play.countsAs !== null) panel.add(countsAsPip(scene, x, fanY + MINI_H + 4, play.card.identity, play.countsAs));
     if (play.seatId === last.winnerSeatId) {
       panel.add(scene.add.rectangle(x, fanY, MINI_W, MINI_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
     }

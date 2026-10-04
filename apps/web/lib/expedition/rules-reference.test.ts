@@ -8,10 +8,9 @@ function viewWith(over: { characterId?: string | null; kit?: string[] }) {
     seats: [
       {
         seatId: "s1",
-        characterId: over.characterId === undefined ? "scout" : over.characterId,
+        characterId: over.characterId === undefined ? "explorer" : over.characterId,
         upgradeId: null,
         items: { equipped: (over.kit ?? []).map((itemId, i) => ({ uid: `it${i}`, itemId, remaining: null })), backpack: [], concealed: false },
-        pool: null,
         usage: [],
       },
     ],
@@ -84,18 +83,18 @@ describe("buildRulesReference", () => {
   });
 
   it("lists your character, then your kit, with window, limit and text", () => {
-    const scout = SOURCE_DISPLAY.scout!;
+    const explorer = SOURCE_DISPLAY.explorer!;
     const bait = SOURCE_DISPLAY.bait!;
-    const kit = byId(buildRulesReference(viewWith({ characterId: "scout", kit: ["bait"] })), "kit");
-    expect(kit.items.map((i) => i.label)).toEqual(["Spyglass (The Scout)", bait.name]);
-    expect(kit.items[0]!.body).toBe("Between tricks, Once per camp. See a random card in a teammate's hand.");
+    const kit = byId(buildRulesReference(viewWith({ characterId: "explorer", kit: ["bait"] })), "kit");
+    expect(kit.items.map((i) => i.label)).toEqual(["Compass (The Explorer)", bait.name]);
+    expect(kit.items[0]!.body).toBe("Between tricks or on your turn, Once per camp. A card in your hand counts one rank higher or lower.");
     expect(kit.items[1]!.body).toContain(bait.text);
     expect(kit.paragraphs).not.toContain("You have not picked a character yet.");
   });
 
   it("marks a passive-only source as always on", () => {
-    const kit = byId(buildRulesReference(viewWith({ characterId: "signaller" })), "kit");
-    expect(kit.items[0]!.body).toBe("Always on. You may whisper twice each camp.");
+    const kit = byId(buildRulesReference(viewWith({ characterId: "leader" })), "kit");
+    expect(kit.items[0]!.body).toBe("Always on. Whisper twice each camp.");
   });
 
   it("skips kit ids missing from the catalogue and says so when nothing is left", () => {

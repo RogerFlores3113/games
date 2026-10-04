@@ -79,6 +79,11 @@ export function describeChoice(view: ExpeditionView, choiceId: string, nameOf: (
       const [cardId, rank] = [rest[0] ?? "", Number(rest[1])];
       return `${cardPhrase(view, cardId).replace(/^your /, "")} as ${rankLabel(rank)}`;
     }
+    case "objective-value": {
+      const objective = attemptOf(view)?.camp.objectives.find((o) => o.id === rest[0]);
+      const card = objective !== undefined && "target" in objective ? cardLabel(objective.target) : "an objective's card";
+      return `${card} shifted to ${rankLabel(Number(rest[1]))}`;
+    }
     case "board":
       return "this trick";
     case "supplies":
@@ -113,8 +118,10 @@ function targetingPrompt(view: ExpeditionView, ui: LocalUiState, nameOf: (seatId
 
   const name = sourceName(yourSourceId(view, targeting.sourceKey));
   if (step !== null) {
-    const held = targeting.valueCardId === null ? null : identityOf(view, targeting.valueCardId);
+    const held = targeting.heldId === null ? null : identityOf(view, targeting.heldId);
     if (held !== null) return { text: `${name}: pick the rank ${cardLabel(held)} counts as`, tone: "your-move" };
+    const objective = targeting.heldId === null ? undefined : attemptOf(view)?.camp.objectives.find((o) => o.id === targeting.heldId);
+    if (objective !== undefined && "target" in objective) return { text: `${name}: pick the rank to shift ${cardLabel(objective.target)} to`, tone: "your-move" };
     const full = `${name}: ${step.prompt}`;
     return { text: full.length <= PROMPT_MAX_CHARS ? full : step.prompt, tone: "your-move" };
   }
@@ -167,7 +174,7 @@ function campOverPrompt(camp: ExpeditionCampView, nameOf: (seatId: string | null
   return { text: "Camp failed", tone: "alert" };
 }
 
-/** "Bait" or "Bait or Howler Call": your abilities usable on your turn,
+/** "Bait" or "Bait or Rule Breaker": your abilities usable on your turn,
  * before you play. */
 function onYourTurnNames(view: ExpeditionView): string | null {
   const names = view.yourAbilities

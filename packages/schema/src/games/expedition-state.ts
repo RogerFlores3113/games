@@ -58,9 +58,8 @@ const CampIndexSchema = z.number().int().min(1).transform((n) => n as number & {
 const StampSchema = z.strictObject({ camp: CampIndexSchema, attempt: z.number().int().min(1), trick: z.number().int().min(0) });
 
 const LedgerEntrySchema = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("used"), sourceKey: z.string().min(1), at: StampSchema, poolCost: z.number().int().min(0), free: z.literal(true).optional() }),
+  z.strictObject({ kind: z.literal("used"), sourceKey: z.string().min(1), at: StampSchema, free: z.literal(true).optional() }),
   z.strictObject({ kind: z.literal("passed"), sourceKey: z.string().min(1), at: StampSchema, failedObjectiveIds: z.array(z.string()) }),
-  z.strictObject({ kind: z.literal("regained"), amount: z.number().int(), at: StampSchema }),
 ]);
 
 const AudienceSchema = z.union([z.literal("public"), z.array(z.string().min(1))]);

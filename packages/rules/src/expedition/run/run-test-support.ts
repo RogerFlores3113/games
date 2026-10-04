@@ -78,9 +78,14 @@ export function testCatalog(parts: {
   });
 }
 
+/** Characters whose powers change nothing until used: an unnamed seat gets
+ * these first, so a test's counts (whispers, slots, coins, routes) are the
+ * base rules'. */
+const QUIET_CHARACTERS = ["explorer", "magician", "hermit", "cartographer", "jd"];
+
 /** Builds a run at the loadout of camp `camp` (default 1) of a `length`
  * (default standard) run: each seat gets `characters[seat]` or the
- * catalogue's next unclaimed plain character, `upgrades[seat]` as its
+ * catalogue's next unclaimed character, quiet ones first, `upgrades[seat]` as its
  * upgrade, and one instance per id of `items[seat]`, minted in seat order as
  * the draft mints them (it0, it1, ...; equipped while a slot is free), so a
  * test can call `ready` at once. `supplies` and `purse` default to
@@ -99,7 +104,10 @@ export function setupRun(opts: {
 }): RunState {
   const run = createRun({ seatIds: opts.seatIds, seed: opts.seed });
   const chosen = Object.values(opts.characters ?? {});
-  const spare = Object.keys(opts.catalog.characters).filter((id) => !chosen.includes(id));
+  const quietFirst = (id: string) => (QUIET_CHARACTERS.includes(id) ? QUIET_CHARACTERS.indexOf(id) : QUIET_CHARACTERS.length);
+  const spare = Object.keys(opts.catalog.characters)
+    .filter((id) => !chosen.includes(id))
+    .sort((a, b) => quietFirst(a) - quietFirst(b));
 
   const seats = run.seats.map((seat) => {
     const characterId = opts.characters?.[seat.seatId] ?? spare.shift();

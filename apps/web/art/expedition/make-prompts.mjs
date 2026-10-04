@@ -50,50 +50,69 @@ const SOURCE_BATCH = {
 };
 
 const SOURCE_ICONS = [
-  ["scout", "brass spyglass, diagonal"],
-  ["guide", "machete blade"],
-  ["botanist", "green vial with a leaf"],
-  ["medic", "rolled white bandage"],
-  ["signaller", "hourglass drum"],
-  ["cartographer", "pencil over a card"],
-  ["scout.keen-eye", "eye with a gold glint"],
-  ["scout.eavesdrop", "cupped ear with a sound arc"],
-  ["guide.pathfinder", "two boot prints"],
-  ["guide.howler-call", "howler monkey head, mouth open"],
-  ["botanist.greenhouse", "glass dome over a sprout"],
-  ["botanist.antidote", "stoppered blue bottle"],
-  ["medic.rally", "raised hand holding a card"],
-  ["medic.field-kit", "small crate with a green leaf"],
-  ["signaller.loud-call", "conch shell"],
-  ["signaller.call-and-response", "two speech arcs facing each other"],
-  ["cartographer.detour", "bent arrow"],
-  ["cartographer.landmark", "flag on a stone cairn"],
-  ["trained-monkey", "small monkey holding a card"],
-  ["pack-mule", "mule head with a pack"],
-  ["parrot", "red parrot in profile"],
-  ["trail-map", "folded map with a dotted path"],
-  ["rain-poncho", "yellow poncho"],
-  ["smoke-signal", "smoke puffs over a fire"],
-  ["whetstone", "grey stone with a spark"],
-  ["puffball", "puffball mushroom with spores"],
-  ["bait", "banana on a string"],
-  ["camouflage", "leafy cloak"],
-  ["rope-ladder", "rope ladder"],
-  ["heavy-pack", "bulging backpack"],
-  ["mosquito-net", "net with a mosquito"],
+  ["medic", "rolled white bandage", 44],
+  ["signaller", "hourglass drum", 4],
+  ["cartographer", "pencil over a card", 5],
+  ["medic.rally", "raised hand holding a card", 12],
+  ["medic.field-kit", "small crate with a green leaf", 13],
+  ["signaller.loud-call", "conch shell", 14],
+  ["signaller.call-and-response", "two speech arcs facing each other", 15],
+  ["cartographer.detour", "bent arrow", 16],
+  ["cartographer.landmark", "flag on a stone cairn", 17],
+  ["trained-monkey", "small monkey holding a card", 18],
+  ["pack-mule", "mule head with a pack", 19],
+  ["parrot", "red parrot in profile", 20],
+  ["trail-map", "folded map with a dotted path", 21],
+  ["rain-poncho", "yellow poncho", 22],
+  ["smoke-signal", "smoke puffs over a fire", 23],
+  ["whetstone", "grey stone with a spark", 24],
+  ["puffball", "puffball mushroom with spores", 25],
+  ["bait", "banana on a string", 26],
+  ["camouflage", "leafy cloak", 27],
+  ["rope-ladder", "rope ladder", 28],
+  ["heavy-pack", "bulging backpack", 29],
+  ["mosquito-net", "net with a mosquito", 30],
 ];
-const SOURCE_FRAMES = [0, 43, 2, 44, 4, 5, 6, 7, 62, 40, ...Array.from({ length: 21 }, (_, i) => 10 + i)];
+
+/** The third icon batch, for the nine characters: one 64-frame set styled
+ * on the scout (since retired), parrot and whetstone icons. `frame` is the candidate
+ * chosen by eye; the descriptions say what each frame shows. */
+const NINE_BATCH = {
+  ...ICON_BATCH,
+  params: { description: ICON_BATCH.params.description, size: 16, view: "sidescroller", style_images: ["sources/scout.png", "sources/parrot.png", "sources/whetstone.png"] },
+  object_id: "b28dd46a-a2bf-4964-af7a-f55e90287cdf",
+};
+
+const NINE_ICONS = [
+  ["jd", "tourist's baseball cap", 0],
+  ["jd.blend-in", "eyes peering out of a leafy bush", 8],
+  ["jd.free-spirit", "white feather", 9],
+  ["jd.rule-breaker", "rule book with a broken chain", 10],
+  ["leader", "red megaphone", 5],
+  ["leader.open-ears", "cupped ear", 25],
+  ["leader.delegate", "open hand passing a speech bubble", 26],
+  ["leader.momentum", "rising arrow with a star", 27],
+  ["explorer", "brass compass", 4],
+  ["explorer.second-wind", "gust of wind", 22],
+  ["explorer.true-form", "framed card with a red mark", 23],
+  ["explorer.reshape", "hand shaping a card", 24],
+];
 
 /** Seated silhouettes behind the stump, one per character. */
 const CREW = [
-  ["scout", "dark silhouette of a jungle scout sitting cross-legged facing the viewer, raising a spyglass to one eye, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "096975a2"],
-  ["guide", "dark silhouette of a jungle guide sitting cross-legged facing the viewer, holding a machete raised high in one hand, bandana, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "c606e1d6"],
-  ["botanist", "dark silhouette of a botanist sitting cross-legged facing the viewer, wearing a very wide straw hat with a flower on it, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "7c44a336"],
   ["medic", "dark silhouette of a field medic sitting cross-legged facing the viewer, a big satchel bag on the hip with a white cross patch, a pith helmet, almost black shape with a thin warm orange firelight rim light on one side, isolated sprite on plain background", 11, "23711889"],
   ["signaller", "dark silhouette of a drummer sitting cross-legged facing the viewer with a large hourglass-shaped talking drum in the lap, a curved drumstick raised in one hand, almost black shape with a thin warm orange firelight rim light on one side, isolated sprite on plain background", 11, "e2526109"],
   ["cartographer", "dark silhouette of a cartographer sitting cross-legged facing the viewer, holding a large unrolled map open in both hands, a long map tube slung across the back over one shoulder, almost black shape with a thin warm orange firelight rim light on one side, no glowing eyes, isolated sprite on plain background", 11, "b5819dd6"],
 ];
-const crewSpec = (description, seed, job) => ({
+
+/** The nine characters' silhouettes, natively transparent and used as
+ * downloaded. The Cartographer keeps its silhouette above. */
+const NINE_CREW = [
+  ["jd", "dark silhouette of an ordinary tourist sitting cross-legged facing the viewer, baseball cap, t-shirt, a camera hanging on a strap around the neck, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "a796eb43-bbaf-47fd-9ff2-58a274a7bca3"],
+  ["explorer", "dark silhouette of a jungle explorer sitting cross-legged facing the viewer, pith helmet, a coiled rope over one shoulder, holding a compass up in one hand, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "d424936a-4ab5-4a3a-8181-45675ed48d63"],
+  ["leader", "dark silhouette of an expedition leader sitting cross-legged facing the viewer, wide-brim hat, raising a megaphone to the mouth with one hand, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "2fe92e81-3308-421b-a7af-6cc8dd4e870a"],
+];
+const crewSpec = (description, seed, job, note) => ({
   tool: "create_image_pixflux",
   params: {
     description,
@@ -107,7 +126,7 @@ const crewSpec = (description, seed, job) => ({
   },
   job,
   scale: 1,
-  note: "alpha thresholded and grey halos stripped locally; drawn bottom-centred on a 64x80 canvas",
+  note,
 });
 
 const MASCOT = {
@@ -277,12 +296,12 @@ const specs = {
   ...Object.fromEntries(
     ICONS.map(([id, item], i) => [id, { ...ICON_BATCH, item_description: item, batch_index: FIRST_ICON_FRAME + i, scale: 1 }]),
   ),
-  ...Object.fromEntries(
-    SOURCE_ICONS.map(([id, item], i) => [`source-${id}`, { ...SOURCE_BATCH, item_description: item, batch_index: SOURCE_FRAMES[i], scale: 1 }]),
-  ),
+  ...Object.fromEntries(SOURCE_ICONS.map(([id, item, frame]) => [`source-${id}`, { ...SOURCE_BATCH, item_description: item, batch_index: frame, scale: 1 }])),
+  ...Object.fromEntries(NINE_ICONS.map(([id, item, frame]) => [`source-${id}`, { ...NINE_BATCH, item_description: item, batch_index: frame, scale: 1 }])),
   ...LOCATIONS,
   ...Object.fromEntries(BOSSES.map((boss) => [`boss-${boss[0]}`, bossSpec(boss)])),
-  ...Object.fromEntries(CREW.map(([id, description, seed, job]) => [`crew-${id}`, crewSpec(description, seed, job)])),
+  ...Object.fromEntries(CREW.map(([id, description, seed, job]) => [`crew-${id}`, crewSpec(description, seed, job, "alpha thresholded and grey halos stripped locally; drawn bottom-centred on a 64x80 canvas")])),
+  ...Object.fromEntries(NINE_CREW.map(([id, description, seed, job]) => [`crew-${id}`, crewSpec(description, seed, job, "natively transparent; used as downloaded")])),
   "icon-tricks": {
     tool: "hand-drawn",
     script: "apps/web/art/expedition/draw-icon-tricks.mjs",

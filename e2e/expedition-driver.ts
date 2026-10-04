@@ -7,7 +7,7 @@ import { getModel } from "./expedition-helpers";
 /** Characters and drafted items whose abilities the camp drivers can
  * target (a seat, a hand card or an objective) and that never hold a gated
  * window (a rescue). */
-export const DRAFT_PREFERENCE = ["guide", "scout", "cartographer", "signaller", "trail-map", "trained-monkey", "smoke-signal", "whetstone"];
+export const DRAFT_PREFERENCE = ["explorer", "jd", "cartographer", "leader", "trail-map", "trained-monkey", "smoke-signal", "whetstone"];
 
 export type SceneName = "camp" | "trail" | "run-end";
 

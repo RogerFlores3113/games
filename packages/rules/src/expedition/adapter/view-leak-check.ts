@@ -106,7 +106,7 @@ export function secretsForExpeditionSeat(
   // A card id set, for the hiddenIds exclusion below (whether this seat may
   // see this card AT ALL). Kept separate from the reveals LIST below, which
   // preserves duplicates: a card can legitimately be revealed to the same
-  // seat more than once (e.g. Spyglass, then later a Whisper), and the
+  // seat more than once (e.g. a Tornado gust, then later a Whisper), and the
   // view's `reveals` array carries one entry per such reveal, not one per
   // distinct card — so the allowed COUNT must bump once per matching
   // reveal, not once per distinct card id.
@@ -115,7 +115,7 @@ export function secretsForExpeditionSeat(
   const revealedToViewer = new Set(revealsToViewer.map((r) => r.cardId));
   // An effect the viewer may read names only ids its owner picked from their
   // own hand or the table; the owner keeps knowing that id after the card
-  // moves (a Herb Tonic'd card swapped away), as with a reveal.
+  // moves (a Compass-changed card swapped away), as with a reveal.
   const namedByVisibleEffects = new Set(
     (attempt?.effects ?? [])
       .filter((effect) => effect.audience === "public" || (seated && effect.origin.kind === "seat" && effect.origin.seatId === seatId))

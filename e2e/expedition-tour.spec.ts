@@ -422,7 +422,7 @@ const uses = (left: number, of: number) => ({ kind: "uses", left, of });
 
 /** The loadout before camp 3's animal boss: one item equipped and two in
  * the backpack, the shop with supplies, an item a teammate bought, and the
- * Scout's upgrades just out of reach. */
+ * Explorer's upgrades just out of reach. */
 function shopView(game: Game): Game {
   const mate = game.seats.find((s) => s.seatId !== game.yourSeatId)!.seatId;
   return {
@@ -435,7 +435,7 @@ function shopView(game: Game): Game {
         ? s
         : {
             ...s,
-            characterId: "scout",
+            characterId: "explorer",
             upgradeId: null,
             items: {
               equipped: [{ uid: "it91", itemId: "rain-poncho", remaining: uses(2, 2) }],
@@ -460,8 +460,9 @@ function shopView(game: Game): Game {
           { stockId: "item2", what: { kind: "item", itemId: "camouflage" }, price: 4, soldTo: null },
         ],
         yourUpgrades: [
-          { stockId: "upgrade:scout.keen-eye", upgradeId: "scout.keen-eye", price: 8 },
-          { stockId: "upgrade:scout.eavesdrop", upgradeId: "scout.eavesdrop", price: 8 },
+          { stockId: "upgrade:explorer.second-wind", upgradeId: "explorer.second-wind", price: 8 },
+          { stockId: "upgrade:explorer.true-form", upgradeId: "explorer.true-form", price: 8 },
+          { stockId: "upgrade:explorer.reshape", upgradeId: "explorer.reshape", price: 8 },
         ],
       },
       readySeatIds: [],

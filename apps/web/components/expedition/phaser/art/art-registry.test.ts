@@ -54,9 +54,9 @@ describe("ART and ART_FILES", () => {
   });
 
   it("sourceArtId and crewArtId find the art for an id that has one and null otherwise", () => {
-    expect(sourceArtId("botanist.antidote")).toBe("source-botanist.antidote");
+    expect(sourceArtId("explorer.reshape")).toBe("source-explorer.reshape");
     expect(sourceArtId("not-a-source")).toBeNull();
-    expect(crewArtId("medic")).toBe("crew-medic");
+    expect(crewArtId("leader")).toBe("crew-leader");
     expect(crewArtId("bait")).toBeNull();
   });
 

@@ -39,7 +39,7 @@ import { campStack, modCtx, pairingOf, specOf, type StackLayer } from "../run/st
 import type { StatusPart } from "../content/mods/mod-def";
 import { whispersUsedBy } from "../run/whisper";
 import { abilityStatus } from "../run/abilities";
-import { abilityKeys, abilityOf, activeOfKey, backpackOf, itemOf, poolBalance, remaining, usedThisAttempt, type Remaining } from "../run/usage";
+import { abilityKeys, abilityOf, activeOfKey, backpackOf, itemOf, remaining, usedThisAttempt, type Remaining } from "../run/usage";
 import { priceFor, upgradeOffers, type StockEntry } from "../run/shop";
 import { currentWindow, gatedPendingSeatIds } from "../run/windows";
 import type { RunRules } from "../run/run-rules";
@@ -254,14 +254,16 @@ function toRemainingView(left: Remaining): ExpeditionRemainingView {
   switch (left.kind) {
     case "uses":
       return { kind: "uses", left: left.left, of: left.of };
-    case "pool":
-      return { kind: "pool", balance: left.balance, max: left.max, cost: left.cost };
     case "supplies":
       return { kind: "supplies", cost: left.cost };
     case "crew":
       return { kind: "crew", left: left.left, earned: left.earned };
     case "coins":
       return { kind: "coins", cost: left.cost };
+    case "unlimited":
+      return { kind: "unlimited" };
+    case "whispers":
+      return { kind: "whispers", left: left.left };
   }
 }
 
@@ -273,8 +275,6 @@ function toItemView(state: RunState, seat: SeatRun, item: ItemInstance, catalog:
 /** Under Heavy fog another seat's items show only once used this attempt;
  * its character and upgrade stay public. */
 function toSeatView(state: RunState, seat: SeatRun, viewerSeatId: string, rules: RunRules, catalog: Catalog): ExpeditionSeatView {
-  const balance = poolBalance(seat, catalog);
-  const pool = seat.characterId === null ? undefined : catalog.characters[seat.characterId]?.pool;
   const concealed = rules.hides(state, viewerSeatId, { kind: "loadout", seatId: seat.seatId });
   const shown = (key: string): boolean => !concealed || itemOf(seat, key) === undefined || usedThisAttempt(state, seat, key);
   return {
@@ -286,7 +286,6 @@ function toSeatView(state: RunState, seat: SeatRun, viewerSeatId: string, rules:
       backpack: concealed ? null : backpackOf(seat).map((item) => toItemView(state, seat, item, catalog)),
       concealed,
     },
-    pool: balance !== null && pool !== undefined ? { balance, max: pool.max } : null,
     usage: abilityKeys(state, seat, catalog)
       .filter((key) => abilityOf(state, seat, key, catalog) !== undefined && shown(key))
       .map((sourceKey) => ({ sourceKey, remaining: toRemainingView(remaining(state, seat.seatId, sourceKey, catalog)) })),

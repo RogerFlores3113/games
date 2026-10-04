@@ -61,7 +61,7 @@ function kitOf(kit: readonly string[]): Pick<ExpeditionView["seats"][number], "u
 }
 
 function seat(seatId: string, characterId: string | null, kit: string[] = []): ExpeditionView["seats"][number] {
-  return { seatId, characterId, ...kitOf(kit), pool: null, usage: [] };
+  return { seatId, characterId, ...kitOf(kit), usage: [] };
 }
 
 function ability(sourceKey: string, step?: { kind: ExpeditionAbilityView["steps"][number]["kind"]; choices: string[] }, usableNow = true, reason: string | null = null): ExpeditionAbilityView {
@@ -99,9 +99,9 @@ function makeView({ attempt, campIndex = 2, ...overrides }: ViewOverrides = {}):
     supplies: { count: 5, max: 5 },
     plan: [],
     seats: [
-      seat("s1", "guide"),
-      seat("s2", "scout"),
-      seat("s3", "medic"),
+      seat("s1", "leader"),
+      seat("s2", "explorer"),
+      seat("s3", "jd"),
     ],
     yourAbilities: [],
     history: [],
@@ -267,7 +267,7 @@ describe("objectives", () => {
     const model2 = buildSceneModel(server(notActorView), ui(), "big-index");
     expect(model2.faceUpObjectives[0]!.pickable).toBe(false);
 
-    const targetingActive = ui({ targeting: { mode: "ability", sourceKey: "scout", selected: [], valueCardId: null } });
+    const targetingActive = ui({ targeting: { mode: "ability", sourceKey: "explorer", selected: [], heldId: null } });
     const model3 = buildSceneModel(server(pickableView), targetingActive, "big-index");
     expect(model3.faceUpObjectives[0]!.pickable).toBe(false);
   });
@@ -280,7 +280,7 @@ describe("objectives", () => {
 });
 
 describe("hand: dimming, sort, lift, targeting", () => {
-  function handView(cards: { id: string; identity: ExpeditionCardIdentityView; effectiveRank: null; countsAs: null }[], legalIds: string[], patch: Partial<ExpeditionCampView> = {}): ExpeditionView {
+  function handView(cards: { id: string; identity: ExpeditionCardIdentityView; effectiveRank: number | null; countsAs: ExpeditionCardIdentityView | null }[], legalIds: string[], patch: Partial<ExpeditionCampView> = {}): ExpeditionView {
     return makeView({
       attempt: {
         attemptNumber: 1,
@@ -317,6 +317,20 @@ describe("hand: dimming, sort, lift, targeting", () => {
     expect(model.hand.find((c) => c.id === "as")!.dimmed).toBe(false);
     expect(model.hand.find((c) => c.id === "kd")!.dimmed).toBe(true);
     expect(model.hand.find((c) => c.id === "as")!.playable).toBe(true);
+  });
+
+  it("badges a card with what it counts as: a recounted rank keeps its suit, a counted-as card shows that card", () => {
+    const cards = [
+      { id: "kd", identity: KD, effectiveRank: 12, countsAs: null },
+      { id: "th", identity: TH, effectiveRank: null, countsAs: { kind: "standard" as const, suit: "hearts" as const, rank: 9 as const } },
+      { id: "as", identity: AS, effectiveRank: null, countsAs: null },
+    ];
+    const model = buildSceneModel(server(handView(cards, [])), ui(), "big-index");
+    expect(model.hand.map((c) => [c.id, c.countsAs])).toEqual([
+      ["as", null],
+      ["th", { kind: "standard", suit: "hearts", rank: 9 }],
+      ["kd", { ...KD, rank: 12 }],
+    ]);
   });
 
   it("dims nothing when it is not your turn", () => {
@@ -500,7 +514,7 @@ describe("trick and lastTrick", () => {
         }),
       },
     });
-    const model = buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceKey: "bait", selected: [], valueCardId: null } }), "big-index");
+    const model = buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceKey: "bait", selected: [], heldId: null } }), "big-index");
     expect(model.trick!.plays.map((p) => [shown(p).card.id, shown(p).card.targetable])).toEqual([
       ["c1", false],
       ["c2", true],
@@ -566,22 +580,22 @@ describe("HUD: top bar", () => {
 
 describe("source chips", () => {
   it("lists each seat's character then kit, naming sources and falling back to the id for an unknown one", () => {
-    const view = makeView({ seats: [seat("s1", "guide", ["bait", "not-a-real-source"]), seat("s2", "scout"), seat("s3", null)] });
+    const view = makeView({ seats: [seat("s1", "leader", ["bait", "not-a-real-source"]), seat("s2", "explorer"), seat("s3", null)] });
     const model = buildSceneModel(server(view), ui(), "big-index");
     const s1 = model.seats.find((s) => s.seatId === "s1")!;
-    expect(s1.sources.map((c) => c.name)).toEqual(["Machete", "Bait", "not-a-real-source"]);
+    expect(s1.sources.map((c) => c.name)).toEqual(["Megaphone", "Bait", "not-a-real-source"]);
     expect(s1.sources.map((c) => c.kind)).toEqual(["character", "item", "item"]);
     expect(s1.sources[1]!.objectId).toBe(sourceObjectId("bait"));
     expect(s1.sources[1]!.objectId).toBe("source:bait");
     expect(model.seats.find((s) => s.seatId === "s3")!.sources).toEqual([]);
   });
 
-  it("a teammate's spent source comes from the seat's usage: a use count of zero left", () => {
+  it("a teammate's spent source comes from the seat's usage: no use or whisper left", () => {
     const view = makeView({
       seats: [
-        { ...seat("s1", "guide"), usage: [{ sourceKey: "guide", remaining: { kind: "uses", left: 0, of: 1 } }] },
-        seat("s2", "scout"),
-        { ...seat("s3", "medic"), usage: [{ sourceKey: "medic", remaining: { kind: "uses", left: 1, of: 1 } }] },
+        { ...seat("s1", "leader"), usage: [{ sourceKey: "leader", remaining: { kind: "whispers", left: 0 } }] },
+        seat("s2", "explorer"),
+        { ...seat("s3", "jd"), usage: [{ sourceKey: "jd", remaining: { kind: "unlimited" } }] },
       ],
     });
     const model = buildSceneModel(server(view), ui(), "big-index");
@@ -590,36 +604,36 @@ describe("source chips", () => {
   });
 
   it("usable and pulse for your own chip come from yourAbilities, and pulse stops while targeting", () => {
-    const view = makeView({ yourAbilities: [ability("scout", { kind: "hand", choices: ["hand:s1"] })] });
+    const view = makeView({ yourAbilities: [ability("explorer", { kind: "hand", choices: ["hand:s1"] })] });
     const s2 = (m: ReturnType<typeof buildSceneModel>) => m.seats.find((s) => s.seatId === "s2")!;
     const idle = s2(buildSceneModel(server(view), ui(), "big-index")).sources[0]!;
-    expect(idle).toMatchObject({ sourceKey: "scout", usable: true, pulse: true, reason: null });
+    expect(idle).toMatchObject({ sourceKey: "explorer", usable: true, pulse: true, reason: null });
 
-    const targeting = ui({ targeting: { mode: "ability", sourceKey: "scout", selected: [], valueCardId: null } });
+    const targeting = ui({ targeting: { mode: "ability", sourceKey: "explorer", selected: [], heldId: null } });
     expect(s2(buildSceneModel(server(view), targeting, "big-index")).sources[0]).toMatchObject({ usable: true, pulse: false });
   });
 
   it("an unusable source of yours carries the server's reason and never pulses; a teammate's chip is never usable", () => {
-    const view = makeView({ yourAbilities: [ability("scout", undefined, false, "Already used this camp")] });
+    const view = makeView({ yourAbilities: [ability("explorer", undefined, false, "Already used this camp")] });
     const model = buildSceneModel(server(view), ui(), "big-index");
     expect(model.seats.find((s) => s.seatId === "s2")!.sources[0]).toMatchObject({ usable: false, pulse: false, reason: "Already used this camp" });
     expect(model.seats.find((s) => s.seatId === "s1")!.sources[0]).toMatchObject({ usable: false, pulse: false, reason: null });
   });
 
   it("tooltip carries the hovered source's rules text, and the reason only while it is unusable", () => {
-    const blocked = makeView({ yourAbilities: [ability("scout", undefined, false, "Already used this camp")] });
-    expect(buildSceneModel(server(blocked), ui({ tooltipSourceId: "scout" }), "big-index").tooltip).toEqual({
-      title: "Spyglass",
-      text: "See a random card in a teammate's hand.",
-      badges: ["Between tricks", "Once per camp"],
+    const blocked = makeView({ yourAbilities: [ability("explorer", undefined, false, "Already used this camp")] });
+    expect(buildSceneModel(server(blocked), ui({ tooltipSourceId: "explorer" }), "big-index").tooltip).toEqual({
+      title: "Compass",
+      text: "A card in your hand counts one rank higher or lower.",
+      badges: ["Between tricks or on your turn", "Once per camp"],
       reason: "Already used this camp",
     });
 
-    const usable = makeView({ yourAbilities: [ability("scout", { kind: "hand", choices: ["hand:s1"] })] });
-    expect(buildSceneModel(server(usable), ui({ tooltipSourceId: "scout" }), "big-index").tooltip).toEqual({
-      title: "Spyglass",
-      text: "See a random card in a teammate's hand.",
-      badges: ["Between tricks", "Once per camp"],
+    const usable = makeView({ yourAbilities: [ability("explorer", { kind: "hand", choices: ["hand:s1"] })] });
+    expect(buildSceneModel(server(usable), ui({ tooltipSourceId: "explorer" }), "big-index").tooltip).toEqual({
+      title: "Compass",
+      text: "A card in your hand counts one rank higher or lower.",
+      badges: ["Between tricks or on your turn", "Once per camp"],
       reason: null,
     });
     expect(buildSceneModel(server(usable), ui(), "big-index").tooltip).toBeNull();
@@ -695,7 +709,7 @@ describe("reveals", () => {
         pendingSeatIds: [],
         rescue: null,
         effects: [],
-        reveals: [{ cardId: "c1", fromSeatId: "s1", source: "scout", identity: KD, toSeatId: null }],
+        reveals: [{ cardId: "c1", fromSeatId: "s1", source: "explorer", identity: KD, toSeatId: null }],
         log: [],
         yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp(),
@@ -704,7 +718,7 @@ describe("reveals", () => {
     const model = buildSceneModel(server(view), ui(), "big-index");
     const reveal = model.seats.find((s) => s.seatId === "s1")!.reveals[0]!;
     expect(reveal.sourceTag).toBe("ability");
-    expect(reveal.sourceName).toBe("Spyglass");
+    expect(reveal.sourceName).toBe("Compass");
   });
 });
 
@@ -876,10 +890,10 @@ describe("banner", () => {
   const failedKd = (owner: string): ExpeditionObjectiveView => ({ id: "o1", kind: "win-card", target: KD, ownerSeatId: owner, status: "failed" });
 
   it("rescue: names the failed objective and its owner, and your rescue", () => {
-    const view = gated(["s2"], [ability("medic"), ability("rain-poncho")], [failedKd("s2")]);
+    const view = gated(["s2"], [ability("jd.free-spirit"), ability("rain-poncho")], [failedKd("s2")]);
     const banner = buildSceneModel(server(view), ui(), "big-index").banner!;
-    expect(banner).toMatchObject({ title: "Objective failed: K♦ (yours)", detail: "You can rescue it with Triage", youPending: true });
-    expect(banner.uses.map((u) => u.sourceKey)).toEqual(["medic"]);
+    expect(banner).toMatchObject({ title: "Objective failed: K♦ (yours)", detail: "You can rescue it with Free Spirit", youPending: true });
+    expect(banner.uses.map((u) => u.sourceKey)).toEqual(["jd.free-spirit"]);
   });
 
   it("rescue: tells everyone else who can rescue it", () => {
@@ -896,25 +910,25 @@ describe("banner", () => {
     expect(buildSceneModel(server(makeView()), ui(), "big-index").banner).toBeNull();
     const between = makeView({ attempt: { ...makeAttempt(), window: "between-tricks" } });
     expect(buildSceneModel(server(between), ui(), "big-index").banner).toBeNull();
-    const view = gated(["s2"], [ability("medic", { kind: "failed-objective", choices: ["objective:o1"] })], [failedKd("s2")]);
-    expect(buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceKey: "medic", selected: [], valueCardId: null } }), "big-index").banner).toBeNull();
+    const view = gated(["s2"], [ability("jd.free-spirit", { kind: "failed-objective", choices: ["objective:o1"] })], [failedKd("s2")]);
+    expect(buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceKey: "jd.free-spirit", selected: [], heldId: null } }), "big-index").banner).toBeNull();
   });
 });
 
 describe("pick tray", () => {
   const withSteps = (sourceKey: string, step: { kind: ExpeditionAbilityView["steps"][number]["kind"]; choices: string[] }, attempt: Partial<ExpeditionAttemptView> = {}): ExpeditionView =>
     makeView({ yourAbilities: [ability(sourceKey, step)], attempt: { ...makeAttempt(), ...attempt } });
-  const aiming = (sourceKey: string, valueCardId: string | null = null): LocalUiState => ui({ targeting: { mode: "ability", sourceKey, selected: [], valueCardId } });
+  const aiming = (sourceKey: string, heldId: string | null = null): LocalUiState => ui({ targeting: { mode: "ability", sourceKey, selected: [], heldId } });
 
   it("lists whispers by who sent them to whom, with the card when you know it", () => {
-    const view = withSteps("scout.eavesdrop", { kind: "whisper", choices: ["whisper:0", "whisper:1"] }, {
+    const view = withSteps("leader.delegate", { kind: "whisper", choices: ["whisper:0", "whisper:1"] }, {
       log: [
         { event: "whisper", actorSeatId: "s1", subjectSeatIds: ["s3"], sourceId: null, private: false },
         { event: "whisper", actorSeatId: "s3", subjectSeatIds: ["s2"], sourceId: null, private: false },
       ],
       reveals: [{ cardId: "c-kd", fromSeatId: "s3", source: "whisper", identity: KD, toSeatId: "s2" }],
     });
-    expect(buildSceneModel(server(view), aiming("scout.eavesdrop"), "big-index").tray).toEqual({
+    expect(buildSceneModel(server(view), aiming("leader.delegate"), "big-index").tray).toEqual({
       title: "Pick one",
       options: [
         { choiceId: "whisper:0", objectId: "pick:whisper:0", label: "Alice to Cara", cards: [] },
@@ -946,33 +960,33 @@ describe("pick tray", () => {
   });
 
   it("offers the held card's ranks only once a card is held", () => {
-    const view = withSteps("botanist", { kind: "card-value", choices: ["value:c-as:13", "value:c-other:5"] });
-    expect(buildSceneModel(server(view), aiming("botanist"), "big-index").tray).toBeNull();
-    const held = buildSceneModel(server(view), aiming("botanist", "c-as"), "big-index");
+    const view = withSteps("explorer", { kind: "card-value", choices: ["value:c-as:13", "value:c-other:5"] });
+    expect(buildSceneModel(server(view), aiming("explorer"), "big-index").tray).toBeNull();
+    const held = buildSceneModel(server(view), aiming("explorer", "c-as"), "big-index");
     expect(held.tray).toEqual({ title: "Count A♠ as", options: [{ choiceId: "value:c-as:13", objectId: "pick:value:c-as:13", label: "K", cards: [] }] });
     expect(held.hand[0]).toMatchObject({ id: "c-as", targetable: true, selected: true });
   });
 
   it("is null outside targeting and for kinds with a place on the table", () => {
     expect(buildSceneModel(server(makeView()), ui(), "big-index").tray).toBeNull();
-    const view = withSteps("guide", { kind: "player", choices: ["seat:s1"] });
-    expect(buildSceneModel(server(view), aiming("guide"), "big-index").tray).toBeNull();
+    const view = withSteps("leader", { kind: "player", choices: ["seat:s1"] });
+    expect(buildSceneModel(server(view), aiming("leader"), "big-index").tray).toBeNull();
   });
 });
 
 describe("board and supplies picks", () => {
   it("the board is a pick only while a board step offers it", () => {
-    const view = makeView({ yourAbilities: [ability("guide.howler-call", { kind: "board", choices: ["board"] })] });
-    const aiming = ui({ targeting: { mode: "ability", sourceKey: "guide.howler-call", selected: [], valueCardId: null } });
+    const view = makeView({ yourAbilities: [ability("leader.delegate", { kind: "board", choices: ["board"] })] });
+    const aiming = ui({ targeting: { mode: "ability", sourceKey: "leader.delegate", selected: [], heldId: null } });
     expect(buildSceneModel(server(view), aiming, "big-index").boardPick).toEqual({ targetable: true, selected: false });
     expect(buildSceneModel(server(view), ui(), "big-index").boardPick).toBeNull();
-    const picked = ui({ targeting: { mode: "ability", sourceKey: "guide.howler-call", selected: ["board"], valueCardId: null } });
+    const picked = ui({ targeting: { mode: "ability", sourceKey: "leader.delegate", selected: ["board"], heldId: null } });
     expect(buildSceneModel(server(view), picked, "big-index").boardPick).toEqual({ targetable: false, selected: true });
   });
 
   it("the supplies in the top bar are a pick only while a supplies step offers them", () => {
-    const view = makeView({ yourAbilities: [ability("medic.field-kit", { kind: "supplies", choices: ["supplies"] })] });
-    const aiming = ui({ targeting: { mode: "ability", sourceKey: "medic.field-kit", selected: [], valueCardId: null } });
+    const view = makeView({ yourAbilities: [ability("explorer.reshape", { kind: "supplies", choices: ["supplies"] })] });
+    const aiming = ui({ targeting: { mode: "ability", sourceKey: "explorer.reshape", selected: [], heldId: null } });
     expect(buildSceneModel(server(view), aiming, "big-index").topBar.suppliesPick).toEqual({ targetable: true, selected: false });
     expect(buildSceneModel(server(view), ui(), "big-index").topBar.suppliesPick).toBeNull();
   });
@@ -982,14 +996,14 @@ describe("charges and shown cards", () => {
   it("a chip says what is left of its source", () => {
     const view = makeView({
       seats: [
-        { ...seat("s1", "botanist", ["bait", "heavy-pack"]), usage: [{ sourceKey: "botanist", remaining: { kind: "pool", balance: 2, max: 3, cost: 1 } }, { sourceKey: "bait", remaining: { kind: "uses", left: 1, of: 1 } }] },
-        { ...seat("s2", "scout"), usage: [{ sourceKey: "scout", remaining: { kind: "uses", left: 0, of: 1 } }] },
-        seat("s3", "medic"),
+        { ...seat("s1", "leader", ["bait", "heavy-pack"]), usage: [{ sourceKey: "leader", remaining: { kind: "whispers", left: 2 } }, { sourceKey: "bait", remaining: { kind: "uses", left: 1, of: 1 } }] },
+        { ...seat("s2", "explorer"), usage: [{ sourceKey: "explorer", remaining: { kind: "uses", left: 0, of: 1 } }] },
+        seat("s3", "jd"),
       ],
     });
     const model = buildSceneModel(server(view), ui(), "big-index");
     expect(model.seats.find((s) => s.seatId === "s1")!.sources.map((c) => [c.name, c.charge, c.spent])).toEqual([
-      ["Herb Tonic", { full: "2/3 herbs", short: "2/3 herbs" }, false],
+      ["Megaphone", { full: "2 whispers left", short: "2 left" }, false],
       ["Bait", { full: "Single use", short: "Single use" }, false],
       ["Heavy Pack", { full: "Always on", short: "Always on" }, false],
     ]);
@@ -1001,28 +1015,28 @@ describe("charges and shown cards", () => {
       attempt: {
         ...makeAttempt(),
         reveals: [
-          { cardId: "c1", fromSeatId: "s1", source: "scout", identity: KD, toSeatId: null },
+          { cardId: "c1", fromSeatId: "s1", source: "explorer", identity: KD, toSeatId: null },
           { cardId: "c2", fromSeatId: "s3", source: "whisper", identity: AS, toSeatId: "s2" },
         ],
       },
     });
     expect(buildSceneModel(server(view), ui(), "big-index").shownCards).toEqual([
-      { fromSeatId: "s1", fromName: "Alice", sourceName: "Spyglass", card: "K♦", objectId: "reveal:K♦" },
+      { fromSeatId: "s1", fromName: "Alice", sourceName: "Compass", card: "K♦", objectId: "reveal:K♦" },
     ]);
   });
 });
 
 describe("targeting", () => {
-  const scoutView = () => makeView({ yourAbilities: [ability("scout", { kind: "hand", choices: ["hand:s1", "hand:s3"] })] });
+  const explorerView = () => makeView({ yourAbilities: [ability("explorer", { kind: "hand", choices: ["hand:s1", "hand:s3"] })] });
 
   it("ability targeting: sourceObjectId, nextKind, canConfirm", () => {
-    const model = buildSceneModel(server(scoutView()), ui({ targeting: { mode: "ability", sourceKey: "scout", selected: [], valueCardId: null } }), "big-index");
-    expect(model.targeting).toEqual({ mode: "ability", sourceObjectId: sourceObjectId("scout"), nextKind: "hand", canConfirm: false });
+    const model = buildSceneModel(server(explorerView()), ui({ targeting: { mode: "ability", sourceKey: "explorer", selected: [], heldId: null } }), "big-index");
+    expect(model.targeting).toEqual({ mode: "ability", sourceObjectId: sourceObjectId("explorer"), nextKind: "hand", canConfirm: false });
   });
 
   it("ability targeting with every step picked can confirm", () => {
-    const model = buildSceneModel(server(scoutView()), ui({ targeting: { mode: "ability", sourceKey: "scout", selected: ["hand:s1"], valueCardId: null } }), "big-index");
-    expect(model.targeting).toEqual({ mode: "ability", sourceObjectId: "source:scout", nextKind: null, canConfirm: true });
+    const model = buildSceneModel(server(explorerView()), ui({ targeting: { mode: "ability", sourceKey: "explorer", selected: ["hand:s1"], heldId: null } }), "big-index");
+    expect(model.targeting).toEqual({ mode: "ability", sourceObjectId: "source:explorer", nextKind: null, canConfirm: true });
   });
 
   it("whisper targeting: sourceObjectId is WHISPER_ID", () => {
@@ -1036,19 +1050,19 @@ describe("targeting", () => {
   });
 
   it("a hand step makes exactly the offered teammates' hands targetable, not the seats", () => {
-    const model = buildSceneModel(server(scoutView()), ui({ targeting: { mode: "ability", sourceKey: "scout", selected: [], valueCardId: null } }), "big-index");
+    const model = buildSceneModel(server(explorerView()), ui({ targeting: { mode: "ability", sourceKey: "explorer", selected: [], heldId: null } }), "big-index");
     expect(model.seats.map((s) => [s.seatId, s.targetable, s.handPick.targetable, s.handObjectId])).toEqual([
       ["s2", false, false, "seat-hand:s2"],
       ["s3", false, true, "seat-hand:s3"],
       ["s1", false, true, "seat-hand:s1"],
     ]);
-    const picked = buildSceneModel(server(scoutView()), ui({ targeting: { mode: "ability", sourceKey: "scout", selected: ["hand:s3"], valueCardId: null } }), "big-index");
+    const picked = buildSceneModel(server(explorerView()), ui({ targeting: { mode: "ability", sourceKey: "explorer", selected: ["hand:s3"], heldId: null } }), "big-index");
     expect(picked.seats.find((s) => s.seatId === "s3")!.handPick).toEqual({ targetable: false, selected: true });
   });
 
   it("a player step makes exactly the offered seats targetable", () => {
-    const view = makeView({ yourAbilities: [ability("guide", { kind: "player", choices: ["seat:s1", "seat:s2"] })] });
-    const model = buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceKey: "guide", selected: [], valueCardId: null } }), "big-index");
+    const view = makeView({ yourAbilities: [ability("leader", { kind: "player", choices: ["seat:s1", "seat:s2"] })] });
+    const model = buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceKey: "leader", selected: [], heldId: null } }), "big-index");
     expect(model.seats.map((s) => [s.seatId, s.targetable])).toEqual([
       ["s2", true],
       ["s3", false],
@@ -1057,7 +1071,7 @@ describe("targeting", () => {
   });
 
   it("nothing is targetable when no targeting is active", () => {
-    const model = buildSceneModel(server(scoutView()), ui(), "big-index");
+    const model = buildSceneModel(server(explorerView()), ui(), "big-index");
     expect(model.seats.every((s) => !s.targetable)).toBe(true);
   });
 
@@ -1069,7 +1083,7 @@ describe("targeting", () => {
         camp: makeCamp({ yourHand: [{ id: "c-as", identity: AS, effectiveRank: null, countsAs: null }, { id: "c-kd", identity: KD, effectiveRank: null, countsAs: null }], yourLegalCardIds: ["c-as", "c-kd"] }),
       },
     });
-    const model = buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceKey: "trained-monkey", selected: [], valueCardId: null } }), "big-index");
+    const model = buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceKey: "trained-monkey", selected: [], heldId: null } }), "big-index");
     expect(model.hand.map((c) => ({ id: c.id, targetable: c.targetable, dimmed: c.dimmed }))).toEqual([
       { id: "c-as", targetable: true, dimmed: false },
       { id: "c-kd", targetable: false, dimmed: true },
@@ -1089,13 +1103,13 @@ describe("targeting", () => {
         }),
       },
     });
-    const model = buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceKey: "cartographer", selected: [], valueCardId: null } }), "big-index");
+    const model = buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceKey: "cartographer", selected: [], heldId: null } }), "big-index");
     expect(model.faceUpObjectives.map((o) => ({ id: o.objectiveId, targetable: o.targetable, selected: o.selected }))).toEqual([
       { id: "o3", targetable: true, selected: false },
       { id: "o4", targetable: false, selected: false },
     ]);
 
-    const picked = buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceKey: "cartographer", selected: ["objective:o3"], valueCardId: null } }), "big-index");
+    const picked = buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceKey: "cartographer", selected: ["objective:o3"], heldId: null } }), "big-index");
     expect(picked.faceUpObjectives.find((o) => o.objectiveId === "o3")!.selected).toBe(true);
   });
 });
@@ -1201,7 +1215,7 @@ describe("the temple", () => {
     const base = makeAttempt();
     return makeView({
       campIndex: 6,
-      seats: [seat("s1", "guide"), seat("s2", "scout"), seat("s3", "medic")].map((s) => ({ ...s, usage: [crew(left, earned)] })),
+      seats: [seat("s1", "leader"), seat("s2", "explorer"), seat("s3", "jd")].map((s) => ({ ...s, usage: [crew(left, earned)] })),
       yourAbilities: over.abilities ?? [ability("temple", undefined, false, "Win the Sun to earn it")],
       stage: {
         tag: "camp",

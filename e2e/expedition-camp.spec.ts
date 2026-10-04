@@ -23,7 +23,7 @@ const GATE_SKIP_ID = "gate-skip";
 const NAMES = ["Roger", "Bianca", "Sam"];
 /** Abilities whose every target step is a seat, a hand card or an objective:
  * the kinds this driver can click. */
-const DRIVABLE_ABILITIES = new Set(["guide", "scout", "cartographer", "cartographer.detour", "trail-map", "trained-monkey"]);
+const DRIVABLE_ABILITIES = new Set(["leader.delegate", "jd.free-spirit", "cartographer", "cartographer.detour", "trail-map", "trained-monkey"]);
 
 interface CardModel {
   id: string;

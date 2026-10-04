@@ -66,15 +66,14 @@ const draftView = {
   seats: [
     {
       seatId: "seat-1",
-      characterId: "botanist",
-      upgradeId: "botanist.greenhouse",
+      characterId: "leader",
+      upgradeId: "leader.delegate",
       items: noItems,
-      pool: { balance: 2, max: 3 },
-      usage: [{ sourceKey: "botanist", remaining: { kind: "pool", balance: 2, max: 3, cost: 1 } }],
+      usage: [{ sourceKey: "leader.delegate", remaining: { kind: "whispers", left: 2 } }],
     },
     {
       seatId: "seat-2",
-      characterId: "scout",
+      characterId: "explorer",
       upgradeId: null,
       items: {
         equipped: [
@@ -84,14 +83,14 @@ const draftView = {
         backpack: [{ uid: "it2", itemId: "parrot", remaining: { kind: "uses", left: 1, of: 1 } }],
         concealed: false,
       },
-      pool: null,
       usage: [
-        { sourceKey: "scout", remaining: { kind: "uses", left: 1, of: 1 } },
+        { sourceKey: "explorer", remaining: { kind: "uses", left: 1, of: 1 } },
+        { sourceKey: "explorer.reshape", remaining: { kind: "unlimited" } },
         { sourceKey: "it0", remaining: { kind: "uses", left: 1, of: 1 } },
       ],
     },
   ],
-  yourAbilities: [{ sourceKey: "botanist", usableNow: false, reason: "Usable between tricks", steps: [] }],
+  yourAbilities: [{ sourceKey: "leader.delegate", usableNow: false, reason: "Usable between tricks", steps: [] }],
   history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }],
   stage: {
     tag: "draft",
@@ -103,18 +102,18 @@ const draftView = {
 };
 
 const campSeats = [
-  { seatId: "seat-1", characterId: "guide", upgradeId: null, items: noItems, pool: null, usage: [] },
-  { seatId: "seat-2", characterId: "medic", upgradeId: null, items: noItems, pool: null, usage: [] },
-  { seatId: "seat-3", characterId: "signaller", upgradeId: null, items: noItems, pool: null, usage: [] },
+  { seatId: "seat-1", characterId: "leader", upgradeId: "leader.delegate", items: noItems, usage: [] },
+  { seatId: "seat-2", characterId: "jd", upgradeId: null, items: noItems, usage: [] },
+  { seatId: "seat-3", characterId: "explorer", upgradeId: null, items: noItems, usage: [] },
 ];
 
 const midCampFields = {
   yourAbilities: [
     {
-      sourceKey: "guide",
+      sourceKey: "leader.delegate",
       usableNow: true,
       reason: null,
-      steps: [{ kind: "player", prompt: "Pick a player", choices: ["seat:seat-1", "seat:seat-2", "seat:seat-3"] }],
+      steps: [{ kind: "player", prompt: "Pick a teammate", choices: ["seat:seat-2", "seat:seat-3"] }],
     },
   ],
   history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }],
@@ -127,7 +126,7 @@ const midAttempt = {
     rescue: null,
     effects: [
       { origin: { kind: "seat", seatId: "seat-2", sourceId: "bait" }, atTrick: 1, lasts: "trick", params: { cardId: "card-4" } },
-      { origin: { kind: "seat", seatId: "seat-3", sourceId: "botanist" }, atTrick: 1, lasts: "attempt", params: null },
+      { origin: { kind: "seat", seatId: "seat-3", sourceId: "explorer" }, atTrick: 1, lasts: "attempt", params: null },
       { origin: { kind: "mod", modId: "thunderstorm", strength: "full" }, atTrick: 1, lasts: "trick", params: { strike: true } },
     ],
     reveals: [
@@ -235,7 +234,7 @@ describe("ExpeditionViewSchema", () => {
             { stockId: "supplies", what: { kind: "supplies" }, price: 6, soldTo: null },
             { stockId: "item0", what: { kind: "item", itemId: "bait" }, price: 2, soldTo: "seat-2" },
           ],
-          yourUpgrades: [{ stockId: "upgrade:guide.pathfinder", upgradeId: "guide.pathfinder", price: 8 }],
+          yourUpgrades: [{ stockId: "upgrade:explorer.reshape", upgradeId: "explorer.reshape", price: 8 }],
         },
         readySeatIds: [],
       },
@@ -264,7 +263,7 @@ describe("ExpeditionViewSchema", () => {
       campCount: null,
       plan: [],
       lastVote: null,
-      seats: [{ ...draftView.seats[0], characterId: null, pool: null, usage: [] }],
+      seats: [{ ...draftView.seats[0], characterId: null, upgradeId: null, usage: [] }],
       stage: { tag: "muster", ballots: [{ seatId: "seat-1", choice: "long" }, { seatId: "seat-2", choice: null }] },
     };
     expect(ExpeditionViewSchema.safeParse(muster).success).toBe(true);

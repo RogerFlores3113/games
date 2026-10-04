@@ -26,24 +26,24 @@ describe("SOURCE_DISPLAY", () => {
   });
 
   it("carries a character's name, text, kind, window phrase, limit badge and target kinds", () => {
-    expect(SOURCE_DISPLAY.scout).toEqual({
-      id: "scout",
-      name: "The Scout",
-      text: "See a random card in a teammate's hand.",
+    expect(SOURCE_DISPLAY.explorer).toEqual({
+      id: "explorer",
+      name: "The Explorer",
+      text: "A card in your hand counts one rank higher or lower.",
       kind: "character",
-      characterId: "scout",
-      active: { windows: ["between-tricks"], windowPhrase: "Between tricks", limitBadge: "Once per camp", limitKind: "per-camp", targets: ["hand"] },
+      characterId: "explorer",
+      active: { windows: ["between-tricks", "in-trick"], windowPhrase: "Between tricks or on your turn", limitBadge: "Once per camp", limitKind: "per-camp", targets: ["card-value"] },
       passive: false,
       item: null,
     });
   });
 
   it("carries an upgrade's characterId and an upgrade with no active as active: null", () => {
-    expect(SOURCE_DISPLAY["scout.keen-eye"]).toMatchObject({ kind: "upgrade", characterId: "scout", active: null, passive: false });
-    expect(SOURCE_DISPLAY["scout.eavesdrop"]).toMatchObject({
+    expect(SOURCE_DISPLAY["explorer.second-wind"]).toMatchObject({ kind: "upgrade", characterId: "explorer", active: null, passive: false });
+    expect(SOURCE_DISPLAY["leader.delegate"]).toMatchObject({
       kind: "upgrade",
-      characterId: "scout",
-      active: { windowPhrase: "Between tricks", limitBadge: "Once per camp", targets: ["whisper"] },
+      characterId: "leader",
+      active: { windowPhrase: "Between tricks", limitBadge: "Takes a whisper", limitKind: "whispers", targets: ["player"] },
     });
   });
 
@@ -58,24 +58,24 @@ describe("SOURCE_DISPLAY", () => {
     expect(SOURCE_DISPLAY["trail-map"]!.item).toEqual({ rarity: "rare", price: 5, uses: "Single use", usesKind: "single-use" });
     expect(SOURCE_DISPLAY["pack-mule"]!.item).toEqual({ rarity: "common", price: 3, uses: "Once per camp", usesKind: "per-camp" });
     expect(SOURCE_DISPLAY["rain-poncho"]!.item).toEqual({ rarity: "common", price: 3, uses: "2 charges", usesKind: "charges" });
-    expect(SOURCE_DISPLAY["scout.keen-eye"]!.item).toBeNull();
+    expect(SOURCE_DISPLAY["explorer.second-wind"]!.item).toBeNull();
   });
 
   it("phrases each limit kind, and an item's uses as its badge", () => {
-    expect(SOURCE_DISPLAY.scout!.active!.limitBadge).toBe("Once per camp");
-    expect(SOURCE_DISPLAY["guide.howler-call"]!.active!.limitBadge).toBe("Once per run");
+    expect(SOURCE_DISPLAY.explorer!.active!.limitBadge).toBe("Once per camp");
     expect(SOURCE_DISPLAY["trail-map"]!.active!.limitBadge).toBe("Single use");
     expect(SOURCE_DISPLAY["rain-poncho"]!.active!.limitBadge).toBe("2 charges");
     expect(SOURCE_DISPLAY["parrot"]!.active!.limitBadge).toBe("Once per camp");
     expect(SOURCE_DISPLAY.whetstone!.active!.limitBadge).toBe("Single use");
-    expect(SOURCE_DISPLAY.botanist!.active!.limitBadge).toBe("1 herb");
-    expect(SOURCE_DISPLAY["botanist.antidote"]!.active!.limitBadge).toBe("2 herbs");
-    expect(["guide.howler-call", "rain-poncho", "parrot", "trail-map", "botanist", "medic"].map((id) => SOURCE_DISPLAY[id]!.active!.limitKind)).toEqual([
+    expect(SOURCE_DISPLAY["explorer.reshape"]!.active!.limitBadge).toBe("Once per camp, shared with Compass");
+    expect(SOURCE_DISPLAY["medic.rally"]!.active!.limitBadge).toBe("Once per run");
+    expect(["medic.rally", "rain-poncho", "parrot", "trail-map", "explorer.reshape", "leader.delegate", "medic"].map((id) => SOURCE_DISPLAY[id]!.active!.limitKind)).toEqual([
       "per-run",
       "charges",
       "per-camp",
       "single-use",
-      "pool",
+      "per-camp",
+      "whispers",
       "supplies",
     ]);
     expect(SOURCE_DISPLAY.medic!.active!.limitBadge).toBe("1 supply");
@@ -84,7 +84,7 @@ describe("SOURCE_DISPLAY", () => {
   it("phrases each window", () => {
     expect(SOURCE_DISPLAY["rain-poncho"]!.active!.windowPhrase).toBe("Between tricks");
     expect(SOURCE_DISPLAY.cartographer!.active!.windowPhrase).toBe("While picking objectives");
-    expect(SOURCE_DISPLAY["guide.howler-call"]!.active!.windowPhrase).toBe("On your turn");
+    expect(SOURCE_DISPLAY["jd.rule-breaker"]!.active!.windowPhrase).toBe("On your turn");
     expect(SOURCE_DISPLAY.medic!.active!.windowPhrase).toBe("When an objective fails");
   });
 
@@ -102,10 +102,16 @@ describe("SOURCE_DISPLAY", () => {
 });
 
 describe("CHARACTER_DISPLAY", () => {
-  it("has one entry per character, listing its two upgrades and its pool", () => {
+  it("has one entry per character, listing its further powers and its upgrades", () => {
     expect(Object.keys(CHARACTER_DISPLAY).sort()).toEqual(Object.keys(CATALOG.characters).sort());
-    expect(CHARACTER_DISPLAY.scout).toMatchObject({ id: "scout", power: "Spyglass", pool: null, upgradeIds: ["scout.keen-eye", "scout.eavesdrop"] });
-    expect(CHARACTER_DISPLAY.botanist!.pool).toEqual({ name: "Herbs", start: 2, max: 3 });
+    expect(CHARACTER_DISPLAY.explorer).toEqual({
+      id: "explorer",
+      name: "The Explorer",
+      theme: "Changes card values",
+      power: "Compass",
+      powerIds: [],
+      upgradeIds: ["explorer.second-wind", "explorer.true-form", "explorer.reshape"],
+    });
   });
 
   it("is JSON round-trippable", () => {

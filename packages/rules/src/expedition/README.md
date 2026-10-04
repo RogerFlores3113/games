@@ -46,11 +46,11 @@ else the highest kept card; equal strength goes to the earliest play. A card
 objective fails at once when its printed card burned, counted as another
 card or was discarded, and fails if never played by the final trick.
 - **`content/`**: the catalogue. `content/source-def.ts` holds the def types
-  (`CharacterDef`, `UpgradeDef`, `ItemDef`, `ActiveAbility`,
-  `PassiveAbility`, `UsageLimit`, `PoolDef`, `AbilityContext`) and the
-  `defineCharacter`/`defineUpgrade`/`defineItem`/`ability` helpers.
-  `content/characters/<id>.ts` is one character with its base power and its
-  two upgrades; `content/items/<id>.ts` is one item. Each folder has a
+  (`CharacterDef`, `PowerDef`, `UpgradeDef`, `ItemDef`, `ActiveAbility`,
+  `PassiveAbility`, `UsageLimit`, `AbilityContext`) and the
+  `defineCharacter`/`definePower`/`defineUpgrade`/`defineItem`/`ability`
+  helpers. `content/characters/<id>.ts` is one character with its base
+  power, any further powers and its two or three upgrades; `content/items/<id>.ts` is one item. Each folder has a
   `registry.ts` (`CHARACTERS`, `ITEMS`). `content/helpers.ts` holds shared
   effect helpers (`winnerExcluding`, `freshObjectiveAvailable`).
   `content/mods/` holds the camp modifiers: `mod-def.ts` (`ModDef`,
@@ -74,7 +74,7 @@ card or was discarded, and fails if never played by the final trick.
   (`abilityStatus`, `useAbility`, `passWindow`), `run/targets.ts`
   (`TARGET_KINDS`, `resolveTargets`, `stepsFor`), `run/windows.ts`
   (`WINDOWS`, `currentWindow`, `gatedPendingSeatIds`), `run/usage.ts`
-  (`remaining`, `poolBalance`, `liveSourceKeys`, `abilityKeys`,
+  (`remaining`, `shareOf`, `liveSourceKeys`, `abilityKeys`,
   `backpackOf`, `defIdOf`), `run/items.ts` (`mintItems`, `equipError`),
   `run/compose.ts` (`rulesFor`, the rule layers), `run/run-rules.ts` (`RunHooks`,
   `HOOK_NAMES`), `run/toolkit.ts` (`ToolkitOp`, `applyToolkitOps`, the only
@@ -130,8 +130,8 @@ auto-pass after the existing grace.
 **Layering order** (`run/compose.ts`): **base, then each camp-stack
 layer's `rules` (location, weather, pairing, the boss or the temple, then
 the temple's helpers at half strength), then per seat (seat
-order) each live source's passive in `[character, upgrade, ...equipped]`
-order, then each live effect's layer in `attempt.effects` order, then the
+order) each live source's passive in `[character, ...powers, upgrade,
+...equipped]` order, then each live effect's layer in `attempt.effects` order, then the
 passives marked `foldsLast`.** A boss
 folds after the weather so it can refine it; passives fold after both, so an
 item can lift a camp rule for its owner (Mosquito Net under Rain). A
@@ -164,8 +164,9 @@ effect added with `deferIfFatal` (a Thunderstorm strike) waits one trick
 when, under the fully composed rules, it is what lost the camp
 (`run/stages/camp.ts`).
 
-**Source keys.** A seat acts through a key: its character id, its upgrade
-id, an item instance's uid (`it7`, minted from `RunState.itemSerial`), or
+**Source keys.** A seat acts through a key: its character id, a power's id
+(a further ability of its character, live whenever it is that character),
+its upgrade id, an item instance's uid (`it7`, minted from `RunState.itemSerial`), or
 the id of a camp modifier that grants an ability (`abilityKeys`).
 The ledger, `use-ability`, `abilityStatus`, `remaining` and the view's
 `yourAbilities` and `usage` are keyed by it, so two copies of one item keep
@@ -186,9 +187,9 @@ dealt camp and throws outside one. In a camp `applyToolkitOps` asserts card
 conservation after the ops; a broken op throws (a content-author defect,
 POLICY A3).
 
-**Spending is the engine's job.** `useAbility` appends a `used` ledger entry
-(with its pool cost), takes the supplies of a supplies limit and the coins
-of a coins limit, and removes an item instance on the use that spends its
+**Spending is the engine's job.** `useAbility` appends a `used` ledger
+entry, takes the supplies of a supplies limit and the coins of a coins
+limit, and removes an item instance on the use that spends its
 last charge. A use the composed `freeUse` names is stamped `free`: it
 spends nothing and counts against no limit. Authors never count uses.
 
@@ -256,9 +257,9 @@ and `A` there are that camp's.
    conservation, a JSON round-trip, the per-seat leak check, the usage
    limits, and for an active item that its uses exhaust as declared, that a
    per-camp item resets on a replay, and that a spent instance leaves its
-   owner. Its first test (`has 6 characters, 12 upgrades and 13 items with
-   unique ids`) counts the catalogue, so raise the item count and the id
-   total there.
+   owner. Its first test (`has 6 characters, 0 powers, 15 upgrades and 13
+   items with unique ids`) counts the catalogue, so raise the item count and
+   the id total there.
 5. Add its 16x16 icon as `apps/web/public/expedition/sprites/sources/<id>.png`
    and its id to `SOURCE_ICON_IDS` (`apps/web/components/expedition/phaser/
    art/art-registry.ts`); `source-icons.test.ts` fails until you do.
@@ -272,29 +273,43 @@ that card can't win this one trick.
 ## Add a character
 
 1. Create `content/characters/<id>.ts` exporting `defineCharacter({ id,
-   name, theme, power, text, pool?, active?, passive?, upgrades })`. `power`
-   names the base power ("Spyglass"); `text` says what it does. A character
-   or upgrade ability gives `ability({ window, limit, targets, apply })`
-   with `limit` one of `{ kind: "per-camp", times }`, `{ kind: "per-run",
-   times }`, `{ kind: "pool", cost }`, `{ kind: "supplies", cost }` or
-   `{ kind: "coins", cost(ctx) }` (a price from the purse that may read the
-   key's uses this camp and this run, and the picked targets). A
-   character or upgrade may also react to engine events with `on` (see
+   name, theme, power, text, active?, passive?, on?, powers?, upgrades })`.
+   `power` names the base power ("Compass"); `text` says what it does. A
+   character, power or upgrade ability gives `ability({ window, limit,
+   targets, apply })` with `limit` one of:
+   - `{ kind: "per-camp", times }` or `{ kind: "per-run", times }`;
+   - `{ kind: "supplies", cost }`, the crew's supplies, never the last one;
+   - `{ kind: "coins", cost(ctx) }`, a price from the purse that may read
+     the key's uses this camp and this run, the picked targets, the
+     composed rules and the catalogue;
+   - `{ kind: "unlimited" }`, as often as the window and `canUse` allow;
+   - `{ kind: "whispers" }`, while the seat has a whisper left this camp
+     (the ability's own layer takes the whisper through `whispersPerCamp`,
+     as Delegate does);
+   - `{ kind: "shares", of, spends }`, the uses of another of the seat's
+     sources: both count against that one's limit, this one `spends` at a
+     time (Reshape uses the Compass's).
+
+   A character or upgrade may also react to engine events with `on` (see
    "The character seams").
-2. `pool` (optional) is the character's resource: `{ name, start, max,
-   regain }`. Abilities of this character and its upgrades may use
-   `{ kind: "pool", cost }`; the engine regains it after each cleared camp.
-3. `upgrades` is exactly two `defineUpgrade({...})` entries in the same
-   file. `defineCharacter` stamps the character id onto both. A seat buys
-   one of its own character's upgrades at the shop, and owning one also
-   gives it one more whisper per camp. An upgrade that tunes the base power
-   has no ability of its own: the base power reads `owner.hasUpgrade("<upgrade
-   id>")` through a `Tuned<T>` value (see Pathfinder in `guide.ts`).
+2. `powers` (optional) are further abilities of the base power, each a
+   `definePower({ id, name, text, active })` with its own key, live whenever
+   the seat is that character, for a base power that acts in more than one
+   window or on different targets.
+3. `upgrades` is two or three `defineUpgrade({...})` entries in the same
+   file. `defineCharacter` stamps the character id onto every power and
+   upgrade. A seat buys one of its own character's upgrades at the shop,
+   and owning one also gives it one more whisper per camp. An upgrade that
+   tunes the base power has no ability of its own: the base power reads
+   `owner.hasUpgrade("<upgrade id>")` through a `Tuned<T>` value (Second
+   Wind in `explorer.ts`).
 4. Add one line to `content/characters/registry.ts`'s `CHARACTERS`. The
-   contract tests cover the character and both upgrades; raise the counts
-   in `sources.contract.test.ts`'s first test. Add the 64x80 silhouette as
-   `sprites/crew/<id>.png`, the icons for the power and both upgrades under
-   `sprites/sources/`, and the ids to `CREW_IDS` and `SOURCE_ICON_IDS`.
+   contract tests cover the character, its powers and its upgrades; raise
+   the counts in `sources.contract.test.ts`'s first test. Add the 64x80
+   silhouette as `sprites/crew/<id>.png`, the 16x16 icons for the power,
+   each further power and each upgrade under `sprites/sources/`, the ids to
+   `CREW_IDS` and `SOURCE_ICON_IDS`, and one behaviour test per power and
+   upgrade in `content/catalogue.test.ts`.
 
 ## The character seams
 

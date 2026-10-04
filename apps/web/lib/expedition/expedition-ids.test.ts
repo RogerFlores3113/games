@@ -113,9 +113,9 @@ describe("objectiveObjectId", () => {
 describe("seat/source/draft/kit/gate/interactable object ids", () => {
   it("build the expected prefixed ids", () => {
     expect(seatObjectId("s1")).toBe("seat:s1");
-    expect(sourceObjectId("scout")).toBe("source:scout");
+    expect(sourceObjectId("explorer")).toBe("source:explorer");
     expect(mateSourceObjectId("s2", "bait")).toBe("seat-source:s2:bait");
-    expect(draftObjectId("guide")).toBe("draft:guide");
+    expect(draftObjectId("leader")).toBe("draft:leader");
     expect(kitObjectId("rain-poncho")).toBe("kit:rain-poncho");
     expect(gateUseObjectId("jam")).toBe("gate-use:jam");
     expect(interactableObjectId("campfire")).toBe("interactable:campfire");

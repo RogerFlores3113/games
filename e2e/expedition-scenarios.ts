@@ -31,7 +31,6 @@ interface Seat {
   upgradeId: string | null;
   items: { equipped: Item[]; backpack: Item[] | null; concealed: boolean };
   usage: { sourceKey: string; remaining: Json }[];
-  pool: Json | null;
 }
 type Attempt = Json & { camp: Camp; log: Json[]; reveals: Json[]; window: string | null; pendingSeatIds: string[]; rescue: Json | null };
 export interface Game extends Json {
@@ -63,7 +62,7 @@ export function scenarioKey(sourceId: string): string {
   return ITEM_SOURCES.has(sourceId) ? ITEM_UID : sourceId;
 }
 
-const ITEM_SOURCES = new Set(["puffball", "bait", "pack-mule"]);
+const ITEM_SOURCES = new Set(["puffball", "bait", "pack-mule", "trained-monkey", "parrot"]);
 
 /** Your seat holds `sourceId` with `remaining` uses: as its character for a
  * character id, its upgrade for an upgrade id, else an equipped item. */
@@ -115,26 +114,26 @@ const STD = (c: Card): c is Card & { identity: { kind: "standard"; rank: number 
 export const PICKER_SCENARIOS: Record<string, { sourceId: string; rewrite: Rewrite }> = {
   self: {
     sourceId: "puffball",
-    rewrite: (g) => withAbility(holding(playing(g, { plays: 0, window: "between-tricks" }), "puffball", "guide", { kind: "uses", left: 1, of: 1 }), "puffball", [
+    rewrite: (g) => withAbility(holding(playing(g, { plays: 0, window: "between-tricks" }), "puffball", "explorer", { kind: "uses", left: 1, of: 1 }), "puffball", [
       { kind: "self", prompt: "Use it on yourself", choices: [`seat:${g.yourSeatId}`] },
     ]),
   },
   player: {
-    sourceId: "guide",
-    rewrite: (g) => withAbility(holding(playing(g, { plays: 0, window: "between-tricks" }), "guide", "guide", { kind: "uses", left: 1, of: 1 }), "guide", [
-      { kind: "player", prompt: "Pick a player", choices: g.seats.map((s) => `seat:${s.seatId}`) },
+    sourceId: "leader.delegate",
+    rewrite: (g) => withAbility(holding(playing(g, { plays: 0, window: "between-tricks" }), "leader.delegate", "leader", { kind: "whispers", left: 2 }), "leader.delegate", [
+      { kind: "player", prompt: "Pick a teammate", choices: others(g).map((id) => `seat:${id}`) },
     ]),
   },
   hand: {
-    sourceId: "scout",
-    rewrite: (g) => withAbility(holding(playing(g, { plays: 0, window: "between-tricks" }), "scout", "scout", { kind: "uses", left: 1, of: 1 }), "scout", [
+    sourceId: "trained-monkey",
+    rewrite: (g) => withAbility(holding(playing(g, { plays: 0, window: "between-tricks" }), "trained-monkey", "explorer", { kind: "uses", left: 1, of: 1 }), "trained-monkey", [
       { kind: "hand", prompt: "Pick a teammate's hand", choices: others(g).map((id) => `hand:${id}`) },
     ]),
   },
   card: {
     sourceId: "bait",
     rewrite: (g) => {
-      const next = holding(playing(g, { plays: 2, window: "in-trick" }), "bait", "guide", { kind: "uses", left: 1, of: 1 });
+      const next = holding(playing(g, { plays: 2, window: "in-trick" }), "bait", "explorer", { kind: "uses", left: 1, of: 1 });
       return withAbility(next, "bait", [{ kind: "card", prompt: "Pick a card on the table", choices: attempt(next).camp.currentTrick.plays.map((p) => `card:${p.card.id}`) }]);
     },
   },
@@ -160,18 +159,18 @@ export const PICKER_SCENARIOS: Record<string, { sourceId: string; rewrite: Rewri
     rewrite: (g) => rescue(g),
   },
   whisper: {
-    sourceId: "scout.eavesdrop",
+    sourceId: "parrot",
     rewrite: (g) => {
-      const next = holding(playing(g, { plays: 0, window: "between-tricks" }), "scout.eavesdrop", "scout", { kind: "uses", left: 1, of: 1 });
-      const [a, b] = others(g);
-      attempt(next).log = [{ event: "whisper", actorSeatId: a, subjectSeatIds: [b], sourceId: null, private: false }];
-      return withAbility(next, "scout.eavesdrop", [{ kind: "whisper", prompt: "Pick a whisper between two teammates", choices: ["whisper:0"] }]);
+      const next = holding(playing(g, { plays: 0, window: "between-tricks" }), "parrot", "explorer", { kind: "uses", left: 1, of: 1 });
+      const [a] = others(g);
+      attempt(next).log = [{ event: "whisper", actorSeatId: a, subjectSeatIds: [g.yourSeatId], sourceId: null, private: false }];
+      return withAbility(next, "parrot", [{ kind: "whisper", prompt: "Pick a whisper you received", choices: ["whisper:0"] }]);
     },
   },
   "won-trick": {
     sourceId: "pack-mule",
     rewrite: (g) => {
-      const next = holding(playing(g, { plays: 0, window: "between-tricks" }), "pack-mule", "guide", { kind: "uses", left: 1, of: 1 });
+      const next = holding(playing(g, { plays: 0, window: "between-tricks" }), "pack-mule", "explorer", { kind: "uses", left: 1, of: 1 });
       return withAbility(next, "pack-mule", [
         { kind: "won-trick", prompt: "Pick a trick you won", choices: ["trick:0", "trick:1"] },
         { kind: "player", prompt: "Pick a teammate", choices: others(g).map((id) => `seat:${id}`) },
@@ -179,18 +178,12 @@ export const PICKER_SCENARIOS: Record<string, { sourceId: string; rewrite: Rewri
     },
   },
   "card-value": {
-    sourceId: "botanist",
+    sourceId: "explorer",
     rewrite: (g) => {
-      const next = holding(playing(g, { plays: 0, window: "between-tricks" }), "botanist", "botanist", { kind: "pool", balance: 2, max: 3, cost: 1 });
+      const next = holding(playing(g, { plays: 0, window: "between-tricks" }), "explorer", "explorer", { kind: "uses", left: 1, of: 1 });
       const choices = attempt(next).camp.yourHand.filter(STD).flatMap((c) => [c.identity.rank - 1, c.identity.rank + 1].filter((r) => r >= 2 && r <= 14).map((r) => `value:${c.id}:${r}`));
-      return withAbility(next, "botanist", [{ kind: "card-value", prompt: "Pick a card in your hand to recount", choices }]);
+      return withAbility(next, "explorer", [{ kind: "card-value", prompt: "Pick a card in your hand to recount", choices }]);
     },
-  },
-  board: {
-    sourceId: "guide.howler-call",
-    rewrite: (g) => withAbility(holding(playing(g, { plays: 2, window: "in-trick" }), "guide.howler-call", "guide", { kind: "uses", left: 1, of: 1 }), "guide.howler-call", [
-      { kind: "board", prompt: "Pick the trick on the table", choices: ["board"] },
-    ]),
   },
   supplies: {
     sourceId: "medic.field-kit",

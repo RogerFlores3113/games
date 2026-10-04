@@ -1,7 +1,7 @@
 // The run layer's type contract.
 //
-// DERIVE, DON'T CACHE: run status, a source's remaining uses, a pool's
-// balance, the next attempt number and a seat's remaining whisper count are
+// DERIVE, DON'T CACHE: run status, a source's remaining uses, the next
+// attempt number and a seat's remaining whisper count are
 // computed from RunState, never stored. Purse, supplies and history are
 // stored plainly: every reader wants the number, and four writers is few.
 //
@@ -43,15 +43,14 @@ export type Stamp = { readonly camp: CampIndex; readonly attempt: number; readon
 /** "it7", minted from RunState.itemSerial, so an id never names its item. */
 export type ItemUid = string;
 export type ItemInstance = { readonly uid: ItemUid; readonly itemId: SourceId };
-/** What an ability is used through: a character id, an upgrade id or an
- * item instance's uid, so two copies of one item keep separate uses. */
+/** What an ability is used through: a character id, a power id, an upgrade
+ * id or an item instance's uid, so two copies of one item keep separate uses. */
 export type SourceKey = string;
 
 export type LedgerEntry =
-  /** poolCost is 0 unless a pool limit; a `free` use counts against no limit. */
-  | { readonly kind: "used"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly poolCost: number; readonly free?: true }
-  | { readonly kind: "passed"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly failedObjectiveIds: readonly string[] } // gated-window pass; the failures it declined
-  | { readonly kind: "regained"; readonly amount: number; readonly at: Stamp }; // pool regain on a clear
+  /** A `free` use counts against no limit. */
+  | { readonly kind: "used"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly free?: true }
+  | { readonly kind: "passed"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly failedObjectiveIds: readonly string[] }; // gated-window pass; the failures it declined
 
 export type SeatRun = {
   readonly seatId: SeatId;
@@ -67,7 +66,7 @@ export type Reveal = {
   readonly cardId: string;
   readonly fromSeatId: string; // the hand holding the card when revealed; pinned forever (WR-03)
   readonly audience: readonly string[]; // the ONLY seats a view may show this card to
-  readonly source: string; // "whisper", a source id (e.g. "scout") or a mod id
+  readonly source: string; // "whisper", a source id (e.g. "magician") or a mod id
   readonly targetSeatId?: string; // whispers only: the seat the whisperer named, public in the log anyway
 };
 
@@ -186,7 +185,7 @@ export type Catalog = {
   readonly items: Readonly<Record<string, ItemDef>>;
   readonly mods: Readonly<Record<ModId, ModDef>>;
   readonly pairings: readonly PairingRule[];
-  /** Every character, every character's upgrades and every item, by id. */
+  /** Every character, every character's powers and upgrades, and every item, by id. */
   readonly sources: Readonly<Record<SourceId, SourceDef>>;
 };
 

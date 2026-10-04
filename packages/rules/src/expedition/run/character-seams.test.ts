@@ -96,7 +96,7 @@ describe("stage windows", () => {
     expect(currentWindow(loadout, rulesFor(loadout, catalog))).toBe("loadout");
     const used = use(loadout, "p0", "purser", [], catalog);
     expect(used.purse).toBe(1);
-    expect(used.seats[0]!.ledger).toEqual([{ kind: "used", sourceKey: "purser", at: { camp: 1, attempt: 1, trick: 0 }, poolCost: 0 }]);
+    expect(used.seats[0]!.ledger).toEqual([{ kind: "used", sourceKey: "purser", at: { camp: 1, attempt: 1, trick: 0 } }]);
     expect(used.stage.tag).toBe("loadout");
   });
 
@@ -308,7 +308,7 @@ describe("freeUse", () => {
     const camp = advanceTo(setupRun({ seatIds: SEATS, seed: "free", catalog, characters: { p0: "sturdy" }, items: { p0: ["once"] } }), "between-tricks", catalog);
     const free = use(camp, "p0", "it0", [], catalog);
     expect(free.seats[0]!.items).toEqual([{ uid: "it0", itemId: "once" }]);
-    expect(free.seats[0]!.ledger).toEqual([{ kind: "used", sourceKey: "it0", at: { camp: 1, attempt: 1, trick: 0 }, poolCost: 0, free: true }]);
+    expect(free.seats[0]!.ledger).toEqual([{ kind: "used", sourceKey: "it0", at: { camp: 1, attempt: 1, trick: 0 }, free: true }]);
     expect(remaining(free, "p0", "it0", catalog)).toEqual({ kind: "uses", left: 1, of: 1 });
     expect(use(free, "p0", "it0", [], catalog).seats[0]!.items).toEqual([]);
   });

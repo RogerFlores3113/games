@@ -193,13 +193,13 @@ describe("property: whole-run simulation (RUN-07)", () => {
     let rescueStates = 0;
     let rescueUses = 0;
     let inTrickUses = 0;
-    const RESCUE_AND_IN_TRICK = new Set(["medic", "rope-ladder", "bait", "guide.howler-call"]);
+    const RESCUE_AND_IN_TRICK = new Set(["medic", "rope-ladder", "bait", "jd.rule-breaker"]);
     fc.assert(
       fc.property(fc.constantFrom(3, 4, 5), fc.string({ minLength: 1 }), choicesArb, (seatCount, seed, choices) => {
         const seatIds = seatIdsFor(seatCount);
-        const characters = Object.fromEntries(seatIds.map((seatId, i) => [seatId, ["medic", "guide", "scout", "signaller", "botanist"][i]!]));
+        const characters = Object.fromEntries(seatIds.map((seatId, i) => [seatId, ["medic", "jd", "explorer", "leader", "cartographer"][i]!]));
         const items = Object.fromEntries(seatIds.map((seatId, i) => [seatId, i % 2 === 0 ? ["rope-ladder", "bait"] : []]));
-        const initial = setupRun({ seatIds, seed, catalog: CATALOG, characters, items });
+        const initial = setupRun({ seatIds, seed, catalog: CATALOG, characters, upgrades: { [seatIds[1]!]: "jd.rule-breaker" }, items });
 
         const { states, log } = driveRun(initial, choices, CATALOG);
 

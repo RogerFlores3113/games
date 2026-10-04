@@ -22,7 +22,7 @@ import {
 } from "./local-ui";
 
 const SCOUT: ExpeditionAbilityView = {
-  sourceKey: "scout",
+  sourceKey: "explorer",
   usableNow: true,
   reason: null,
   steps: [{ kind: "hand", prompt: "Pick a teammate's hand", choices: ["hand:p1", "hand:p2"] }],
@@ -64,9 +64,9 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     supplies: { count: 3, max: 5 },
     plan: [],
     seats: [
-      { seatId: "p0", characterId: "scout", ...kitOf(["trained-monkey", "bait"]), pool: null, usage: [] },
-      { seatId: "p1", characterId: "guide", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
-      { seatId: "p2", characterId: "medic", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
+      { seatId: "p0", characterId: "explorer", ...kitOf(["trained-monkey", "bait"]), usage: [] },
+      { seatId: "p1", characterId: "leader", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
+      { seatId: "p2", characterId: "jd", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
     ],
     yourAbilities: [SCOUT, MONKEY, BAIT, PARROT],
     history: [],
@@ -166,21 +166,21 @@ describe("initialLocalUi", () => {
 
 describe("beginAbilityTargeting", () => {
   it("is a no-op when the ability is not usable now", () => {
-    const view = makeView({ yourAbilities: [{ sourceKey: "scout", usableNow: false, reason: "Already used this camp", steps: [] }] });
+    const view = makeView({ yourAbilities: [{ sourceKey: "explorer", usableNow: false, reason: "Already used this camp", steps: [] }] });
     const ui = freeze(initialLocalUi());
-    expect(beginAbilityTargeting(ui, view, "scout")).toBe(ui);
+    expect(beginAbilityTargeting(ui, view, "explorer")).toBe(ui);
   });
 
   it("is a no-op when the source is absent from yourAbilities", () => {
     const view = makeView({ yourAbilities: [] });
     const ui = freeze(initialLocalUi());
-    expect(beginAbilityTargeting(ui, view, "scout")).toBe(ui);
+    expect(beginAbilityTargeting(ui, view, "explorer")).toBe(ui);
   });
 
-  it("begins targeting the scout with an empty selection; next kind is hand", () => {
+  it("begins targeting the explorer with an empty selection; next kind is hand", () => {
     const view = makeView();
-    const next = beginAbilityTargeting(freeze(initialLocalUi()), view, "scout");
-    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "scout", selected: [], valueCardId: null });
+    const next = beginAbilityTargeting(freeze(initialLocalUi()), view, "explorer");
+    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "explorer", selected: [], heldId: null });
     expect(nextTargetKind(next, view)).toBe("hand");
     expect(currentStep(next, view)?.prompt).toBe("Pick a teammate's hand");
   });
@@ -195,7 +195,7 @@ describe("beginAbilityTargeting", () => {
 describe("selectTarget", () => {
   it("an id outside the current step's choices is a no-op", () => {
     const view = makeView();
-    const started = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "scout"));
+    const started = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "explorer"));
     expect(selectTarget(started, view, "hand:p0")).toBe(started);
     expect(selectTarget(started, view, "p1")).toBe(started);
   });
@@ -208,9 +208,9 @@ describe("selectTarget", () => {
 
   it("picking an offered id records it and ends the steps", () => {
     const view = makeView();
-    const started = beginAbilityTargeting(freeze(initialLocalUi()), view, "scout");
+    const started = beginAbilityTargeting(freeze(initialLocalUi()), view, "explorer");
     const next = selectTarget(freeze(started), view, "hand:p1");
-    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "scout", selected: ["hand:p1"], valueCardId: null });
+    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "explorer", selected: ["hand:p1"], heldId: null });
     expect(nextTargetKind(next, view)).toBeNull();
   });
 
@@ -225,7 +225,7 @@ describe("selectTarget", () => {
     expect(nextTargetKind(ui, view)).toBe("player");
 
     ui = freeze(selectTarget(ui, view, "seat:p1"));
-    expect(ui.targeting).toEqual({ mode: "ability", sourceKey: "trained-monkey", selected: ["card:c1", "seat:p1"], valueCardId: null });
+    expect(ui.targeting).toEqual({ mode: "ability", sourceKey: "trained-monkey", selected: ["card:c1", "seat:p1"], heldId: null });
     expect(nextTargetKind(ui, view)).toBeNull();
   });
 });
@@ -238,9 +238,9 @@ describe("choiceFor", () => {
     expect(choiceFor(monkey, view, "card", "c9")).toBeNull();
     expect(choiceFor(monkey, view, "seat", "p1")).toBeNull();
 
-    const scout = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "scout"));
-    expect(choiceFor(scout, view, "hand", "p2")).toBe("hand:p2");
-    expect(choiceFor(scout, view, "seat", "p2")).toBeNull();
+    const explorer = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "explorer"));
+    expect(choiceFor(explorer, view, "hand", "p2")).toBe("hand:p2");
+    expect(choiceFor(explorer, view, "seat", "p2")).toBeNull();
 
     const parrot = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "parrot"));
     expect(choiceFor(parrot, view, "objective", "o1")).toBe("objective:o1");
@@ -252,17 +252,17 @@ describe("choiceFor", () => {
   });
 
   it("maps the board and the supplies to their single ids", () => {
-    const howler: ExpeditionAbilityView = { sourceKey: "guide.howler-call", usableNow: true, reason: null, steps: [{ kind: "board", prompt: "Pick the trick on the table", choices: ["board"] }] };
-    const kit: ExpeditionAbilityView = { sourceKey: "medic.field-kit", usableNow: true, reason: null, steps: [{ kind: "supplies", prompt: "Pick the crew's supplies", choices: ["supplies"] }] };
+    const howler: ExpeditionAbilityView = { sourceKey: "leader.delegate", usableNow: true, reason: null, steps: [{ kind: "board", prompt: "Pick the trick on the table", choices: ["board"] }] };
+    const kit: ExpeditionAbilityView = { sourceKey: "explorer.reshape", usableNow: true, reason: null, steps: [{ kind: "supplies", prompt: "Pick the crew's supplies", choices: ["supplies"] }] };
     const view = makeView({ yourAbilities: [howler, kit] });
-    expect(choiceFor(beginAbilityTargeting(initialLocalUi(), view, "guide.howler-call"), view, "board", "")).toBe("board");
-    expect(choiceFor(beginAbilityTargeting(initialLocalUi(), view, "medic.field-kit"), view, "supplies", "")).toBe("supplies");
+    expect(choiceFor(beginAbilityTargeting(initialLocalUi(), view, "leader.delegate"), view, "board", "")).toBe("board");
+    expect(choiceFor(beginAbilityTargeting(initialLocalUi(), view, "explorer.reshape"), view, "supplies", "")).toBe("supplies");
   });
 });
 
 describe("card-value steps", () => {
   const TONIC: ExpeditionAbilityView = {
-    sourceKey: "botanist",
+    sourceKey: "explorer",
     usableNow: true,
     reason: null,
     steps: [{ kind: "card-value", prompt: "Pick a card in your hand to recount", choices: ["value:c1:4", "value:c1:6", "value:c2:9"] }],
@@ -270,7 +270,7 @@ describe("card-value steps", () => {
 
   it("a hand card holds the card, then a rank completes the step and confirms", () => {
     const view = makeView({ yourAbilities: [TONIC] });
-    let ui = beginAbilityTargeting(initialLocalUi(), view, "botanist");
+    let ui = beginAbilityTargeting(initialLocalUi(), view, "explorer");
     expect(choiceFor(ui, view, "card", "c1")).toBe("card:c1");
     expect(choiceFor(ui, view, "card", "c3")).toBeNull();
     ui = selectTarget(ui, view, "card:c1");
@@ -278,13 +278,34 @@ describe("card-value steps", () => {
     expect(isPicked(ui, "card", "c1")).toBe(true);
     ui = selectTarget(ui, view, "value:c1:6");
     expect(valueChoices(ui, view)).toEqual([]);
-    expect(confirmTargeting(ui, view).request).toEqual({ type: "use-ability", sourceKey: "botanist", targets: ["value:c1:6"] });
+    expect(confirmTargeting(ui, view).request).toEqual({ type: "use-ability", sourceKey: "explorer", targets: ["value:c1:6"] });
   });
 
   it("a rank for another card than the held one is refused", () => {
     const view = makeView({ yourAbilities: [TONIC] });
-    const ui = selectTarget(beginAbilityTargeting(initialLocalUi(), view, "botanist"), view, "card:c1");
+    const ui = selectTarget(beginAbilityTargeting(initialLocalUi(), view, "explorer"), view, "card:c1");
     expect(selectTarget(ui, view, "value:c2:9").targeting).toEqual(ui.targeting);
+  });
+});
+
+describe("objective-value steps", () => {
+  const RESHAPE: ExpeditionAbilityView = {
+    sourceKey: "explorer.reshape",
+    usableNow: true,
+    reason: null,
+    steps: [{ kind: "objective-value", prompt: "Pick an objective's card to shift", choices: ["objective-value:o1:6", "objective-value:o1:8", "objective-value:o2:3"] }],
+  };
+
+  it("an objective holds it, then a rank completes the step and confirms", () => {
+    const view = makeView({ yourAbilities: [RESHAPE] });
+    let ui = beginAbilityTargeting(initialLocalUi(), view, "explorer.reshape");
+    expect([choiceFor(ui, view, "objective", "o1"), choiceFor(ui, view, "objective", "o3"), choiceFor(ui, view, "card", "o1")]).toEqual(["objective:o1", null, null]);
+    ui = selectTarget(ui, view, "objective:o1");
+    expect(valueChoices(ui, view)).toEqual(["objective-value:o1:6", "objective-value:o1:8"]);
+    expect([isPicked(ui, "objective", "o1"), isPicked(ui, "objective", "o2")]).toEqual([true, false]);
+    expect(selectTarget(ui, view, "objective-value:o2:3").targeting).toEqual(ui.targeting);
+    ui = selectTarget(ui, view, "objective-value:o1:8");
+    expect(confirmTargeting(ui, view).request).toEqual({ type: "use-ability", sourceKey: "explorer.reshape", targets: ["objective-value:o1:8"] });
   });
 });
 
@@ -301,7 +322,7 @@ describe("self steps", () => {
 describe("confirmTargeting", () => {
   it("before all steps are picked: request is null, ui is unchanged", () => {
     const view = makeView();
-    const started = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "scout"));
+    const started = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "explorer"));
     const { ui, request } = confirmTargeting(started, view);
     expect(request).toBeNull();
     expect(ui).toBe(started);
@@ -365,7 +386,7 @@ describe("beginWhisper", () => {
 describe("cancelTargeting", () => {
   it("clears targeting only, leaving hover/lastTrickOpen untouched", () => {
     const view = makeView();
-    let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "scout"));
+    let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "explorer"));
     ui = freeze(setHoveredCard(ui, "c1"));
     ui = freeze(setLastTrickOpen(ui, true));
     const next = cancelTargeting(ui);
@@ -378,8 +399,8 @@ describe("cancelTargeting", () => {
 describe("reconcileLocalUi", () => {
   it("clears an ability targeting whose ability is no longer usable", () => {
     const view1 = makeView();
-    let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view1, "scout"));
-    const view2 = makeView({ yourAbilities: [{ sourceKey: "scout", usableNow: false, reason: "Already used this camp", steps: [] }] });
+    let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view1, "explorer"));
+    const view2 = makeView({ yourAbilities: [{ sourceKey: "explorer", usableNow: false, reason: "Already used this camp", steps: [] }] });
     ui = reconcileLocalUi(ui, view2);
     expect(ui.targeting).toBeNull();
   });
@@ -403,7 +424,7 @@ describe("reconcileLocalUi", () => {
       steps: [{ kind: "card", prompt: "Pick one of your cards", choices: ["card:c2"] }, MONKEY.steps[1]!],
     };
     const next = reconcileLocalUi(ui, makeView({ yourAbilities: [narrowed] }));
-    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "trained-monkey", selected: [], valueCardId: null });
+    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "trained-monkey", selected: [], heldId: null });
   });
 
   it("keeps a still-offered first pick and drops only the later one", () => {
@@ -417,7 +438,7 @@ describe("reconcileLocalUi", () => {
       steps: [MONKEY.steps[0]!, { kind: "player", prompt: "Pick a teammate", choices: ["seat:p2"] }],
     };
     const next = reconcileLocalUi(ui, makeView({ yourAbilities: [narrowed] }));
-    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "trained-monkey", selected: ["card:c1"], valueCardId: null });
+    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "trained-monkey", selected: ["card:c1"], heldId: null });
   });
 
   it("drops a whisper card pick that left the hand", () => {
@@ -445,10 +466,10 @@ describe("reconcileLocalUi", () => {
 
   it("leaves valid targeting/hover untouched", () => {
     const view = makeView();
-    let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "scout"));
+    let ui = freeze(beginAbilityTargeting(freeze(initialLocalUi()), view, "explorer"));
     ui = freeze(setHoveredCard(ui, "c1"));
     const next = reconcileLocalUi(ui, view);
-    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "scout", selected: [], valueCardId: null });
+    expect(next.targeting).toEqual({ mode: "ability", sourceKey: "explorer", selected: [], heldId: null });
     expect(next.hoveredCardId).toBe("c1");
   });
 });
@@ -458,7 +479,7 @@ describe("setHoveredCard / setLastTrickOpen / tooltip setters", () => {
     const ui = freeze(initialLocalUi());
     expect(setHoveredCard(ui, "c1")).toEqual({ ...initialLocalUi(), hoveredCardId: "c1" });
     expect(setLastTrickOpen(ui, true)).toEqual({ ...initialLocalUi(), lastTrickOpen: true });
-    expect(setTooltipSource(ui, "scout")).toEqual({ ...initialLocalUi(), tooltipSourceId: "scout" });
+    expect(setTooltipSource(ui, "explorer")).toEqual({ ...initialLocalUi(), tooltipSourceId: "explorer" });
     expect(setTooltipObjective(ui, "o1")).toEqual({ ...initialLocalUi(), tooltipObjectiveId: "o1" });
     expect(setTooltipMateSource(ui, { seatId: "s1", sourceKey: "bait" })).toEqual({
       ...initialLocalUi(),

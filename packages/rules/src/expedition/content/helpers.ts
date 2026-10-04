@@ -69,7 +69,7 @@ export function shiftedRank(run: RunState, seatId: string, cardId: string, rank:
   return { rankOf: (prev) => (card) => (card.id === cardId ? rank : prev(card)) };
 }
 
-function heldOrPlayedBy(camp: CampState, seatId: string, cardId: string): boolean {
+export function heldOrPlayedBy(camp: CampState, seatId: string, cardId: string): boolean {
   const held = camp.hands.some((hand) => hand.seatId === seatId && hand.cards.some((card) => card.id === cardId));
   const plays = [...camp.completedTricks.flatMap((trick) => trick.plays), ...camp.currentTrick.plays];
   return held || plays.some((play) => play.seatId === seatId && play.card.id === cardId);

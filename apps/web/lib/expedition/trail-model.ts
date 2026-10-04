@@ -62,8 +62,8 @@ export interface CharacterCard {
   name: string;
   theme: string;
   power: { sourceId: string; name: string; text: string; badges: string[] };
-  /** "Herbs: start 2, max 3"; null without a pool. */
-  pool: string | null;
+  /** The base power's further abilities (the Cartographer's Redraw). */
+  more: { sourceId: string; name: string; text: string; badges: string[] }[];
   /** The teammate who took it; "You" for your own pick. */
   takenBy: string | null;
   yours: boolean;
@@ -175,7 +175,7 @@ export interface CrewRow {
   isYou: boolean;
   connected: boolean;
   status: "ready" | "waiting" | "drafting" | "voted" | "voting";
-  /** "The Scout", or null while still choosing. */
+  /** "The Explorer", or null while still choosing. */
   character: string | null;
   sources: { sourceKey: string; sourceId: string; name: string }[];
   /** Heavy fog hides the items this teammate took. */
@@ -291,7 +291,7 @@ function buildMuster(server: SceneServerInput, ballots: readonly { seatId: strin
       name: c.name,
       theme: c.theme,
       power: { sourceId: c.id, name: c.power, text: power?.text ?? "", badges: sourceBadges(c.id) },
-      pool: c.pool === null ? null : `${c.pool.name}: start ${c.pool.start}, max ${c.pool.max}`,
+      more: c.powerIds.map((id) => ({ sourceId: id, name: SOURCE_DISPLAY[id]?.name ?? id, text: SOURCE_DISPLAY[id]?.text ?? "", badges: sourceBadges(id) })),
       takenBy,
       yours,
       pickable: holder === undefined && you !== undefined && you.characterId === null,

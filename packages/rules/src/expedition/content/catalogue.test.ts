@@ -14,13 +14,14 @@ import { CATALOG } from "../run/catalog";
 import { rulesFor } from "../run/compose";
 import { attemptOf, withAttempt } from "../run/attempt";
 import { advanceTo, setupRun, testCatalog } from "../run/run-test-support";
+import { createRun } from "../run/lifecycle";
 import { applyRunAction } from "../run/stages/registry";
 import { resolvedPlay } from "../test-support";
 import { defineItem } from "./source-def";
 import { campCardIds } from "../run/toolkit";
 import type { RunAction, RunState } from "../run/types";
 import type { ExpeditionAttemptView, ExpeditionView } from "../adapter/view-types";
-import { poolBalance, remaining } from "../run/usage";
+import { remaining } from "../run/usage";
 import { currentWindow, gatedPendingSeatIds } from "../run/windows";
 
 const SEATS = ["p0", "p1", "p2"] as const;
@@ -29,7 +30,7 @@ function attemptViewOf(view: ExpeditionView): ExpeditionAttemptView {
   if (view.stage.tag !== "camp") throw new Error(`expected the camp stage, got ${view.stage.tag}`);
   return view.stage.attempt;
 }
-const FILLERS = ["scout", "guide", "botanist", "medic", "cartographer"];
+const FILLERS = ["jd", "explorer", "cartographer", "leader", "medic"];
 
 const std = (id: string, suit: Suit, rank: StandardRank): ExpeditionCard => ({ id, identity: { kind: "standard", suit, rank } });
 const ident = (suit: Suit, rank: StandardRank): StandardIdentity => ({ kind: "standard", suit, rank });
@@ -56,6 +57,8 @@ const WON_BY_P1 = trick(0, "p0", [["p0", std("x", "spades", 9)], ["p1", Y12], ["
 
 type Spec = {
   character?: string;
+  /** p1's and p2's characters, instead of the fillers. */
+  mates?: readonly [string, string];
   kit?: readonly string[];
   camp?: number;
   supplies?: number;
@@ -68,8 +71,8 @@ type Spec = {
 };
 
 function crew(spec: Spec): RunState {
-  const character = spec.character ?? "scout";
-  const [p1, p2] = FILLERS.filter((id) => id !== character);
+  const character = spec.character ?? "jd";
+  const [p1, p2] = spec.mates ?? FILLERS.filter((id) => id !== character);
   return setupRun({
     seatIds: SEATS,
     seed: "catalogue",
@@ -150,7 +153,6 @@ const rules = (run: RunState) => rulesFor(run, CATALOG);
 const whisperAllowance = (run: RunState) => SEATS.map((seatId) => rules(run).whispersPerCamp(run, seatId));
 const objectiveOf = (run: RunState, id: string) => camp(run).objectives.find((o) => o.id === id)!;
 const revealsFor = (run: RunState, seatId: string) => attemptViewOf(toExpeditionPlayerView(run, seatId, CATALOG)).reveals;
-const balance = (run: RunState, seatId = "p0") => poolBalance(run.seats.find((s) => s.seatId === seatId)!, CATALOG);
 
 /** A camp one trick from clearing: p0 wins with the spades 14 and owns that objective. */
 function clearableTable(spec: Spec): RunState {
@@ -165,124 +167,113 @@ function clearableTable(spec: Spec): RunState {
 
 const playOut = (run: RunState) => play(play(play(run, "p0", "a"), "p1", "b"), "p2", "c");
 
-describe("Scout", () => {
-  const hands = {
-    p1: [std("b1", "hearts", 5), std("b2", "hearts", 6), std("b3", "hearts", 7)],
-  };
-
-  it("Spyglass reveals exactly one card of the target's hand to the user only", () => {
-    const run = use(table({ character: "scout", hands }), "p0", "scout", ["hand:p1"]);
-    const [reveal, ...rest] = attemptOf(run)!.reveals;
-    expect(rest).toEqual([]);
-    expect(reveal).toMatchObject({ fromSeatId: "p1", audience: ["p0"], source: "scout" });
-    expect(["b1", "b2", "b3"]).toContain(reveal!.cardId);
-    expect(revealsFor(run, "p0")).toEqual([
-      expect.objectContaining({ cardId: reveal!.cardId, identity: hands.p1.find((c) => c.id === reveal!.cardId)!.identity }),
-    ]);
-    expect(revealsFor(run, "p1")).toEqual([]);
-    expect(revealsFor(run, "p2")).toEqual([]);
+describe("J.D.", () => {
+  it("Beginner's Luck gives J.D. one random item when the length vote opens camp 1", () => {
+    let run = createRun({ seatIds: SEATS, seed: "beginner" });
+    for (const [seatId, characterId] of [["p0", "jd"], ["p1", "leader"], ["p2", "explorer"]] as const) run = act(run, seatId, { type: "pick-character", characterId });
+    for (const seatId of SEATS) run = act(run, seatId, { type: "vote", choice: "short" });
+    expect(run.stage.tag).toBe("loadout");
+    expect(run.seats.map((s) => [s.items, s.equipped])).toEqual([[[{ uid: "it0", itemId: "parrot" }], ["it0"]], [[], []], [[], []]]);
   });
 
-  it("Keen Eye makes Spyglass reveal two distinct cards", () => {
-    const run = use(table({ character: "scout", kit: ["scout.keen-eye"], hands }), "p0", "scout", ["hand:p1"]);
-    const ids = attemptOf(run)!.reveals.map((r) => r.cardId);
-    expect(ids).toHaveLength(2);
-    expect(new Set(ids).size).toBe(2);
-    expect(ids.every((id) => ["b1", "b2", "b3"].includes(id))).toBe(true);
-    expect(revealsFor(run, "p2")).toEqual([]);
+  it("J.D.'s hidden luck adds 5 to every route's chance of fair weather, up to 100", () => {
+    const run = table({ character: "jd" });
+    expect([rules(run).normalWeatherChance(run, 80), rules(run).normalWeatherChance(run, 98)]).toEqual([85, 100]);
+    const without = table({ character: "leader", mates: ["explorer", "medic"] });
+    expect(rules(without).normalWeatherChance(without, 80)).toBe(80);
   });
 
-  it("Eavesdrop shows the user the card of a whisper between two teammates", () => {
-    const start = table({ character: "scout", kit: ["scout.eavesdrop"], hands: { p1: [Y12] } });
-    const whispered = whisper(start, "p1", "p2", "y");
-    expect(revealsFor(whispered, "p0")).toEqual([]);
-    const run = use(whispered, "p0", "scout.eavesdrop", ["whisper:0"]);
-    expect(revealsFor(run, "p0")).toEqual([
-      { cardId: "y", fromSeatId: "p1", source: "scout.eavesdrop", identity: Y12.identity, toSeatId: null },
-    ]);
-  });
-});
-
-describe("Guide", () => {
-  it("Machete makes the chosen seat lead the next trick, once per camp", () => {
-    const start = table({ character: "guide", leader: "p0" });
-    const run = use(start, "p0", "guide", ["seat:p2"]);
-    expect(camp(run).currentTrick.leaderSeatId).toBe("p2");
-    expect(refusal(run, "p0", "guide", ["seat:p1"])).toBe("ability_spent");
+  it("Blend In keeps the rats from J.D.'s slots", () => {
+    const run = crew({ character: "jd", kit: ["jd.blend-in"], camp: 3 });
+    const rats = { ...run, plan: { ...run.plan!, bosses: run.plan!.bosses.map((b) => (b.at === 3 ? { ...b, modId: "rats" } : b)) } };
+    expect(SEATS.map((seatId) => rules(rats).itemSlots(rats, seatId))).toEqual([2, 1, 1]);
   });
 
-  it("Pathfinder lets Machete work twice per camp and the third use is spent", () => {
-    const start = table({ character: "guide", kit: ["guide.pathfinder"], leader: "p0" });
-    const once = use(start, "p0", "guide", ["seat:p2"]);
-    const twice = use(once, "p0", "guide", ["seat:p1"]);
-    expect(camp(twice).currentTrick.leaderSeatId).toBe("p1");
-    expect(remaining(twice, "p0", "guide", CATALOG)).toEqual({ kind: "uses", left: 0, of: 2 });
-    expect(refusal(twice, "p0", "guide", ["seat:p2"])).toBe("ability_spent");
-  });
-
-  it("Howler Call makes the lowest led-suit card win that trick only", () => {
-    const hands = {
-      p0: [std("a4", "spades", 4), std("a3", "spades", 3)],
-      p1: [std("b12", "spades", 12), std("b13", "spades", 13)],
-      p2: [std("c9", "spades", 9), std("c6", "spades", 6)],
-    };
-    const start = table({ character: "guide", kit: ["guide.howler-call"], hands, leader: "p2" });
-    const led = play(start, "p2", "c9");
-    const called = use(led, "p0", "guide.howler-call", ["board"]);
-    const first = play(play(called, "p0", "a4"), "p1", "b12");
-    expect(camp(first).completedTricks[0]!.winnerSeatId).toBe("p0");
-    const second = play(play(play(first, "p0", "a3"), "p1", "b13"), "p2", "c6");
-    expect(camp(second).completedTricks[1]!.winnerSeatId).toBe("p1");
-  });
-});
-
-describe("Botanist", () => {
-  it("Herb Tonic changes the card's rank in rankOf and spends a herb", () => {
-    const hands = { p0: [std("a5", "spades", 5), std("k8", "hearts", 8)], p1: [std("b6", "spades", 6)], p2: [std("c4", "spades", 4)] };
-    const start = table({ character: "botanist", hands, leader: "p0" });
-    expect(balance(start)).toBe(2);
-    const run = use(start, "p0", "botanist", ["value:a5:6"]);
-    expect(rules(run).rankOf(hands.p0[0]!)).toBe(6);
-    expect(rules(run).rankOf(hands.p0[1]!)).toBe(8);
-    expect(balance(run)).toBe(1);
-    const played = play(play(play(run, "p0", "a5"), "p1", "b6"), "p2", "c4");
-    expect(camp(played).completedTricks[0]!.winnerSeatId).toBe("p0");
-  });
-
-  it("Greenhouse regains 2 herbs instead of 1 on a cleared camp, capped at 3", () => {
-    const spent = (kit: readonly string[]) => {
-      const start = use(clearableTable({ character: "botanist", kit }), "p0", "botanist", ["value:a:13"]);
-      return balance(playOut(start));
-    };
-    expect(spent([])).toBe(2);
-    expect(spent(["botanist.greenhouse"])).toBe(3);
-    expect(balance(playOut(clearableTable({ character: "botanist", kit: ["botanist.greenhouse"] })))).toBe(3);
-  });
-
-  it("Antidote turns a failed objective into a pending win-card for the same owner", () => {
-    const start = failedTable({ character: "botanist", kit: ["botanist.antidote"] });
+  it("Free Spirit clears an ordered objective won out of order, from the rescue window", () => {
+    const objectives: Objective[] = [
+      { id: "o1", kind: "ordered", target: ident("clubs", 2), order: 1, ownerSeatId: "p2" },
+      { id: "o2", kind: "ordered", target: ident("spades", 14), order: 2, ownerSeatId: "p0" },
+    ];
+    const start = table({ character: "jd", kit: ["jd.free-spirit"], objectives, tricks: [WON_BY_P0] });
     expect(currentWindow(start, rules(start))).toBe("rescue");
-    const run = use(start, "p0", "botanist.antidote", ["objective:o1"]);
-    expect(objectiveOf(run, "o1")).toEqual({ id: "o1", kind: "win-card", target: ident("spades", 7), ownerSeatId: "p1" });
-    expect(evaluateObjective(camp(run), objectiveOf(run, "o1"))).toBe("pending");
-    expect(camp(run).objectiveDeck).toEqual([]);
-    expect(balance(run)).toBe(0);
-    expect(run.stage.tag).toBe("camp");
+    const run = rescue(start, "p0", "jd.free-spirit", []);
+    expect(objectives.map((o) => rules(run).objectiveStatus(camp(run), objectiveOf(run, o.id)))).toEqual(["pending", "done"]);
+    expect(checkCampOutcome(camp(run), rules(run)).status).toBe("in_progress");
   });
 
-  it("Antidote drops the failed objective when no fresh one can be drawn, without asking hidden hands first", () => {
-    const start = table({
-      character: "botanist",
-      kit: ["botanist.antidote"],
-      objectives: [winCard("o1", ident("spades", 14), "p1")],
-      tricks: [WON_BY_P0],
-      deck: [ident("spades", 7)],
-    });
-    expect(gatedPendingSeatIds(start, CATALOG)).toEqual(["p0"]);
-    const run = rescue(start, "p0", "botanist.antidote", ["objective:o1"]);
-    expect(camp(run).objectives).toEqual([]);
-    expect(camp(run).objectiveDeck).toEqual([ident("spades", 7)]);
-    expect(balance(run)).toBe(0);
+  it("Rule Breaker lets J.D. play off the led suit for this trick only", () => {
+    const hands = { p0: [std("a", "spades", 9), std("h", "hearts", 5)], p2: [std("c", "spades", 4), std("c2", "spades", 3)], p1: [std("b", "spades", 6), std("b2", "spades", 2)] };
+    const led = play(table({ character: "jd", kit: ["jd.rule-breaker"], hands, leader: "p2", totalTricks: 2 }), "p2", "c");
+    expect(rules(led).legalPlays(camp(led), "p0").map((c) => c.id)).toEqual(["a"]);
+    const broken = use(led, "p0", "jd.rule-breaker", []);
+    expect(rules(broken).legalPlays(camp(broken), "p0").map((c) => c.id)).toEqual(["a", "h"]);
+    const next = play(play(play(broken, "p0", "h"), "p1", "b"), "p1", "b2");
+    expect(camp(next).completedTricks[0]!.winnerSeatId).toBe("p1");
+    expect(rules(play(next, "p2", "c2")).legalPlays(camp(play(next, "p2", "c2")), "p0").map((c) => c.id)).toEqual(["a"]);
+  });
+});
+
+describe("Leader", () => {
+  it("Megaphone lets the Leader whisper twice each camp", () => {
+    const run = table({ character: "leader", mates: ["jd", "explorer"] });
+    expect(whisperAllowance(run)).toEqual([2, 1, 1]);
+  });
+
+  it("Open Ears lets the Leader hear each teammate's first whisper of the camp, and only the first", () => {
+    const hands = { p1: [std("b1", "hearts", 5), std("b2", "hearts", 6)] };
+    const start = table({ character: "leader", kit: ["leader.open-ears"], mates: ["signaller", "jd"], hands });
+    const first = whisper(start, "p1", "p2", "b1");
+    expect(revealsFor(first, "p0").map((r) => r.cardId)).toEqual(["b1"]);
+    const second = whisper(first, "p1", "p2", "b2");
+    expect(revealsFor(second, "p0").map((r) => r.cardId)).toEqual(["b1"]);
+    expect(revealsFor(second, "p2").map((r) => r.cardId)).toEqual(["b1", "b2"]);
+  });
+
+  it("Delegate hands one of the Leader's whispers to a teammate, until none are left", () => {
+    const start = table({ character: "leader", kit: ["leader.delegate"], mates: ["jd", "explorer"] });
+    expect(whisperAllowance(start)).toEqual([3, 1, 1]);
+    const once = use(start, "p0", "leader.delegate", ["seat:p1"]);
+    expect(whisperAllowance(once)).toEqual([2, 2, 1]);
+    const thrice = use(use(once, "p0", "leader.delegate", ["seat:p2"]), "p0", "leader.delegate", ["seat:p2"]);
+    expect(whisperAllowance(thrice)).toEqual([0, 2, 3]);
+    expect(refusal(thrice, "p0", "leader.delegate", ["seat:p1"])).toBe("ability_spent");
+  });
+
+  it("Momentum gives the Leader a whisper per trick won, and no other bonus reaches them", () => {
+    const start = table({ character: "leader", kit: ["leader.momentum", "smoke-signal"], mates: ["jd", "explorer"] });
+    expect(whisperAllowance(start)).toEqual([2, 1, 1]);
+    const smoked = use(start, "p0", "smoke-signal", []);
+    expect(whisperAllowance(smoked)).toEqual([2, 2, 2]);
+    const won = table({ character: "leader", kit: ["leader.momentum"], mates: ["jd", "explorer"], tricks: [WON_BY_P0] });
+    expect(whisperAllowance(won)).toEqual([3, 1, 1]);
+  });
+});
+
+describe("Explorer", () => {
+  it("Compass makes a card count one rank higher for winning, not for objectives, once per camp", () => {
+    const run = use(table({ character: "explorer", mates: ["jd", "leader"] }), "p0", "explorer", ["value:a:10"]);
+    const card = camp(run).hands[0]!.cards[0]!;
+    expect([rules(run).rankOf(card), rules(run).identityOf(card)]).toEqual([10, ident("spades", 9)]);
+    expect(refusal(run, "p0", "explorer", ["value:a:8"])).toBe("ability_spent");
+  });
+
+  it("Second Wind lets the Compass work twice per camp", () => {
+    const once = use(table({ character: "explorer", kit: ["explorer.second-wind"], mates: ["jd", "leader"] }), "p0", "explorer", ["value:a:10"]);
+    const twice = use(once, "p0", "explorer", ["value:a:8"]);
+    expect(remaining(twice, "p0", "explorer", CATALOG)).toEqual({ kind: "uses", left: 0, of: 2 });
+  });
+
+  it("True Form makes the changed card count as its new card for objectives too", () => {
+    const run = use(table({ character: "explorer", kit: ["explorer.true-form"], mates: ["jd", "leader"] }), "p0", "explorer", ["value:a:10"]);
+    const card = camp(run).hands[0]!.cards[0]!;
+    expect([rules(run).rankOf(card), rules(run).identityOf(card)]).toEqual([10, ident("spades", 10)]);
+  });
+
+  it("Reshape shifts an open objective's card instead, sharing the Compass's use", () => {
+    const start = table({ character: "explorer", kit: ["explorer.reshape"], mates: ["jd", "leader"], objectives: [winCard("o1", ident("spades", 7), "p0")] });
+    const run = use(start, "p0", "explorer.reshape", ["objective-value:o1:8"]);
+    expect(objectiveOf(run, "o1")).toEqual(winCard("o1", ident("spades", 8), "p0"));
+    expect([refusal(run, "p0", "explorer", ["value:a:10"]), refusal(run, "p0", "explorer.reshape", ["objective-value:o1:9"])]).toEqual(["ability_spent", "ability_spent"]);
   });
 });
 

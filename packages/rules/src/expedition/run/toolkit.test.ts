@@ -336,12 +336,12 @@ describe("applyToolkitOps", () => {
     const camp = pickAllObjectives(freshCamp());
     const run = makeRun({ camp });
     const card = camp.hands.find((h) => h.seatId === "p1")!.cards[0]!;
-    const result = applyToolkitOps(run, by("p0", "scout"), [{ op: "reveal", cardId: card.id, audience: ["p0"] }], rules, CATALOG);
+    const result = applyToolkitOps(run, by("p0", "explorer"), [{ op: "reveal", cardId: card.id, audience: ["p0"] }], rules, CATALOG);
     const reveal = attemptOf(result)!.reveals[0]!;
     expect(reveal.cardId).toBe(card.id);
     expect(reveal.fromSeatId).toBe("p1");
     expect(reveal.audience).toEqual(["p0"]);
-    expect(reveal.source).toBe("scout");
+    expect(reveal.source).toBe("explorer");
   });
 
   it("reveal throws for an empty audience", () => {

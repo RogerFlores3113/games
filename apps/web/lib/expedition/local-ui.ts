@@ -14,10 +14,11 @@ import type { ExpeditionAbilityStepView, ExpeditionTargetKind, ExpeditionView, R
  * server request (D-02).
  */
 
-/** `valueCardId`: the hand card a rank pick is for, chosen first on a
- * card-value step; the rank tray then offers that card's ranks. */
+/** `heldId`: the hand card or objective a rank pick is for, chosen first
+ * on a card-value or objective-value step; the rank tray then offers its
+ * ranks. */
 export type Targeting =
-  | { mode: "ability"; sourceKey: string; selected: string[]; valueCardId: string | null }
+  | { mode: "ability"; sourceKey: string; selected: string[]; heldId: string | null }
   | { mode: "whisper"; selected: string[] };
 
 /** What a clicked thing on the table is, for matching it to a choice id.
@@ -40,6 +41,19 @@ const ENTITY_PREFIX: Readonly<Record<PickEntity, string | null>> = {
 export function choiceIdOf(entity: PickEntity, rawId: string): string {
   const prefix = ENTITY_PREFIX[entity];
   return prefix === null ? entity : `${prefix}:${rawId}`;
+}
+
+/** The steps whose choices are a thing and a rank for it: the thing is
+ * clicked first, then a rank from the tray. */
+const RANK_STEPS: Readonly<Partial<Record<ExpeditionTargetKind, { entity: PickEntity; prefix: string }>>> = {
+  "card-value": { entity: "card", prefix: "value" },
+  "objective-value": { entity: "objective", prefix: "objective-value" },
+};
+
+/** The choice ids for `rawId`'s ranks begin with this. */
+function rankPrefix(kind: ExpeditionTargetKind, rawId: string): string | null {
+  const rank = RANK_STEPS[kind];
+  return rank === undefined ? null : `${rank.prefix}:${rawId}:`;
 }
 
 export interface LocalUiState {
@@ -100,34 +114,39 @@ export function nextTargetKind(ui: LocalUiState, view: ExpeditionView): Expediti
 }
 
 /** The current step's choice id for a clicked entity, or null when it is
- * not a choice right now. On a card-value step a hand card is a choice when
- * any of its ranks is: the click picks the card, then a rank. */
+ * not a choice right now. On a card-value or objective-value step a card or
+ * an objective is a choice when any of its ranks is: the click holds it,
+ * then a rank is picked. */
 export function choiceFor(ui: LocalUiState, view: ExpeditionView, entity: PickEntity, rawId: string): string | null {
   const step = currentStep(ui, view);
   if (step === null) return null;
-  if (step.kind === "card-value" && entity === "card") {
-    return step.choices.some((id) => id.startsWith(`value:${rawId}:`)) ? `card:${rawId}` : null;
+  const rank = RANK_STEPS[step.kind];
+  if (rank !== undefined && rank.entity === entity) {
+    const prefix = rankPrefix(step.kind, rawId)!;
+    return step.choices.some((id) => id.startsWith(prefix)) ? choiceIdOf(entity, rawId) : null;
   }
   const id = choiceIdOf(entity, rawId);
   return step.choices.includes(id) ? id : null;
 }
 
-/** Whether the current targeting already picked this entity, or holds this
- * card for a rank pick. */
+/** Whether the current targeting already picked this entity, or holds it
+ * for a rank pick. */
 export function isPicked(ui: LocalUiState, entity: PickEntity, rawId: string): boolean {
   const targeting = ui.targeting;
   if (targeting === null) return false;
-  if (entity === "card" && targeting.mode === "ability" && targeting.valueCardId === rawId) return true;
-  if (entity === "card" && targeting.selected.some((id) => id.startsWith(`value:${rawId}:`))) return true;
+  const ranks = Object.values(RANK_STEPS).filter((rank) => rank.entity === entity);
+  if (ranks.length > 0 && targeting.mode === "ability" && targeting.heldId === rawId) return true;
+  if (ranks.some((rank) => targeting.selected.some((id) => id.startsWith(`${rank.prefix}:${rawId}:`)))) return true;
   return targeting.selected.includes(choiceIdOf(entity, rawId));
 }
 
-/** The rank choices for the card held on a card-value step. */
+/** The rank choices for the card or objective held on a rank step. */
 export function valueChoices(ui: LocalUiState, view: ExpeditionView): string[] {
   const targeting = ui.targeting;
   const step = currentStep(ui, view);
-  if (targeting?.mode !== "ability" || targeting.valueCardId === null || step?.kind !== "card-value") return [];
-  return step.choices.filter((id) => id.startsWith(`value:${targeting.valueCardId}:`));
+  if (targeting?.mode !== "ability" || targeting.heldId === null || step === null) return [];
+  const prefix = rankPrefix(step.kind, targeting.heldId);
+  return prefix === null ? [] : step.choices.filter((id) => id.startsWith(prefix));
 }
 
 /** Picks every leading `self` step: it has exactly one choice. */
@@ -144,7 +163,7 @@ function autoPick(ui: LocalUiState, view: ExpeditionView): LocalUiState {
 export function beginAbilityTargeting(ui: LocalUiState, view: ExpeditionView, sourceKey: string): LocalUiState {
   const ability = view.yourAbilities.find((a) => a.sourceKey === sourceKey);
   if (!ability || !ability.usableNow) return ui;
-  return autoPick({ ...ui, trayPage: 0, targeting: { mode: "ability", sourceKey, selected: [], valueCardId: null } }, view);
+  return autoPick({ ...ui, trayPage: 0, targeting: { mode: "ability", sourceKey, selected: [], heldId: null } }, view);
 }
 
 /** Begins Whisper targeting (a card, then a teammate). A no-op unless it is
@@ -155,23 +174,25 @@ export function beginWhisper(ui: LocalUiState, view: ExpeditionView): LocalUiSta
 }
 
 /** Picks `choiceId` for the current step. A no-op unless it is one of that
- * step's choices. On a card-value step, `card:<id>` holds that card for the
- * rank pick instead. */
+ * step's choices. On a card-value or objective-value step, `card:<id>` or
+ * `objective:<id>` holds that thing for the rank pick instead. */
 export function selectTarget(ui: LocalUiState, view: ExpeditionView, choiceId: string): LocalUiState {
   const targeting = ui.targeting;
   if (targeting === null) return ui;
   const step = currentStep(ui, view);
   if (step === null) return ui;
-  if (step.kind === "card-value" && targeting.mode === "ability" && choiceId.startsWith("card:")) {
-    const cardId = choiceId.slice("card:".length);
-    if (!step.choices.some((id) => id.startsWith(`value:${cardId}:`))) return ui;
-    return { ...ui, targeting: { ...targeting, valueCardId: cardId } };
+  const rank = RANK_STEPS[step.kind];
+  const entityPrefix = rank === undefined ? null : ENTITY_PREFIX[rank.entity];
+  if (rank !== undefined && targeting.mode === "ability" && choiceId.startsWith(`${entityPrefix}:`)) {
+    const rawId = choiceId.slice(`${entityPrefix}:`.length);
+    if (!step.choices.some((id) => id.startsWith(rankPrefix(step.kind, rawId)!))) return ui;
+    return { ...ui, targeting: { ...targeting, heldId: rawId } };
   }
   if (!step.choices.includes(choiceId)) return ui;
-  const held = targeting.mode === "ability" ? targeting.valueCardId : null;
-  if (held !== null && !choiceId.startsWith(`value:${held}:`)) return ui;
+  const held = targeting.mode === "ability" ? targeting.heldId : null;
+  if (held !== null && !choiceId.startsWith(rankPrefix(step.kind, held) ?? "")) return ui;
   const picked = { ...targeting, selected: [...targeting.selected, choiceId] };
-  return autoPick({ ...ui, trayPage: 0, targeting: picked.mode === "ability" ? { ...picked, valueCardId: null } : picked }, view);
+  return autoPick({ ...ui, trayPage: 0, targeting: picked.mode === "ability" ? { ...picked, heldId: null } : picked }, view);
 }
 
 /** Clears the current targeting only. Hover and last-trick state are
@@ -221,8 +242,8 @@ export function reconcileLocalUi(ui: LocalUiState, view: ExpeditionView): LocalU
       const kept = targeting.selected.findIndex((id, i) => !(steps[i]?.choices.includes(id) ?? false));
       if (kept !== -1) next = { ...next, targeting: { ...targeting, selected: targeting.selected.slice(0, kept) } };
       const held = next.targeting;
-      if (held?.mode === "ability" && held.valueCardId !== null && valueChoices(next, view).length === 0) {
-        next = { ...next, targeting: { ...held, valueCardId: null } };
+      if (held?.mode === "ability" && held.heldId !== null && valueChoices(next, view).length === 0) {
+        next = { ...next, targeting: { ...held, heldId: null } };
       }
     }
   }

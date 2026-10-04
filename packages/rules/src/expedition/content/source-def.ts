@@ -1,5 +1,6 @@
-// The catalogue's def types: characters (each with a base power and exactly
-// two upgrades), upgrades and items are all sources. A source may carry an
+// The catalogue's def types: characters (each with a base power, any further
+// powers of its own and two or three upgrades), powers, upgrades and items
+// are all sources. A source may carry an
 // active ability (a window, a limit and typed targets) and a passive rule
 // layer. An item's `uses` is its limit, counted per owned instance. `apply`
 // returns toolkit op data; the engine owns spending, gating, target
@@ -20,19 +21,28 @@ export type SourceId = string;
 export type UsageLimit =
   | { readonly kind: "per-camp"; readonly times: number } // counted by (camp, attempt) stamp; a replay is a fresh camp
   | { readonly kind: "per-run"; readonly times: number } // counted over the whole ledger; survives replays
-  | { readonly kind: "pool"; readonly cost: number } // the owner's character pool; characters and upgrades only
   | { readonly kind: "supplies"; readonly cost: number } // the crew's supplies; never spends the last one
   /** Shared by the crew: earned this attempt minus every seat's uses this
    * attempt. `locked` is the reason shown while none was earned. */
   | { readonly kind: "crew-tokens"; earned(run: RunState, rules: RunRules): number; readonly locked: string }
   /** Coins from the crew's purse, spent by the engine after the use. */
-  | { readonly kind: "coins"; cost(ctx: CoinCost): number };
+  | { readonly kind: "coins"; cost(ctx: CoinCost): number }
+  /** As often as its window and canUse allow. */
+  | { readonly kind: "unlimited" }
+  /** While the seat has a whisper left this camp. The ability's own rule
+   * layer takes the whisper, through whispersPerCamp. */
+  | { readonly kind: "whispers" }
+  /** The uses of another of the seat's sources: both count against that
+   * source's limit, this one `spends` uses at a time. */
+  | { readonly kind: "shares"; readonly of: SourceId; readonly spends: number };
 
 /** What a coins price may read: the key's counted uses so far, and the
  * picked targets (null before they are picked, when the price shown is the
  * least the use can cost). */
 export type CoinCost = {
   readonly run: RunState;
+  readonly rules: RunRules;
+  readonly catalog: Catalog;
   readonly seatId: string;
   readonly uses: { readonly thisCamp: number; readonly thisRun: number };
   readonly targets: readonly Target[] | null;
@@ -42,9 +52,6 @@ export type CoinCost = {
 export type Owner = { readonly seatId: string; hasUpgrade(upgradeId: SourceId): boolean };
 /** A value an upgrade may tune. Evaluated fresh at each read, never stored. */
 export type Tuned<T> = T | ((owner: Owner) => T);
-
-/** A character's personal resource. At most one per character. */
-export type PoolDef = { readonly name: string; readonly start: number; readonly max: number; readonly regain: Tuned<number> };
 
 export type EffectParams = Readonly<Record<string, string | number | boolean>>;
 
@@ -139,17 +146,22 @@ export type ItemDef = Named & {
     | { readonly uses?: never; readonly active?: never; readonly passive: PassiveAbility }
   );
 export type UpgradeDef = SourceBase & { readonly kind: "upgrade"; readonly characterId: string };
+/** A further ability of a character's base power, live whenever the seat
+ * is that character, under its own key. */
+export type PowerDef = SourceBase & { readonly kind: "power"; readonly characterId: string };
 export type CharacterDef = SourceBase & {
   readonly kind: "character";
   readonly theme: string;
-  /** The base power's name, which upgrades refer to ("Your Spyglass ..."). */
+  /** The base power's name, which upgrades refer to ("Your Compass ..."). */
   readonly power: string;
-  readonly pool?: PoolDef;
-  readonly upgrades: readonly [UpgradeDef, UpgradeDef];
+  readonly powers: readonly PowerDef[];
+  /** Two or three. */
+  readonly upgrades: readonly UpgradeDef[];
 };
-export type SourceDef = CharacterDef | UpgradeDef | ItemDef;
+export type SourceDef = CharacterDef | PowerDef | UpgradeDef | ItemDef;
 
 type UnboundUpgrade = Omit<UpgradeDef, "characterId">;
+type UnboundPower = Omit<PowerDef, "characterId">;
 
 /** Keeps S and P literal so ctx.targets is a typed tuple; erases them for storage (the one cast). */
 export function ability<const S extends readonly TargetSpec[], P extends EffectParams = EffectParams>(a: ActiveAbility<S, P>): ActiveAbility {
@@ -171,18 +183,22 @@ export function defineUpgrade(def: Omit<UpgradeDef, "kind" | "characterId">): Un
   return { ...def, kind: "upgrade" };
 }
 
-/** Stamps characterId onto both upgrades, so an upgrade cannot name the wrong character. */
+export function definePower(def: Omit<PowerDef, "kind" | "characterId">): UnboundPower {
+  return { ...def, kind: "power" };
+}
+
+/** Stamps characterId onto every power and upgrade, so neither can name the wrong character. */
 export function defineCharacter(
-  def: Omit<CharacterDef, "kind" | "upgrades"> & { readonly upgrades: readonly [UnboundUpgrade, UnboundUpgrade] },
+  def: Omit<CharacterDef, "kind" | "upgrades" | "powers"> & {
+    readonly powers?: readonly UnboundPower[];
+    readonly upgrades: readonly [UnboundUpgrade, UnboundUpgrade] | readonly [UnboundUpgrade, UnboundUpgrade, UnboundUpgrade];
+  },
 ): CharacterDef {
-  const [first, second] = def.upgrades;
   return {
     ...def,
     kind: "character",
-    upgrades: [
-      { ...first, characterId: def.id },
-      { ...second, characterId: def.id },
-    ],
+    powers: (def.powers ?? []).map((power) => ({ ...power, characterId: def.id })),
+    upgrades: def.upgrades.map((upgrade) => ({ ...upgrade, characterId: def.id })),
   };
 }
 

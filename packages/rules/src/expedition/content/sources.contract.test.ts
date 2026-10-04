@@ -1,5 +1,5 @@
-// The sources contract: every character, upgrade and item in the production
-// catalogue, iterated from the registries, so a new entry is covered with no
+// The sources contract: every character, power, upgrade and item in the
+// production catalogue, iterated from the registries, so a new entry is covered with no
 // edit here. Usable states are found by a seeded random walk through the
 // real dispatcher, never built by hand.
 
@@ -15,7 +15,7 @@ import { TARGET_KINDS } from "../run/targets";
 import { campCardIds } from "../run/toolkit";
 import type { LedgerEntry, RunState } from "../run/types";
 import { currentStamp, defIdOf, limitOf, liveSourceKeys, remaining } from "../run/usage";
-import { resolveTuned, type CharacterDef, type ItemDef, type ItemUses, type Owner, type SourceDef } from "./source-def";
+import type { CharacterDef, ItemDef, ItemUses, SourceDef } from "./source-def";
 
 const SOURCES: readonly SourceDef[] = Object.values(CATALOG.sources);
 const ACTIVE_SOURCES = SOURCES.filter((def) => def.active !== undefined);
@@ -37,13 +37,8 @@ function declaredUses(uses: ItemUses): number {
 
 function characterFor(def: SourceDef): CharacterDef | null {
   if (def.kind === "character") return def;
-  if (def.kind === "upgrade") return CATALOG.characters[def.characterId]!;
+  if (def.kind === "upgrade" || def.kind === "power") return CATALOG.characters[def.characterId]!;
   return null;
-}
-
-function owners(def: SourceDef): Owner[] {
-  const upgrades = characterFor(def)?.upgrades.map((u) => u.id) ?? [];
-  return [{ seatId: "p0", hasUpgrade: () => false }, ...upgrades.map((upgrade): Owner => ({ seatId: "p0", hasUpgrade: (id) => id === upgrade }))];
 }
 
 /** A seeded LCG, so the walk is reproducible. */
@@ -84,9 +79,9 @@ function findUsable(def: SourceDef): RunState {
   const key = keyFor(def);
   for (let attempt = 0; attempt < 60; attempt++) {
     const next = lcg(attempt * 7919 + def.id.length);
-    let state = crewFor(def, `${def.id}-${attempt}`, attempt % 2 === 0 ? 1 : 3);
+    let state = crewFor(def, `${def.id}-${attempt}`, [1, 3, 4][attempt % 3]);
     for (let step = 0; step < 400 && state.stage.tag !== "ended"; step++) {
-      const status = attemptOf(state) === null ? null : abilityStatus(state, "p0", key, CATALOG);
+      const status = currentStamp(state) === null ? null : abilityStatus(state, "p0", key, CATALOG);
       if (status?.usable) return state;
       const legal = enumerateLegalRunActions(state, CATALOG).filter(
         (c) =>
@@ -118,8 +113,17 @@ function useFirst(state: RunState, key: string): RunState {
 /** `count` earlier uses of `key`, stamped now. */
 function usedTimes(state: RunState, key: string, count: number): RunState {
   const at = currentStamp(state)!;
-  return withLedger(state, "p0", Array.from({ length: count }, () => ({ kind: "used", sourceKey: key, at, poolCost: 0 }) as const));
+  return withLedger(state, "p0", Array.from({ length: count }, () => ({ kind: "used", sourceKey: key, at }) as const));
 }
+
+/** p0 has sent `count` more whispers this attempt. */
+function whispered(state: RunState, count: number): RunState {
+  const attempt = attemptOf(state)!;
+  const entries = Array.from({ length: count }, () => ({ event: "whisper", actorSeatId: "p0", subjectSeatIds: ["p1"], sourceId: null, audience: "public" }) as const);
+  return withAttempt(state, { ...attempt, log: [...attempt.log, ...entries] });
+}
+
+const effectsOf = (state: RunState) => attemptOf(state)?.effects ?? [];
 
 function replayed(state: RunState): RunState {
   return withAttempt(state, { ...attemptOf(state)!, attemptNumber: currentStamp(state)!.attempt + 1 });
@@ -129,18 +133,20 @@ function withLedger(state: RunState, seatId: string, extra: readonly LedgerEntry
   return { ...state, seats: state.seats.map((s) => (s.seatId === seatId ? { ...s, ledger: [...s.ledger, ...extra] } : s)) };
 }
 
-/** Target kinds unit 12 added for the nine characters; unit 13's characters use them. */
-const AWAITING_CHARACTERS = ["item", "route-option", "fanned-card", "objective-value", "option"];
+/** Target kinds only characters still to be registered use: the Howler
+ * Call's board waits for the Perfumist, unit 12's kinds for the rest. */
+const AWAITING_CHARACTERS = ["board", "item", "route-option", "fanned-card", "option"];
 
 const USABLE = new Map<string, RunState>(ACTIVE_SOURCES.map((def) => [def.id, findUsable(def)]));
 
 describe("source shape", () => {
-  it("has 6 characters, 12 upgrades and 13 items with unique ids", () => {
+  it("has 6 characters, 0 powers, 15 upgrades and 13 items with unique ids", () => {
     const kinds = SOURCES.map((def) => def.kind);
     expect(kinds.filter((k) => k === "character")).toHaveLength(6);
-    expect(kinds.filter((k) => k === "upgrade")).toHaveLength(12);
+    expect(kinds.filter((k) => k === "power")).toHaveLength(0);
+    expect(kinds.filter((k) => k === "upgrade")).toHaveLength(15);
     expect(kinds.filter((k) => k === "item")).toHaveLength(13);
-    expect(new Set(SOURCES.map((def) => def.id)).size).toBe(31);
+    expect(new Set(SOURCES.map((def) => def.id)).size).toBe(34);
   });
 
   it.each(SOURCES.map((def) => [def.id, def] as const))("%s: text is one plain sentence about the effect", (_id, def) => {
@@ -149,20 +155,15 @@ describe("source shape", () => {
   });
 
   it.each(Object.values(CATALOG.characters).map((def) => [def.id, def] as const))(
-    "%s: both upgrades name their character and carry its id as a prefix",
+    "%s: two or three upgrades and every power name their character and carry its id as a prefix",
     (id, def) => {
-      for (const upgrade of def.upgrades) {
-        expect(upgrade.characterId).toBe(id);
-        expect(upgrade.id.startsWith(`${id}.`)).toBe(true);
+      expect([2, 3]).toContain(def.upgrades.length);
+      for (const source of [...def.powers, ...def.upgrades]) {
+        expect(source.characterId).toBe(id);
+        expect(source.id.startsWith(`${id}.`)).toBe(true);
       }
     },
   );
-
-  it.each(ACTIVE_SOURCES.flatMap((def) => (def.kind === "item" ? [] : [[def.id, def] as const])))("%s: a pool limit only on a pooled character's own sources", (_id, def) => {
-    for (const owner of owners(def)) {
-      if (resolveTuned(def.active!.limit, owner).kind === "pool") expect(characterFor(def)?.pool).toBeDefined();
-    }
-  });
 
   it.each(Object.values(CATALOG.items).map((def) => [def.id, def] as const))("%s: uses with an active and no limit, or a passive alone; a rarity and a price", (_id, def) => {
     expect(def.active === undefined).toBe(def.uses === undefined);
@@ -182,9 +183,9 @@ describe("each active source in play", () => {
   it.each(ACTIVE_SOURCES.map((def) => [def.id, def] as const))("%s: has effect if and only if a use adds a modifier", (id, def) => {
     const before = USABLE.get(id)!;
     const after = useFirst(before, keyFor(def));
-    const added = attemptOf(after)!.effects.length - attemptOf(before)!.effects.length;
+    const added = effectsOf(after).length - effectsOf(before).length;
     expect(added > 0).toBe(def.active!.effect !== undefined);
-    for (const effect of attemptOf(after)!.effects.slice(attemptOf(before)!.effects.length)) expect(effect.origin).toEqual({ kind: "seat", seatId: "p0", sourceKey: keyFor(def), sourceId: id });
+    for (const effect of effectsOf(after).slice(effectsOf(before).length)) expect(effect.origin).toEqual({ kind: "seat", seatId: "p0", sourceKey: keyFor(def), sourceId: id });
   });
 
   it.each(ACTIVE_SOURCES.map((def) => [def.id, def] as const))("%s: a use spends its limit", (id, def) => {
@@ -200,11 +201,11 @@ describe("each active source in play", () => {
           expect(left.left).toBe(1);
         }
         break;
-      case "pool":
-        expect(remaining(after, "p0", id, CATALOG)).toMatchObject({ kind: "pool", balance: left.balance - left.cost });
-        break;
       case "supplies":
         expect(after.supplies).toBe(before.supplies - left.cost);
+        break;
+      case "whispers":
+        expect(remaining(after, "p0", key, CATALOG)).toEqual({ kind: "whispers", left: left.left - 1 });
         break;
     }
   });
@@ -213,18 +214,15 @@ describe("each active source in play", () => {
     const key = keyFor(def);
     const state = USABLE.get(id)!;
     const left = remaining(state, "p0", key, CATALOG);
-    const at = currentStamp(state)!;
     const status = abilityStatus(state, "p0", key, CATALOG)!;
     const targets = status.usable ? status.steps.map((step) => step.choices[0]!) : [];
     switch (left.kind) {
       case "uses":
         expect(useAbility(usedTimes(state, key, left.left), "p0", key, targets, CATALOG)).toEqual({ ok: false, error: "ability_spent" });
         break;
-      case "pool": {
-        const drained = withLedger(state, "p0", [{ kind: "used", sourceKey: key, at, poolCost: left.balance - left.cost + 1 }]);
-        expect(useAbility(drained, "p0", key, targets, CATALOG)).toEqual({ ok: false, error: "cannot_afford" });
+      case "whispers":
+        expect(useAbility(whispered(state, left.left), "p0", key, targets, CATALOG)).toEqual({ ok: false, error: "ability_spent" });
         break;
-      }
       case "supplies": {
         const short = { ...state, supplies: left.cost };
         expect(useAbility(short, "p0", key, targets, CATALOG)).toEqual({ ok: false, error: "cannot_afford" });
@@ -276,22 +274,29 @@ describe("random runs with the whole catalogue", () => {
   const RUN_SEEDS = ["contract-a", "contract-b", "contract-c"];
   const CHOICES = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9];
 
-  /** Every seat has its character's first upgrade and a quarter of the
-   * items: two equipped, the rest in the backpack. */
-  function fullKitRun(seed: string): RunState {
+  /** Each run seats the next four characters round the catalogue, each
+   * with one of its upgrades in turn, and a quarter of the items: two
+   * equipped, the rest in the backpack. Three runs reach every character. */
+  function fullKitRun(seed: string, run: number): RunState {
     const characters = Object.keys(CATALOG.characters);
+    const characterAt = (i: number) => characters[(run * SEATS.length + i) % characters.length]!;
     return setupRun({
       seatIds: SEATS,
       seed,
       catalog: CATALOG,
-      characters: Object.fromEntries(SEATS.map((seat, i) => [seat, characters[i]!])),
-      upgrades: Object.fromEntries(SEATS.map((seat, i) => [seat, CATALOG.characters[characters[i]!]!.upgrades[0].id])),
+      characters: Object.fromEntries(SEATS.map((seat, i) => [seat, characterAt(i)])),
+      upgrades: Object.fromEntries(
+        SEATS.map((seat, i) => {
+          const upgrades = CATALOG.characters[characterAt(i)]!.upgrades;
+          return [seat, upgrades[run % upgrades.length]!.id];
+        }),
+      ),
       items: Object.fromEntries(SEATS.map((seat, i) => [seat, ITEM_IDS.filter((_, j) => j % SEATS.length === i)])),
     });
   }
 
-  const DRIVEN = RUN_SEEDS.map((seed) => {
-    const initial = fullKitRun(seed);
+  const DRIVEN = RUN_SEEDS.map((seed, run) => {
+    const initial = fullKitRun(seed, run);
     return { initial, ...driveRun(initial, CHOICES, CATALOG, 4000) };
   });
 
@@ -340,7 +345,7 @@ describe("random runs with the whole catalogue", () => {
   it("keeps every live source a catalogue entry", () => {
     for (const driven of DRIVEN) {
       for (const seat of driven.states.at(-1)!.seats) {
-        for (const key of liveSourceKeys(seat)) expect(CATALOG.sources[defIdOf(seat, key)]).toBeDefined();
+        for (const key of liveSourceKeys(seat, CATALOG)) expect(CATALOG.sources[defIdOf(seat, key)]).toBeDefined();
       }
     }
   });

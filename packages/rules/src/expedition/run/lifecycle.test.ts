@@ -233,7 +233,7 @@ describe("settling a failure", () => {
 
   it("seats and ledgers persist across a replay (RUN-06)", () => {
     const failed = readyAll(atCamp3(), catalog);
-    const ledger = [{ kind: "used" as const, sourceKey: "plain-1", at: { camp: campIndex(3), attempt: 1, trick: 0 }, poolCost: 0 }];
+    const ledger = [{ kind: "used" as const, sourceKey: "plain-1", at: { camp: campIndex(3), attempt: 1, trick: 0 } }];
     const seats = failed.seats.map((s) => (s.seatId === "p0" ? { ...s, ledger } : s));
     const second = readyAll({ ...failed, seats }, catalog);
     expect(second.history.map((h) => h.attempt)).toEqual([1, 2]);
@@ -242,20 +242,7 @@ describe("settling a failure", () => {
 });
 
 describe("settling a clear", () => {
-  const pooled = defineCharacter({
-    id: "pooled",
-    name: "Pooled",
-    theme: "Has a pool",
-    power: "Pool power",
-    text: "Nothing happens.",
-    pool: { name: "Herbs", start: 1, max: 3, regain: (owner) => (owner.hasUpgrade("pooled.rich") ? 2 : 1) },
-    upgrades: [
-      defineUpgrade({ id: "pooled.rich", name: "Rich", text: "Regain more." }),
-      defineUpgrade({ id: "pooled.b", name: "B", text: "Nothing happens." }),
-    ],
-  });
   const catalog = testCatalog({
-    characters: { pooled },
     items: { "item-a": plainItem("item-a"), "item-b": plainItem("item-b"), "item-c": plainItem("item-c") },
   });
 
@@ -286,20 +273,6 @@ describe("settling a clear", () => {
       }
     }
     expect(settled.seats[0]!.offers[0]!.bundles.flat()).toContain("item-a");
-  });
-
-  it("appends a pool `regained` ledger entry for a pooled character, stamped at the clear, tuned by its upgrades", () => {
-    const run = setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog, characters: { p0: "pooled", p1: "plain-1", p2: "plain-2" }, upgrades: { p0: "pooled.rich" } });
-    const settled = settleCamp(clearedCamp(run, catalog), "cleared", catalog);
-    expect(settled.seats[0]!.ledger).toEqual([{ kind: "regained", amount: 2, at: { camp: 1, attempt: 1, trick: 0 } }]);
-    expect(settled.seats[1]!.ledger).toEqual([]);
-    expect(settled.seats[2]!.ledger).toEqual([]);
-  });
-
-  it("regains the base amount without the upgrade", () => {
-    const run = setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog, characters: { p0: "pooled" } });
-    const settled = settleCamp(clearedCamp(run, catalog), "cleared", catalog);
-    expect(settled.seats[0]!.ledger).toEqual([{ kind: "regained", amount: 1, at: { camp: 1, attempt: 1, trick: 0 } }]);
   });
 
   it("clearing the final camp wins: camp 4 of a short run, camp 8 of a long one", () => {

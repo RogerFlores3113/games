@@ -23,7 +23,7 @@ export type SourceActiveDisplay = {
   windows: ActiveWindow[];
   /** Badge text, e.g. "Between tricks", or "Between tricks or when an objective fails". */
   windowPhrase: string;
-  /** Badge text for the base limit, e.g. "Once per camp", "1 herb". */
+  /** Badge text for the base limit, e.g. "Once per camp", "1 supply". */
   limitBadge: string;
   /** How the uses come back: an item's uses kind, else its limit's kind. */
   limitKind: ItemUses["kind"] | UsageLimit["kind"];
@@ -43,8 +43,9 @@ export type SourceDisplay = {
   id: string;
   name: string;
   text: string;
-  /** "grant": an ability a camp modifier gives every seat, keyed by the modifier's id. */
-  kind: "character" | "upgrade" | "item" | "grant";
+  /** "power": a further ability of a character's base power. "grant": an
+   * ability a camp modifier gives every seat, keyed by the modifier's id. */
+  kind: "character" | "power" | "upgrade" | "item" | "grant";
   /** The character a power or upgrade belongs to; null for items and grants. */
   characterId: string | null;
   /** null for a source with no active ability. */
@@ -58,9 +59,10 @@ export type CharacterDisplay = {
   id: string;
   name: string;
   theme: string;
-  /** The base power's name: "Spyglass". */
+  /** The base power's name: "Compass". */
   power: string;
-  pool: { name: string; start: number; max: number } | null;
+  /** The base power's further abilities, each its own source. */
+  powerIds: string[];
   upgradeIds: string[];
 };
 
@@ -69,7 +71,7 @@ const BASE_OWNER: Owner = { seatId: "", hasUpgrade: () => false };
 
 function characterOf(def: SourceDef): CharacterDef | null {
   if (def.kind === "character") return def;
-  if (def.kind === "upgrade") return CATALOG.characters[def.characterId] ?? null;
+  if (def.kind === "upgrade" || def.kind === "power") return CATALOG.characters[def.characterId] ?? null;
   return null;
 }
 
@@ -84,33 +86,46 @@ function usesBadge(uses: ItemUses): string {
   }
 }
 
-function limitBadge(limit: UsageLimit, character: CharacterDef | null): string {
+/** A shares limit reads the limit it shares, so its badge and kind are that one's. */
+function sharedLimit(limit: UsageLimit): UsageLimit {
+  if (limit.kind !== "shares") return limit;
+  const def = CATALOG.sources[limit.of];
+  if (def === undefined || def.kind === "item" || def.active === undefined) throw new Error(`catalog-display: "${limit.of}" has no limit to share`);
+  return resolveTuned(def.active.limit, BASE_OWNER);
+}
+
+function limitBadge(limit: UsageLimit): string {
   switch (limit.kind) {
     case "per-camp":
       return limit.times === 1 ? "Once per camp" : `${limit.times} per camp`;
     case "per-run":
       return limit.times === 1 ? "Once per run" : `${limit.times} per run`;
-    case "pool": {
-      const name = (character?.pool?.name ?? "pool").toLowerCase();
-      return `${limit.cost} ${limit.cost === 1 && name.endsWith("s") ? name.slice(0, -1) : name}`;
-    }
     case "supplies":
       return `${limit.cost} ${limit.cost === 1 ? "supply" : "supplies"}`;
     case "coins":
       return "Costs coins";
     case "crew-tokens":
       return "Crew token";
+    case "unlimited":
+      return "No limit";
+    case "whispers":
+      return "Takes a whisper";
+    case "shares": {
+      const shared = sharedLimit(limit);
+      const name = CATALOG.characters[limit.of]?.power ?? CATALOG.sources[limit.of]?.name ?? limit.of;
+      return `${limitBadge(shared)}, shared with ${name}`;
+    }
   }
 }
 
-function badgeOf(def: SourceDef, character: CharacterDef | null): string {
+function badgeOf(def: SourceDef): string {
   if (def.kind === "item") return def.uses === undefined ? "" : usesBadge(def.uses);
-  return def.active === undefined ? "" : limitBadge(resolveTuned(def.active.limit, BASE_OWNER), character);
+  return def.active === undefined ? "" : limitBadge(resolveTuned(def.active.limit, BASE_OWNER));
 }
 
 function limitKindOf(def: SourceDef): SourceActiveDisplay["limitKind"] {
   if (def.kind === "item") return def.uses?.kind ?? "single-use";
-  return def.active === undefined ? "per-camp" : resolveTuned(def.active.limit, BASE_OWNER).kind;
+  return def.active === undefined ? "per-camp" : sharedLimit(resolveTuned(def.active.limit, BASE_OWNER)).kind;
 }
 
 function activeDisplay(active: ItemAbility, limitBadge: string, limitKind: SourceActiveDisplay["limitKind"]): SourceActiveDisplay {
@@ -132,7 +147,7 @@ function toSourceDisplay(def: SourceDef): SourceDisplay {
     text: def.text,
     kind: def.kind,
     characterId: character?.id ?? null,
-    active: def.active === undefined ? null : activeDisplay(def.active, badgeOf(def, character), limitKindOf(def)),
+    active: def.active === undefined ? null : activeDisplay(def.active, badgeOf(def), limitKindOf(def)),
     passive: def.passive !== undefined,
     item:
       def.kind === "item"
@@ -143,7 +158,7 @@ function toSourceDisplay(def: SourceDef): SourceDisplay {
 
 function toGrantDisplay(id: string, grant: ActiveAbility & { readonly name: string; readonly text: string }): SourceDisplay {
   const limit = resolveTuned(grant.limit, BASE_OWNER);
-  const active = activeDisplay(grant, limitBadge(limit, null), limit.kind);
+  const active = activeDisplay(grant, limitBadge(limit), limit.kind);
   return { id, name: grant.name, text: grant.text, kind: "grant", characterId: null, active, passive: false, item: null };
 }
 
@@ -161,7 +176,7 @@ export const CHARACTER_DISPLAY: Readonly<Record<string, CharacterDisplay>> = Obj
       name: def.name,
       theme: def.theme,
       power: def.power,
-      pool: def.pool === undefined ? null : { name: def.pool.name, start: def.pool.start, max: def.pool.max },
+      powerIds: def.powers.map((power) => power.id),
       upgradeIds: def.upgrades.map((upgrade) => upgrade.id),
     },
   ]),

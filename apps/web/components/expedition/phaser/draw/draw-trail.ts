@@ -167,7 +167,9 @@ function drawCharacterCard(ctx: Ctx, card: CharacterCard, x: number, y: number, 
   }
   cy += 3;
   container.add(scene.add.rectangle(4, cy - 2, w - 8, 1, toPhaserColor(PALETTE.plateEdge)).setOrigin(0, 0));
-  const icon = sourceArtId(card.power.sourceId);
+  // The icon steps aside for a power name too long to share the line.
+  const powerArt = sourceArtId(card.power.sourceId);
+  const icon = powerArt !== null && 18 + labelWidth(card.power.name) <= w - 4 ? powerArt : null;
   const powerW = (icon === null ? 0 : 18) + labelWidth(card.power.name);
   const px = Math.floor((w - powerW) / 2);
   if (icon !== null) container.add(placeArt(scene, icon, px + 8, cy + 6));
@@ -184,9 +186,11 @@ function drawCharacterCard(ctx: Ctx, card: CharacterCard, x: number, y: number, 
       cy += LINE + 1;
     }
   }
-  if (card.pool !== null) {
-    for (const line of wrapped(card.pool, chars, 2)) {
-      container.add(centredText(scene, cx, cy, line, PALETTE.done));
+  for (const more of card.more) {
+    container.add(centredText(scene, cx, cy + 2, fitLabel(more.name, chars), PALETTE.done));
+    cy += LINE + 2;
+    for (const line of wrapped(more.text, chars, 3)) {
+      container.add(centredText(scene, cx, cy, line));
       cy += LINE;
     }
   }

@@ -1,7 +1,8 @@
 // The ability pipeline. A use runs window, limit, canUse and target checks,
 // hands the def's ops to the toolkit (the only mutation surface), then
 // spends: a ledger entry keyed by the source key, supplies for a supplies
-// limit, and the item instance whose last charge this use spent.
+// limit, coins for a coins limit, and the item instance whose last charge
+// this use spent.
 
 import type { AdapterResult } from "../../adapter";
 import { shuffleWithSeed } from "../../shuffle";
@@ -15,7 +16,7 @@ import type { RunRules } from "./run-rules";
 import { resolveTargets, stepsFor, type AbilityStep, type SeatScope, type Target, type TargetSpec } from "./targets";
 import { applyToolkitOps, type ToolkitOp } from "./toolkit";
 import type { Catalog, LedgerEntry, LogEntry, RunError, RunState, SeatRun, SourceKey } from "./types";
-import { abilityKeys, abilityOf, coinCost, currentStamp, defIdOf, grantOf, limitBlock, limitOf, ownerOf, remaining, sameStamp, seatOf, spendsInstance, type Remaining } from "./usage";
+import { abilityKeys, abilityOf, coinCost, currentStamp, defIdOf, grantOf, limitBlock, limitOf, ownerOf, remaining, sameStamp, seatOf, shareOf, spendsInstance, type Remaining } from "./usage";
 import { WINDOWS, currentWindow, type ActiveWindow } from "./windows";
 
 export type AbilityStatus =
@@ -71,7 +72,7 @@ function statusWith(run: RunState, seat: SeatRun, key: SourceKey, active: ItemAb
   if (window === null || !windows.includes(window) || !WINDOWS[window].mayAct(run, rules, seat.seatId)) {
     return { usable: false, error: "wrong_window", reason: `Usable ${windows.map((w) => WINDOWS[w].phrase.toLowerCase()).join(" or ")}`, remaining: left };
   }
-  const blocked = limitBlock(run, left);
+  const blocked = limitBlock(run, left, shareOf(seat, key, catalog).spends);
   if (blocked !== null) return { usable: false, error: blocked.error, reason: blocked.reason, remaining: left };
   const canUse = active.canUse ? active.canUse(abilityContext<readonly []>(run, seat, key, rules, catalog, [], false)) : true;
   if (canUse !== true) return { usable: false, error: "ability_unavailable", reason: canUse, remaining: left };
@@ -164,7 +165,7 @@ export function useAbility(
   const limit = status.remaining;
   const grant = grantOf(run, key, catalog);
   const declared = grant === undefined ? limitOf(seat, key, catalog) : resolveTuned(grant.limit, ownerOf(seat));
-  const coins = declared.kind === "coins" && !free ? coinCost(run, seat, key, declared, resolved.targets) : 0;
+  const coins = declared.kind === "coins" && !free ? coinCost(run, seat, key, declared, resolved.targets, rules, catalog) : 0;
   if (run.purse < coins) return { ok: false, error: "cannot_afford" };
 
   const sourceId = defIdOf(seat, key);
@@ -174,7 +175,7 @@ export function useAbility(
   const applied = applyToolkitOps(run, { kind: "seat", seatId, sourceKey: key, sourceId }, ops, rules, catalog);
 
   const at = currentStamp(run)!;
-  const used: LedgerEntry = free ? { kind: "used", sourceKey: key, at, poolCost: 0, free: true } : { kind: "used", sourceKey: key, at, poolCost: limit.kind === "pool" ? limit.cost : 0 };
+  const used: LedgerEntry = free ? { kind: "used", sourceKey: key, at, free: true } : { kind: "used", sourceKey: key, at };
   const spent = !free && spendsInstance(seat, key, catalog) && limit.kind === "uses" && limit.left === 1;
   const seats = applied.seats.map((s) => {
     if (s.seatId !== seatId) return s;

@@ -33,7 +33,7 @@ describe("draftOfferFor", () => {
   });
 
   it("pins a production offer, so a stream rename shows up", () => {
-    expect(draftOfferFor("pinned", CAMP_1, seat("p0", "scout"), 0, CATALOG)).toEqual({
+    expect(draftOfferFor("pinned", CAMP_1, seat("p0", "explorer"), 0, CATALOG)).toEqual({
       kind: "standard",
       bundles: [
         ["trained-monkey", "trail-map"],
@@ -86,7 +86,7 @@ describe("draftOfferFor", () => {
   it("never offers an upgrade", () => {
     const upgradeIds = new Set(Object.values(CATALOG.sources).filter((def) => def.kind === "upgrade").map((def) => def.id));
     for (let n = 0; n < 30; n++) {
-      for (const id of draftOfferFor(`up-${n}`, CAMP_1, seat("p0", "scout"), 0, CATALOG).bundles.flat()) {
+      for (const id of draftOfferFor(`up-${n}`, CAMP_1, seat("p0", "explorer"), 0, CATALOG).bundles.flat()) {
         expect(upgradeIds.has(id)).toBe(false);
         expect(Object.hasOwn(CATALOG.items, id)).toBe(true);
       }

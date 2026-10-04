@@ -24,7 +24,7 @@ function playOut(seatIds: readonly string[]): RunState {
 
 const crewed = (): RunState => {
   const muster = createRun({ seatIds: ["a", "b", "c"], seed: "autoplay" });
-  return { ...muster, seats: muster.seats.map((seat, i) => ({ ...seat, characterId: ["scout", "guide", "medic"][i]! })) };
+  return { ...muster, seats: muster.seats.map((seat, i) => ({ ...seat, characterId: ["explorer", "jd", "medic"][i]! })) };
 };
 
 describe("botMove", () => {

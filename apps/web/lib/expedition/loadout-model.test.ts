@@ -6,10 +6,9 @@ function seat(equipped: string[], backpack: string[], over: Partial<ExpeditionSe
   const item = (uid: string) => ({ uid, itemId: "bait", remaining: { kind: "uses" as const, left: 1, of: 1 } });
   return {
     seatId: "s1",
-    characterId: "scout",
+    characterId: "explorer",
     upgradeId: null,
     items: { equipped: equipped.map(item), backpack: backpack.map(item), concealed: false },
-    pool: null,
     usage: [],
     ...over,
   };
@@ -108,13 +107,13 @@ describe("buildShop", () => {
   });
 
   it("shows the upgrade you bought as owned", () => {
-    const entries = buildShop(input({ you: seat([], [], { upgradeId: "scout.keen-eye" }) })).entries;
+    const entries = buildShop(input({ you: seat([], [], { upgradeId: "leader.open-ears" }) })).entries;
     expect(entries.at(-1)).toEqual({
-      stockId: "upgrade:scout.keen-eye",
-      objectId: "shop:upgrade:scout.keen-eye",
-      infoId: "shop-info:upgrade:scout.keen-eye",
-      sourceId: "scout.keen-eye",
-      name: "Keen Eye",
+      stockId: "upgrade:leader.open-ears",
+      objectId: "shop:upgrade:leader.open-ears",
+      infoId: "shop-info:upgrade:leader.open-ears",
+      sourceId: "leader.open-ears",
+      name: "Open Ears",
       detail: "Upgrade, +1 whisper",
       rare: false,
       price: null,

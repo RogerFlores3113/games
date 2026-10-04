@@ -43,9 +43,9 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     supplies: { count: 3, max: 5 },
     plan: STANDARD_PLAN,
     seats: [
-      { seatId: "s1", characterId: "scout", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
-      { seatId: "s2", characterId: "guide", ...kitOf(["trained-monkey"]), pool: null, usage: [] },
-      { seatId: "s3", characterId: "medic", ...kitOf(["bait"]), pool: null, usage: [] },
+      { seatId: "s1", characterId: "explorer", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
+      { seatId: "s2", characterId: "leader", ...kitOf(["trained-monkey"]), usage: [] },
+      { seatId: "s3", characterId: "jd", ...kitOf(["bait"]), usage: [] },
     ],
     yourAbilities: [],
     history: [CLEARED_1],
@@ -201,9 +201,9 @@ describe("muster", () => {
   it("lists the crew you first: choosing until a character is picked, voting until a ballot is cast, then ready", () => {
     const view = musterView([{ seatId: "s2", choice: "short" }], {
       seats: [
-        { seatId: "s1", characterId: null, upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
-        { seatId: "s2", characterId: "guide", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
-        { seatId: "s3", characterId: "medic", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] },
+        { seatId: "s1", characterId: null, upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
+        { seatId: "s2", characterId: "leader", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
+        { seatId: "s3", characterId: "jd", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
       ],
     });
     expect(panel(view).crew).toEqual([
@@ -216,27 +216,26 @@ describe("muster", () => {
   describe("characters", () => {
     const mustering = (you: Partial<ExpeditionView["seats"][number]>): ExpeditionView => musterView([], { seats: seatsWith({ upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, ...you }) });
 
-    it("shows all six characters, marking the ones teammates took, all pickable for you until you pick", () => {
+    it("shows every character, marking the ones teammates took, all pickable for you until you pick", () => {
       const cards = panel(mustering({ characterId: null })).characters;
-      expect(cards.map((c) => [c.characterId, c.takenBy, c.pickable])).toEqual([
-        ["scout", "Alice", false],
-        ["guide", null, true],
-        ["botanist", null, true],
-        ["medic", "Cara", false],
-        ["signaller", null, true],
+      const ids = ["jd", "leader", "explorer", "cartographer"];
+      expect(cards.filter((c) => ids.includes(c.characterId)).map((c) => [c.characterId, c.takenBy, c.pickable])).toEqual([
+        ["jd", "Cara", false],
+        ["leader", null, true],
+        ["explorer", "Alice", false],
         ["cartographer", null, true],
       ]);
     });
 
-    it("describes a character by name, theme, base power and pool", () => {
-      const botanist = panel(mustering({ characterId: null })).characters.find((c) => c.characterId === "botanist");
-      expect(botanist).toEqual({
-        characterId: "botanist",
-        objectId: "draft:botanist",
-        name: "The Botanist",
-        theme: "Brews jungle herbs",
-        power: { sourceId: "botanist", name: "Herb Tonic", text: "A card in your hand counts one rank higher or lower this camp.", badges: ["Between tricks", "1 herb"] },
-        pool: "Herbs: start 2, max 3",
+    it("describes a character by name, theme, base power and further powers", () => {
+      const leader = panel(mustering({ characterId: null })).characters.find((c) => c.characterId === "leader");
+      expect(leader).toEqual({
+        characterId: "leader",
+        objectId: "draft:leader",
+        name: "The Leader",
+        theme: "Communicates",
+        power: { sourceId: "leader", name: "Megaphone", text: "Whisper twice each camp.", badges: ["Always on"] },
+        more: [],
         takenBy: null,
         yours: false,
         pickable: true,
@@ -244,8 +243,8 @@ describe("muster", () => {
     });
 
     it("marks your pick as yours and leaves nothing pickable after it", () => {
-      const cards = panel(mustering({ characterId: "guide" })).characters;
-      expect(cards.find((c) => c.characterId === "guide")).toMatchObject({ takenBy: "You", yours: true, pickable: false });
+      const cards = panel(mustering({ characterId: "leader" })).characters;
+      expect(cards.find((c) => c.characterId === "leader")).toMatchObject({ takenBy: "You", yours: true, pickable: false });
       expect(cards.filter((c) => c.pickable)).toEqual([]);
     });
   });
@@ -425,7 +424,7 @@ describe("loadout gear and shop", () => {
       { stockId: "supplies", what: { kind: "supplies" }, price: 6, soldTo: null },
       { stockId: "item0", what: { kind: "item", itemId: "smoke-signal" }, price: 5, soldTo: "s1" },
     ],
-    yourUpgrades: [{ stockId: "upgrade:guide.pathfinder", upgradeId: "guide.pathfinder", price: 8 }],
+    yourUpgrades: [{ stockId: "upgrade:leader.delegate", upgradeId: "leader.delegate", price: 8 }],
   };
   const shopView = (over: Partial<ExpeditionView> = {}, readySeatIds: string[] = []) =>
     at({ tag: "loadout", camp: preview(3, { shop: true, survey: null }), mods: [], yourSlots: 2, shop, readySeatIds }, over);
@@ -482,11 +481,11 @@ describe("loadout gear and shop", () => {
           buy: { kind: "status", label: "Sold to Alice" },
         },
         {
-          stockId: "upgrade:guide.pathfinder",
-          objectId: "shop:upgrade:guide.pathfinder",
-          infoId: "shop-info:upgrade:guide.pathfinder",
-          sourceId: "guide.pathfinder",
-          name: "Pathfinder",
+          stockId: "upgrade:leader.delegate",
+          objectId: "shop:upgrade:leader.delegate",
+          infoId: "shop-info:upgrade:leader.delegate",
+          sourceId: "leader.delegate",
+          name: "Delegate",
           detail: "Upgrade, +1 whisper",
           rare: false,
           price: 8,
@@ -615,20 +614,20 @@ describe("kit", () => {
     const view = makeView({
       seats: seatsWith({
         usage: [
-          { sourceKey: "guide", remaining: { kind: "uses", left: 0, of: 1 } },
+          { sourceKey: "leader", remaining: { kind: "whispers", left: 0 } },
           { sourceKey: "trained-monkey", remaining: { kind: "uses", left: 1, of: 1 } },
         ],
       }),
     });
     expect(model(view).kit).toEqual([
-      { sourceKey: "guide", sourceId: "guide", objectId: "kit:guide", name: "Machete", kind: "character", charge: { full: "Used this camp", short: "Used" } },
+      { sourceKey: "leader", sourceId: "leader", objectId: "kit:leader", name: "Megaphone", kind: "character", charge: { full: "No whispers left", short: "Used" } },
       { sourceKey: "trained-monkey", sourceId: "trained-monkey", objectId: "kit:trained-monkey", name: "Trained Monkey", kind: "item", charge: { full: "Once per camp", short: "1 per camp" } },
     ]);
   });
 
   it("marks a passive-only character as always on", () => {
-    const view = makeView({ seats: seatsWith({ characterId: "signaller", upgradeId: null, items: { equipped: [], backpack: [], concealed: false } }) });
-    expect(model(view).kit).toEqual([{ sourceKey: "signaller", sourceId: "signaller", objectId: "kit:signaller", name: "Talking Drum", kind: "character", charge: { full: "Always on", short: "Always on" } }]);
+    const view = makeView({ seats: seatsWith({ characterId: "leader", upgradeId: null, items: { equipped: [], backpack: [], concealed: false } }) });
+    expect(model(view).kit).toEqual([{ sourceKey: "leader", sourceId: "leader", objectId: "kit:leader", name: "Megaphone", kind: "character", charge: { full: "Always on", short: "Always on" } }]);
   });
 
   it("is null for a spectator", () => {
@@ -645,9 +644,9 @@ describe("crew", () => {
         isYou: true,
         connected: true,
         status: "waiting",
-        character: "The Guide",
+        character: "The Leader",
         sources: [
-          { sourceKey: "guide", sourceId: "guide", name: "Machete" },
+          { sourceKey: "leader", sourceId: "leader", name: "Megaphone" },
           { sourceKey: "trained-monkey", sourceId: "trained-monkey", name: "Trained Monkey" },
         ],
         itemsHidden: false,
@@ -658,14 +657,14 @@ describe("crew", () => {
         isYou: false,
         connected: false,
         status: "waiting",
-        character: "The Medic",
+        character: "J.D.",
         sources: [
-          { sourceKey: "medic", sourceId: "medic", name: "Triage" },
+          { sourceKey: "jd", sourceId: "jd", name: "Beginner's Luck" },
           { sourceKey: "bait", sourceId: "bait", name: "Bait" },
         ],
         itemsHidden: false,
       },
-      { seatId: "s1", displayLabel: "Alice", isYou: false, connected: true, status: "waiting", character: "The Scout", sources: [{ sourceKey: "scout", sourceId: "scout", name: "Spyglass" }], itemsHidden: false },
+      { seatId: "s1", displayLabel: "Alice", isYou: false, connected: true, status: "waiting", character: "The Explorer", sources: [{ sourceKey: "explorer", sourceId: "explorer", name: "Compass" }], itemsHidden: false },
     ]);
   });
 
@@ -674,9 +673,9 @@ describe("crew", () => {
     const view = makeView();
     const rows = model({ ...view, seats: view.seats.map((seat) => (seat.seatId === "s2" ? seat : fogged(seat))) }).crew;
     expect(rows.map((row) => [row.seatId, row.itemsHidden, row.sources.map((s) => s.sourceKey)])).toEqual([
-      ["s2", false, ["guide", "trained-monkey"]],
-      ["s3", true, ["medic"]],
-      ["s1", true, ["scout"]],
+      ["s2", false, ["leader", "trained-monkey"]],
+      ["s3", true, ["jd"]],
+      ["s1", true, ["explorer"]],
     ]);
   });
 
@@ -708,10 +707,10 @@ describe("tooltip", () => {
   });
 
   it("titles a character by its power", () => {
-    expect(model(makeView(), ui({ tooltipSourceId: "scout" })).tooltip).toEqual({
-      title: "Spyglass",
-      text: "See a random card in a teammate's hand.",
-      badges: ["Between tricks", "Once per camp"],
+    expect(model(makeView(), ui({ tooltipSourceId: "explorer" })).tooltip).toEqual({
+      title: "Compass",
+      text: "A card in your hand counts one rank higher or lower.",
+      badges: ["Between tricks or on your turn", "Once per camp"],
       reason: null,
     });
   });

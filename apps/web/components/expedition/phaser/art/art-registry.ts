@@ -24,18 +24,19 @@ const c = toPhaserColor;
 /** Every character, upgrade and item, each with a 16x16 icon under
  * sources/<id>.png. `source-icons.test.ts` checks this against the catalogue. */
 export const SOURCE_ICON_IDS = [
-  "scout", "guide", "botanist", "medic", "signaller", "cartographer",
-  "scout.keen-eye", "scout.eavesdrop", "guide.pathfinder", "guide.howler-call",
-  "botanist.greenhouse", "botanist.antidote", "medic.rally", "medic.field-kit",
-  "signaller.loud-call", "signaller.call-and-response", "cartographer.detour", "cartographer.landmark",
+  "jd", "jd.blend-in", "jd.free-spirit", "jd.rule-breaker",
+  "leader", "leader.open-ears", "leader.delegate", "leader.momentum",
+  "explorer", "explorer.second-wind", "explorer.true-form", "explorer.reshape",
+  "medic", "signaller", "cartographer",
+  "medic.rally", "medic.field-kit", "signaller.loud-call", "signaller.call-and-response", "cartographer.detour", "cartographer.landmark",
   "trained-monkey", "pack-mule", "parrot", "trail-map", "rain-poncho", "smoke-signal", "whetstone",
   "puffball", "bait", "camouflage", "rope-ladder", "heavy-pack", "mosquito-net",
   "temple",
 ] as const;
 
-/** The six characters, each a 64x80 seated silhouette under crew/<id>.png,
+/** The characters, each a 64x80 seated silhouette under crew/<id>.png,
  * drawn bottom-centred. */
-export const CREW_IDS = ["scout", "guide", "botanist", "medic", "signaller", "cartographer"] as const;
+export const CREW_IDS = ["jd", "leader", "explorer", "medic", "signaller", "cartographer"] as const;
 
 type SourceIconId = `source-${(typeof SOURCE_ICON_IDS)[number]}`;
 type CrewArtId = `crew-${(typeof CREW_IDS)[number]}`;
