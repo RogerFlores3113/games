@@ -15,6 +15,7 @@ import { createRun, runStatus } from "../run/lifecycle";
 import { applyRunAction } from "../run/run-actions";
 import { CATALOG } from "../run/catalog";
 import { gatedPendingSeatIds } from "../run/windows";
+import { expeditionDevHooks } from "../dev/hooks";
 import { toExpeditionPlayerView } from "./view";
 import { parseRunAction } from "./request-guards";
 import type { RunAction, RunError, RunState } from "../run/types";
@@ -57,4 +58,6 @@ export const expeditionGame: GameAdapter<RunState, RunAction, ExpeditionConfig, 
   autoPassRequest(state, seatId) {
     return gatedPendingSeatIds(state, CATALOG).includes(seatId) ? { type: "skip-window" } : null;
   },
+
+  dev: expeditionDevHooks,
 };

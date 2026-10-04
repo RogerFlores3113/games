@@ -10,7 +10,14 @@ export const RULES_SMOKE = "rules-smoke-ok";
 export type {
   AdapterError,
   AdapterResult,
+  DevField,
+  DevInspectSection,
+  DevOption,
+  DevParams,
+  DevResult,
+  DevShortcut,
   GameAdapter,
+  GameDevHooks,
   GameEndResult,
   Variant,
 } from "./adapter";

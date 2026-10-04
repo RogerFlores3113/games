@@ -211,49 +211,38 @@ export function assignFaceDown(camp: CampState, seed: string, campNumber: number
   return { ...camp, objectives };
 }
 
-/** Settles a decided camp (no-op while still in_progress, or before a camp
- * even exists). A failure spends rules.failureCost(run) supplies — computed
- * BEFORE the attempt is cleared — and returns to the fireside with NO draft
- * (D-01), unless the rescue window still waits on a seat. A success regains
- * each pooled character's pool, then advances the camp and deals every seat
- * a fresh private offer, or ends the run at FINAL_CAMP (won). Supplies
- * reaching 0 makes runStatus "lost". */
-export function settleIfDecided(run: RunState, catalog: Catalog): RunState {
-  if (run.attempt === null || run.attempt.camp === null) return run;
+/** Records the current attempt as failed: spends rules.failureCost(run),
+ * computed BEFORE the attempt is cleared, and returns to the fireside with
+ * NO draft (D-01). Supplies reaching 0 makes runStatus "lost". */
+export function recordCampFailure(run: RunState, catalog: Catalog): RunState {
+  if (run.attempt === null) throw new Error("recordCampFailure: no attempt in progress");
   const attempt = run.attempt;
-  const camp = run.attempt.camp;
-  const rules = rulesFor(run, catalog);
-  const outcome = checkCampOutcome(camp, rules);
-
-  if (outcome.status === "in_progress") return run;
-
-  if (outcome.status === "failed") {
-    // A camp failed only by failed objectives waits while a seat can still
-    // rescue it (the rescue window); otherwise it fails in this same call.
-    if (currentWindow(run, rules) === "rescue" && gatedPendingSeatIds(run, catalog).length > 0) return run;
-    // Computed while the attempt (and its effects layer) still exists.
-    const cost = rules.failureCost(run);
-    if (!Number.isInteger(cost) || cost < 1) {
-      throw new Error(`settleIfDecided: failureCost must be an integer >= 1, got ${cost}`);
-    }
-    const result: CampResult = {
-      campNumber: run.campNumber,
-      attemptNumber: attempt.attemptNumber,
-      status: "failed",
-      suppliesSpent: cost,
-    };
-    return {
-      ...run,
-      supplies: Math.max(0, run.supplies - cost),
-      attempt: null,
-      history: [...run.history, result],
-    };
+  const cost = rulesFor(run, catalog).failureCost(run);
+  if (!Number.isInteger(cost) || cost < 1) {
+    throw new Error(`settleIfDecided: failureCost must be an integer >= 1, got ${cost}`);
   }
-
-  // succeeded
   const result: CampResult = {
     campNumber: run.campNumber,
     attemptNumber: attempt.attemptNumber,
+    status: "failed",
+    suppliesSpent: cost,
+  };
+  return {
+    ...run,
+    supplies: Math.max(0, run.supplies - cost),
+    attempt: null,
+    history: [...run.history, result],
+  };
+}
+
+/** Records the current attempt as cleared: regains each pooled character's
+ * pool, then advances the camp and deals every seat a fresh private offer,
+ * or ends the run at FINAL_CAMP (won). */
+export function recordCampSuccess(run: RunState, catalog: Catalog): RunState {
+  if (run.attempt === null) throw new Error("recordCampSuccess: no attempt in progress");
+  const result: CampResult = {
+    campNumber: run.campNumber,
+    attemptNumber: run.attempt.attemptNumber,
     status: "succeeded",
     suppliesSpent: 0,
   };
@@ -273,6 +262,20 @@ export function settleIfDecided(run: RunState, catalog: Catalog): RunState {
   const seats = regained.map((seat) => ({ ...seat, draftOffer: draftOfferFor(run.seed, nextCampNumber, seat, catalog) }));
 
   return { ...run, campNumber: nextCampNumber, seats, attempt: null, history };
+}
+
+/** Settles a decided camp (no-op while still in_progress, or before a camp
+ * even exists). A camp failed only by failed objectives waits while a seat
+ * can still rescue it (the rescue window). */
+export function settleIfDecided(run: RunState, catalog: Catalog): RunState {
+  if (run.attempt === null || run.attempt.camp === null) return run;
+  const rules = rulesFor(run, catalog);
+  const outcome = checkCampOutcome(run.attempt.camp, rules);
+
+  if (outcome.status === "in_progress") return run;
+  if (outcome.status === "succeeded") return recordCampSuccess(run, catalog);
+  if (currentWindow(run, rules) === "rescue" && gatedPendingSeatIds(run, catalog).length > 0) return run;
+  return recordCampFailure(run, catalog);
 }
 
 /** The single entry point every RunAction handler (Plan 10-07) calls after

@@ -47,7 +47,7 @@ export type GameEndResult = { score: number; reason: string; band?: string };
 
 /**
  * The contract a game plugs into the room layer through. Five required
- * members and one optional hook, no others — see the file-level invariants
+ * members and two optional hooks, no others — see the file-level invariants
  * above. Generic over
  * each game's own config (`TConfig`), end-result (`TEndResult`) and error
  * (`TError`) types (D-06) — deliberately no default type arguments, so the
@@ -91,4 +91,56 @@ export interface GameAdapter<TState, TAction, TConfig, TEndResult, TError extend
    * for a decision it may decline. `null` when the game is not waiting on
    * it. A non-null request must be one `applyAction` accepts. */
   autoPassRequest?(state: TState, seatId: string): unknown | null;
+
+  /** Optional. Dev-mode tooling (a worker started with DEV_MODE only). The
+   * room layer never calls it otherwise, so a game without it plays exactly
+   * the same. */
+  readonly dev?: GameDevHooks<TState>;
+}
+
+/** One input of a dev shortcut, rendered generically by the web dev panel. */
+export type DevField =
+  | { readonly name: string; readonly label: string; readonly kind: "number"; readonly min: number; readonly max: number; readonly initial: number }
+  | { readonly name: string; readonly label: string; readonly kind: "choice"; readonly options: readonly DevOption[] }
+  | { readonly name: string; readonly label: string; readonly kind: "text"; readonly initial: string };
+
+export type DevOption = { readonly value: string; readonly label: string };
+
+/** A named state edit the dev panel offers as a button plus its fields. */
+export type DevShortcut = {
+  readonly id: string;
+  readonly label: string;
+  readonly group: string;
+  readonly fields: readonly DevField[];
+};
+
+/** A shortcut's submitted field values, keyed by `DevField.name`. Untrusted. */
+export type DevParams = Readonly<Record<string, string | number>>;
+
+export type DevResult<TState> = { readonly ok: true; readonly state: TState } | { readonly ok: false; readonly error: string };
+
+/** A titled block of plain-text lines showing hidden information. */
+export type DevInspectSection = { readonly title: string; readonly lines: readonly string[] };
+
+/** A game's dev-mode surface. Everything here sees the WHOLE state, so its
+ * output may only ever reach a dev-mode socket, never a player view. */
+export interface GameDevHooks<TState> {
+  /** Problems that make `state` unusable, e.g. a broken card count. `state`
+   * has already passed the game's state schema; `[]` means it is legal. */
+  check(state: TState): readonly string[];
+  /** The seat ids `state` was built for, in seat order. Loading a state
+   * saved in another room renames these to the room's own seats. */
+  seatIds(state: TState): readonly string[];
+  /** The shortcuts offered for `state` (field options may depend on it). */
+  shortcuts(state: TState): readonly DevShortcut[];
+  /** Applies shortcut `id`, or returns a readable error. Never throws. */
+  runShortcut(state: TState, id: string, params: DevParams): DevResult<TState>;
+  /** The next request one of `seatIds` can make that `applyAction` accepts,
+   * or `null` when none of them has a decision to make. */
+  botMove(state: TState, seatIds: readonly string[]): { readonly seatId: string; readonly request: unknown } | null;
+  /** A key that changes whenever the game crosses a boundary autoplay can
+   * stop at (Expedition: a camp settling). */
+  milestone(state: TState): string;
+  /** Full-information summary for a human: every hand, every hidden thing. */
+  inspect(state: TState): readonly DevInspectSection[];
 }
