@@ -1,16 +1,9 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { buyStock, clickUntilChanged, dragGear, gearOf, shopEntry, tapGear, type TrailView } from "./expedition-driver";
 import { createExpeditionRoom, getModel, waitForBridge } from "./expedition-helpers";
 
 // Needs the worker in dev mode (see dev-mode.spec.ts): the dev shortcuts set
 // up a boss camp's loadout with coins and items, and the UI does the rest.
-
-/** Phaser also hit-tests mouse presses on DOM over the canvas, so a real
- * click on a dev panel button can press whatever canvas button lies under
- * it (Set out). A DOM click event does not. */
-async function press(button: Locator): Promise<void> {
-  await button.dispatchEvent("click");
-}
 
 /** Runs a dev shortcut and waits until the model shows its effect. */
 async function shortcut(page: Page, id: string, fields: Record<string, string>, applied: (m: TrailView) => boolean): Promise<void> {
@@ -20,7 +13,7 @@ async function shortcut(page: Page, id: string, fields: Record<string, string>, 
     if ((await field.evaluate((el) => el.tagName)) === "SELECT") await field.selectOption(value);
     else await field.fill(value);
   }
-  await press(panel.getByTestId(`dev-shortcut-${id}`));
+  await panel.getByTestId(`dev-shortcut-${id}`).click();
   await expect.poll(async () => applied(await getModel<TrailView>(page)), { message: `${id} applied` }).toBe(true);
 }
 
@@ -29,9 +22,9 @@ test("a seat equips by tap and drag, and buys supplies and an item at a boss cam
   await createExpeditionRoom(page, "Solo");
   await page.getByTestId("dev-toggle").click();
   const panel = page.getByTestId("dev-panel");
-  await press(panel.getByTestId("dev-add-bot"));
+  await panel.getByTestId("dev-add-bot").click();
   await expect(panel.getByTestId("dev-result")).toHaveText(/^Bot 1 joined\./);
-  await press(panel.getByTestId("dev-add-bot"));
+  await panel.getByTestId("dev-add-bot").click();
   await expect(panel.getByTestId("dev-result")).toHaveText(/^Bot 2 joined\./);
   await page.getByTestId("start-game").click();
   await waitForBridge(page);

@@ -22,6 +22,7 @@ import { PALETTE, toPhaserColor } from "./palette";
 import { SCENE_FACTORIES } from "./scenes/scene-registry";
 import { ObjectIndex } from "./object-index";
 import { createAudioDirector } from "./audio-director";
+import { confineInputToCanvas } from "./confine-input";
 import { computeZoom, isBelowComfortSize, STAGE_HEIGHT, STAGE_WIDTH } from "../../../lib/expedition/compute-zoom";
 import type { ExpeditionSceneStore } from "../../../lib/expedition/expedition-scene-store";
 
@@ -68,9 +69,11 @@ export default function ExpeditionPhaserMount({ store }: ExpeditionPhaserMountPr
       backgroundColor: toPhaserColor(PALETTE.jungle),
       scale: { mode: Phaser.Scale.NONE, zoom: initialZoom },
       banner: false,
+      input: { windowEvents: false },
     });
     gameRef.current = game;
     game.canvas.style.imageRendering = "pixelated";
+    const releaseInput = confineInputToCanvas(game);
 
     for (const [key, factory] of Object.entries(SCENE_FACTORIES)) {
       game.scene.add(key, factory({ store, index }), false);
@@ -101,6 +104,7 @@ export default function ExpeditionPhaserMount({ store }: ExpeditionPhaserMountPr
       destroyed = true;
       window.removeEventListener("resize", handleResize);
       unsubscribeScene();
+      releaseInput();
       audio.destroy();
       uninstallBridge?.();
       game.destroy(true);
