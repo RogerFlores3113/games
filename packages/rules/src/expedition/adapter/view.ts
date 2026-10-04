@@ -38,7 +38,7 @@ import { campStack, modCtx, pairingOf, specOf, type StackLayer } from "../run/st
 import type { StatusPart } from "../content/mods/mod-def";
 import { whispersUsedBy } from "../run/whisper";
 import { abilityStatus } from "../run/abilities";
-import { abilityKeys, activeOfKey, backpackOf, itemOf, liveSourceKeys, poolBalance, remaining, usedThisAttempt, type Remaining } from "../run/usage";
+import { abilityKeys, abilityOf, activeOfKey, backpackOf, itemOf, poolBalance, remaining, usedThisAttempt, type Remaining } from "../run/usage";
 import { upgradeOffers, type StockEntry } from "../run/shop";
 import { currentWindow, gatedPendingSeatIds } from "../run/windows";
 import type { RunRules } from "../run/run-rules";
@@ -283,8 +283,8 @@ function toSeatView(state: RunState, seat: SeatRun, viewerSeatId: string, rules:
       concealed,
     },
     pool: balance !== null && pool !== undefined ? { balance, max: pool.max } : null,
-    usage: liveSourceKeys(seat)
-      .filter((key) => activeOfKey(seat, key, catalog) !== undefined && shown(key))
+    usage: abilityKeys(state, seat, catalog)
+      .filter((key) => abilityOf(state, seat, key, catalog) !== undefined && shown(key))
       .map((sourceKey) => ({ sourceKey, remaining: toRemainingView(remaining(state, seat.seatId, sourceKey, catalog)) })),
   };
 }

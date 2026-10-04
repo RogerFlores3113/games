@@ -4,7 +4,9 @@ import { createRun, runStatus } from "../run/lifecycle";
 import { campIndex } from "../run/plan";
 import { campSpecAt } from "../run/route";
 import { applyRunAction } from "../run/stages/registry";
-import type { RunState } from "../run/types";
+import type { RunAt, RunState } from "../run/types";
+import type { CardIdentity, ExpeditionCard } from "../state";
+import { toExpeditionPlayerView } from "../adapter/view";
 import { botMove } from "./autoplay";
 import { DEV_SHORTCUTS } from "./shortcuts";
 
@@ -20,6 +22,11 @@ function playOut(seatIds: readonly string[]): RunState {
   return run;
 }
 
+const crewed = (): RunState => {
+  const muster = createRun({ seatIds: ["a", "b", "c"], seed: "autoplay" });
+  return { ...muster, seats: muster.seats.map((seat, i) => ({ ...seat, characterId: ["scout", "guide", "medic"][i]! })) };
+};
+
 describe("botMove", () => {
   it("plays a 3-player run to its end", () => {
     expect(runStatus(playOut(["a", "b", "c"]))).not.toBe("in_progress");
@@ -28,11 +35,6 @@ describe("botMove", () => {
   it("plays a 5-player run to its end", () => {
     expect(runStatus(playOut(["a", "b", "c", "d", "e"]))).not.toBe("in_progress");
   });
-
-  const crewed = (): RunState => {
-    const muster = createRun({ seatIds: ["a", "b", "c"], seed: "autoplay" });
-    return { ...muster, seats: muster.seats.map((seat, i) => ({ ...seat, characterId: ["scout", "guide", "medic"][i]! })) };
-  };
 
   it("at muster, picks a free character first and then abstains from the length vote", () => {
     const muster = createRun({ seatIds: ["a", "b", "c"], seed: "autoplay" });
@@ -65,5 +67,34 @@ describe("botMove", () => {
     const event: RunState = { ...loadout, stage: { tag: "event", route: { id: "a", next }, ready: { a: true } } };
     expect(botMove(event, ["a"], CATALOG)).toBeNull();
     expect(botMove(event, ["a", "b"], CATALOG)).toEqual({ seatId: "b", request: { type: "ready" } });
+  });
+});
+
+describe("botMove at the temple", () => {
+  type Camp = RunAt<"camp">;
+  const club: ExpeditionCard = { id: "c4", identity: { kind: "standard", suit: "clubs", rank: 4 } as CardIdentity };
+  const spade: ExpeditionCard = { id: "s9", identity: { kind: "standard", suit: "spades", rank: 9 } as CardIdentity };
+  const sun: ExpeditionCard = { id: "sun", identity: { kind: "joker", joker: "sun" } };
+
+  /** The Short temple with every objective taken, `cards` in the leader's
+   * hand and the path's next plate read back. */
+  function temple(cards: readonly ExpeditionCard[]): { run: Camp; leader: string; next: string } {
+    const run = DEV_SHORTCUTS["jump-to-camp"].apply(crewed(), { length: "short", camp: 4, stage: "camp" }, CATALOG) as Camp;
+    const camp = run.stage.attempt.camp;
+    const leader = camp.currentTrick.leaderSeatId;
+    const objectives = camp.objectives.map((o) => ({ ...o, ownerSeatId: leader }));
+    const hands = camp.hands.map((h) => (h.seatId === leader ? { ...h, cards } : h));
+    const next: Camp = { ...run, stage: { ...run.stage, attempt: { ...run.stage.attempt, camp: { ...camp, objectives, hands } } } };
+    const path = toExpeditionPlayerView(next, leader, CATALOG).stage;
+    const plates = path.tag === "camp" ? path.mods.find((m) => m.id === "temple")!.status[0] : undefined;
+    return { run: next, leader, next: plates?.kind === "path" ? String(plates.plates[plates.pressed]) : "" };
+  }
+
+  it("leads the next plate's suit before any other card, and holds the Sun back", () => {
+    const { run, leader, next } = temple([sun, spade, club]);
+    expect(next).toBe("clubs");
+    expect(botMove(run, [leader], CATALOG)).toEqual({ seatId: leader, request: { type: "play-card", cardId: "c4" } });
+    const noClubs = temple([sun, spade]);
+    expect(botMove(noClubs.run, [noClubs.leader], CATALOG)).toEqual({ seatId: noClubs.leader, request: { type: "play-card", cardId: "s9" } });
   });
 });

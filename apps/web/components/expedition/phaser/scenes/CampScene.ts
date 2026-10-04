@@ -17,7 +17,9 @@ import { preloadArt } from "../art/place-art";
 import { drawBoardPick, drawDropTarget, drawHand, drawLastTrick, drawTrick } from "../draw/draw-hand-trick";
 import { drawControls, drawStumpOverlays } from "../draw/draw-controls";
 import { drawWhispers } from "../draw/draw-whispers";
-import { drawBossCaption, placeBoss } from "../draw/draw-boss";
+import { drawBossCaption, placeBosses, worldKey } from "../draw/draw-boss";
+import { drawTemplePath } from "../draw/draw-temple";
+import { TEMPLE_PATH_ID } from "../../../../lib/expedition/temple-model";
 import { BossFx } from "../draw/draw-boss-fx";
 import { bossObjectId } from "../../../../lib/expedition/boss-model";
 import { INTERACTABLE_REGISTRY } from "../interactables/registry";
@@ -203,8 +205,9 @@ export class CampScene extends Phaser.Scene {
   private backdropLayer: Phaser.GameObjects.Container | null = null;
   private backdropLocation: string | null = null;
   private bossLayer: Phaser.GameObjects.Container | null = null;
-  private bossId: string | null = null;
-  /** The world's furniture, which steps aside while a boss stands there. */
+  private bossKey: string | null = null;
+  /** The world's furniture, which steps aside while a boss or the temple's
+   * helpers stand there. */
   private furniture: Phaser.GameObjects.Components.Visible[] = [];
   private weather: WeatherOverlay | null = null;
   private fx: BossFx | null = null;
@@ -250,7 +253,7 @@ export class CampScene extends Phaser.Scene {
 
     const skyLayer = this.add.container(0, 0);
     this.bossLayer = this.add.container(0, 0);
-    this.bossId = null;
+    this.bossKey = null;
     this.dynamicLayer = this.add.container(0, 0);
     this.fx = new BossFx(this, this.add.container(0, 0), this.index);
     this.dragLayer = this.add.container(0, 0);
@@ -304,25 +307,26 @@ export class CampScene extends Phaser.Scene {
     this.renderModel(model);
   }
 
-  /** The backdrop follows the camp's location; the overlay its weather. */
+  /** The backdrop follows the camp's location (the temple's own at the
+   * temple); the overlay its weather. */
   private renderSky(model: SceneModel): void {
-    if (this.backdropLayer !== null && this.backdropLocation !== model.sky.location) {
+    if (this.backdropLayer !== null && this.backdropLocation !== model.sky.backdrop) {
       this.backdropLayer.removeAll(true);
-      this.backdropLayer.add(drawBackdrop(this, model.sky.location));
-      this.backdropLocation = model.sky.location;
+      this.backdropLayer.add(drawBackdrop(this, model.sky.backdrop));
+      this.backdropLocation = model.sky.backdrop;
     }
     this.weather?.setSky(model.sky);
     this.weather?.flash(model.sky.strike);
   }
 
-  /** The boss sprite is rebuilt only when the boss changes, so its idle
-   * bob is not restarted by every redraw. */
+  /** The boss sprites are rebuilt only when the bosses change, so their
+   * idle bob is not restarted by every redraw. */
   private renderBoss(model: SceneModel): void {
-    const id = model.boss?.id ?? null;
-    if (this.bossLayer === null || this.bossId === id) return;
-    placeBoss(this, this.bossLayer, model.boss, this.index, this.handlers);
-    this.bossId = id;
-    for (const piece of this.furniture) piece.setVisible(id === null);
+    const key = worldKey(model);
+    if (this.bossLayer === null || this.bossKey === key) return;
+    placeBosses(this, this.bossLayer, model, this.index, this.handlers);
+    this.bossKey = key;
+    for (const piece of this.furniture) piece.setVisible(key === null);
   }
 
   renderModel(model: SceneModel): void {
@@ -354,6 +358,9 @@ export class CampScene extends Phaser.Scene {
     drawLastTrick(this, layer, model, this.index, this.handlers);
     drawWhispers(this, layer, model, this.index);
     drawBossCaption(this, layer, model);
+    const before = this.previousModel?.temple;
+    const pressedNow = model.temple !== null && before !== undefined && before !== null && before.key === model.temple.key && model.temple.pressed > before.pressed;
+    drawTemplePath(this, layer, model, this.index, this.handlers, pressedNow);
     drawControls(this, layer, model, this.index, this.handlers);
     drawBoardPick(this, layer, model, this.index, this.handlers);
     drawStumpOverlays(this, layer, model, this.index, this.handlers);
@@ -498,6 +505,8 @@ export class CampScene extends Phaser.Scene {
     if (ui.tooltipMateSource !== null && !over(mateSourceObjectId(ui.tooltipMateSource.seatId, ui.tooltipMateSource.sourceKey))) {
       this.handlers.onMateSourceHover(null);
     }
-    if (ui.tooltipModId !== null && !over(modObjectId(ui.tooltipModId)) && !over(bossObjectId(ui.tooltipModId))) this.handlers.onModHover(null);
+    if (ui.tooltipModId !== null && !over(modObjectId(ui.tooltipModId)) && !over(bossObjectId(ui.tooltipModId)) && !(ui.tooltipModId === "temple" && over(TEMPLE_PATH_ID))) {
+      this.handlers.onModHover(null);
+    }
   }
 }

@@ -226,7 +226,8 @@ export type ExpeditionSeatView = {
    * only the items used this attempt and `backpack` is null. */
   items: { equipped: ExpeditionItemView[]; backpack: ExpeditionItemView[] | null; concealed: boolean };
   pool: { balance: number; max: number } | null;
-  /** Every live source key with an active ability. */
+  /** Every live source key with an active ability, and every ability a
+   * camp modifier grants the crew (the temple's skip, under "temple"). */
   usage: { sourceKey: string; remaining: ExpeditionRemainingView }[];
 };
 

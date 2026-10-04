@@ -3,12 +3,32 @@
 // takes the first bundle; abstains from votes so the human's ballot decides.
 
 import { currentActorSeatId } from "../camp";
+import { platePath, pressedCount } from "../content/mods/temple";
 import { rulesFor } from "../run/compose";
+import { campStack, modCtx } from "../run/stack";
 import { applyRunAction } from "../run/stages/registry";
-import type { Catalog, RunAction, RunState } from "../run/types";
+import type { Catalog, RunAction, RunAt, RunState } from "../run/types";
 import { gatedPendingSeatIds } from "../run/windows";
+import type { CardIdentity, ExpeditionCard } from "../state";
 
 type Candidate = { readonly seatId: string; readonly request: RunAction };
+
+const isSun = (identity: CardIdentity): boolean => identity.kind === "joker" && identity.joker === "sun";
+
+/** At the temple a lead that presses the next plate comes first, and the Sun
+ * comes last unless it presses the last plate: it breaks the path if it
+ * leaves play any earlier. */
+function templeOrder(run: RunAt<"camp">, cards: readonly ExpeditionCard[], catalog: Catalog): readonly ExpeditionCard[] {
+  const layer = campStack(run, catalog).find((l) => l.def.kind === "temple");
+  if (layer === undefined) return cards;
+  const camp = run.stage.attempt.camp;
+  const path = platePath(modCtx(run, run.stage.camp, layer), camp);
+  const next = path[pressedCount(camp, path)];
+  const leading = camp.currentTrick.plays.length === 0;
+  const presses = (identity: CardIdentity) => (next === "sun" ? isSun(identity) : identity.kind === "standard" && identity.suit === next);
+  const order = (card: ExpeditionCard) => (leading && presses(card.identity) ? 0 : isSun(card.identity) ? 2 : 1);
+  return [...cards].sort((a, b) => order(a) - order(b));
+}
 
 function candidates(run: RunState, seatIds: readonly string[], catalog: Catalog): Candidate[] {
   const mine = run.seats.filter((seat) => seatIds.includes(seat.seatId));
@@ -38,7 +58,7 @@ function candidates(run: RunState, seatIds: readonly string[], catalog: Catalog)
       if (actor !== null && seatIds.includes(actor)) {
         const unowned = camp.objectives.find((o) => o.ownerSeatId === null);
         if (unowned !== undefined) out.push({ seatId: actor, request: { type: "pick-objective", objectiveId: unowned.id } });
-        for (const card of camp.hands.find((h) => h.seatId === actor)?.cards ?? []) out.push({ seatId: actor, request: { type: "play-card", cardId: card.id } });
+        for (const card of templeOrder(run as RunAt<"camp">, camp.hands.find((h) => h.seatId === actor)?.cards ?? [], catalog)) out.push({ seatId: actor, request: { type: "play-card", cardId: card.id } });
       }
       return out;
     }

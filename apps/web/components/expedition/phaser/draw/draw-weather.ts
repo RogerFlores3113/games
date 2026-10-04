@@ -97,13 +97,14 @@ const GAUGE_W = 18;
 const GAUGE_H = 6;
 
 /** How much of a chip fits: its reading, its name, or its icon alone. */
-type ChipFit = "badge" | "name" | "icon";
+export type ChipFit = "badge" | "name" | "icon";
 const FITS: readonly ChipFit[] = ["badge", "name", "icon"];
 
-/** A boss keeps its name longest: it is the camp's headline. */
+/** A boss or the temple keeps its name longest: it is the camp's headline.
+ * A helper at the temple does not; the world column names it. */
 function fitOf(chip: ModChip, tier: ChipFit): ChipFit {
-  const boss = chip.kind === "animal" || chip.kind === "disaster" || chip.kind === "temple";
-  return tier === "icon" && boss ? "name" : tier;
+  const headline = chip.kind === "temple" || ((chip.kind === "animal" || chip.kind === "disaster") && chip.strength === "full");
+  return tier === "icon" && headline ? "name" : tier;
 }
 
 function chipWidth(chip: ModChip, fit: ChipFit): number {
@@ -136,19 +137,25 @@ function bolt(g: Phaser.GameObjects.Graphics, x: number, y: number, color: strin
   }
 }
 
+/** How much of each chip the strip shows in `room` px, and how wide it is. */
+export function stripFit(chips: readonly ModChip[], room: number): { tier: ChipFit; total: number } {
+  const totalAt = (tier: ChipFit) => chips.reduce((w, chip) => w + chipWidth(chip, fitOf(chip, tier)), 0) + CHIP_GAP * (chips.length - 1);
+  const tier = FITS.find((t) => totalAt(t) <= room) ?? "icon";
+  return { tier, total: totalAt(tier) };
+}
+
 export interface StripHandlers {
   onModHover(modId: string | null): void;
 }
 
 /** The camp's modifiers as chips centred in the top bar's free span
  * [left, right): icon, name, and a live reading. When the span is too
- * narrow the readings go first, then every name but the boss's. */
+ * narrow the readings go first, then every name but the boss's or the
+ * temple's. */
 export function drawModStrip(scene: Phaser.Scene, layer: Layer, chips: ModChip[], span: { left: number; right: number }, index: ObjectIndex, handlers: StripHandlers): void {
   if (chips.length === 0) return;
   const room = span.right - span.left;
-  const totalAt = (tier: ChipFit) => chips.reduce((w, chip) => w + chipWidth(chip, fitOf(chip, tier)), 0) + CHIP_GAP * (chips.length - 1);
-  const tier = FITS.find((t) => totalAt(t) <= room) ?? "icon";
-  const total = totalAt(tier);
+  const { tier, total } = stripFit(chips, room);
   const zone = ZONES.topBar;
   const y = zone.y + Math.floor((zone.h - CHIP_H) / 2);
   let x = span.left + Math.max(0, Math.floor((room - total) / 2));

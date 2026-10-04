@@ -58,8 +58,10 @@ export type StatusPart =
   | { readonly kind: "swarm"; readonly seatId: string | null } // Locusts: whose item they eat next; null: a card from every hand
   | { readonly kind: "path"; readonly plates: readonly (Suit | "sun")[]; readonly pressed: number }; // Temple: the plates in order, the first `pressed` pressed
 
-/** An ability every seat may use, keyed by the granting def's id. */
-export type Grant = ActiveAbility & { readonly name: string; readonly text: string };
+/** An ability every seat may use, keyed by the granting def's id. It has no
+ * `effect`: compose resolves a seat effect's layer through the catalogue's
+ * sources, which a mod id is not. */
+export type Grant = Omit<ActiveAbility, "effect"> & { readonly name: string; readonly text: string };
 
 export type ModBody = {
   readonly rules?: (ctx: ModCtx) => RuleModifier;

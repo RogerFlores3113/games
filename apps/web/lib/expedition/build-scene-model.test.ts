@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ExpeditionAbilityView, ExpeditionAttemptView, ExpeditionCampView, ExpeditionStageView, ExpeditionCardIdentityView, ExpeditionObjectiveView, ExpeditionView } from "@games/rules";
+import type { ExpeditionAbilityView, ExpeditionAttemptView, ExpeditionCampView, ExpeditionStageView, ExpeditionCardIdentityView, ExpeditionObjectiveView, ExpeditionStatusPartView, ExpeditionView } from "@games/rules";
 import { initialLocalUi } from "./local-ui";
 import type { LocalUiState } from "./local-ui";
 import { cardLabel, handObjectId, objectiveObjectId, seatObjectId, sourceObjectId, trickObjectId, WHISPER_ID } from "./expedition-ids";
@@ -1188,5 +1188,80 @@ describe("concealment", () => {
       ["s3", true],
       ["s1", true],
     ]);
+  });
+});
+
+describe("the temple", () => {
+  const PATH: ExpeditionStatusPartView = { kind: "path", plates: ["clubs", "hearts", "sun"], pressed: 1 };
+  const sunObjective = (owner: string | null, status: ExpeditionObjectiveView["status"] = "pending"): ExpeditionObjectiveView => ({ id: "o-sun", kind: "win-card", target: SUN, ownerSeatId: owner, status });
+  const crew = (left: number, earned: number) => ({ sourceKey: "temple", remaining: { kind: "crew" as const, left, earned } });
+
+  function templeView(over: { objectives?: ExpeditionObjectiveView[]; token?: [number, number]; abilities?: ExpeditionAbilityView[]; attempt?: Partial<ExpeditionAttemptView> } = {}): ExpeditionView {
+    const [left, earned] = over.token ?? [0, 0];
+    const base = makeAttempt();
+    return makeView({
+      campIndex: 6,
+      seats: [seat("s1", "guide"), seat("s2", "scout"), seat("s3", "medic")].map((s) => ({ ...s, usage: [crew(left, earned)] })),
+      yourAbilities: over.abilities ?? [ability("temple", undefined, false, "Win the Sun to earn it")],
+      stage: {
+        tag: "camp",
+        camp: { index: 6, location: "desert", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: "temple", shop: true },
+        mods: [
+          { id: "desert", kind: "location", strength: "full", status: [] },
+          { id: "temple", kind: "temple", strength: "full", status: [PATH] },
+          { id: "tiger", kind: "animal", strength: "half", status: [{ kind: "streak", seatId: "s3", count: 2 }] },
+        ],
+        attempt: { ...base, ...over.attempt, camp: makeCamp({ goals: [{ id: "temple", status: "pending" }], objectives: over.objectives ?? [sunObjective(null)] }) },
+      },
+    });
+  }
+
+  it("lays the plate path, brings the tiger back at half strength beside no boss, and names the camp by number", () => {
+    const m = buildSceneModel(server(templeView()), ui(), "big-index");
+    expect(m.temple).toMatchObject({ count: "Plates 1/3", hint: "Next: lead ♥", status: "pending" });
+    expect(m.temple?.plates.map((p) => p.state)).toEqual(["pressed", "next", "ahead"]);
+    expect(m.boss).toBeNull();
+    expect(m.helpers.map((h) => [h.name, h.caption])).toEqual([["Tiger (half)", "Pounce: Cara"]]);
+    expect(m.seats.find((s) => s.seatId === "s3")?.bossMark).toEqual({ label: "streak 2", alert: true });
+    expect(m.sky).toMatchObject({ location: "desert", backdrop: "temple" });
+    expect(m.topBar.camp).toBe("Camp 6 of 6");
+  });
+
+  it("draws the Sun objective as the Sun, in the pool and on its owner's plate", () => {
+    expect(buildSceneModel(server(templeView()), ui(), "big-index").faceUpObjectives).toMatchObject([{ objectiveId: "o-sun", kind: "sun", label: "Sun", status: "pending" }]);
+    const owned = buildSceneModel(server(templeView({ objectives: [sunObjective("s1", "done")] })), ui(), "big-index");
+    expect(owned.seats.find((s) => s.seatId === "s1")?.objectives).toMatchObject([{ kind: "sun", label: "Sun", status: "done" }]);
+    expect(buildSceneModel(server(templeView()), ui({ tooltipObjectiveId: "o-sun" }), "big-index").tooltip?.title).toBe("The Sun");
+  });
+
+  it("puts the crew's Skip in every seat's kit: locked with its reason until the Sun is won, then 1 left", () => {
+    const locked = buildSceneModel(server(templeView()), ui({ tooltipSourceId: "temple" }), "big-index");
+    const skipOf = (m: typeof locked, seatId: string) => m.seats.find((s) => s.seatId === seatId)?.sources.find((c) => c.sourceKey === "temple");
+    expect(skipOf(locked, "s2")).toMatchObject({ sourceId: "temple", objectId: "source:temple", name: "Skip", kind: "grant", charge: "not earned", usable: false, reason: "Win the Sun to earn it" });
+    expect(skipOf(locked, "s1")).toMatchObject({ name: "Skip", charge: "not earned", usable: false });
+    expect(locked.tooltip).toEqual({ title: "Skip", text: "Drop one open objective.", badges: ["Between tricks or when an objective fails", "Crew token"], reason: "Win the Sun to earn it" });
+
+    const earned = templeView({ token: [1, 1], abilities: [ability("temple", { kind: "objective", choices: ["objective:o2"] })] });
+    const m = buildSceneModel(server(earned), ui(), "big-index");
+    expect(skipOf(m, "s2")).toMatchObject({ charge: "1 left", usable: true, pulse: true });
+    expect(skipOf(m, "s3")).toMatchObject({ charge: "1 left", usable: false });
+    expect(skipOf(buildSceneModel(server(templeView({ token: [0, 1] })), ui(), "big-index"), "s1")).toMatchObject({ charge: "used", spent: true });
+  });
+
+  it("offers the Skip in rescue like any rescue ability", () => {
+    const failed: ExpeditionObjectiveView = { id: "o2", kind: "win-card", target: KD, ownerSeatId: "s2", status: "failed" };
+    const view = templeView({
+      token: [1, 1],
+      objectives: [sunObjective("s1", "done"), failed],
+      abilities: [ability("temple", { kind: "objective", choices: ["objective:o2"] })],
+      attempt: { window: "rescue", pendingSeatIds: ["s1", "s2", "s3"], rescue: { failedObjectiveIds: ["o2"] } },
+    });
+    const banner = buildSceneModel(server(view), ui(), "big-index").banner!;
+    expect(banner).toMatchObject({ title: "Objective failed: K♦ (yours)", detail: "You can rescue it with Skip. Alice and Cara can too", youPending: true });
+    expect(banner.uses.map((u) => u.sourceKey)).toEqual(["temple"]);
+    const five = { ...view, seats: [...view.seats, seat("s4", null), seat("s5", null)] };
+    if (five.stage.tag === "camp") five.stage.attempt.pendingSeatIds = ["s1", "s2", "s3", "s4", "s5"];
+    const names = roomSeats().concat([{ seatId: "s4", displayLabel: "Dan", connected: true }, { seatId: "s5", displayLabel: "Eve", connected: true }]);
+    expect(buildSceneModel(server(five, names), ui(), "big-index").banner?.detail).toBe("You can rescue it with Skip. Alice, Cara, Dan and Eve can too");
   });
 });

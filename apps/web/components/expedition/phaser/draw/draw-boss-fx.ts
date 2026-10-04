@@ -216,7 +216,7 @@ export class BossFx {
       const end = this.index.positionOf(chip.objectId);
       if (from === undefined || end === null || was.get(chip.objectiveId) === chip.ownerSeatId) continue;
       const ghost = this.scene.add.container(from.x, from.y);
-      if (chip.kind === "win-card" || chip.kind === "ordered") ghost.add(miniCard(this.scene, 0, 0, chip.label, model.cardPackId));
+      if (chip.kind === "win-card" || chip.kind === "sun" || chip.kind === "ordered") ghost.add(miniCard(this.scene, 0, 0, chip.label, model.cardPackId));
       else {
         ghost.add(plate(this.scene, 0, 0, labelWidth(chip.label) + 4, MINI_H, PALETTE.stump));
         ghost.add(text(this.scene, 2, Math.floor((MINI_H - LABEL_CELL.h) / 2), chip.label));

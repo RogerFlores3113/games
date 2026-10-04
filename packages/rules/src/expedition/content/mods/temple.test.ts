@@ -129,6 +129,17 @@ describe("the temple's skip", () => {
     expect(used.state.history).toEqual([{ camp: 2, attempt: 1, status: "cleared", suppliesSpent: 0, coins: 8 }]);
   });
 
+  it("shows every seat the crew's token in its usage: not earned, then 1 left, then used", () => {
+    const usage = (run: RunState, seatId: string) => toExpeditionPlayerView(run, "p1", catalog).seats.find((s) => s.seatId === seatId)!.usage;
+    const before = templeCamp({ objectives: [winSun("o1", "p0"), open], hands, completedTricks: plated, currentTrick: nextTrick(2) });
+    expect(usage(before, "p2")).toEqual([{ sourceKey: "temple", remaining: { kind: "crew", left: 0, earned: 0 } }]);
+    const won = templeCamp({ objectives: [winSun("o1", "p0"), open, { ...open, id: "o3" }], hands, completedTricks: [...plated, led(2, card("s", SUN))], currentTrick: nextTrick(3) });
+    expect(usage(won, "p0")).toEqual([{ sourceKey: "temple", remaining: { kind: "crew", left: 1, earned: 1 } }]);
+    const used = applyRunAction(won, "p2", { type: "use-ability", sourceKey: "temple", targets: ["objective:o3"] }, catalog);
+    if (!used.ok) throw new Error(used.error);
+    expect(usage(used.state, "p1")).toEqual([{ sourceKey: "temple", remaining: { kind: "crew", left: 0, earned: 1 } }]);
+  });
+
   it("is one token for the whole crew", () => {
     const third: Objective = { id: "o3", kind: "win-card", target: std("spades", 13), ownerSeatId: "p1" };
     const run = templeCamp({ objectives: [winSun("o1", "p0"), open, third], hands, completedTricks: [...plated, led(2, card("s", SUN))], currentTrick: nextTrick(3) });

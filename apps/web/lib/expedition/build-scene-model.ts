@@ -25,7 +25,8 @@ import { buildPrompt } from "./build-prompt";
 import type { ObjectiveHolder } from "./objective-tooltip";
 import { objectiveTooltip } from "./objective-tooltip";
 import { buildModChips, buildSky, modTooltip, whisperBlocker, type ModChip, type Sky } from "./weather-model";
-import { bossBlockReason, bossHappenings, buildBoss, latestGust, type BossHappening, type BossModel, type Gust, type SeatBossMark, type SeatNamer } from "./boss-model";
+import { bossBlockReason, bossHappenings, buildBoss, buildHelpers, latestGust, seatMarks, type BossHappening, type BossModel, type Gust, type SeatBossMark, type SeatNamer } from "./boss-model";
+import { buildTemplePath, type TemplePath } from "./temple-model";
 import { chargeText, isSpent, liveSourceKeys, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, type SourceKind } from "./source-text";
 
 const TORNADO_ID = "tornado";
@@ -110,7 +111,8 @@ export interface CardModel {
   countsAs: ExpeditionCardIdentityView | null;
 }
 
-export type ObjectiveKind = "win-card" | "ordered" | "no-tricks" | "exactly-n" | "hidden";
+/** "sun": the temple's win-card objective on the Sun. */
+export type ObjectiveKind = "win-card" | "sun" | "ordered" | "no-tricks" | "exactly-n" | "hidden";
 
 export interface ObjectiveChip {
   objectiveId: string;
@@ -258,8 +260,14 @@ export interface SceneModel {
   topBar: TopBar;
   /** The camp's modifiers in fold order, on the top bar. */
   mods: ModChip[];
-  /** The boss on the table; null for a plain camp. */
+  /** The boss on the table; null for a plain camp and the temple. */
   boss: BossModel | null;
+  /** At the temple, the bosses back at half strength: none at a Short
+   * temple, the animal at a Standard one, the animal then the disaster at a
+   * Long one. */
+  helpers: BossModel[];
+  /** The temple's plate path; null at any other camp. */
+  temple: TemplePath | null;
   /** The location's backdrop and what the weather draws over it. */
   sky: Sky;
   seats: SeatModel[];
@@ -392,6 +400,10 @@ function objectiveLabel(o: ExpeditionObjectiveView): { label: string; orderBadge
   return { label: `=${o.n} tricks`, orderBadge: null };
 }
 
+function chipKind(o: ExpeditionObjectiveView): ObjectiveKind {
+  return o.kind === "win-card" && o.target.kind === "joker" && o.target.joker === "sun" ? "sun" : o.kind;
+}
+
 function buildObjectiveChip(o: ExpeditionObjectiveView, camp: ExpeditionCampView, view: ExpeditionView, ui: LocalUiState): ObjectiveChip {
   const { label, orderBadge } = objectiveLabel(o);
   const isFaceUp = o.ownerSeatId === null;
@@ -402,7 +414,7 @@ function buildObjectiveChip(o: ExpeditionObjectiveView, camp: ExpeditionCampView
   return {
     objectiveId: o.id,
     objectId: objectiveObjectId(o),
-    kind: o.kind,
+    kind: chipKind(o),
     label,
     orderBadge,
     status: o.status,
@@ -446,7 +458,14 @@ function buildTrickPlayModel(
   };
 }
 
-function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiState, boss: BossModel | null): SeatModel {
+/** Abilities the camp grants every seat (the temple's skip), keyed by the
+ * granting modifier's id. */
+function grantedKeys(view: ExpeditionView): string[] {
+  const stage = view.stage;
+  return stage.tag === "camp" ? stage.mods.flatMap((m) => (SOURCE_DISPLAY[m.id]?.kind === "grant" ? [m.id] : [])) : [];
+}
+
+function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiState, marks: Readonly<Record<string, SeatBossMark>>): SeatModel {
   const room = roomSeatFor(roomSeats, seatId);
   const camp = attemptOf(view)?.camp ?? null;
   const handSize = camp?.handSizes.find((h) => h.seatId === seatId)?.size ?? 0;
@@ -462,7 +481,7 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
   }
 
   const seatView = view.seats.find((s) => s.seatId === seatId);
-  const sources = (seatView === undefined ? [] : liveSourceKeys(seatView)).map((key) => sourceChipFor(key, seatId, view, ui));
+  const sources = [...(seatView === undefined ? [] : liveSourceKeys(seatView)), ...grantedKeys(view)].map((key) => sourceChipFor(key, seatId, view, ui));
   const objectives = objectivesForOwner(camp, seatId, view, ui);
 
   const reveals: MiniCard[] = (attemptOf(view)?.reveals ?? [])
@@ -497,7 +516,7 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
     selected,
     handObjectId: seatHandObjectId(seatId),
     handPick: targetInfo(ui, view, "hand", seatId),
-    bossMark: boss?.marks[seatId] ?? null,
+    bossMark: marks[seatId] ?? null,
   };
 }
 
@@ -629,12 +648,12 @@ export function buildTopBar(view: ExpeditionView, suppliesPick: PickState | null
   return { supplies: view.supplies.count, suppliesMax: view.supplies.max, purse: view.purse, camp: campLabel(view), suppliesPick };
 }
 
-/** In a boss camp the strip's chip names the boss, so the label says only
- * which camp of how many. */
+/** In a boss camp or the temple the strip's chip names it, so the label
+ * says only which camp of how many. */
 function campLabel(view: ExpeditionView): string {
   const stage = view.stage;
   const index = focusCampIndex(view);
-  const bossChip = stage.tag === "camp" && stage.mods.some((m) => m.kind === "animal" || m.kind === "disaster");
+  const bossChip = stage.tag === "camp" && stage.mods.some((m) => m.kind === "animal" || m.kind === "disaster" || m.kind === "temple");
   return bossChip && index !== null && view.campCount !== null ? `Camp ${index} of ${view.campCount}` : campHeadline(view);
 }
 
@@ -698,9 +717,14 @@ function buildBanner(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalU
   });
   const title = failed.length === 1 ? `Objective failed: ${failed[0]}` : failed.length > 1 ? `Objectives failed: ${failed.join(", ")}` : "An objective failed";
   const detail = youPending
-    ? `You can rescue it with ${useNames}${others.length === 0 ? "" : `. ${others.join(" and ")} can too`}`
+    ? `You can rescue it with ${useNames}${others.length === 0 ? "" : `. ${listed(others)} can too`}`
     : `${others.join(" or ")} can rescue it. Waiting on them`;
   return { title, detail: youPending || others.length !== 1 ? detail : `Waiting on ${others[0]} to rescue it or pass`, youPending, uses };
+}
+
+/** "Bob", "Bob and Cara", "Bob, Cara and Dan". */
+function listed(names: readonly string[]): string {
+  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
 function trickLabel(index: number): string {
@@ -764,7 +788,9 @@ export function buildSceneModel(
 
   const namer: SeatNamer = { name: (seatId) => roomSeatFor(roomSeats, seatId).displayLabel, isYou: (seatId) => seatId === view.yourSeatId };
   const boss = buildBoss(view, namer);
-  const seats = orderedSeatIds(view).map((seatId, ring) => seatModelFor(seatId, ring, view, roomSeats, ui, boss));
+  const helpers = buildHelpers(view, namer);
+  const marks = seatMarks(boss, helpers);
+  const seats = orderedSeatIds(view).map((seatId, ring) => seatModelFor(seatId, ring, view, roomSeats, ui, marks));
   const hand = buildHand(camp, view, ui);
   const trick = buildTrick(camp, view, ui);
   const lastTrick = buildLastTrick(camp, view, ui);
@@ -792,7 +818,9 @@ export function buildSceneModel(
     topBar: buildTopBar(view, pickOrNull(ui, view, "supplies")),
     mods: buildModChips(view),
     boss,
-    sky: buildSky(view) ?? { location: "jungle", precipitation: "none", haze: "none", flood: null, strike: null, notice: null, bloodMoon: false },
+    helpers,
+    temple: buildTemplePath(view),
+    sky: buildSky(view) ?? { location: "jungle", backdrop: "jungle", precipitation: "none", haze: "none", flood: null, strike: null, notice: null, bloodMoon: false },
     seats,
     hand,
     trick,

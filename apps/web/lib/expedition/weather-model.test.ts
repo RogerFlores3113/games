@@ -34,8 +34,8 @@ function campView(weather: string, mods: ExpeditionModView[], trick = 0, removed
 describe("buildModChips", () => {
   it("names each layer in fold order with its live reading", () => {
     expect(buildModChips(campView("thunderstorm", [CLIFFTOP, STORM]))).toEqual([
-      { id: "clifftop", objectId: "mod:clifftop", kind: "location", name: "Clifftop", badge: null, pips: 0, gauge: null, alert: false },
-      { id: "thunderstorm", objectId: "mod:thunderstorm", kind: "weather", name: "Thunderstorm", badge: "30%", pips: 2, gauge: null, alert: false },
+      { id: "clifftop", objectId: "mod:clifftop", kind: "location", strength: "full", name: "Clifftop", badge: null, pips: 0, gauge: null, alert: false },
+      { id: "thunderstorm", objectId: "mod:thunderstorm", kind: "weather", strength: "full", name: "Thunderstorm", badge: "30%", pips: 2, gauge: null, alert: false },
     ]);
   });
 
@@ -51,7 +51,7 @@ describe("buildModChips", () => {
 
 describe("buildSky", () => {
   it("rains under rain, storms under a thunderstorm, and is dry in fair weather", () => {
-    expect(buildSky(campView("rain", [RAIN]))).toEqual({ location: "clifftop", precipitation: "rain", haze: "none", flood: null, strike: null, notice: null, bloodMoon: false });
+    expect(buildSky(campView("rain", [RAIN]))).toEqual({ location: "clifftop", backdrop: "clifftop", precipitation: "rain", haze: "none", flood: null, strike: null, notice: null, bloodMoon: false });
     expect(buildSky(campView("thunderstorm", [STORM]))?.precipitation).toBe("storm");
     expect(buildSky(campView("fair", []))?.precipitation).toBe("none");
   });
@@ -59,6 +59,7 @@ describe("buildSky", () => {
   it("keys a strike by camp, attempt and trick, so its flash plays once, and says what it does", () => {
     expect(buildSky(campView("thunderstorm", [STRUCK], 4))).toEqual({
       location: "clifftop",
+      backdrop: "clifftop",
       precipitation: "storm",
       haze: "none",
       flood: null,
@@ -137,5 +138,25 @@ describe("the magma pool", () => {
     const view = campView("fair", [MAGMA], 0, [...low, fourClubs]);
     expect(buildModChips(view)[0]).toMatchObject({ name: "Magma pool", badge: "No 2s 3s 4♣" });
     expect(modTooltip(view, "magma")?.badges).toEqual(["Location", "Burned: 2s 3s 4♣"]);
+  });
+});
+
+describe("the temple", () => {
+  const TEMPLE: ExpeditionModView = { id: "temple", kind: "temple", strength: "full", status: [{ kind: "path", plates: ["spades", "sun"], pressed: 0 }] };
+  const TIGER: ExpeditionModView = { id: "tiger", kind: "animal", strength: "half", status: [] };
+  const templeCamp = (): ExpeditionView => {
+    const view = campView("fair", [CLIFFTOP, TEMPLE, TIGER]);
+    if (view.stage.tag === "camp") view.stage.camp.bossId = "temple";
+    return view;
+  };
+
+  it("stands the camp in the temple while the location's chip stays", () => {
+    expect(buildSky(templeCamp())).toMatchObject({ location: "clifftop", backdrop: "temple" });
+    expect(buildModChips(templeCamp()).map((c) => c.name)).toEqual(["Clifftop", "The Temple", "Tiger (half)"]);
+  });
+
+  it("marks a returning boss as half strength on its chip and in its tooltip", () => {
+    expect(buildModChips(templeCamp())[2]).toMatchObject({ kind: "animal", strength: "half" });
+    expect(modTooltip(templeCamp(), "tiger")?.badges).toEqual(["Animal boss", "Half strength at the temple"]);
   });
 });

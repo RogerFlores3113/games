@@ -2,7 +2,8 @@ import { mkdirSync } from "node:fs";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { clickHandCard, clickUntilChanged } from "./expedition-driver";
-import { createExpeditionRoom, getModel, getScene, waitForBridge } from "./expedition-helpers";
+import { getModel, getScene } from "./expedition-helpers";
+import { autoplay, shortcut, soloTable } from "./expedition-dev-panel";
 
 // Needs the dev servers in dev mode (see dev-mode.spec.ts). Each animal boss
 // is set on camp 3, and each disaster on camp 6 of a Long run, with the dev
@@ -33,55 +34,6 @@ interface CampModel {
   faceUpObjectives: unknown[];
   whisper: { visible: boolean; active: boolean };
   targeting: { canConfirm: boolean } | null;
-}
-
-async function soloTable(page: Page): Promise<Locator> {
-  await createExpeditionRoom(page, "Solo");
-  await page.getByTestId("dev-toggle").click();
-  const panel = page.getByTestId("dev-panel");
-  for (const n of [1, 2]) {
-    await panel.getByTestId("dev-add-bot").click();
-    await expect(panel.getByTestId("dev-result")).toHaveText(new RegExp(`^Bot ${n} joined\\.`));
-  }
-  await page.getByTestId("start-game").click();
-  await waitForBridge(page);
-  return panel;
-}
-
-const LABELS: Readonly<Record<string, string>> = {
-  "jump-to-camp": "Jump to camp",
-  "set-plan-boss": "Set a boss camp's boss",
-  "force-camp": "Force the camp's outcome",
-  "set-supplies": "Set supplies",
-  "give-item": "Give a seat an item",
-};
-
-/** Runs a dev shortcut and waits for its own answer and for the panel to
- * take input again. */
-async function shortcut(panel: Locator, id: string, fields: Record<string, string> = {}): Promise<void> {
-  await idle(panel);
-  for (const [name, value] of Object.entries(fields)) {
-    const field = panel.getByTestId(`dev-field-${id}-${name}`);
-    if ((await field.evaluate((el) => el.tagName)) === "SELECT") await field.selectOption(value);
-    else await field.fill(value);
-  }
-  await panel.getByTestId(`dev-shortcut-${id}`).click();
-  await expect(panel.getByTestId("dev-result")).toHaveText(new RegExp(`^${LABELS[id]}: done\\.`));
-  await idle(panel);
-}
-
-async function idle(panel: Locator): Promise<void> {
-  await expect(panel.getByTestId("dev-autoplay-run")).toBeEnabled();
-}
-
-async function autoplay(panel: Locator, scope: "everyone" | "others", steps: number): Promise<void> {
-  await panel.getByTestId("dev-autoplay-scope").selectOption(scope);
-  // "My decision" would stop an everyone-scope run before its first step.
-  await panel.getByTestId("dev-autoplay-stop").selectOption(scope === "everyone" ? "milestone" : "decision");
-  await panel.getByTestId("dev-autoplay-steps").fill(String(steps));
-  await panel.getByTestId("dev-autoplay-run").click();
-  await expect(panel.getByTestId("dev-result")).toHaveText(/^Autoplay: /);
-  await idle(panel);
 }
 
 /** Camp 6 of a Long run, the disaster camp, dealt under `boss`. */

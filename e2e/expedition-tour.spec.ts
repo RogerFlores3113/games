@@ -17,6 +17,7 @@ import {
 } from "./expedition-driver";
 import { clickObject, getModel, getScene, hoverObject, startExpeditionGame } from "./expedition-helpers";
 import { PICKER_SCENARIOS, playing, rescue, rewriteViews, scenarioKey, type Game } from "./expedition-scenarios";
+import { autoplay, shortcut } from "./expedition-dev-panel";
 
 /**
  * UI tour. Plays 3-player runs and screenshots each phase from player 1's
@@ -59,6 +60,7 @@ const RARE = [
   "camp-cave", "camp-night", "camp-desert", "camp-fog", "camp-magma", "camp-flood", "loadout-fog",
   "camp-tiger", "camp-rats", "camp-snake", "camp-crocodile", "camp-capybara", "camp-beaver", "route-boss",
   "camp-tornado", "camp-earthquake", "camp-wildfire", "camp-meteor", "camp-blood-moon", "camp-locusts", "camp-monsoon", "long-camp-6",
+  "temple-short", "temple-standard", "temple-long", "temple-rescue",
 ];
 
 interface Identity { kind: "standard" | "joker"; suit?: string; rank?: number; joker?: "sun" | "moon" }
@@ -736,6 +738,87 @@ async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<v
   await capture(routeTieView as (g: Game) => Game, "trail", "vote-tie-route", 2_000);
   if (!tour.has("run-end-won")) await capture(wonView as (g: Game) => Game, "run-end", "run-end-won-rewritten");
   await longCamp6(host, tour, rewrite);
+  await temples(host, tour, rewrite);
+}
+
+interface TempleCampModel extends CampModel {
+  temple: { pressed: number } | null;
+  trick: { leaderSeatId: string; plays: unknown[] } | null;
+}
+
+const TEMPLE_CAMPS = [["short", 4], ["standard", 6], ["long", 8]] as const;
+
+/** Each length's final camp, the temple, reached with the dev panel's jump
+ * and played on until a plate is pressed when play gets there; then the
+ * Long temple's rescue offering the crew's Skip, from a rewritten view. */
+async function temples(host: Page, tour: Tour, rewrite: Rewriter): Promise<void> {
+  rewrite.current = (g) => g;
+  await host.reload();
+  await host.waitForFunction(() => window.__expeditionTest?.ready === true && window.__expeditionTest.scene !== null);
+  await host.getByTestId("dev-toggle").click();
+  const panel = host.getByTestId("dev-panel");
+  const arrive = async (length: string, at: number): Promise<void> => {
+    await shortcut(panel, "set-supplies", { supplies: "4" });
+    await shortcut(panel, "jump-to-camp", { length, camp: String(at), stage: "camp" });
+    await expect.poll(async () => {
+      const m = await getModel<TempleCampModel>(host);
+      return m.sceneKey === "camp" && m.campIndex === at && m.temple !== null;
+    }).toBe(true);
+  };
+  for (const [length, at] of TEMPLE_CAMPS) {
+    await arrive(length, at);
+    for (let step = 0; step < 40; step++) {
+      const m = await getModel<TempleCampModel>(host);
+      if (m.sceneKey !== "camp" || ((m.temple?.pressed ?? 0) >= 1 && (m.trick?.plays.length ?? 0) === 0)) break;
+      await autoplay(panel, "everyone", 1);
+    }
+    // A camp that failed on the way is dealt again and captured as it opens.
+    if ((await getModel<TempleCampModel>(host)).sceneKey !== "camp") await arrive(length, at);
+    await host.getByTestId("dev-toggle").click();
+    await host.mouse.move(5, 5);
+    await tour.shot(`temple-${length}`);
+    await host.getByTestId("dev-toggle").click();
+  }
+  await arrive("long", 8);
+  await host.getByTestId("dev-toggle").click();
+  rewrite.current = templeRescueView;
+  await host.reload();
+  await waitForScene(host, "camp", 30_000);
+  await host.mouse.move(5, 5);
+  await tour.shot("temple-rescue");
+  rewrite.current = (g) => g;
+}
+
+type TempleMod = { id: string; status: { kind: string; plates?: unknown[]; pressed?: number }[] };
+
+/** The temple after the Sun was won on the last plate: every plate pressed,
+ * your objective failed, and the crew's Skip offered to every seat. */
+function templeRescueView(game: Game): Game {
+  const dealt = JSON.parse(JSON.stringify(game)) as Game;
+  const order = [game.yourSeatId, ...game.seats.map((s) => s.seatId).filter((id) => id !== game.yourSeatId)];
+  dealt.stage.attempt!.camp.objectives.forEach((o, i) => (o.ownerSeatId ??= order[i % order.length]!));
+  const next = playing(dealt, { plays: 0, window: "between-tricks" });
+  const attempt = next.stage.attempt!;
+  const camp = attempt.camp;
+  const sun = camp.objectives.find((o) => o.target?.kind === "joker" && o.target.joker === "sun");
+  const mate = game.seats.find((s) => s.seatId !== game.yourSeatId)!.seatId;
+  if (sun !== undefined) Object.assign(sun, { status: "done", ownerSeatId: mate });
+  const failed = camp.objectives.find((o) => o !== sun && o.ownerSeatId === game.yourSeatId) ?? camp.objectives.find((o) => o !== sun)!;
+  Object.assign(failed, { status: "failed", ownerSeatId: game.yourSeatId });
+  camp.campPhase = "ended";
+  camp.currentActorSeatId = null;
+  camp.goals = [{ id: "temple", status: "done" }];
+  for (const m of next.stage.mods as TempleMod[]) for (const part of m.status) if (part.kind === "path") part.pressed = part.plates!.length;
+  attempt.window = "rescue";
+  attempt.pendingSeatIds = game.seats.map((s) => s.seatId);
+  attempt.rescue = { failedObjectiveIds: [failed.id] };
+  const token = { sourceKey: "temple", remaining: { kind: "crew", left: 1, earned: 1 } };
+  next.seats = next.seats.map((s) => ({ ...s, usage: [...s.usage.filter((u) => u.sourceKey !== "temple"), token] }));
+  next.yourAbilities = [
+    ...next.yourAbilities.filter((a) => a.sourceKey !== "temple"),
+    { sourceKey: "temple", usableNow: true, reason: null, steps: [{ kind: "objective", prompt: "Pick an open objective", choices: [`objective:${failed.id}`] }] },
+  ];
+  return next;
 }
 
 /** Camp 6 of a Long run, the disaster camp, reached with the dev panel's

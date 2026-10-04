@@ -113,7 +113,7 @@ export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[]
       lines: [
         `stage ${run.stage.tag}, status ${runStatus(run)}, ${run.plan === null ? "no plan yet" : `${run.plan.length} run of ${campCount(run.plan)} camps`}`,
         `supplies ${run.supplies} of ${SUPPLIES_MAX}, purse ${run.purse}, next item it${run.itemSerial}`,
-        `bosses: ${run.plan?.bosses.map((b) => `${b.tier} at ${b.at} (${b.modId ?? "none drawn"}${b.modId !== null && b.at > horizon(run) ? ", not yet revealed" : ""})`).join(", ") || "none"}`,
+        `bosses: ${run.plan?.bosses.map((b) => `${b.tier} at ${b.at} (${b.modId ?? "none drawn"}${b.modId !== null && b.tier !== "temple" && b.at > horizon(run) ? ", not yet revealed" : ""})`).join(", ") || "none"}`,
         `history: ${run.history.map((h) => `${h.camp}.${h.attempt} ${h.status}${h.coins > 0 ? ` +${h.coins}` : ""}`).join(", ") || "empty"}`,
         `last vote: ${vote === null ? "none" : `${vote.topic} -> ${vote.result.winner}${vote.result.tied === null ? "" : ` (flip between ${vote.result.tied.join(", ")})`}`}`,
         ...stageLines(run, catalog),

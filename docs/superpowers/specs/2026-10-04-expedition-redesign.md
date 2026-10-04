@@ -1531,3 +1531,85 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
   supplies topped up). The earthquake test depends on a camp surviving to its halfway trick under
   random play, so it has an 800-step budget. The tour gains `camp-tornado` ... `camp-monsoon` from
   rewritten views and `long-camp-6`, camp 6 of 8 reached through the dev jump.
+
+### Implementation notes (unit 10)
+
+- `ModBody.grants` is a `Grant`: an `ActiveAbility` plus a `name` and one sentence of `text`,
+  since the ability bar needs both and a bare ability has neither. `SOURCE_DISPLAY` lists a
+  grant under its modifier's id with `kind: "grant"` (the temple's is "Skip").
+- `liveSourceKeys(seat)` keeps only the seat's own keys, which passives fold from. The new
+  `abilityKeys(run, seat, catalog)` appends the stack's granted mod ids and is what abilities,
+  the view's `yourAbilities` and `usage` and the random driver read; `abilityOf` resolves a
+  grant before a seat source. Every seat's `usage` carries the crew's token, so any seat can
+  read its charge outside the skip's windows, where `yourAbilities` gives only the window.
+- `crew-tokens` takes `earned(run, rules)`, not `earned(run)`: the Sun objective's status is
+  the composed one (a Snake helper's bite can fail it). The limit also carries `locked`, the
+  reason shown while none is earned ("Win the Sun to earn it"); once spent the reason is "The
+  crew has used it". The view's remaining gains `{ kind: "crew", left, earned }`.
+- `ActiveAbility.window` is `ActiveWindow | readonly ActiveWindow[]`, read through `windowsOf`.
+  `SourceActiveDisplay.window` became `windows`; the phrase joins them with "or".
+- Deviation: the plates goal also fails once the Sun has left play (played or discarded)
+  without pressing the last plate. The goal is unreachable then, and a task fails once
+  unreachable. It follows that the Sun can be won without failing the camp only by leading it
+  as the last plate, so the skip is earned at the end of the path.
+- The path is rolled per attempt (`roll("plate{i}")`) against the current `totalTricks`; a
+  Locusts helper's `discard-round` shortens it by its last suit plate. Status part `path {
+  plates, pressed }`.
+- `drawPlan` plans the registered temple def for the temple tier. `visibleBossId` shows the
+  temple at every horizon and the leak check never hides it: its tier already names it, and
+  the hidden-string check would otherwise flag the tier itself.
+- The objective target gains `whose: "open"`: any seat's taken objective that is not done.
+- The contract test plays every boss's half body as a temple helper (the boss planned at camp
+  1, the temple at camp 2) at 3, 4 and 5 players. The Long-run property plays every camp with
+  random legal moves; before the temple a camp failed twice, or a failure that would end the
+  run, is cleared by `force-camp` (Heavy Packs can make one failure cost more than full
+  supplies).
+- `RunState` is unchanged, so `ROOM_SCHEMA_VERSION` stays 11. Rescue still opens only with no
+  failed goal, so its view still needs no `failedGoalIds`. The skip's 16x16 icon is drawn in
+  code (`apps/web/art/expedition/draw-icon-skip.mjs`).
+
+### Implementation notes (unit 10, web)
+
+- The web shows the Skip in every seat's kit with its charge from `usage` ("not earned", "1
+  left", "used").
+- The temple camp, and its loadout, stand in `bg-temple` whatever the location; the location's
+  chip and rules stay. `Sky.backdrop` and `CampPreview.backdrop` name what is drawn
+  (`campBackdrop`: the temple when the camp's `bossId` is the temple def). A route card or
+  loadout preview of the temple has `bossId: null`, so it reads "The Temple" with the temple
+  marker, never a boss without a portrait.
+- The plate path takes a new `path` zone (120, 276, 400x16) at the foot of the stump, carved off
+  the top of the hand zone, which shrinks to (120, 292, 400x64): the hand tray and a lifted card
+  already started at y 292, so the hand does not move. It reads "Plates 2/9", a 12px tile per
+  plate (a pressed plate lit, the next outlined with a pulsing ring, those ahead dark with a grey
+  pip; the Sun last) and "Next: lead ♠", "Next: lead the Sun", "Every plate pressed" or "The path
+  is broken" from the `temple` goal. A newly pressed plate throws a ring once. Hovering the row
+  shows the temple's rules. `layout.test.ts` checks the longest path (9 plates at 3 players)
+  with the longest texts.
+- Helpers stack in the world column, one row each, the sprite above two caption lines: "Tiger
+  (half)" (short names for the crocodile, earthquake, meteor, Blood Moon and locusts) and its
+  reading. A lone helper stands at exactly half its boss's scale; two share the column at up to
+  half (the tallest sprites drop to about 0.35 of their boss scale, 70% of half), since half
+  scale for both would put a sprite over a caption. A helper has no gaze arrow and no ticker
+  rule; its seat marks still show (the boss's mark wins a seat, then the first helper's). The
+  half Capybara reads "+1 objective" and the half Rats "Chewing 2 packs". At a Short temple,
+  with no helper, the campfire stands as in a plain camp.
+- The top bar's strip keeps the temple's name (and a full boss's) when it narrows; a helper's
+  chip drops to its icon. Its name reads "Tiger (half)" and its tooltip adds "Half strength at
+  the temple". In a boss camp or the temple the camp label reads "Camp 6 of 6".
+- The Sun objective is an `ObjectiveChip` of kind `sun`: the Sun mini card with a sun-coloured
+  ring, captioned "the Sun" in the pool; its tooltip says to lead it on the last plate and that
+  winning it earns the crew a Skip.
+- The Skip is a `grant` source chip on every seat, on moss in your kit. A teammate's plate leaves
+  it out of its kit icons: the token is the crew's, and at 4 objectives the icon crowded the
+  plate's objective row. Its tooltip gives the window and "Crew token" badges and the lock
+  reason; it targets through the existing objective picker, and the rescue banner offers "Use
+  Skip". A rescue waiting on more than two others lists them with commas.
+- Temple camps deal 4 to 6 objectives, so a teammate's plate holds two or three. A row that does
+  not fit now shortens a trick-count tag to its number ("0", "=2") before it squeezes items
+  together; the squeeze alone overlapped a "0 tricks" tag with the card before it.
+- Dev: autoplay leads the next plate's suit at the temple when it can and holds the Sun back
+  until it presses the last plate. `e2e/expedition-temple.spec.ts` plays each length's temple to
+  a pressed plate, and a 5-player Short temple to the Sun on the last plate (the Sun moved to the
+  leader and its objective given to them with the dev panel), then spends the Skip. The dev
+  panel helpers moved to `e2e/expedition-dev-panel.ts`. The tour gains `temple-short`,
+  `temple-standard`, `temple-long` and `temple-rescue`.

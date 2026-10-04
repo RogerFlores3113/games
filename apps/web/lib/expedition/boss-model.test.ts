@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ExpeditionModView, ExpeditionStatusPartView, ExpeditionView } from "@games/rules";
-import { CAPTION_MAX_CHARS, RULE_MAX_CHARS, bossBlockReason, bossHappenings, buildBoss, latestGust, rightOf, type SeatNamer } from "./boss-model";
+import { MOD_DISPLAY } from "@games/rules";
+import { CAPTION_MAX_CHARS, RULE_MAX_CHARS, bossBlockReason, bossHappenings, buildBoss, buildHelpers, latestGust, rightOf, seatMarks, type SeatNamer } from "./boss-model";
 
 const NAMES: Record<string, string> = { s1: "Roger", s2: "Bianca", s3: "Maximilian" };
 const seats: SeatNamer = { name: (id) => NAMES[id] ?? "?", isYou: (id) => id === "s1" };
@@ -208,5 +209,45 @@ describe("happenings", () => {
       { text: "The earthquake shook the open objectives to new owners", cards: [] },
       { text: "Locusts ate a card from every hand", cards: ["9♣", "Moon"] },
     ]);
+  });
+});
+
+describe("buildHelpers", () => {
+  const TEMPLE: ExpeditionModView = { id: "temple", kind: "temple", strength: "full", status: [{ kind: "path", plates: ["spades", "sun"], pressed: 0 }] };
+  const half = (mod: ExpeditionModView): ExpeditionModView => ({ ...mod, strength: "half" });
+
+  it("is empty outside the temple and at a Short temple, where no boss returns", () => {
+    expect(buildHelpers(campView([JUNGLE, boss("tiger")]), seats)).toEqual([]);
+    expect(buildHelpers(campView([JUNGLE, TEMPLE]), seats)).toEqual([]);
+  });
+
+  it("names each returning boss as a half-strength helper, in the order the run met them, with what it is doing", () => {
+    const view = campView([JUNGLE, TEMPLE, half(boss("crocodile", [{ kind: "facing", seatId: "s2" }])), half(disaster("tornado", [{ kind: "countdown", tricks: 2 }]))]);
+    expect(buildBoss(view, seats)).toBeNull();
+    expect(buildHelpers(view, seats)).toEqual([
+      { id: "crocodile", objectId: "boss:crocodile", name: "Croc (half)", caption: "Watching Bianca", rule: "", facingSeatId: null, alert: true, marks: { s2: { label: "watched", alert: true } } },
+      { id: "tornado", objectId: "boss:tornado", name: "Tornado (half)", caption: "Gust in 2", rule: "", facingSeatId: null, alert: false, marks: {} },
+    ]);
+  });
+
+  it("says what a half Capybara and half Rats bring", () => {
+    expect(buildHelpers(campView([TEMPLE, half(boss("capybara"))]), seats)[0]?.caption).toBe("+1 objective");
+    expect(buildHelpers(campView([TEMPLE, half(boss("rats"))]), seats)[0]?.caption).toBe("Chewing 2 packs");
+  });
+
+  it("fits every boss's helper name on one caption line", () => {
+    const bosses = Object.values(MOD_DISPLAY).filter((d) => d.kind === "animal" || d.kind === "disaster");
+    const long = bosses.map((d) => buildHelpers(campView([TEMPLE, half(boss(d.id))]), seats)[0]!.name).filter((name) => name.length > CAPTION_MAX_CHARS);
+    expect(bosses).toHaveLength(13);
+    expect(long).toEqual([]);
+  });
+});
+
+describe("seatMarks", () => {
+  it("lets the boss's mark win a seat, then the first helper's", () => {
+    const mark = (label: string) => ({ label, alert: true });
+    const model = (marks: Record<string, { label: string; alert: boolean }>) => ({ id: "x", objectId: "boss:x", name: "X", caption: "", rule: "", facingSeatId: null, alert: false, marks });
+    expect(seatMarks(null, [model({ s1: mark("watched") }), model({ s1: mark("next meal"), s2: mark("next meal") })])).toEqual({ s1: mark("watched"), s2: mark("next meal") });
+    expect(seatMarks(model({ s2: mark("streak 2") }), [])).toEqual({ s2: mark("streak 2") });
   });
 });

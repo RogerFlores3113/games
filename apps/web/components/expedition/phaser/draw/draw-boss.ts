@@ -2,8 +2,10 @@
  * The boss on the table, in the `world` column above your kit where the
  * campfire stands in a plain camp: its sprite scaled to fill the column,
  * breathing; under it a caption with what it is doing; for the Crocodile,
- * an arrow pointing at the seat it watches. The sprite lives in its own
- * layer and is rebuilt only when the boss changes, so the idle bob runs on
+ * an arrow pointing at the seat it watches. At the temple the column holds
+ * the helpers instead, one row each at half a boss's size, captioned with
+ * their name and what they are doing. The sprites live in their own layer
+ * and are rebuilt only when the bosses change, so the idle bob runs on
  * across redraws.
  */
 import type Phaser from "phaser";
@@ -11,7 +13,7 @@ import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
 import { ART, modArtId, type ArtId } from "../art/art-registry";
 import { placeArt } from "../art/place-art";
-import { ZONES, centreOf, type Point, type Rect } from "../layout";
+import { HELPER_CAPTION_LINE_H, ZONES, centreOf, helperRows, type Point, type Rect } from "../layout";
 import type { ObjectIndex } from "../object-index";
 import type { SceneModel } from "../../../../lib/expedition/build-scene-model";
 import type { BossModel } from "../../../../lib/expedition/boss-model";
@@ -37,22 +39,25 @@ export function bossScale(w: number, h: number, stage: Rect = bossStage()): numb
   return Math.min(1, stage.w / w, stage.h / h);
 }
 
-/** The boss's art and the height it stands at on the table. */
-function bossArt(bossId: string): { art: ArtId; scale: number; h: number } | null {
+/** A helper stands at half the scale its boss gets alone, or smaller
+ * when its row is too short for that. */
+export function helperScale(w: number, h: number, room: Rect): number {
+  return Math.min(bossScale(w, h) / 2, room.w / w, room.h / h);
+}
+
+/** The boss's art and the height it stands at in `stage`. */
+function bossArt(bossId: string, stage: Rect, helper: boolean): { art: ArtId; scale: number; h: number } | null {
   const art = modArtId({ id: bossId, kind: "animal" });
   if (art === null) return null;
-  const scale = bossScale(ART[art].w, ART[art].h);
+  const scale = helper ? helperScale(ART[art].w, ART[art].h, stage) : bossScale(ART[art].w, ART[art].h, stage);
   return { art, scale, h: Math.round(ART[art].h * scale) };
 }
 
-/** Builds the boss sprite into `layer` (cleared first), bobbing, with its
- * hover showing the boss's rules. */
-export function placeBoss(scene: Phaser.Scene, layer: Layer, boss: BossModel | null, index: ObjectIndex, handlers: CampHandlers): void {
-  layer.removeAll(true);
-  if (boss === null) return;
-  const fit = bossArt(boss.id);
+/** One bobbing sprite standing at the foot of `stage`, its hover showing
+ * the boss's rules. */
+function placeSprite(scene: Phaser.Scene, layer: Layer, boss: BossModel, stage: Rect, helper: boolean, index: ObjectIndex, handlers: CampHandlers): void {
+  const fit = bossArt(boss.id, stage, helper);
   if (fit === null) return;
-  const stage = bossStage();
   const sprite = placeArt(scene, fit.art, stage.x + Math.floor(stage.w / 2), stage.y + stage.h - Math.ceil(fit.h / 2)).setScale(fit.scale);
   sprite.setInteractive();
   sprite.on("pointerover", () => handlers.onModHover(boss.id));
@@ -60,6 +65,40 @@ export function placeBoss(scene: Phaser.Scene, layer: Layer, boss: BossModel | n
   scene.tweens.add({ targets: sprite, y: sprite.y + BOB_PX, duration: BOB_MS, ease: "Sine.InOut", yoyo: true, repeat: -1 });
   layer.add(sprite);
   index.register("camp", boss.objectId, sprite);
+}
+
+/** What stands in the world column, as a key that changes only when the
+ * bosses there do: null for the campfire. */
+export function worldKey(model: SceneModel): string | null {
+  if (model.boss !== null) return model.boss.id;
+  return model.helpers.length === 0 ? null : model.helpers.map((h) => h.id).join("+");
+}
+
+/** Builds the boss, or the temple's helpers, into `layer` (cleared first). */
+export function placeBosses(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
+  layer.removeAll(true);
+  if (model.boss !== null) {
+    placeSprite(scene, layer, model.boss, bossStage(), false, index, handlers);
+    return;
+  }
+  const rows = helperRows(model.helpers.length);
+  model.helpers.forEach((helper, i) => placeSprite(scene, layer, helper, rows[i]!.sprite, true, index, handlers));
+}
+
+/** Each helper's caption under its sprite: its name, then what it does. */
+function drawHelperCaptions(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
+  const rows = helperRows(model.helpers.length);
+  model.helpers.forEach((helper, i) => {
+    const box = rows[i]!.caption;
+    const lines = [
+      { value: fitLabel(helper.name, CAPTION_CHARS), color: PALETTE.textDim },
+      { value: fitLabel(helper.caption, CAPTION_CHARS), color: helper.alert ? PALETTE.destructive : PALETTE.sun },
+    ];
+    lines.forEach((line, j) => {
+      const x = box.x + Math.floor((box.w - labelWidth(line.value)) / 2);
+      layer.add(platedText(scene, x, box.y + j * HELPER_CAPTION_LINE_H + 1, line.value, line.color));
+    });
+  });
 }
 
 /** An arrow from (x, y) pointing at `to`. */
@@ -77,10 +116,14 @@ function gazeArrow(scene: Phaser.Scene, from: Point, to: Point): Phaser.GameObje
   return g;
 }
 
-/** The caption under the sprite, and the gaze arrow toward the watched seat. */
+/** The caption under the sprite, and the gaze arrow toward the watched seat;
+ * at the temple, the helpers' captions. */
 export function drawBossCaption(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
   const boss = model.boss;
-  if (boss === null) return;
+  if (boss === null) {
+    drawHelperCaptions(scene, layer, model);
+    return;
+  }
   const zone = ZONES.world;
   const caption = fitLabel(boss.caption, CAPTION_CHARS);
   const x = zone.x + Math.floor((zone.w - labelWidth(caption)) / 2);
@@ -89,6 +132,6 @@ export function drawBossCaption(scene: Phaser.Scene, layer: Layer, model: SceneM
   const seat = seatRect(model, boss.facingSeatId);
   if (seat === null) return;
   const stage = bossStage();
-  const from = { x: zone.x + zone.w - ARROW_LEN - 2, y: stage.y + stage.h - Math.floor((bossArt(boss.id)?.h ?? 0) / 2) };
+  const from = { x: zone.x + zone.w - ARROW_LEN - 2, y: stage.y + stage.h - Math.floor((bossArt(boss.id, stage, false)?.h ?? 0) / 2) };
   layer.add(gazeArrow(scene, from, centreOf(seat)));
 }

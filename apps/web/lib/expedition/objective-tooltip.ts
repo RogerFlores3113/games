@@ -19,7 +19,10 @@ export function objectiveTooltip(o: ExpeditionObjectiveView, holder: ObjectiveHo
   const who = subject(holder);
   let title: string;
   let body: string;
-  if (o.kind === "win-card") {
+  if (o.kind === "win-card" && o.target.kind === "joker" && o.target.joker === "sun") {
+    title = "The Sun";
+    body = "win the trick containing the Sun. Lead it on the last plate: winning it earns the crew a Skip";
+  } else if (o.kind === "win-card") {
     title = cardLabel(o.target);
     body = `win the trick containing ${title}`;
   } else if (o.kind === "ordered") {

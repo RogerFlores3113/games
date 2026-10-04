@@ -16,6 +16,8 @@ export interface ModChip {
   objectId: string;
   /** Picks the chip's icon. */
   kind: ModDisplay["kind"];
+  /** "half" for a boss back at the temple as a helper. */
+  strength: "full" | "half";
   name: string;
   /** A live reading: "30%", "Lowest wins"; null when there is none. */
   badge: string | null;
@@ -34,8 +36,10 @@ export type Haze = "none" | "night" | "fog";
 
 /** What the backdrop and the weather overlay draw. */
 export interface Sky {
-  /** The location id, which names its backdrop. */
+  /** The location id. */
   location: string;
+  /** What the backdrop shows: the location, or the temple at the temple. */
+  backdrop: string;
   precipitation: Precipitation;
   haze: Haze;
   /** How far the river has risen, 0 to 1; null without a flood. */
@@ -84,6 +88,12 @@ export function modDisplayName(id: string): string {
   return MOD_DISPLAY[id]?.name ?? modName(id);
 }
 
+/** The temple camp stands in the temple whatever its location: the
+ * location's rules still apply, its art does not show. */
+export function campBackdrop(camp: { readonly location: string; readonly bossId: string | null }): string {
+  return camp.bossId !== null && MOD_DISPLAY[camp.bossId]?.kind === "temple" ? camp.bossId : camp.location;
+}
+
 const BLOOD_MOON_ID = "blood-moon";
 
 /** The camp modifier whose removed cards the strip names. */
@@ -118,7 +128,8 @@ function chipFor(mod: ExpeditionModView, view: ExpeditionView): ModChip {
     id: mod.id,
     objectId: modObjectId(mod.id),
     kind: mod.kind,
-    name: modDisplayName(mod.id),
+    strength: mod.strength,
+    name: mod.strength === "half" ? `${modDisplayName(mod.id)} (half)` : modDisplayName(mod.id),
     badge,
     pips: chance?.strikesLeft ?? 0,
     gauge: meter === undefined ? null : { left: meter.left, of: meter.of },
@@ -144,6 +155,7 @@ export function buildSky(view: ExpeditionView): Sky | null {
   const meter = stage.mods.flatMap((mod) => mod.status).find((part) => part.kind === "meter");
   return {
     location: stage.camp.location,
+    backdrop: campBackdrop(stage.camp),
     precipitation: PRECIPITATION[stage.camp.weather] ?? "none",
     haze: HAZE[stage.camp.weather] ?? "none",
     flood: meter === undefined || meter.of === 0 ? null : (meter.of - meter.left) / meter.of,
@@ -161,7 +173,7 @@ export function modTooltip(view: ExpeditionView, modId: string): Tooltip | null 
   const chip = chipFor(mod, view);
   const chance = mod.status.find((part) => part.kind === "chance");
   const meter = mod.status.find((part) => part.kind === "meter");
-  const badges = [KIND_LABEL[mod.kind]];
+  const badges = mod.strength === "half" ? [KIND_LABEL[mod.kind], "Half strength at the temple"] : [KIND_LABEL[mod.kind]];
   if (chance !== undefined) badges.push(chance.percent > 0 ? `${chance.percent}% next trick` : "No more strikes", `${chance.strikesLeft} ${chance.strikesLeft === 1 ? "strike" : "strikes"} left`);
   if (meter !== undefined) badges.push(meter.left === 0 ? "The river has flooded" : `Floods after ${meter.left} more ${meter.left === 1 ? "trick" : "tricks"}`);
   if (modId === HEAT_ID && chip.badge !== null) badges.push(chip.badge.replace(/^No /, "Burned: "));

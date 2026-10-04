@@ -335,7 +335,7 @@ describe("route", () => {
     const paired = at({ tag: "route", options: [{ id: "a", next: preview(3, { location: "clifftop", weather: "thunderstorm", pairing: "steam" }) }], ballots: [] });
     const p = model(paired).panel;
     if (p.kind !== "route") throw new Error("expected the route panel");
-    expect(p.options[0]!.next).toMatchObject({ location: "Clifftop", weather: "Thunderstorm", locationId: "clifftop", weatherId: "thunderstorm", pairing: "Steam" });
+    expect(p.options[0]!.next).toMatchObject({ location: "Clifftop", weather: "Thunderstorm", locationId: "clifftop", backdrop: "clifftop", weatherId: "thunderstorm", pairing: "Steam" });
   });
 
   it("builds a card per route with its camp preview, voters (you first) and your vote", () => {
@@ -348,7 +348,7 @@ describe("route", () => {
           id: "a",
           objectId: "route:a",
           label: "Route A",
-          next: { title: "Camp 3 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", weatherId: "fair", pairing: null, event: "Event", objectives: ["3 cards to win"], boss: "Animal boss", bossId: "tiger", bossName: "Tiger" },
+          next: { title: "Camp 3 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", backdrop: "jungle", weatherId: "fair", pairing: null, event: "Event", objectives: ["3 cards to win"], boss: "Animal boss", bossId: "tiger", bossName: "Tiger" },
           voters: ["You", "Alice"],
           yours: true,
           votable: true,
@@ -357,7 +357,7 @@ describe("route", () => {
           id: "b",
           objectId: "route:b",
           label: "Route B",
-          next: { title: "Camp 3 of 6", shop: true, location: "River Delta", weather: "Storm", locationId: "river-delta", weatherId: "storm", pairing: null, event: null, objectives: ["1 card to win", "Win 2 in order", "A trick count"], boss: "Animal boss", bossId: null, bossName: null },
+          next: { title: "Camp 3 of 6", shop: true, location: "River Delta", weather: "Storm", locationId: "river-delta", backdrop: "river-delta", weatherId: "storm", pairing: null, event: null, objectives: ["1 card to win", "Win 2 in order", "A trick count"], boss: "Animal boss", bossId: null, bossName: null },
           voters: [],
           yours: false,
           votable: true,
@@ -369,6 +369,13 @@ describe("route", () => {
   it("is not votable for a spectator", () => {
     const p = model(routeView([], { yourSeatId: null })).panel;
     expect(p.kind === "route" && p.options.map((o) => o.votable)).toEqual([false, false]);
+  });
+
+  it("reads the temple as the temple, never as a boss with no portrait, and stands it in the temple", () => {
+    const plan: ExpeditionView["plan"] = [{ at: 3, tier: "animal", bossId: "tiger" }, { at: 6, tier: "temple", bossId: "temple" }];
+    const view = at({ tag: "route", options: [{ id: "t", next: preview(6, { location: "desert", bossId: "temple" }) }], ballots: [] }, { plan });
+    const p = model(view).panel;
+    expect(p.kind === "route" && p.options[0]!.next).toMatchObject({ location: "Desert", locationId: "desert", backdrop: "temple", boss: "The Temple", bossId: null, bossName: null });
   });
 
   it("labels a plain camp without a boss", () => {
@@ -385,14 +392,14 @@ describe("event and loadout panels", () => {
       kind: "event",
       name: "Event",
       text: "Nothing happens here yet.",
-      next: { title: "Camp 4 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", weatherId: "fair", pairing: null, event: "Event", objectives: ["2 cards to win"], boss: null, bossId: null, bossName: null },
+      next: { title: "Camp 4 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", backdrop: "jungle", weatherId: "fair", pairing: null, event: "Event", objectives: ["2 cards to win"], boss: null, bossId: null, bossName: null },
     });
   });
 
   it("shows the camp the crew is about to start in the loadout, with your gear and no shop", () => {
     expect(model(makeView()).panel).toEqual({
       kind: "loadout",
-      next: { title: "Camp 2 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", weatherId: "fair", pairing: null, event: null, objectives: ["2 cards to win"], boss: null, bossId: null, bossName: null },
+      next: { title: "Camp 2 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", backdrop: "jungle", weatherId: "fair", pairing: null, event: null, objectives: ["2 cards to win"], boss: null, bossId: null, bossName: null },
       gear: {
         equipped: ["trained-monkey"],
         slots: [

@@ -36,7 +36,9 @@ export const ZONES = {
   ticker: { x: 136, y: 232, w: 368, h: 18 },
   tooltip: { x: 104, y: 252, w: 432, h: 24 },
   you: { x: 8, y: 276, w: 108, h: 80 },
-  hand: { x: 120, y: 276, w: 400, h: 80 },
+  /** The temple's plate path, along the foot of the stump above your hand. */
+  path: { x: 120, y: 276, w: 400, h: 16 },
+  hand: { x: 120, y: 292, w: 400, h: 64 },
   actions: { x: 524, y: 276, w: 108, h: 80 },
 } as const satisfies Record<string, Rect>;
 
@@ -211,6 +213,72 @@ export const OBJECTIVE_POOL_STEP = 50;
 export function stumpRowXs(count: number, step: number): number[] {
   const firstX = STUMP_CENTRE.x - ((count - 1) * step) / 2;
   return Array.from({ length: count }, (_, i) => Math.round(firstX + i * step));
+}
+
+// ---------------------------------------------------------------------------
+// The temple: its plate path, and the helpers in the world column
+// ---------------------------------------------------------------------------
+
+export const PLATE_TILE = 12;
+const PLATE_STEP = PLATE_TILE + 2;
+const PATH_GAP = 6;
+
+export interface PathLayout {
+  /** Left x of the count ("Plates 2/9"), each tile, and the hint. */
+  countX: number;
+  tileXs: number[];
+  hintX: number;
+  /** Top of the tiles, and of the text centred beside them. */
+  tileY: number;
+  textY: number;
+  /** The whole row, for its hover. */
+  row: Rect;
+}
+
+/** The count, `plates` tiles and the hint in one row centred in the path
+ * zone, for texts `countW` and `hintW` px wide. */
+export function pathLayout(plates: number, countW: number, hintW: number, textH: number): PathLayout {
+  const zone = ZONES.path;
+  const tilesW = plates * PLATE_STEP - 2;
+  const total = countW + PATH_GAP + tilesW + PATH_GAP + hintW;
+  const countX = zone.x + Math.floor((zone.w - total) / 2);
+  const firstTile = countX + countW + PATH_GAP;
+  const tileY = zone.y + Math.floor((zone.h - PLATE_TILE) / 2);
+  return {
+    countX,
+    tileXs: Array.from({ length: plates }, (_, i) => firstTile + i * PLATE_STEP),
+    hintX: firstTile + tilesW + PATH_GAP,
+    tileY,
+    textY: zone.y + Math.floor((zone.h - textH) / 2),
+    row: { x: countX - 2, y: zone.y, w: total + 4, h: zone.h },
+  };
+}
+
+export const HELPER_CAPTION_LINE_H = 9;
+const HELPER_CAPTION_LINES = 2;
+
+export interface HelperRow {
+  /** Where the helper's sprite stands. */
+  sprite: Rect;
+  /** Its two caption lines: its name, then what it is doing. */
+  caption: Rect;
+}
+
+/** The world column split into one row per temple helper, top to bottom:
+ * each row's sprite above its caption, so neither overlaps the other or
+ * the kit below. The sprite's box leaves a pixel above and below for its
+ * idle bob. */
+export function helperRows(count: number): HelperRow[] {
+  const zone = ZONES.world;
+  const rowH = Math.floor(zone.h / Math.max(1, count));
+  const captionH = HELPER_CAPTION_LINES * HELPER_CAPTION_LINE_H;
+  return Array.from({ length: count }, (_, i) => {
+    const y = zone.y + i * rowH;
+    return {
+      sprite: { x: zone.x + 1, y: y + 1, w: zone.w - 2, h: rowH - captionH - 2 },
+      caption: { x: zone.x, y: y + rowH - captionH, w: zone.w, h: captionH },
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------

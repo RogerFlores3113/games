@@ -9,7 +9,7 @@ import { bundleItemObjectId, bundleObjectId, draftObjectId, kitObjectId, lengthO
 import { buildGear, buildShop, type Gear, type ShopPanel } from "./loadout-model";
 import type { LocalUiState } from "./local-ui";
 import { bossLabel, focusCampIndex, modName, plannedBossAt } from "./view-access";
-import { modDisplayName } from "./weather-model";
+import { campBackdrop, modDisplayName } from "./weather-model";
 
 /**
  * The trail before, between and after the camps: the muster with its
@@ -104,6 +104,8 @@ export interface CampPreview {
   weather: string;
   /** The location's and the weather's ids, for their icons. */
   locationId: string;
+  /** What the backdrop shows: the location, or the temple. */
+  backdrop: string;
   weatherId: string;
   /** What the location and weather make together; null for none. */
   pairing: string | null;
@@ -113,7 +115,8 @@ export interface CampPreview {
   objectives: string[];
   /** "Animal boss", "The Temple"; null for a plain camp. */
   boss: string | null;
-  /** The boss's id and name once a route preview has revealed it. */
+  /** The boss's id and name once a route preview has revealed it; null at
+   * the temple, which `boss` already names. */
   bossId: string | null;
   bossName: string | null;
 }
@@ -248,19 +251,22 @@ function objectiveLabels(slotKinds: readonly string[]): string[] {
 }
 
 export function campPreview(view: View, camp: ExpeditionCampPreviewView): CampPreview {
+  const backdrop = campBackdrop(camp);
+  const bossId = backdrop === camp.bossId ? null : camp.bossId;
   return {
     title: view.campCount === null ? `Camp ${camp.index}` : `Camp ${camp.index} of ${view.campCount}`,
     shop: camp.shop,
     location: modDisplayName(camp.location),
     weather: modDisplayName(camp.weather),
     locationId: camp.location,
+    backdrop,
     weatherId: camp.weather,
     pairing: camp.pairing === null ? null : modDisplayName(camp.pairing),
     event: camp.event === null ? null : (EVENT_DISPLAY[camp.event]?.name ?? modName(camp.event)),
     objectives: objectiveLabels(camp.slotKinds),
     boss: bossLabel(view, camp.index),
-    bossId: camp.bossId,
-    bossName: camp.bossId === null ? null : modDisplayName(camp.bossId),
+    bossId,
+    bossName: bossId === null ? null : modDisplayName(bossId),
   };
 }
 

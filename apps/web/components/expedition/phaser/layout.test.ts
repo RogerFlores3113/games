@@ -209,3 +209,90 @@ describe("the boss in the world column", () => {
     expect(Math.min(...sizes.map((s) => s.scale))).toBe(0.59);
   });
 });
+
+describe("the temple", () => {
+  it("lays the longest path (9 plates at 3 players) and its longest texts inside the path zone, centred", async () => {
+    const { pathLayout, PLATE_TILE } = await import("./layout");
+    const longest = { count: "Plates 9/9".length * 6, hint: "Every plate pressed".length * 6 };
+    for (const plates of [9, 6, 5, 1]) {
+      const geo = pathLayout(plates, longest.count, longest.hint, 8);
+      const pieces: Rect[] = [
+        { x: geo.countX, y: geo.textY, w: longest.count, h: 8 },
+        ...geo.tileXs.map((x) => ({ x, y: geo.tileY, w: PLATE_TILE, h: PLATE_TILE })),
+        { x: geo.hintX, y: geo.textY, w: longest.hint, h: 8 },
+      ];
+      expect(pieces.every((p) => rectContains(ZONES.path, p))).toBe(true);
+      for (let i = 0; i < pieces.length; i++) for (let j = i + 1; j < pieces.length; j++) expect(rectsIntersect(pieces[i]!, pieces[j]!)).toBe(false);
+      expect(rectContains(ZONES.path, geo.row)).toBe(true);
+    }
+    expect(pathLayout(9, longest.count, longest.hint, 8)).toMatchObject({ countX: 165, hintX: 361, tileY: 278, textY: 280 });
+  });
+
+  it.each([2, 3, 4])("count=%i teammates: the path is clear of every seat, the stump, the hand, the kit, the world column and the top bar", (count) => {
+    const spots = seatSpots(count);
+    const seats = spots.flatMap((s, i) => [plateRect(spots, i), { x: s.x - SILHOUETTE_W / 2, y: s.bottom - SILHOUETTE_H, w: SILHOUETTE_W, h: SILHOUETTE_H }]);
+    for (const r of [...seats, ZONES.stump, ZONES.hand, ZONES.kit, ZONES.world, ZONES.topBar, ZONES.you]) expect(rectsIntersect(ZONES.path, r)).toBe(false);
+    const lifted = handFanXs(18).map((x) => ({ x, y: HAND_CARD_Y - HOVER_LIFT - HAND_MARKER_H - 1, w: CARD_W, h: CARD_H }));
+    for (const card of lifted) expect(rectsIntersect(ZONES.path, card)).toBe(false);
+  });
+
+  it("stacks one or two helpers in the world column, each sprite above its two caption lines", async () => {
+    const { helperRows } = await import("./layout");
+    const { CAPTION_CHARS } = await import("./draw/draw-boss");
+    for (const count of [1, 2]) {
+      const rows = helperRows(count);
+      const boxes = rows.flatMap((r) => [r.sprite, r.caption]);
+      expect(boxes.every((b) => rectContains(ZONES.world, b))).toBe(true);
+      for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) expect(rectsIntersect(boxes[i]!, boxes[j]!)).toBe(false);
+      for (const r of rows) expect(CAPTION_CHARS * 6).toBeLessThanOrEqual(r.caption.w);
+    }
+    expect(helperRows(2).map((r) => r.sprite)).toEqual([{ x: 7, y: 43, w: 94, h: 30 }, { x: 7, y: 93, w: 94, h: 30 }]);
+  });
+
+  it("stands a lone helper at exactly half its boss's size, and two at up to half, each inside its row", async () => {
+    const { helperRows } = await import("./layout");
+    const { bossScale, helperScale } = await import("./draw/draw-boss");
+    const { ART } = await import("./art/art-registry");
+    const bosses = Object.entries(ART).filter(([id]) => id.startsWith("boss-"));
+    expect(bosses).toHaveLength(13);
+    for (const count of [1, 2]) {
+      const room = helperRows(count)[0]!.sprite;
+      const ratios = bosses.map(([, art]) => {
+        const scale = helperScale(art.w, art.h, room);
+        expect(Math.round(art.w * scale)).toBeLessThanOrEqual(room.w);
+        expect(Math.round(art.h * scale)).toBeLessThanOrEqual(room.h);
+        return Math.round((scale / bossScale(art.w, art.h)) * 100) / 100;
+      });
+      if (count === 1) expect(new Set(ratios)).toEqual(new Set([0.5]));
+      else expect(Math.min(...ratios)).toBe(0.35);
+    }
+  });
+});
+
+describe("the top bar's modifier strip at the temple", () => {
+  it("fits a pairing, the temple and two helpers in the span left at 1280x720, naming the temple and only icons for the rest", async () => {
+    const { stripFit } = await import("./draw/draw-weather");
+    const chip = (id: string, kind: "location" | "weather" | "pairing" | "animal" | "disaster" | "temple", name: string, strength: "full" | "half" = "full") =>
+      ({ id, objectId: `mod:${id}`, kind, strength, name, badge: null, pips: 0, gauge: null, alert: false });
+    const chips = [
+      chip("magma", "location", "Magma pool"),
+      chip("rain", "weather", "Rain"),
+      chip("steam", "pairing", "Steam"),
+      chip("temple", "temple", "The Temple"),
+      chip("crocodile", "animal", "Crocodile (half)", "half"),
+      chip("blood-moon", "disaster", "Blood Moon (half)", "half"),
+    ];
+    expect(stripFit(chips, 219)).toEqual({ tier: "icon", total: 173 });
+  });
+});
+
+describe("a crowded objective row", () => {
+  it("shortens a trick-count tag to its number, so a card and the tag fit a teammate plate beside two kit icons", async () => {
+    const { objectiveItemWidth } = await import("./draw/ui-kit");
+    const chip = (kind: "ordered" | "no-tricks", label: string) => ({ objectiveId: label, objectId: label, kind, label, orderBadge: null, status: "pending" as const, ownerSeatId: "s1", pickable: false, targetable: false, selected: false });
+    const tag = chip("no-tricks", "0 tricks");
+    expect([objectiveItemWidth(tag), objectiveItemWidth(tag, true)]).toEqual([58, 16]);
+    const room = 108 - 2 * 17 - 4;
+    expect(objectiveItemWidth(chip("ordered", "10♠"), true) + 2 + objectiveItemWidth(tag, true)).toBeLessThanOrEqual(room);
+  });
+});

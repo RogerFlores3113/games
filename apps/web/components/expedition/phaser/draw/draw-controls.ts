@@ -24,6 +24,7 @@ const PULSE_MS = 600;
 
 function tileCaption(chip: ObjectiveChip): { body: string | null; caption: string } {
   if (chip.kind === "hidden") return { body: null, caption: "hidden" };
+  if (chip.kind === "sun") return { body: null, caption: "the Sun" };
   if (chip.kind === "no-tricks") return { body: "0", caption: "tricks" };
   if (chip.kind === "exactly-n") return { body: chip.label.split(" ")[0]!, caption: "tricks" };
   if (chip.orderBadge === null) return { body: null, caption: chip.label };
@@ -55,8 +56,9 @@ function drawObjectivePool(scene: Phaser.Scene, layer: Layer, model: SceneModel,
     container.add(platedText(scene, Math.floor((TILE_W - labelWidth(caption)) / 2), MINI_H + 3, caption));
 
     const highlighted = chip.pickable || chip.targetable;
-    if (highlighted || chip.selected) {
-      container.add(scene.add.rectangle(bodyX, 0, MINI_W, MINI_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
+    const ring = highlighted || chip.selected ? PALETTE.turn : chip.kind === "sun" ? PALETTE.sun : null;
+    if (ring !== null) {
+      container.add(scene.add.rectangle(bodyX, 0, MINI_W, MINI_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(ring)));
     }
     const hit = scene.add.zone(0, 0, TILE_W, MINI_H + 3 + LABEL_CELL.h).setOrigin(0, 0);
     container.add(hit);

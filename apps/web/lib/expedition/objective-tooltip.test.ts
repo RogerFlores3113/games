@@ -34,4 +34,9 @@ describe("objectiveTooltip", () => {
     expect(render(two, { kind: "seat", name: "Sam" })).toBe("Exactly 2: Sam must win exactly 2 tricks. [Failed]");
     expect(render({ ...two, n: 1 }, { kind: "seat", name: "Sam" })).toBe("Exactly 1: Sam must win exactly 1 trick. [Failed]");
   });
+
+  it("explains the temple's Sun objective: win it on the last plate to earn the crew's Skip", () => {
+    const sun = { id: "o6", kind: "win-card", target: { kind: "joker", joker: "sun" }, ownerSeatId: null, status: "pending" } as const;
+    expect(render(sun, { kind: "nobody" })).toBe("The Sun: Win the trick containing the Sun. Lead it on the last plate: winning it earns the crew a Skip. [Still open]");
+  });
 });

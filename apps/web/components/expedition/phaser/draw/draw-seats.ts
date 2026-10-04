@@ -78,8 +78,11 @@ function nameRow(ctx: Ctx, group: Layer, seat: SeatModel, row: Rect, badge: { va
 
 function objectivesRow(ctx: Ctx, group: Layer, chips: ObjectiveChip[], x: number, y: number, maxW: number): void {
   const targeting = ctx.model.targeting !== null;
-  const widths = chips.map(objectiveItemWidth);
-  const natural = widths.reduce((sum, w) => sum + w, 0) + OBJECTIVE_GAP * Math.max(0, chips.length - 1);
+  const rowWidth = (ws: number[]) => ws.reduce((sum, w) => sum + w, 0) + OBJECTIVE_GAP * Math.max(0, chips.length - 1);
+  // A crowded row shortens "0 tricks" to "0" before squeezing items together; the tooltip says the rest.
+  const tight = rowWidth(chips.map((c) => objectiveItemWidth(c))) > maxW;
+  const widths = chips.map((c) => objectiveItemWidth(c, tight));
+  const natural = rowWidth(widths);
   const squeeze = chips.length > 1 && natural > maxW ? (natural - maxW) / (chips.length - 1) : 0;
   let cursor = x;
   chips.forEach((chip, i) => {
@@ -87,6 +90,7 @@ function objectivesRow(ctx: Ctx, group: Layer, chips: ObjectiveChip[], x: number
       onClick: () => ctx.handlers.onObjective(chip.objectiveId),
       onHover: (over) => ctx.handlers.onObjectiveHover(over ? chip.objectiveId : null),
       dim: targeting,
+      tight,
     });
     group.add(item);
     ctx.index.register("camp", chip.objectId, item);
@@ -95,10 +99,11 @@ function objectivesRow(ctx: Ctx, group: Layer, chips: ObjectiveChip[], x: number
 }
 
 /** A teammate's kit as icons, right-aligned ending at `right`. Hover shows
- * the source's rules; teammates' sources never start targeting. */
+ * the source's rules; teammates' sources never start targeting. A camp's
+ * grant (the temple's skip) is the crew's, shown once in your own kit. */
 function kitIcons(ctx: Ctx, group: Layer, seat: SeatModel, right: number, cy: number, maxW: number): number {
   const fit = Math.max(0, Math.floor((maxW + 1) / (ICON + 1)));
-  const shown = seat.sources.slice(0, fit);
+  const shown = seat.sources.filter((chip) => chip.kind !== "grant").slice(0, fit);
   shown.forEach((chip, i) => {
     const x = right - (shown.length - i) * (ICON + 1) + 1;
     const art = sourceArtId(chip.sourceId);
@@ -282,12 +287,14 @@ function drawYou(ctx: Ctx, layer: Layer, seat: SeatModel): void {
 }
 
 const KIT_ROW_H = 18;
+/** Items on bark; a camp's gift to the crew (the temple's skip) on moss. */
+const KIT_ROW_FACE: Readonly<Record<SourceChip["kind"], string>> = { character: PALETTE.stump, upgrade: PALETTE.stump, item: PALETTE.bark, grant: PALETTE.moss };
 const KIT_ROW_GAP = 1;
 
 function kitRow(ctx: Ctx, layer: Layer, chip: SourceChip, x: number, y: number, w: number): void {
   const { scene, index, handlers } = ctx;
   const container = scene.add.container(x, y);
-  const bg = plate(scene, 0, 0, w, KIT_ROW_H, chip.kind === "item" ? PALETTE.bark : PALETTE.stump);
+  const bg = plate(scene, 0, 0, w, KIT_ROW_H, KIT_ROW_FACE[chip.kind]);
   if (chip.usable) bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn));
   container.add(bg);
   const art = sourceArtId(chip.sourceId);

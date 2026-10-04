@@ -53,7 +53,7 @@ function shorten(name: string, chars: number): string {
 }
 
 type Reading = Omit<BossModel, "id" | "objectId" | "name">;
-type Reader = (status: readonly ExpeditionStatusPartView[], seats: SeatNamer) => Reading;
+type Reader = (status: readonly ExpeditionStatusPartView[], seats: SeatNamer, strength: ExpeditionModView["strength"]) => Reading;
 
 function part<K extends ExpeditionStatusPartView["kind"]>(status: readonly ExpeditionStatusPartView[], kind: K): Extract<ExpeditionStatusPartView, { kind: K }> | undefined {
   return status.find((p): p is Extract<ExpeditionStatusPartView, { kind: K }> => p.kind === kind);
@@ -112,8 +112,10 @@ const READERS: Readonly<Record<string, Reader>> = {
     const glyph = SUIT_GLYPH[dam.suit];
     return calm(`Dam: ${glyph} ${dam.suit}`, `Beaver dams ${glyph}: play another suit if you can`);
   },
-  rats: () => calm("-1 item slot", "Rats: everyone has one fewer item slot this camp"),
-  capybara: () => calm("+2 objectives", "Capybara: two extra objectives this camp"),
+  rats: (_status, _seats, strength) =>
+    strength === "full" ? calm("-1 item slot", "Rats: everyone has one fewer item slot this camp") : calm("Chewing 2 packs", "Rats: the first two seats have one fewer item slot"),
+  capybara: (_status, _seats, strength) =>
+    strength === "full" ? calm("+2 objectives", "Capybara: two extra objectives this camp") : calm("+1 objective", "Capybara: one extra objective this camp"),
   tornado: (status) => {
     const countdown = part(status, "countdown");
     if (countdown === undefined) return calm("Calm", "Tornado: no more gusts this camp");
@@ -170,14 +172,48 @@ function fallback(mod: ExpeditionModView): Reading {
   return calm(display?.name ?? modName(mod.id), display?.text ?? "");
 }
 
+function bossMods(view: ExpeditionView): ExpeditionModView[] {
+  const stage = view.stage;
+  if (stage.tag !== "camp" && stage.tag !== "loadout") return [];
+  return stage.mods.filter((m) => m.kind === "animal" || m.kind === "disaster");
+}
+
+function read(mod: ExpeditionModView, seats: SeatNamer): Reading {
+  return READERS[mod.id]?.(mod.status, seats, mod.strength) ?? fallback(mod);
+}
+
 /** The camp's full-strength boss, or null for a plain camp. */
 export function buildBoss(view: ExpeditionView, seats: SeatNamer): BossModel | null {
-  const stage = view.stage;
-  if (stage.tag !== "camp" && stage.tag !== "loadout") return null;
-  const mod = stage.mods.find((m) => (m.kind === "animal" || m.kind === "disaster") && m.strength === "full");
+  const mod = bossMods(view).find((m) => m.strength === "full");
   if (mod === undefined) return null;
-  const reading = READERS[mod.id]?.(mod.status, seats) ?? fallback(mod);
-  return { id: mod.id, objectId: bossObjectId(mod.id), name: MOD_DISPLAY[mod.id]?.name ?? modName(mod.id), ...reading };
+  return { id: mod.id, objectId: bossObjectId(mod.id), name: MOD_DISPLAY[mod.id]?.name ?? modName(mod.id), ...read(mod, seats) };
+}
+
+/** Names short enough that "<name> (half)" stays within a caption line. */
+const HELPER_SHORT_NAME: Readonly<Record<string, string>> = {
+  crocodile: "Croc",
+  earthquake: "Quake",
+  meteor: "Meteor",
+  "blood-moon": "Moon",
+  locusts: "Locusts",
+};
+
+/** The bosses planned earlier in the run, back at the temple at half
+ * strength, in the order the run met them. `name` is their caption's
+ * first line ("Tiger (half)"); a helper has no gaze arrow and no rule under
+ * the stump: its caption and the marks it leaves on seats say what it does. */
+export function buildHelpers(view: ExpeditionView, seats: SeatNamer): BossModel[] {
+  return bossMods(view)
+    .filter((m) => m.strength === "half")
+    .map((mod) => {
+      const short = HELPER_SHORT_NAME[mod.id] ?? MOD_DISPLAY[mod.id]?.name ?? modName(mod.id);
+      return { id: mod.id, objectId: bossObjectId(mod.id), name: `${short} (half)`, ...read(mod, seats), rule: "", facingSeatId: null };
+    });
+}
+
+/** The mark each seat wears: the boss's, else the first helper's. */
+export function seatMarks(boss: BossModel | null, helpers: readonly BossModel[]): Readonly<Record<string, SeatBossMark>> {
+  return Object.assign({}, ...[...helpers].reverse().map((h) => h.marks), boss?.marks ?? {});
 }
 
 /** Why the boss keeps this card in hand, or null when it does not. */

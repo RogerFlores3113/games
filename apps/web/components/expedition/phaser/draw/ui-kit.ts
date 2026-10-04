@@ -136,11 +136,22 @@ function orderText(chip: ObjectiveChip): string | null {
   return chip.orderBadge === "L" ? "L" : chip.orderBadge;
 }
 
+/** Whether an objective is drawn as a mini card (face up, or a hidden back)
+ * rather than a trick-count tag. */
+export function showsCard(chip: ObjectiveChip): boolean {
+  return chip.kind === "win-card" || chip.kind === "sun" || chip.kind === "ordered" || chip.kind === "hidden";
+}
+
+/** A trick-count tag's text: "0 tricks", or in a crowded row just "0". */
+function tagLabel(chip: ObjectiveChip, tight: boolean): string {
+  return tight ? chip.label.split(" ")[0]! : chip.label;
+}
+
 /** Width of one compact objective item: a mini card plus a badge column, or
- * a text tag for trick-count objectives. */
-export function objectiveItemWidth(chip: ObjectiveChip): number {
-  const isCard = chip.kind === "win-card" || chip.kind === "ordered" || chip.kind === "hidden";
-  return isCard ? MINI_W + 1 + LABEL_CELL.w : labelWidth(chip.label) + 4 + LABEL_CELL.w;
+ * a text tag for trick-count objectives (shortened when `tight`). */
+export function objectiveItemWidth(chip: ObjectiveChip, tight = false): number {
+  const isCard = showsCard(chip);
+  return isCard ? MINI_W + 1 + LABEL_CELL.w : labelWidth(tagLabel(chip, tight)) + 4 + LABEL_CELL.w;
 }
 
 /** A compact objective (mini card with order and status badges, or a
@@ -152,12 +163,14 @@ export function objectiveItem(
   y: number,
   chip: ObjectiveChip,
   packId: CardPackId,
-  opts: { onClick: () => void; onHover: (over: boolean) => void; dim: boolean },
+  opts: { onClick: () => void; onHover: (over: boolean) => void; dim: boolean; tight?: boolean },
 ): Phaser.GameObjects.Container {
   const container = scene.add.container(Math.round(x), Math.round(y));
-  const isCard = chip.kind === "win-card" || chip.kind === "ordered" || chip.kind === "hidden";
-  const w = objectiveItemWidth(chip);
-  const bodyW = isCard ? MINI_W : labelWidth(chip.label) + 4;
+  const isCard = showsCard(chip);
+  const tight = opts.tight ?? false;
+  const w = objectiveItemWidth(chip, tight);
+  const label = tagLabel(chip, tight);
+  const bodyW = isCard ? MINI_W : labelWidth(label) + 4;
 
   if (chip.kind === "hidden") {
     container.add(hiddenMiniCard(scene, 0, 0, packId));
@@ -165,15 +178,16 @@ export function objectiveItem(
     container.add(scene.add.image(0, 0, cardTextureKey(packId, chip.label, "mini")).setOrigin(0, 0));
   } else {
     container.add(plate(scene, 0, 0, bodyW, MINI_H, PALETTE.stump));
-    container.add(text(scene, 2, Math.floor((MINI_H - LABEL_CELL.h) / 2), chip.label));
+    container.add(text(scene, 2, Math.floor((MINI_H - LABEL_CELL.h) / 2), label));
   }
   const order = orderText(chip);
   if (order !== null) container.add(text(scene, bodyW + 1, 0, order, PALETTE.sun));
   const status = STATUS_GLYPH[chip.status];
   if (status !== null) container.add(text(scene, bodyW + 1, MINI_H - LABEL_CELL.h, status.glyph, status.color));
 
-  if (chip.targetable || chip.selected) {
-    container.add(scene.add.rectangle(0, 0, bodyW, MINI_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
+  const ring = chip.targetable || chip.selected ? PALETTE.turn : chip.kind === "sun" ? PALETTE.sun : null;
+  if (ring !== null) {
+    container.add(scene.add.rectangle(0, 0, bodyW, MINI_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(ring)));
   }
   const hit = scene.add.zone(0, 0, w, MINI_H).setOrigin(0, 0);
   container.add(hit);
