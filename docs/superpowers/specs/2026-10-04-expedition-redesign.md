@@ -1613,3 +1613,124 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
   leader and its objective given to them with the dev panel), then spends the Skip. The dev
   panel helpers moved to `e2e/expedition-dev-panel.ts`. The tour gains `temple-short`,
   `temple-standard`, `temple-long` and `temple-rescue`.
+
+### Implementation notes (unit 11)
+
+- `run/balance.ts` gains the five tunables that lived elsewhere, each at its old value:
+  `WHISPERS_PER_CAMP` and `WHISPERS_PER_UPGRADE` (the base `whispersPerCamp` in
+  `run/run-rules.ts`), `FAILURE_COST` (the base `failureCost`), `BOTH_MIX_MIN_SLOTS` (the "both"
+  mix threshold in `run/route.ts`) and `PURSE_START` (`createRun` in `run/lifecycle.ts`).
+- A number that one def alone reads stays in that def: half-body parameters, the temple's plate
+  count, the earthquake's trick, Clifftop's fair chance, the Heat's ranks, and every item's price,
+  rarity and uses. A number two defs share lives in `balance.ts` (`RIVER_SHARE`, read by Flooding
+  and Monsoon through `river`). `THUNDERSTORM` and `TORNADO` were in `balance.ts` already and stay.
+- A boss's `weight` only gates its pool: `drawPlan` draws uniformly among a tier's defs with weight
+  above 0. Locations and non-fair weathers draw by weight.
+
+Every number the owner may tune is below. Paths are relative to `packages/rules/src/expedition/`,
+and a bare identifier lives in `run/balance.ts`. A def's `text` repeats some of its numbers
+("two extra objectives"), so a tuning pass edits both.
+
+| What | Current value | Where it lives |
+|---|---|---|
+| Run lengths and boss camps | Short 4 camps, temple at 4; Standard 6, animal at 3, temple at 6; Long 8, animal at 3, disaster at 6, temple at 8 | `RUN_LENGTHS` |
+| Seat objectives per camp, before boss and temple slots | Short 2, 3, 4, 3; Standard 2, 3, 3, 4, 4, 4; Long 2, 3, 3, 4, 4, 4, 5, 4 | `OBJECTIVE_RAMP` |
+| First camp with mixed slots | camp 4 | `MIX_FROM_CAMP` |
+| Fewest slots for the "both" mix | 4 | `BOTH_MIX_MIN_SLOTS` |
+| Mix choices | plain, ordered pair (2 slots), trick-count, both; uniform | `run/route.ts` `optionsAfter`, `slotsFor` |
+| Trick-count slot kind | no-tricks or exactly-n, even odds, per attempt | `resolveTrickCountSlot` |
+| Exactly-n's N | 2 to 4, uniform | `TRICK_COUNT_N_RANGE` |
+| Route options | 2 or 3, uniform | `ROUTE_OPTIONS` |
+| Event on a route | uniform over `EVENTS` | `run/route.ts` `optionsAfter` |
+| Supplies at the start | 3 | `SUPPLIES_START` |
+| Supplies cap | 4 | `SUPPLIES_MAX` |
+| Supply price at the shop | 6 coins | `SUPPLY_PRICE` |
+| Failure cost | 1 supply | `FAILURE_COST` |
+| Purse at the start | 0 coins | `PURSE_START` |
+| Payout for a clear | 5, plus 1 per unplayed trick up to 3 | `PAYOUT` |
+| Draft offer | 3 bundles of 2 items | `DRAFT.options`, `DRAFT.bundleSize` |
+| Rare chance, draft and shop | 15% | `DRAFT.rareChance` |
+| Shop items | 3 single copies | `SHOP.items` |
+| Upgrade price | 8 coins | `SHOP.upgradePrice` |
+| Item slots | 2 | `ITEM_SLOTS` |
+| Whispers per camp | 1 | `WHISPERS_PER_CAMP` |
+| Extra whispers for an upgrade owner | 1 | `WHISPERS_PER_UPGRADE` |
+| Trained Monkey, Pack Mule, Parrot | 3 coins, common, per-camp | `content/items/<id>.ts` `price`, `rarity`, `uses` |
+| Trail Map | 5 coins, rare, single-use | `content/items/trail-map.ts` |
+| Rain Poncho | 3 coins, common, 2 charges, +1 whisper each | `content/items/rain-poncho.ts` |
+| Smoke Signal | 5 coins, rare, 2 charges, +1 whisper for everyone each | `content/items/smoke-signal.ts` |
+| Whetstone | 2 coins, common, single-use, up to 2 ranks either way | `content/items/whetstone.ts` (`spread: 2`) |
+| Puffball, Bait | 2 coins, common, single-use | `content/items/<id>.ts` |
+| Camouflage | 4 coins, rare, single-use | `content/items/camouflage.ts` |
+| Rope Ladder | 3 coins, common, single-use | `content/items/rope-ladder.ts` |
+| Heavy Pack | 3 coins, common, passive: +1 whisper, +1 supply per failure | `content/items/heavy-pack.ts` |
+| Mosquito Net | 4 coins, rare, passive | `content/items/mosquito-net.ts` |
+| Fair weather chance | 80% | `NORMAL_WEATHER_CHANCE` |
+| Clifftop's fair weather chance | 50% | `content/mods/clifftop.ts` `normalWeatherChance` |
+| Location weights | clearing, jungle, clifftop, desert, cave, magma: 1 each | each def's `weight` in `content/mods/<id>.ts` |
+| Weather weights | rain, fog, thunderstorm, night: 1 each; fair 0 (drawn by chance) | each def's `weight` |
+| Pairing and temple weights | steam, flooding, temple: 0 (never drawn) | each def's `weight` |
+| Boss pool | uniform over a tier's defs with weight above 0; every boss weight 1 | `run/plan.ts` `bossPool`, each def's `weight` |
+| Thunderstorm strike chance | 20% before trick 0, +10% per trick, capped at 100% | `THUNDERSTORM.firstChance`, `THUNDERSTORM.perTrick` |
+| Thunderstorm strikes per camp | at most 2 | `THUNDERSTORM.maxStrikes` |
+| River (Flooding, Monsoon) | every objective done by trick `ceil(total * 3 / 4)` | `RIVER_SHARE`; `river` in `content/mods/flooding.ts` |
+| Heat (Magma) | no 2s or 3s, then 4s (clubs, diamonds, hearts, spades) until the deck divides by the seat count | `content/mods/magma.ts` `heatDeck`, `FOURS_ORDER` |
+| Tiger | pounces on a leader with 2 or more wins in a row; full every trick, half even trick indices | `content/mods/tiger.ts` `pounceOn`, `body(1)`, `body(2)` |
+| Rats | full: every seat 1 slot fewer; half: only the first 2 seats | `content/mods/rats.ts` `full`, `half` (`slice(0, 2)`) |
+| Snake | a whisper's bite lasts full 2 tricks, half 1 | `content/mods/snake.ts` `body(2)`, `body(1)` |
+| Crocodile | full watches every trick, half every other | `content/mods/crocodile.ts` `body(1)`, `body(2)` |
+| Capybara | full +2 win-card slots, half +1 | `content/mods/capybara.ts` `extra(2)`, `extra(1)` |
+| Beaver | full dams every trick, half every other | `content/mods/beaver.ts` `body(1)`, `body(2)` |
+| Tornado | full every 3rd trick, half every 6th; 3 cards from each hand | `TORNADO.every`, `TORNADO.cards`; half `TORNADO.every * 2` in `content/mods/tornado.ts` |
+| Earthquake | once floor(total / 2) tricks are done; full deals open objectives out again, half swaps two seats' | `content/mods/earthquake.ts` `quakeAt`, `shuffleOpen`, `swapTwo` |
+| Wildfire | full burns every trick, half odd tricks | `content/mods/wildfire.ts` `body(false)`, `body(true)` |
+| Meteor | full every trick, half odd tricks; aces never objectives at either | `content/mods/meteor.ts` `body(false)`, `body(true)` |
+| Blood Moon | full odd trick indices (period 2), half indices 3, 7, 11 (period 4) | `content/mods/blood-moon.ts` `body(2)`, `body(4)` |
+| Locusts | full every trick, items then a card from every hand; half items only, odd tricks | `content/mods/locusts.ts` `body(false)`, `body(true)` |
+| Monsoon | full floods at the river, half 1 trick later | `content/mods/monsoon.ts` `body(0)`, `body(1)` |
+| Temple plates | floor(total / 2) - 1 suits, then the Sun | `content/mods/temple.ts` `platePath` |
+| Temple skips | 1 per Sun won | `content/mods/temple.ts` `grants.limit.earned` |
+
+Web and test notes:
+
+- Deviation: no balance pass. The owner was not available, so every placeholder is listed in the
+  table above for a later pass instead of being tuned.
+- `ROOM_SCHEMA_VERSION` is 12: unit 10 planned the temple def for the temple tier without a bump,
+  so a room in flight kept a plan with no temple.
+- One uses wording, `usesLabel` in `apps/web/lib/expedition/source-text.ts`, for the loadout,
+  the trail kit and the camp kit: "Single use", "Once per camp", "Used this camp", "1 of 2
+  charges", "Once per run", "Costs 1 supply", "Not earned", "Always on". It also gives a short
+  form ("1 per camp", "1/2 charges", "Used"), which only the camp's kit rows use: at 11
+  characters they cannot hold "Once per camp". The catalogue badge for a per-camp limit of 1 now
+  reads "Once per camp", a passive's badge "Always on", and `SourceActiveDisplay` gains
+  `limitKind` so the web can phrase what is left.
+- The draft offer takes the panel and crew row (`DRAFT_ZONES.offer`), so each bundle card is
+  about 193 stage px wide and every item's rules show in full, at most three lines.
+  `layout.test.ts` fails if an item's text would need a fourth. The crew panel returns once the
+  offer is taken; "N still choosing" beside Ready says who is left. The panel's payout heading
+  is deleted; the prompt says it once.
+- Route cards: "On the way" holds the event and, before a boss camp, the Shop chip. The cards in
+  a row share the tallest card's height, their votes pinned to the foot.
+- The boss's one-line rule and a strike notice under the stump sit on an opaque plate edged in
+  their colour; whispers keep the old translucent backing.
+- Seat plates: `plateRect` counted a plate on the row below as a neighbour, which held every
+  five-seat plate to 98 px. Plates now limit each other only where they overlap vertically, so
+  every plate at 2 to 5 seats is at least 112 px, room for "14 cards" beside "0 tricks". A
+  spectator's narrowest plates fall back to "0 won", then to the bare hand count.
+- The rules modal has four pages (Rules, Locations, Weather, Bosses). Locations and bosses show
+  their art; weather and pairings show the canvas's 9x9 icons as SVG, whose grids moved to the
+  Phaser-free `art/mod-icons.ts`. The copy reads its numbers from `BALANCE_DISPLAY` and
+  `RUN_LENGTH_DISPLAY`.
+- Run end: each camp names its boss under its number ("Tiger", "The Temple"); a lost run says
+  where ("Out of supplies after 2 tries against the Tiger"), a won one the length ("Standard
+  run: all 6 camps cleared, with 2 supplies and 32 coins left").
+- The earthquake e2e loads the seed `quake-8` through the dev state editor; autoplay reaches the
+  quake at step 31 whatever the seat ids, pinned by `dev/autoplay.test.ts`. It ran in 6 s
+  instead of up to 10 minutes.
+- The UI tour adds a five-seat table (you and four bots): `five-route`, `five-camp` and
+  `five-temple`. The strict tour passed at 1920x1080 and 1280x720 with 0 layout violations.
+- Two e2e fixes found by the full suite: the temple's Skip test expected the trail after the Skip
+  dropped the last open objective, but that clears a Short run's final camp and wins the run, so
+  it now expects the run end. `expedition-overlay-input.spec.ts` dispatched clicks on dev panel
+  buttons that are disabled until the room answers, and under eight workers the click was
+  dropped; it now waits for each button to be enabled.

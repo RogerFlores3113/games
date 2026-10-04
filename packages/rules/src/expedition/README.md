@@ -6,12 +6,14 @@ both the Cloudflare Worker (source of truth) and the Next.js client (display
 only; the client never decides legality). See `purity.test.ts` for the
 enforced import and API restrictions.
 
-ENG-01's promise: adding an item, a character, an objective kind, a hook or
-a toolkit op is **one new file plus one registry (or union or list) line**,
-and the catalogue contract tests (`content/sources.contract.test.ts`,
+ENG-01's promise: adding an item, a character, a camp modifier, an
+objective kind, a hook or a toolkit op is **one new file plus one
+registry (or union or list) line**, and the catalogue contract tests
+(`content/sources.contract.test.ts`, `content/mods/mods.contract.test.ts`,
 `run/targets.contract.test.ts`, `objective-kinds.contract.test.ts`) cover
-the new entry with no test edits (ENG-02). Every recipe below names the exact
-files and identifiers involved.
+the new entry with no test edits (ENG-02). The one exception is the source
+count in `sources.contract.test.ts` (see "Add an item"). Every recipe below
+names the exact files and identifiers involved.
 
 ## Layout
 
@@ -58,8 +60,9 @@ card or was discarded, and fails if never played by the final trick.
   `applyRunAction`, the single run-level transition, plus one file per
   stage: muster, loadout, camp, draft, route, event), `run/lifecycle.ts`
   (`createRun`, `runStatus`, `dealCamp`, `settleCamp`), `run/plan.ts`
-  (`RunPlan`, `campIndex`, `drawPlan`), `run/route.ts` (`CampSpec`,
-  `firstCampSpec`, `routeOptions`, `slotKindsFor`), `run/vote.ts` (`tally`),
+  (`RunPlan`, `campIndex`, `drawPlan`, `helpersFor`, `horizon`),
+  `run/route.ts` (`CampSpec`, `firstCampSpec`, `routeOptions`,
+  `slotKindsFor`), `run/vote.ts` (`tally`),
   `run/stack.ts` (`campStack`, the one list of a camp's modifiers, and
   `modCtx`), `run/react.ts` (`react`, the camp modifiers' one pass over the
   engine's events),
@@ -67,16 +70,19 @@ card or was discarded, and fails if never played by the final trick.
   (`abilityStatus`, `useAbility`, `passWindow`), `run/targets.ts`
   (`TARGET_KINDS`, `resolveTargets`, `stepsFor`), `run/windows.ts`
   (`WINDOWS`, `currentWindow`, `gatedPendingSeatIds`), `run/usage.ts`
-  (`remaining`, `poolBalance`, `liveSourceKeys`, `backpackOf`,
-  `defIdOf`), `run/items.ts` (`mintItems`, `equipError`), `run/compose.ts`
-  (`rulesFor`, the rule layers), `run/run-rules.ts` (`RunHooks`,
+  (`remaining`, `poolBalance`, `liveSourceKeys`, `abilityKeys`,
+  `backpackOf`, `defIdOf`), `run/items.ts` (`mintItems`, `equipError`),
+  `run/compose.ts` (`rulesFor`, the rule layers), `run/run-rules.ts` (`RunHooks`,
   `HOOK_NAMES`), `run/toolkit.ts` (`ToolkitOp`, `applyToolkitOps`, the only
   mutation surface for abilities), `run/draft.ts` (`draftOfferFor`,
   `drawItem`), `run/shop.ts` (`stockFor`, `buy`), `run/whisper.ts`,
-  `run/balance.ts` (every tunable number), `run/rng.ts` (`STREAMS`,
+  `run/balance.ts` (the run's tunable numbers; a number only one def
+  reads, such as an item's price or a boss's half-strength parameter,
+  lives in that def), `run/rng.ts` (`STREAMS`,
   `seededIndex`) and `run/catalog.ts`'s `CATALOG` (`{ characters, items,
   mods, pairings }` plus the flattened `sources` index). `content/events/`
-  holds `EVENTS`.
+  holds the route events: `event-def.ts` (`EventDef`, `defineEvent`), one
+  file per event and its `registry.ts` (`EVENTS`).
 
 **The run loop.** A run is a stored stage, and `applyRunAction` is the one
 transition: it refuses an action type the stage does not accept
@@ -117,7 +123,8 @@ A disconnected seat's ballot is cast as an abstention by the worker's
 auto-pass after the existing grace.
 
 **Layering order** (`run/compose.ts`): **base, then each camp-stack
-layer's `rules` (location, weather, pairing, boss), then per seat (seat
+layer's `rules` (location, weather, pairing, the boss or the temple, then
+the temple's helpers at half strength), then per seat (seat
 order) each live source's passive in `[character, upgrade, ...equipped]`
 order, then each live effect's layer in `attempt.effects` order.** A boss
 folds after the weather so it can refine it; passives fold after both, so an
@@ -184,24 +191,31 @@ draw derives a fresh, uniquely named stream via `run/rng.ts`'s `STREAMS`:
 | Planned boss | `expedition-plan:{animal\|disaster}` |
 | Route vote tie | `expedition-vote:route:camp{k}` (k = the next camp) |
 | Route option count | `expedition-route:camp{k}:count` |
-| Route option field | `expedition-route:camp{k}:reroll{r}:option{i}:{event\|mix}` |
+| Route option field | `expedition-route:camp{k}:reroll{r}:option{i}:{location\|fair\|weather\|event\|mix}` |
 | Draft item | `expedition-draft:camp{k}:seat{id}:offer{o}:bundle{b}:item{j}:{rarity\|pick}` (k = the cleared camp) |
 | Shop item | `expedition-shop:camp{k}:item{i}:{rarity\|pick}` (a replay of the boss camp draws the same stock) |
 | Attempt deal seed | `{seed}:camp{k}:attempt{A}` |
 | Trick-count kind and N | `expedition-trickcount-{kind\|n}:camp{k}:attempt{A}` |
 | Ability draws (`ctx.randomCards`, `ctx.randomIndex`) | `expedition-ability:camp{k}:attempt{A}:seat{id}:use{u}:draw{j}` |
+| Mod rule roll (`ctx.roll`) | `expedition-mod:{id}:{strength}:camp{k}:attempt{A}:rule:{label}` |
+| Mod reaction draw (`ctx.draw`, `ctx.randomCards`) | `expedition-mod:{id}:{strength}:camp{k}:attempt{A}:on:{eventKey}:draw{j}` |
 
 `u` is the seat's ledger length before the use and `j` counts draws inside
 one `apply`; the context builds both, so an ability never names a stream.
+A camp modifier never names one either: `ctx.roll` gives the same value for
+the same label within an attempt, and `eventKey` is `dealt`, `pick{n}`,
+`t{i}-start`, `t{i}-p{position}`, `t{i}-done` or `whisper{ordinal}`.
 
 ## Add an item
 
 1. Create `content/items/<id>.ts` exporting `defineItem({ id, name, rarity,
-   price, text, ... })`. `rarity` is `"common"` or `"rare"` (the draft and
-   the shop roll it first), `price` is its cost at the shop, and the optional
-   `exclusiveTo` names the one character it is drafted for. `text` is one
-   short sentence about the effect; the window and uses render as badges
-   from the def, so the text never repeats them.
+   price, text, ... })`. `rarity` is `"common"` or `"rare"`. The draft and
+   the shop roll the rarity first, rare at `DRAFT.rareChance` percent
+   (`run/balance.ts`), then pick an item of it. `price` is its cost in coins
+   at the shop. The optional `exclusiveTo` names the one character it is
+   drafted for, and the shop never stocks such an item. `text` is one short
+   sentence about the effect; the window and uses render as badges from the
+   def, so the text never repeats them.
 2. An active item gives `uses` and `active: itemAbility({ window, targets,
    apply })`; a passive item gives `passive: { modifier(owner) }` and
    neither of the others (the type allows only these two shapes).
@@ -209,8 +223,8 @@ one `apply`; the context builds both, so an ability never names a stream.
      attempt, never runs out) or `{ kind: "charges", n }`. The uses are the
      limit, so an item ability has no `limit`; the engine counts them per
      instance and removes a spent instance from its owner.
-   - `window`: one of `run/windows.ts`'s `ActiveWindow`s (see "Add a
-     window").
+   - `window`: one of `run/windows.ts`'s `ActiveWindow`s, or a list of
+     them when the ability may fire in several (see "Add a window").
    - `targets`: a list of `TargetSpec`s, one picker step each (see "Add a
      target kind"). `ctx.targets` arrives resolved and typed per kind; you
      never parse an id or check a choice.
@@ -219,14 +233,17 @@ one `apply`; the context builds both, so an ability never names a stream.
    - `apply(ctx)`: returns `ToolkitOp` data. If it emits `add-modifier`,
      also give `effect(e, run)`, the `RuleModifier` that op switches on.
 3. Add one line to `content/items/registry.ts`'s `ITEMS`.
-4. `content/sources.contract.test.ts` covers it with no edits: shape, one
-   sentence of text, `effect` iff `add-modifier`, determinism, conservation,
-   a JSON round-trip, the per-seat leak check, the usage limits, and for an
-   active item that its uses exhaust as declared, that a per-camp item resets
-   on a replay, and that a spent instance leaves its owner. Add its
-   16x16 icon as `apps/web/public/expedition/sprites/sources/<id>.png` and its
-   id to `SOURCE_ICON_IDS` (`apps/web/components/expedition/phaser/art/
-   art-registry.ts`); `source-icons.test.ts` fails until you do.
+4. `content/sources.contract.test.ts` covers it: shape, one sentence of
+   text, a rarity and a price, `effect` iff `add-modifier`, determinism,
+   conservation, a JSON round-trip, the per-seat leak check, the usage
+   limits, and for an active item that its uses exhaust as declared, that a
+   per-camp item resets on a replay, and that a spent instance leaves its
+   owner. Its first test (`has 6 characters, 12 upgrades and 13 items with
+   unique ids`) counts the catalogue, so raise the item count and the id
+   total there.
+5. Add its 16x16 icon as `apps/web/public/expedition/sprites/sources/<id>.png`
+   and its id to `SOURCE_ICON_IDS` (`apps/web/components/expedition/phaser/
+   art/art-registry.ts`); `source-icons.test.ts` fails until you do.
 
 **Worked example (Bait, `content/items/bait.ts`):** common, price 2, uses
 `single-use`, window `"in-trick"`, one `{ kind: "card", where: "board" }`
@@ -252,10 +269,147 @@ that card can't win this one trick.
    has no ability of its own: the base power reads `owner.hasUpgrade("<upgrade
    id>")` through a `Tuned<T>` value (see Pathfinder in `guide.ts`).
 4. Add one line to `content/characters/registry.ts`'s `CHARACTERS`. The
-   contract tests cover the character and both upgrades with no edits. Add
-   the 64x80 silhouette as `sprites/crew/<id>.png`, the icons for the power
-   and both upgrades under `sprites/sources/`, and the ids to `CREW_IDS` and
-   `SOURCE_ICON_IDS`.
+   contract tests cover the character and both upgrades; raise the counts
+   in `sources.contract.test.ts`'s first test. Add the 64x80 silhouette as
+   `sprites/crew/<id>.png`, the icons for the power and both upgrades under
+   `sprites/sources/`, and the ids to `CREW_IDS` and `SOURCE_ICON_IDS`.
+
+## The channel rule
+
+A camp modifier's body has six channels. Pick each mechanic's channel by
+what the mechanic is.
+
+| The mechanic is | Channel | Example |
+|---|---|---|
+| A question the engine asks: who wins, what is legal, what is done, who sees what | `rules(ctx)`, a `RuleModifier` over `HOOK_NAMES` | Crocodile's `goals` guard (`content/mods/crocodile.ts`) asks whether the watched seat won a trick |
+| A change to stored state at a moment: cards move, an item breaks | `on`, a reaction to an `EngineEvent` that returns toolkit ops | Tornado's `trick-completed` handler (`content/mods/tornado.ts`) returns `reveal` and `move-card` ops |
+| A rule that starts at a moment | `on` returns `add-modifier`, and `effect(e, ctx)` is the layer it switches on | Snake's `whisper-sent` bite (`content/mods/snake.ts`), whose `effect` fails objectives through `objectiveStatus` |
+| The shape of the deal or of the objective slots | a deal hook in `rules` (`deckFor`, `objectiveDeckFor`) or `slots(prev)` | Magma's `deckFor` (`content/mods/magma.ts`); Capybara's `slots` (`content/mods/capybara.ts`) |
+| An action a player chooses | `grants`, an ability every seat may use while the def is in play | the temple's Skip (`content/mods/temple.ts`) |
+| Public state the table draws | `status(ctx)`, a list of `StatusPart`s | Beaver's `dam` part (`content/mods/beaver.ts`) |
+
+Prefer a rule to a reaction. A rule derives its answer from the camp, the
+trick log and `ctx.roll`, so it stores nothing and a replay rebuilds it.
+Crocodile asks who won the trick it watched, and Tiger asks what a
+leader may lead, so both are rules even though they act every trick. Write
+a reaction only when stored state must change: hands, items, owners or the
+attempt's effects.
+Reactions never trigger reactions, so a Tornado move does not wake the
+Locusts. The same rule applies to sources. An item's `passive` is a rule;
+its `active.apply` returns ops, and its `effect` is the rule an
+`add-modifier` switches on.
+
+## Add a camp modifier
+
+Locations, weathers, pairings, bosses and the temple are all `ModDef`s
+(`content/mods/mod-def.ts`). Read "The channel rule" first.
+
+1. Create `content/mods/<id>.ts`. A location, weather, pairing or temple
+   exports `defineMod({ id, kind, name, weight, text, full })`. An animal or
+   disaster boss exports `defineBoss({ id, kind, name, weight, text, full,
+   half })`.
+   - `id` is also the web art id.
+   - `text` is one sentence that ends with a period.
+   - `weight` is the draw weight; 0 is never drawn. A location or a
+     non-fair weather is drawn for a route by weight. A boss of weight
+     above 0 joins its tier's pool, and `drawPlan` draws uniformly from the
+     pool. Pairings, `fair` and the temple have weight 0.
+   - A location may set `normalWeatherChance`, the percent chance of fair
+     weather there (Clifftop: 50). Without it the route uses
+     `NORMAL_WEATHER_CHANCE`.
+2. Write the `full` body with the channels from "The channel rule".
+   - In `rules` and `status`, `ctx.roll(label, n)` is seeded and gives the
+     same value for the same label within an attempt. Put the trick in the
+     label (`t${index}`) when the roll changes per trick.
+   - In `on`, `ctx.draw(n)` and `ctx.randomCards(seatId, n)` are seeded and
+     numbered per call. `ctx.rules` is the composed rules.
+   - `ctx.camp` is null in the loadout, before the deal.
+   - A `status` part carries no card and reads only the current trick. A
+     new part kind goes in `StatusPart`, `adapter/view-types.ts`'s
+     `ExpeditionStatusPartView` and `packages/schema/src/games/
+     expedition.ts`'s `StatusPartViewSchema`.
+3. A boss also writes a `half` body by hand. It plays when the boss returns
+   as a temple helper. Write the body as a function of its parameter and
+   call it twice, so full and half cannot drift apart.
+4. Add one line to `content/mods/registry.ts`'s `MODS`.
+5. A location that changes with a weather gets a row in
+   `content/mods/pairings.ts`'s `PAIRINGS`. `"never"` keeps the pair off
+   every route. `{ cancels, adds }` drops the named defs from the stack and
+   adds a pairing def, registered like any other with weight 0.
+6. Put each number in one place. A number only this def reads stays in the
+   def. A number two defs share goes in `run/balance.ts` (`RIVER_SHARE`,
+   read by Flooding and Monsoon).
+7. `content/mods/mods.contract.test.ts` covers the def with no edits: its
+   id, kind, name, one sentence and whole weight; a half body if and only
+   if it is a boss; `rules` keys in `HOOK_NAMES`, `on` keys in
+   `ENGINE_EVENT_TYPES`, and `effect` only beside `on`. It forces the def
+   into camp 2's stack and plays the camp with random legal actions at 3, 4
+   and 5 players, at full strength and, for a boss, as a half-strength
+   temple helper. Every step must conserve cards, round-trip through JSON,
+   replay the same, pass the leak check, and keep a status that a later
+   trick's roll does not change. Add one behaviour test beside its kind's
+   (`locations.test.ts`, `weather.test.ts`, `bosses.test.ts`,
+   `disasters.test.ts`, `temple.test.ts`).
+8. Art in `apps/web`. `modArtId` in `components/expedition/phaser/art/
+   art-registry.ts` names a location's backdrop and a boss's sprite.
+   - A location: a 640x360 backdrop at `public/expedition/sprites/
+     locations/bg-<id>.png` and its `LOCATION_ART` entry.
+   - A boss: a sprite at `public/expedition/sprites/bosses/<id>.png` and
+     its size in `BOSS_SIZES`.
+   - Then run `npm run art:files --workspace apps/web` to regenerate
+     `art-files.generated.ts`. `mod-art.test.ts` fails until every location
+     and boss has its file.
+   - The modifier chip draws a 9x9 pixel icon from `ICONS` in
+     `components/expedition/phaser/art/mod-icons.ts`; without one it
+     falls back to its kind's `KIND_ICON`.
+   - The rules modal's Locations, Weather and Bosses pages
+     (`lib/expedition/rules-reference.ts`'s `buildModPages`) list every
+     `MOD_DISPLAY` entry by kind with its art or icon, with no edits.
+   - A boss's caption and one-line rule come from its entry in `READERS`
+     (`lib/expedition/boss-model.ts`). A weather that changes the sky maps
+     its id in `PRECIPITATION` or `HAZE` (`lib/expedition/weather-model.ts`).
+   - A `grants` ability needs a 16x16 icon at `public/expedition/sprites/
+     sources/<id>.png` and the id in `SOURCE_ICON_IDS`, since
+     `SOURCE_DISPLAY` lists it as a source (`source-icons.test.ts`).
+
+**Worked example, a boss with a half body (`content/mods/crocodile.ts`):**
+`body(every)` returns a body with two channels. Its `rules` add a `goals`
+guard that breaks once the seat it faces wins a trick. Its `status` names
+that seat as a `facing` part. The facing seat starts at
+`ctx.roll("start")` and shifts one seat per trick. `full: body(1)` faces
+every trick; `half: body(2)` faces every other one.
+
+**Worked example, slots and grants (`content/mods/temple.ts`):** `slots`
+appends a win-card slot `fixed` on the Sun. `rules` adds the plates goal
+over `platePath`, which rolls `floor(totalTricks / 2) - 1` suits with
+`ctx.roll`, one label `plate{i}` per plate, and ends with the Sun.
+`status` reports the `path` part. `grants` is the Skip: an ability with a `name` and `text`, usable
+`between-tricks` or in `rescue`, whose `crew-tokens` limit earns one token
+when the Sun objective is done. Its key is the def id `temple`, through
+`run/usage.ts`'s `abilityKeys`.
+
+## Add an event
+
+An event waits on every route between two camps. Events have no effect
+yet; the event stage (`run/stages/event.ts`) waits for every seat's
+`ready`.
+
+1. Create `content/events/<id>.ts` exporting `defineEvent({ id, name, text
+   })` (`content/events/event-def.ts`). `text` is one sentence.
+2. Add one line to `content/events/registry.ts`'s `EVENTS`.
+
+Nothing else changes. `run/route.ts`'s `optionsAfter` draws each route's
+event uniformly from `EVENTS`, ids sorted, on the route option's `event`
+stream. Adding an event changes which event a seeded route shows; the other
+route fields draw on their own streams and stay. `adapter/
+catalog-display.ts`'s `EVENT_DISPLAY` projects the name and text, and the
+web shows them on the route card and the event panel
+(`apps/web/lib/expedition/trail-model.ts`). No contract test covers events
+yet.
+
+**Worked example (`content/events/event.ts`):** the one stub,
+`defineEvent({ id: "event", name: "Event", text: "Nothing happens here
+yet." })`, exported as `blankEvent` and registered as `event: blankEvent`.
 
 ## Add a target kind
 
