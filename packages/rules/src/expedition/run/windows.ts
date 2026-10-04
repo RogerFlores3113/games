@@ -1,7 +1,7 @@
 // The timing windows abilities fire in. At most one is open; each is
 // derived from the run, never stored. A gated window holds the table until
-// every seat that can act in it has used or passed: pre-deal holds the deal,
-// rescue holds the settle of a camp failed only by failed objectives.
+// every seat that can act in it has used or passed: rescue holds the settle
+// of a camp failed only by failed objectives.
 
 import { campPhase, checkCampOutcome, currentActorSeatId } from "../camp";
 import { pendingSourceIds } from "./abilities";
@@ -9,7 +9,7 @@ import { rulesFor } from "./compose";
 import type { RunRules } from "./run-rules";
 import type { Catalog, RunState } from "./types";
 
-export type ActiveWindow = "pre-deal" | "objective-pick" | "between-tricks" | "in-trick" | "rescue";
+export type ActiveWindow = "objective-pick" | "between-tricks" | "in-trick" | "rescue";
 
 export type WindowDef = {
   readonly id: ActiveWindow;
@@ -20,26 +20,19 @@ export type WindowDef = {
 };
 
 function playingTrickSize(run: RunState, rules: RunRules): number | null {
-  const camp = run.attempt?.camp ?? null;
-  if (camp === null || campPhase(camp, rules) !== "playing") return null;
+  const camp = run.attempt?.camp;
+  if (camp === undefined || campPhase(camp, rules) !== "playing") return null;
   return camp.currentTrick.plays.length;
 }
 
 const anySeat = () => true;
 
 export const WINDOWS: { readonly [W in ActiveWindow]: WindowDef } = {
-  "pre-deal": {
-    id: "pre-deal",
-    phrase: "Before the deal",
-    gated: true,
-    isOpen: (run) => run.attempt !== null && run.attempt.camp === null,
-    mayAct: anySeat,
-  },
   "objective-pick": {
     id: "objective-pick",
     phrase: "While picking objectives",
     gated: false,
-    isOpen: (run, rules) => run.attempt?.camp != null && campPhase(run.attempt.camp, rules) === "objective-pick",
+    isOpen: (run, rules) => run.attempt !== null && campPhase(run.attempt.camp, rules) === "objective-pick",
     mayAct: anySeat,
   },
   "between-tricks": {
@@ -55,7 +48,7 @@ export const WINDOWS: { readonly [W in ActiveWindow]: WindowDef } = {
     phrase: "On your turn",
     gated: false,
     isOpen: (run, rules) => (playingTrickSize(run, rules) ?? 0) > 0,
-    mayAct: (run, rules, seatId) => currentActorSeatId(run.attempt!.camp!, rules) === seatId,
+    mayAct: (run, rules, seatId) => currentActorSeatId(run.attempt!.camp, rules) === seatId,
   },
   rescue: {
     id: "rescue",
@@ -63,9 +56,8 @@ export const WINDOWS: { readonly [W in ActiveWindow]: WindowDef } = {
     gated: true,
     // Only failed objectives open it; a fired failure check never does.
     isOpen: (run, rules) => {
-      const camp = run.attempt?.camp ?? null;
-      if (camp === null) return false;
-      const outcome = checkCampOutcome(camp, rules);
+      if (run.attempt === null) return false;
+      const outcome = checkCampOutcome(run.attempt.camp, rules);
       return outcome.status === "failed" && outcome.failedObjectiveIds.length > 0 && outcome.firedFailureCheckIds.length === 0;
     },
     mayAct: anySeat,
@@ -75,8 +67,8 @@ export const WINDOWS: { readonly [W in ActiveWindow]: WindowDef } = {
 const WINDOW_ORDER = Object.keys(WINDOWS) as ActiveWindow[];
 
 /** At most one window is open; the isOpen predicates are mutually exclusive
- * by construction (no attempt, undealt, picking, playing with or without
- * plays, decided). */
+ * by construction (no attempt, picking, playing with or without plays,
+ * decided). */
 export function currentWindow(run: RunState, rules: RunRules): ActiveWindow | null {
   return WINDOW_ORDER.find((id) => WINDOWS[id].isOpen(run, rules)) ?? null;
 }

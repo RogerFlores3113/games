@@ -1,18 +1,15 @@
-// The production CATALOG: the six characters (with their upgrades), the
-// thirteen items and the boss twists. buildCatalog flattens every source
+// The production CATALOG: the six characters (with their upgrades) and the
+// thirteen items. buildCatalog flattens every source
 // into one index; tests build their own catalogues through it.
 
 import { CHARACTERS } from "../content/characters/registry";
 import { ITEMS } from "../content/items/registry";
 import type { CharacterDef, ItemDef, SourceDef } from "../content/source-def";
-import { BOSS_REGISTRY } from "../boss/registry";
-import type { BossDef } from "../boss/boss-def";
 import type { Catalog } from "./types";
 
 export function buildCatalog(parts: {
   readonly characters: Readonly<Record<string, CharacterDef>>;
   readonly items: Readonly<Record<string, ItemDef>>;
-  readonly bosses: Readonly<Record<string, BossDef>>;
 }): Catalog {
   const sources: Record<string, SourceDef> = {};
   const add = (def: SourceDef): void => {
@@ -24,7 +21,7 @@ export function buildCatalog(parts: {
     for (const upgrade of character.upgrades) add(upgrade);
   }
   for (const item of Object.values(parts.items)) add(item);
-  return { characters: parts.characters, items: parts.items, bosses: parts.bosses, sources };
+  return { characters: parts.characters, items: parts.items, sources };
 }
 
-export const CATALOG: Catalog = buildCatalog({ characters: CHARACTERS, items: ITEMS, bosses: BOSS_REGISTRY });
+export const CATALOG: Catalog = buildCatalog({ characters: CHARACTERS, items: ITEMS });

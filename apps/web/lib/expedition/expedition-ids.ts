@@ -93,9 +93,9 @@ export function kitObjectId(sourceId: string): string {
   return `kit:${sourceId}`;
 }
 
-/** Using a source in a gated window (before the deal, or a rescue). */
-export function preDealUseObjectId(sourceId: string): string {
-  return `predeal-use:${sourceId}`;
+/** Using a source in a gated window (a rescue). */
+export function gateUseObjectId(sourceId: string): string {
+  return `gate-use:${sourceId}`;
 }
 
 export function interactableObjectId(id: string): string {
@@ -109,7 +109,7 @@ export const SUPPLIES_ID = "supplies";
 export const WHISPER_ID = "whisper";
 export const CONFIRM_ID = "confirm";
 export const CANCEL_ID = "cancel";
-export const PREDEAL_SKIP_ID = "predeal-skip";
+export const GATE_SKIP_ID = "gate-skip";
 export const LAST_TRICK_ID = "last-trick";
 export const NEW_EXPEDITION_ID = "run-end:new-expedition";
 export const LEAVE_ID = "run-end:leave";

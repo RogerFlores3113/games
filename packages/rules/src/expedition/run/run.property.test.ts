@@ -1,5 +1,5 @@
 // Whole-run fast-check simulation properties (RUN-07): arbitrary seeds, 3/4/5
-// players, every boss-twist pairing for camps 3 and 6, random starting camps,
+// players, random starting camps,
 // random characters and kits drawn from the production CATALOG, driven by
 // random bots through driveRun, which applies every step through the real
 // applyRunAction transition (the only dispatcher in the run layer).
@@ -26,7 +26,6 @@ import { campCardIds } from "./toolkit";
 import type { CampNumber, RunState } from "./types";
 import { currentWindow } from "./windows";
 
-const BOSS_IDS = Object.keys(CATALOG.bosses);
 const CHARACTER_IDS = Object.keys(CATALOG.characters);
 const KIT_POOL = [...Object.keys(CATALOG.items), ...Object.values(CATALOG.characters).flatMap((c) => c.upgrades.map((u) => u.id))];
 
@@ -41,15 +40,9 @@ type RunInput = {
   seed: string;
   choices: number[];
   startCamp: CampNumber;
-  bossPair: [string, string];
   characters: Record<string, string>;
   kits: Record<string, string[]>;
 };
-
-// An ordered pair of DISTINCT boss ids, one per boss camp (3, 6): D-03.
-const bossPairArb: fc.Arbitrary<[string, string]> = fc
-  .tuple(fc.constantFrom(...BOSS_IDS), fc.constantFrom(...BOSS_IDS))
-  .filter(([a, b]) => a !== b) as fc.Arbitrary<[string, string]>;
 
 const choicesArb = fc.array(fc.nat({ max: 1000 }), { minLength: 1, maxLength: 64 });
 
@@ -60,7 +53,6 @@ const runInputArb: fc.Arbitrary<RunInput> = fc.constantFrom(3, 4, 5).chain((seat
       seed: fc.string({ minLength: 1 }),
       choices: choicesArb,
       startCamp: fc.constantFrom<CampNumber>(1, 2, 3, 4, 5, 6),
-      bossPair: bossPairArb,
       crew: fc.shuffledSubarray(CHARACTER_IDS, { minLength: seatCount, maxLength: seatCount }),
       picks: fc.tuple(...seatIds.map(() => fc.subarray(KIT_POOL, { maxLength: 4 }))),
     })
@@ -82,7 +74,6 @@ function build(input: RunInput): RunState {
     campNumber: input.startCamp,
     characters: input.characters,
     kits: input.kits,
-    bossTwists: { 3: input.bossPair[0], 6: input.bossPair[1] },
   });
 }
 
@@ -107,7 +98,7 @@ function checkRun(states: readonly RunState[]): void {
       leakViewsChecked++;
     }
 
-    if (state.attempt !== null && state.attempt.camp !== null) {
+    if (state.attempt !== null) {
       const ids = campCardIds(state.attempt.camp);
       expect(new Set(ids).size).toBe(ids.length);
       const key = `${state.campNumber}:${state.attempt.attemptNumber}`;
@@ -166,7 +157,7 @@ describe("property: whole-run simulation (RUN-07)", () => {
 
   it("gives different attempt-1 camp-1 hands for at least one of 20 distinct seed pairs (seed sensitivity, A1)", () => {
     const seatIds = seatIdsFor(4);
-    const handsFor = (seed: string) => advanceTo(setupRun({ seatIds, seed, catalog: CATALOG }), "objective-pick", CATALOG).attempt!.camp!.hands;
+    const handsFor = (seed: string) => advanceTo(setupRun({ seatIds, seed, catalog: CATALOG }), "objective-pick", CATALOG).attempt!.camp.hands;
 
     let sawDifference = false;
     for (let i = 0; i < 20 && !sawDifference; i++) {

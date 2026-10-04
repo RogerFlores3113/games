@@ -79,7 +79,7 @@ describe("toExpeditionPlayerView", () => {
       pool: { balance: 2, max: 3 },
       usage: [
         { sourceId: "botanist", remaining: { kind: "pool", balance: 2, max: 3, cost: 1 } },
-        { sourceId: "rain-poncho", remaining: { kind: "uses", left: 1, of: 1 } },
+        { sourceId: "rain-poncho", remaining: { kind: "uses", left: 2, of: 2 } },
       ],
     });
     expect(seats[1]).toMatchObject({ characterId: "scout", kit: [], pool: null, usage: [{ sourceId: "scout", remaining: { kind: "uses", left: 1, of: 1 } }] });
@@ -89,10 +89,10 @@ describe("toExpeditionPlayerView", () => {
   it("dealt face-up camp: own hand full identity, correct handSizes, objectives carry status, no other seat's card id leaks", () => {
     const seed = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const run = advanceTo(setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG }), "objective-pick", CATALOG);
-    const camp = run.attempt!.camp!;
+    const camp = run.attempt!.camp;
 
     const view = toExpeditionPlayerView(run, "p0", CATALOG);
-    const campView = view.attempt!.camp!;
+    const campView = view.attempt!.camp;
 
     const ownHand = camp.hands.find((h) => h.seatId === "p0")!;
     expect(campView.yourHand.map((c) => c.id).sort()).toEqual(ownHand.cards.map((c) => c.id).sort());
@@ -115,41 +115,19 @@ describe("toExpeditionPlayerView", () => {
     }
   });
 
-  it("Thick Fog: objectiveAssignment is face-down, a viewer sees only its own objectives, an unseated viewer sees none", () => {
-    const seed = "cccccccccccccccccccccccccccccccc";
-    const run = advanceTo(
-      setupRun({
-        seatIds: [...SEATS],
-        seed,
-        catalog: CATALOG,
-        campNumber: 3 as CampNumber,
-        bossTwists: { 3: "blind-orders", 6: null },
-      }),
-      "objective-pick",
-      CATALOG,
-    );
-
-    const view = toExpeditionPlayerView(run, "p0", CATALOG);
-    const campView = view.attempt!.camp!;
-    expect(campView.objectiveAssignment).toBe("face-down");
-    for (const objective of campView.objectives) {
-      expect(objective.ownerSeatId).toBe("p0");
+  it("every viewer, seated or not, sees every objective", () => {
+    const run = advanceTo(setupRun({ seatIds: [...SEATS], seed: "cccccccccccccccccccccccccccccccc", catalog: CATALOG, campNumber: 3 as CampNumber }), "objective-pick", CATALOG);
+    const ids = run.attempt!.camp.objectives.map((o) => o.id);
+    expect(ids).toHaveLength(3);
+    for (const viewer of ["p0", "p1", "spectator"]) {
+      expect(toExpeditionPlayerView(run, viewer, CATALOG).attempt!.camp.objectives.map((o) => o.id)).toEqual(ids);
     }
-
-    const otherObjectiveIds = run.attempt!.camp!.objectives.filter((o) => o.ownerSeatId !== "p0").map((o) => o.id);
-    const json = JSON.stringify(view);
-    for (const id of otherObjectiveIds) {
-      expect(json.includes(id)).toBe(false);
-    }
-
-    const spectatorView = toExpeditionPlayerView(run, "spectator", CATALOG);
-    expect(spectatorView.attempt!.camp!.objectives).toEqual([]);
   });
 
   it("Whisper: only the addressed seat and the sender get the reveal; the public log entry carries no audience key", () => {
     const seed = "dddddddddddddddddddddddddddddddd";
     const setup = advanceTo(setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG }), "between-tricks", CATALOG);
-    const camp0 = setup.attempt!.camp!;
+    const camp0 = setup.attempt!.camp;
     const cardId = camp0.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
 
     const result = applyRunAction(setup, "p0", { type: "whisper", targetSeatId: "p1", cardId }, CATALOG);
@@ -182,14 +160,14 @@ describe("toExpeditionPlayerView", () => {
   it("WR-03: a reveal keeps its recorded fromSeatId after the revealed card is moved to a third seat's hand", () => {
     const seed = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
     const setup = advanceTo(setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG }), "between-tricks", CATALOG);
-    const camp0 = setup.attempt!.camp!;
+    const camp0 = setup.attempt!.camp;
     const cardId = camp0.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
 
     const whispered = applyRunAction(setup, "p0", { type: "whisper", targetSeatId: "p1", cardId }, CATALOG);
     expect(whispered.ok).toBe(true);
     if (!whispered.ok) return;
     const run = whispered.state;
-    const camp = run.attempt!.camp!;
+    const camp = run.attempt!.camp;
 
     const movedCard = camp.hands.find((h) => h.seatId === "p0")!.cards.find((c) => c.id === cardId)!;
     const movedCamp: CampState = {
@@ -217,8 +195,8 @@ describe("toExpeditionPlayerView", () => {
     expect(view.yourSeatId).toBeNull();
     expect(view.yourDraftOffer).toBeNull();
     expect(view.yourAbilities).toEqual([]);
-    expect(view.attempt!.camp!.yourHand).toEqual([]);
-    expect(view.attempt!.camp!.yourLegalCardIds).toEqual([]);
+    expect(view.attempt!.camp.yourHand).toEqual([]);
+    expect(view.attempt!.camp.yourLegalCardIds).toEqual([]);
     expect(view.attempt!.reveals).toEqual([]);
     for (const entry of view.attempt!.log) {
       expect(entry.private).toBe(false);
@@ -228,26 +206,26 @@ describe("toExpeditionPlayerView", () => {
   it("yourLegalCardIds is non-empty only for the current actor while playing, and every id belongs to their own hand", () => {
     const seed = "01234567890123456789012345678901";
     const run = advanceTo(setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG }), "between-tricks", CATALOG);
-    const camp = run.attempt!.camp!;
+    const camp = run.attempt!.camp;
     const actor = currentActorSeatId(camp, rulesFor(run, CATALOG))!;
 
     const actorView = toExpeditionPlayerView(run, actor, CATALOG);
-    expect(actorView.attempt!.camp!.campPhase).toBe("playing");
-    expect(actorView.attempt!.camp!.yourLegalCardIds.length).toBeGreaterThan(0);
+    expect(actorView.attempt!.camp.campPhase).toBe("playing");
+    expect(actorView.attempt!.camp.yourLegalCardIds.length).toBeGreaterThan(0);
     const ownHandIds = camp.hands.find((h) => h.seatId === actor)!.cards.map((c) => c.id);
-    for (const id of actorView.attempt!.camp!.yourLegalCardIds) {
+    for (const id of actorView.attempt!.camp.yourLegalCardIds) {
       expect(ownHandIds).toContain(id);
     }
 
     const nonActor = SEATS.find((s) => s !== actor)!;
     const otherView = toExpeditionPlayerView(run, nonActor, CATALOG);
-    expect(otherView.attempt!.camp!.yourLegalCardIds).toEqual([]);
+    expect(otherView.attempt!.camp.yourLegalCardIds).toEqual([]);
   });
 
   it("yourWhisper: one whisper allowed per camp, spent after sending, null when unseated", () => {
     const seed = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const setup = advanceTo(setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG }), "between-tricks", CATALOG);
-    const cardId = setup.attempt!.camp!.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
+    const cardId = setup.attempt!.camp.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
     expect(toExpeditionPlayerView(setup, "p0", CATALOG).attempt!.yourWhisper).toEqual({ allowed: true, left: 1 });
 
     const sent = applyRunAction(setup, "p0", { type: "whisper", targetSeatId: "p1", cardId }, CATALOG);
@@ -257,14 +235,13 @@ describe("toExpeditionPlayerView", () => {
     expect(toExpeditionPlayerView(sent.state, "watcher", CATALOG).attempt!.yourWhisper).toBeNull();
   });
 
-  it("yourWhisper: Monsoon forbids whispers for every seat", () => {
+  it("yourWhisper: a Rain Poncho gives only its owner one more whisper this camp", () => {
     const seed = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    const run = advanceTo(
-      setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG, campNumber: 3, bossTwists: { 3: "radio-silence", 6: null } }),
-      "between-tricks",
-      CATALOG,
-    );
-    expect(toExpeditionPlayerView(run, "p0", CATALOG).attempt!.yourWhisper).toEqual({ allowed: false, left: 1 });
+    const run = advanceTo(setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG, campNumber: 3, kits: { p0: ["rain-poncho"] } }), "between-tricks", CATALOG);
+    const used = applyRunAction(run, "p0", { type: "use-ability", sourceId: "rain-poncho", targets: [] }, CATALOG);
+    if (!used.ok) throw new Error(used.error);
+    expect(toExpeditionPlayerView(used.state, "p0", CATALOG).attempt!.yourWhisper).toEqual({ allowed: true, left: 2 });
+    expect(toExpeditionPlayerView(used.state, "p1", CATALOG).attempt!.yourWhisper).toEqual({ allowed: true, left: 1 });
   });
 
   it("is pure: two calls return deep-equal views, the input state is unchanged, and the view round-trips through JSON", () => {
@@ -288,22 +265,22 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
 
   it("yourAbilities: a usable ability lists its steps' choices, an unusable one a reason and no steps", () => {
     const run = advanceTo(
-      setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG, characters: { p0: "scout", p1: "signaller" }, kits: { p0: ["rain-poncho"] } }),
+      setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG, characters: { p0: "scout", p1: "signaller" }, kits: { p0: ["rope-ladder"] } }),
       "between-tricks",
       CATALOG,
     );
 
     const abilities = toExpeditionPlayerView(run, "p0", CATALOG).yourAbilities;
 
-    expect(abilities.map((a) => a.sourceId)).toEqual(["scout", "rain-poncho"]);
-    const [scout, poncho] = abilities;
+    expect(abilities.map((a) => a.sourceId)).toEqual(["scout", "rope-ladder"]);
+    const [scout, ladder] = abilities;
     expect(scout).toEqual({
       sourceId: "scout",
       usableNow: true,
       reason: null,
       steps: [{ kind: "hand", prompt: "Pick a teammate's hand", choices: ["hand:p1", "hand:p2"] }],
     });
-    expect(poncho).toEqual({ sourceId: "rain-poncho", usableNow: false, reason: "Usable before the deal", steps: [] });
+    expect(ladder).toEqual({ sourceId: "rope-ladder", usableNow: false, reason: "Usable when an objective fails", steps: [] });
     expect(toExpeditionPlayerView(run, "p1", CATALOG).yourAbilities).toEqual([]);
   });
 
@@ -374,7 +351,7 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
       "between-tricks",
       CATALOG,
     );
-    const before = toExpeditionPlayerView(start, "p0", CATALOG).attempt!.camp!.yourHand;
+    const before = toExpeditionPlayerView(start, "p0", CATALOG).attempt!.camp.yourHand;
     expect(before.every((card) => card.effectiveRank === null)).toBe(true);
 
     const step = toExpeditionPlayerView(start, "p0", CATALOG).yourAbilities.find((a) => a.sourceId === "whetstone")!.steps[0]!;
@@ -383,7 +360,7 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
 
     const view = toExpeditionPlayerView(used.state, "p0", CATALOG);
     const params = view.attempt!.effects[0]!.params as { cardId: string; rank: number };
-    const changed = view.attempt!.camp!.yourHand.filter((card) => card.effectiveRank !== null);
+    const changed = view.attempt!.camp.yourHand.filter((card) => card.effectiveRank !== null);
     expect(changed.map((card) => card.id)).toEqual([params.cardId]);
     expect(changed[0]!.effectiveRank).toBe(params.rank);
     const printed = changed[0]!.identity;
@@ -410,14 +387,14 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
     const start = advanceTo(setupRun({ seatIds: [...SEATS], seed: SEED, catalog: boostCatalog, kits: { p0: ["boost"] } }), "between-tricks", boostCatalog);
     const used = applyRunAction(start, "p0", { type: "use-ability", sourceId: "boost", targets: [] }, boostCatalog);
     if (!used.ok) throw new Error(used.error);
-    const camp = used.state.attempt!.camp!;
+    const camp = used.state.attempt!.camp;
     const rules = rulesFor(used.state, boostCatalog);
     const actor = currentActorSeatId(camp, rules)!;
     const standard = rules.legalPlays(camp, actor).find((card) => card.identity.kind === "standard")!;
     const played = applyRunAction(used.state, actor, { type: "play-card", cardId: standard.id }, boostCatalog);
     if (!played.ok) throw new Error(played.error);
 
-    const play = toExpeditionPlayerView(played.state, "p0", boostCatalog).attempt!.camp!.currentTrick.plays[0]!;
+    const play = toExpeditionPlayerView(played.state, "p0", boostCatalog).attempt!.camp.currentTrick.plays[0]!;
 
     expect(play.card.id).toBe(standard.id);
     expect(standard.identity.kind === "standard" && play.effectiveRank).toBe(standard.identity.kind === "standard" ? standard.identity.rank + 1 : null);
@@ -454,24 +431,11 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
     const rescue = view.attempt!.rescue!;
     expect(rescue.failedObjectiveIds.length).toBeGreaterThan(0);
     for (const id of rescue.failedObjectiveIds) {
-      expect(view.attempt!.camp!.objectives.find((o) => o.id === id)!.status).toBe("failed");
+      expect(view.attempt!.camp.objectives.find((o) => o.id === id)!.status).toBe("failed");
     }
     expect(view.yourAbilities.find((a) => a.sourceId === "medic")!.usableNow).toBe(true);
 
     const between = advanceTo(setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG }), "between-tricks", CATALOG);
     expect(toExpeditionPlayerView(between, "p0", CATALOG).attempt!.rescue).toBeNull();
-  });
-
-  it("attempt.window and pendingSeatIds report the pre-deal window", () => {
-    const run = advanceTo(
-      setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG, campNumber: 3, bossTwists: { 3: "eclipse", 6: null }, kits: { p1: ["rain-poncho"] } }),
-      "pre-deal",
-      CATALOG,
-    );
-    const view = toExpeditionPlayerView(run, "p0", CATALOG);
-    expect(view.runPhase).toBe("pre-deal");
-    expect(view.attempt!.window).toBe("pre-deal");
-    expect(view.attempt!.pendingSeatIds).toEqual(["p1"]);
-    expect(view.attempt!.camp).toBeNull();
   });
 });

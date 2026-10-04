@@ -4,7 +4,7 @@ import {
   CANCEL_ID,
   CONFIRM_ID,
   LAST_TRICK_ID,
-  PREDEAL_SKIP_ID,
+  GATE_SKIP_ID,
   READY_ID,
   SUIT_GLYPH,
   WHISPER_ID,
@@ -16,7 +16,7 @@ import {
   mateSourceObjectId,
   sourceObjectId,
   objectiveObjectId,
-  preDealUseObjectId,
+  gateUseObjectId,
   rankLabel,
   revealObjectId,
   seatObjectId,
@@ -110,14 +110,14 @@ describe("objectiveObjectId", () => {
   });
 });
 
-describe("seat/source/draft/kit/predeal/interactable object ids", () => {
+describe("seat/source/draft/kit/gate/interactable object ids", () => {
   it("build the expected prefixed ids", () => {
     expect(seatObjectId("s1")).toBe("seat:s1");
     expect(sourceObjectId("scout")).toBe("source:scout");
     expect(mateSourceObjectId("s2", "bait")).toBe("seat-source:s2:bait");
     expect(draftObjectId("guide")).toBe("draft:guide");
     expect(kitObjectId("rain-poncho")).toBe("kit:rain-poncho");
-    expect(preDealUseObjectId("jam")).toBe("predeal-use:jam");
+    expect(gateUseObjectId("jam")).toBe("gate-use:jam");
     expect(interactableObjectId("campfire")).toBe("interactable:campfire");
   });
 });
@@ -128,7 +128,7 @@ describe("fixed id constants", () => {
     expect(WHISPER_ID).toBe("whisper");
     expect(CONFIRM_ID).toBe("confirm");
     expect(CANCEL_ID).toBe("cancel");
-    expect(PREDEAL_SKIP_ID).toBe("predeal-skip");
+    expect(GATE_SKIP_ID).toBe("gate-skip");
     expect(LAST_TRICK_ID).toBe("last-trick");
   });
 });

@@ -1,5 +1,5 @@
-import type { ExpeditionActiveWindow, ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionObjectiveView, ExpeditionTargetKind, ExpeditionView } from "@games/rules";
-import { BOSS_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
+import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionObjectiveView, ExpeditionTargetKind, ExpeditionView } from "@games/rules";
+import { SOURCE_DISPLAY } from "@games/rules";
 import type { CardPackId } from "./card-pack-ids";
 import {
   cardLabel,
@@ -56,11 +56,10 @@ export interface SceneServerInput {
 
 export type SceneKey = "camp" | "fireside" | "run-end";
 
-/** The top bar's three readouts, shared by the camp and fireside scenes. */
+/** The top bar's readouts, shared by the camp and fireside scenes. */
 export interface TopBar {
   supplies: number;
   camp: string;
-  boss: { text: string; dim: boolean } | null;
   /** The supply crates as an ability target (Field Kit); null outside
    * targeting. */
   suppliesPick: PickState | null;
@@ -84,8 +83,6 @@ export interface Tooltip {
 
 export const BOSS_CAMP_NUMBERS: readonly number[] = [3, 6];
 export const FINAL_CAMP_NUMBER = 6;
-
-export type BossEffect = "rain" | "dark-sky" | "none";
 
 export interface CardModel {
   id: string;
@@ -198,8 +195,8 @@ export interface TrayOption {
 
 /** A gated window the table waits on: before the deal, or a rescue after
  * an objective fails. `uses` are your abilities that answer it. */
+/** The rescue window's sign: what failed, and who may still answer it. */
 export interface Banner {
-  window: ExpeditionActiveWindow;
   title: string;
   detail: string;
   youPending: boolean;
@@ -219,7 +216,6 @@ export interface SceneModel {
   runPhase: ExpeditionView["runPhase"];
   campNumber: number;
   supplies: number;
-  bossTwist: { id: string; name: string; effect: BossEffect; cancelled: boolean } | null;
   topBar: TopBar;
   seats: SeatModel[];
   hand: CardModel[];
@@ -480,11 +476,7 @@ function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: Lo
   });
 }
 
-function whisperStatus(
-  view: ExpeditionView,
-  bossTwist: SceneModel["bossTwist"],
-  active: boolean,
-): SceneModel["whisper"] {
+function whisperStatus(view: ExpeditionView, active: boolean): SceneModel["whisper"] {
   const camp = view.attempt?.camp ?? null;
   const shown = view.yourSeatId !== null && camp !== null && camp.campPhase === "playing";
   const mine = view.attempt?.yourWhisper ?? { allowed: true, left: 1 };
@@ -492,7 +484,7 @@ function whisperStatus(
   let reason: string | null = null;
   if (!mine.allowed) {
     state = "blocked";
-    reason = bossTwist !== null && !bossTwist.cancelled ? `Blocked: ${bossTwist.name}` : "Blocked right now";
+    reason = "Blocked right now";
   } else if (mine.left === 0) {
     state = "used";
     reason = "Used this camp";
@@ -557,30 +549,11 @@ function buildLastTrick(camp: ExpeditionCampView | null, ui: LocalUiState): Scen
   };
 }
 
-function buildBossTwist(view: ExpeditionView): SceneModel["bossTwist"] {
-  if (view.activeBossTwistId === null) return null;
-  const id = view.activeBossTwistId;
-  const display = BOSS_DISPLAY[id];
-  let effect: BossEffect = "none";
-  if (id === "radio-silence") effect = "rain";
-  else if (id === "eclipse") effect = "dark-sky";
-  return {
-    id,
-    name: display?.name ?? id,
-    effect,
-    cancelled: view.attempt?.bossCancelled ?? false,
-  };
-}
-
-function buildTopBar(view: ExpeditionView, bossTwist: SceneModel["bossTwist"], ui: LocalUiState): TopBar {
+function buildTopBar(view: ExpeditionView, ui: LocalUiState): TopBar {
   const camp = BOSS_CAMP_NUMBERS.includes(view.campNumber)
     ? `Camp ${view.campNumber} of ${FINAL_CAMP_NUMBER} - Boss camp`
     : `Camp ${view.campNumber} of ${FINAL_CAMP_NUMBER}`;
-  const boss =
-    bossTwist === null
-      ? null
-      : { text: bossTwist.cancelled ? `Boss: ${bossTwist.name} (off)` : `Boss: ${bossTwist.name}`, dim: bossTwist.cancelled };
-  return { supplies: view.supplies, camp, boss, suppliesPick: pickOrNull(ui, view, "supplies") };
+  return { supplies: view.supplies, camp, suppliesPick: pickOrNull(ui, view, "supplies") };
 }
 
 function buildTooltip(server: SceneServerInput, ui: LocalUiState): Tooltip | null {
@@ -623,24 +596,17 @@ function objectiveName(o: ExpeditionObjectiveView, view: ExpeditionView, roomSea
 }
 
 function buildBanner(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiState): Banner | null {
-  const window = view.attempt?.window ?? null;
-  if (window !== "pre-deal" && window !== "rescue") return null;
+  if (view.attempt?.window !== "rescue") return null;
   const pending = view.attempt?.pendingSeatIds ?? [];
   const you = view.yourSeatId;
   const youPending = you !== null && pending.includes(you);
   const uses = youPending
     ? view.yourAbilities
-        .filter((a) => a.usableNow && SOURCE_DISPLAY[a.sourceId]?.active?.window === window)
+        .filter((a) => a.usableNow && SOURCE_DISPLAY[a.sourceId]?.active?.window === "rescue")
         .map((a) => sourceChipFor(a.sourceId, you, view, ui))
     : [];
   const others = pending.filter((id) => id !== you).map((id) => roomSeatFor(roomSeats, id).displayLabel);
-  const waiting = others.length === 0 ? "" : `Waiting on ${others.join(" and ")}`;
   const useNames = uses.map((u) => u.name).join(" or ");
-
-  if (window === "pre-deal") {
-    const detail = youPending ? `You can use ${useNames} now, or skip` : waiting || "Dealing the cards";
-    return { window, title: "Before the deal", detail, youPending, uses };
-  }
   const objectives = view.attempt?.camp?.objectives ?? [];
   const failed = (view.attempt?.rescue?.failedObjectiveIds ?? []).flatMap((id) => {
     const o = objectives.find((x) => x.id === id);
@@ -650,7 +616,7 @@ function buildBanner(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalU
   const detail = youPending
     ? `You can rescue it with ${useNames}${others.length === 0 ? "" : `. ${others.join(" and ")} can too`}`
     : `${others.join(" or ")} can rescue it. Waiting on them`;
-  return { window, title, detail: youPending || others.length !== 1 ? detail : `Waiting on ${others[0]} to rescue it or pass`, youPending, uses };
+  return { title, detail: youPending || others.length !== 1 ? detail : `Waiting on ${others[0]} to rescue it or pass`, youPending, uses };
 }
 
 function trickLabel(index: number): string {
@@ -716,11 +682,10 @@ export function buildSceneModel(
   const hand = buildHand(camp, view, ui);
   const trick = buildTrick(camp, view, ui);
   const lastTrick = buildLastTrick(camp, ui);
-  const bossTwist = buildBossTwist(view);
   const faceUpObjectives = objectivesForOwner(camp, null, view, ui);
   const removedCardLabels = (camp?.removedCards ?? []).map((identity) => cardLabel(identity));
 
-  const whisper = whisperStatus(view, bossTwist, ui.targeting?.mode === "whisper");
+  const whisper = whisperStatus(view, ui.targeting?.mode === "whisper");
   const prompt = buildPrompt(view, roomSeats, ui, { reconnecting, whisperAvailable: whisper.visible });
 
   const drag =
@@ -740,8 +705,7 @@ export function buildSceneModel(
     runPhase: view.runPhase,
     campNumber: view.campNumber,
     supplies: view.supplies,
-    bossTwist,
-    topBar: buildTopBar(view, bossTwist, ui),
+    topBar: buildTopBar(view, ui),
     seats,
     hand,
     trick,

@@ -43,12 +43,8 @@ const CANCEL_ID = "cancel";
 const CONFIRM_ID = "confirm";
 const READY_ID = "ready";
 const LAST_TRICK_ID = "last-trick";
-const PREDEAL_SKIP_ID = "predeal-skip";
+const GATE_SKIP_ID = "gate-skip";
 const NEW_EXPEDITION_ID = "run-end:new-expedition";
-
-/** Rain Poncho, the only pre-deal item, opens the pre-deal window at the
- * boss camps 3 and 6. */
-const TOUR_DRAFT_PREFERENCE = ["rain-poncho", ...DRAFT_PREFERENCE];
 
 /** Phases scripted play reaches often enough to keep starting new runs for. */
 const WANTED = [
@@ -57,7 +53,7 @@ const WANTED = [
   "run-end-lost", "run-end-guest",
 ];
 /** Phases play rarely reaches; each is also captured from a rewritten view. */
-const RARE = ["predeal-ability", "run-end-won", "between-camps-draft"];
+const RARE = ["run-end-won", "between-camps-draft"];
 
 interface Identity { kind: "standard" | "joker"; suit?: string; rank?: number; joker?: "sun" | "moon" }
 interface Card { id: string; objectId: string; label: string; identity: Identity; playable: boolean }
@@ -131,7 +127,7 @@ async function fireside(page: Page, tour: Tour | null): Promise<void> {
     await hoverObject(page, offer[0]!.objectId);
     await tour?.shot(names.draft);
     await page.mouse.move(5, 5);
-    const pick = pickDraftOffer(offer, TOUR_DRAFT_PREFERENCE);
+    const pick = pickDraftOffer(offer, DRAFT_PREFERENCE);
     model = await clickUntilChanged<FiresideView>(page, pick.objectId, (m) => draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
   }
   if ((await getScene(page)) !== "fireside" || isReady(model)) return;
@@ -212,7 +208,7 @@ async function peekTargeting(page: Page, tour: Tour, openId: string, name: strin
 async function captureHostState(host: Page, tour: Tour): Promise<void> {
   const m = await getModel<CampModel>(host);
   if (m.sceneKey !== "camp") return;
-  if (m.banner?.youPending) await tour.shot(m.banner.window === "rescue" ? "rescue-played" : "predeal-ability");
+  if (m.banner?.youPending) await tour.shot("rescue-played");
   if (m.faceUpObjectives.some((o) => o.pickable)) await tour.shot("objective-pick");
   const plays = m.trick?.plays.length ?? 0;
   if (plays >= 1) await tour.shot("trick-led");
@@ -259,8 +255,8 @@ async function stepPage(page: Page, isHost: boolean, tour: Tour): Promise<void> 
   if (!you) return;
 
   if (model.banner?.youPending) {
-    if (isHost) await tour.shot(model.banner.window === "rescue" ? "rescue-played" : "predeal-ability");
-    await clickUntilChanged<CampModel>(page, PREDEAL_SKIP_ID, (m) => !(m.banner?.youPending ?? false));
+    if (isHost) await tour.shot("rescue-played");
+    await clickUntilChanged<CampModel>(page, GATE_SKIP_ID, (m) => !(m.banner?.youPending ?? false));
     return;
   }
   if (you.mayAct) {
@@ -359,35 +355,6 @@ const h = (campNumber: number, attemptNumber: number, status: "succeeded" | "fai
   suppliesSpent: status === "failed" ? 1 : 0,
 });
 
-/** Pre-deal at boss camp 3 with your Rain Poncho waiting on you. */
-function preDealView(game: Game): Game {
-  const poncho = { sourceId: "rain-poncho", remaining: { kind: "uses", left: 1, of: 1 } };
-  return {
-    ...game,
-    runPhase: "pre-deal",
-    campNumber: 3,
-    supplies: 2,
-    activeBossTwistId: "radio-silence",
-    bossTwists: { camp3: "radio-silence", camp6: null },
-    seats: game.seats.map((s) => ({ ...s, kit: s.seatId === game.yourSeatId ? ["rain-poncho"] : [], usage: s.seatId === game.yourSeatId ? [poncho] : [], ready: false, draftPending: false })),
-    yourDraftOffer: null,
-    yourAbilities: [{ sourceId: "rain-poncho", usableNow: true, reason: null, steps: [] }],
-    history: [h(1, 1, "succeeded"), h(2, 1, "succeeded")],
-    attempt: {
-      attemptNumber: 1,
-      bossCancelled: false,
-      window: "pre-deal",
-      pendingSeatIds: [game.yourSeatId],
-      rescue: null,
-      effects: [],
-      reveals: [],
-      log: [],
-      yourWhisper: { allowed: false, left: 1 },
-      camp: null,
-    },
-  };
-}
-
 function wonView(game: Game): Game {
   return {
     ...game,
@@ -416,7 +383,7 @@ async function capturePickers(host: Page, tour: Tour, rewrite: Rewriter): Promis
     if (kind === "card") await tour.shot("in-trick-affordance");
     if (kind === "failed-objective") {
       await tour.shot("rescue-you");
-      await clickUntilChanged<CampModel>(host, `predeal-use:${scenario.sourceId}`, (m) => m.targeting !== null);
+      await clickUntilChanged<CampModel>(host, `gate-use:${scenario.sourceId}`, (m) => m.targeting !== null);
     } else {
       await clickUntilChanged<CampModel>(host, `source:${scenario.sourceId}`, (m) => m.targeting !== null);
     }
@@ -445,12 +412,6 @@ async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<v
     await host.reload();
     await waitForScene(host, "fireside", 30_000);
     await tour.shot("between-camps-draft-rewritten");
-  }
-  if (!tour.has("predeal-ability")) {
-    rewrite.current = preDealView as (g: Game) => Game;
-    await host.reload();
-    await host.waitForFunction(() => (window.__expeditionTest?.model as { banner?: { youPending: boolean } } | null)?.banner?.youPending === true);
-    await tour.shot("predeal-ability-rewritten");
   }
   if (!tour.has("run-end-won")) {
     rewrite.current = wonView as (g: Game) => Game;
@@ -486,7 +447,6 @@ test.describe("@tour Expedition UI tour", () => {
       } finally {
         const notes: string[] = [];
         if (!tour.has("between-camps-draft")) notes.push(`no camp was cleared in ${outcomes.length} run(s), so the fireside after a cleared camp was not reached`);
-        if (!tour.has("predeal-ability")) notes.push("no run reached boss camp 3 with Rain Poncho in a kit; predeal-ability-rewritten shows that window from a rewritten view");
         if (!tour.has("run-end-won")) notes.push("no run was won; run-end-won-rewritten shows the won screen from a rewritten view");
         const total = tour.write({
           size: size.name,

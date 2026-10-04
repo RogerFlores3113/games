@@ -19,8 +19,6 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     runStatus: "in_progress",
     campNumber: 2,
     supplies: 3,
-    bossTwists: { camp3: null, camp6: null },
-    activeBossTwistId: null,
     seats: [
       { seatId: "s1", characterId: "scout", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
       { seatId: "s2", characterId: "guide", kit: ["trained-monkey"], ready: false, draftPending: false, pool: null, usage: [] },
@@ -48,13 +46,7 @@ function seatsWith(you: Partial<ExpeditionView["seats"][number]>): ExpeditionVie
 
 describe("topBar", () => {
   it("names the camp about to start", () => {
-    expect(buildFiresideModel(server(makeView()), ui()).topBar).toEqual({ supplies: 3, camp: "Camp 2 of 6", boss: null, suppliesPick: null });
-  });
-
-  it("previews a boss camp, by name once the twist is revealed", () => {
-    expect(buildFiresideModel(server(makeView({ campNumber: 3 })), ui()).topBar.boss).toEqual({ text: "Boss camp ahead", dim: false });
-    const revealed = makeView({ campNumber: 3, bossTwists: { camp3: "radio-silence", camp6: null } });
-    expect(buildFiresideModel(server(revealed), ui()).topBar.boss).toEqual({ text: "Boss ahead: Monsoon", dim: false });
+    expect(buildFiresideModel(server(makeView()), ui()).topBar).toEqual({ supplies: 3, camp: "Camp 2 of 6", suppliesPick: null });
   });
 });
 
@@ -105,8 +97,8 @@ describe("draft", () => {
           name: "Rain Poncho",
           kind: "item",
           ribbon: "Item",
-          text: "Cancel this camp's boss twist, and nobody may whisper this camp.",
-          badges: ["Before the deal", "Once per run"],
+          text: "Whisper once more this camp.",
+          badges: ["Between tricks", "2 per run"],
         },
       ],
     });
@@ -239,8 +231,8 @@ describe("tooltip", () => {
     const poncho = buildFiresideModel(server(makeView({ yourDraftOffer: ["rain-poncho"] })), ui({ tooltipSourceId: "rain-poncho" })).tooltip;
     expect(poncho).toEqual({
       title: "Rain Poncho",
-      text: "Cancel this camp's boss twist, and nobody may whisper this camp.",
-      badges: ["Before the deal", "Once per run"],
+      text: "Whisper once more this camp.",
+      badges: ["Between tricks", "2 per run"],
       reason: null,
     });
     expect(buildFiresideModel(server(makeView()), ui()).tooltip).toBeNull();

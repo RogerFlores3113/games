@@ -2,10 +2,9 @@
 // point the adapter wraps: muster (pick-character), the fireside (pick-draft,
 // ready), abilities and window passes, whisper, and the two camp actions
 // (pick-objective, play-card) all flow through this single function, and
-// `advanceRun` (lifecycle.ts) runs after every accepted action. That is what
-// settles a camp decided mid-action (a play, or an ability like Camouflage
-// removing the last open objective) and deals once the pre-deal wait
-// clears, all in the SAME call.
+// `settleIfDecided` (lifecycle.ts) runs after every accepted action. That is
+// what settles a camp decided mid-action (a play, or an ability like
+// Camouflage removing the last open objective) in the SAME call.
 //
 // GUARD ORDER (T-10-24): typeof action !== "object" or null, or an unknown
 // `type` (including any hand-forged "undo": there is no undo action anywhere
@@ -26,7 +25,7 @@
 import { applyCampAction } from "../actions";
 import { rulesFor } from "./compose";
 import { passWindow, useAbility } from "./abilities";
-import { advanceRun, runPhase, runStatus, startAttempt } from "./lifecycle";
+import { runPhase, runStatus, settleIfDecided, startAttempt } from "./lifecycle";
 import { applyWhisper } from "./whisper";
 import type { AdapterResult } from "../../adapter";
 import type { Catalog, RunAction, RunError, RunState } from "./types";
@@ -35,15 +34,15 @@ function err(error: RunError): AdapterResult<RunState, RunError> {
   return { ok: false, error };
 }
 
-/** Every accepted-handler exit point routes through here so advanceRun
- * (settle-then-deal) always runs exactly once per accepted action, whatever
- * handler produced the new state. */
+/** Every accepted-handler exit point routes through here so settleIfDecided
+ * always runs exactly once per accepted action, whatever handler produced
+ * the new state. */
 function accept(next: RunState, catalog: Catalog): AdapterResult<RunState, RunError> {
-  return { ok: true, state: advanceRun(next, catalog) };
+  return { ok: true, state: settleIfDecided(next, catalog) };
 }
 
 /** Re-wraps a delegate's own AdapterResult (abilities, whisper) through the
- * same advanceRun pass every other accepted action gets — an ability can
+ * same settleIfDecided pass every other accepted action gets — an ability can
  * decide a camp (e.g. Camouflage removing the last open objective) just as
  * a play can. */
 function delegated(result: AdapterResult<RunState, RunError>, catalog: Catalog): AdapterResult<RunState, RunError> {
@@ -86,12 +85,7 @@ function handleReady(run: RunState, actorSeatId: string, catalog: Catalog): Adap
   const readySeatIds = [...run.readySeatIds, actorSeatId];
   const next: RunState = { ...run, readySeatIds };
 
-  if (run.seatIds.every((id) => readySeatIds.includes(id))) {
-    // startAttempt itself ends by calling advanceRun (lifecycle.ts) — do not
-    // wrap a second advanceRun call around its result.
-    return { ok: true, state: startAttempt(next, catalog) };
-  }
-  return accept(next, catalog);
+  return accept(run.seatIds.every((id) => readySeatIds.includes(id)) ? startAttempt(next, catalog) : next, catalog);
 }
 
 function handleCampAction(
@@ -101,8 +95,8 @@ function handleCampAction(
   catalog: Catalog,
 ): AdapterResult<RunState, RunError> {
   if (runPhase(run) !== "camp") return err("wrong_phase");
-  const attempt = run.attempt!; // runPhase === "camp" guarantees attempt.camp !== null
-  const camp = attempt.camp!;
+  const attempt = run.attempt!;
+  const camp = attempt.camp;
   const rules = rulesFor(run, catalog);
 
   const result = applyCampAction(camp, actorSeatId, action, rules);
@@ -112,7 +106,7 @@ function handleCampAction(
 }
 
 /** The single run-level transition. Dispatches every `RunAction` type after
- * three guards (invalid_action, not_a_seat, run_over); calls `advanceRun`
+ * three guards (invalid_action, not_a_seat, run_over); calls `settleIfDecided`
  * after every accepted action; never mutates `run`. */
 export function applyRunAction(
   run: RunState,

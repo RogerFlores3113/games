@@ -18,7 +18,6 @@ function camp(over: Partial<Camp> = {}): Camp {
     expeditionLeaderSeatId: "a",
     totalTricks: 10,
     removedCards: [],
-    objectiveAssignment: "face-up",
     objectives: [objective("o1", "pending")],
     yourHand: [],
     yourLegalCardIds: [],
@@ -38,15 +37,12 @@ function game(over: Partial<ExpeditionView> = {}, campOver: Partial<Camp> = {}, 
     runStatus: "in_progress",
     campNumber: 1,
     supplies: 5,
-    bossTwists: { camp3: null, camp6: null },
-    activeBossTwistId: null,
     seats: [{ seatId: "a", characterId: "scout", kit: [], ready: true, draftPending: false, pool: null, usage: [] }],
     yourDraftOffer: null,
     yourAbilities: [],
     history: [],
     attempt: {
       attemptNumber: 1,
-      bossCancelled: false,
       window: null,
       pendingSeatIds: [],
       rescue: null,
@@ -84,9 +80,8 @@ describe("cuesFor", () => {
   });
 
   it("plays card-deal when a camp attempt begins, and again on a retry", () => {
-    const pre = game({ runPhase: "pre-deal" });
-    pre.attempt!.camp = null;
-    expect(cuesFor(pre, game())).toEqual(["sfx-card-deal"]);
+    const fireside = game({ runPhase: "fireside", attempt: null });
+    expect(cuesFor(fireside, game())).toEqual(["sfx-card-deal"]);
 
     const retry = game();
     retry.attempt!.attemptNumber = 2;

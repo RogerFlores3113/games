@@ -1,4 +1,4 @@
-import { BOSS_DISPLAY, SOURCE_DISPLAY, type ExpeditionView } from "@games/rules";
+import { SOURCE_DISPLAY, type ExpeditionView } from "@games/rules";
 import { characterName, sourceBadges, sourceName } from "./source-text";
 
 export interface RulesItem {
@@ -7,13 +7,13 @@ export interface RulesItem {
 }
 
 export interface RulesSection {
-  id: "goal" | "tricks" | "objectives" | "whisper" | "explorers" | "kit" | "this-camp";
+  id: "goal" | "tricks" | "objectives" | "whisper" | "explorers" | "kit";
   heading: string;
   paragraphs: string[];
   items: RulesItem[];
 }
 
-type RulesView = Pick<ExpeditionView, "seats" | "yourSeatId" | "activeBossTwistId" | "campNumber">;
+type RulesView = Pick<ExpeditionView, "seats" | "yourSeatId">;
 
 function kitSection(view: RulesView | null): RulesSection {
   const you = view?.seats.find((s) => s.seatId === view.yourSeatId);
@@ -28,16 +28,6 @@ function kitSection(view: RulesView | null): RulesSection {
   }
   if (items.length === 0) paragraphs.push("You have not picked a character yet.");
   return { id: "kit", heading: "Your kit", paragraphs, items };
-}
-
-function campSection(view: RulesView | null): RulesSection {
-  const boss = view?.activeBossTwistId ? BOSS_DISPLAY[view.activeBossTwistId] : undefined;
-  return {
-    id: "this-camp",
-    heading: "This camp",
-    paragraphs: boss ? [] : ["No boss twist this camp."],
-    items: boss ? [{ label: boss.name, body: boss.text }] : [],
-  };
 }
 
 export function buildRulesReference(view: ExpeditionView | null): RulesSection[] {
@@ -98,6 +88,5 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       ],
     },
     kitSection(view),
-    campSection(view),
   ];
 }

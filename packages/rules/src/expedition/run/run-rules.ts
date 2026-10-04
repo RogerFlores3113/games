@@ -3,11 +3,11 @@
 // LABELED DEVIATION: RunRules lives BESIDE CoreRules (a `CoreRules &
 // RunHooks` intersection) rather than being folded into rules.ts's own
 // CoreRules type. This keeps Core (rules.ts) importing nothing from run/,
-// so the Core layer never names a boss or source id (per rules.ts's own
+// so the Core layer never names a source id (per rules.ts's own
 // header contract).
 //
 // COMPOSITION ORDER (spec §6.1, "each hook receives the previous layer's
-// answer"): base -> boss twist -> live passives (seat order, then each
+// answer"): base -> live passives (seat order, then each
 // seat's [character, ...kit] order) -> active effects (in the order they
 // were added).
 // A RuleModifier is a function from the previous layer's hook to this
@@ -17,7 +17,7 @@
 // Rules are RECOMPUTED on every call and are NEVER cached: RunState is
 // plain JSON data (ActiveEffect entries, not stored functions), so a
 // composed RunRules value is always rebuilt fresh from that data via each
-// source's `passive.modifier`/`active.effect` and each BossDef's `modifiers`. This is
+// source's `passive.modifier`/`active.effect`. This is
 // what lets Phase 11 persist RunState with no special-casing of "live"
 // rule objects.
 
@@ -28,7 +28,6 @@ export type RunHooks = {
   whisperAllowed(run: RunState, seatId: string): boolean;
   whisperAudience(run: RunState, seatId: string, targetSeatId: string): readonly string[];
   whispersPerCamp(run: RunState, seatId: string): number;
-  objectiveAssignment(run: RunState): "face-up" | "face-down";
   failureCost(run: RunState): number;
 };
 
@@ -54,7 +53,6 @@ const HOOK_NAME_SET: Record<HookName, true> = {
   whisperAllowed: true,
   whisperAudience: true,
   whispersPerCamp: true,
-  objectiveAssignment: true,
   failureCost: true,
 };
 
@@ -69,9 +67,6 @@ export const baseRunHooks: RunHooks = {
   },
   whispersPerCamp(_run, _seatId) {
     return 1;
-  },
-  objectiveAssignment(_run) {
-    return "face-up";
   },
   failureCost(_run) {
     return 1;

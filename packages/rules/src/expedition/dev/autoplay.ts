@@ -38,7 +38,7 @@ function candidates(run: RunState, seatIds: readonly string[], catalog: Catalog)
   }
 
   const camp = run.attempt?.camp;
-  if (phase === "camp" && camp !== undefined && camp !== null) {
+  if (phase === "camp" && camp !== undefined) {
     const actor = currentActorSeatId(camp, rulesFor(run, catalog));
     if (actor !== null && seatIds.includes(actor)) {
       const unowned = camp.objectives.find((o) => o.ownerSeatId === null);

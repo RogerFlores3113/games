@@ -33,8 +33,12 @@
  * decision: reset on deploy, no migration).
  *
  * Bumped to 6 when Expedition's gear gave way to characters, upgrades and
- * items: a persisted run with gear-shaped seats resets to an empty lobby. */
-export const ROOM_SCHEMA_VERSION = 6;
+ * items: a persisted run with gear-shaped seats resets to an empty lobby.
+ *
+ * Bumped to 7 when Expedition dropped its boss twists, face-down objectives
+ * and the pre-deal window; each later Expedition redesign unit that changes
+ * the persisted run bumps it again. */
+export const ROOM_SCHEMA_VERSION = 7;
 
 /** D-01: 32 uppercase-safe characters — no `I`, `O`, `0`, `1` — because the
  * room code is read aloud over a voice call. Do not add lowercase. */

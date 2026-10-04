@@ -12,9 +12,7 @@
 //   - own hand, full identity: `camp.yourHand`
 //   - other hands as SIZES only, never identities: `camp.handSizes` (no
 //     `cards` key for any other seat, anywhere in this file)
-//   - objectives per assignment mode: `camp.objectiveAssignment` +
-//     `camp.objectives` (face-down mode already filtered to owned-by-viewer
-//     before this type is populated — Plan 11-03's job, not this file's)
+//   - every objective, public: `camp.objectives`
 //   - audience-filtered reveals and log: `attempt.reveals`, `attempt.log`
 //     (never carries an `audience` key — see (c))
 //   - public characters, kits, pools and usage: `seats[]`
@@ -140,7 +138,6 @@ export type ExpeditionCampView = {
   expeditionLeaderSeatId: string;
   totalTricks: number;
   removedCards: ExpeditionCardIdentityView[];
-  objectiveAssignment: "face-up" | "face-down";
   // Deliberately no `objectiveDeck` key: the undrawn objective deck order
   // must never be projected.
   objectives: ExpeditionObjectiveView[];
@@ -155,16 +152,15 @@ export type ExpeditionCampView = {
 
 export type ExpeditionAttemptView = {
   attemptNumber: number;
-  bossCancelled: boolean;
   window: ActiveWindow | null;
-  /** Seats the open gated window (pre-deal or rescue) waits on. */
+  /** Seats the open gated window (rescue) waits on. */
   pendingSeatIds: string[];
-  /** Set while the rescue window holds a failed camp open; visible objectives only. */
+  /** Set while the rescue window holds a failed camp open. */
   rescue: { failedObjectiveIds: string[] } | null;
   effects: ExpeditionEffectView[];
   reveals: ExpeditionRevealView[];
   log: ExpeditionLogEntryView[];
-  camp: ExpeditionCampView | null;
+  camp: ExpeditionCampView;
   /** The viewer's own Whisper allowance this camp; null when unseated. */
   yourWhisper: { allowed: boolean; left: number } | null;
 };
@@ -200,12 +196,10 @@ export type ExpeditionCampResultView = { campNumber: number; attemptNumber: numb
 // never be projected to any client (T-11-03).
 export type ExpeditionView = {
   yourSeatId: string | null;
-  runPhase: "muster" | "fireside" | "pre-deal" | "camp" | "ended";
+  runPhase: "muster" | "fireside" | "camp" | "ended";
   runStatus: "in_progress" | "won" | "lost";
   campNumber: number;
   supplies: number;
-  bossTwists: { camp3: string | null; camp6: string | null };
-  activeBossTwistId: string | null;
   seats: ExpeditionSeatView[];
   yourDraftOffer: string[] | null;
   yourAbilities: ExpeditionAbilityView[];

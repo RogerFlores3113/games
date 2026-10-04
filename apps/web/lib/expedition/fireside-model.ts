@@ -1,5 +1,5 @@
 import type { ExpeditionView } from "@games/rules";
-import { BOSS_DISPLAY, CHARACTER_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
+import { CHARACTER_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
 import type { Prompt } from "./build-prompt";
 import { buildFiresidePrompt } from "./build-prompt";
 import type { SceneServerInput, Tooltip, TopBar } from "./build-scene-model";
@@ -101,18 +101,8 @@ function liveSourceIds(seat: ExpeditionView["seats"][number]): string[] {
   return seat.characterId === null ? [...seat.kit] : [seat.characterId, ...seat.kit];
 }
 
-function bossFor(view: ExpeditionView, campNumber: number): string | null {
-  if (campNumber === 3) return view.bossTwists.camp3;
-  if (campNumber === 6) return view.bossTwists.camp6;
-  return null;
-}
-
 function buildTopBar(view: ExpeditionView): TopBar {
-  const camp = `Camp ${view.campNumber} of ${FINAL_CAMP_NUMBER}`;
-  if (!BOSS_CAMP_NUMBERS.includes(view.campNumber)) return { supplies: view.supplies, camp, boss: null, suppliesPick: null };
-  const bossId = bossFor(view, view.campNumber);
-  const text = bossId === null ? "Boss camp ahead" : `Boss ahead: ${BOSS_DISPLAY[bossId]?.name ?? bossId}`;
-  return { supplies: view.supplies, camp, boss: { text, dim: false }, suppliesPick: null };
+  return { supplies: view.supplies, camp: `Camp ${view.campNumber} of ${FINAL_CAMP_NUMBER}`, suppliesPick: null };
 }
 
 function buildTrail(view: ExpeditionView): TrailStop[] {

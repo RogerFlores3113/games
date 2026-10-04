@@ -63,7 +63,6 @@ function crewFor(def: SourceDef, seed: string, campNumber: CampNumber = 1): RunS
     supplies: 2,
     characters,
     kits,
-    bossTwists: { 3: "radio-silence", 6: "mutiny" },
   });
 }
 

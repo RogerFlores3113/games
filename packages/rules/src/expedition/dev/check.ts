@@ -2,7 +2,7 @@
 // answers "could the real engine have produced this?" as readable problems.
 
 import { buildFullDeck, cardLabel } from "../deck";
-import { BOSS_CAMPS, FINAL_CAMP } from "../run/balance";
+import { FINAL_CAMP } from "../run/balance";
 import type { Catalog, RunState } from "../run/types";
 
 function duplicates(values: readonly string[]): string[] {
@@ -38,11 +38,7 @@ function checkCrew(run: RunState, catalog: Catalog, problems: string[]): void {
   for (const id of duplicates(characterIds)) problems.push(`character ${id} is held by more than one seat`);
 }
 
-function checkRunFields(run: RunState, catalog: Catalog, problems: string[]): void {
-  for (const camp of BOSS_CAMPS) {
-    const boss = run.bossTwists[camp];
-    if (boss !== null && !Object.hasOwn(catalog.bosses, boss)) problems.push(`boss twist for camp ${camp}: unknown boss ${boss}`);
-  }
+function checkRunFields(run: RunState, problems: string[]): void {
   for (const id of run.readySeatIds) if (!run.seatIds.includes(id)) problems.push(`ready list holds unknown seat ${id}`);
   for (const id of duplicates(run.readySeatIds)) problems.push(`ready list holds ${id} more than once`);
   if (!Number.isInteger(run.supplies) || run.supplies < 0) problems.push(`supplies must be a non-negative integer, got ${run.supplies}`);
@@ -54,7 +50,7 @@ function checkRunFields(run: RunState, catalog: Catalog, problems: string[]): vo
 
 function checkCamp(run: RunState, problems: string[]): void {
   const camp = run.attempt?.camp;
-  if (camp === undefined || camp === null) return;
+  if (camp === undefined) return;
   const sameSeats = camp.seatIds.length === run.seatIds.length && camp.seatIds.every((id, i) => id === run.seatIds[i]);
   if (!sameSeats) problems.push("camp seats differ from the run's seats");
 
@@ -88,7 +84,7 @@ function checkCamp(run: RunState, problems: string[]): void {
 export function checkRunState(run: RunState, catalog: Catalog): string[] {
   const problems: string[] = [];
   checkCrew(run, catalog, problems);
-  checkRunFields(run, catalog, problems);
+  checkRunFields(run, problems);
   checkCamp(run, problems);
   return problems;
 }

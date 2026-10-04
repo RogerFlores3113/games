@@ -9,7 +9,7 @@
 import Phaser from "phaser";
 import { ensurePixelFonts } from "../font/pixel-font";
 import { ensureCardTextures } from "../card-packs/card-textures";
-import { drawPrompt, drawStaticWorld, drawTooltip, drawTopBar, setBossEffect } from "../draw/draw-table";
+import { drawPrompt, drawStaticWorld, drawTooltip, drawTopBar } from "../draw/draw-table";
 import { drawCrowdAndStump, drawPlates, drawYouAndKit } from "../draw/draw-seats";
 import type { CampHandlers } from "../draw/camp-handlers";
 import { preloadArt } from "../art/place-art";
@@ -284,8 +284,6 @@ export class CampScene extends Phaser.Scene {
     drawCrowdAndStump(this, this.dynamicLayer, model, this.index, this.handlers);
     drawTopBar(this, this.dynamicLayer, model.topBar, this.index, () => this.handlers.onPick("supplies", ""));
     drawPrompt(this, this.dynamicLayer, model.prompt);
-    const effect = model.bossTwist !== null && !model.bossTwist.cancelled ? model.bossTwist.effect : "none";
-    setBossEffect(this, effect);
     this.renderTable(model);
     drawTooltip(this, this.dynamicLayer, model.tooltip, ZONES.tooltip);
     this.previousModel = model;

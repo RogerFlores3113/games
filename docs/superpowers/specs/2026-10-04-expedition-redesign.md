@@ -1159,3 +1159,25 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
 | Leader | `whispersPerCamp` 2; Open Ears `whisperAudience`; Delegate; Momentum reads won tricks |
 | Hermit | `remove-objective` plus a `goals` guard (wins no tricks); Burden `add-objective`; First Pick an objective-pick window; Alms `whispersPerCamp` |
 | Pack Rat | `draftShape` with `exclusiveTo` items; `itemSlots` 3; Quartermaster `give-item`; Pack Animal `swap-slots`; Sturdy Straps a first-use exemption |
+
+## Implementation notes
+
+### Implementation notes (unit 1)
+
+- `AttemptState.camp` and `Stamp.trick` are no longer nullable: with the pre-deal window gone an
+  attempt is always dealt. The attempt view's `camp` is non-null to match.
+- `startAttempt` deals and returns; it no longer settles. `ready` settles through the dispatcher's
+  usual pass, so a camp decided at the deal (a forced failure check) still settles in that call.
+  `advanceRun` and `dealAttempt` are deleted.
+- Rain Poncho fires `between-tricks` (the spec names no window) with `per-run` 2 until unit 4
+  gives it `charges 2`.
+- Mosquito Net reads "Nothing can stop your whispers." until unit 5 makes it the Rain counter,
+  since the boss twists it named are gone. It is tested against a test-only whisper blocker.
+- `secretsForExpeditionSeat` keeps its `catalog` parameter, unread for now, so twenty callers do
+  not change twice before unit 7's `hides` needs it.
+- Web: no "PD" badge existed, so there was none to drop. The gated-window button ids were
+  `predeal-use:<id>` and `predeal-skip`; they are now `gate-use:<id>` and `gate-skip`, and the
+  banner model loses `window` (only rescue is gated). The top bar's twist readout, the rain and
+  dark-sky boss effects and the rules modal's "This camp" section are deleted; units 5 and 11
+  bring weather overlays and camp pages back. Boss-camp markers and the "Boss camp" label stay,
+  since camps 3 and 6 are still boss camps by position until unit 3.

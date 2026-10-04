@@ -24,7 +24,7 @@
 // the count of "whisper" log entries whose actorSeatId is the seat in
 // question.
 //
-// Bosses and sources that change whisper legality, audience or count act
+// Sources that change whisper legality, audience or count act
 // ONLY through the composed RunHooks (whisperAllowed/whisperAudience/
 // whispersPerCamp); this file never names any of them.
 
@@ -42,9 +42,8 @@ export function whispersUsedBy(run: RunState, seatId: string): number {
   return run.attempt.log.filter((entry) => entry.event === "whisper" && entry.actorSeatId === seatId).length;
 }
 
-/** Guard order (COMM-01): wrong_phase (no attempt, or the camp hasn't been
- * dealt yet) -> wrong_window (must be between tricks, D-13: no grace period)
- * -> whisper_blocked (a boss or source layer forbids it) -> no_whispers_left
+/** Guard order (COMM-01): wrong_phase (no attempt) -> wrong_window (must be between tricks, D-13: no grace period)
+ * -> whisper_blocked (a source layer forbids it) -> no_whispers_left
  * (per-camp cap, composed) -> invalid_target (self or a non-seat) ->
  * card_not_in_hand (own-hand-only, T-10-20). */
 export function whisperLegality(
@@ -54,7 +53,7 @@ export function whisperLegality(
   cardId: string,
   catalog: Catalog,
 ): { legal: true } | { legal: false; reason: RunError } {
-  if (run.attempt === null || run.attempt.camp === null) {
+  if (run.attempt === null) {
     return { legal: false, reason: "wrong_phase" };
   }
   const rules = rulesFor(run, catalog);

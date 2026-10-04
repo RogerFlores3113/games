@@ -27,7 +27,6 @@ function makeCamp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampVi
     expeditionLeaderSeatId: "s1",
     totalTricks: 17,
     removedCards: [],
-    objectiveAssignment: "face-up",
     objectives: [],
     yourHand: [{ id: "c-as", identity: AS, effectiveRank: null }],
     yourLegalCardIds: ["c-as"],
@@ -59,8 +58,6 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     runStatus: "in_progress",
     campNumber: 2,
     supplies: 5,
-    bossTwists: { camp3: null, camp6: null },
-    activeBossTwistId: null,
     seats: [
       seat("s1", "guide"),
       seat("s2", "scout"),
@@ -71,7 +68,6 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     history: [],
     attempt: {
       attemptNumber: 1,
-      bossCancelled: false,
       window: null,
       pendingSeatIds: [],
       rescue: null,
@@ -101,8 +97,7 @@ describe("sceneKeyFor", () => {
   it("maps muster to the fireside scene", () => {
     expect(sceneKeyFor(makeView({ runPhase: "muster" }))).toBe("fireside");
   });
-  it("maps pre-deal and camp to camp", () => {
-    expect(sceneKeyFor(makeView({ runPhase: "pre-deal" }))).toBe("camp");
+  it("maps camp to camp", () => {
     expect(sceneKeyFor(makeView({ runPhase: "camp" }))).toBe("camp");
   });
 });
@@ -133,7 +128,6 @@ describe("seat order and identity", () => {
     const view = makeView({
       attempt: {
         attemptNumber: 1,
-        bossCancelled: false,
         window: null,
         pendingSeatIds: [],
         rescue: null,
@@ -157,20 +151,18 @@ describe("seat order and identity", () => {
 });
 
 describe("mayAct", () => {
-  it("pre-deal: reads attempt.pendingSeatIds", () => {
+  it("a gated window: reads attempt.pendingSeatIds", () => {
     const view = makeView({
-      runPhase: "pre-deal",
       attempt: {
         attemptNumber: 1,
-        bossCancelled: false,
-        window: "pre-deal",
+        window: "rescue",
         pendingSeatIds: ["s1", "s3"],
-        rescue: null,
+        rescue: { failedObjectiveIds: [] },
         effects: [],
         reveals: [],
         log: [],
         yourWhisper: { allowed: true, left: 1 },
-        camp: null,
+        camp: makeCamp({ campPhase: "ended", currentActorSeatId: null }),
       },
     });
     const model = buildSceneModel(server(view), ui(), "big-index");
@@ -195,7 +187,6 @@ describe("objectives", () => {
     return makeView({
       attempt: {
         attemptNumber: 1,
-        bossCancelled: false,
         window: null,
         pendingSeatIds: [],
         rescue: null,
@@ -260,7 +251,6 @@ describe("hand: dimming, sort, lift, targeting", () => {
     return makeView({
       attempt: {
         attemptNumber: 1,
-        bossCancelled: false,
         window: null,
         pendingSeatIds: [],
         rescue: null,
@@ -377,7 +367,6 @@ describe("trick and lastTrick", () => {
     const view = makeView({
       attempt: {
         attemptNumber: 1,
-        bossCancelled: false,
         window: null,
         pendingSeatIds: [],
         rescue: null,
@@ -412,7 +401,6 @@ describe("trick and lastTrick", () => {
     const view = makeView({
       attempt: {
         attemptNumber: 1,
-        bossCancelled: false,
         window: null,
         pendingSeatIds: [],
         rescue: null,
@@ -464,40 +452,20 @@ describe("trick and lastTrick", () => {
   });
 });
 
-describe("HUD: supplies, campNumber, bossTwist", () => {
+describe("HUD: supplies and campNumber", () => {
   it("copies supplies and campNumber verbatim", () => {
     const model = buildSceneModel(server(makeView({ supplies: 7, campNumber: 4 })), ui(), "big-index");
     expect(model.supplies).toBe(7);
     expect(model.campNumber).toBe(4);
   });
 
-  it("bossTwist maps radio-silence to rain and eclipse to dark-sky", () => {
-    const rainView = makeView({ activeBossTwistId: "radio-silence" });
-    const rainModel = buildSceneModel(server(rainView), ui(), "big-index");
-    expect(rainModel.bossTwist!.effect).toBe("rain");
-
-    const eclipseView = makeView({ activeBossTwistId: "eclipse" });
-    const eclipseModel = buildSceneModel(server(eclipseView), ui(), "big-index");
-    expect(eclipseModel.bossTwist!.effect).toBe("dark-sky");
-  });
-
-  it("topBar names the camp, flags boss camps and shows the active twist", () => {
+  it("topBar names the camp and flags boss camps", () => {
     expect(buildSceneModel(server(makeView({ campNumber: 2, supplies: 2 })), ui(), "big-index").topBar).toEqual({
       supplies: 2,
       camp: "Camp 2 of 6",
-      boss: null,
       suppliesPick: null,
     });
-    expect(buildSceneModel(server(makeView({ campNumber: 3, activeBossTwistId: "eclipse" })), ui(), "big-index").topBar.boss).toEqual({
-      text: "Boss: Eclipse",
-      dim: false,
-    });
     expect(buildSceneModel(server(makeView({ campNumber: 3 })), ui(), "big-index").topBar.camp).toBe("Camp 3 of 6 - Boss camp");
-  });
-
-  it("bossTwist is null when there is no active twist", () => {
-    const model = buildSceneModel(server(makeView({ activeBossTwistId: null })), ui(), "big-index");
-    expect(model.bossTwist).toBeNull();
   });
 });
 
@@ -566,7 +534,6 @@ describe("source chips", () => {
     const view = makeView({
       attempt: {
         attemptNumber: 1,
-        bossCancelled: false,
         window: null,
         pendingSeatIds: [],
         rescue: null,
@@ -606,7 +573,6 @@ describe("reveals", () => {
     const view = makeView({
       attempt: {
         attemptNumber: 1,
-        bossCancelled: false,
         window: null,
         pendingSeatIds: [],
         rescue: null,
@@ -630,7 +596,6 @@ describe("reveals", () => {
     const view = makeView({
       attempt: {
         attemptNumber: 1,
-        bossCancelled: false,
         window: null,
         pendingSeatIds: [],
         rescue: null,
@@ -653,14 +618,11 @@ function whisperView(opts: {
   yourWhisper?: { allowed: boolean; left: number };
   reveals?: NonNullable<ExpeditionView["attempt"]>["reveals"];
   log?: { actor: string; to: string }[];
-  boss?: string | null;
 }): ExpeditionView {
   return makeView({
     yourSeatId: "s2",
-    activeBossTwistId: opts.boss ?? null,
     attempt: {
       attemptNumber: 1,
-      bossCancelled: false,
       window: opts.window === undefined ? "between-tricks" : opts.window,
       pendingSeatIds: [],
       rescue: null,
@@ -699,9 +661,9 @@ describe("whisper status", () => {
     expect(buildSceneModel(server(view), ui(), "big-index").whisper).toMatchObject({ visible: true, state: "ready", left: 1 });
   });
 
-  it("blocked: names the boss twist that forbids it", () => {
-    const view = whisperView({ yourWhisper: { allowed: false, left: 1 }, boss: "radio-silence" });
-    expect(buildSceneModel(server(view), ui(), "big-index").whisper).toMatchObject({ visible: false, state: "blocked", reason: "Blocked: Monsoon" });
+  it("blocked: says whispers are blocked", () => {
+    const view = whisperView({ yourWhisper: { allowed: false, left: 1 } });
+    expect(buildSceneModel(server(view), ui(), "big-index").whisper).toMatchObject({ visible: false, state: "blocked", reason: "Blocked right now" });
   });
 
   it("active reflects ui.targeting.mode === whisper", () => {
@@ -738,56 +700,35 @@ describe("whispers on the table", () => {
 });
 
 describe("banner", () => {
-  function gated(window: "pre-deal" | "rescue", pending: string[], abilities: ExpeditionView["yourAbilities"], objectives: ExpeditionObjectiveView[] = []): ExpeditionView {
+  function gated(pending: string[], abilities: ExpeditionView["yourAbilities"], objectives: ExpeditionObjectiveView[] = []): ExpeditionView {
     return makeView({
-      runPhase: window === "pre-deal" ? "pre-deal" : "camp",
+      runPhase: "camp",
       yourAbilities: abilities,
       attempt: {
         attemptNumber: 1,
-        bossCancelled: false,
-        window,
+        window: "rescue",
         pendingSeatIds: pending,
-        rescue: window === "rescue" ? { failedObjectiveIds: objectives.map((o) => o.id) } : null,
+        rescue: { failedObjectiveIds: objectives.map((o) => o.id) },
         effects: [],
         reveals: [],
         log: [],
         yourWhisper: { allowed: true, left: 1 },
-        camp: window === "pre-deal" ? null : makeCamp({ campPhase: "ended", currentActorSeatId: null, objectives }),
+        camp: makeCamp({ campPhase: "ended", currentActorSeatId: null, objectives }),
       },
     });
   }
   const failedKd = (owner: string): ExpeditionObjectiveView => ({ id: "o1", kind: "win-card", target: KD, ownerSeatId: owner, status: "failed" });
 
-  it("pre-deal: offers your usable pre-deal sources when the table waits on you", () => {
-    const view = gated("pre-deal", ["s2"], [ability("rain-poncho", { kind: "board", choices: [] }), ability("scout", { kind: "hand", choices: ["hand:s1"] })]);
-    view.seats = [seat("s1", "guide"), seat("s2", "scout", ["rain-poncho"]), seat("s3", "medic")];
-    const banner = buildSceneModel(server(view), ui(), "big-index").banner!;
-    expect(banner).toMatchObject({ window: "pre-deal", title: "Before the deal", detail: "You can use Rain Poncho now, or skip", youPending: true });
-    expect(banner.uses.map((u) => [u.sourceId, u.name, u.objectId])).toEqual([["rain-poncho", "Rain Poncho", "source:rain-poncho"]]);
-  });
-
-  it("pre-deal: says who the table waits on, with no uses of yours", () => {
-    const view = gated("pre-deal", ["s1"], [ability("rain-poncho", undefined, false, "Already used this run")]);
-    expect(buildSceneModel(server(view), ui(), "big-index").banner).toEqual({
-      window: "pre-deal",
-      title: "Before the deal",
-      detail: "Waiting on Alice",
-      youPending: false,
-      uses: [],
-    });
-  });
-
   it("rescue: names the failed objective and its owner, and your rescue", () => {
-    const view = gated("rescue", ["s2"], [ability("medic"), ability("rain-poncho")], [failedKd("s2")]);
+    const view = gated(["s2"], [ability("medic"), ability("rain-poncho")], [failedKd("s2")]);
     const banner = buildSceneModel(server(view), ui(), "big-index").banner!;
-    expect(banner).toMatchObject({ window: "rescue", title: "Objective failed: K♦ (yours)", detail: "You can rescue it with Triage", youPending: true });
+    expect(banner).toMatchObject({ title: "Objective failed: K♦ (yours)", detail: "You can rescue it with Triage", youPending: true });
     expect(banner.uses.map((u) => u.sourceId)).toEqual(["medic"]);
   });
 
   it("rescue: tells everyone else who can rescue it", () => {
-    const view = gated("rescue", ["s1"], [], [failedKd("s3")]);
+    const view = gated(["s1"], [], [failedKd("s3")]);
     expect(buildSceneModel(server(view), ui(), "big-index").banner).toEqual({
-      window: "rescue",
       title: "Objective failed: K♦ (Cara's)",
       detail: "Waiting on Alice to rescue it or pass",
       youPending: false,
@@ -799,7 +740,7 @@ describe("banner", () => {
     expect(buildSceneModel(server(makeView()), ui(), "big-index").banner).toBeNull();
     const between = makeView({ attempt: { ...makeView().attempt!, window: "between-tricks" } });
     expect(buildSceneModel(server(between), ui(), "big-index").banner).toBeNull();
-    const view = gated("rescue", ["s2"], [ability("medic", { kind: "failed-objective", choices: ["objective:o1"] })], [failedKd("s2")]);
+    const view = gated(["s2"], [ability("medic", { kind: "failed-objective", choices: ["objective:o1"] })], [failedKd("s2")]);
     expect(buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceId: "medic", selected: [], valueCardId: null } }), "big-index").banner).toBeNull();
   });
 });
@@ -1008,7 +949,6 @@ describe("removedCardLabels", () => {
     const view = makeView({
       attempt: {
         attemptNumber: 1,
-        bossCancelled: false,
         window: null,
         pendingSeatIds: [],
         rescue: null,

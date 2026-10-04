@@ -52,7 +52,7 @@ const CampStateSchema = z.strictObject({
 });
 
 const CampNumberSchema = z.literal([1, 2, 3, 4, 5, 6]);
-const StampSchema = z.strictObject({ camp: CampNumberSchema, attempt: z.number().int().min(1), trick: z.number().int().min(0).nullable() });
+const StampSchema = z.strictObject({ camp: CampNumberSchema, attempt: z.number().int().min(1), trick: z.number().int().min(0) });
 
 const LedgerEntrySchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("used"), sourceId: z.string().min(1), at: StampSchema, poolCost: z.number().int().min(0) }),
@@ -64,7 +64,6 @@ const AudienceSchema = z.union([z.literal("public"), z.array(z.string().min(1))]
 
 const AttemptSchema = z.strictObject({
   attemptNumber: z.number().int().min(1),
-  bossCancelled: z.boolean(),
   effects: z.array(
     z.strictObject({
       sourceId: z.string().min(1),
@@ -93,7 +92,7 @@ const AttemptSchema = z.strictObject({
       audience: AudienceSchema,
     }),
   ),
-  camp: CampStateSchema.nullable(),
+  camp: CampStateSchema,
 });
 
 export const ExpeditionRunStateSchema = z.strictObject({
@@ -110,7 +109,6 @@ export const ExpeditionRunStateSchema = z.strictObject({
       ledger: z.array(LedgerEntrySchema),
     }),
   ),
-  bossTwists: z.strictObject({ 3: z.string().min(1).nullable(), 6: z.string().min(1).nullable() }),
   readySeatIds: z.array(z.string().min(1)),
   attempt: AttemptSchema.nullable(),
   history: z.array(

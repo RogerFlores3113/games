@@ -1,5 +1,5 @@
 // Tests for run/compose.ts (Plan 10-03: composeRules, ruleLayersFor,
-// rulesFor, activeBossId).
+// rulesFor).
 
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
@@ -9,14 +9,13 @@ import { baseRules } from "../rules";
 import { isTrump, trickWinner } from "../trick";
 import { currentActorSeatId } from "../camp";
 import { winnerExcluding } from "../content/helpers";
-import { activeBossId, composeRules, ruleLayersFor, rulesFor } from "./compose";
+import { composeRules, ruleLayersFor, rulesFor } from "./compose";
 import { applyRunAction } from "./run-actions";
 import { advanceTo, setupRun, testCatalog } from "./run-test-support";
 import type { RuleModifier } from "./run-rules";
 import type { AttemptState, Catalog, RunState, SeatRun } from "./types";
 import type { CampState, CardIdentity, ExpeditionCard, Hand, TrickPlay } from "../state";
 import { ability, defineCharacter, defineItem, defineUpgrade } from "../content/source-def";
-import type { BossDef } from "../boss/boss-def";
 
 function seat(seatId: string, overrides: Partial<SeatRun> = {}): SeatRun {
   return { seatId, characterId: null, kit: [], draftOffer: null, ledger: [], ...overrides };
@@ -30,7 +29,6 @@ function makeRun(overrides: Partial<RunState> = {}): RunState {
     campNumber: 2,
     supplies: 3,
     seats: seatIds.map((id) => seat(id)),
-    bossTwists: { 3: null, 6: null },
     readySeatIds: [],
     attempt: null,
     history: [],
@@ -41,11 +39,10 @@ function makeRun(overrides: Partial<RunState> = {}): RunState {
 function makeAttempt(overrides: Partial<AttemptState> = {}): AttemptState {
   return {
     attemptNumber: 1,
-    bossCancelled: false,
     effects: [],
     reveals: [],
     log: [],
-    camp: null,
+    camp: createCamp({ seatIds: ["p0", "p1", "p2"], seed: "attempt-seed", objectiveSlots: [{ kind: "win-card" }] }, baseRules),
     ...overrides,
   };
 }
@@ -111,7 +108,6 @@ describe("composeRules([])", () => {
     expect(composed.whisperAllowed(run, "p0")).toBe(true);
     expect(composed.whispersPerCamp(run, "p0")).toBe(1);
     expect(composed.whisperAudience(run, "p0", "p1")).toEqual(["p1"]);
-    expect(composed.objectiveAssignment(run)).toBe("face-up");
     expect(composed.failureCost(run)).toBe(1);
   });
 });
@@ -165,34 +161,7 @@ describe("composeRules layer folding", () => {
   });
 });
 
-describe("activeBossId", () => {
-  it("is null at the fireside (attempt null)", () => {
-    const run = makeRun({ campNumber: 3, bossTwists: { 3: "boss-x", 6: null }, attempt: null });
-    expect(activeBossId(run)).toBeNull();
-  });
-
-  it("is null when bossCancelled is true", () => {
-    const run = makeRun({
-      campNumber: 3,
-      bossTwists: { 3: "boss-x", 6: null },
-      attempt: makeAttempt({ bossCancelled: true }),
-    });
-    expect(activeBossId(run)).toBeNull();
-  });
-
-  it("is null on a non-boss camp", () => {
-    const run = makeRun({ campNumber: 2, bossTwists: { 3: "boss-x", 6: null }, attempt: makeAttempt() });
-    expect(activeBossId(run)).toBeNull();
-  });
-
-  it("returns bossTwists[campNumber] on an active boss camp", () => {
-    const run = makeRun({ campNumber: 3, bossTwists: { 3: "boss-x", 6: null }, attempt: makeAttempt() });
-    expect(activeBossId(run)).toBe("boss-x");
-  });
-});
-
 describe("rulesFor / ruleLayersFor", () => {
-  const bossX: BossDef = { id: "boss-x", name: "X", text: "", modifiers: { whisperAllowed: () => () => false } };
   const passiveItem = defineItem({
     id: "whisper-plus-2",
     name: "Whisper+2",
@@ -215,16 +184,8 @@ describe("rulesFor / ruleLayersFor", () => {
       effect: () => ({ whispersPerCamp: (prev) => (run, seatId) => prev(run, seatId) + 1 }),
     }),
   });
-  const catalog = testCatalog({ items: { "whisper-plus-2": passiveItem, "effect-item": effectItem }, bosses: { "boss-x": bossX } });
+  const catalog = testCatalog({ items: { "whisper-plus-2": passiveItem, "effect-item": effectItem } });
   const effect = { sourceId: "effect-item", seatId: "p0", atTrick: 0, lasts: "attempt", params: {}, audience: "public" } as const;
-
-  it("applies the boss layer only while active", () => {
-    const runBoss = makeRun({ campNumber: 3, bossTwists: { 3: "boss-x", 6: null }, attempt: makeAttempt() });
-    expect(rulesFor(runBoss, catalog).whisperAllowed(runBoss, "p0")).toBe(false);
-
-    const runFireside = makeRun({ campNumber: 3, bossTwists: { 3: "boss-x", 6: null }, attempt: null });
-    expect(rulesFor(runFireside, catalog).whisperAllowed(runFireside, "p0")).toBe(true);
-  });
 
   it("applies a kit passive only for its owner", () => {
     const run = makeRun({
@@ -281,11 +242,6 @@ describe("rulesFor / ruleLayersFor", () => {
     expect(() => ruleLayersFor(run, catalog)).toThrow(/ghost-character/);
   });
 
-  it("throws naming an unknown boss id (POLICY A3)", () => {
-    const run = makeRun({ campNumber: 3, bossTwists: { 3: "no-such-boss", 6: null }, attempt: makeAttempt() });
-    expect(() => ruleLayersFor(run, catalog)).toThrow(/no-such-boss/);
-  });
-
   it("throws when an effect's source has no active.effect", () => {
     const passiveOnly = { ...effect, sourceId: "whisper-plus-2" };
     const run = makeRun({ attempt: makeAttempt({ effects: [passiveOnly] }) });
@@ -313,7 +269,6 @@ describe("layer order", () => {
       [...prev(run, seatId, targetSeatId), label],
   });
   const passive = (label: string) => ({ modifier: () => tag(label) });
-  const boss: BossDef = { id: "boss-x", name: "X", text: "", modifiers: tag("boss") };
   const char0 = defineCharacter({
     id: "char-0",
     name: "C0",
@@ -340,11 +295,10 @@ describe("layer order", () => {
     text: "",
     active: ability({ window: "between-tricks", limit: { kind: "per-camp", times: 1 }, targets: [], apply: () => [], effect: () => tag("effect") }),
   });
-  const catalog = testCatalog({ characters: { "char-0": char0, "char-1": char1 }, items: { "item-a": itemA, "item-b": itemB, fx }, bosses: { "boss-x": boss } });
+  const catalog = testCatalog({ characters: { "char-0": char0, "char-1": char1 }, items: { "item-a": itemA, "item-b": itemB, fx } });
 
   const run = makeRun({
     campNumber: 3,
-    bossTwists: { 3: "boss-x", 6: null },
     seats: [
       seat("p0", { characterId: "char-0", kit: ["char-0.a", "item-b", "item-a"] }),
       seat("p1", { characterId: "char-1", kit: ["item-a"] }),
@@ -358,10 +312,9 @@ describe("layer order", () => {
     }),
   });
 
-  it("folds the boss, then passives in seat order and [character, ...kit] order, then effects", () => {
+  it("folds passives in seat order and [character, ...kit] order, then effects", () => {
     expect(rulesFor(run, catalog).whisperAudience(run, "p0", "p9")).toEqual([
       "p9",
-      "boss",
       "char-0",
       "char-0.a",
       "item-b",
@@ -371,11 +324,6 @@ describe("layer order", () => {
       "effect",
       "effect",
     ]);
-  });
-
-  it("drops the boss layer when its twist is cancelled for the attempt", () => {
-    const cancelled = { ...run, attempt: { ...run.attempt!, bossCancelled: true } };
-    expect(rulesFor(cancelled, catalog).whisperAudience(cancelled, "p0", "p9")[1]).toBe("char-0");
   });
 });
 
@@ -422,7 +370,7 @@ describe("trick-scoped effects", () => {
     let run = used.state;
     for (let i = 0; i < 3; i++) {
       const rules = rulesFor(run, catalog);
-      const camp = run.attempt!.camp!;
+      const camp = run.attempt!.camp;
       const actor = currentActorSeatId(camp, rules)!;
       const played = applyRunAction(run, actor, { type: "play-card", cardId: rules.legalPlays(camp, actor)[0]!.id }, catalog);
       if (!played.ok) throw new Error(played.error);
@@ -434,8 +382,8 @@ describe("trick-scoped effects", () => {
   it("a trick-scoped effect bends exactly one trick", () => {
     const { afterUse, afterTrick } = useThenPlayOneTrick("sit-out-trick");
     expect(rulesFor(afterUse, catalog).trickWinner(probe)).toBe("p2");
-    expect(afterTrick.attempt!.camp!.completedTricks[0]!.winnerSeatId).not.toBe("p0");
-    expect(afterTrick.attempt!.camp!.completedTricks).toHaveLength(1);
+    expect(afterTrick.attempt!.camp.completedTricks[0]!.winnerSeatId).not.toBe("p0");
+    expect(afterTrick.attempt!.camp.completedTricks).toHaveLength(1);
     expect(rulesFor(afterTrick, catalog).trickWinner(probe)).toBe("p0");
   });
 

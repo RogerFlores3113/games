@@ -2,16 +2,15 @@
 // toolkit.test.ts's own discipline: a hand-built 3-seat RunState whose
 // attempt.camp is createCamp(...), with objectives picked and tricks played
 // via the real currentActorSeatId + applyCampAction path — never a
-// hand-rolled copy of pick-order/follow-suit rules. Fake BossDef/item
-// objects are declared inline in a local Catalog; the catalog is empty
-// unless a test says otherwise.
+// hand-rolled copy of pick-order/follow-suit rules. Fake items are
+// declared inline in a local Catalog; the catalog is empty unless a test
+// says otherwise.
 
 import { describe, expect, it } from "vitest";
 import { applyCampAction } from "../actions";
 import { campPhase, createCamp, currentActorSeatId } from "../camp";
 import { baseRules } from "../rules";
 import type { CampState } from "../state";
-import type { BossDef } from "../boss/boss-def";
 import { ability, defineItem } from "../content/source-def";
 import { baseRunHooks, type RunRules } from "./run-rules";
 import { testCatalog } from "./run-test-support";
@@ -72,26 +71,16 @@ function makeSeats(): readonly SeatRun[] {
   return SEAT_IDS.map((seatId) => ({ seatId, characterId: "plain-1", kit: [], draftOffer: null, ledger: [] }));
 }
 
+/** A run whose attempt holds `camp`; no attempt at all when camp is null. */
 function makeRun(input: {
   camp: CampState | null;
-  attempt?: AttemptState | null;
   effects?: readonly ActiveEffect[];
   campNumber?: 1 | 2 | 3 | 4 | 5 | 6;
-  bossTwists?: { readonly 3: string | null; readonly 6: string | null };
   log?: AttemptState["log"];
   seed?: string;
 }): RunState {
   const attempt: AttemptState | null =
-    input.attempt !== undefined
-      ? input.attempt
-      : {
-          attemptNumber: 1,
-          bossCancelled: false,
-          effects: input.effects ?? [],
-          reveals: [],
-          log: input.log ?? [],
-          camp: input.camp,
-        };
+    input.camp === null ? null : { attemptNumber: 1, effects: input.effects ?? [], reveals: [], log: input.log ?? [], camp: input.camp };
 
   return {
     seed: input.seed ?? "whisper-seed",
@@ -99,7 +88,6 @@ function makeRun(input: {
     campNumber: input.campNumber ?? 2,
     supplies: 10,
     seats: makeSeats(),
-    bossTwists: input.bossTwists ?? { 3: null, 6: null },
     readySeatIds: [],
     attempt,
     history: [],
@@ -113,15 +101,15 @@ function emptyCatalog(): Catalog {
 describe("whisperLegality", () => {
   it("rejects during objective-pick with wrong_window", () => {
     const run = makeRun({ camp: freshCamp() });
-    const actor = currentActorSeatId(run.attempt!.camp!, CORE_RULES)!;
+    const actor = currentActorSeatId(run.attempt!.camp, CORE_RULES)!;
     const target = SEAT_IDS.find((s) => s !== actor)!;
-    const cardId = run.attempt!.camp!.hands.find((h) => h.seatId === actor)!.cards[0]!.id;
+    const cardId = run.attempt!.camp.hands.find((h) => h.seatId === actor)!.cards[0]!.id;
     const result = whisperLegality(run, actor, target, cardId, emptyCatalog());
     expect(result).toEqual({ legal: false, reason: "wrong_window" });
   });
 
   it("rejects at the fireside (attempt null) with wrong_phase", () => {
-    const run = makeRun({ camp: null, attempt: null });
+    const run = makeRun({ camp: null });
     const result = whisperLegality(run, "p0", "p1", "anything", emptyCatalog());
     expect(result).toEqual({ legal: false, reason: "wrong_phase" });
   });
@@ -136,18 +124,11 @@ describe("whisperLegality", () => {
     expect(result).toEqual({ legal: false, reason: "wrong_window" });
   });
 
-  it("rejects with whisper_blocked when a boss forbids whispering", () => {
+  it("rejects with whisper_blocked when a layer forbids whispering", () => {
     const camp = betweenTricksCamp();
-    const bossDef: BossDef = {
-      id: "boss-block",
-      name: "Blocker",
-      text: "",
-      modifiers: {
-        whisperAllowed: () => () => false,
-      },
-    };
-    const catalog: Catalog = testCatalog({ bosses: { "boss-block": bossDef } });
-    const run = makeRun({ camp, campNumber: 3, bossTwists: { 3: "boss-block", 6: null } });
+    const gag = defineItem({ id: "gag", name: "Gag", text: "Nobody may whisper.", passive: { modifier: () => ({ whisperAllowed: () => () => false }) } });
+    const catalog: Catalog = testCatalog({ items: { gag } });
+    const run = { ...makeRun({ camp }), seats: makeSeats().map((seat) => (seat.seatId === "p2" ? { ...seat, kit: ["gag"] } : seat)) };
     const cardId = camp.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
     const result = whisperLegality(run, "p0", "p1", cardId, catalog);
     expect(result).toEqual({ legal: false, reason: "whisper_blocked" });
@@ -273,7 +254,7 @@ describe("applyWhisper", () => {
     expect(whispered.ok).toBe(true);
     if (!whispered.ok) return;
 
-    const afterTrick = playOneTrick(whispered.state.attempt!.camp!);
+    const afterTrick = playOneTrick(whispered.state.attempt!.camp);
     const finalRun: RunState = { ...whispered.state, attempt: { ...whispered.state.attempt!, camp: afterTrick } };
 
     expect(finalRun.attempt!.reveals).toEqual([{ cardId, fromSeatId: "p0", audience: ["p1"], source: "whisper", targetSeatId: "p1" }]);

@@ -7,8 +7,8 @@
 
 /** Seat names, gear box names, supply count, objective marker glyphs. */
 export const WORLD_LABEL_FONT = "world-label";
-/** The in-world wooden sign's window/state text (D-03) and the boss-twist
- * name (D-15) — the single largest, most important read-at-a-glance text. */
+/** The in-world wooden sign's window/state text (D-03): the single
+ * largest, most important read-at-a-glance text. */
 export const WORLD_SIGN_FONT = "world-sign";
 
 export const LABEL_CELL = { w: 6, h: 8 } as const;

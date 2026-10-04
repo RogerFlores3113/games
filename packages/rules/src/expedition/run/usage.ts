@@ -29,8 +29,7 @@ export function ownerOf(seat: SeatRun): Owner {
 /** The stamp a ledger entry written now would carry; null with no attempt. */
 export function currentStamp(run: RunState): Stamp | null {
   if (run.attempt === null) return null;
-  const camp = run.attempt.camp;
-  return { camp: run.campNumber, attempt: run.attempt.attemptNumber, trick: camp === null ? null : camp.completedTricks.length };
+  return { camp: run.campNumber, attempt: run.attempt.attemptNumber, trick: run.attempt.camp.completedTricks.length };
 }
 
 export function sameStamp(a: Stamp, b: Stamp): boolean {

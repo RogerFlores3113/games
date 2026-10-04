@@ -26,27 +26,13 @@ function dealtFaceUpCamp(): RunState {
   );
 }
 
-function thickFogCamp(): RunState {
-  return advanceTo(
-    setupRun({
-      seatIds: SEAT_IDS,
-      seed: SEED,
-      catalog: CATALOG,
-      campNumber: 3,
-      bossTwists: { 3: "blind-orders", 6: null },
-    }),
-    "objective-pick",
-    CATALOG,
-  );
-}
-
 function postWhisperState(): RunState {
   const between = advanceTo(
     setupRun({ seatIds: SEAT_IDS, seed: SEED, catalog: CATALOG, campNumber: 2 }),
     "between-tricks",
     CATALOG,
   );
-  const hand = between.attempt!.camp!.hands.find((h) => h.seatId === "p0")!;
+  const hand = between.attempt!.camp.hands.find((h) => h.seatId === "p0")!;
   const cardId = hand.cards[0]!.id;
   const result = applyRunAction(between, "p0", { type: "whisper", targetSeatId: "p1", cardId }, CATALOG);
   if (!result.ok) throw new Error(`postWhisperState: whisper rejected: ${result.error}`);
@@ -85,7 +71,7 @@ function afterWhetstone(): RunState {
 describe("view-leak-check: clean baseline", () => {
   it("reports no leaks for a real toExpeditionPlayerView on every seat and an unseated viewer, across several run shapes", () => {
     let checked = 0;
-    const states: RunState[] = [musterRun(), dealtFaceUpCamp(), thickFogCamp(), postWhisperState(), afterWhetstone(), freshFireside(), realFireside()];
+    const states: RunState[] = [musterRun(), dealtFaceUpCamp(), postWhisperState(), afterWhetstone(), freshFireside(), realFireside()];
 
     for (const state of states) {
       for (const seatId of [...state.seatIds, "unseated-viewer"]) {
@@ -107,11 +93,11 @@ describe("view-leak-check: canary suite", () => {
     const view = toExpeditionPlayerView(state, viewer, CATALOG);
     const secrets = secretsForExpeditionSeat(state, viewer, CATALOG, SEED);
 
-    const otherHand = state.attempt!.camp!.hands.find((h) => h.seatId !== viewer)!;
+    const otherHand = state.attempt!.camp.hands.find((h) => h.seatId !== viewer)!;
     const otherCard = otherHand.cards[0]!;
 
     const leaky = structuredClone(view);
-    leaky.attempt!.camp!.yourHand.push({ id: otherCard.id, identity: otherCard.identity as never, effectiveRank: null });
+    leaky.attempt!.camp.yourHand.push({ id: otherCard.id, identity: otherCard.identity as never, effectiveRank: null });
 
     const reasons = checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets });
     expect(reasons).toContain(`structural:hidden-id:${otherCard.id}`);
@@ -181,27 +167,6 @@ describe("view-leak-check: canary suite", () => {
     expect(reasons).toContain("string:forbidden-token");
   });
 
-  it("Canary D: in a Thick Fog view, another seat's objective literal appended reports hidden-id for that objective id", () => {
-    const state = thickFogCamp();
-    const viewer = "p0";
-    const view = toExpeditionPlayerView(state, viewer, CATALOG);
-    const secrets = secretsForExpeditionSeat(state, viewer, CATALOG, SEED);
-
-    const otherObjective = state.attempt!.camp!.objectives.find((o) => o.ownerSeatId !== viewer)!;
-    expect(otherObjective).toBeDefined();
-
-    const leaky = structuredClone(view);
-    (leaky.attempt!.camp!.objectives as unknown[]).push({
-      id: otherObjective.id,
-      kind: otherObjective.kind,
-      ownerSeatId: otherObjective.ownerSeatId,
-      status: "pending",
-    });
-
-    const reasons = checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets });
-    expect(reasons).toContain(`structural:hidden-id:${otherObjective.id}`);
-  });
-
   it("Canary E: the view of a seat NOT in the reveal audience, with the reveal appended, reports identity-count-exceeded and hidden-id", () => {
     const state = postWhisperState();
     const reveal = state.attempt!.reveals[0]!;
@@ -213,7 +178,7 @@ describe("view-leak-check: canary suite", () => {
     // Premise: the reveal is genuinely absent from the outsider's clean view.
     expect(view.attempt!.reveals).toEqual([]);
 
-    const camp = state.attempt!.camp!;
+    const camp = state.attempt!.camp;
     const card = camp.hands.flatMap((h) => h.cards).find((c) => c.id === reveal.cardId)!;
 
     const leaky = structuredClone(view);
@@ -269,11 +234,11 @@ describe("view-leak-check: canary suite", () => {
     const view = toExpeditionPlayerView(state, viewer, CATALOG);
     const secrets = secretsForExpeditionSeat(state, viewer, CATALOG, SEED);
 
-    const otherHand = state.attempt!.camp!.hands.find((h) => h.seatId !== viewer)!;
+    const otherHand = state.attempt!.camp.hands.find((h) => h.seatId !== viewer)!;
     const otherCard = otherHand.cards[0]!;
 
     const leaky = structuredClone(view);
-    const entry = leaky.attempt!.camp!.handSizes.find((h) => h.seatId === otherHand.seatId)! as unknown as Record<
+    const entry = leaky.attempt!.camp.handSizes.find((h) => h.seatId === otherHand.seatId)! as unknown as Record<
       string,
       unknown
     >;
@@ -289,7 +254,7 @@ describe("view-leak-check: canary suite", () => {
     const viewer = "p0";
     const view = toExpeditionPlayerView(state, viewer, CATALOG);
     const secrets = secretsForExpeditionSeat(state, viewer, CATALOG, SEED);
-    const otherCard = state.attempt!.camp!.hands.find((h) => h.seatId !== viewer)!.cards[0]!;
+    const otherCard = state.attempt!.camp.hands.find((h) => h.seatId !== viewer)!.cards[0]!;
 
     const leaky = { ...view, steps: [{ kind: "card", prompt: "", choices: [`card:${otherCard.id}`, `value:${otherCard.id}:5`] }] };
 

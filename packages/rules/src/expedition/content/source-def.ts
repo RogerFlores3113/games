@@ -36,7 +36,7 @@ export type AbilityContext<S extends readonly TargetSpec[]> = {
   readonly sourceId: SourceId;
   readonly owner: Owner;
   readonly run: RunState; // read-only snapshot, before the use
-  readonly camp: CampState | null; // null during pre-deal
+  readonly camp: CampState;
   readonly rules: RunRules;
   readonly targets: TargetsOf<S>; // resolved domain targets, positionally typed
   ownHand(): readonly ExpeditionCard[];

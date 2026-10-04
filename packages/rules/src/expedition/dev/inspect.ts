@@ -15,7 +15,6 @@ export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[]
       lines: [
         `camp ${run.campNumber}, attempt ${run.attempt?.attemptNumber ?? "none"}, supplies ${run.supplies}`,
         `phase ${runPhase(run)}, status ${runStatus(run)}`,
-        `boss twists: camp 3 ${run.bossTwists[3] ?? "none"}, camp 6 ${run.bossTwists[6] ?? "none"}`,
         `history: ${run.history.map((h) => `${h.campNumber}.${h.attemptNumber} ${h.status}`).join(", ") || "empty"}`,
       ],
     },
@@ -29,7 +28,7 @@ export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[]
   ];
 
   const camp = run.attempt?.camp;
-  if (camp === undefined || camp === null) return sections;
+  if (camp === undefined) return sections;
   const rules = rulesFor(run, catalog);
 
   sections.push({

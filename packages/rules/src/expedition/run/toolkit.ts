@@ -2,7 +2,7 @@
 // ability's `apply` returns a list of ToolkitOp data; this file is the sole
 // executor of that data, and every op preserves invariants BY CONSTRUCTION:
 // card conservation, audience-scoped reveals, pending-only objective swaps
-// (D-10), window-bound leader/boss changes (D-09/D-04). A violation is a
+// (D-10), window-bound leader changes (D-09). A violation is a
 // content-author defect and THROWS (POLICY A3), matching actions.ts's
 // composed-hook throw policy.
 //
@@ -29,7 +29,6 @@ export type ToolkitOp<P extends EffectParams = EffectParams> =
   | { readonly op: "reveal"; readonly cardId: string; readonly audience: readonly string[] }
   | { readonly op: "add-modifier"; readonly lasts: "attempt" | "trick"; readonly params: P; readonly audience: "public" | "owner" }
   | { readonly op: "set-next-leader"; readonly seatId: string }
-  | { readonly op: "cancel-boss-twist" }
   | { readonly op: "log"; readonly event: string; readonly subjectSeatIds: readonly string[]; readonly audience: "public" | readonly string[] };
 
 /** Every card id currently in play (hands, completed tricks, the
@@ -45,13 +44,6 @@ export function campCardIds(camp: CampState): string[] {
   }
   for (const play of camp.currentTrick.plays) ids.push(play.card.id);
   return ids.sort();
-}
-
-function requireCamp(attempt: AttemptState, opName: string): CampState {
-  if (attempt.camp === null) {
-    throw new Error(`toolkit: ${opName}: no camp in progress`);
-  }
-  return attempt.camp;
 }
 
 /** A reveal's audience: non-empty, no duplicates, every seat known. */
@@ -91,7 +83,7 @@ function applyAttemptOp(
 ): AttemptState {
   switch (op.op) {
     case "move-card": {
-      const camp = requireCamp(attempt, "move-card");
+      const camp = attempt.camp;
       if (op.fromSeatId === op.toSeatId) {
         throw new Error("toolkit: move-card: fromSeatId === toSeatId");
       }
@@ -117,7 +109,7 @@ function applyAttemptOp(
     }
 
     case "swap-cards": {
-      const camp = requireCamp(attempt, "swap-cards");
+      const camp = attempt.camp;
       if (op.seatA === op.seatB) {
         throw new Error("toolkit: swap-cards: seatA === seatB");
       }
@@ -153,7 +145,7 @@ function applyAttemptOp(
     }
 
     case "replace-objective": {
-      const camp = requireCamp(attempt, "replace-objective");
+      const camp = attempt.camp;
       const objective = camp.objectives.find((o) => o.id === op.objectiveId);
       if (!objective) {
         throw new Error(`toolkit: replace-objective: unknown objective ${op.objectiveId}`);
@@ -192,7 +184,7 @@ function applyAttemptOp(
     case "reassign-objective": {
       // An owner change. The objective must already be owned: taking an
       // unowned one is a pick, which only the Core performs.
-      const camp = requireCamp(attempt, "reassign-objective");
+      const camp = attempt.camp;
       const objective = camp.objectives.find((o) => o.id === op.objectiveId);
       if (!objective) {
         throw new Error(`toolkit: reassign-objective: unknown objective ${op.objectiveId}`);
@@ -209,7 +201,7 @@ function applyAttemptOp(
 
     case "reassign-trick": {
       // A completed trick's winner changes; its cards stay where they are.
-      const camp = requireCamp(attempt, "reassign-trick");
+      const camp = attempt.camp;
       const trick = camp.completedTricks.find((t) => t.index === op.trickIndex);
       if (!trick) {
         throw new Error(`toolkit: reassign-trick: no completed trick ${op.trickIndex}`);
@@ -224,7 +216,6 @@ function applyAttemptOp(
     case "share-reveal": {
       // Copies a whisper's identity and its pinned holder (WR-03) to a new
       // audience. The ordinal counts whispers only, as the public log does.
-      requireCamp(attempt, "share-reveal");
       const whisper = attempt.reveals.filter((r) => r.source === "whisper")[op.whisperOrdinal];
       if (!whisper) {
         throw new Error(`toolkit: share-reveal: no whisper ${op.whisperOrdinal}`);
@@ -236,7 +227,7 @@ function applyAttemptOp(
 
     case "swap-objectives": {
       // D-10: only PENDING objectives move; an already-done one stays put.
-      const camp = requireCamp(attempt, "swap-objectives");
+      const camp = attempt.camp;
       const objectives = camp.objectives.map((o) => {
         if (evaluateObjective(camp, o) !== "pending") return o;
         if (o.ownerSeatId === op.seatA) return { ...o, ownerSeatId: op.seatB };
@@ -248,7 +239,7 @@ function applyAttemptOp(
 
     case "remove-objective": {
       // D-11: the objective leaves play entirely.
-      const camp = requireCamp(attempt, "remove-objective");
+      const camp = attempt.camp;
       if (!camp.objectives.some((o) => o.id === op.objectiveId)) {
         throw new Error(`toolkit: remove-objective: unknown objective ${op.objectiveId}`);
       }
@@ -259,7 +250,7 @@ function applyAttemptOp(
     case "reveal": {
       // T-10-12: the ONLY op that can expose a card to a non-holder; the
       // audience is the sole grant of visibility.
-      const camp = requireCamp(attempt, "reveal");
+      const camp = attempt.camp;
       assertAudience(run, op.audience, "reveal");
       const holder = camp.hands.find((h) => h.cards.some((c) => c.id === op.cardId));
       if (!holder) {
@@ -270,7 +261,7 @@ function applyAttemptOp(
     }
 
     case "add-modifier": {
-      const atTrick = attempt.camp ? attempt.camp.currentTrick.index : 0;
+      const atTrick = attempt.camp.currentTrick.index;
       const effect: ActiveEffect = { sourceId, seatId: actorSeatId, atTrick, lasts: op.lasts, params: op.params, audience: op.audience };
       return { ...attempt, effects: [...attempt.effects, effect] };
     }
@@ -279,19 +270,11 @@ function applyAttemptOp(
       // D-09: allowed in any between-tricks window, including before trick
       // 1. The ability's window guarantees "between tricks"; this op itself
       // only guards against a trick already in progress.
-      const camp = requireCamp(attempt, "set-next-leader");
+      const camp = attempt.camp;
       if (camp.currentTrick.plays.length > 0) {
         throw new Error("toolkit: set-next-leader: trick already in progress");
       }
       return { ...attempt, camp: { ...camp, currentTrick: { ...camp.currentTrick, leaderSeatId: op.seatId } } };
-    }
-
-    case "cancel-boss-twist": {
-      // D-04: only before the deal.
-      if (attempt.camp !== null) {
-        throw new Error("toolkit: cancel-boss-twist: camp already dealt");
-      }
-      return { ...attempt, bossCancelled: true };
     }
 
     case "log": {
@@ -329,24 +312,19 @@ export function applyToolkitOps(run: RunState, actorSeatId: string, sourceId: So
     throw new Error("toolkit: applyToolkitOps: no attempt in progress");
   }
 
-  const beforeCamp = run.attempt.camp;
-  const beforeIds = beforeCamp ? campCardIds(beforeCamp) : null;
+  const beforeIds = campCardIds(run.attempt.camp);
 
   let next = run;
   for (const op of ops) {
     next = applyOp(next, actorSeatId, sourceId, op);
   }
 
-  const afterCamp = next.attempt!.camp;
-  if (afterCamp !== null) {
-    const afterIds = campCardIds(afterCamp);
-    const expected = beforeIds ?? [];
-    if (afterIds.length !== expected.length || afterIds.some((id, i) => id !== expected[i])) {
-      throw new Error("toolkit: card conservation violated");
-    }
-    if (new Set(afterIds).size !== afterIds.length) {
-      throw new Error("toolkit: card conservation violated");
-    }
+  const afterIds = campCardIds(next.attempt!.camp);
+  if (afterIds.length !== beforeIds.length || afterIds.some((id, i) => id !== beforeIds[i])) {
+    throw new Error("toolkit: card conservation violated");
+  }
+  if (new Set(afterIds).size !== afterIds.length) {
+    throw new Error("toolkit: card conservation violated");
   }
 
   return next;

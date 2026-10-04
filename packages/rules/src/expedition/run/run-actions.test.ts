@@ -1,5 +1,5 @@
 // Tests for run/run-actions.ts: the single applyRunAction dispatcher. Fake
-// items are declared inline (one pre-deal, three plain) beside the plain
+// items are declared inline (one between-tricks, three plain) beside the plain
 // characters. CampState fixtures for the delegation tests are hand-built
 // literals (matching actions.test.ts) rather than driven through createCamp,
 // so a single play can be forced to decide the camp deterministically.
@@ -9,17 +9,17 @@ import { ability, defineItem } from "../content/source-def";
 import type { CampState } from "../state";
 import { createRun, runPhase, runStatus } from "./lifecycle";
 import { applyRunAction } from "./run-actions";
-import { setupRun, testCatalog } from "./run-test-support";
+import { advanceTo, setupRun, testCatalog } from "./run-test-support";
 import type { AttemptState, RunState, SeatRun } from "./types";
 
 const plain = (id: string) => defineItem({ id, name: id, text: "Nothing happens." });
 const catalog = testCatalog({
   items: {
-    predeal: defineItem({
-      id: "predeal",
-      name: "Pre-deal",
-      text: "Does nothing before the deal.",
-      active: ability({ window: "pre-deal", limit: { kind: "per-run", times: 1 }, targets: [], apply: () => [] }),
+    spare: defineItem({
+      id: "spare",
+      name: "Spare",
+      text: "Does nothing between tricks.",
+      active: ability({ window: "between-tricks", limit: { kind: "per-run", times: 1 }, targets: [], apply: () => [] }),
     }),
     "item-a": plain("item-a"),
     "item-b": plain("item-b"),
@@ -78,14 +78,14 @@ function decidingCamp(): CampState {
   };
 }
 
-const ATTEMPT: AttemptState = { attemptNumber: 1, bossCancelled: false, effects: [], reveals: [], log: [], camp: null };
-
 function campRun(kits: Record<string, readonly string[]> = {}): RunState {
-  return { ...firesideRun(kits), attempt: { ...ATTEMPT, camp: decidingCamp() } };
+  const attempt: AttemptState = { attemptNumber: 1, effects: [], reveals: [], log: [], camp: decidingCamp() };
+  return { ...firesideRun(kits), attempt };
 }
 
-function preDealRun(): RunState {
-  return { ...firesideRun({ p0: ["predeal"] }), attempt: ATTEMPT };
+/** Between tricks of a dealt camp, with p0 holding the between-tricks item. */
+function betweenRun(): RunState {
+  return advanceTo(firesideRun({ p0: ["spare"] }), "between-tricks", catalog);
 }
 
 describe("applyRunAction: guards", () => {
@@ -205,10 +205,9 @@ describe("applyRunAction: pick-draft (RUN-04)", () => {
     expect(applyRunAction(first, "p0", { type: "pick-draft", sourceId: "item-a" }, catalog)).toEqual({ ok: false, error: "no_draft_pending" });
   });
 
-  it("rejects pick-draft in muster, pre-deal and camp as wrong_phase", () => {
+  it("rejects pick-draft in muster and camp as wrong_phase", () => {
     const pick = { type: "pick-draft", sourceId: "item-a" } as const;
     expect(applyRunAction(musterRun(), "p1", pick, catalog)).toEqual({ ok: false, error: "wrong_phase" });
-    expect(applyRunAction(preDealRun(), "p1", pick, catalog)).toEqual({ ok: false, error: "wrong_phase" });
     expect(applyRunAction(campRun(), "p1", pick, catalog)).toEqual({ ok: false, error: "wrong_phase" });
   });
 });
@@ -229,16 +228,11 @@ describe("applyRunAction: ready (D-07)", () => {
     expect(applyRunAction(first, "p0", { type: "ready" }, catalog)).toEqual({ ok: false, error: "already_ready" });
   });
 
-  it("starts the attempt when the last seat readies, landing on 'camp' with no pre-deal ability", () => {
+  it("starts and deals the attempt when the last seat readies", () => {
     const run = { ...firesideRun(), readySeatIds: ["p0", "p1"] };
     const state = ok(applyRunAction(run, "p2", { type: "ready" }, catalog));
     expect(runPhase(state)).toBe("camp");
     expect(state.readySeatIds).toEqual([]);
-  });
-
-  it("starts the attempt landing on 'pre-deal' when a seat holds a pre-deal item (D-07, D-12)", () => {
-    const run = { ...firesideRun({ p0: ["predeal"] }), readySeatIds: ["p0", "p1"] };
-    expect(runPhase(ok(applyRunAction(run, "p2", { type: "ready" }, catalog)))).toBe("pre-deal");
   });
 
   it("lets seats with a character ready during muster, and the last ready after the last pick starts the attempt", () => {
@@ -259,25 +253,14 @@ describe("applyRunAction: ready (D-07)", () => {
 
   it("rejects ready outside muster and the fireside as wrong_phase", () => {
     expect(applyRunAction(campRun(), "p1", { type: "ready" }, catalog)).toEqual({ ok: false, error: "wrong_phase" });
-    expect(applyRunAction(preDealRun(), "p1", { type: "ready" }, catalog)).toEqual({ ok: false, error: "wrong_phase" });
   });
 });
 
-describe("applyRunAction: skip-window and use-ability in pre-deal (D-12)", () => {
-  it("a pass by the pending seat is stamped and deals (runPhase becomes camp)", () => {
-    const state = ok(applyRunAction(preDealRun(), "p0", { type: "skip-window" }, catalog));
+describe("applyRunAction: skip-window and use-ability", () => {
+  it("using a between-tricks item records a use stamped with the trick", () => {
+    const state = ok(applyRunAction(betweenRun(), "p0", { type: "use-ability", sourceId: "spare", targets: [] }, catalog));
     expect(runPhase(state)).toBe("camp");
-    expect(state.seats[0]!.ledger).toEqual([{ kind: "passed", sourceId: "predeal", at: { camp: 1, attempt: 1, trick: null }, failedObjectiveIds: [] }]);
-  });
-
-  it("using the pre-deal item records a use and deals", () => {
-    const state = ok(applyRunAction(preDealRun(), "p0", { type: "use-ability", sourceId: "predeal", targets: [] }, catalog));
-    expect(runPhase(state)).toBe("camp");
-    expect(state.seats[0]!.ledger).toEqual([{ kind: "used", sourceId: "predeal", at: { camp: 1, attempt: 1, trick: null }, poolCost: 0 }]);
-  });
-
-  it("rejects a seat with nothing pending as nothing_to_skip", () => {
-    expect(applyRunAction(preDealRun(), "p1", { type: "skip-window" }, catalog)).toEqual({ ok: false, error: "nothing_to_skip" });
+    expect(state.seats[0]!.ledger).toEqual([{ kind: "used", sourceId: "spare", at: { camp: 1, attempt: 1, trick: 0 }, poolCost: 0 }]);
   });
 
   it("rejects skip-window in muster, at the fireside and in an ungated window as wrong_window", () => {
@@ -287,11 +270,11 @@ describe("applyRunAction: skip-window and use-ability in pre-deal (D-12)", () =>
   });
 
   it.each(PROTOTYPE_KEYS)("rejects using the prototype key %s as not_owned", (sourceId) => {
-    expect(applyRunAction(preDealRun(), "p0", { type: "use-ability", sourceId, targets: [] }, catalog)).toEqual({ ok: false, error: "not_owned" });
+    expect(applyRunAction(betweenRun(), "p0", { type: "use-ability", sourceId, targets: [] }, catalog)).toEqual({ ok: false, error: "not_owned" });
   });
 
   it("rejects using a source the seat does not hold as not_owned", () => {
-    expect(applyRunAction(preDealRun(), "p1", { type: "use-ability", sourceId: "predeal", targets: [] }, catalog)).toEqual({
+    expect(applyRunAction(betweenRun(), "p1", { type: "use-ability", sourceId: "spare", targets: [] }, catalog)).toEqual({
       ok: false,
       error: "not_owned",
     });

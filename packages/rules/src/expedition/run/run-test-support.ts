@@ -20,9 +20,8 @@ import { abilityStatus } from "./abilities";
 import { createRun, runPhase, runStatus } from "./lifecycle";
 import { applyRunAction } from "./run-actions";
 import { liveSourceIds } from "./usage";
-import { currentWindow, gatedPendingSeatIds, WINDOWS } from "./windows";
+import { currentWindow, WINDOWS } from "./windows";
 import { defineCharacter, defineUpgrade, type CharacterDef, type ItemDef, type SourceId } from "../content/source-def";
-import type { BossDef } from "../boss/boss-def";
 import type { Catalog, CampNumber, RunAction, RunState } from "./types";
 
 function plainCharacter(n: number): CharacterDef {
@@ -48,24 +47,22 @@ export const PLAIN_CHARACTERS: Readonly<Record<string, CharacterDef>> = Object.f
   }),
 );
 
-/** A catalogue of plain characters (unless given) plus the given items,
- * extra characters and bosses. */
+/** A catalogue of plain characters (unless given) plus the given items and
+ * extra characters. */
 export function testCatalog(parts: {
   readonly characters?: Readonly<Record<string, CharacterDef>>;
   readonly items?: Readonly<Record<string, ItemDef>>;
-  readonly bosses?: Readonly<Record<string, BossDef>>;
 } = {}): Catalog {
   return buildCatalog({
     characters: { ...PLAIN_CHARACTERS, ...parts.characters },
     items: parts.items ?? {},
-    bosses: parts.bosses ?? {},
   });
 }
 
 /** Builds a fireside RunState past muster: each seat gets `characters[seat]`
  * or the catalogue's next unclaimed plain character, and `kits[seat]` as its
  * kit, with drafts cleared so a test can call `ready` at once.
- * `campNumber`/`supplies`/`bossTwists` default to createRun's values. */
+ * `campNumber`/`supplies` default to createRun's values. */
 export function setupRun(opts: {
   seatIds: readonly string[];
   seed: string;
@@ -74,7 +71,6 @@ export function setupRun(opts: {
   supplies?: number;
   characters?: Readonly<Record<string, string>>;
   kits?: Readonly<Record<string, readonly SourceId[]>>;
-  bossTwists?: { readonly 3: string | null; readonly 6: string | null };
 }): RunState {
   const run = createRun({ seatIds: opts.seatIds, seed: opts.seed });
   const chosen = Object.values(opts.characters ?? {});
@@ -90,7 +86,6 @@ export function setupRun(opts: {
     ...run,
     campNumber: opts.campNumber ?? run.campNumber,
     supplies: opts.supplies ?? run.supplies,
-    bossTwists: opts.bossTwists ?? run.bossTwists,
     seats,
   };
 }
@@ -98,17 +93,10 @@ export function setupRun(opts: {
 /** Drives `run` forward through applyRunAction ONLY until `target` is
  * reached: readies every seat (throws if any seat's draft is still pending —
  * callers must resolve drafts first, or use setupRun which clears them),
- * then — for "pre-deal" — returns as soon as the attempt starts in the
- * pre-deal window (throws if the deal happened immediately because no seat
- * had a pre-deal ability); otherwise resolves every pending pre-deal
- * seat by skipping, and — for "between-tricks" — additionally has the
- * current actor pick their first unowned objective, repeatedly, until the
- * window opens. Throws on any rejected action or if the run ends first. */
-export function advanceTo(
-  run: RunState,
-  target: "pre-deal" | "objective-pick" | "between-tricks",
-  catalog: Catalog,
-): RunState {
+ * which deals the camp; for "between-tricks" the current actor then picks
+ * their first unowned objective, repeatedly, until the window opens. Throws
+ * on any rejected action or if the run ends first. */
+export function advanceTo(run: RunState, target: "objective-pick" | "between-tricks", catalog: Catalog): RunState {
   let next = run;
 
   for (const seatId of next.seatIds) {
@@ -118,24 +106,6 @@ export function advanceTo(
       throw new Error(`advanceTo: ready rejected for seat "${seatId}": ${result.error}`);
     }
     next = result.state;
-  }
-
-  if (target === "pre-deal") {
-    if (runPhase(next) !== "pre-deal") {
-      throw new Error("advanceTo: expected pre-deal, but the deal already happened (no seat had a pre-deal ability)");
-    }
-    return next;
-  }
-
-  while (runPhase(next) === "pre-deal") {
-    const pending = gatedPendingSeatIds(next, catalog);
-    for (const seatId of pending) {
-      const result = applyRunAction(next, seatId, { type: "skip-window" }, catalog);
-      if (!result.ok) {
-        throw new Error(`advanceTo: skip-window rejected for seat "${seatId}": ${result.error}`);
-      }
-      next = result.state;
-    }
   }
 
   if (target === "objective-pick") {
@@ -150,7 +120,7 @@ export function advanceTo(
   for (;;) {
     const rules = rulesFor(next, catalog);
     if (currentWindow(next, rules) === "between-tricks") return next;
-    if (next.attempt === null || next.attempt.camp === null) {
+    if (next.attempt === null) {
       throw new Error("advanceTo: run left the camp before reaching between-tricks");
     }
     const camp = next.attempt.camp;
@@ -223,12 +193,7 @@ export function enumerateLegalRunActions(
       }
       candidates.push({ seatId: seat.seatId, action: { type: "ready" } });
     }
-  } else if (phase === "pre-deal") {
-    for (const seat of run.seats) {
-      candidates.push({ seatId: seat.seatId, action: { type: "skip-window" } });
-    }
-    candidates.push(...abilityCandidates(run, catalog));
-  } else if (phase === "camp" && run.attempt !== null && run.attempt.camp !== null) {
+  } else if (phase === "camp" && run.attempt !== null) {
     const camp = run.attempt.camp;
     const rules = rulesFor(run, catalog);
     const actorSeatId = currentActorSeatId(camp, rules);

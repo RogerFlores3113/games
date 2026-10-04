@@ -1,12 +1,11 @@
-// Phase 12, Plan 02: SOURCE_DISPLAY, CHARACTER_DISPLAY and BOSS_DISPLAY are
+// Phase 12, Plan 02: SOURCE_DISPLAY and CHARACTER_DISPLAY are
 // function-free projections of the production catalogue. Key coverage
 // iterates CATALOG so a new source is covered with no edit here; the
 // per-entry values are literal, so a drift in what the client shows fails.
 
 import { describe, expect, it } from "vitest";
 import { CATALOG } from "../run/catalog";
-import { BOSS_REGISTRY } from "../boss/registry";
-import { BOSS_DISPLAY, CHARACTER_DISPLAY, SOURCE_DISPLAY } from "./catalog-display";
+import { CHARACTER_DISPLAY, SOURCE_DISPLAY } from "./catalog-display";
 
 describe("SOURCE_DISPLAY", () => {
   it("has exactly one entry per source in the catalogue", () => {
@@ -42,7 +41,8 @@ describe("SOURCE_DISPLAY", () => {
 
   it("phrases each limit kind", () => {
     expect(SOURCE_DISPLAY.scout!.active!.limitBadge).toBe("1 per camp");
-    expect(SOURCE_DISPLAY["rain-poncho"]!.active!.limitBadge).toBe("Once per run");
+    expect(SOURCE_DISPLAY["trail-map"]!.active!.limitBadge).toBe("Once per run");
+    expect(SOURCE_DISPLAY["rain-poncho"]!.active!.limitBadge).toBe("2 per run");
     expect(SOURCE_DISPLAY.whetstone!.active!.limitBadge).toBe("Single use");
     expect(SOURCE_DISPLAY.botanist!.active!.limitBadge).toBe("1 herb");
     expect(SOURCE_DISPLAY["botanist.antidote"]!.active!.limitBadge).toBe("2 herbs");
@@ -50,7 +50,7 @@ describe("SOURCE_DISPLAY", () => {
   });
 
   it("phrases each window", () => {
-    expect(SOURCE_DISPLAY["rain-poncho"]!.active!.windowPhrase).toBe("Before the deal");
+    expect(SOURCE_DISPLAY["rain-poncho"]!.active!.windowPhrase).toBe("Between tricks");
     expect(SOURCE_DISPLAY.cartographer!.active!.windowPhrase).toBe("While picking objectives");
     expect(SOURCE_DISPLAY["guide.howler-call"]!.active!.windowPhrase).toBe("On your turn");
     expect(SOURCE_DISPLAY.medic!.active!.windowPhrase).toBe("When an objective fails");
@@ -78,28 +78,6 @@ describe("CHARACTER_DISPLAY", () => {
 
   it("is JSON round-trippable", () => {
     for (const display of Object.values(CHARACTER_DISPLAY)) {
-      expect(JSON.parse(JSON.stringify(display))).toEqual(display);
-    }
-  });
-});
-
-describe("BOSS_DISPLAY", () => {
-  it("has exactly the same keys as BOSS_REGISTRY", () => {
-    expect(Object.keys(BOSS_DISPLAY)).toEqual(Object.keys(BOSS_REGISTRY));
-  });
-
-  it('radio-silence.name is "Monsoon"', () => {
-    expect(BOSS_DISPLAY["radio-silence"]?.name).toBe("Monsoon");
-  });
-
-  it("no BOSS_DISPLAY value carries a modifiers key", () => {
-    for (const display of Object.values(BOSS_DISPLAY)) {
-      expect(display).not.toHaveProperty("modifiers");
-    }
-  });
-
-  it("is JSON round-trippable", () => {
-    for (const display of Object.values(BOSS_DISPLAY)) {
       expect(JSON.parse(JSON.stringify(display))).toEqual(display);
     }
   });

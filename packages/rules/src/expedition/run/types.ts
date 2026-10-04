@@ -9,10 +9,10 @@
 // Phase 9's CampState discipline (no stored phase/outcome/tricks-won).
 //
 // RESET-ON-REPLAY CONTRACT (research A4): everything inside AttemptState
-// (bossCancelled, effects, reveals, log, camp) is reset to a fresh attempt
-// on every replay (RUN-06). RunState's top-level fields — seatIds,
-// campNumber, supplies, seats (character, kit, draft offers, ledgers),
-// bossTwists, readySeatIds, history — persist across a replay and across
+// (effects, reveals, log, camp) is reset to a fresh attempt on every
+// replay (RUN-06). RunState's top-level fields — seatIds, campNumber,
+// supplies, seats (character, kit, draft offers, ledgers), readySeatIds,
+// history — persist across a replay and across
 // camps; only `attempt` is torn down and rebuilt. Per-camp limits need no
 // reset: they count ledger entries stamped with the current (camp, attempt).
 //
@@ -27,18 +27,15 @@
 // same names; run/rng.ts's STREAMS is the single builder that realizes it):
 //   - draft upgrade slot: "expedition-draft:camp{N}:seat{seatId}:upgrade"
 //   - draft item slots:   "expedition-draft:camp{N}:seat{seatId}:items"
-//   - boss:                "expedition-boss:camp{N}"
 //   - attempt deal seed:   "{seed}:camp{N}:attempt{A}"
 //   - trick-count kind:    "expedition-trickcount-kind:camp{N}:attempt{A}"
 //   - trick-count N:       "expedition-trickcount-n:camp{N}:attempt{A}"
-//   - face-down assign:    "expedition-face-down:camp{N}:attempt{A}"
 //   - ability draws:       "expedition-ability:camp{N}:attempt{A}:seat{id}:use{k}:draw{j}"
 //     where k = the seat's ledger length before the use and j counts draws
 //     inside one `apply`.
-// The rule: two draws never share a stream name. Draft and boss draws
-// happen AT MOST ONCE per camp number per run (a draft only follows a
-// CLEAR, a boss twist is drawn only on first reaching the camp — D-01/D-02),
-// so their names deliberately omit the attempt number. Every ability draw
+// The rule: two draws never share a stream name. A draft happens AT MOST
+// ONCE per camp number per run (it only follows a CLEAR, D-01), so its
+// names deliberately omit the attempt number. Every ability draw
 // carries camp, attempt, seat, the seat's use index k and a draw counter j,
 // so repeated uses never collide.
 //
@@ -67,19 +64,17 @@
 // (run/targets.ts resolves them).
 
 import type { CampError, CampState } from "../state";
-import type { BossDef } from "../boss/boss-def";
 import type { CharacterDef, EffectParams, ItemDef, SourceDef, SourceId } from "../content/source-def";
 
 export type CampNumber = 1 | 2 | 3 | 4 | 5 | 6;
 export type BossCampNumber = 3 | 6;
 
-/** When a ledger entry happened. `trick` is completedTricks.length, or null
- * before the deal. */
-export type Stamp = { readonly camp: CampNumber; readonly attempt: number; readonly trick: number | null };
+/** When a ledger entry happened. `trick` is completedTricks.length. */
+export type Stamp = { readonly camp: CampNumber; readonly attempt: number; readonly trick: number };
 
 export type LedgerEntry =
   | { readonly kind: "used"; readonly sourceId: SourceId; readonly at: Stamp; readonly poolCost: number } // 0 unless a pool limit
-  | { readonly kind: "passed"; readonly sourceId: SourceId; readonly at: Stamp; readonly failedObjectiveIds: readonly string[] } // gated-window pass; the failures it declined ([] before the deal)
+  | { readonly kind: "passed"; readonly sourceId: SourceId; readonly at: Stamp; readonly failedObjectiveIds: readonly string[] } // gated-window pass; the failures it declined
   | { readonly kind: "regained"; readonly amount: number; readonly at: Stamp }; // pool regain on a clear
 
 export type SeatRun = {
@@ -118,11 +113,10 @@ export type ActiveEffect<P extends EffectParams = EffectParams> = {
 
 export type AttemptState = {
   readonly attemptNumber: number; // 1-based per campNumber
-  readonly bossCancelled: boolean; // Rain Poncho, this attempt only (D-04)
   readonly effects: readonly ActiveEffect[]; // mid-camp modifiers (add-modifier), this attempt only
   readonly reveals: readonly Reveal[]; // COMM-02: cleared with the attempt
   readonly log: readonly LogEntry[];
-  readonly camp: CampState | null; // null during the pre-deal window
+  readonly camp: CampState;
 };
 
 export type CampResult = {
@@ -138,14 +132,13 @@ export type RunState = {
   readonly campNumber: CampNumber;
   readonly supplies: number;
   readonly seats: readonly SeatRun[]; // same order as seatIds
-  readonly bossTwists: { readonly 3: string | null; readonly 6: string | null }; // D-02 fixed per boss camp
   readonly readySeatIds: readonly string[]; // D-07 (pure data; disconnect handling is the room layer's)
   readonly attempt: AttemptState | null; // null = muster, fireside (or run over)
   readonly history: readonly CampResult[];
 };
 
 export type RunStatus = "in_progress" | "won" | "lost";
-export type RunPhase = "muster" | "fireside" | "pre-deal" | "camp" | "ended";
+export type RunPhase = "muster" | "fireside" | "camp" | "ended";
 
 export type RunAction =
   | { readonly type: "pick-character"; readonly characterId: string }
@@ -181,7 +174,6 @@ export type RunError =
 export type Catalog = {
   readonly characters: Readonly<Record<string, CharacterDef>>;
   readonly items: Readonly<Record<string, ItemDef>>;
-  readonly bosses: Readonly<Record<string, BossDef>>;
   /** Every character, every character's upgrades and every item, by id. */
   readonly sources: Readonly<Record<SourceId, SourceDef>>;
 };

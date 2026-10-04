@@ -6,12 +6,11 @@ both the Cloudflare Worker (source of truth) and the Next.js client (display
 only; the client never decides legality). See `purity.test.ts` for the
 enforced import and API restrictions.
 
-ENG-01's promise: adding an item, a character, an objective kind, a boss
-twist, a hook or a toolkit op is **one new file plus one registry (or union
-or list) line**, and the catalogue contract tests
-(`content/sources.contract.test.ts`, `run/targets.contract.test.ts`,
-`boss/boss.contract.test.ts`, `objective-kinds.contract.test.ts`) cover the
-new entry with no test edits (ENG-02). Every recipe below names the exact
+ENG-01's promise: adding an item, a character, an objective kind, a hook or
+a toolkit op is **one new file plus one registry (or union or list) line**,
+and the catalogue contract tests (`content/sources.contract.test.ts`,
+`run/targets.contract.test.ts`, `objective-kinds.contract.test.ts`) cover
+the new entry with no test edits (ENG-02). Every recipe below names the exact
 files and identifiers involved.
 
 ## Layout
@@ -22,8 +21,8 @@ files and identifiers involved.
   `currentActorSeatId`), `actions.ts` (`applyCampAction`), `objectives.ts`
   (`OBJECTIVE_KINDS`, `evaluateObjective`), `rules.ts` (`CoreRules` with
   `isTrump` and `rankOf`, `baseRules`), `deck.ts`, `trick.ts`, `leader.ts`,
-  `legality.ts`. The Core never imports a boss or source id; it only calls
-  through a `CoreRules` value.
+  `legality.ts`. The Core never imports a source id; it only calls through
+  a `CoreRules` value.
 - **`content/`**: the catalogue. `content/source-def.ts` holds the def types
   (`CharacterDef`, `UpgradeDef`, `ItemDef`, `ActiveAbility`,
   `PassiveAbility`, `UsageLimit`, `PoolDef`, `AbilityContext`) and the
@@ -32,27 +31,24 @@ files and identifiers involved.
   two upgrades; `content/items/<id>.ts` is one item. Each folder has a
   `registry.ts` (`CHARACTERS`, `ITEMS`). `content/helpers.ts` holds shared
   effect helpers (`winnerExcluding`, `freshObjectiveAvailable`).
-- **`boss/`**: one file per boss twist (a `BossDef`), plus `boss/registry.ts`'s
-  `BOSS_REGISTRY`.
 - **`run/`**: the six-camp run on top of Core. `run/types.ts` (`RunState`,
   `SeatRun` with its `ledger`, `RunAction`, `Catalog`), `run/lifecycle.ts`
-  (muster, `startAttempt`, `dealAttempt`, rescue-aware `settleIfDecided`,
-  `advanceRun`), `run/run-actions.ts` (`applyRunAction`, the single run-level
+  (muster, `startAttempt`, which deals at once, rescue-aware
+  `settleIfDecided`), `run/run-actions.ts` (`applyRunAction`, the single run-level
   transition), `run/abilities.ts` (`abilityStatus`, `useAbility`,
   `passWindow`), `run/targets.ts` (`TARGET_KINDS`, `resolveTargets`,
   `stepsFor`), `run/windows.ts` (`WINDOWS`, `currentWindow`,
   `gatedPendingSeatIds`), `run/usage.ts` (`remaining`, `poolBalance`,
-  `liveSourceIds`), `run/visibility.ts` (`visibleObjectives`),
-  `run/compose.ts` (`rulesFor`, the rule layers), `run/run-rules.ts`
+  `liveSourceIds`), `run/compose.ts` (`rulesFor`, the rule layers), `run/run-rules.ts`
   (`RunHooks`, `HOOK_NAMES`), `run/toolkit.ts` (`ToolkitOp`,
   `applyToolkitOps`, the only mutation surface for abilities),
   `run/draft.ts`, `run/whisper.ts`, `run/balance.ts` (the tunable ramp),
   `run/rng.ts` (`STREAMS`, `seededIndex`) and `run/catalog.ts`'s `CATALOG`
-  (`{ characters, items, bosses }` plus the flattened `sources` index).
+  (`{ characters, items }` plus the flattened `sources` index).
 
-**Layering order** (`run/compose.ts`): **base, then the active boss twist,
-then per seat (seat order) each live source's passive in `[character,
-...kit]` order, then each live effect's layer in `attempt.effects` order.**
+**Layering order** (`run/compose.ts`): **base, then per seat (seat order)
+each live source's passive in `[character, ...kit]` order, then each live
+effect's layer in `attempt.effects` order.**
 Each layer's `RuleModifier` maps the previous layer's answer to its own, hook
 by hook. The card-reading hooks `isTrump` and `rankOf` fold first (WR-03);
 every other hook folds over the base built from them. A trick-scoped effect
@@ -75,9 +71,7 @@ draw derives a fresh, uniquely named stream via `run/rng.ts`'s `STREAMS`:
 |---|---|
 | Draft, upgrade slot | `expedition-draft:camp{N}:seat{id}:upgrade` |
 | Draft, item slots | `expedition-draft:camp{N}:seat{id}:items` |
-| Boss selection | `expedition-boss:camp{N}` |
 | Attempt deal seed | `{seed}:camp{N}:attempt{A}` |
-| Face-down assignment (Thick Fog) | `expedition-face-down:camp{N}:attempt{A}` |
 | Ability draws (`ctx.randomCards`, `ctx.randomIndex`) | `expedition-ability:camp{N}:attempt{A}:seat{id}:use{k}:draw{j}` |
 
 `k` is the seat's ledger length before the use and `j` counts draws inside
@@ -163,9 +157,9 @@ that card can't win this one trick.
    for every eligible seat to use or pass), `isOpen(run, rules)` and
    `mayAct(run, rules, seatId)`. The `isOpen` predicates must stay mutually
    exclusive: `currentWindow` assumes at most one is open.
-2. A gated window needs a hold in `run/lifecycle.ts`'s `advanceRun` (pre-deal
-   holds the deal; rescue holds the settle) and is passed with
-   `skip-window`. `gatedPendingSeatIds` already counts any gated window.
+2. A gated window needs a hold in `run/lifecycle.ts`'s `settleIfDecided`
+   (rescue holds the settle) and is passed with `skip-window`.
+   `gatedPendingSeatIds` already counts any gated window.
 3. The web client shows a gated window as the banner on the stump
    (`buildBanner` in `apps/web/lib/expedition/build-scene-model.ts`); an open
    window needs nothing more, since `yourAbilities` already says what is
@@ -201,33 +195,6 @@ that card can't win this one trick.
    the existing four kinds needed none beyond that split, but this is not
    a promise that every future kind is literally zero extra lines in
    `camp.ts`.
-
-## Add a boss twist
-
-1. Create `boss/<id>.ts` exporting a `BossDef` (`boss/boss-def.ts`): `id`,
-   `name`, `text`, and `modifiers`: a plain `RuleModifier`, composed exactly
-   like a source's passive or effect layer (see
-   `boss/radio-silence.ts`'s single `whisperAllowed` override, or
-   `boss/mutiny.ts`'s single `failureChecks` override). A boss twist has no
-   `apply`, no toolkit ops, no targets — it is pure hook data, active for the
-   whole camp from `run/compose.ts`'s `activeBossId` (unless cancelled this
-   attempt by Rain Poncho, D-04).
-2. Add one line to `boss/registry.ts`'s `BOSS_REGISTRY` object literal.
-   `BossId` (`keyof typeof BOSS_REGISTRY`) and camp 6's twist-pool exclusion
-   of camp 3's twist (D-03, `run/lifecycle.ts`'s `drawBossTwist`) both pick
-   up the new entry with no other change.
-3. `boss/boss.contract.test.ts` iterates `Object.entries(BOSS_REGISTRY)` and
-   drives a real camp-3 attempt at 3/4/5 players to a decided outcome for
-   every registered twist automatically — shape (every `modifiers` key is a
-   known `HookName`), card conservation, a JSON round-trip, a full replay
-   producing a byte-identical action log (determinism), and the per-seat
-   leak check (adapter/view-leak-check.ts, run for every seat and an
-   unseated viewer).
-
-Note again: the four v1 twists (Monsoon/`radio-silence`, Eclipse/`eclipse`,
-Thick Fog/`blind-orders`, Mutiny/`mutiny`) are explicitly **provisional
-placeholders**, expected to be replaced by more original, jungle-native
-twists later. This recipe is exactly what that replacement will use.
 
 ## Add a hook
 
@@ -313,8 +280,7 @@ to turn it on. The web app shows the panel when `NODE_ENV` is `development`
   "Bots act automatically" re-runs bot autoplay after every change.
 - Shortcuts: jump to a camp, jump to the final camp, end the run won or lost,
   force the camp to succeed or fail, set supplies, set a seat's character or
-  kit, give a source, set a boss twist, move a card between hands, set an
-  objective's owner.
+  kit, give a source, move a card between hands, set an objective's owner.
 - Reveal all hands: a plain-text dump of every hand, objective and trick.
 - State: the whole `RunState` as JSON. Edit and Apply; the worker parses it
   with `ExpeditionRunStateSchema` and then `dev/check.ts` (card conservation,
@@ -392,10 +358,10 @@ whichever shortcuts touch the changed fields.
 `adapter/request-guards.ts` (hostile-input `unknown` → `RunAction` narrowing)
 and `adapter/view-leak-check.ts` (`checkExpeditionViewForLeaks`/
 `secretsForExpeditionSeat`, the real per-seat leak checker) are this
-engine's only seam to the room layer. A new source, target kind or boss
+engine's only seam to the room layer. A new source or target kind
 registered per the recipes above is leak-checked automatically by
-`sources.contract.test.ts`, `targets.contract.test.ts` and
-`boss.contract.test.ts`, which call the real checker for every registered
-entry with zero test edits. `adapter/catalog-display.ts` projects the
-catalogue for the client (`SOURCE_DISPLAY`, `CHARACTER_DISPLAY`,
-`BOSS_DISPLAY`): names, text, window and limit badges, never a function.
+`sources.contract.test.ts` and `targets.contract.test.ts`, which call the
+real checker for every registered entry with zero test edits.
+`adapter/catalog-display.ts` projects the catalogue for the client
+(`SOURCE_DISPLAY`, `CHARACTER_DISPLAY`): names, text, window and limit
+badges, never a function.

@@ -10,10 +10,7 @@ export const trailMap = defineItem({
     limit: { kind: "per-run", times: 1 },
     targets: [{ kind: "player", who: "teammate" }],
     canTarget: (ctx) => {
-      // WR-02: under Thick Fog a refusal would reveal a teammate's hidden
-      // objectives, so a swap of nothing is allowed instead.
-      if (ctx.rules.objectiveAssignment(ctx.run) === "face-down") return true;
-      const camp = ctx.camp!;
+      const camp = ctx.camp;
       return hasPendingObjective(camp, ctx.self) || hasPendingObjective(camp, ctx.targets[0].seatId)
         ? true
         : "Neither of you has an open objective";

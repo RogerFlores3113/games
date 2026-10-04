@@ -12,8 +12,8 @@
 // pairwise-distinct over the full camp/attempt/seat/use-index/draw grid.
 //
 // seededIndex is the single seeded-draw primitive every later plan uses for
-// a 0..n-1 pick (ability draws, Thick Fog's face-down assignment,
-// camp 5's trick-count kind/N draws). It never falls back to Math.random.
+// a 0..n-1 pick (ability draws and camp 5's trick-count
+// kind/N draws). It never falls back to Math.random.
 
 import { nextRandom, seedToRngState } from "../../shuffle";
 
@@ -28,17 +28,11 @@ export const STREAMS = {
   draftItems(campNumber: number, seatId: string): string {
     return `expedition-draft:camp${campNumber}:seat${seatId}:items`;
   },
-  boss(campNumber: number): string {
-    return `expedition-boss:camp${campNumber}`;
-  },
   trickCountKind(campNumber: number, attemptNumber: number): string {
     return `expedition-trickcount-kind:camp${campNumber}:attempt${attemptNumber}`;
   },
   trickCountN(campNumber: number, attemptNumber: number): string {
     return `expedition-trickcount-n:camp${campNumber}:attempt${attemptNumber}`;
-  },
-  faceDown(campNumber: number, attemptNumber: number): string {
-    return `expedition-face-down:camp${campNumber}:attempt${attemptNumber}`;
   },
   ability(campNumber: number, attemptNumber: number, seatId: string, useIndex: number, draw: number): string {
     return `expedition-ability:camp${campNumber}:attempt${attemptNumber}:seat${seatId}:use${useIndex}:draw${draw}`;

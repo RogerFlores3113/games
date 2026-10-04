@@ -1,13 +1,11 @@
-// A phaser-free, function-free display catalogue of the sources and boss
-// twists, exported from @games/rules for the web client. This is an explicit
+// A phaser-free, function-free display catalogue of the sources, exported from @games/rules for the web client. This is an explicit
 // ALLOWLIST projection: it never carries a function or a RuleModifier, so
 // JSON.parse(JSON.stringify(v)) deep-equals v for every value. Window and
 // limit badges come from the defs, so a source's text never repeats them.
 //
 // This file lives under adapter/ because purity.test.ts's Core fence forbids
-// top-level files from importing ./run or ./boss.
+// top-level files from importing ./run.
 
-import { BOSS_REGISTRY } from "../boss/registry";
 import { resolveTuned, type ActiveAbility, type CharacterDef, type Owner, type SourceDef } from "../content/source-def";
 import { CATALOG } from "../run/catalog";
 import type { TargetKind } from "../run/targets";
@@ -46,8 +44,6 @@ export type CharacterDisplay = {
   pool: { name: string; start: number; max: number } | null;
   upgradeIds: string[];
 };
-
-export type BossDisplay = { id: string; name: string; text: string };
 
 /** Badges show the untuned limit: an owner with no upgrades. */
 const BASE_OWNER: Owner = { seatId: "", hasUpgrade: () => false };
@@ -111,17 +107,6 @@ export const CHARACTER_DISPLAY: Readonly<Record<string, CharacterDisplay>> = Obj
       power: def.power,
       pool: def.pool === undefined ? null : { name: def.pool.name, start: def.pool.start, max: def.pool.max },
       upgradeIds: def.upgrades.map((upgrade) => upgrade.id),
-    },
-  ]),
-);
-
-export const BOSS_DISPLAY: Readonly<Record<string, BossDisplay>> = Object.fromEntries(
-  Object.entries(BOSS_REGISTRY).map(([id, def]) => [
-    id,
-    {
-      id: def.id,
-      name: def.name,
-      text: def.text,
     },
   ]),
 );

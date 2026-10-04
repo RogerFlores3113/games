@@ -21,7 +21,7 @@ interface CampModel {
   hand: { id: string; objectId: string; label: string; playable: boolean; targetable: boolean }[];
   trick: { plays: { seatId: string; card: { id: string; objectId: string; targetable: boolean } }[] } | null;
   faceUpObjectives: Chip[];
-  banner: { window: string; youPending: boolean; title: string; detail: string } | null;
+  banner: { youPending: boolean; title: string; detail: string } | null;
   tray: { options: { choiceId: string; objectId: string }[] } | null;
   targeting: { canConfirm: boolean } | null;
   prompt: { text: string };
@@ -61,7 +61,7 @@ async function playUntilRescue(host: Page, pages: Page[]): Promise<boolean> {
       await readyAll(pages);
       continue;
     }
-    if (model.banner?.window === "rescue") {
+    if (model.banner !== null) {
       if (model.banner.youPending) return true;
       for (const p of pages.slice(1)) expect((await getModel<CampModel>(p)).banner?.detail).toMatch(/Waiting on Roger/);
     }
@@ -125,8 +125,8 @@ test.describe("Expedition characters and abilities", () => {
         await waitForScene(page, "camp");
         let model = await getModel<CampModel>(page);
         if (kind === "failed-objective") {
-          expect(model.banner).toMatchObject({ window: "rescue", youPending: true });
-          model = await clickUntilChanged<CampModel>(page, `predeal-use:${scenario.sourceId}`, (m) => m.targeting !== null);
+          expect(model.banner).toMatchObject({ youPending: true });
+          model = await clickUntilChanged<CampModel>(page, `gate-use:${scenario.sourceId}`, (m) => m.targeting !== null);
         } else {
           model = await clickUntilChanged<CampModel>(page, `source:${scenario.sourceId}`, (m) => m.targeting !== null);
         }
@@ -225,7 +225,7 @@ test.describe("Expedition characters and abilities", () => {
       expect(await playUntilRescue(page, pages), "an objective failed and the Medic was asked to rescue it").toBe(true);
       expect((await getModel<CampModel>(page)).banner!.title).toMatch(/^Objectives? failed: /);
       await page.screenshot({ path: ".audit/abilities/rescue-banner.png" });
-      await clickUntilChanged<CampModel>(page, "predeal-use:medic", (m) => m.targeting !== null);
+      await clickUntilChanged<CampModel>(page, "gate-use:medic", (m) => m.targeting !== null);
       const failed = (await getModel<CampModel>(page)).seats.flatMap((s) => s.objectives).find((o) => o.targetable)!;
       await clickUntilChanged<CampModel>(page, failed.objectId, (m) => m.targeting?.canConfirm === true);
       await clickUntilChanged<CampModel>(page, "confirm", (m) => m.sceneKey !== "camp" || m.targeting === null);
@@ -258,7 +258,7 @@ test.describe("Expedition characters and abilities", () => {
 
       const left = Date.now();
       await page.close();
-      await expect.poll(async () => (await getModel<CampModel>(bianca)).banner?.window ?? null, { timeout: 90_000, intervals: [1_000] }).not.toBe("rescue");
+      await expect.poll(async () => (await getModel<CampModel>(bianca)).banner ?? null, { timeout: 90_000, intervals: [1_000] }).toBeNull();
       const waited = Date.now() - left;
       expect(waited, "the pass waited out the grace period").toBeGreaterThanOrEqual(29_000);
       await bianca.screenshot({ path: ".audit/abilities/after-auto-pass.png" });

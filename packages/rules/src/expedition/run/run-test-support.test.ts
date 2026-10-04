@@ -1,10 +1,9 @@
 // Tests for run/run-test-support.ts: setupRun, advanceTo,
 // enumerateLegalRunActions, driveRun, replayRun. A small catalogue is used
-// throughout: plain characters plus one item per window and one boss.
+// throughout: plain characters plus one item per window.
 
 import { describe, expect, it } from "vitest";
 import { ability, defineItem } from "../content/source-def";
-import type { BossDef } from "../boss/boss-def";
 import { rulesFor } from "./compose";
 import { createRun, runPhase, runStatus } from "./lifecycle";
 import { applyRunAction } from "./run-actions";
@@ -12,12 +11,6 @@ import { advanceTo, driveRun, enumerateLegalRunActions, replayRun, setupRun, tes
 import { currentWindow } from "./windows";
 
 const ITEMS = {
-  "item-predeal": defineItem({
-    id: "item-predeal",
-    name: "Pre-deal item",
-    text: "Does nothing before the deal.",
-    active: ability({ window: "pre-deal", limit: { kind: "per-run", times: 1 }, targets: [], apply: () => [] }),
-  }),
   "item-objpick": defineItem({
     id: "item-objpick",
     name: "Objective-pick item",
@@ -47,10 +40,7 @@ const ITEMS = {
     passive: { modifier: () => ({}) },
   }),
 };
-const BOSSES: Record<string, BossDef> = {
-  "boss-1": { id: "boss-1", name: "Boss One", text: "", modifiers: {} },
-};
-const catalog = testCatalog({ items: ITEMS, bosses: BOSSES });
+const catalog = testCatalog({ items: ITEMS });
 const SEAT_IDS = ["p0", "p1", "p2"];
 
 describe("setupRun", () => {
@@ -76,11 +66,6 @@ describe("setupRun", () => {
     expect(setupRun({ seatIds: SEAT_IDS, seed: "s", catalog, supplies: 7 }).supplies).toBe(7);
   });
 
-  it("honors a bossTwists override", () => {
-    const run = setupRun({ seatIds: SEAT_IDS, seed: "s", catalog, campNumber: 3, bossTwists: { 3: "boss-1", 6: null } });
-    expect(run.bossTwists).toEqual({ 3: "boss-1", 6: null });
-  });
-
   it("throws when the catalogue has too few characters for the crew", () => {
     const tiny = testCatalog();
     const noSpare = { ...tiny, characters: { "plain-1": tiny.characters["plain-1"]! } };
@@ -89,19 +74,7 @@ describe("setupRun", () => {
 });
 
 describe("advanceTo", () => {
-  it("reaches pre-deal when a seat holds a pre-deal item, and currentWindow agrees", () => {
-    const run = setupRun({ seatIds: SEAT_IDS, seed: "adv-1", catalog, kits: { p0: ["item-predeal"] } });
-    const result = advanceTo(run, "pre-deal", catalog);
-    expect(runPhase(result)).toBe("pre-deal");
-    expect(currentWindow(result, rulesFor(result, catalog))).toBe("pre-deal");
-  });
-
-  it("throws for 'pre-deal' when no seat has a pre-deal ability (the deal already happened)", () => {
-    const run = setupRun({ seatIds: SEAT_IDS, seed: "adv-2", catalog });
-    expect(() => advanceTo(run, "pre-deal", catalog)).toThrow();
-  });
-
-  it("reaches objective-pick with no pre-deal ability anywhere", () => {
+  it("reaches objective-pick once every seat readies", () => {
     const result = advanceTo(setupRun({ seatIds: SEAT_IDS, seed: "adv-3", catalog }), "objective-pick", catalog);
     expect(runPhase(result)).toBe("camp");
     expect(currentWindow(result, rulesFor(result, catalog))).toBe("objective-pick");
@@ -111,12 +84,6 @@ describe("advanceTo", () => {
     const result = advanceTo(setupRun({ seatIds: SEAT_IDS, seed: "adv-4", catalog }), "between-tricks", catalog);
     expect(runPhase(result)).toBe("camp");
     expect(currentWindow(result, rulesFor(result, catalog))).toBe("between-tricks");
-  });
-
-  it("skips a pre-deal item to reach the deal", () => {
-    const run = setupRun({ seatIds: SEAT_IDS, seed: "adv-5", catalog, kits: { p0: ["item-predeal"] } });
-    const result = advanceTo(run, "objective-pick", catalog);
-    expect(result.seats[0]!.ledger).toEqual([{ kind: "passed", sourceId: "item-predeal", at: { camp: 1, attempt: 1, trick: null }, failedObjectiveIds: [] }]);
   });
 });
 

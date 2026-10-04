@@ -37,7 +37,7 @@ function abilityContext<S extends readonly TargetSpec[]>(
     if (!drawsAllowed) throw new Error(`abilities: "${sourceId}" drew randomness outside apply`);
     return STREAMS.ability(run.campNumber, attempt.attemptNumber, self, seat.ledger.length, draw++);
   };
-  const handOf = (seatId: string) => camp?.hands.find((h) => h.seatId === seatId)?.cards ?? [];
+  const handOf = (seatId: string) => camp.hands.find((h) => h.seatId === seatId)?.cards ?? [];
   return {
     self,
     sourceId,
@@ -91,11 +91,10 @@ export function abilityStatus(run: RunState, seatId: string, sourceId: SourceId,
   return statusWith(run, seat, sourceId, active, catalog, rulesFor(run, catalog));
 }
 
-/** The camp's failed objective ids right now; [] with no camp or no failure. */
+/** The camp's failed objective ids right now; [] with no attempt or no failure. */
 function failedObjectiveIds(run: RunState, rules: RunRules): readonly string[] {
-  const camp = run.attempt?.camp ?? null;
-  if (camp === null) return [];
-  const outcome = checkCampOutcome(camp, rules);
+  if (run.attempt === null) return [];
+  const outcome = checkCampOutcome(run.attempt.camp, rules);
   return outcome.status === "failed" ? outcome.failedObjectiveIds : [];
 }
 

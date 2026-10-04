@@ -11,11 +11,11 @@ const run = (id: keyof typeof DEV_SHORTCUTS, state: RunState, params: Record<str
   DEV_SHORTCUTS[id].apply(state, params, CATALOG);
 
 describe("dev shortcuts", () => {
-  it("jump-to-camp 6 deals a fresh attempt with the boss twist drawn", () => {
+  it("jump-to-camp 6 deals a fresh attempt", () => {
     const jumped = run("jump-to-camp", fresh(), { camp: 6 });
     expect(jumped.campNumber).toBe(6);
     expect(jumped.attempt?.attemptNumber).toBe(1);
-    expect(jumped.bossTwists[6]).not.toBeNull();
+    expect(jumped.attempt?.camp.objectives).toHaveLength(5);
     expect(jumped.history).toEqual([]);
     expect(checkRunState(jumped, CATALOG)).toEqual([]);
   });
@@ -59,20 +59,17 @@ describe("dev shortcuts", () => {
     expect(() => run("set-kit", fresh(), { seat: "a", kit: "scout" })).toThrow("scout is not an upgrade or item in the catalogue");
   });
 
-  it("set-supplies and set-boss set their fields", () => {
+  it("set-supplies sets supplies within bounds", () => {
     expect(run("set-supplies", fresh(), { supplies: 7 }).supplies).toBe(7);
     expect(() => run("set-supplies", fresh(), { supplies: 100 })).toThrow("supplies must be a whole number from 0 to 99");
-    const boss = Object.keys(CATALOG.bosses)[0]!;
-    expect(run("set-boss", fresh(), { camp: "3", boss }).bossTwists[3]).toBe(boss);
-    expect(run("set-boss", run("set-boss", fresh(), { camp: "3", boss }), { camp: "3", boss: "none" }).bossTwists[3]).toBeNull();
   });
 
   it("move-card moves a card and keeps the state legal", () => {
     const dealt = run("jump-to-camp", fresh(), { camp: 1 });
-    const hands = dealt.attempt!.camp!.hands;
+    const hands = dealt.attempt!.camp.hands;
     const card = hands[0]!.cards[0]!;
     const moved = run("move-card", dealt, { card: card.id, to: "b" });
-    const after = moved.attempt!.camp!.hands;
+    const after = moved.attempt!.camp.hands;
     expect(after[0]!.cards.length).toBe(hands[0]!.cards.length - 1);
     expect(after[1]!.cards.at(-1)).toEqual(card);
     expect(checkRunState(moved, CATALOG)).toEqual([]);
@@ -86,9 +83,9 @@ describe("dev shortcuts", () => {
 
   it("set-objective-owner assigns and clears an owner", () => {
     const dealt = run("jump-to-camp", fresh(), { camp: 1 });
-    const id = dealt.attempt!.camp!.objectives[0]!.id;
+    const id = dealt.attempt!.camp.objectives[0]!.id;
     const owned = run("set-objective-owner", dealt, { objective: id, seat: "c" });
-    expect(owned.attempt!.camp!.objectives[0]!.ownerSeatId).toBe("c");
-    expect(run("set-objective-owner", owned, { objective: id, seat: "none" }).attempt!.camp!.objectives[0]!.ownerSeatId).toBeNull();
+    expect(owned.attempt!.camp.objectives[0]!.ownerSeatId).toBe("c");
+    expect(run("set-objective-owner", owned, { objective: id, seat: "none" }).attempt!.camp.objectives[0]!.ownerSeatId).toBeNull();
   });
 });

@@ -16,22 +16,17 @@
 // for the server seed (T-11-03), which cannot legitimately appear in any
 // view.
 //
-// Type-only imports from "../run/types" and "../state" — this module stays
-// zero-runtime-dependency, per packages/rules' FDN-02 rule, EXCEPT for
-// rulesFor (a real function call, needed to determine objectiveAssignment,
-// exactly as the projection function itself does) and evaluateObjective (a
-// failed objective is public even under face-down assignment).
+// Type-only imports from "../run/types" and "../state"; the only runtime
+// import is the default catalogue.
 
-import { evaluateObjective } from "../objectives";
-import { rulesFor } from "../run/compose";
 import { CATALOG } from "../run/catalog";
 import type { Catalog, RunState } from "../run/types";
 import type { CardIdentity } from "../state";
 
 export interface ExpeditionSeatSecrets {
   /** Card ids (in another seat's still-in-hand cards, not yet revealed to
-   * this viewer) and, under Thick Fog, other seats' objective ids — string
-   * values that must never appear anywhere in this seat's view. */
+   * this viewer): string values that must never appear anywhere in this
+   * seat's view. */
   readonly hiddenIds: readonly string[];
   /** The {kind}:{suit}:{rank} / {kind}:{joker} identity keys this seat MAY
    * legitimately see, as a multiset. */
@@ -74,10 +69,7 @@ function typedKeyFromObj(obj: Record<string, unknown>): string | null {
  * and the in-progress trick. Mirrors view.ts's findCardIdentity exactly
  * (this file must not call view.ts, so it is re-derived here, independently,
  * from RunState). Returns null (never throws) when not found. */
-function findCardIdentity(
-  camp: NonNullable<NonNullable<RunState["attempt"]>["camp"]>,
-  cardId: string,
-): CardIdentity | null {
+function findCardIdentity(camp: NonNullable<RunState["attempt"]>["camp"], cardId: string): CardIdentity | null {
   for (const hand of camp.hands) {
     const card = hand.cards.find((c) => c.id === cardId);
     if (card !== undefined) return card.identity;
@@ -92,14 +84,15 @@ function findCardIdentity(
 }
 
 /** Derives the secrets a given seat's view must never leak, INDEPENDENTLY of
- * the view-projection function (T-11-16). `catalog` defaults to the production
- * CATALOG (rulesFor needs it to compute objectiveAssignment); `seed` is
- * passed only when the caller wants the seed substring scan active (mirrors
- * secretsForHanabiSeat's own optional-seed contract). */
+ * the view-projection function (T-11-16). `seed` is passed only when the
+ * caller wants the seed substring scan active (mirrors secretsForHanabiSeat's
+ * own optional-seed contract). `catalog` is unread while every objective is
+ * public; it stays in the signature because camp modifiers that hide things
+ * compose their rules from it. */
 export function secretsForExpeditionSeat(
   state: RunState,
   seatId: string,
-  catalog: Catalog = CATALOG,
+  _catalog: Catalog = CATALOG,
   seed?: string,
 ): ExpeditionSeatSecrets {
   const seated = state.seatIds.includes(seatId);
@@ -130,8 +123,8 @@ export function secretsForExpeditionSeat(
     counts[key] = (counts[key] ?? 0) + 1;
   };
 
-  const camp = state.attempt?.camp ?? null;
-  if (camp !== null) {
+  const camp = state.attempt?.camp;
+  if (camp !== undefined) {
     for (const hand of camp.hands) {
       if (hand.seatId === seatId) {
         if (seated) {
@@ -156,17 +149,8 @@ export function secretsForExpeditionSeat(
 
     for (const identity of camp.removedCards) bump(identity);
 
-    const assignment = rulesFor(state, catalog).objectiveAssignment(state);
     for (const objective of camp.objectives) {
-      const visible =
-        assignment === "face-up" || (seated && (objective.ownerSeatId === seatId || evaluateObjective(camp, objective) === "failed"));
-      if (visible) {
-        if (objective.kind === "win-card" || objective.kind === "ordered") {
-          bump({ kind: "standard", suit: objective.target.suit, rank: objective.target.rank });
-        }
-      } else if (assignment === "face-down") {
-        if (!seated || objective.ownerSeatId !== seatId) hiddenIds.push(objective.id);
-      }
+      if (objective.kind === "win-card" || objective.kind === "ordered") bump(objective.target);
     }
   }
 

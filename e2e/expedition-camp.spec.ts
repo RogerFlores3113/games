@@ -10,7 +10,7 @@ import { clickObject, getModel, getScene, hoverObject, startExpeditionGame, wait
  * input, then proves refresh-and-resume, per-browser card packs, and that
  * the four interactables never touch game state. Every id used below
  * mirrors `apps/web/lib/expedition/expedition-ids.ts`'s literal scheme
- * (`draft:<id>`, `source:<id>`, `seat:<seatId>`, "predeal-skip",
+ * (`draft:<id>`, `source:<id>`, `seat:<seatId>`, "gate-skip",
  * `objective:<label>`, `hand:<label>`, "ready", "whisper", "confirm",
  * "last-trick", `interactable:<id>`) verbatim, per the plan's own
  * `<interfaces>` block — this spec never imports app code.
@@ -20,7 +20,7 @@ const WHISPER_ID = "whisper";
 const CONFIRM_ID = "confirm";
 const READY_ID = "ready";
 const LAST_TRICK_ID = "last-trick";
-const PREDEAL_SKIP_ID = "predeal-skip";
+const GATE_SKIP_ID = "gate-skip";
 const NAMES = ["Roger", "Bianca", "Sam"];
 /** Abilities whose every target step is a seat, a hand card or an objective:
  * the kinds this driver can click. */
@@ -93,7 +93,7 @@ interface CampModel {
   tooltip: { title: string; text: string; badges: string[]; reason: string | null } | null;
   drag: { cardId: string; legal: boolean } | null;
   targeting: Targeting | null;
-  banner: { window: string; youPending: boolean } | null;
+  banner: { youPending: boolean } | null;
   tray: { options: { objectId: string }[] } | null;
   boardPick: { targetable: boolean } | null;
   topBar: { suppliesPick: { targetable: boolean } | null };
@@ -465,7 +465,7 @@ async function stepCamp(pages: Page[], state: DriveState): Promise<void> {
     if (!you) continue;
 
     if (model.banner?.youPending && model.targeting === null) {
-      await clickUntilChanged<CampModel>(page, PREDEAL_SKIP_ID, (m) => m.sceneKey !== "camp" || !(m.banner?.youPending ?? false));
+      await clickUntilChanged<CampModel>(page, GATE_SKIP_ID, (m) => m.sceneKey !== "camp" || !(m.banner?.youPending ?? false));
       continue;
     }
 

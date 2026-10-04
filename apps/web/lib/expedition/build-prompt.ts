@@ -122,19 +122,17 @@ function targetingPrompt(view: ExpeditionView, ui: LocalUiState, nameOf: (seatId
   return { text: full.length <= PROMPT_MAX_CHARS ? full : ask, tone: "your-move" };
 }
 
-/** Before the deal or during a rescue: the table waits on these seats. */
+/** During a rescue: the table waits on these seats. */
 function gatePrompt(view: ExpeditionView, nameOf: (seatId: string | null) => string): Prompt | null {
-  const window = view.attempt?.window;
-  if (window !== "pre-deal" && window !== "rescue") return null;
-  const pending = view.attempt?.pendingSeatIds ?? [];
-  const when = window === "pre-deal" ? "Before the deal" : "An objective failed";
+  if (view.attempt?.window !== "rescue") return null;
+  const pending = view.attempt.pendingSeatIds;
   if (view.yourSeatId !== null && pending.includes(view.yourSeatId)) {
-    const ability = view.yourAbilities.find((a) => a.usableNow && SOURCE_DISPLAY[a.sourceId]?.active?.window === window);
+    const ability = view.yourAbilities.find((a) => a.usableNow && SOURCE_DISPLAY[a.sourceId]?.active?.window === "rescue");
     const name = ability === undefined ? "an ability" : sourceName(ability.sourceId);
-    return { text: window === "pre-deal" ? `${when}: use ${name} or skip` : `${when}: rescue it with ${name}, or pass`, tone: "your-move" };
+    return { text: `An objective failed: rescue it with ${name}, or pass`, tone: "your-move" };
   }
-  if (pending.length === 0) return window === "pre-deal" ? { text: "Dealing the cards…", tone: "waiting" } : null;
-  return { text: `${when}: waiting for ${nameOf(pending[0]!)}`, tone: "waiting" };
+  if (pending.length === 0) return null;
+  return { text: `An objective failed: waiting for ${nameOf(pending[0]!)}`, tone: "waiting" };
 }
 
 function trickWinnerOf(camp: ExpeditionCampView, target: ExpeditionCardIdentityView): string | null {
@@ -186,7 +184,6 @@ function followPrompt(camp: ExpeditionCampView): Prompt {
 function playingPrompt(view: ExpeditionView, camp: ExpeditionCampView, whisperAvailable: boolean, nameOf: (seatId: string | null) => string): Prompt {
   const actor = camp.currentActorSeatId;
   const leading = camp.currentTrick.plays.length === 0;
-  const firstTrick = leading && camp.completedTricks.length === 0;
 
   if (actor !== null && actor === view.yourSeatId) {
     if (!leading) return withTurnAbility(followPrompt(camp), onYourTurnNames(view));
@@ -195,9 +192,6 @@ function playingPrompt(view: ExpeditionView, camp: ExpeditionCampView, whisperAv
     return { text: whisperAvailable ? `Your lead: ${play}, or Whisper first` : `Your lead: ${play}`, tone: "your-move" };
   }
 
-  if (firstTrick && camp.objectiveAssignment === "face-down") {
-    return { text: "Thick Fog: objectives were dealt face down", tone: "info" };
-  }
   if (leading && whisperAvailable) return { text: `${nameOf(actor)} leads next. You can Whisper now`, tone: "waiting" };
   return { text: `${nameOf(actor)} is playing`, tone: "waiting" };
 }

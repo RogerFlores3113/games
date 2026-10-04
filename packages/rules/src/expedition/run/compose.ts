@@ -1,6 +1,6 @@
 // Phase 10 hook-composition engine (Plan 03, spec §6.1).
 //
-// COMPOSITION ORDER: base -> active boss twist -> each seat's live passives
+// COMPOSITION ORDER: base -> each seat's live passives
 // (seat order, then [character, ...kit] order) -> active effects (in the
 // order stored on attempt.effects). Every layer's RuleModifier maps the PREVIOUS
 // layer's answer to its own, per hook (run-rules.ts's own header repeats
@@ -21,20 +21,12 @@
 // attempt.effects entry) always recomposes to a new one.
 //
 // POLICY A3 (content-defect throw): a live or effect-referencing source id
-// or a stored boss id absent from the Catalog is a content bug, not a player
-// error — ruleLayersFor throws a plain Error naming the missing id, matching
+// absent from the Catalog is a content bug, not a player error — ruleLayersFor throws a plain Error naming the missing id, matching
 // the Plan 10-01 policy for composed rule-hook defects.
 //
-// D-02: the active boss twist is read from RunState.bossTwists (fixed per
-// boss camp at first arrival), never redrawn here. D-04: bossCancelled
-// suppresses the boss layer for the current attempt only — activeBossId
-// returns null while it is set, so the boss's RuleModifier is simply never
-// added to the layer list for this attempt.
-//
 // RESET-ON-REPLAY (RUN-06) falls out structurally: a fresh AttemptState has
-// no effects and bossCancelled === false, so a replay's first rulesFor call
-// naturally omits both the old effects layer and any prior cancellation —
-// there is nothing here to reset by hand.
+// no effects, so a replay's first rulesFor call naturally omits the old
+// effects layer — there is nothing here to reset by hand.
 
 import { baseRulesWith } from "../rules";
 import { isTrump, rankOf } from "../trick";
@@ -77,31 +69,12 @@ export function composeRules(layers: readonly RuleModifier[]): RunRules {
   return result;
 }
 
-/** The active boss's id for this exact RunState, or null when there is no
- * attempt, the twist was cancelled this attempt (D-04), or campNumber isn't
- * a boss camp. Never redraws (D-02): only reads the stored bossTwists. */
-export function activeBossId(run: RunState): string | null {
-  if (run.attempt === null || run.attempt.bossCancelled) return null;
-  if (run.campNumber !== 3 && run.campNumber !== 6) return null;
-  return run.bossTwists[run.campNumber];
-}
-
-/** Builds the ordered layer list for `run` under `catalog`: active boss ->
- * each seat's live passives (seat order, then [character, ...kit] order) ->
- * each live attempt effect's `active.effect`, in attempt.effects order.
- * Throws a named Error for any source or boss id missing from the catalog
- * (POLICY A3). */
+/** Builds the ordered layer list for `run` under `catalog`: each seat's
+ * live passives (seat order, then [character, ...kit] order) -> each live
+ * attempt effect's `active.effect`, in attempt.effects order. Throws a named
+ * Error for any source id missing from the catalog (POLICY A3). */
 export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
   const layers: RuleModifier[] = [];
-
-  const bossId = activeBossId(run);
-  if (bossId !== null) {
-    const bossDef = catalog.bosses[bossId];
-    if (bossDef === undefined) {
-      throw new Error(`ruleLayersFor: bossTwists names unknown boss id "${bossId}"`);
-    }
-    layers.push(bossDef.modifiers);
-  }
 
   for (const seat of run.seats) {
     const owner = ownerOf(seat);
@@ -112,7 +85,7 @@ export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
   }
 
   if (run.attempt !== null) {
-    const trickIndex = run.attempt.camp?.currentTrick.index ?? 0;
+    const trickIndex = run.attempt.camp.currentTrick.index;
     for (const effect of run.attempt.effects) {
       // A trick-scoped effect bends only the trick it was stamped with:
       // applyCampAction resolves trickWinner while currentTrick.index still

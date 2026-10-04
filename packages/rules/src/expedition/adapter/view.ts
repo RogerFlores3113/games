@@ -29,13 +29,12 @@
 
 import { campPhase, currentActorSeatId } from "../camp";
 import { evaluateObjective } from "../objectives";
-import { activeBossId, rulesFor } from "../run/compose";
+import { rulesFor } from "../run/compose";
 import { runPhase, runStatus } from "../run/lifecycle";
 import { whispersUsedBy } from "../run/whisper";
 import { abilityStatus } from "../run/abilities";
 import { liveSourceIds, poolBalance, remaining, type Remaining } from "../run/usage";
 import { currentWindow, gatedPendingSeatIds } from "../run/windows";
-import { visibleObjectives } from "../run/visibility";
 import type { RunRules } from "../run/run-rules";
 import type { ActiveEffect, Catalog, LogEntry, Reveal, RunState, SeatRun } from "../run/types";
 import { rankOf } from "../trick";
@@ -274,12 +273,12 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
     const rawAttempt = state.attempt;
     const window = currentWindow(state, rules);
 
+    const campState = rawAttempt.camp;
     const reveals: ExpeditionRevealView[] = [];
-    if (seated && rawAttempt.camp !== null) {
-      const camp = rawAttempt.camp;
+    if (seated) {
       for (const reveal of rawAttempt.reveals) {
         if (!isRevealVisibleTo(reveal, seatId)) continue;
-        const revealView = toRevealView(camp, reveal);
+        const revealView = toRevealView(campState, reveal);
         if (revealView !== null) reveals.push(revealView);
       }
     }
@@ -288,57 +287,47 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
       .filter((entry) => logVisibleTo(entry, seated ? seatId : null))
       .map(toLogEntryView);
 
-    let rescue: ExpeditionAttemptView["rescue"] = null;
-    let camp: ExpeditionCampView | null = null;
-    if (rawAttempt.camp !== null) {
-      const campState = rawAttempt.camp;
-      const assignment = rules.objectiveAssignment(state);
-      const shownObjectives = visibleObjectives(state, campState, rules, seatId);
-      if (window === "rescue") {
-        rescue = {
-          failedObjectiveIds: shownObjectives.filter((o) => evaluateObjective(campState, o) === "failed").map((o) => o.id),
-        };
-      }
+    const rescue: ExpeditionAttemptView["rescue"] =
+      window === "rescue"
+        ? { failedObjectiveIds: campState.objectives.filter((o) => evaluateObjective(campState, o) === "failed").map((o) => o.id) }
+        : null;
 
-      const yourHandRaw = seated ? campState.hands.find((h) => h.seatId === seatId) : undefined;
-      const yourHand: ExpeditionRankedCardView[] = yourHandRaw !== undefined ? yourHandRaw.cards.map((card) => toRankedCardView(card, rules)) : [];
+    const yourHandRaw = seated ? campState.hands.find((h) => h.seatId === seatId) : undefined;
+    const yourHand: ExpeditionRankedCardView[] = yourHandRaw !== undefined ? yourHandRaw.cards.map((card) => toRankedCardView(card, rules)) : [];
 
-      const handSizes: ExpeditionHandSizeView[] = campState.hands.map((hand) => ({
-        seatId: hand.seatId,
-        size: hand.cards.length,
-      }));
+    const handSizes: ExpeditionHandSizeView[] = campState.hands.map((hand) => ({
+      seatId: hand.seatId,
+      size: hand.cards.length,
+    }));
 
-      const derivedCampPhase = campPhase(campState, rules);
-      const derivedCurrentActorSeatId = currentActorSeatId(campState, rules);
+    const derivedCampPhase = campPhase(campState, rules);
+    const derivedCurrentActorSeatId = currentActorSeatId(campState, rules);
 
-      const yourLegalCardIds: string[] =
-        seated && derivedCampPhase === "playing" && derivedCurrentActorSeatId === seatId
-          ? rules
-              .legalPlays(campState, seatId)
-              .map((c) => c.id)
-              .filter((id) => yourHand.some((c) => c.id === id))
-          : [];
+    const yourLegalCardIds: string[] =
+      seated && derivedCampPhase === "playing" && derivedCurrentActorSeatId === seatId
+        ? rules
+            .legalPlays(campState, seatId)
+            .map((c) => c.id)
+            .filter((id) => yourHand.some((c) => c.id === id))
+        : [];
 
-      camp = {
-        playerCount: campState.playerCount,
-        expeditionLeaderSeatId: campState.expeditionLeaderSeatId,
-        totalTricks: campState.totalTricks,
-        removedCards: campState.removedCards.map(toIdentityView),
-        objectiveAssignment: assignment,
-        objectives: shownObjectives.map((o) => toObjectiveView(campState, o)),
-        yourHand,
-        yourLegalCardIds,
-        handSizes,
-        completedTricks: campState.completedTricks.map((trick) => toCompletedTrickView(trick, rules)),
-        currentTrick: toCurrentTrickView(campState.currentTrick, rules),
-        campPhase: derivedCampPhase,
-        currentActorSeatId: derivedCurrentActorSeatId,
-      };
-    }
+    const camp: ExpeditionCampView = {
+      playerCount: campState.playerCount,
+      expeditionLeaderSeatId: campState.expeditionLeaderSeatId,
+      totalTricks: campState.totalTricks,
+      removedCards: campState.removedCards.map(toIdentityView),
+      objectives: campState.objectives.map((o) => toObjectiveView(campState, o)),
+      yourHand,
+      yourLegalCardIds,
+      handSizes,
+      completedTricks: campState.completedTricks.map((trick) => toCompletedTrickView(trick, rules)),
+      currentTrick: toCurrentTrickView(campState.currentTrick, rules),
+      campPhase: derivedCampPhase,
+      currentActorSeatId: derivedCurrentActorSeatId,
+    };
 
     attempt = {
       attemptNumber: rawAttempt.attemptNumber,
-      bossCancelled: rawAttempt.bossCancelled,
       window,
       pendingSeatIds: Array.from(gatedPendingSeatIds(state, catalog)),
       rescue,
@@ -361,8 +350,6 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
     runStatus: runStatus(state),
     campNumber: state.campNumber,
     supplies: state.supplies,
-    bossTwists: { camp3: state.bossTwists[3], camp6: state.bossTwists[6] },
-    activeBossTwistId: activeBossId(state),
     seats,
     yourDraftOffer,
     yourAbilities,

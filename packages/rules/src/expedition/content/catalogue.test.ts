@@ -11,10 +11,10 @@ import type { CampState, CompletedTrick, ExpeditionCard, Objective, StandardIden
 import { trickWinner } from "../trick";
 import { useAbility } from "../run/abilities";
 import { CATALOG } from "../run/catalog";
-import { activeBossId, rulesFor } from "../run/compose";
-import { runPhase } from "../run/lifecycle";
+import { rulesFor } from "../run/compose";
 import { applyRunAction } from "../run/run-actions";
-import { advanceTo, setupRun } from "../run/run-test-support";
+import { advanceTo, setupRun, testCatalog } from "../run/run-test-support";
+import { defineItem } from "./source-def";
 import { campCardIds } from "../run/toolkit";
 import type { CampNumber, RunAction, RunState } from "../run/types";
 import { poolBalance, remaining } from "../run/usage";
@@ -22,7 +22,6 @@ import { currentWindow, gatedPendingSeatIds } from "../run/windows";
 
 const SEATS = ["p0", "p1", "p2"] as const;
 const FILLERS = ["scout", "guide", "botanist", "medic", "cartographer"];
-const MONSOON = { 3: "radio-silence", 6: null } as const;
 
 const std = (id: string, suit: Suit, rank: StandardRank): ExpeditionCard => ({ id, identity: { kind: "standard", suit, rank } });
 const ident = (suit: Suit, rank: StandardRank): StandardIdentity => ({ kind: "standard", suit, rank });
@@ -69,7 +68,6 @@ function crew(spec: Spec): RunState {
     catalog: CATALOG,
     ...(spec.campNumber === undefined ? {} : { campNumber: spec.campNumber }),
     ...(spec.supplies === undefined ? {} : { supplies: spec.supplies }),
-    bossTwists: MONSOON,
     characters: { p0: character, p1: p1!, p2: p2! },
     kits: { p0: spec.kit ?? [] },
   });
@@ -78,7 +76,7 @@ function crew(spec: Spec): RunState {
 /** A run between tricks whose camp is exactly the spec's. */
 function table(spec: Spec = {}): RunState {
   const run = advanceTo(crew(spec), "between-tricks", CATALOG);
-  const camp = run.attempt!.camp!;
+  const camp = run.attempt!.camp;
   const hands = {
     p0: [std("a", "spades", 9)],
     p1: [std("b", "spades", 6)],
@@ -130,17 +128,13 @@ const refusal = (run: RunState, seatId: string, sourceId: string, targets: reado
   return result.ok ? "ok" : result.error;
 };
 
-const camp = (run: RunState): CampState => run.attempt!.camp!;
+const camp = (run: RunState): CampState => run.attempt!.camp;
 const handIds = (run: RunState, seatId: string) => camp(run).hands.find((h) => h.seatId === seatId)!.cards.map((c) => c.id);
 const rules = (run: RunState) => rulesFor(run, CATALOG);
 const whisperAllowance = (run: RunState) => SEATS.map((seatId) => rules(run).whispersPerCamp(run, seatId));
 const objectiveOf = (run: RunState, id: string) => camp(run).objectives.find((o) => o.id === id)!;
 const revealsFor = (run: RunState, seatId: string) => toExpeditionPlayerView(run, seatId, CATALOG).attempt!.reveals;
 const balance = (run: RunState, seatId = "p0") => poolBalance(run.seats.find((s) => s.seatId === seatId)!, CATALOG);
-
-function readyAll(run: RunState): RunState {
-  return SEATS.reduce((state, seatId) => (runPhase(state) === "fireside" ? act(state, seatId, { type: "ready" }) : state), run);
-}
 
 /** A camp one trick from clearing: p0 wins with the spades 14 and owns that objective. */
 function clearableTable(spec: Spec): RunState {
@@ -422,15 +416,14 @@ describe("items", () => {
     ]);
   });
 
-  it("Rain Poncho cancels the boss twist and blocks whispers, and is pending only at a boss camp", () => {
-    const boss = readyAll(crew({ kit: ["rain-poncho"], campNumber: 3 }));
-    expect(runPhase(boss)).toBe("pre-deal");
-    expect(activeBossId(boss)).toBe("radio-silence");
-    const run = use(boss, "p0", "rain-poncho", []);
-    expect(activeBossId(run)).toBeNull();
-    expect(run.attempt!.bossCancelled).toBe(true);
-    expect(SEATS.map((seatId) => rules(run).whisperAllowed(run, seatId))).toEqual([false, false, false]);
-    expect(runPhase(readyAll(crew({ kit: ["rain-poncho"], campNumber: 1 })))).toBe("camp");
+  it("Rain Poncho gives its owner one more whisper this camp, twice a run", () => {
+    const start = table({ kit: ["rain-poncho"] });
+    expect(whisperAllowance(start)).toEqual([1, 1, 1]);
+    const once = use(start, "p0", "rain-poncho", []);
+    expect(whisperAllowance(once)).toEqual([2, 1, 1]);
+    const twice = use(once, "p0", "rain-poncho", []);
+    expect(whisperAllowance(twice)).toEqual([3, 1, 1]);
+    expect(refusal(twice, "p0", "rain-poncho", [])).toBe("ability_spent");
   });
 
   it("Smoke Signal gives everyone one more whisper and spends a supply", () => {
@@ -535,17 +528,11 @@ describe("items", () => {
     expect(failing([]).end.supplies).toBe(2);
   });
 
-  it("Mosquito Net lets its owner whisper under Monsoon but not under Rain Poncho", () => {
-    const monsoon = table({ kit: ["mosquito-net"], campNumber: 3 });
-    expect(activeBossId(monsoon)).toBe("radio-silence");
-    expect(applyRunAction(monsoon, "p1", { type: "whisper", targetSeatId: "p0", cardId: "b" }, CATALOG)).toEqual({
-      ok: false,
-      error: "whisper_blocked",
-    });
-    expect(applyRunAction(monsoon, "p0", { type: "whisper", targetSeatId: "p1", cardId: "a" }, CATALOG).ok).toBe(true);
-
-    const poncho = use(readyAll(crew({ kit: ["rain-poncho", "mosquito-net"], campNumber: 3 })), "p0", "rain-poncho", []);
-    expect(rules(poncho).whisperAllowed(poncho, "p0")).toBe(false);
+  it("Mosquito Net lets its owner whisper through a layer that forbids it", () => {
+    const gag = defineItem({ id: "gag", name: "Gag", text: "Nobody may whisper.", passive: { modifier: () => ({ whisperAllowed: () => () => false }) } });
+    const catalog = testCatalog({ characters: CATALOG.characters, items: { ...CATALOG.items, gag } });
+    const run = advanceTo(setupRun({ seatIds: SEATS, seed: "catalogue", catalog, kits: { p0: ["gag", "mosquito-net"] } }), "between-tricks", catalog);
+    expect(SEATS.map((seatId) => rulesFor(run, catalog).whisperAllowed(run, seatId))).toEqual([true, false, false]);
   });
 });
 

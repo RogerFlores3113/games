@@ -17,7 +17,6 @@ describe("STREAMS distinctness (A1)", () => {
     const draws = [0, 1, 2];
 
     for (const camp of camps) {
-      names.push(STREAMS.boss(camp));
       for (const seat of seats) {
         names.push(STREAMS.draftUpgrade(camp, seat));
         names.push(STREAMS.draftItems(camp, seat));
@@ -25,7 +24,6 @@ describe("STREAMS distinctness (A1)", () => {
       for (const attempt of attempts) {
         names.push(STREAMS.trickCountKind(camp, attempt));
         names.push(STREAMS.trickCountN(camp, attempt));
-        names.push(STREAMS.faceDown(camp, attempt));
         for (const useIndex of useIndices) {
           for (const seat of seats) {
             for (const draw of draws) {

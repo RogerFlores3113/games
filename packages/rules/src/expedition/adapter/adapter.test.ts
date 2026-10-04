@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { expeditionGame } from "./adapter";
 import { toExpeditionPlayerView } from "./view";
+import { currentActorSeatId } from "../camp";
+import { rulesFor } from "../run/compose";
 import { createRun } from "../run/lifecycle";
 import { CATALOG } from "../run/catalog";
 import { advanceTo, driveRun, setupRun } from "../run/run-test-support";
@@ -16,17 +18,8 @@ const SEED = "cccccccccccccccccccccccccccccccc";
 
 function fixtures(): Record<string, RunState> {
   const fresh = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
-  const preDeal = advanceTo(
-    setupRun({
-      seatIds: ["p0", "p1", "p2"],
-      seed: SEED,
-      catalog: CATALOG,
-      campNumber: 3,
-      bossTwists: { 3: "eclipse", 6: null },
-      kits: { p0: ["rain-poncho"] },
-    }),
-    "pre-deal",
-    CATALOG,
+  const rescue = failedFirstTrick(
+    advanceTo(setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, campNumber: 3, kits: { p0: ["rope-ladder"] } }), "between-tricks", CATALOG),
   );
   const objectivePick = advanceTo(
     setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, campNumber: 2 }),
@@ -38,7 +31,23 @@ function fixtures(): Record<string, RunState> {
     "between-tricks",
     CATALOG,
   );
-  return { fresh, preDeal, objectivePick, betweenTricks };
+  return { fresh, rescue, objectivePick, betweenTricks };
+}
+
+/** Gives every seat a no-tricks objective and plays one trick, so its winner's
+ * objective fails and the rescue window opens. */
+function failedFirstTrick(run: RunState): RunState {
+  const camp = run.attempt!.camp;
+  const objectives = camp.seatIds.map((seatId) => ({ id: `duck-${seatId}`, kind: "no-tricks" as const, ownerSeatId: seatId }));
+  let next: RunState = { ...run, attempt: { ...run.attempt!, camp: { ...camp, objectives } } };
+  for (let i = 0; i < run.seatIds.length; i++) {
+    const rules = rulesFor(next, CATALOG);
+    const actor = currentActorSeatId(next.attempt!.camp, rules)!;
+    const played = expeditionGame.applyAction(next, actor, { type: "play-card", cardId: rules.legalPlays(next.attempt!.camp, actor)[0]!.id });
+    if (!played.ok) throw new Error(played.error);
+    next = played.state;
+  }
+  return next;
 }
 
 const WELL_SHAPED_NONSENSE_ARB = fc.oneof(
@@ -154,17 +163,18 @@ describe("expeditionGame: toPlayerView", () => {
 
 describe("expeditionGame: autoPassRequest", () => {
   it("names skip-window for a seat a gated window waits on, and null for anyone else", () => {
-    const { preDeal, betweenTricks } = fixtures();
-    expect(expeditionGame.autoPassRequest!(preDeal!, "p0")).toEqual({ type: "skip-window" });
-    expect(expeditionGame.autoPassRequest!(preDeal!, "p1")).toBeNull();
+    const { rescue, betweenTricks } = fixtures();
+    expect(expeditionGame.autoPassRequest!(rescue!, "p0")).toEqual({ type: "skip-window" });
+    expect(expeditionGame.autoPassRequest!(rescue!, "p1")).toBeNull();
     expect(expeditionGame.autoPassRequest!(betweenTricks!, "p0")).toBeNull();
   });
 
   it("is a request the game accepts, which moves the window on", () => {
-    const { preDeal } = fixtures();
-    const passed = expeditionGame.applyAction(preDeal!, "p0", expeditionGame.autoPassRequest!(preDeal!, "p0"));
+    const { rescue } = fixtures();
+    const passed = expeditionGame.applyAction(rescue!, "p0", expeditionGame.autoPassRequest!(rescue!, "p0"));
     if (!passed.ok) throw new Error(passed.error);
-    expect(passed.state.attempt!.camp).not.toBeNull();
+    expect(passed.state.attempt).toBeNull();
+    expect(passed.state.history).toEqual([{ campNumber: 3, attemptNumber: 1, status: "failed", suppliesSpent: 1 }]);
     expect(expeditionGame.autoPassRequest!(passed.state, "p0")).toBeNull();
   });
 });

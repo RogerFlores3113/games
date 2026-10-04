@@ -24,7 +24,6 @@ describe("expeditionDevHooks", () => {
       ["set-character", "Crew"],
       ["set-kit", "Crew"],
       ["give-source", "Crew"],
-      ["set-boss", "Run"],
       ["move-card", "Cards"],
       ["set-objective-owner", "Cards"],
     ]);
@@ -47,8 +46,8 @@ describe("expeditionDevHooks", () => {
   it("refuses a shortcut whose result fails the check", () => {
     const result = hooks.runShortcut(fresh(), "set-kit", { seat: "a", kit: "bait" });
     expect(result.ok).toBe(true);
-    const bad = hooks.runShortcut({ ...fresh(), supplies: -1 }, "set-boss", { camp: "3", boss: "none" });
-    expect(bad).toEqual({ ok: false, error: "shortcut set-boss produced an invalid state: supplies must be a non-negative integer, got -1" });
+    const bad = hooks.runShortcut({ ...fresh(), supplies: -1 }, "set-kit", { seat: "a", kit: "bait" });
+    expect(bad).toEqual({ ok: false, error: "shortcut set-kit produced an invalid state: supplies must be a non-negative integer, got -1" });
   });
 
   it("builds a milestone key and inspects a dealt run", () => {

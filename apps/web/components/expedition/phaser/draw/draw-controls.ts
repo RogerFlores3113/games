@@ -1,6 +1,6 @@
 /**
  * The face-up objective pool on the stump, and the `actions` zone: the
- * Whisper button, Confirm / Cancel, and pre-deal Use / Skip. Every flag
+ * Whisper button, Confirm / Cancel, and rescue Use / Pass. Every flag
  * drawn (`pickable`, `targetable`, `canConfirm`, `whisper.*`) is already a
  * server-derived fact on the model.
  */
@@ -8,7 +8,7 @@ import type Phaser from "phaser";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
 import { MINI_H, MINI_W, OBJECTIVE_POOL_STEP, ZONES, stumpRowXs } from "../layout";
-import { CANCEL_ID, CONFIRM_ID, PREDEAL_SKIP_ID, TRAY_MORE_ID, WHISPER_ID, preDealUseObjectId } from "../../../../lib/expedition/expedition-ids";
+import { CANCEL_ID, CONFIRM_ID, GATE_SKIP_ID, TRAY_MORE_ID, WHISPER_ID, gateUseObjectId } from "../../../../lib/expedition/expedition-ids";
 import type { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
 import type { ArtId } from "../art/art-registry";
@@ -134,7 +134,7 @@ function drawWhisperCaption(scene: Phaser.Scene, layer: Layer, model: SceneModel
 
 const BANNER_PAD = 6;
 
-/** A gated window on the stump: what happened, who it waits on, and your
+/** The rescue window on the stump: what failed, who it waits on, and your
  * Use and Pass buttons when it waits on you. */
 function drawBanner(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   const banner = model.banner;
@@ -151,20 +151,18 @@ function drawBanner(scene: Phaser.Scene, layer: Layer, model: SceneModel, index:
   const h = BANNER_PAD * 2 + titleH + detail.length * lineH + buttons * (BUTTON_H + 6);
   const y = zone.y + Math.floor((zone.h - h) / 2);
   const bg = plate(scene, x, y, w, h);
-  bg.setStrokeStyle(1, toPhaserColor(banner.window === "rescue" ? PALETTE.destructive : PALETTE.sun));
+  bg.setStrokeStyle(1, toPhaserColor(PALETTE.destructive));
   layer.add(bg);
-  const titleColor = banner.window === "rescue" ? PALETTE.destructive : PALETTE.sun;
   titleLines.forEach((line, i) => {
-    layer.add(text(scene, x + Math.floor((w - labelWidth(line)) / 2), y + BANNER_PAD + i * lineH, line, titleColor));
+    layer.add(text(scene, x + Math.floor((w - labelWidth(line)) / 2), y + BANNER_PAD + i * lineH, line, PALETTE.destructive));
   });
   detail.forEach((line, i) => {
     layer.add(text(scene, x + Math.floor((w - labelWidth(line)) / 2), y + BANNER_PAD + titleH + i * lineH, line));
   });
   if (!banner.youPending) return;
-  const pass = banner.window === "rescue" ? "Pass" : "Skip";
   const items = [
-    ...banner.uses.map((u) => ({ id: preDealUseObjectId(u.sourceId), label: `Use ${u.name}`, onClick: () => handlers.onGateUse(u.sourceId), outline: true })),
-    { id: PREDEAL_SKIP_ID, label: pass, onClick: () => handlers.onGateSkip(), outline: false },
+    ...banner.uses.map((u) => ({ id: gateUseObjectId(u.sourceId), label: `Use ${u.name}`, onClick: () => handlers.onGateUse(u.sourceId), outline: true })),
+    { id: GATE_SKIP_ID, label: "Pass", onClick: () => handlers.onGateSkip(), outline: false },
   ];
   const gap = 6;
   const bw = Math.min(96, Math.floor((w - BANNER_PAD * 2 - gap * (items.length - 1)) / items.length));

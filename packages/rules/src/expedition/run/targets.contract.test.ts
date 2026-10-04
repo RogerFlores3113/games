@@ -43,7 +43,7 @@ function scopeFor(run: RunState, seatId: string): SeatScope {
 }
 
 function playOne(run: RunState): RunState {
-  const camp = run.attempt!.camp!;
+  const camp = run.attempt!.camp;
   const rules = rulesFor(run, CATALOG);
   const actor = currentActorSeatId(camp, rules)!;
   const played = applyCampAction(camp, actor, { type: "play-card", cardId: rules.legalPlays(camp, actor)[0]!.id }, rules);
@@ -57,31 +57,21 @@ function standardTarget(play: TrickPlay): StandardIdentity | null {
 
 /** One trick won, one card on the table, a whisper from each seat to the
  * next, and objectives crafted to be done, failed, pending (one per seat)
- * and unclaimed. Thick Fog when faceDown. */
-function richState(playerCount: 3 | 4 | 5, faceDown: boolean): RunState {
+ * and unclaimed. */
+function richState(playerCount: 3 | 4 | 5): RunState {
   const seatIds = Array.from({ length: playerCount }, (_, i) => `p${i}`);
-  let run = advanceTo(
-    setupRun({
-      seatIds,
-      seed: SEED,
-      catalog: CATALOG,
-      campNumber: faceDown ? 3 : 2,
-      bossTwists: { 3: faceDown ? "blind-orders" : null, 6: null },
-    }),
-    "between-tricks",
-    CATALOG,
-  );
+  let run = advanceTo(setupRun({ seatIds, seed: SEED, catalog: CATALOG, campNumber: 2 }), "between-tricks", CATALOG);
   seatIds.forEach((seatId, i) => {
-    const cardId = run.attempt!.camp!.hands.find((h) => h.seatId === seatId)!.cards[0]!.id;
+    const cardId = run.attempt!.camp.hands.find((h) => h.seatId === seatId)!.cards[0]!.id;
     const whispered = applyRunAction(run, seatId, { type: "whisper", targetSeatId: seatIds[(i + 1) % playerCount]!, cardId }, CATALOG);
     if (!whispered.ok) throw new Error(whispered.error);
     run = whispered.state;
   });
   const perSeat = seatIds.map((seatId): Objective => ({ id: `obj-${seatId}`, kind: "exactly-n", n: 1, ownerSeatId: seatId }));
-  run = { ...run, attempt: { ...run.attempt!, camp: { ...run.attempt!.camp!, objectives: perSeat } } };
+  run = { ...run, attempt: { ...run.attempt!, camp: { ...run.attempt!.camp, objectives: perSeat } } };
   for (let i = 0; i <= playerCount; i++) run = playOne(run);
 
-  const camp: CampState = run.attempt!.camp!;
+  const camp: CampState = run.attempt!.camp;
   const trick = camp.completedTricks[0]!;
   const winner = trick.winnerSeatId;
   const loser = seatIds.find((id) => id !== winner)!;
@@ -102,8 +92,8 @@ describe("target-kind registry", () => {
   });
 
   it("offers the expected choices on a concrete 3-player table", () => {
-    const run = richState(3, false);
-    const camp = run.attempt!.camp!;
+    const run = richState(3);
+    const camp = run.attempt!.camp;
     const winner = camp.completedTricks[0]!.winnerSeatId;
     const loser = ["p0", "p1", "p2"].find((id) => id !== winner)!;
     const ids = (seatId: string, spec: TargetSpec) => choicesFor(scopeFor(run, seatId), spec).map((c) => c.id);
@@ -128,21 +118,9 @@ describe("target-kind registry", () => {
     ]);
   });
 
-  it("under Thick Fog a seat sees its own objectives and every failed one, never another seat's open one", () => {
-    const run = richState(3, true);
-    const loser = run.attempt!.camp!.objectives.find((o) => o.id === "obj-failed")!.ownerSeatId!;
-    const other = ["p0", "p1", "p2"].find((id) => id !== loser)!;
-    const ids = (seatId: string) => toExpeditionPlayerView(run, seatId, CATALOG).attempt!.camp!.objectives.map((o) => o.id).sort();
-    expect(ids(other)).toEqual(expect.arrayContaining(["obj-failed", `obj-${other}`]));
-    expect(ids(other)).not.toContain(`obj-${loser}`);
-    expect(ids(other)).not.toContain("obj-open");
-    expect(choicesFor(scopeFor(run, other), { kind: "failed-objective" }).map((c) => c.id)).toEqual(["objective:obj-failed"]);
-    expect(toExpeditionPlayerView(run, "spectator", CATALOG).attempt!.camp!.objectives).toEqual([]);
-  });
-
   it("card-value offers each other rank within the spread, inside 2..14", () => {
-    const run = richState(3, false);
-    const own = run.attempt!.camp!.hands.find((h) => h.seatId === "p0")!.cards;
+    const run = richState(3);
+    const own = run.attempt!.camp.hands.find((h) => h.seatId === "p0")!.cards;
     const card = own.find((c) => c.identity.kind === "standard")!;
     const rank = (card.identity as StandardIdentity).rank;
     const ids = choicesFor(scopeFor(run, "p0"), { kind: "card-value", spread: 2 }).map((c) => c.id).filter((id) => id.startsWith(`value:${card.id}:`));
@@ -151,7 +129,7 @@ describe("target-kind registry", () => {
   });
 
   it("refuses a malformed or wrong-length id list", () => {
-    const scope = scopeFor(richState(3, false), "p0");
+    const scope = scopeFor(richState(3), "p0");
     expect(resolveTargets(scope, [{ kind: "supplies" }], "supplies").ok).toBe(false);
     expect(resolveTargets(scope, [{ kind: "supplies" }], []).ok).toBe(false);
     expect(resolveTargets(scope, [{ kind: "supplies" }], ["supplies"])).toEqual({
@@ -162,52 +140,45 @@ describe("target-kind registry", () => {
 
   for (const playerCount of [3, 4, 5] as const) {
     describe(`at ${playerCount} players`, () => {
-      const faceUp = richState(playerCount, false);
-      const faceDown = richState(playerCount, true);
-      const seatIds = faceUp.seatIds;
+      const run = richState(playerCount);
+      const seatIds = run.seatIds;
 
       for (const spec of SPECS) {
         const label = JSON.stringify(spec);
 
         it(`${label}: some seat has a choice, and choices are stable`, () => {
-          expect(seatIds.some((seatId) => choicesFor(scopeFor(faceUp, seatId), spec).length > 0)).toBe(true);
-          for (const run of [faceUp, faceDown]) {
-            const roundTripped: RunState = JSON.parse(JSON.stringify(run));
-            for (const seatId of seatIds) {
-              const first = choicesFor(scopeFor(run, seatId), spec);
-              expect(choicesFor(scopeFor(run, seatId), spec)).toEqual(first);
-              expect(choicesFor(scopeFor(roundTripped, seatId), spec)).toEqual(first);
-            }
+          expect(seatIds.some((seatId) => choicesFor(scopeFor(run, seatId), spec).length > 0)).toBe(true);
+          const roundTripped: RunState = JSON.parse(JSON.stringify(run));
+          for (const seatId of seatIds) {
+            const first = choicesFor(scopeFor(run, seatId), spec);
+            expect(choicesFor(scopeFor(run, seatId), spec)).toEqual(first);
+            expect(choicesFor(scopeFor(roundTripped, seatId), spec)).toEqual(first);
           }
         });
 
         it(`${label}: each choice resolves to itself and a foreign id is refused`, () => {
-          for (const run of [faceUp, faceDown]) {
-            const everyId = new Set(seatIds.flatMap((seatId) => SPECS.flatMap((s) => choicesFor(scopeFor(run, seatId), s).map((c) => c.id))));
-            for (const seatId of seatIds) {
-              const scope = scopeFor(run, seatId);
-              const own = choicesFor(scope, spec);
-              for (const choice of own) {
-                expect(resolveTargets(scope, [spec], [choice.id])).toEqual({ ok: true, targets: [choice.target] });
-              }
-              const ownIds = new Set(own.map((c) => c.id));
-              const foreign = [...everyId].filter((id) => !ownIds.has(id)).concat(["seat:nobody", "card:zzzzzzzz"]);
-              for (const id of foreign) {
-                expect(resolveTargets(scope, [spec], [id]).ok).toBe(false);
-              }
+          const everyId = new Set(seatIds.flatMap((seatId) => SPECS.flatMap((s) => choicesFor(scopeFor(run, seatId), s).map((c) => c.id))));
+          for (const seatId of seatIds) {
+            const scope = scopeFor(run, seatId);
+            const own = choicesFor(scope, spec);
+            for (const choice of own) {
+              expect(resolveTargets(scope, [spec], [choice.id])).toEqual({ ok: true, targets: [choice.target] });
+            }
+            const ownIds = new Set(own.map((c) => c.id));
+            const foreign = [...everyId].filter((id) => !ownIds.has(id)).concat(["seat:nobody", "card:zzzzzzzz"]);
+            for (const id of foreign) {
+              expect(resolveTargets(scope, [spec], [id]).ok).toBe(false);
             }
           }
         });
       }
 
       it("a view carrying every seat's steps passes the leak check", () => {
-        for (const run of [faceUp, faceDown]) {
-          for (const seatId of seatIds) {
-            const view = toExpeditionPlayerView(run, seatId, CATALOG);
-            const carrying = { ...view, steps: stepsFor(scopeFor(run, seatId), SPECS) };
-            const secrets = secretsForExpeditionSeat(run, seatId, CATALOG, SEED);
-            expect(checkExpeditionViewForLeaks({ view: carrying, serialized: JSON.stringify(carrying), secrets })).toEqual([]);
-          }
+        for (const seatId of seatIds) {
+          const view = toExpeditionPlayerView(run, seatId, CATALOG);
+          const carrying = { ...view, steps: stepsFor(scopeFor(run, seatId), SPECS) };
+          const secrets = secretsForExpeditionSeat(run, seatId, CATALOG, SEED);
+          expect(checkExpeditionViewForLeaks({ view: carrying, serialized: JSON.stringify(carrying), secrets })).toEqual([]);
         }
       });
     });

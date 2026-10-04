@@ -16,8 +16,6 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     runStatus: "lost",
     campNumber: 2,
     supplies: 0,
-    bossTwists: { camp3: null, camp6: null },
-    activeBossTwistId: null,
     seats: [{ seatId: "s1", characterId: "scout", kit: [], ready: false, draftPending: false, pool: null, usage: [] }],
     yourDraftOffer: null,
     yourAbilities: [],

@@ -20,7 +20,6 @@ function camp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampView {
     expeditionLeaderSeatId: "me",
     totalTricks: 1,
     removedCards: [],
-    objectiveAssignment: "face-up",
     objectives: [],
     yourHand: [
       { id: "h7", identity: H7, effectiveRank: null },
@@ -43,29 +42,28 @@ function view(campView: ExpeditionCampView | null, overrides: Partial<Expedition
     runStatus: "in_progress",
     campNumber: 1,
     supplies: 3,
-    bossTwists: { camp3: null, camp6: null },
-    activeBossTwistId: null,
     seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: "scout", kit: [], ready: true, draftPending: false, pool: null, usage: [] })),
     yourDraftOffer: null,
     yourAbilities: [],
     history: [],
-    attempt: {
-      attemptNumber: 1,
-      bossCancelled: false,
-      window: null,
-      pendingSeatIds: [],
-      rescue: null,
-      effects: [],
-      reveals: [],
-      log: [],
-      yourWhisper: { allowed: true, left: 1 },
-      camp: campView,
-    },
+    attempt:
+      campView === null
+        ? null
+        : {
+            attemptNumber: 1,
+            window: null,
+            pendingSeatIds: [],
+            rescue: null,
+            effects: [],
+            reveals: [],
+            log: [],
+            yourWhisper: { allowed: true, left: 1 },
+            camp: campView,
+          },
     ...overrides,
   };
 }
 
-const PONCHO: ExpeditionAbilityView = { sourceId: "rain-poncho", usableNow: true, reason: null, steps: [] };
 const MEDIC: ExpeditionAbilityView = { sourceId: "medic", usableNow: true, reason: null, steps: [] };
 const SCOUT: ExpeditionAbilityView = {
   sourceId: "scout",
@@ -96,11 +94,6 @@ const LONG_STEP: ExpeditionAbilityView = {
   steps: [{ kind: "card", prompt: "Pick one of your cards to swap with a teammate now", choices: ["card:h7"] }],
 };
 
-function preDeal(pending: string[]): ExpeditionView {
-  const base = view(null, { runPhase: "pre-deal", yourAbilities: [PONCHO] });
-  return { ...base, attempt: { ...base.attempt!, window: "pre-deal", pendingSeatIds: pending } };
-}
-
 function rescue(pending: string[], abilities: ExpeditionAbilityView[] = [MEDIC]): ExpeditionView {
   const base = view(camp({ campPhase: "ended", currentActorSeatId: null }), { yourAbilities: abilities });
   return { ...base, attempt: { ...base.attempt!, window: "rescue", pendingSeatIds: pending, rescue: { failedObjectiveIds: ["o1"] } } };
@@ -115,9 +108,6 @@ const canWhisper = { reconnecting: false, whisperAvailable: true };
 
 const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   ["reconnecting beats everything", view(camp()), ui(), { reconnecting: true, whisperAvailable: true }, { text: "Reconnecting…", tone: "alert" }],
-  ["pre-deal, you are pending", preDeal(["me", "ana"]), ui(), playing, { text: "Before the deal: use Rain Poncho or skip", tone: "your-move" }],
-  ["pre-deal, waiting on a teammate", preDeal(["ana"]), ui(), playing, { text: "Before the deal: waiting for Ana", tone: "waiting" }],
-  ["pre-deal, nobody pending", preDeal([]), ui(), playing, { text: "Dealing the cards…", tone: "waiting" }],
   ["rescue, you are pending", rescue(["me"]), ui(), playing, { text: "An objective failed: rescue it with Triage, or pass", tone: "your-move" }],
   ["rescue, waiting on a teammate", rescue(["bo"]), ui(), playing, { text: "An objective failed: waiting for Bo", tone: "waiting" }],
   [
@@ -133,13 +123,6 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
     ui(),
     playing,
     { text: "Ana is picking an objective", tone: "waiting" },
-  ],
-  [
-    "Thick Fog, before the first card",
-    view(camp({ objectiveAssignment: "face-down", currentActorSeatId: "bo", currentTrick: { index: 0, leaderSeatId: "bo", plays: [] } })),
-    ui(),
-    playing,
-    { text: "Thick Fog: objectives were dealt face down", tone: "info" },
   ],
   ["your lead with the Whisper open", view(camp()), ui(), canWhisper, { text: "Your lead: play any card, or Whisper first", tone: "your-move" }],
   ["your lead, Whisper spent", view(camp()), ui(), playing, { text: "Your lead: play any card", tone: "your-move" }],
@@ -311,7 +294,7 @@ describe("buildPrompt", () => {
       ([, text]) => text.length > PROMPT_MAX_CHARS,
     );
     expect(tooLong).toEqual([]);
-    expect(buildPrompt(preDeal(["ana"]), longSeats, ui(), playing).text).toBe("Before the deal: waiting for Maximilia…");
+    expect(buildPrompt(rescue(["ana"]), longSeats, ui(), playing).text).toBe("An objective failed: waiting for Maximilia…");
   });
 });
 

@@ -20,7 +20,7 @@ describe("checkRunState", () => {
 
   it("flags a card that appears twice", () => {
     const run = dealt();
-    const camp = run.attempt!.camp!;
+    const camp = run.attempt!.camp;
     const first = camp.hands[0]!.cards[0]!;
     const hands = camp.hands.map((h, i) => (i === 1 ? { ...h, cards: [first, ...h.cards.slice(1)] } : h));
     const broken = { ...run, attempt: { ...run.attempt!, camp: { ...camp, hands } } };
@@ -30,7 +30,7 @@ describe("checkRunState", () => {
 
   it("flags an edited card identity as a conservation break", () => {
     const run = dealt();
-    const camp = run.attempt!.camp!;
+    const camp = run.attempt!.camp;
     const [a, b] = camp.hands[0]!.cards;
     const hands = camp.hands.map((h, i) => (i === 0 ? { ...h, cards: [{ ...a!, identity: b!.identity }, ...h.cards.slice(1)] } : h));
     const broken = { ...run, attempt: { ...run.attempt!, camp: { ...camp, hands } } };

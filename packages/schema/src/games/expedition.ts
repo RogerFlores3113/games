@@ -152,7 +152,7 @@ const LogEntryViewSchema = z.strictObject({
   private: z.boolean(),
 });
 
-const ActiveWindowSchema = z.enum(["pre-deal", "objective-pick", "between-tricks", "in-trick", "rescue"]);
+const ActiveWindowSchema = z.enum(["objective-pick", "between-tricks", "in-trick", "rescue"]);
 
 const TargetKindSchema = z.enum([
   "self",
@@ -183,7 +183,6 @@ const CampViewSchema = z.strictObject({
   expeditionLeaderSeatId: z.string().min(1),
   totalTricks: z.number().int().min(0),
   removedCards: z.array(CardIdentityViewSchema),
-  objectiveAssignment: z.enum(["face-up", "face-down"]),
   // Deliberately no `objectiveDeck` key: the undrawn objective deck order
   // must never be projected.
   objectives: z.array(ObjectiveViewSchema),
@@ -198,14 +197,13 @@ const CampViewSchema = z.strictObject({
 
 const AttemptViewSchema = z.strictObject({
   attemptNumber: z.number().int().min(1),
-  bossCancelled: z.boolean(),
   window: ActiveWindowSchema.nullable(),
   pendingSeatIds: z.array(z.string().min(1)),
   rescue: z.strictObject({ failedObjectiveIds: z.array(z.string().min(1)) }).nullable(),
   effects: z.array(EffectViewSchema),
   reveals: z.array(RevealViewSchema),
   log: z.array(LogEntryViewSchema),
-  camp: CampViewSchema.nullable(),
+  camp: CampViewSchema,
   yourWhisper: z.strictObject({ allowed: z.boolean(), left: z.number().int().min(0) }).nullable(),
 });
 
@@ -259,15 +257,10 @@ const CampResultViewSchema = z.strictObject({
 // must never be projected to any client (T-11-03/T-11-09).
 export const ExpeditionViewSchema = z.strictObject({
   yourSeatId: z.string().min(1).nullable(),
-  runPhase: z.enum(["muster", "fireside", "pre-deal", "camp", "ended"]),
+  runPhase: z.enum(["muster", "fireside", "camp", "ended"]),
   runStatus: z.enum(["in_progress", "won", "lost"]),
   campNumber: z.number().int().min(1).max(6),
   supplies: z.number().int().min(0),
-  bossTwists: z.strictObject({
-    camp3: z.string().min(1).nullable(),
-    camp6: z.string().min(1).nullable(),
-  }),
-  activeBossTwistId: z.string().min(1).nullable(),
   seats: z.array(SeatViewSchema),
   yourDraftOffer: z.array(z.string().min(1)).nullable(),
   yourAbilities: z.array(AbilityViewSchema),

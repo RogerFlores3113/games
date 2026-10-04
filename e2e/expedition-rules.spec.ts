@@ -14,7 +14,7 @@ test("rules modal shows the reference, lists your character, and closes on Escap
     await host.getByTestId("expedition-rules-button").click();
     const dialog = host.getByRole("dialog", { name: "Rules" });
     await expect(dialog).toBeVisible();
-    for (const heading of ["Goal", "Tricks", "Objectives", "The Whisper", "Explorers and gear", "Your kit", "This camp"]) {
+    for (const heading of ["Goal", "Tricks", "Objectives", "The Whisper", "Explorers and gear", "Your kit"]) {
       await expect(dialog.getByRole("heading", { name: heading, exact: true })).toBeVisible();
     }
     const character = CHARACTER_DISPLAY[pick.sourceId]!;

@@ -14,7 +14,6 @@ import type { CampState, CompletedTrick, Objective, ObjectiveStatus, StandardRan
 import { STARTING_SUPPLIES } from "./balance";
 import type { RunRules } from "./run-rules";
 import type { RunState } from "./types";
-import { visibleObjectives } from "./visibility";
 
 export type TargetKind =
   | "self"
@@ -82,7 +81,7 @@ export type AbilityStep = { readonly kind: TargetKind; readonly prompt: string; 
 function objectivesWithStatus(scope: SeatScope, status: ObjectiveStatus): readonly Objective[] {
   const camp = scope.camp;
   if (camp === null) return [];
-  return visibleObjectives(scope.run, camp, scope.rules, scope.seatId).filter((o) => evaluateObjective(camp, o) === status);
+  return camp.objectives.filter((o) => evaluateObjective(camp, o) === status);
 }
 
 /** Whisper reveals in log order; the ordinal counts whispers only, matching

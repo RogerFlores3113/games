@@ -27,7 +27,6 @@ function makeCamp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampVi
     expeditionLeaderSeatId: "s1",
     totalTricks: 17,
     removedCards: [],
-    objectiveAssignment: "face-up",
     objectives: [],
     yourHand: [{ id: "c-as", identity: AS, effectiveRank: null }],
     yourLegalCardIds: ["c-as"],
@@ -51,8 +50,6 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     runStatus: "in_progress",
     campNumber: 2,
     supplies: 5,
-    bossTwists: { camp3: null, camp6: null },
-    activeBossTwistId: null,
     seats: [
       { seatId: "s1", characterId: "guide", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
       { seatId: "s2", characterId: "scout", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
@@ -63,7 +60,6 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     history: [],
     attempt: {
       attemptNumber: 1,
-      bossCancelled: false,
       window: "between-tricks",
       pendingSeatIds: [],
       rescue: null,

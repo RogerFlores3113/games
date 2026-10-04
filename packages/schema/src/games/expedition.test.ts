@@ -42,8 +42,6 @@ const firesideView = {
   runStatus: "in_progress",
   campNumber: 1,
   supplies: 3,
-  bossTwists: { camp3: null, camp6: null },
-  activeBossTwistId: null,
   seats: [
     {
       seatId: "seat-1",
@@ -79,8 +77,6 @@ const midCampView = {
   runStatus: "in_progress",
   campNumber: 2,
   supplies: 5,
-  bossTwists: { camp3: null, camp6: "eclipse" },
-  activeBossTwistId: null,
   seats: [
     { seatId: "seat-1", characterId: "guide", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
     { seatId: "seat-2", characterId: "medic", kit: [], ready: true, draftPending: false, pool: null, usage: [] },
@@ -98,7 +94,6 @@ const midCampView = {
   history: [{ campNumber: 1, attemptNumber: 1, status: "succeeded", suppliesSpent: 2 }],
   attempt: {
     attemptNumber: 1,
-    bossCancelled: false,
     window: "between-tricks",
     pendingSeatIds: [],
     rescue: null,
@@ -125,7 +120,6 @@ const midCampView = {
       expeditionLeaderSeatId: "seat-1",
       totalTricks: 8,
       removedCards: [{ kind: "standard", suit: "clubs", rank: 2 }],
-      objectiveAssignment: "face-up",
       objectives: [
         {
           id: "o1",

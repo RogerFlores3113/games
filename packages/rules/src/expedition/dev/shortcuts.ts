@@ -3,7 +3,7 @@
 // When RunState is redesigned, this file and check.ts are what change.
 
 import { cardLabel } from "../deck";
-import { BOSS_CAMPS, FINAL_CAMP } from "../run/balance";
+import { FINAL_CAMP } from "../run/balance";
 import { recordCampFailure, recordCampSuccess, runStatus, startAttempt } from "../run/lifecycle";
 import { applyToolkitOps } from "../run/toolkit";
 import type { CampNumber, Catalog, RunState } from "../run/types";
@@ -76,11 +76,11 @@ function ensureAttempt(run: RunState, catalog: Catalog): RunState {
 }
 
 function allCardHolders(run: RunState): { readonly id: string; readonly label: string; readonly seatId: string }[] {
-  return (run.attempt?.camp?.hands ?? []).flatMap((h) => h.cards.map((c) => ({ id: c.id, label: `${cardLabel(c.identity)} (in ${h.seatId})`, seatId: h.seatId })));
+  return (run.attempt?.camp.hands ?? []).flatMap((h) => h.cards.map((c) => ({ id: c.id, label: `${cardLabel(c.identity)} (in ${h.seatId})`, seatId: h.seatId })));
 }
 
 function objectiveOptions(run: RunState): DevOption[] {
-  return (run.attempt?.camp?.objectives ?? []).map((o) => ({ value: o.id, label: `${describeObjective(o)} (${o.id})` }));
+  return (run.attempt?.camp.objectives ?? []).map((o) => ({ value: o.id, label: `${describeObjective(o)} (${o.id})` }));
 }
 
 const campField: DevField = { name: "camp", label: "Camp", kind: "number", min: 1, max: FINAL_CAMP, initial: FINAL_CAMP };
@@ -164,19 +164,6 @@ export const DEV_SHORTCUTS = {
       return withSeat(run, seatId, { kit: [...seat.kit, source] });
     },
   },
-  "set-boss": {
-    label: "Set a boss twist",
-    group: "Run",
-    fields: (_run, catalog) => [
-      { name: "camp", label: "Boss camp", kind: "choice", options: opts(BOSS_CAMPS.map(String)) },
-      { name: "boss", label: "Boss", kind: "choice", options: opts([...Object.keys(catalog.bosses), "none"]) },
-    ],
-    apply: (run, params, catalog) => {
-      const camp = readChoice(params, "camp", opts(BOSS_CAMPS.map(String)));
-      const boss = readChoice(params, "boss", opts([...Object.keys(catalog.bosses), "none"]));
-      return { ...run, bossTwists: { ...run.bossTwists, [camp]: boss === "none" ? null : boss } };
-    },
-  },
   "move-card": {
     label: "Move a card to another hand",
     group: "Cards",
@@ -185,7 +172,7 @@ export const DEV_SHORTCUTS = {
       { name: "to", label: "To", kind: "choice", options: seatOptions(run) },
     ],
     apply: (run, params) => {
-      if (run.attempt?.camp == null) throw new Error("there is no dealt camp to move cards in");
+      if (run.attempt === null) throw new Error("there is no dealt camp to move cards in");
       const holders = allCardHolders(run);
       const cardId = readChoice(params, "card", holders.map((c) => ({ value: c.id, label: c.label })));
       const to = readChoice(params, "to", seatOptions(run));
@@ -203,7 +190,7 @@ export const DEV_SHORTCUTS = {
     ],
     apply: (run, params) => {
       const attempt = run.attempt;
-      if (attempt?.camp == null) throw new Error("there is no dealt camp with objectives");
+      if (attempt === null) throw new Error("there is no dealt camp with objectives");
       const camp = attempt.camp;
       const objectiveId = readChoice(params, "objective", objectiveOptions(run));
       const seat = readChoice(params, "seat", [...seatOptions(run), { value: "none", label: "none" }]);
