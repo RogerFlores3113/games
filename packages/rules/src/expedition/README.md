@@ -292,6 +292,50 @@ back() }`, drawing to Phaser textures, one file plus one registry line per
 pack (v1 ships two: Big Index and Classic, per spec §7.3) — covered
 automatically by `card-packs.contract.test.ts`.
 
+## Dev mode
+
+A sandbox for debugging: skip to any camp, edit any state, play a 3-5 seat
+table alone.
+
+**Enable.** Both halves must be on. The worker needs `DEV_MODE`: `npm run
+dev` in `apps/worker` runs `wrangler dev --port 8787 --var DEV_MODE:1`, and
+Playwright's worker command passes the same var. `wrangler.jsonc` never sets
+it, so a deploy refuses every `dev` message with a `dev_result` saying how
+to turn it on. The web app shows the panel when `NODE_ENV` is `development`
+(`next dev`) or `NEXT_PUBLIC_DEV_MODE=1`.
+
+**Use.** On a room page press backtick or click the small DEV button
+(bottom left).
+- Lobby: "Add bot" seats a bot (a seat nobody connects to). Two bots plus you
+  is a legal Expedition table.
+- Autoplay: pick who it plays for (bots, everyone but me, everyone) and when
+  it stops (your decision, or the end of the current camp), with a step cap.
+  "Bots act automatically" re-runs bot autoplay after every change.
+- Shortcuts: jump to a camp, jump to the final camp, end the run won or lost,
+  force the camp to succeed or fail, set supplies, set a seat's character or
+  kit, give a source, set a boss twist, move a card between hands, set an
+  objective's owner.
+- Reveal all hands: a plain-text dump of every hand, objective and trick.
+- State: the whole `RunState` as JSON. Edit and Apply; the worker parses it
+  with `ExpeditionRunStateSchema` and then `dev/check.ts` (card conservation,
+  known ids, seat alignment), and answers with a readable error if either
+  fails.
+- Snapshots: named copies of the state in this browser's localStorage. One
+  saved in another room loads into any room with the same seat count; its
+  seat ids are renamed to the room's.
+
+**Where it lives.** The room plumbing is game-agnostic: `GameAdapter.dev`
+(`packages/rules/src/adapter.ts`), `apps/worker/src/dev-room.ts`, the `dev`
+messages in `packages/schema/src/dev.ts`, and `apps/web/components/dev/
+DevPanel.tsx`, which renders whatever shortcuts the game describes. The
+Expedition layer is `dev/`: `shortcuts.ts` (the `DEV_SHORTCUTS` registry,
+one small pure function over `RunState` each), `check.ts`, `autoplay.ts`
+(`botMove`, the first priority move `applyRunAction` accepts, never a
+whisper or an ability), `inspect.ts` and `hooks.ts`. When `RunState`
+changes, update `ExpeditionRunStateSchema` (the worker's compile-time
+assertion in `game-registration.ts` fails until you do), then `check.ts` and
+whichever shortcuts touch the changed fields.
+
 ## Invariants
 
 - **No state mutation outside the toolkit.** An ability's `apply` only ever
