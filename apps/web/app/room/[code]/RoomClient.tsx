@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { nanoid } from "nanoid";
 import type { ClientMessage } from "@games/schema";
 import { useRoomSocket } from "../../../lib/room-socket";
@@ -24,6 +25,14 @@ import { JoinForm } from "../../../components/JoinForm";
 import { Lobby } from "../../../components/Lobby";
 import { BOARD_COMPONENTS } from "../../../components/game-ui";
 import { Button } from "../../../components/Button";
+import { DEV_PANEL_ENABLED } from "../../../lib/dev/dev-gate";
+
+// Behind the inlined constant so a production bundle drops the panel entirely.
+const DevPanel = DEV_PANEL_ENABLED
+  ? dynamic(() => import("../../../components/dev/DevPanel").then((m) => m.DevPanel), {
+      ssr: false,
+    })
+  : null;
 
 export interface RoomClientProps {
   code: string;
@@ -249,14 +258,21 @@ function ConnectedRoom({
     );
   }
 
+  const devPanel = DevPanel ? (
+    <DevPanel view={view} send={send} disabled={status === "reconnecting"} />
+  ) : null;
+
   if (view.status === "lobby") {
     return (
-      <Lobby
-        view={view}
-        onSetConfig={(config: unknown) => send({ type: "set_config", config })}
-        onStartGame={() => send({ type: "start_game" })}
-        reconnecting={status === "reconnecting"}
-      />
+      <>
+        <Lobby
+          view={view}
+          onSetConfig={(config: unknown) => send({ type: "set_config", config })}
+          onStartGame={() => send({ type: "start_game" })}
+          reconnecting={status === "reconnecting"}
+        />
+        {devPanel}
+      </>
     );
   }
 
@@ -269,20 +285,23 @@ function ConnectedRoom({
     return null;
   }
   return (
-    <Board
-      view={view}
-      onAction={(request) =>
-        // D-07: actionId is minted once per user intent (one click). If a
-        // retry path is ever added it MUST reuse the same id verbatim rather
-        // than minting a new one, or server-side dedup is defeated.
-        send({ type: "game_action", actionId: nanoid(), request })
-      }
-      reconnecting={status === "reconnecting"}
-      // Owner request (2026-09-18): same one-actionId-per-click idempotency
-      // shape as `game_action` above, tracked server-side against
-      // `Seat.lastAppliedRoomActionId` (a separate field, room-state.ts).
-      onDeleteRoom={() => send({ type: "delete_room", actionId: nanoid() })}
-      onRestartLobby={() => send({ type: "restart_lobby", actionId: nanoid() })}
-    />
+    <>
+      <Board
+        view={view}
+        onAction={(request) =>
+          // D-07: actionId is minted once per user intent (one click). If a
+          // retry path is ever added it MUST reuse the same id verbatim rather
+          // than minting a new one, or server-side dedup is defeated.
+          send({ type: "game_action", actionId: nanoid(), request })
+        }
+        reconnecting={status === "reconnecting"}
+        // Owner request (2026-09-18): same one-actionId-per-click idempotency
+        // shape as `game_action` above, tracked server-side against
+        // `Seat.lastAppliedRoomActionId` (a separate field, room-state.ts).
+        onDeleteRoom={() => send({ type: "delete_room", actionId: nanoid() })}
+        onRestartLobby={() => send({ type: "restart_lobby", actionId: nanoid() })}
+      />
+      {devPanel}
+    </>
   );
 }

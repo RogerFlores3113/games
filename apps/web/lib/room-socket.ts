@@ -17,6 +17,7 @@ import { readPendingGame } from "./pending-room";
 import { isTerminalCloseCode } from "./close-codes";
 import { isPongOverdue, resolveClientHeartbeatTiming, resumeAction } from "./heartbeat";
 import { useRoomStore } from "./room-store";
+import { useDevStore } from "./dev/dev-store";
 
 /**
  * Default matches `wrangler dev`'s local port (see `.env.example`). Plan 11
@@ -203,6 +204,11 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Room
         return;
       }
       const message = result.data;
+
+      if (message.type === "dev_state" || message.type === "dev_result") {
+        useDevStore.getState().receive(message);
+        return;
+      }
 
       if (message.type === "error" && !joinReplyPendingRef.current) {
         // WR-04: not an answer to our `join` (see joinReplyPendingRef). The
