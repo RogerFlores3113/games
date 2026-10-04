@@ -10,7 +10,7 @@ type Log = Attempt["log"];
 const club3 = { id: "c3", identity: { kind: "standard", suit: "clubs", rank: 3 } } as const;
 const club4 = { id: "c4", identity: { kind: "standard", suit: "clubs", rank: 4 } } as const;
 
-const preview = { index: 1, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null, shop: false };
+const preview = { index: 1, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false };
 
 function objective(id: string, status: Obj["status"], ownerSeatId: string | null = null): Obj {
   return { id, kind: "no-tricks", ownerSeatId, status };
@@ -66,6 +66,7 @@ function game(over: Partial<ExpeditionView> = {}, campOver: Partial<Camp> = {}, 
     stage: {
       tag: "camp",
       camp: preview,
+      mods: [],
       attempt: {
         attemptNumber,
         window: null,
@@ -82,7 +83,7 @@ function game(over: Partial<ExpeditionView> = {}, campOver: Partial<Camp> = {}, 
   };
 }
 
-const loadout: ExpeditionView["stage"] = { tag: "loadout", camp: preview, yourSlots: 2, shop: null, readySeatIds: [] };
+const loadout: ExpeditionView["stage"] = { tag: "loadout", camp: preview, mods: [], yourSlots: 2, shop: null, readySeatIds: [] };
 const draft: ExpeditionView["stage"] = { tag: "draft", cleared: 1, payout: 8, yourOffer: null, pendingSeatIds: [] };
 
 describe("cuesFor", () => {

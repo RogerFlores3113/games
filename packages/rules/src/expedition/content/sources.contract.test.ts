@@ -181,7 +181,7 @@ describe("each active source in play", () => {
     const after = useFirst(before, keyFor(def));
     const added = attemptOf(after)!.effects.length - attemptOf(before)!.effects.length;
     expect(added > 0).toBe(def.active!.effect !== undefined);
-    for (const effect of attemptOf(after)!.effects.slice(attemptOf(before)!.effects.length)) expect(effect.sourceId).toBe(id);
+    for (const effect of attemptOf(after)!.effects.slice(attemptOf(before)!.effects.length)) expect(effect.origin).toEqual({ kind: "seat", seatId: "p0", sourceKey: keyFor(def), sourceId: id });
   });
 
   it.each(ACTIVE_SOURCES.map((def) => [def.id, def] as const))("%s: a use spends its limit", (id, def) => {

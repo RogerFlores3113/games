@@ -56,14 +56,18 @@ function drawCards(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: 
   });
 }
 
+/** The newest whispers under the stump; a lightning strike on the trick
+ * in play takes the bottom line. */
 function drawTicker(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
-  const lines = model.whisperLog.slice(-TICKER_LINES);
+  const notice = model.sky.notice;
+  const lines = [...model.whisperLog, ...(notice === null ? [] : [notice])].slice(-TICKER_LINES);
   const zone = ZONES.ticker;
   lines.forEach((line, i) => {
     const age = lines.length - 1 - i;
     const y = zone.y + zone.h - TICKER_LINE_H * (age + 1) + 1;
     const x = zone.x + Math.floor((zone.w - labelWidth(line)) / 2);
-    layer.add(platedText(scene, x, y, line, age === 0 ? PALETTE.text : PALETTE.textDim));
+    const color = notice !== null && age === 0 ? PALETTE.coin : age === 0 ? PALETTE.text : PALETTE.textDim;
+    layer.add(platedText(scene, x, y, line, color));
   });
 }
 

@@ -13,8 +13,8 @@ export const draft: StageDef<"draft"> = {
       return ok(mintItems(picked, seatId, bundle, catalog));
     },
   },
-  advance: (run) =>
+  advance: (run, catalog) =>
     run.seats.some((seat) => seat.offers.length > 0)
       ? run
-      : { ...run, stage: { tag: "route", from: run.stage.cleared, options: routeOptions(run), ballots: {} } },
+      : { ...run, stage: { tag: "route", from: run.stage.cleared, options: routeOptions(run, catalog), ballots: {} } },
 };

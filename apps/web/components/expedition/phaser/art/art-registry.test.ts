@@ -1,7 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ART, fittedFallbackLabel, crewArtId, resolveArt, sourceArtId, type ArtId } from "./art-registry";
+import { MOD_DISPLAY } from "@games/rules";
+import { ART, backdropArtId, fittedFallbackLabel, crewArtId, resolveArt, sourceArtId, type ArtId } from "./art-registry";
 import { ART_FILES } from "./art-files.generated";
 
 const SPRITES_DIR = fileURLToPath(new URL("../../../../public/expedition/sprites/", import.meta.url));
@@ -57,6 +58,12 @@ describe("ART and ART_FILES", () => {
     expect(sourceArtId("not-a-source")).toBeNull();
     expect(crewArtId("medic")).toBe("crew-medic");
     expect(crewArtId("bait")).toBeNull();
+  });
+
+  it("every location has a backdrop: its own, or the Jungle's camp art for the Jungle", () => {
+    const locations = Object.values(MOD_DISPLAY).filter((mod) => mod.kind === "location").map((mod) => mod.id);
+    expect(locations.map((id) => [id, backdropArtId(id)])).toEqual(locations.map((id) => [id, id === "jungle" ? "bg-jungle-night" : `bg-${id}`]));
+    expect(backdropArtId("nowhere")).toBe("bg-jungle-night");
   });
 
   it("no two entries share a file", () => {

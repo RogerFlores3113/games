@@ -11,8 +11,7 @@ import { guard } from "../camp";
 import { defineItem, itemAbility } from "../content/source-def";
 import { buildCatalog, CATALOG as PRODUCTION } from "./catalog";
 import { rulesFor } from "./compose";
-import { attemptOf } from "./attempt";
-import { nextAttemptNumber } from "./lifecycle";
+import { attemptOf, nextAttemptNumber } from "./attempt";
 import { campIndex } from "./plan";
 import { applyRunAction } from "./stages/registry";
 import { advanceTo, enumerateLegalRunActions, setupRun } from "./run-test-support";
@@ -38,6 +37,8 @@ const testSabotage = defineItem({
 const catalog = buildCatalog({
   characters: PRODUCTION.characters,
   items: { ...PRODUCTION.items, "test-sabotage": testSabotage },
+  mods: PRODUCTION.mods,
+  pairings: PRODUCTION.pairings,
 });
 
 function act(run: RunState, seatId: string, action: Parameters<typeof applyRunAction>[2]): RunState {

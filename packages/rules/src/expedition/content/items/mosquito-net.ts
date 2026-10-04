@@ -5,7 +5,7 @@ export const mosquitoNet = defineItem({
   name: "Mosquito Net",
   rarity: "rare",
   price: 4,
-  text: "Nothing can stop your whispers.",
+  text: "Rain can't stop your whispers.",
   passive: {
     modifier: (owner) => ({
       whisperAllowed: (prev) => (run, seatId) => seatId === owner.seatId || prev(run, seatId),

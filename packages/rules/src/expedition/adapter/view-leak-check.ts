@@ -110,7 +110,7 @@ export function secretsForExpeditionSeat(
   // moves (a Herb Tonic'd card swapped away), as with a reveal.
   const namedByVisibleEffects = new Set(
     (attempt?.effects ?? [])
-      .filter((effect) => effect.audience === "public" || (seated && effect.seatId === seatId))
+      .filter((effect) => effect.audience === "public" || (seated && effect.origin.kind === "seat" && effect.origin.seatId === seatId))
       .flatMap((effect) => Object.values(effect.params).filter((value): value is string => typeof value === "string")),
   );
 

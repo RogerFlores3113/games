@@ -9,6 +9,7 @@ import { bundleItemObjectId, bundleObjectId, draftObjectId, kitObjectId, lengthO
 import { buildGear, buildShop, type Gear, type ShopPanel } from "./loadout-model";
 import type { LocalUiState } from "./local-ui";
 import { bossLabel, focusCampIndex, modName, plannedBossAt } from "./view-access";
+import { modDisplayName } from "./weather-model";
 
 /**
  * The trail before, between and after the camps: the muster with its
@@ -101,6 +102,11 @@ export interface CampPreview {
   shop: boolean;
   location: string;
   weather: string;
+  /** The location's and the weather's ids, for their icons. */
+  locationId: string;
+  weatherId: string;
+  /** What the location and weather make together; null for none. */
+  pairing: string | null;
   /** The event's name on the way there; null at camp 1. */
   event: string | null;
   /** "3 cards to win", "Win 2 in order", "A trick count". */
@@ -240,8 +246,11 @@ export function campPreview(view: View, camp: ExpeditionCampPreviewView): CampPr
   return {
     title: view.campCount === null ? `Camp ${camp.index}` : `Camp ${camp.index} of ${view.campCount}`,
     shop: camp.shop,
-    location: modName(camp.location),
-    weather: modName(camp.weather),
+    location: modDisplayName(camp.location),
+    weather: modDisplayName(camp.weather),
+    locationId: camp.location,
+    weatherId: camp.weather,
+    pairing: camp.pairing === null ? null : modDisplayName(camp.pairing),
     event: camp.event === null ? null : (EVENT_DISPLAY[camp.event]?.name ?? modName(camp.event)),
     objectives: objectiveLabels(camp.slotKinds),
     boss: bossLabel(view, camp.index),

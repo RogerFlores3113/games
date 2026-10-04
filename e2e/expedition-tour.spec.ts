@@ -54,7 +54,7 @@ const WANTED = [
   "route-voted", "event", "loadout", "next-camp", "run-end-lost", "run-end-guest",
 ];
 /** Phases play rarely reaches; each is also captured from a rewritten view. */
-const RARE = ["run-end-won", "between-camps-draft", "vote-tie-length", "vote-tie-route", "shop"];
+const RARE = ["run-end-won", "between-camps-draft", "vote-tie-length", "vote-tie-route", "shop", "camp-storm-strike", "camp-rain", "route-weather"];
 
 interface Identity { kind: "standard" | "joker"; suit?: string; rank?: number; joker?: "sun" | "moon" }
 interface Card { id: string; objectId: string; label: string; identity: Identity; playable: boolean }
@@ -373,7 +373,7 @@ async function newExpedition(pages: Page[]): Promise<void> {
 
 const h = (camp: number, attempt: number, status: "cleared" | "failed") => ({ camp, attempt, status, coins: status === "cleared" ? 7 : 0 });
 
-const PREVIEW = { index: 2, location: "jungle", weather: "fair", event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: null, shop: false };
+const PREVIEW = { index: 2, location: "jungle", weather: "fair", pairing: null, event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: null, shop: false };
 
 function wonView(game: Game): Game {
   return {
@@ -402,7 +402,7 @@ function lengthTieView(game: Game): Game {
     ...game,
     history: [],
     lastVote: { topic: "length", tally: [{ choice: "short", votes: 1 }, { choice: "standard", votes: 1 }, { choice: "long", votes: 0 }], tied: ["short", "standard"], winner: "standard" },
-    stage: { tag: "loadout", camp: { ...PREVIEW, index: 1, event: null, slotKinds: ["win-card", "win-card"] }, yourSlots: 2, shop: null, readySeatIds: [] },
+    stage: { tag: "loadout", camp: { ...PREVIEW, index: 1, event: null, slotKinds: ["win-card", "win-card"] }, mods: [], yourSlots: 2, shop: null, readySeatIds: [] },
   };
 }
 
@@ -438,6 +438,7 @@ function shopView(game: Game): Game {
     stage: {
       tag: "loadout",
       camp: { ...PREVIEW, index: 3, event: null, bossId: null, shop: true },
+      mods: [],
       yourSlots: 2,
       shop: {
         stock: [
@@ -452,6 +453,47 @@ function shopView(game: Game): Game {
         ],
       },
       readySeatIds: [],
+    },
+  };
+}
+
+const mod = (id: string, kind: string, status: Record<string, unknown>[] = []) => ({ id, kind, strength: "full", status });
+
+/** The camp in play on the clifftop in a thunderstorm, its sky still dark
+ * from a strike on the trick in play. */
+function stormView(game: Game): Game {
+  const stage = game.stage as Game["stage"] & { camp: Record<string, unknown> };
+  return {
+    ...game,
+    stage: {
+      ...stage,
+      camp: { ...stage.camp, location: "clifftop", weather: "thunderstorm" },
+      mods: [mod("clifftop", "location"), mod("thunderstorm", "weather", [{ kind: "chance", percent: 40, strikesLeft: 1 }, { kind: "strike" }])],
+    },
+  };
+}
+
+/** The camp in play in the rain, with the Whisper button stopped. */
+function rainView(game: Game): Game {
+  const stage = game.stage as Game["stage"] & { camp: Record<string, unknown> };
+  const attempt = { ...stage.attempt!, yourWhisper: { allowed: false, left: 1 } };
+  return { ...game, stage: { ...stage, camp: { ...stage.camp, weather: "rain" }, mods: [mod("jungle", "location"), mod("rain", "weather")], attempt } };
+}
+
+/** A route vote whose options show every weather, and a pairing. */
+function routeWeatherView(game: Game): Game {
+  const next = (location: string, weather: string, pairing: string | null) => ({ ...PREVIEW, index: 4, location, weather, pairing });
+  return {
+    ...game,
+    history: [h(1, 1, "cleared"), h(2, 1, "cleared"), h(3, 1, "cleared")],
+    stage: {
+      tag: "route",
+      options: [
+        { id: "a", next: next("clearing", "thunderstorm", null) },
+        { id: "b", next: next("clifftop", "rain", "steam") },
+        { id: "c", next: next("jungle", "fair", null) },
+      ],
+      ballots: [],
     },
   };
 }
@@ -484,6 +526,11 @@ async function capturePickers(host: Page, tour: Tour, rewrite: Rewriter): Promis
   }
   await reloadTo((g) => rescue(g, { youPending: false }));
   await tour.shot("rescue-waiting");
+  await reloadTo(stormView);
+  await host.waitForTimeout(1_000);
+  await tour.shot("camp-storm-strike");
+  await reloadTo(rainView);
+  await tour.shot("camp-rain");
   await reloadTo((g) => g);
 }
 
@@ -507,6 +554,7 @@ async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<v
     );
   }
   await capture(shopView, "trail", "shop");
+  await capture(routeWeatherView, "trail", "route-weather");
   await capture(lengthTieView as (g: Game) => Game, "trail", "vote-tie-length", 2_000);
   await capture(routeTieView as (g: Game) => Game, "trail", "vote-tie-route", 2_000);
   if (!tour.has("run-end-won")) await capture(wonView as (g: Game) => Game, "run-end", "run-end-won-rewritten");

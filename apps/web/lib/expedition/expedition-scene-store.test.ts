@@ -64,7 +64,8 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     lastVote: null,
     stage: {
       tag: "camp",
-      camp: { index: 2, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null, shop: false },
+      camp: { index: 2, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false },
+      mods: [],
       attempt: {
         attemptNumber: 1,
         window: "between-tricks",

@@ -29,6 +29,9 @@ import { liveSourceKeys } from "./usage";
 import { upgradeOffers } from "./shop";
 import { currentWindow, WINDOWS } from "./windows";
 import { defineCharacter, defineItem, defineUpgrade, type CharacterDef, type ItemDef, type Rarity } from "../content/source-def";
+import { MODS } from "../content/mods/registry";
+import { PAIRINGS, type PairingRule } from "../content/mods/pairings";
+import type { ModDef } from "../content/mods/mod-def";
 import type { Catalog, RunAction, RunLength, RunState } from "./types";
 
 function plainCharacter(n: number): CharacterDef {
@@ -60,14 +63,18 @@ export function plainItem(id: string, opts: { readonly rarity?: Rarity; readonly
 }
 
 /** A catalogue of plain characters (unless given) plus the given items and
- * extra characters. */
+ * extra characters, over the production camp modifiers plus any given. */
 export function testCatalog(parts: {
   readonly characters?: Readonly<Record<string, CharacterDef>>;
   readonly items?: Readonly<Record<string, ItemDef>>;
+  readonly mods?: Readonly<Record<string, ModDef>>;
+  readonly pairings?: readonly PairingRule[];
 } = {}): Catalog {
   return buildCatalog({
     characters: { ...PLAIN_CHARACTERS, ...parts.characters },
     items: parts.items ?? {},
+    mods: { ...MODS, ...parts.mods },
+    pairings: parts.pairings ?? PAIRINGS,
   });
 }
 
@@ -105,7 +112,7 @@ export function setupRun(opts: {
     (acc, seatId) => mintItems(acc, seatId, opts.items?.[seatId] ?? [], opts.catalog),
     { ...run, plan: drawPlan(length), supplies: opts.supplies ?? run.supplies, purse: opts.purse ?? run.purse, seats },
   );
-  return openLoadout(crewed, campSpecAt(opts.seed, length, campIndex(opts.camp ?? 1)), opts.catalog);
+  return openLoadout(crewed, campSpecAt(opts.seed, length, campIndex(opts.camp ?? 1), opts.catalog), opts.catalog);
 }
 
 /** Drives `run` forward through applyRunAction ONLY until `target` is

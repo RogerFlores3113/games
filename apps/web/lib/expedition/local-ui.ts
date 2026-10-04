@@ -51,6 +51,8 @@ export interface LocalUiState {
   tooltipObjectiveId: string | null;
   /** A teammate's source key: read-only, so it never starts targeting. */
   tooltipMateSource: { seatId: string; sourceKey: string } | null;
+  /** A camp modifier's chip on the strip. */
+  tooltipModId: string | null;
   /** The hand-card gesture in flight: press, drag, or the return after a
    * rejected drop. */
   drag: DragState;
@@ -63,7 +65,7 @@ export interface LocalUiState {
 }
 
 export function initialLocalUi(): LocalUiState {
-  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipSourceId: null, tooltipObjectiveId: null, tooltipMateSource: null, drag: IDLE_DRAG, trayPage: 0, takenBundle: null, packPage: 0 };
+  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipSourceId: null, tooltipObjectiveId: null, tooltipMateSource: null, tooltipModId: null, drag: IDLE_DRAG, trayPage: 0, takenBundle: null, packPage: 0 };
 }
 
 function currentHandIds(view: ExpeditionView): string[] {
@@ -256,6 +258,10 @@ export function setTooltipObjective(ui: LocalUiState, objectiveId: string | null
 export function setTooltipMateSource(ui: LocalUiState, mate: { seatId: string; sourceKey: string } | null): LocalUiState {
   const same = ui.tooltipMateSource?.seatId === mate?.seatId && ui.tooltipMateSource?.sourceKey === mate?.sourceKey;
   return same ? ui : { ...ui, tooltipMateSource: mate };
+}
+
+export function setTooltipMod(ui: LocalUiState, modId: string | null): LocalUiState {
+  return ui.tooltipModId === modId ? ui : { ...ui, tooltipModId: modId };
 }
 
 export function nextTrayPage(ui: LocalUiState): LocalUiState {

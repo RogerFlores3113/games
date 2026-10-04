@@ -11,6 +11,9 @@ import { SUPPLIES_START, objectiveSlotsFor, payoutFor } from "./balance";
 import { bossAt, isFinalCamp } from "./plan";
 import { planOf, type CampSpec } from "./route";
 import { attemptSeed } from "./rng";
+import { nextAttemptNumber } from "./attempt";
+import { react } from "./react";
+import { campSlots } from "./stack";
 import { stockFor } from "./shop";
 import type { CampIndex, CampResult, Catalog, RunAt, RunState, RunStatus, SeatRun } from "./types";
 
@@ -42,11 +45,6 @@ export function runStatus(run: RunState): RunStatus {
   return run.stage.tag === "ended" ? run.stage.result : "in_progress";
 }
 
-/** 1 + the attempts already recorded at this camp. */
-export function nextAttemptNumber(run: RunState, at: CampIndex): number {
-  return 1 + run.history.filter((entry) => entry.camp === at).length;
-}
-
 /** The loadout of `camp`, with the shop open before a boss camp. Every
  * visit draws the stock afresh from the same streams, so a replay of a boss
  * camp offers the same stock, unsold. */
@@ -56,15 +54,15 @@ export function openLoadout(run: RunState, camp: CampSpec, catalog: Catalog): Ru
 }
 
 /** Deals a fresh attempt of the loadout's camp (RUN-02: a replay is a fresh
- * deal and fresh objectives). */
+ * deal and fresh objectives), with every stack layer's slots, and lets the
+ * camp's modifiers react to the deal. */
 export function dealCamp(run: RunAt<"loadout">, catalog: Catalog): RunAt<"camp"> {
   const spec = run.stage.camp;
   const attemptNumber = nextAttemptNumber(run, spec.index);
-  const camp = createCamp(
-    { seatIds: run.seatIds, seed: attemptSeed(run.seed, spec.index, attemptNumber), objectiveSlots: objectiveSlotsFor(run.seed, spec, attemptNumber) },
-    rulesFor(run, catalog),
-  );
-  return { ...run, stage: { tag: "camp", camp: spec, attempt: { attemptNumber, effects: [], reveals: [], log: [], camp } } };
+  const slots = objectiveSlotsFor(run.seed, { ...spec, slots: campSlots(run, spec, catalog) }, attemptNumber);
+  const camp = createCamp({ seatIds: run.seatIds, seed: attemptSeed(run.seed, spec.index, attemptNumber), objectiveSlots: slots }, rulesFor(run, catalog));
+  const dealt: RunAt<"camp"> = { ...run, stage: { tag: "camp", camp: spec, attempt: { attemptNumber, effects: [], reveals: [], log: [], camp } } };
+  return react(dealt, [{ type: "camp-dealt" }], catalog);
 }
 
 function settleFailure(run: RunAt<"camp">, catalog: Catalog): RunState {

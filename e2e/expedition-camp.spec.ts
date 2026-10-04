@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { draftOffer, kitIds, pickDraftOffer, trailToCamp, walkTrail, type TrailView, type SceneName } from "./expedition-driver";
-import { clickObject, getModel, getScene, hoverObject, startExpeditionGame, waitForBridge } from "./expedition-helpers";
+import { clickObject, createExpeditionRoom, getModel, getScene, hoverObject, startExpeditionGame, waitForBridge } from "./expedition-helpers";
 
 /**
  * Full-camp, reconnect, card-pack and interactables e2e (Plan 12-13, spec
@@ -741,4 +741,67 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
       for (const context of contexts) await context.close();
     }
   });
+});
+
+// ---------------------------------------------------------------------------
+// A forced Thunderstorm (needs the worker in dev mode, see dev-mode.spec.ts)
+// ---------------------------------------------------------------------------
+
+interface StormModel {
+  sceneKey: SceneName;
+  youSeatId: string;
+  mods: { id: string; name: string; badge: string | null; pips: number; alert: boolean }[];
+  sky: { location: string; precipitation: string; strike: string | null; notice: string | null };
+  lastTrick: { winnerSeatId: string; plays: { seatId: string; card: { identity: { kind: string; rank?: number } } }[] } | null;
+  prompt: { text: string };
+}
+
+test("a forced Thunderstorm: its chance on the top bar, a strike's alert, and the lowest card winning the struck trick", async ({ page }) => {
+  test.setTimeout(120_000);
+  await createExpeditionRoom(page, "Solo");
+  await page.getByTestId("dev-toggle").click();
+  const panel = page.getByTestId("dev-panel");
+  await panel.getByTestId("dev-add-bot").click();
+  await expect(panel.getByTestId("dev-result")).toHaveText(/^Bot 1 joined\./);
+  await panel.getByTestId("dev-add-bot").click();
+  await expect(panel.getByTestId("dev-result")).toHaveText(/^Bot 2 joined\./);
+  await page.getByTestId("start-game").click();
+  await waitForBridge(page);
+  const model = () => getModel<StormModel>(page);
+
+  await panel.getByTestId("dev-field-jump-to-camp-camp").fill("2");
+  await panel.getByTestId("dev-field-jump-to-camp-stage").selectOption("camp");
+  await panel.getByTestId("dev-shortcut-jump-to-camp").click();
+  await expect.poll(async () => (await model()).sceneKey).toBe("camp");
+  await panel.getByTestId("dev-field-set-spec-location").selectOption("clifftop");
+  await panel.getByTestId("dev-field-set-spec-weather").selectOption("thunderstorm");
+  await panel.getByTestId("dev-shortcut-set-spec").click();
+  await expect.poll(async () => (await model()).mods.map((m) => m.id)).toEqual(["clifftop", "thunderstorm"]);
+  let m = await model();
+  expect(m.mods[1]).toMatchObject({ name: "Thunderstorm", badge: "20%", pips: 2, alert: false });
+  expect(m.sky).toMatchObject({ location: "clifftop", precipitation: "storm" });
+
+  // One objective nobody can finish or fail this trick, and a strike on the
+  // trick about to start: the strike lands and the lowest card wins.
+  const json = JSON.parse(await panel.getByTestId("dev-state-json").inputValue());
+  const attempt = json.stage.attempt;
+  attempt.camp.objectives = [{ id: "steady", kind: "exactly-n", n: 3, ownerSeatId: m.youSeatId }];
+  attempt.effects = [{ origin: { kind: "mod", modId: "thunderstorm", strength: "full" }, atTrick: 0, lasts: "trick", deferIfFatal: true, params: { strike: true }, audience: "public" }];
+  await panel.getByTestId("dev-state-json").fill(JSON.stringify(json));
+  await panel.getByTestId("dev-apply-state").click();
+  await expect.poll(async () => (await model()).sky.strike).not.toBeNull();
+  m = await model();
+  const struck = m.sky.strike;
+  expect(m.mods[1]).toMatchObject({ badge: "Lowest wins", pips: 1, alert: true });
+  expect(m.sky.notice).toBe("Lightning struck: the lowest card wins this trick");
+
+  await panel.getByTestId("dev-autoplay-scope").selectOption("everyone");
+  await panel.getByTestId("dev-autoplay-steps").fill("3");
+  await panel.getByTestId("dev-autoplay-run").click();
+  await expect.poll(async () => (await model()).lastTrick?.plays.length ?? 0).toBe(3);
+  m = await model();
+  const strength = (play: NonNullable<StormModel["lastTrick"]>["plays"][number]) => (play.card.identity.kind === "joker" ? 99 : play.card.identity.rank!);
+  const lowest = m.lastTrick!.plays.reduce((low, play) => (strength(play) < strength(low) ? play : low));
+  expect(m.lastTrick!.winnerSeatId).toBe(lowest.seatId);
+  expect(m.sky.strike, "the strike stays on its trick; a new roll may strike the next").not.toBe(struck);
 });

@@ -15,6 +15,7 @@ import { createCamp } from "./camp";
 import { describeObjective, evaluateObjective, OBJECTIVE_KINDS } from "./objectives";
 import { objectiveSlotsFor, RUN_LENGTHS } from "./run/balance";
 import { campIndex } from "./run/plan";
+import { CATALOG } from "./run/catalog";
 import { campSpecAt } from "./run/route";
 import type { RunLength } from "./run/types";
 import type { ObjectiveKind, ObjectiveSlot, ObjectiveStatus } from "./state";
@@ -72,7 +73,7 @@ describe("every ObjectiveSlot kind a camp spec can produce is registered", () =>
       const seed = `${SEED}-balance-${i}`;
       for (const length of lengths) {
         for (let k = 1; k <= RUN_LENGTHS[length].camps; k++) {
-          const spec = campSpecAt(seed, length, campIndex(k));
+          const spec = campSpecAt(seed, length, campIndex(k), CATALOG);
           for (const slot of objectiveSlotsFor(seed, spec, 1)) {
             expect(registryKeys.has(slot.kind)).toBe(true);
           }

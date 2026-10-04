@@ -3,6 +3,7 @@ import { createCamp } from "../camp";
 import type { CampState } from "../state";
 import { RUN_LENGTHS, TRICK_COUNT_N_RANGE, objectiveSlotsFor, payoutFor } from "./balance";
 import { campIndex } from "./plan";
+import { CATALOG } from "./catalog";
 import { campSpecAt, type CampSpec } from "./route";
 import type { RunLength } from "./types";
 
@@ -53,7 +54,7 @@ describe("objectiveSlotsFor", () => {
       for (let k = 1; k <= RUN_LENGTHS[length].camps; k++) {
         for (const players of [3, 4, 5]) {
           const seed = `deal-${length}-${k}-${players}`;
-          const slots = objectiveSlotsFor(seed, campSpecAt(seed, length, campIndex(k)), 1);
+          const slots = objectiveSlotsFor(seed, campSpecAt(seed, length, campIndex(k), CATALOG), 1);
           expect(createCamp({ seatIds: seatIds(players), seed, objectiveSlots: slots }).objectives).toHaveLength(slots.length);
         }
       }

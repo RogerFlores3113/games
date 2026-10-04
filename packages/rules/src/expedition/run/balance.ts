@@ -32,6 +32,12 @@ export const PAYOUT = { base: 5, perUnplayedTrick: 1, unplayedCap: 3 } as const;
 
 export const ROUTE_OPTIONS = { min: 2, max: 3 } as const;
 
+/** Percent chance a route's weather is fair; a location may set its own. */
+export const NORMAL_WEATHER_CHANCE = 80;
+
+/** A strike's chance before trick t is firstChance + perTrick * t percent. */
+export const THUNDERSTORM = { firstChance: 20, perTrick: 10, maxStrikes: 2 } as const;
+
 /** A draft offer: `options` bundles of `bundleSize` items; each item is rare
  * with `rareChance` percent. */
 export const DRAFT = { options: 3, bundleSize: 2, rareChance: 15 } as const;

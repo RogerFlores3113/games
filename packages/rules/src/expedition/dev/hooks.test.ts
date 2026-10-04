@@ -18,6 +18,7 @@ describe("expeditionDevHooks", () => {
     expect(hooks.shortcuts(fresh()).map((s) => [s.id, s.group])).toEqual([
       ["jump-to-camp", "Run"],
       ["jump-to-final-camp", "Run"],
+      ["set-spec", "Camp"],
       ["end-run", "Run"],
       ["force-camp", "Camp"],
       ["set-supplies", "Run"],
@@ -68,5 +69,11 @@ describe("expeditionDevHooks", () => {
     const dealt = hooks.runShortcut(fresh(), "jump-to-camp", { length: "standard", camp: 1, stage: "camp" });
     if (!dealt.ok) throw new Error(dealt.error);
     expect(hooks.inspect(dealt.state).map((s) => s.title)).toEqual(["Run", "Crew", "Hands", "Objectives", "Trick"]);
+    const stormy = hooks.runShortcut(dealt.state, "set-spec", { location: "clifftop", weather: "thunderstorm" });
+    if (!stormy.ok) throw new Error(stormy.error);
+    expect(hooks.inspect(stormy.state)[0]!.lines.filter((line) => line.startsWith("mod "))).toEqual([
+      "mod clifftop (location, full)",
+      "mod thunderstorm (weather, full): 20% next, 2 strikes left",
+    ]);
   });
 });

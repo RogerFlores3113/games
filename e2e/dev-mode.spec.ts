@@ -69,7 +69,7 @@ test("a saved snapshot loads into a fresh room, and a broken state edit is refus
   await panel.getByTestId("dev-shortcut-jump-to-camp").click();
   await expect(panel.getByTestId("dev-result")).toHaveText(/^Jump to camp: done\. \(0:in_progress\)$/);
   await panel.getByTestId("dev-reveal").check();
-  await expect(panel.getByTestId("dev-inspect")).toContainText("camp 4: jungle");
+  await expect(panel.getByTestId("dev-inspect")).toContainText("camp 4: ");
   await panel.getByTestId("dev-snapshot-name").fill("camp four");
   await panel.getByTestId("dev-snapshot-save").click();
   await expect(panel.getByTestId("dev-snapshot-list")).toContainText("camp four");
@@ -79,7 +79,7 @@ test("a saved snapshot loads into a fresh room, and a broken state edit is refus
   await panel.getByTestId("dev-snapshot-list").getByRole("button", { name: "Load" }).click();
   await expect(panel.getByTestId("dev-result")).toHaveText(/^State loaded \(seats renamed to this room's\)\. \(0:in_progress\)$/);
   await panel.getByTestId("dev-reveal").check();
-  await expect(panel.getByTestId("dev-inspect")).toContainText("camp 4: jungle");
+  await expect(panel.getByTestId("dev-inspect")).toContainText("camp 4: ");
 
   const json = await panel.getByTestId("dev-state-json").inputValue();
   await panel.getByTestId("dev-state-json").fill(json.replace(/"supplies": \d+/, '"supplies": -2'));

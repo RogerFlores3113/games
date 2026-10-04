@@ -40,7 +40,11 @@ const EXPEDITION_ERROR_CODES = [
   "nothing_to_skip",
 ] as const;
 
-const preview = { index: 2, location: "jungle", weather: "fair", event: "event", slotKinds: ["win-card", "ordered", "ordered"], bossId: null, shop: false };
+const CAMP_MODS = [
+  { id: "jungle", kind: "location", strength: "full", status: [] },
+  { id: "thunderstorm", kind: "weather", strength: "full", status: [{ kind: "chance", percent: 30, strikesLeft: 1 }, { kind: "strike" }] },
+];
+const preview = { index: 2, location: "jungle", weather: "fair", pairing: null, event: "event", slotKinds: ["win-card", "ordered", "ordered"], bossId: null, shop: false };
 const noItems = { equipped: [], backpack: [], concealed: false };
 
 const header = {
@@ -119,8 +123,9 @@ const midAttempt = {
     pendingSeatIds: [],
     rescue: null,
     effects: [
-      { sourceId: "bait", seatId: "seat-2", atTrick: 1, lasts: "trick", params: { cardId: "card-4" } },
-      { sourceId: "botanist", seatId: "seat-3", atTrick: 1, lasts: "attempt", params: null },
+      { origin: { kind: "seat", seatId: "seat-2", sourceId: "bait" }, atTrick: 1, lasts: "trick", params: { cardId: "card-4" } },
+      { origin: { kind: "seat", seatId: "seat-3", sourceId: "botanist" }, atTrick: 1, lasts: "attempt", params: null },
+      { origin: { kind: "mod", modId: "thunderstorm", strength: "full" }, atTrick: 1, lasts: "trick", params: { strike: true } },
     ],
     reveals: [
       {
@@ -134,6 +139,7 @@ const midAttempt = {
     log: [
       { event: "whisper", actorSeatId: "seat-1", subjectSeatIds: ["seat-2"], sourceId: null, private: false },
       { event: "use-ability", actorSeatId: "seat-2", subjectSeatIds: [], sourceId: "bait", private: true },
+      { event: "blew", actorSeatId: null, subjectSeatIds: [], sourceId: "tornado", private: false },
     ],
     yourWhisper: { allowed: true, left: 1 },
     camp: {
@@ -192,7 +198,7 @@ const midAttempt = {
 };
 
 function campWith(attempt: unknown) {
-  return { ...header, seats: campSeats, ...midCampFields, stage: { tag: "camp", camp: preview, attempt } };
+  return { ...header, seats: campSeats, ...midCampFields, stage: { tag: "camp", camp: preview, mods: CAMP_MODS, attempt } };
 }
 
 const midCampView = campWith(midAttempt);
@@ -208,12 +214,13 @@ describe("ExpeditionViewSchema", () => {
   });
 
   it.each([
-    ["loadout", { tag: "loadout", camp: preview, yourSlots: 2, shop: null, readySeatIds: ["seat-2"] }],
+    ["loadout", { tag: "loadout", camp: { ...preview, pairing: "steam" }, mods: CAMP_MODS, yourSlots: 2, shop: null, readySeatIds: ["seat-2"] }],
     [
       "loadout with the shop",
       {
         tag: "loadout",
         camp: { ...preview, index: 3, shop: true },
+        mods: [],
         yourSlots: 2,
         shop: {
           stock: [
@@ -407,6 +414,9 @@ describe("ExpeditionViewSchema", () => {
     ["camp index 0", { ...midCampView, stage: { ...midCampView.stage, camp: { ...preview, index: 0 } } }],
     ["supplies -1", { ...midCampView, supplies: { count: -1, max: 4 } }],
     ["a stage tag that does not exist", { ...midCampView, stage: { tag: "fireside" } }],
+    ["a modifier status carrying a card", { ...midCampView, stage: { ...midCampView.stage, mods: [{ id: "thunderstorm", kind: "weather", strength: "full", status: [{ kind: "strike", cardId: "card-1" }] }] } }],
+    ["a modifier of an unknown kind", { ...midCampView, stage: { ...midCampView.stage, mods: [{ id: "x", kind: "volcano", strength: "full", status: [] }] } }],
+    ["an effect with no origin", { ...midCampView, stage: { ...midCampView.stage, attempt: { ...midAttempt, effects: [{ sourceId: "bait", seatId: "seat-2", atTrick: 1, lasts: "trick", params: null }] } } }],
     ["a route option with a bad slot kind", { ...draftView, stage: { tag: "route", options: [{ id: "a", next: { ...preview, slotKinds: ["boss"] } }], ballots: [] } }],
   ])("rejects: %s", (_name, input) => {
     expect(ExpeditionViewSchema.safeParse(input).success).toBe(false);

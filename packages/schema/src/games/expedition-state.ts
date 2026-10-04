@@ -68,10 +68,13 @@ const AttemptSchema = z.strictObject({
   attemptNumber: z.number().int().min(1),
   effects: z.array(
     z.strictObject({
-      sourceId: z.string().min(1),
-      seatId: z.string().min(1),
+      origin: z.discriminatedUnion("kind", [
+        z.strictObject({ kind: z.literal("seat"), seatId: z.string().min(1), sourceKey: z.string().min(1), sourceId: z.string().min(1) }),
+        z.strictObject({ kind: z.literal("mod"), modId: z.string().min(1), strength: z.enum(["full", "half"]) }),
+      ]),
       atTrick: z.number().int().min(0),
       lasts: z.enum(["attempt", "trick"]),
+      deferIfFatal: z.boolean(),
       params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
       audience: z.enum(["public", "owner"]),
     }),
@@ -88,7 +91,7 @@ const AttemptSchema = z.strictObject({
   log: z.array(
     z.strictObject({
       event: z.string(),
-      actorSeatId: z.string().min(1),
+      actorSeatId: z.string().min(1).nullable(),
       subjectSeatIds: z.array(z.string()),
       sourceId: z.string().nullable(),
       audience: AudienceSchema,

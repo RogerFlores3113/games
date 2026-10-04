@@ -12,6 +12,7 @@ import { winnerExcluding } from "../content/helpers";
 import { composeRules, ruleLayersFor, rulesFor } from "./compose";
 import { attemptOf } from "./attempt";
 import { campIndex } from "./plan";
+import { CATALOG } from "./catalog";
 import { campSpecAt } from "./route";
 import { applyRunAction } from "./stages/registry";
 import { advanceTo, setupRun, testCatalog } from "./run-test-support";
@@ -34,7 +35,7 @@ function carrying(first: number, ...itemIds: string[]): Pick<SeatRun, "items" | 
 function makeRun(overrides: Partial<RunState> & { attempt?: AttemptState } = {}): RunState {
   const { attempt, ...rest } = overrides;
   const seatIds = rest.seatIds ?? ["p0", "p1", "p2"];
-  const spec = campSpecAt("test-seed", "standard", campIndex(2));
+  const spec = campSpecAt("test-seed", "standard", campIndex(2), CATALOG);
   return {
     seed: "test-seed",
     seatIds,
@@ -221,7 +222,7 @@ describe("rulesFor / ruleLayersFor", () => {
     }),
   });
   const catalog = testCatalog({ items: { "whisper-plus-2": passiveItem, "effect-item": effectItem } });
-  const effect = { sourceId: "effect-item", seatId: "p0", atTrick: 0, lasts: "attempt", params: {}, audience: "public" } as const;
+  const effect = { origin: { kind: "seat", seatId: "p0", sourceKey: "effect-item", sourceId: "effect-item" }, atTrick: 0, lasts: "attempt", deferIfFatal: false, params: {}, audience: "public" } as const;
 
   it("applies an equipped item's passive only for its owner", () => {
     const run = makeRun({
@@ -278,7 +279,7 @@ describe("rulesFor / ruleLayersFor", () => {
   });
 
   it("throws when an effect's source has no active.effect", () => {
-    const passiveOnly = { ...effect, sourceId: "whisper-plus-2" };
+    const passiveOnly = { ...effect, origin: { ...effect.origin, sourceId: "whisper-plus-2" } };
     const run = makeRun({ attempt: makeAttempt({ effects: [passiveOnly] }) });
     expect(() => ruleLayersFor(run, catalog)).toThrow(/whisper-plus-2.*no active\.effect/);
   });
@@ -294,7 +295,7 @@ describe("rulesFor / ruleLayersFor", () => {
       active: itemAbility({ window: "between-tricks", targets: [], apply: () => [] }),
     });
     const bare = testCatalog({ items: { "no-effect": noEffect } });
-    const run = makeRun({ attempt: makeAttempt({ effects: [{ ...effect, sourceId: "no-effect" }] }) });
+    const run = makeRun({ attempt: makeAttempt({ effects: [{ ...effect, origin: { ...effect.origin, sourceId: "no-effect" } }] }) });
     expect(() => ruleLayersFor(run, bare)).toThrow(/no-effect.*no active\.effect/);
   });
 });
@@ -346,8 +347,8 @@ describe("layer order", () => {
     ],
     attempt: makeAttempt({
       effects: [
-        { sourceId: "fx", seatId: "p2", atTrick: 0, lasts: "attempt", params: {}, audience: "public" },
-        { sourceId: "fx", seatId: "p1", atTrick: 0, lasts: "attempt", params: {}, audience: "public" },
+        { origin: { kind: "seat", seatId: "p2", sourceKey: "fx", sourceId: "fx" }, atTrick: 0, lasts: "attempt", deferIfFatal: false, params: {}, audience: "public" },
+        { origin: { kind: "seat", seatId: "p1", sourceKey: "fx", sourceId: "fx" }, atTrick: 0, lasts: "attempt", deferIfFatal: false, params: {}, audience: "public" },
       ],
     }),
   });
@@ -389,7 +390,7 @@ describe("trick-scoped effects", () => {
         targets: [],
         apply: () => [{ op: "add-modifier", lasts, params: {}, audience: "public" }],
         effect: (effect) => ({
-          trickWinner: (prev) => (plays, led) => winnerExcluding(prev, plays, led, (play) => play.seatId === effect.seatId),
+          trickWinner: (prev) => (plays, led) => winnerExcluding(prev, plays, led, (play) => play.seatId === effect.origin.seatId),
         }),
       }),
     });

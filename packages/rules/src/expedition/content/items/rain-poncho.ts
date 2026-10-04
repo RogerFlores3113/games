@@ -12,6 +12,6 @@ export const rainPoncho = defineItem({
     window: "between-tricks",
     targets: [],
     apply: () => [{ op: "add-modifier", lasts: "attempt", audience: "public", params: {} }],
-    effect: (e) => extraWhisper(e.seatId),
+    effect: (e) => extraWhisper(e.origin.seatId),
   }),
 });

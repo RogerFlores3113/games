@@ -1,10 +1,12 @@
-// Phase 10 hook-composition engine (Plan 03, spec §6.1).
+// The hook-composition engine.
 //
-// COMPOSITION ORDER: base -> each seat's live passives
-// (seat order, then [character, upgrade, ...equipped] order) -> active effects (in the
-// order stored on the attempt's effects). Every layer's RuleModifier maps the PREVIOUS
-// layer's answer to its own, per hook (run-rules.ts's own header repeats
-// this contract; this file is what actually folds it).
+// COMPOSITION ORDER: base -> each camp-stack layer's `rules` (location,
+// weather, pairing, boss) -> each seat's live passives (seat order, then
+// [character, upgrade, ...equipped] order) -> live effects (in the order
+// stored on the attempt). Bosses fold after weather so a boss can refine a
+// weather; passives fold after both so an item can lift a camp rule for its
+// owner (Mosquito Net under Rain); effects win last. Every layer's
+// RuleModifier maps the PREVIOUS layer's answer to its own, per hook.
 //
 // THE CARD-READING HOOKS ARE FOLDED FIRST, separately from every other hook
 // (WR-03): identityOf, then isTrump, then rankOf, whose default reads the
@@ -16,23 +18,23 @@
 // NO CACHE (T-10-08): this module holds no Map, WeakMap or module-level
 // mutable state. rulesFor recomputes ruleLayersFor and composeRules fresh on
 // every call; RunState is plain JSON, so "the same RunState" always
-// recomposes to the same RunRules, and a changed RunState (e.g. a new
-// attempt.effects entry) always recomposes to a new one.
+// recomposes to the same RunRules.
 //
-// POLICY A3 (content-defect throw): a live or effect-referencing source id
-// absent from the Catalog is a content bug, not a player error — ruleLayersFor throws a plain Error naming the missing id, matching
-// the Plan 10-01 policy for composed rule-hook defects.
+// POLICY A3 (content-defect throw): a live or effect-referencing id absent
+// from the Catalog is a content bug, not a player error: ruleLayersFor
+// throws a plain Error naming the missing id.
 //
 // RESET-ON-REPLAY (RUN-06) falls out structurally: a fresh AttemptState has
-// no effects, so a replay's first rulesFor call naturally omits the old
-// effects layer — there is nothing here to reset by hand.
+// no effects, so a replay's first rulesFor call omits the old effects.
 
 import { baseRulesWith } from "../rules";
 import { cardReading, isTrump } from "../trick";
 import { HOOK_NAMES, baseRunHooks, type HookName, type RuleModifier, type RunRules } from "./run-rules";
-import type { Catalog, RunState } from "./types";
+import type { ActiveEffect, Catalog, RunState, SeatEffect } from "./types";
 import { defOfKey, liveSourceKeys, ownerOf, sourceDef } from "./usage";
 import { attemptOf } from "./attempt";
+import { bodyOf } from "../content/mods/mod-def";
+import { campStack, modCtx, modDef, specOf } from "./stack";
 
 const CARD_HOOKS = ["identityOf", "isTrump", "rankOf"] as const;
 type CardHook = (typeof CARD_HOOKS)[number];
@@ -73,12 +75,36 @@ export function composeRules(layers: readonly RuleModifier[]): RunRules {
   return result;
 }
 
-/** Builds the ordered layer list for `run` under `catalog`: each seat's
- * live passives (seat order, then [character, upgrade, ...equipped] order) -> each live
- * attempt effect's `active.effect`, in attempt.effects order. Throws a named
- * Error for any source id missing from the catalog (POLICY A3). */
+/** The rule layer an effect switches on: a seat ability's `active.effect`
+ * or a camp modifier's `body.effect`. */
+function effectLayer(run: RunState, effect: ActiveEffect, catalog: Catalog): RuleModifier {
+  const origin = effect.origin;
+  if (origin.kind === "seat") {
+    const toLayer = sourceDef(catalog, origin.sourceId).active?.effect;
+    if (toLayer === undefined) throw new Error(`ruleLayersFor: effect from "${origin.sourceId}" has no active.effect`);
+    return toLayer(effect as SeatEffect, run);
+  }
+  const def = modDef(catalog, origin.modId);
+  const toLayer = bodyOf(def, origin.strength).effect;
+  const spec = specOf(run);
+  if (toLayer === undefined || spec === null) throw new Error(`ruleLayersFor: effect from "${origin.modId}" has no body.effect`);
+  return toLayer(effect, modCtx(run, spec, { def, strength: origin.strength }));
+}
+
+/** Builds the ordered layer list for `run` under `catalog`: each camp-stack
+ * layer's `rules` -> each seat's live passives (seat order, then
+ * [character, upgrade, ...equipped] order) -> each live attempt effect's
+ * layer, in attempt.effects order. Throws a named Error for any id missing
+ * from the catalog (POLICY A3). */
 export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
   const layers: RuleModifier[] = [];
+
+  const spec = specOf(run);
+  if (spec !== null) {
+    for (const layer of campStack(run, catalog)) {
+      if (layer.body.rules !== undefined) layers.push(layer.body.rules(modCtx(run, spec, layer)));
+    }
+  }
 
   for (const seat of run.seats) {
     const owner = ownerOf(seat);
@@ -96,11 +122,7 @@ export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
       // applyCampAction resolves trickWinner while currentTrick.index still
       // equals atTrick, and the next trick's index drops the layer.
       if (effect.lasts === "trick" && effect.atTrick !== trickIndex) continue;
-      const toLayer = sourceDef(catalog, effect.sourceId).active?.effect;
-      if (toLayer === undefined) {
-        throw new Error(`ruleLayersFor: effect from "${effect.sourceId}" has no active.effect`);
-      }
-      layers.push(toLayer(effect, run));
+      layers.push(effectLayer(run, effect, catalog));
     }
   }
 

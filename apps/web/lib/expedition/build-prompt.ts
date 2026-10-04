@@ -1,5 +1,5 @@
 import { CHARACTER_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
-import { attemptOf } from "./view-access";
+import { attemptOf, whisperLog } from "./view-access";
 import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
 import { cardLabel, rankLabel, SUIT_GLYPH } from "./expedition-ids";
 import type { LocalUiState } from "./local-ui";
@@ -66,7 +66,7 @@ export function describeChoice(view: ExpeditionView, choiceId: string, nameOf: (
     case "objective":
       return objectivePhrase(view, raw);
     case "whisper": {
-      const entry = (attemptOf(view)?.log ?? []).filter((l) => l.event === "whisper")[Number(raw)];
+      const entry = whisperLog(view)[Number(raw)];
       if (entry === undefined) return "a whisper";
       const to = entry.subjectSeatIds[0] ?? null;
       const who = (id: string | null): string => (id === view.yourSeatId ? "you" : nameOf(id));

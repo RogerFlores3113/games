@@ -37,7 +37,7 @@ function camp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampView {
   };
 }
 
-const PREVIEW: ExpeditionCampPreviewView = { index: 1, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null, shop: false };
+const PREVIEW: ExpeditionCampPreviewView = { index: 1, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false };
 
 function withAttempt(v: ExpeditionView, patch: Partial<ExpeditionAttemptView>): ExpeditionView {
   if (v.stage.tag !== "camp") throw new Error("fixture is not in a camp");
@@ -60,6 +60,7 @@ function view(campView: ExpeditionCampView, overrides: Partial<ExpeditionView> =
     stage: {
       tag: "camp",
       camp: PREVIEW,
+      mods: [],
       attempt: {
         attemptNumber: 1,
         window: null,
@@ -454,17 +455,17 @@ describe("buildTrailPrompt", () => {
   });
 
   it("at the loadout tells you to set out by your character", () => {
-    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 2 }, yourSlots: 2, shop: null, readySeatIds: [] }, { history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }] });
+    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 2 }, mods: [], yourSlots: 2, shop: null, readySeatIds: [] }, { history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }] });
     expect(at(v)).toEqual({ text: "The Scout, set out for camp 2 when ready", tone: "your-move" });
   });
 
   it("at the loadout after a failure tells you to try the camp again", () => {
-    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 3 }, yourSlots: 2, shop: null, readySeatIds: [] }, { history: failedCamp3 });
+    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 3 }, mods: [], yourSlots: 2, shop: null, readySeatIds: [] }, { history: failedCamp3 });
     expect(at(v)).toEqual({ text: "Camp 3 failed. Set out to try again", tone: "alert" });
   });
 
   it("at the loadout names who is not ready once you are", () => {
-    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 3 }, yourSlots: 2, shop: null, readySeatIds: ["me"] }, { history: failedCamp3 });
+    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 3 }, mods: [], yourSlots: 2, shop: null, readySeatIds: ["me"] }, { history: failedCamp3 });
     expect(at(v)).toEqual({ text: "Waiting for Ana and Bo", tone: "waiting" });
   });
 
@@ -476,12 +477,12 @@ describe("buildTrailPrompt", () => {
       { seatId: "cy", displayLabel: "Cyprianus" },
       { seatId: "di", displayLabel: "Dionysia" },
     ];
-    const base = trail({ tag: "loadout", camp: PREVIEW, yourSlots: 2, shop: null, readySeatIds: ["me"] });
+    const base = trail({ tag: "loadout", camp: PREVIEW, mods: [], yourSlots: 2, shop: null, readySeatIds: ["me"] });
     const five = { ...base, seats: long.map((s) => ({ seatId: s.seatId, characterId: "scout", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, pool: null, usage: [] })) };
     expect(at(five, long)).toEqual({ text: "Waiting for 4 teammates", tone: "waiting" });
   });
 
   it("says Reconnecting while the socket is down", () => {
-    expect(at(trail({ tag: "loadout", camp: PREVIEW, yourSlots: 2, shop: null, readySeatIds: [] }), SEATS, true)).toEqual({ text: "Reconnecting…", tone: "alert" });
+    expect(at(trail({ tag: "loadout", camp: PREVIEW, mods: [], yourSlots: 2, shop: null, readySeatIds: [] }), SEATS, true)).toEqual({ text: "Reconnecting…", tone: "alert" });
   });
 });

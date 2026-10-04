@@ -152,7 +152,7 @@ export function useAbility(
   const ops: ToolkitOp[] = [...active.apply(abilityContext(run, seat, key, rules, resolved.targets, true))];
   const limit = status.remaining;
   if (limit.kind === "supplies") ops.push({ op: "adjust-supplies", delta: -limit.cost });
-  const applied = applyToolkitOps(run, seatId, sourceId, ops, rules);
+  const applied = applyToolkitOps(run, { kind: "seat", seatId, sourceKey: key, sourceId }, ops, rules);
 
   const used: LedgerEntry = { kind: "used", sourceKey: key, at: currentStamp(run)!, poolCost: limit.kind === "pool" ? limit.cost : 0 };
   const spent = spendsInstance(seat, key, catalog) && limit.kind === "uses" && limit.left === 1;

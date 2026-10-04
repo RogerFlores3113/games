@@ -42,6 +42,7 @@ import type { ActiveWindow } from "../run/windows";
 import type { BossTier } from "../run/plan";
 import type { SlotTemplate } from "../run/route";
 import type { RunLength } from "../run/types";
+import type { ModKind, Strength } from "../content/mods/mod-def";
 
 export type ExpeditionCardIdentityView =
   | { kind: "standard"; suit: Suit; rank: StandardRank }
@@ -136,17 +137,20 @@ export type ExpeditionRevealView = {
 // (or public) are ever mapped into this shape.
 export type ExpeditionLogEntryView = {
   event: string;
-  actorSeatId: string;
+  /** null for a camp modifier. */
+  actorSeatId: string | null;
   subjectSeatIds: string[];
   sourceId: string | null;
   private: boolean;
 };
 
+/** Who switched an effect on: a seat through a source, or a camp modifier. */
+export type ExpeditionEffectOriginView = { kind: "seat"; seatId: string; sourceId: string } | { kind: "mod"; modId: string; strength: Strength };
+
 /** `params` is null unless the effect's audience is public or the viewer
  * owns it. */
 export type ExpeditionEffectView = {
-  sourceId: string;
-  seatId: string;
+  origin: ExpeditionEffectOriginView;
   atTrick: number;
   lasts: "attempt" | "trick";
   params: Record<string, string | number | boolean> | null;
@@ -220,12 +224,14 @@ export type ExpeditionRunLengthView = RunLength;
 export type ExpeditionSlotKindView = SlotTemplate["kind"];
 
 /** A camp as a preview shows it: before the deal, on a route card, or
- * during play. `bossId` is null for a plain camp or a boss not drawn.
- * `shop` is true for a boss camp, whose loadout opens the shop. */
+ * during play. `pairing` is the def a location and weather add together.
+ * `bossId` is null for a plain camp or a boss not drawn. `shop` is true for
+ * a boss camp, whose loadout opens the shop. */
 export type ExpeditionCampPreviewView = {
   index: number;
   location: string;
   weather: string;
+  pairing: string | null;
   event: string | null;
   slotKinds: ExpeditionSlotKindView[];
   bossId: string | null;
@@ -259,10 +265,16 @@ export type ExpeditionVoteView = {
 
 export type ExpeditionPlanBossView = { at: number; tier: BossTier; bossId: string | null };
 
+/** Public table state of a camp modifier. Carries no card. */
+export type ExpeditionStatusPartView = { kind: "chance"; percent: number; strikesLeft: number } | { kind: "strike" };
+
+/** One layer of the camp's modifier stack, in fold order. */
+export type ExpeditionModView = { id: string; kind: ModKind; strength: Strength; status: ExpeditionStatusPartView[] };
+
 export type ExpeditionStageView =
   | { tag: "muster"; ballots: ExpeditionBallotView[] }
-  | { tag: "loadout"; camp: ExpeditionCampPreviewView; yourSlots: number; shop: ExpeditionShopView | null; readySeatIds: string[] }
-  | { tag: "camp"; camp: ExpeditionCampPreviewView; attempt: ExpeditionAttemptView }
+  | { tag: "loadout"; camp: ExpeditionCampPreviewView; mods: ExpeditionModView[]; yourSlots: number; shop: ExpeditionShopView | null; readySeatIds: string[] }
+  | { tag: "camp"; camp: ExpeditionCampPreviewView; mods: ExpeditionModView[]; attempt: ExpeditionAttemptView }
   | { tag: "draft"; cleared: number; payout: number; yourOffer: { bundles: string[][] } | null; pendingSeatIds: string[] }
   | { tag: "route"; options: { id: string; next: ExpeditionCampPreviewView }[]; ballots: ExpeditionBallotView[] }
   | { tag: "event"; event: string; next: ExpeditionCampPreviewView; readySeatIds: string[] }

@@ -9,7 +9,8 @@ import { mintItems } from "../run/items";
 import { dealCamp, openLoadout, runStatus, settleCamp } from "../run/lifecycle";
 import { rulesFor } from "../run/compose";
 import { campIndex, drawPlan } from "../run/plan";
-import { campSpecAt } from "../run/route";
+import { campSpecAt, type CampSpec } from "../run/route";
+import { pairingRuleFor } from "../run/stack";
 import { applyToolkitOps } from "../run/toolkit";
 import type { Catalog, RunAt, RunLength, RunState } from "../run/types";
 import { describeObjective } from "../objectives";
@@ -68,7 +69,7 @@ function assignCharacters(run: RunState, catalog: Catalog): RunState {
 function loadoutAt(run: RunState, length: RunLength, k: number, catalog: Catalog): RunAt<"loadout"> {
   if (k > RUN_LENGTHS[length].camps) throw new Error(`a ${length} run has ${RUN_LENGTHS[length].camps} camps, not ${k}`);
   const crewed: RunState = { ...assignCharacters(run, catalog), plan: drawPlan(length), supplies: Math.max(run.supplies, 1) };
-  return openLoadout({ ...crewed, history: crewed.history.filter((h) => h.camp < k) }, campSpecAt(run.seed, length, campIndex(k)), catalog);
+  return openLoadout({ ...crewed, history: crewed.history.filter((h) => h.camp < k) }, campSpecAt(run.seed, length, campIndex(k), catalog), catalog);
 }
 
 function jumpToCamp(run: RunState, length: RunLength, k: number, stage: "loadout" | "camp", catalog: Catalog): RunState {
@@ -119,6 +120,22 @@ const upgradeOptions = (catalog: Catalog): DevOption[] => [
   ...Object.values(catalog.characters).flatMap((character) => character.upgrades.map((u) => ({ value: u.id, label: `${u.name} (${character.id})` }))),
 ];
 const STAGE_OPTIONS = opts(["camp", "loadout"]);
+const modOptions = (catalog: Catalog, kind: "location" | "weather", current: string | null): DevOption[] => {
+  const ids = Object.values(catalog.mods).filter((def) => def.kind === kind).map((def) => def.id);
+  return opts(current === null ? ids : [current, ...ids.filter((id) => id !== current)]);
+};
+const specOfStage = (run: RunState): CampSpec | null => (run.stage.tag === "loadout" || run.stage.tag === "camp" ? run.stage.camp : null);
+
+/** The loadout or camp with a new location and weather. A dealt camp is
+ * dealt again under the new spec. */
+function setSpec(run: RunState, location: string, weather: string, catalog: Catalog): RunState {
+  const stage = run.stage;
+  if (stage.tag !== "loadout" && stage.tag !== "camp") throw new Error("set-spec works in a loadout or a camp");
+  if (pairingRuleFor(location, weather, catalog)?.result === "never") throw new Error(`${location} never has ${weather}`);
+  const camp = { ...stage.camp, location, weather };
+  if (stage.tag === "loadout") return { ...run, stage: { ...stage, camp } };
+  return dealCamp(openLoadout(run, camp, catalog), catalog);
+}
 
 export const DEV_SHORTCUTS = {
   "jump-to-camp": {
@@ -140,6 +157,16 @@ export const DEV_SHORTCUTS = {
     group: "Run",
     fields: () => [],
     apply: (run, _params, catalog) => jumpToCamp(run, lengthOf(run), RUN_LENGTHS[lengthOf(run)].camps, "camp", catalog),
+  },
+  "set-spec": {
+    label: "Set the camp's location and weather",
+    group: "Camp",
+    fields: (run, catalog) => [
+      { name: "location", label: "Location", kind: "choice", options: modOptions(catalog, "location", specOfStage(run)?.location ?? null) },
+      { name: "weather", label: "Weather", kind: "choice", options: modOptions(catalog, "weather", specOfStage(run)?.weather ?? null) },
+    ],
+    apply: (run, params, catalog) =>
+      setSpec(run, readChoice(params, "location", modOptions(catalog, "location", null)), readChoice(params, "weather", modOptions(catalog, "weather", null)), catalog),
   },
   "end-run": {
     label: "End the run",
@@ -226,7 +253,8 @@ export const DEV_SHORTCUTS = {
       const to = readChoice(params, "to", seatOptions(run));
       const from = holders.find((c) => c.id === cardId)!.seatId;
       if (from === to) throw new Error(`the card is already in ${to}'s hand`);
-      return applyToolkitOps(run, to, "dev", [{ op: "move-card", cardId, fromSeatId: from, toSeatId: to }], rulesFor(run, catalog));
+      const origin = { kind: "seat", seatId: to, sourceKey: "dev", sourceId: "dev" } as const;
+      return applyToolkitOps(run, origin, [{ op: "move-card", cardId, fromSeatId: from, toSeatId: to }], rulesFor(run, catalog));
     },
   },
   "set-objective-owner": {

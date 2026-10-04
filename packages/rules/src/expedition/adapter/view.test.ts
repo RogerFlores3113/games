@@ -79,6 +79,28 @@ describe("toExpeditionPlayerView", () => {
     expect(view.plan).toEqual([{ at: 3, tier: "animal", bossId: null }, { at: 6, tier: "temple", bossId: null }]);
   });
 
+  it("loadout and camp: the camp's modifier stack in fold order with each layer's public status, and the preview's pairing", () => {
+    const base = setupRun({ seatIds: [...SEATS], seed: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", catalog: CATALOG, camp: 2 });
+    if (base.stage.tag !== "loadout") throw new Error("expected a loadout");
+    const stormy: RunState = { ...base, stage: { ...base.stage, camp: { ...base.stage.camp, location: "clifftop", weather: "thunderstorm" } } };
+
+    const loadout = toExpeditionPlayerView(stormy, "p0", CATALOG).stage;
+    expect(loadout).toMatchObject({
+      tag: "loadout",
+      camp: { location: "clifftop", weather: "thunderstorm", pairing: null },
+      mods: [
+        { id: "clifftop", kind: "location", strength: "full", status: [] },
+        { id: "thunderstorm", kind: "weather", strength: "full", status: [{ kind: "chance", percent: 20, strikesLeft: 2 }] },
+      ],
+    });
+    const dealt = toExpeditionPlayerView(advanceTo(stormy, "objective-pick", CATALOG), "spectator", CATALOG).stage;
+    expect(dealt).toMatchObject({ tag: "camp", mods: [{ id: "clifftop" }, { id: "thunderstorm", status: [{ kind: "chance", percent: 20, strikesLeft: 2 }] }] });
+
+    const paired = testCatalog({ characters: CATALOG.characters, items: CATALOG.items, pairings: [{ location: "clifftop", weathers: ["thunderstorm"], result: { cancels: ["clifftop"], adds: "fair" } }] });
+    const pairedView = toExpeditionPlayerView(stormy, "p0", paired).stage;
+    expect(pairedView).toMatchObject({ camp: { pairing: "fair" }, mods: [{ id: "thunderstorm" }, { id: "fair" }] });
+  });
+
   it("loadout before a boss camp: the shared stock, and only the viewer's own character's upgrades while it has none", () => {
     const run = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3, characters: { p0: "scout", p1: "guide" }, upgrades: { p1: "guide.pathfinder" } });
     const stock = run.stage.tag === "loadout" ? run.stage.stock! : [];
@@ -401,9 +423,9 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
     const otherEffect = attemptViewOf(toExpeditionPlayerView(used.state, "p1", CATALOG)).effects[0]!;
     const spectatorEffect = attemptViewOf(toExpeditionPlayerView(used.state, "ghost", CATALOG)).effects[0]!;
 
-    expect(ownerEffect).toMatchObject({ sourceId: "whetstone", seatId: "p0", lasts: "attempt" });
+    expect(ownerEffect).toMatchObject({ origin: { kind: "seat", seatId: "p0", sourceId: "whetstone" }, lasts: "attempt" });
     expect(Object.keys(ownerEffect.params!).sort()).toEqual(["cardId", "rank"]);
-    expect(otherEffect).toEqual({ sourceId: "whetstone", seatId: "p0", atTrick: 0, lasts: "attempt", params: null });
+    expect(otherEffect).toEqual({ origin: { kind: "seat", seatId: "p0", sourceId: "whetstone" }, atTrick: 0, lasts: "attempt", params: null });
     expect(spectatorEffect.params).toBeNull();
 
     const publicCatalog = testCatalog({

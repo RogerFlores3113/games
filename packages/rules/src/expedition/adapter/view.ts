@@ -34,6 +34,8 @@ import { runStatus } from "../run/lifecycle";
 import { SUPPLIES_MAX } from "../run/balance";
 import { bossAt, campCount } from "../run/plan";
 import { slotKindsFor, type CampSpec } from "../run/route";
+import { campStack, modCtx, pairingOf, specOf, type StackLayer } from "../run/stack";
+import type { StatusPart } from "../content/mods/mod-def";
 import { whispersUsedBy } from "../run/whisper";
 import { abilityStatus } from "../run/abilities";
 import { activeOfKey, backpackOf, itemOf, liveSourceKeys, poolBalance, remaining, type Remaining } from "../run/usage";
@@ -55,10 +57,12 @@ import type {
   ExpeditionCompletedTrickView,
   ExpeditionCurrentTrickView,
   ExpeditionAbilityView,
+  ExpeditionEffectOriginView,
   ExpeditionEffectView,
   ExpeditionHandSizeView,
   ExpeditionItemView,
   ExpeditionLogEntryView,
+  ExpeditionModView,
   ExpeditionObjectiveView,
   ExpeditionRankedCardView,
   ExpeditionRemainingView,
@@ -66,6 +70,7 @@ import type {
   ExpeditionSeatView,
   ExpeditionShopView,
   ExpeditionStageView,
+  ExpeditionStatusPartView,
   ExpeditionStockView,
   ExpeditionTrickPlayView,
   ExpeditionView,
@@ -208,11 +213,14 @@ function logVisibleTo(entry: LogEntry, seatId: string | null): boolean {
   return seatId !== null && entry.audience.includes(seatId);
 }
 
+function toOriginView(origin: ActiveEffect["origin"]): ExpeditionEffectOriginView {
+  return origin.kind === "seat" ? { kind: "seat", seatId: origin.seatId, sourceId: origin.sourceId } : { kind: "mod", modId: origin.modId, strength: origin.strength };
+}
+
 function toEffectView(effect: ActiveEffect, viewerSeatId: string | null): ExpeditionEffectView {
-  const shown = effect.audience === "public" || effect.seatId === viewerSeatId;
+  const shown = effect.audience === "public" || (effect.origin.kind === "seat" && effect.origin.seatId === viewerSeatId);
   return {
-    sourceId: effect.sourceId,
-    seatId: effect.seatId,
+    origin: toOriginView(effect.origin),
     atTrick: effect.atTrick,
     lasts: effect.lasts,
     params: shown ? Object.fromEntries(Object.entries(effect.params)) : null,
@@ -293,17 +301,32 @@ function toCampResultView(result: RunState["history"][number]): ExpeditionCampRe
   return { camp: result.camp, attempt: result.attempt, status: result.status, coins: result.coins };
 }
 
-function toPreviewView(state: RunState, spec: CampSpec): ExpeditionCampPreviewView {
+function toPreviewView(state: RunState, spec: CampSpec, catalog: Catalog): ExpeditionCampPreviewView {
   const boss = state.plan === null ? null : bossAt(state.plan, spec.index);
   return {
     index: spec.index,
     location: spec.location,
     weather: spec.weather,
+    pairing: pairingOf(spec, catalog),
     event: spec.event,
-    slotKinds: Array.from(slotKindsFor(spec)),
+    slotKinds: Array.from(slotKindsFor(state, spec, catalog)),
     bossId: boss === null ? null : boss.modId,
     shop: boss !== null,
   };
+}
+
+function toStatusPartView(part: StatusPart): ExpeditionStatusPartView {
+  return part.kind === "chance" ? { kind: "chance", percent: part.percent, strikesLeft: part.strikesLeft } : { kind: "strike" };
+}
+
+function toModView(state: RunState, spec: CampSpec, layer: StackLayer): ExpeditionModView {
+  const status = layer.body.status === undefined ? [] : layer.body.status(modCtx(state, spec, layer));
+  return { id: layer.def.id, kind: layer.def.kind, strength: layer.strength, status: status.map(toStatusPartView) };
+}
+
+function toModViews(state: RunState, catalog: Catalog): ExpeditionModView[] {
+  const spec = specOf(state);
+  return spec === null ? [] : campStack(state, catalog).map((layer) => toModView(state, spec, layer));
 }
 
 function toBallotViews(state: RunState, ballots: PerSeat<string | null>): ExpeditionBallotView[] {
@@ -393,13 +416,19 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
     case "loadout":
       return {
         tag: "loadout",
-        camp: toPreviewView(state, stage.camp),
+        camp: toPreviewView(state, stage.camp, catalog),
+        mods: toModViews(state, catalog),
         yourSlots: ownSeat === undefined ? 0 : rules.itemSlots(state, seatId),
         shop: toShopView(stage.stock, ownSeat, catalog),
         readySeatIds: readySeatIds(state, stage.ready),
       };
     case "camp":
-      return { tag: "camp", camp: toPreviewView(state, stage.camp), attempt: toAttemptView(state, stage.attempt, seatId, ownSeat !== undefined, rules, catalog) };
+      return {
+        tag: "camp",
+        camp: toPreviewView(state, stage.camp, catalog),
+        mods: toModViews(state, catalog),
+        attempt: toAttemptView(state, stage.attempt, seatId, ownSeat !== undefined, rules, catalog),
+      };
     case "draft":
       return {
         tag: "draft",
@@ -411,14 +440,14 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
     case "route":
       return {
         tag: "route",
-        options: stage.options.map((option) => ({ id: option.id, next: toPreviewView(state, option.next) })),
+        options: stage.options.map((option) => ({ id: option.id, next: toPreviewView(state, option.next, catalog) })),
         ballots: toBallotViews(state, stage.ballots),
       };
     case "event":
       return {
         tag: "event",
         event: stage.route.next.event ?? "",
-        next: toPreviewView(state, stage.route.next),
+        next: toPreviewView(state, stage.route.next, catalog),
         readySeatIds: readySeatIds(state, stage.ready),
       };
     case "ended":

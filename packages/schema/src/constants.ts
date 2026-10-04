@@ -40,8 +40,8 @@
  * the persisted run bumps it again: 8 for resolved trick plays, discards
  * and card-identity objective targets; 9 for the staged run (length vote,
  * plan, purse, routes and events); 10 for item instances, upgrades, bundle
- * offers and the shop. */
-export const ROOM_SCHEMA_VERSION = 10;
+ * offers and the shop; 11 for effect origins and camp-modifier log entries. */
+export const ROOM_SCHEMA_VERSION = 11;
 
 /** D-01: 32 uppercase-safe characters — no `I`, `O`, `0`, `1` — because the
  * room code is read aloud over a voice call. Do not add lowercase. */

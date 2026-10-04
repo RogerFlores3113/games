@@ -7,9 +7,9 @@
 // header contract).
 //
 // COMPOSITION ORDER (spec §6.1, "each hook receives the previous layer's
-// answer"): base -> live passives (seat order, then each
-// seat's [character, upgrade, ...equipped] order) -> active effects (in the order they
-// were added).
+// answer"): base -> camp-stack layers (location, weather, pairing, boss) ->
+// live passives (seat order, then each seat's [character, upgrade,
+// ...equipped] order) -> active effects (in the order they were added).
 // A RuleModifier is a function from the previous layer's hook to this
 // layer's hook; composing a full RunRules means folding every layer's
 // RuleModifier, hook by hook, in that fixed order.

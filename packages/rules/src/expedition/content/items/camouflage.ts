@@ -19,7 +19,7 @@ export const camouflage = defineItem({
     ],
     // A guard goal, so breaking cover never opens the rescue window.
     effect: (effect) => ({
-      goals: (prev) => (state) => [...prev(state), guard(`camouflage:${effect.seatId}`, countTricksWon(state, effect.seatId) > 0)],
+      goals: (prev) => (state) => [...prev(state), guard(`camouflage:${effect.origin.seatId}`, countTricksWon(state, effect.origin.seatId) > 0)],
     }),
   }),
 });

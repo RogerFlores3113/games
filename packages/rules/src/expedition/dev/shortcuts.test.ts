@@ -139,4 +139,25 @@ describe("dev shortcuts", () => {
     expect(attemptOf(owned)!.camp.objectives[0]!.ownerSeatId).toBe("c");
     expect(attemptOf(run("set-objective-owner", owned, { objective: id, seat: "none" }))!.camp.objectives[0]!.ownerSeatId).toBeNull();
   });
+
+  it("set-spec sets a loadout's location and weather, and re-deals a dealt camp under them", () => {
+    const loadout = run("set-spec", run("jump-to-camp", fresh(), { length: "standard", camp: 2, stage: "loadout" }), { location: "clifftop", weather: "thunderstorm" });
+    expect(loadout.stage.tag === "loadout" && [loadout.stage.camp.location, loadout.stage.camp.weather]).toEqual(["clifftop", "thunderstorm"]);
+    expect(checkRunState(loadout, CATALOG)).toEqual([]);
+
+    const dealt = run("jump-to-camp", fresh(), camp6);
+    const stormy = run("set-spec", dealt, { location: "clearing", weather: "rain" });
+    expect(stormy.stage.tag === "camp" && [stormy.stage.camp.index, stormy.stage.camp.location, stormy.stage.camp.weather]).toEqual([6, "clearing", "rain"]);
+    expect(attemptOf(stormy)?.attemptNumber).toBe(1);
+    expect(checkRunState(stormy, CATALOG)).toEqual([]);
+  });
+
+  it("set-spec offers the camp's own location and weather first, and refuses outside a loadout or camp or with an unknown id", () => {
+    const dealt = run("set-spec", run("jump-to-camp", fresh(), camp6), { location: "clifftop", weather: "rain" });
+    const [location, weather] = DEV_SHORTCUTS["set-spec"].fields(dealt, CATALOG);
+    expect(location).toMatchObject({ name: "location", options: [{ value: "clifftop" }, { value: "clearing" }, { value: "jungle" }] });
+    expect(weather).toMatchObject({ name: "weather", options: [{ value: "rain" }, { value: "fair" }, { value: "thunderstorm" }] });
+    expect(() => run("set-spec", fresh(), { location: "jungle", weather: "rain" })).toThrow("set-spec works in a loadout or a camp");
+    expect(() => run("set-spec", dealt, { location: "rain", weather: "rain" })).toThrow(/location must be one of/);
+  });
 });

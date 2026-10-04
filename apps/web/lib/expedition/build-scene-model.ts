@@ -1,5 +1,5 @@
 import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionObjectiveView, ExpeditionTargetKind, ExpeditionView } from "@games/rules";
-import { attemptOf, campHeadline, focusCampIndex } from "./view-access";
+import { attemptOf, campHeadline, focusCampIndex, whisperLog } from "./view-access";
 import { SOURCE_DISPLAY } from "@games/rules";
 import type { CardPackId } from "./card-pack-ids";
 import {
@@ -23,6 +23,7 @@ import type { Prompt } from "./build-prompt";
 import { buildPrompt } from "./build-prompt";
 import type { ObjectiveHolder } from "./objective-tooltip";
 import { objectiveTooltip } from "./objective-tooltip";
+import { buildModChips, buildSky, modTooltip, whisperBlocker, type ModChip, type Sky } from "./weather-model";
 import { chargeText, isSpent, liveSourceKeys, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, type SourceKind } from "./source-text";
 
 /**
@@ -224,6 +225,10 @@ export interface SceneModel {
   /** The camp being played. */
   campIndex: number;
   topBar: TopBar;
+  /** The camp's modifiers in fold order, on the top bar. */
+  mods: ModChip[];
+  /** The location's backdrop and what the weather draws over it. */
+  sky: Sky;
   seats: SeatModel[];
   hand: CardModel[];
   trick: { leaderSeatId: string; plays: TrickPlayModel[] } | null;
@@ -495,7 +500,7 @@ function whisperStatus(view: ExpeditionView, active: boolean): SceneModel["whisp
   let reason: string | null = null;
   if (!mine.allowed) {
     state = "blocked";
-    reason = "Blocked right now";
+    reason = whisperBlocker(view) ?? "Blocked right now";
   } else if (mine.left === 0) {
     state = "used";
     reason = "Used this camp";
@@ -523,22 +528,20 @@ function buildWhispers(
   );
 
   let sentSoFar = 0;
-  const whisperLog = (attemptOf(view)?.log ?? [])
-    .filter((l) => l.event === "whisper")
-    .map((l) => {
-      const to = l.subjectSeatIds[0] ?? "";
-      if (l.actorSeatId === you) {
-        const card = mineSent[sentSoFar++];
-        return card === undefined ? `You whispered to ${nameOf(to)}` : `You whispered ${cardLabel(card.identity)} to ${nameOf(to)}`;
-      }
-      return `${nameOf(l.actorSeatId)} whispered to ${to === you ? "you" : nameOf(to)}`;
-    });
+  const whisperLines = whisperLog(view).map((l) => {
+    const to = l.subjectSeatIds[0] ?? "";
+    if (l.actorSeatId === you) {
+      const card = mineSent[sentSoFar++];
+      return card === undefined ? `You whispered to ${nameOf(to)}` : `You whispered ${cardLabel(card.identity)} to ${nameOf(to)}`;
+    }
+    return `${nameOf(l.actorSeatId)} whispered to ${to === you ? "you" : nameOf(to)}`;
+  });
 
   const shownCards = (attemptOf(view)?.reveals ?? [])
     .filter((r) => r.source !== "whisper")
     .map((r) => ({ fromSeatId: r.fromSeatId, fromName: nameOf(r.fromSeatId), sourceName: sourceName(r.source), card: cardLabel(r.identity), objectId: revealObjectId(r.identity) }));
 
-  return { receivedWhispers, sentWhispers, shownCards, whisperLog };
+  return { receivedWhispers, sentWhispers, shownCards, whisperLog: whisperLines };
 }
 
 function buildTrick(camp: ExpeditionCampView | null, view: ExpeditionView, ui: LocalUiState): SceneModel["trick"] {
@@ -573,6 +576,7 @@ function buildTooltip(server: SceneServerInput, ui: LocalUiState): Tooltip | nul
     const name = held === undefined ? "that card" : cardLabel(held.identity);
     return { title: `Can't play ${name}`, text: "", badges: [], reason: drag.reason };
   }
+  if (ui.tooltipModId !== null) return modTooltip(view, ui.tooltipModId);
   if (ui.tooltipObjectiveId !== null) {
     const o = attemptOf(view)?.camp.objectives.find((x) => x.id === ui.tooltipObjectiveId);
     if (o === undefined) return null;
@@ -642,7 +646,7 @@ function buildTray(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiS
   const option = (choiceId: string, label: string, cards: string[] = []): TrayOption => ({ choiceId, objectId: pickObjectId(choiceId), label, cards });
 
   if (step.kind === "whisper") {
-    const whispers = (attemptOf(view)?.log ?? []).filter((l) => l.event === "whisper");
+    const whispers = whisperLog(view);
     const known = (attemptOf(view)?.reveals ?? []).filter((r) => r.source === "whisper");
     return {
       title: step.prompt,
@@ -714,6 +718,8 @@ export function buildSceneModel(
     youSeatId: view.yourSeatId,
     campIndex: focusCampIndex(view) ?? 0,
     topBar: buildTopBar(view, pickOrNull(ui, view, "supplies")),
+    mods: buildModChips(view),
+    sky: buildSky(view) ?? { location: "jungle", precipitation: "none", strike: null, notice: null },
     seats,
     hand,
     trick,

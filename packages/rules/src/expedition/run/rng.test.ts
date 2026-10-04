@@ -16,7 +16,11 @@ describe("STREAMS distinctness (A1)", () => {
     const useIndices = [0, 1, 2, 3];
     const draws = [0, 1, 2];
     const options = [0, 1, 2];
-    const fields = ["event", "mix"] as const;
+    const fields = ["location", "fair", "weather", "event", "mix"] as const;
+    const mods = ["rain", "thunderstorm"];
+    const strengths = ["full", "half"];
+    const labels = ["start", "t1"];
+    const eventKeys = ["dealt", "pick0", "t0-start", "t0-p1", "t0-done", "whisper0"];
     const parts = ["rarity", "pick"] as const;
 
     for (const camp of camps) {
@@ -41,6 +45,14 @@ describe("STREAMS distinctness (A1)", () => {
       for (const attempt of attempts) {
         names.push(STREAMS.trickCountKind(camp, attempt));
         names.push(STREAMS.trickCountN(camp, attempt));
+        for (const mod of mods) {
+          for (const strength of strengths) {
+            for (const label of labels) names.push(STREAMS.modRule(mod, strength, camp, attempt, label));
+            for (const key of eventKeys) {
+              for (const draw of draws) names.push(STREAMS.modDraw(mod, strength, camp, attempt, key, draw));
+            }
+          }
+        }
         for (const useIndex of useIndices) {
           for (const seat of seats) {
             for (const draw of draws) {
@@ -64,6 +76,9 @@ describe("STREAMS names", () => {
     expect(STREAMS.draftItem(2, "p1", 0, 2, 1, "rarity")).toBe("expedition-draft:camp2:seatp1:offer0:bundle2:item1:rarity");
     expect(STREAMS.shopItem(3, 1, "pick")).toBe("expedition-shop:camp3:item1:pick");
     expect(STREAMS.ability(3, 2, "p0", 1, 0)).toBe("expedition-ability:camp3:attempt2:seatp0:use1:draw0");
+    expect(STREAMS.routeField(4, 0, 1, "weather")).toBe("expedition-route:camp4:reroll0:option1:weather");
+    expect(STREAMS.modRule("crocodile", "half", 3, 1, "start")).toBe("expedition-mod:crocodile:half:camp3:attempt1:rule:start");
+    expect(STREAMS.modDraw("thunderstorm", "full", 2, 1, "t3-start", 0)).toBe("expedition-mod:thunderstorm:full:camp2:attempt1:on:t3-start:draw0");
   });
 });
 

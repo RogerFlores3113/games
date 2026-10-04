@@ -101,4 +101,11 @@ describe("checkRunState", () => {
     const lost = withAttempt(run, { ...attemptOf(run)!, camp: { ...camp, hands } });
     expect(checkRunState(lost, CATALOG)).toContain(`card conservation: ${cardLabel(gone!.identity)} appears 0 times, expected 1`);
   });
+
+  it("flags a spec whose location or weather is not a registered def of its kind", () => {
+    const run = dealt();
+    if (run.stage.tag !== "camp") throw new Error("expected a camp");
+    const odd: RunState = { ...run, stage: { ...run.stage, camp: { ...run.stage.camp, location: "rain", weather: "volcano" } } };
+    expect(checkRunState(odd, CATALOG)).toEqual(["the loadout or camp: rain is not a location", "the loadout or camp: volcano is not a weather"]);
+  });
 });

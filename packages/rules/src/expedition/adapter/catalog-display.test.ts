@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { CATALOG } from "../run/catalog";
-import { CHARACTER_DISPLAY, SOURCE_DISPLAY } from "./catalog-display";
+import { CHARACTER_DISPLAY, MOD_DISPLAY, SOURCE_DISPLAY } from "./catalog-display";
 
 describe("SOURCE_DISPLAY", () => {
   it("has exactly one entry per source in the catalogue", () => {
@@ -91,5 +91,13 @@ describe("CHARACTER_DISPLAY", () => {
     for (const display of Object.values(CHARACTER_DISPLAY)) {
       expect(JSON.parse(JSON.stringify(display))).toEqual(display);
     }
+  });
+});
+
+describe("MOD_DISPLAY", () => {
+  it("names every camp modifier with its kind and one sentence, and round-trips through JSON", () => {
+    expect(Object.keys(MOD_DISPLAY).sort()).toEqual(Object.keys(CATALOG.mods).sort());
+    expect(MOD_DISPLAY.thunderstorm).toEqual({ id: "thunderstorm", name: "Thunderstorm", kind: "weather", text: "Lightning may strike before a trick, and then the lowest card wins it." });
+    expect(JSON.parse(JSON.stringify(MOD_DISPLAY))).toEqual(MOD_DISPLAY);
   });
 });

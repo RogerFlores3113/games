@@ -46,6 +46,11 @@ card or was discarded, and fails if never played by the final trick.
   two upgrades; `content/items/<id>.ts` is one item. Each folder has a
   `registry.ts` (`CHARACTERS`, `ITEMS`). `content/helpers.ts` holds shared
   effect helpers (`winnerExcluding`, `freshObjectiveAvailable`).
+  `content/mods/` holds the camp modifiers: `mod-def.ts` (`ModDef`,
+  `ModBody`, `ModCtx`, `ReactionCtx`, `StatusPart`, `defineMod`,
+  `defineBoss`), one file per location, weather, pairing or boss, its
+  `registry.ts` (`MODS`), `pairings.ts` (`PAIRINGS`) and
+  `mods.contract.test.ts`.
 - **`run/`**: the staged run on top of Core. `run/types.ts` (`RunState`,
   its `Stage` union and `RunAt<T>`, `SeatRun` with its `ledger`,
   `RunAction`, `Catalog`), `run/stages/` (`registry.ts`'s `STAGES` and
@@ -53,7 +58,10 @@ card or was discarded, and fails if never played by the final trick.
   stage: muster, loadout, camp, draft, route, event), `run/lifecycle.ts`
   (`createRun`, `runStatus`, `dealCamp`, `settleCamp`), `run/plan.ts`
   (`RunPlan`, `campIndex`, `drawPlan`), `run/route.ts` (`CampSpec`,
-  `firstCampSpec`, `routeOptions`), `run/vote.ts` (`tally`),
+  `firstCampSpec`, `routeOptions`, `slotKindsFor`), `run/vote.ts` (`tally`),
+  `run/stack.ts` (`campStack`, the one list of a camp's modifiers, and
+  `modCtx`), `run/react.ts` (`react`, the camp modifiers' one pass over the
+  engine's events),
   `run/attempt.ts` (`attemptOf`, `withAttempt`), `run/abilities.ts`
   (`abilityStatus`, `useAbility`, `passWindow`), `run/targets.ts`
   (`TARGET_KINDS`, `resolveTargets`, `stepsFor`), `run/windows.ts`
@@ -65,8 +73,9 @@ card or was discarded, and fails if never played by the final trick.
   mutation surface for abilities), `run/draft.ts` (`draftOfferFor`,
   `drawItem`), `run/shop.ts` (`stockFor`, `buy`), `run/whisper.ts`,
   `run/balance.ts` (every tunable number), `run/rng.ts` (`STREAMS`,
-  `seededIndex`) and `run/catalog.ts`'s `CATALOG` (`{ characters, items }`
-  plus the flattened `sources` index). `content/events/` holds `EVENTS`.
+  `seededIndex`) and `run/catalog.ts`'s `CATALOG` (`{ characters, items,
+  mods, pairings }` plus the flattened `sources` index). `content/events/`
+  holds `EVENTS`.
 
 **The run loop.** A run is a stored stage, and `applyRunAction` is the one
 transition: it refuses an action type the stage does not accept
@@ -84,8 +93,9 @@ until the tag stops changing.
    upgrades while it has none), then `ready`, which re-checks the slots.
    After its `ready` a seat can change nothing. The last `ready` deals the
    camp.
-3. **Camp.** Play as before. A decided camp settles unless a rescue is
-   pending.
+3. **Camp.** Play as before. The camp's modifiers react to the engine's
+   events (the deal, picks, plays, completed and started tricks, whispers)
+   with toolkit ops; a decided camp settles unless a rescue is pending.
 4. **Settle.** A failure costs supplies and reopens the loadout for the same
    camp spec with a fresh deal; 0 supplies ends the run. A clear pays
    `5 + min(3, unplayed tricks)` into the shared purse and deals every seat
@@ -100,17 +110,32 @@ until the tag stops changing.
 A disconnected seat's ballot is cast as an abstention by the worker's
 auto-pass after the existing grace.
 
-**Layering order** (`run/compose.ts`): **base, then per seat (seat order)
-each live source's passive in `[character, upgrade, ...equipped]` order,
-then each live effect's layer in `attempt.effects` order.** A backpack item
-is not live: no passive, no ability.
+**Layering order** (`run/compose.ts`): **base, then each camp-stack
+layer's `rules` (location, weather, pairing, boss), then per seat (seat
+order) each live source's passive in `[character, upgrade, ...equipped]`
+order, then each live effect's layer in `attempt.effects` order.** A boss
+folds after the weather so it can refine it; passives fold after both, so an
+item can lift a camp rule for its owner (Mosquito Net under Rain). A
+backpack item is not live: no passive, no ability.
+
+**Camp modifiers.** A camp's location and weather (and later its pairing
+and boss) are `ModDef`s, stacked by `run/stack.ts`'s `campStack`. A body's
+`rules(ctx)` answers the engine's questions, `on` reacts to an event with
+toolkit ops (under the origin `{ kind: "mod" }`), `effect` is the layer an
+`add-modifier` from `on` switches on, `slots` reshapes the camp's
+objective slots, and `status` is public table state the view projects.
+`ctx.roll(label, n)` and a reaction's `ctx.draw(n)` are seeded. A trick
+effect added with `deferIfFatal` (a Thunderstorm strike) waits one trick
+when, under the fully composed rules, it is what lost the camp
+(`run/stages/camp.ts`).
 
 **Source keys.** A seat acts through a key: its character id, its upgrade
 id, or an item instance's uid (`it7`, minted from `RunState.itemSerial`).
 The ledger, `use-ability`, `abilityStatus`, `remaining` and the view's
 `yourAbilities` and `usage` are keyed by it, so two copies of one item keep
-separate uses. Effects, log entries and reveals carry the def id (the
-item's id), since a spent instance is gone by the time they are read.
+separate uses. An effect's `origin` carries the seat, the key and the def
+id (the item's id), and log entries and reveals carry the def id, since a
+spent instance is gone by the time they are read.
 Each layer's `RuleModifier` maps the previous layer's answer to its own, hook
 by hook. The card-reading hooks `identityOf`, `isTrump` and `rankOf` fold
 first, in that order (WR-03); every other hook folds over the base built
@@ -363,8 +388,9 @@ to turn it on. The web app shows the panel when `NODE_ENV` is `development`
   the camp to clear or fail (through the real settle), set supplies, set the
   purse, set a seat's character, give a seat an item (`give-item`: a new
   instance, equipped while a slot is free), set a seat's upgrade
-  (`set-upgrade`, its own character's or none), move a card between hands,
-  set an objective's owner.
+  (`set-upgrade`, its own character's or none), set the camp's location and
+  weather (`set-spec`, dealing a dealt camp again), move a card between
+  hands, set an objective's owner.
 - Reveal all hands: a plain-text dump of every hand, objective and trick.
 - State: the whole `RunState` as JSON. Edit and Apply; the worker parses it
   with `ExpeditionRunStateSchema` and then `dev/check.ts` (card conservation,

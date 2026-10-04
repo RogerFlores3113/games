@@ -10,25 +10,31 @@ import { SUPPLIES_ID } from "../../../../lib/expedition/expedition-ids";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL, SIGN_CELL, WORLD_SIGN_FONT } from "../font/font-keys";
 import { placeArt } from "../art/place-art";
-import { ART } from "../art/art-registry";
+import { ART, backdropArtId, resolveArt } from "../art/art-registry";
+import { ART_FILES } from "../art/art-files.generated";
 import type { Tooltip, TopBar } from "../../../../lib/expedition/build-scene-model";
 import type { Prompt, PromptTone } from "../../../../lib/expedition/build-prompt";
 import { PANEL_ALPHA, coin, labelWidth, plate, text, type Layer } from "./ui-kit";
 import { wrapWords } from "./text-fit";
 
+const ART_FILE_SET: ReadonlySet<string> = new Set(ART_FILES);
 const MAX_CRATES = 8;
 const EMPTY_CRATE_ALPHA = 0.3;
 
-/** The backdrop, drawn once per scene create(). The stump is drawn with
- * the seats, over their silhouettes. */
-export function drawStaticWorld(scene: Phaser.Scene): void {
-  placeArt(scene, "bg-jungle-night", STAGE.w / 2, STAGE.h / 2);
+/** The location's backdrop. The stump is drawn with the seats, over their
+ * silhouettes. A location whose art has not landed draws the Jungle's,
+ * tinted with its placeholder colour. */
+export function drawBackdrop(scene: Phaser.Scene, location: string): Phaser.GameObjects.Sprite {
+  const id = backdropArtId(location);
+  const backdrop = resolveArt(id, ART_FILE_SET);
+  if (backdrop.kind === "file") return placeArt(scene, id, STAGE.w / 2, STAGE.h / 2);
+  return placeArt(scene, "bg-jungle-night", STAGE.w / 2, STAGE.h / 2).setTint(backdrop.def.fallback.color);
 }
 
 /** Supplies as crates of their cap, the purse as a coin, and the camp on
  * the right. `onSupplies` makes the crates a target while an ability picks
- * the supplies. */
-export function drawTopBar(scene: Phaser.Scene, layer: Layer, bar: TopBar, index?: ObjectIndex, onSupplies?: () => void): void {
+ * the supplies. Returns the span left free between them. */
+export function drawTopBar(scene: Phaser.Scene, layer: Layer, bar: TopBar, index?: ObjectIndex, onSupplies?: () => void): { left: number; right: number } {
   const zone = ZONES.topBar;
   layer.add(plate(scene, zone.x, zone.y, zone.w, zone.h).setAlpha(PANEL_ALPHA));
   const textY = zone.y + Math.floor((zone.h - LABEL_CELL.h) / 2);
@@ -60,9 +66,12 @@ export function drawTopBar(scene: Phaser.Scene, layer: Layer, bar: TopBar, index
 
   const coinX = x + 2 + labelWidth(suppliesLabel) + 16;
   layer.add(coin(scene, coinX, zone.y + zone.h / 2, 6));
-  layer.add(text(scene, coinX + 10, textY, `Coins ${bar.purse}`));
+  const coinsLabel = `Coins ${bar.purse}`;
+  layer.add(text(scene, coinX + 10, textY, coinsLabel));
 
-  layer.add(text(scene, zone.x + zone.w - 6 - labelWidth(bar.camp), textY, bar.camp));
+  const campX = zone.x + zone.w - 6 - labelWidth(bar.camp);
+  layer.add(text(scene, campX, textY, bar.camp));
+  return { left: coinX + 10 + labelWidth(coinsLabel) + 10, right: campX - 10 };
 }
 
 const TONE_COLOR: Readonly<Record<PromptTone, string>> = {

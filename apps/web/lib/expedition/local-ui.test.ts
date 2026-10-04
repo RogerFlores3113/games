@@ -73,7 +73,8 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     lastVote: null,
     stage: {
       tag: "camp",
-      camp: { index: 1, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null, shop: false },
+      camp: { index: 1, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false },
+      mods: [],
       attempt: {
       attemptNumber: 1,
       window: "between-tricks",
@@ -154,6 +155,7 @@ describe("initialLocalUi", () => {
       tooltipSourceId: null,
       tooltipObjectiveId: null,
       tooltipMateSource: null,
+      tooltipModId: null,
       drag: { phase: "idle" },
       trayPage: 0,
       takenBundle: null,

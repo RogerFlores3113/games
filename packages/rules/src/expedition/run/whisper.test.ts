@@ -14,6 +14,7 @@ import type { CampState } from "../state";
 import { ability, defineItem, itemAbility } from "../content/source-def";
 import { attemptOf, withAttempt } from "./attempt";
 import { campIndex } from "./plan";
+import { CATALOG } from "./catalog";
 import { campSpecAt } from "./route";
 import { baseRunHooks, type RunRules } from "./run-rules";
 import { testCatalog } from "./run-test-support";
@@ -83,7 +84,7 @@ function makeRun(input: {
   seed?: string;
 }): RunState {
   const seed = input.seed ?? "whisper-seed";
-  const spec = campSpecAt(seed, "standard", campIndex(2));
+  const spec = campSpecAt(seed, "standard", campIndex(2), CATALOG);
   const stage: RunState["stage"] =
     input.camp === null
       ? { tag: "loadout", camp: spec, stock: null, ready: {} }
@@ -217,15 +218,15 @@ describe("applyWhisper", () => {
         window: "between-tricks",
         targets: [],
         apply: () => [],
-        effect: (effect: ActiveEffect) => ({
-          whispersPerCamp: (prev) => (r, seatId) => (seatId === effect.seatId ? 2 : prev(r, seatId)),
+        effect: (effect) => ({
+          whispersPerCamp: (prev) => (r, seatId) => (seatId === effect.origin.seatId ? 2 : prev(r, seatId)),
         }),
       }),
     });
     const catalog = testCatalog({ items: { boost } });
     const run = makeRun({
       camp,
-      effects: [{ sourceId: "boost", seatId: "p0", atTrick: 0, lasts: "attempt", params: {}, audience: "public" }],
+      effects: [{ origin: { kind: "seat", seatId: "p0", sourceKey: "boost", sourceId: "boost" }, atTrick: 0, lasts: "attempt", deferIfFatal: false, params: {}, audience: "public" }],
       log: [{ event: "whisper", actorSeatId: "p0", subjectSeatIds: ["p1"], sourceId: null, audience: "public" }],
     });
     const cardId = camp.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
@@ -252,7 +253,7 @@ describe("applyWhisper", () => {
       }),
     });
     const catalog = testCatalog({ items: { broadcast } });
-    const run = makeRun({ camp, effects: [{ sourceId: "broadcast", seatId: "p0", atTrick: 0, lasts: "attempt", params: {}, audience: "public" }] });
+    const run = makeRun({ camp, effects: [{ origin: { kind: "seat", seatId: "p0", sourceKey: "broadcast", sourceId: "broadcast" }, atTrick: 0, lasts: "attempt", deferIfFatal: false, params: {}, audience: "public" }] });
     const cardId = camp.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
 
     const result = applyWhisper(run, "p0", { targetSeatId: "p1", cardId }, catalog);

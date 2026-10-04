@@ -1,7 +1,8 @@
 import type { PickEntity } from "../../../../lib/expedition/local-ui";
+import type { StripHandlers } from "./draw-weather";
 
 /** The click and hover callbacks every camp draw module wires to. */
-export interface CampHandlers {
+export interface CampHandlers extends StripHandlers {
   /** A click on a card: selects it as a target or plays it. */
   onCard(cardId: string): void;
   /** The pointer went down on a hand card: a click or the start of a drag. */

@@ -21,6 +21,8 @@
 
 import type { CampError, CampState } from "../state";
 import type { CharacterDef, EffectParams, ItemDef, SourceDef, SourceId } from "../content/source-def";
+import type { ModDef, ModId, Strength } from "../content/mods/mod-def";
+import type { PairingRule } from "../content/mods/pairings";
 import type { DraftOffer } from "./draft";
 import type { RunPlan } from "./plan";
 import type { CampSpec, RouteChoice, RouteOption } from "./route";
@@ -63,27 +65,36 @@ export type Reveal = {
   readonly cardId: string;
   readonly fromSeatId: string; // the hand holding the card when revealed; pinned forever (WR-03)
   readonly audience: readonly string[]; // the ONLY seats a view may show this card to
-  readonly source: string; // "whisper" or the source id (e.g. "scout")
+  readonly source: string; // "whisper", a source id (e.g. "scout") or a mod id
   readonly targetSeatId?: string; // whispers only: the seat the whisperer named, public in the log anyway
 };
 
 // Deliberately NO card id / identity fields: logs never carry card information.
 export type LogEntry = {
   readonly event: string; // "whisper" | "use-ability" | source-specific
-  readonly actorSeatId: string;
+  readonly actorSeatId: string | null; // null for a camp modifier
   readonly subjectSeatIds: readonly string[];
-  readonly sourceId: SourceId | null;
+  readonly sourceId: SourceId | ModId | null;
   readonly audience: "public" | readonly string[];
 };
 
+/** Who caused a toolkit op. A seat's origin carries the def id beside the
+ * key, since a spent item instance is gone by the time its effect is read. */
+export type SeatOrigin = { readonly kind: "seat"; readonly seatId: SeatId; readonly sourceKey: SourceKey; readonly sourceId: SourceId };
+export type ModOrigin = { readonly kind: "mod"; readonly modId: ModId; readonly strength: Strength };
+export type Origin = SeatOrigin | ModOrigin;
+
 export type ActiveEffect<P extends EffectParams = EffectParams> = {
-  readonly sourceId: SourceId;
-  readonly seatId: string;
+  readonly origin: Origin;
   readonly atTrick: number; // currentTrick.index at activation
   readonly lasts: "attempt" | "trick"; // "trick": live only while currentTrick.index === atTrick
+  /** A trick effect that would lose the camp moves to the next trick (stages/camp.ts). */
+  readonly deferIfFatal: boolean;
   readonly params: P;
-  readonly audience: "public" | "owner"; // who may see params in a view
+  readonly audience: "public" | "owner"; // who may see params in a view; a mod effect has no owner
 };
+/** An effect a seat's ability switched on. */
+export type SeatEffect<P extends EffectParams = EffectParams> = ActiveEffect<P> & { readonly origin: SeatOrigin };
 
 export type AttemptState = {
   readonly attemptNumber: number; // 1-based per camp index
@@ -171,6 +182,8 @@ export type RunError =
 export type Catalog = {
   readonly characters: Readonly<Record<string, CharacterDef>>;
   readonly items: Readonly<Record<string, ItemDef>>;
+  readonly mods: Readonly<Record<ModId, ModDef>>;
+  readonly pairings: readonly PairingRule[];
   /** Every character, every character's upgrades and every item, by id. */
   readonly sources: Readonly<Record<SourceId, SourceDef>>;
 };

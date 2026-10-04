@@ -30,6 +30,7 @@ import type {
 import { fitLabel, wrapWords } from "./text-fit";
 import { PANEL_ALPHA, button, coin, labelWidth, plate, setCoinFace, text, type Layer } from "./ui-kit";
 import { drawExplorer, drawGear, drawShop, type LoadoutHandlers } from "./draw-loadout";
+import { ICON_SIZE, modIcon } from "./draw-weather";
 
 export interface TrailHandlers extends LoadoutHandlers {
   /** A muster character card: picks that character. */
@@ -285,24 +286,25 @@ function drawMuster(ctx: Ctx, muster: Extract<TrailPanel, { kind: "muster" }>): 
 // Camp previews and the vote result
 // ---------------------------------------------------------------------------
 
-/** "Location  Jungle" rows. Returns the y after the last row. */
-function detailRows(scene: Phaser.Scene, container: Phaser.GameObjects.Container, rows: [string, string][], x: number, y: number, w: number): number {
-  const keyW = Math.max(...rows.map(([key]) => labelWidth(key))) + 6;
-  const chars = Math.floor((w - keyW) / LABEL_CELL.w);
+const PLACE_KEY_W = labelWidth("Location") + 6;
+
+/** Location, weather and any pairing, each with its icon. Returns the y
+ * after the last row. */
+function placeRows(scene: Phaser.Scene, container: Phaser.GameObjects.Container, preview: CampPreview, x: number, y: number, w: number): number {
+  const rows: { key: string; id: string; kind: "location" | "weather" | "pairing"; name: string; color: string }[] = [
+    { key: "Location", id: preview.locationId, kind: "location", name: preview.location, color: PALETTE.text },
+    { key: "Weather", id: preview.weatherId, kind: "weather", name: preview.weather, color: preview.weatherId === "fair" ? PALETTE.text : PALETTE.rain },
+    ...(preview.pairing === null ? [] : [{ key: "Pairing", id: preview.pairing, kind: "pairing" as const, name: preview.pairing, color: PALETTE.coin }]),
+  ];
+  const chars = Math.floor((w - PLACE_KEY_W - ICON_SIZE - 3) / LABEL_CELL.w);
   let cy = y;
-  for (const [key, value] of rows) {
-    container.add(text(scene, x, cy, key, PALETTE.textDim));
-    container.add(text(scene, x + keyW, cy, fitLabel(value, chars), PALETTE.text));
+  for (const row of rows) {
+    container.add(text(scene, x, cy, row.key, PALETTE.textDim));
+    container.add(modIcon(scene, row.id, row.kind, x + PLACE_KEY_W, cy - 1));
+    container.add(text(scene, x + PLACE_KEY_W + ICON_SIZE + 3, cy, fitLabel(row.name, chars), row.color));
     cy += LINE;
   }
   return cy;
-}
-
-function previewRows(preview: CampPreview): [string, string][] {
-  return [
-    ["Location", preview.location],
-    ["Weather", preview.weather],
-  ];
 }
 
 /** Objectives as small chips, wrapped to `w`. Returns the y after them. */
@@ -336,7 +338,7 @@ function drawPreview(ctx: Ctx, preview: CampPreview, zone: Rect, heading: string
   const container = scene.add.container(zone.x, zone.y);
   container.add(signText(scene, 8, 6, heading, PALETTE.sun));
   const w = zone.w - 16;
-  let y = detailRows(scene, container, previewRows(preview), 8, 26, w);
+  let y = placeRows(scene, container, preview, 8, 26, w);
   y += 2;
   container.add(text(scene, 8, y, "Objectives", PALETTE.textDim));
   y = objectiveChips(scene, container, preview.objectives, 8, y + LINE, w);
@@ -541,7 +543,7 @@ function drawRouteCard(ctx: Ctx, card: RouteCard, x: number, y: number, w: numbe
   body.add(text(scene, w - 5 - labelWidth(card.next.title), 3, card.next.title, PALETTE.text));
 
   const inner = w - 12;
-  let cy = detailRows(scene, body, previewRows(card.next), 6, RIBBON_H + 4, inner);
+  let cy = placeRows(scene, body, card.next, 6, RIBBON_H + 4, inner);
   if (card.next.event !== null) {
     body.add(text(scene, 6, cy + 1, "On the way", PALETTE.textDim));
     chip(scene, body, 6 + labelWidth("On the way") + 6, cy + 1, card.next.event, PALETTE.stump);
@@ -619,9 +621,9 @@ function drawEvent(ctx: Ctx, event: Extract<TrailPanel, { kind: "event" }>): voi
   y += 6;
   layer.add(text(scene, main.x + 8, y, fitLabel(`Next: ${event.next.title}`, chars), PALETTE.textDim));
   const next = scene.add.container(main.x, y + LINE);
-  detailRows(scene, next, previewRows(event.next), 8, 0, main.w - 16);
+  const after = placeRows(scene, next, event.next, 8, 0, main.w - 16);
   layer.add(next);
-  bossLine(scene, next, event.next.boss, 8, 2 * LINE + 2);
+  bossLine(scene, next, event.next.boss, 8, after + 2);
   if (ctx.model.vote !== null) drawVoteResult(ctx, ctx.model.vote, vote);
 }
 

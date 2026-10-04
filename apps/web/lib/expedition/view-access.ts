@@ -1,4 +1,4 @@
-import type { ExpeditionAttemptView, ExpeditionPlanBossView, ExpeditionView } from "@games/rules";
+import type { ExpeditionAttemptView, ExpeditionLogEntryView, ExpeditionPlanBossView, ExpeditionView } from "@games/rules";
 
 /**
  * Reads that every scene model shares: the dealt attempt, which camp the
@@ -8,6 +8,11 @@ import type { ExpeditionAttemptView, ExpeditionPlanBossView, ExpeditionView } fr
 
 export function attemptOf(view: ExpeditionView): ExpeditionAttemptView | null {
   return view.stage.tag === "camp" ? view.stage.attempt : null;
+}
+
+/** The attempt's whispers in order; a whisper always has a sender. */
+export function whisperLog(view: ExpeditionView): (ExpeditionLogEntryView & { actorSeatId: string })[] {
+  return (attemptOf(view)?.log ?? []).filter((l): l is ExpeditionLogEntryView & { actorSeatId: string } => l.event === "whisper" && l.actorSeatId !== null);
 }
 
 /** The camp the crew is at, or the next one it heads to; null at muster and

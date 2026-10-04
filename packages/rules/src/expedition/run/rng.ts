@@ -12,7 +12,7 @@ export function attemptSeed(seed: string, campIndex: number, attemptNumber: numb
   return `${seed}:camp${campIndex}:attempt${attemptNumber}`;
 }
 
-export type RouteField = "event" | "mix";
+export type RouteField = "location" | "fair" | "weather" | "event" | "mix";
 /** An item draw rolls its rarity, then picks an item of that rarity. */
 export type ItemDrawPart = "rarity" | "pick";
 
@@ -46,6 +46,14 @@ export const STREAMS = {
   },
   ability(campIndex: number, attemptNumber: number, seatId: string, useIndex: number, draw: number): string {
     return `expedition-ability:camp${campIndex}:attempt${attemptNumber}:seat${seatId}:use${useIndex}:draw${draw}`;
+  },
+  /** A camp modifier's `ctx.roll(label)`; the same label repeats within an attempt. */
+  modRule(modId: string, strength: string, campIndex: number, attemptNumber: number, label: string): string {
+    return `expedition-mod:${modId}:${strength}:camp${campIndex}:attempt${attemptNumber}:rule:${label}`;
+  },
+  /** A camp modifier's j-th `ctx.draw` or `ctx.randomCards` while reacting to one event. */
+  modDraw(modId: string, strength: string, campIndex: number, attemptNumber: number, eventKey: string, draw: number): string {
+    return `expedition-mod:${modId}:${strength}:camp${campIndex}:attempt${attemptNumber}:on:${eventKey}:draw${draw}`;
   },
 };
 

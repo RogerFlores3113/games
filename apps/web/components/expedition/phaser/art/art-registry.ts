@@ -47,6 +47,13 @@ const CREW_ART = Object.fromEntries(
   CREW_IDS.map((id) => [`crew-${id}`, { file: `crew/${id}.png`, w: 64, h: 80, fallback: { color: c(PALETTE.letterbox), label: "" } }]),
 ) as Record<CrewArtId, ArtDef>;
 
+/** Locations with their own 640x360 backdrop under locations/bg-<id>.png.
+ * The Jungle keeps the camp's own backdrop. */
+const LOCATION_ART = {
+  "bg-clearing": { file: "locations/bg-clearing.png", w: 640, h: 360, fallback: { color: c(PALETTE.coinShine), label: "clearing" } },
+  "bg-clifftop": { file: "locations/bg-clifftop.png", w: 640, h: 360, fallback: { color: c(PALETTE.rain), label: "clifftop" } },
+} as const satisfies Readonly<Record<string, ArtDef>>;
+
 export const ART = {
   "bg-jungle-night": { file: "camp/bg-jungle-night.png", w: 640, h: 360, fallback: { color: c(PALETTE.jungle), label: "" } },
   "stump-table": { file: "camp/stump-table.png", w: 384, h: 176, fallback: { color: c(PALETTE.stump), label: "" } },
@@ -70,6 +77,7 @@ export const ART = {
   "backpack-open": { file: "fireside/backpack-open.png", w: 96, h: 64, fallback: { color: c(PALETTE.moss), label: "backpack" } },
   "bg-temple-dawn": { file: "run-end/bg-temple-dawn.png", w: 640, h: 360, fallback: { color: c(PALETTE.jungle), label: "" } },
   "bg-trail-dusk": { file: "run-end/bg-trail-dusk.png", w: 640, h: 360, fallback: { color: c(PALETTE.letterbox), label: "" } },
+  ...LOCATION_ART,
   ...SOURCE_ART,
   ...CREW_ART,
 } as const satisfies Readonly<Record<string, ArtDef>>;
@@ -86,6 +94,12 @@ export function artTextureKey(id: ArtId): string {
 export function sourceArtId(sourceId: string): ArtId | null {
   const id = `source-${sourceId}`;
   return id in ART ? (id as ArtId) : null;
+}
+
+/** A location's backdrop: its own, or the Jungle's. */
+export function backdropArtId(location: string): ArtId {
+  const id = `bg-${location}`;
+  return id in ART ? (id as ArtId) : "bg-jungle-night";
 }
 
 /** The seated silhouette for a character, or null when it has none. */

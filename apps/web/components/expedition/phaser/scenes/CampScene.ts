@@ -9,7 +9,8 @@
 import Phaser from "phaser";
 import { ensurePixelFonts } from "../font/pixel-font";
 import { ensureCardTextures } from "../card-packs/card-textures";
-import { drawPrompt, drawStaticWorld, drawTooltip, drawTopBar } from "../draw/draw-table";
+import { drawBackdrop, drawPrompt, drawTooltip, drawTopBar } from "../draw/draw-table";
+import { WeatherOverlay, drawModStrip } from "../draw/draw-weather";
 import { drawCrowdAndStump, drawPlates, drawYouAndKit } from "../draw/draw-seats";
 import type { CampHandlers } from "../draw/camp-handlers";
 import { preloadArt } from "../art/place-art";
@@ -21,7 +22,7 @@ import { CARD_H, CARD_W, HAND_CARD_Y, INTERACTABLE_ANCHORS, ZONES, handFanXs, po
 import { PALETTE, toPhaserColor } from "../palette";
 import { cardTextureKey } from "../card-packs/card-pack-def";
 import { reduceDrag, type DragEffect, type DragEvent } from "../../../../lib/expedition/card-drag";
-import { interactableObjectId, LAST_TRICK_ID, mateSourceObjectId, sourceObjectId } from "../../../../lib/expedition/expedition-ids";
+import { interactableObjectId, LAST_TRICK_ID, mateSourceObjectId, modObjectId, sourceObjectId } from "../../../../lib/expedition/expedition-ids";
 import { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
 import {
@@ -35,6 +36,7 @@ import {
   setHoveredCard,
   setLastTrickOpen,
   setTooltipMateSource,
+  setTooltipMod,
   setTooltipObjective,
   setTooltipSource,
   type PickEntity,
@@ -174,6 +176,11 @@ function buildHandlers(store: SceneDeps["store"], pointer: () => Point): CampHan
       if (state.reconnecting) return;
       state.updateLocalUi((ui) => setLastTrickOpen(ui, open));
     },
+    onModHover(modId) {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      state.updateLocalUi((ui) => setTooltipMod(ui, modId));
+    },
   };
   return handlers;
 }
@@ -190,6 +197,9 @@ export class CampScene extends Phaser.Scene {
   private handlers!: CampHandlers;
   private unsubscribe: (() => void) | null = null;
   private dynamicLayer: Phaser.GameObjects.Container | null = null;
+  private backdropLayer: Phaser.GameObjects.Container | null = null;
+  private backdropLocation: string | null = null;
+  private weather: WeatherOverlay | null = null;
   private lastCardPackId: string | null = null;
   private previousModel: SceneModel | null = null;
   private dragLayer: Phaser.GameObjects.Container | null = null;
@@ -218,7 +228,8 @@ export class CampScene extends Phaser.Scene {
     this.lastCardPackId = state.cardPackId;
     this.handlers = buildHandlers(this.sceneStore, () => this.pointerAt());
 
-    drawStaticWorld(this);
+    this.backdropLayer = this.add.container(0, 0);
+    this.backdropLocation = null;
 
     for (const [id, def] of Object.entries(INTERACTABLE_REGISTRY)) {
       const anchor = INTERACTABLE_ANCHORS[id as keyof typeof INTERACTABLE_ANCHORS];
@@ -227,8 +238,10 @@ export class CampScene extends Phaser.Scene {
       this.index.register("camp", interactableObjectId(id), root as Phaser.GameObjects.Container);
     }
 
+    const skyLayer = this.add.container(0, 0);
     this.dynamicLayer = this.add.container(0, 0);
     this.dragLayer = this.add.container(0, 0);
+    this.weather = new WeatherOverlay(this, skyLayer, this.add.container(0, 0));
     const stump = ZONES.stump;
     this.tableGlow = this.add.rectangle(stump.x, stump.y, stump.w, stump.h, toPhaserColor(PALETTE.turn), 0.22).setOrigin(0, 0).setVisible(false);
     this.dragLayer.add(this.tableGlow);
@@ -278,11 +291,24 @@ export class CampScene extends Phaser.Scene {
     this.renderModel(model);
   }
 
+  /** The backdrop follows the camp's location; the overlay its weather. */
+  private renderSky(model: SceneModel): void {
+    if (this.backdropLayer !== null && this.backdropLocation !== model.sky.location) {
+      this.backdropLayer.removeAll(true);
+      this.backdropLayer.add(drawBackdrop(this, model.sky.location));
+      this.backdropLocation = model.sky.location;
+    }
+    this.weather?.setPrecipitation(model.sky.precipitation);
+    this.weather?.flash(model.sky.strike);
+  }
+
   renderModel(model: SceneModel): void {
     if (this.dynamicLayer === null || this.unsubscribe === null) return;
+    this.renderSky(model);
     this.dynamicLayer.removeAll(true);
     drawCrowdAndStump(this, this.dynamicLayer, model, this.index, this.handlers);
-    drawTopBar(this, this.dynamicLayer, model.topBar, this.index, () => this.handlers.onPick("supplies", ""));
+    const span = drawTopBar(this, this.dynamicLayer, model.topBar, this.index, () => this.handlers.onPick("supplies", ""));
+    drawModStrip(this, this.dynamicLayer, model.mods, span, this.index, this.handlers);
     drawPrompt(this, this.dynamicLayer, model.prompt);
     this.renderTable(model);
     drawTooltip(this, this.dynamicLayer, model.tooltip, ZONES.tooltip);
@@ -428,7 +454,7 @@ export class CampScene extends Phaser.Scene {
   update(): void {
     this.syncDrag();
     const ui = this.sceneStore.getState().localUi;
-    if (!ui.lastTrickOpen && ui.hoveredCardId === null && ui.tooltipSourceId === null && ui.tooltipObjectiveId === null && ui.tooltipMateSource === null) return;
+    if (!ui.lastTrickOpen && ui.hoveredCardId === null && ui.tooltipSourceId === null && ui.tooltipObjectiveId === null && ui.tooltipMateSource === null && ui.tooltipModId === null) return;
     const { x, y } = this.input.activePointer;
     const over = (id: string): boolean => this.index.contains(id, x, y);
     if (ui.lastTrickOpen && !over(LAST_TRICK_ID)) this.handlers.onLastTrickHover(false);
@@ -444,5 +470,6 @@ export class CampScene extends Phaser.Scene {
     if (ui.tooltipMateSource !== null && !over(mateSourceObjectId(ui.tooltipMateSource.seatId, ui.tooltipMateSource.sourceKey))) {
       this.handlers.onMateSourceHover(null);
     }
+    if (ui.tooltipModId !== null && !over(modObjectId(ui.tooltipModId))) this.handlers.onModHover(null);
   }
 }

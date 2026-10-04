@@ -32,7 +32,8 @@ import { findOwnCard } from "../legality";
 import { currentWindow } from "./windows";
 import { attemptOf, withAttempt } from "./attempt";
 import { rulesFor } from "./compose";
-import type { Catalog, LogEntry, Reveal, RunError, RunState } from "./types";
+import { react } from "./react";
+import type { Catalog, LogEntry, Reveal, RunAt, RunError, RunState } from "./types";
 import type { AdapterResult } from "../../adapter";
 
 /** COMM-01/COMM-02: the count of this attempt's "whisper" log entries whose
@@ -79,8 +80,8 @@ export function whisperLegality(
 }
 
 /** Applies a legal Whisper: computes the audience BEFORE appending anything,
- * then appends the
- * Reveal and the public LogEntry immutably. Never mutates `run`. */
+ * then appends the Reveal and the public LogEntry immutably, and lets the
+ * camp's modifiers react to it. Never mutates `run`. */
 export function applyWhisper(
   run: RunState,
   actorSeatId: string,
@@ -115,5 +116,7 @@ export function applyWhisper(
     audience: "public",
   };
 
-  return { ok: true, state: withAttempt(run, { ...attempt, reveals: [...attempt.reveals, reveal], log: [...attempt.log, logEntry] }) };
+  const ordinal = attempt.log.filter((entry) => entry.event === "whisper").length;
+  const whispered = withAttempt(run, { ...attempt, reveals: [...attempt.reveals, reveal], log: [...attempt.log, logEntry] }) as RunAt<"camp">;
+  return { ok: true, state: react(whispered, [{ type: "whisper-sent", ordinal, fromSeatId: actorSeatId, toSeatId: action.targetSeatId }], catalog) };
 }

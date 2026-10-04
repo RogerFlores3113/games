@@ -14,6 +14,7 @@ import { RUN_LENGTHS } from "../run/balance";
 import type { BossTier } from "../run/plan";
 import type { RunLength } from "../run/types";
 import { EVENTS } from "../content/events/registry";
+import type { ModKind } from "../content/mods/mod-def";
 
 export type ExpeditionTargetKind = TargetKind;
 export type ExpeditionActiveWindow = ActiveWindow;
@@ -164,4 +165,10 @@ export type EventDisplay = { id: string; name: string; text: string };
 
 export const EVENT_DISPLAY: Readonly<Record<string, EventDisplay>> = Object.fromEntries(
   Object.values(EVENTS).map((def) => [def.id, { id: def.id, name: def.name, text: def.text }]),
+);
+
+export type ModDisplay = { id: string; name: string; text: string; kind: ModKind };
+
+export const MOD_DISPLAY: Readonly<Record<string, ModDisplay>> = Object.fromEntries(
+  Object.values(CATALOG.mods).map((def) => [def.id, { id: def.id, name: def.name, text: def.text, kind: def.kind }]),
 );

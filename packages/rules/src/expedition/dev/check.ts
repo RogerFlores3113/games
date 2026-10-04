@@ -6,6 +6,8 @@ import { SUPPLIES_MAX } from "../run/balance";
 import { attemptOf } from "../run/attempt";
 import { rulesFor } from "../run/compose";
 import { campCount } from "../run/plan";
+import { pairingRuleFor } from "../run/stack";
+import type { CampSpec } from "../run/route";
 import type { Catalog, RunState, SeatRun } from "../run/types";
 
 function duplicates(values: readonly string[]): string[] {
@@ -43,7 +45,7 @@ function checkCrew(run: RunState, catalog: Catalog, problems: string[]): void {
   const characterIds = seats.flatMap((seat) => (seat.characterId === null ? [] : [seat.characterId]));
   for (const id of duplicates(characterIds)) problems.push(`character ${id} is held by more than one seat`);
   for (const uid of duplicates(seats.flatMap((seat) => seat.items.map((item) => item.uid)))) problems.push(`item uid ${uid} is owned more than once`);
-  // The slots come from the composed rules, which only a crew of known ids can compose.
+  // The slots come from the composed rules, which only known ids can compose.
   if (problems.length > 0) return;
   const rules = rulesFor(run, catalog);
   for (const seat of seats) {
@@ -73,6 +75,30 @@ function checkPerSeat(run: RunState, what: string, keys: readonly string[], prob
 function checkSpecIndex(run: RunState, what: string, index: number, problems: string[]): void {
   const count = run.plan === null ? 0 : campCount(run.plan);
   if (!Number.isInteger(index) || index < 1 || index > count) problems.push(`${what} is camp ${index}, outside the plan's camps 1 to ${count}`);
+}
+
+/** The location and weather are registered defs of their kinds, and no
+ * "never" pairing keeps them apart. */
+function checkSpec(what: string, spec: CampSpec, catalog: Catalog, problems: string[]): void {
+  const kindOf = (id: string) => (Object.hasOwn(catalog.mods, id) ? catalog.mods[id]!.kind : null);
+  if (kindOf(spec.location) !== "location") problems.push(`${what}: ${spec.location} is not a location`);
+  if (kindOf(spec.weather) !== "weather") problems.push(`${what}: ${spec.weather} is not a weather`);
+  if (pairingRuleFor(spec.location, spec.weather, catalog)?.result === "never") problems.push(`${what}: ${spec.location} never has ${spec.weather}`);
+}
+
+function checkSpecs(run: RunState, catalog: Catalog, problems: string[]): void {
+  const stage = run.stage;
+  if (stage.tag === "loadout" || stage.tag === "camp") checkSpec("the loadout or camp", stage.camp, catalog, problems);
+  if (stage.tag === "route") for (const option of stage.options) checkSpec(`route ${option.id}`, option.next, catalog, problems);
+  if (stage.tag === "event") checkSpec("the chosen route", stage.route.next, catalog, problems);
+  for (const boss of run.plan?.bosses ?? []) {
+    if (boss.modId !== null && !Object.hasOwn(catalog.mods, boss.modId)) problems.push(`the ${boss.tier} boss at camp ${boss.at} is unknown mod ${boss.modId}`);
+  }
+  for (const effect of stage.tag === "camp" ? stage.attempt.effects : []) {
+    const origin = effect.origin;
+    if (origin.kind === "seat" && !run.seatIds.includes(origin.seatId)) problems.push(`an effect names unknown seat ${origin.seatId}`);
+    if (origin.kind === "mod" && !Object.hasOwn(catalog.mods, origin.modId)) problems.push(`an effect names unknown mod ${origin.modId}`);
+  }
 }
 
 function checkRunFields(run: RunState, problems: string[]): void {
@@ -133,6 +159,8 @@ function checkCamp(run: RunState, problems: string[]): void {
 /** Readable problems with `run`; `[]` means it is legal. */
 export function checkRunState(run: RunState, catalog: Catalog): string[] {
   const problems: string[] = [];
+  // Specs first: the crew's slot check composes rules over the stack.
+  checkSpecs(run, catalog, problems);
   checkCrew(run, catalog, problems);
   checkRunFields(run, problems);
   checkCamp(run, problems);

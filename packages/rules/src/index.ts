@@ -58,6 +58,9 @@ export type {
   ExpeditionRemainingView,
   ExpeditionRankedCardView,
   ExpeditionEffectView,
+  ExpeditionEffectOriginView,
+  ExpeditionModView,
+  ExpeditionStatusPartView,
   ExpeditionCompletedTrickView,
   ExpeditionCurrentTrickView,
   ExpeditionRevealView,
@@ -78,10 +81,11 @@ export type { RunAction } from "./expedition/run/types";
 export type { RunError } from "./expedition/run/types";
 export { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "./expedition/adapter/view-leak-check";
 export type { ExpeditionSeatSecrets } from "./expedition/adapter/view-leak-check";
-export { SOURCE_DISPLAY, CHARACTER_DISPLAY, RUN_LENGTH_DISPLAY, EVENT_DISPLAY } from "./expedition/adapter/catalog-display";
+export { SOURCE_DISPLAY, CHARACTER_DISPLAY, RUN_LENGTH_DISPLAY, EVENT_DISPLAY, MOD_DISPLAY } from "./expedition/adapter/catalog-display";
 export type {
   RunLengthDisplay,
   EventDisplay,
+  ModDisplay,
   SourceDisplay,
   SourceActiveDisplay,
   ItemDisplay,

@@ -159,7 +159,8 @@ const RevealViewSchema = z.strictObject({
 // original audience gate.
 const LogEntryViewSchema = z.strictObject({
   event: z.string().min(1),
-  actorSeatId: z.string().min(1),
+  // null for a camp modifier.
+  actorSeatId: z.string().min(1).nullable(),
   subjectSeatIds: z.array(z.string().min(1)),
   sourceId: z.string().min(1).nullable(),
   private: z.boolean(),
@@ -182,10 +183,16 @@ const TargetKindSchema = z.enum([
   "supplies",
 ]);
 
+const StrengthSchema = z.enum(["full", "half"]);
+
+const EffectOriginViewSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("seat"), seatId: z.string().min(1), sourceId: z.string().min(1) }),
+  z.strictObject({ kind: z.literal("mod"), modId: z.string().min(1), strength: StrengthSchema }),
+]);
+
 // `params` is null unless the effect is public or the viewer owns it.
 const EffectViewSchema = z.strictObject({
-  sourceId: z.string().min(1),
-  seatId: z.string().min(1),
+  origin: EffectOriginViewSchema,
   atTrick: z.number().int().min(0),
   lasts: z.enum(["attempt", "trick"]),
   params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).nullable(),
@@ -280,6 +287,7 @@ const CampPreviewViewSchema = z.strictObject({
   index: CampIndexSchema,
   location: z.string().min(1),
   weather: z.string().min(1),
+  pairing: z.string().min(1).nullable(),
   event: z.string().min(1).nullable(),
   slotKinds: z.array(z.enum(["win-card", "ordered", "no-tricks", "exactly-n", "trick-count"])),
   bossId: z.string().min(1).nullable(),
@@ -313,16 +321,30 @@ const PlanBossViewSchema = z.strictObject({
   bossId: z.string().min(1).nullable(),
 });
 
+// Public table state of a camp modifier; carries no card.
+const StatusPartViewSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("chance"), percent: z.number().int().min(0).max(100), strikesLeft: z.number().int().min(0) }),
+  z.strictObject({ kind: z.literal("strike") }),
+]);
+
+const ModViewSchema = z.strictObject({
+  id: z.string().min(1),
+  kind: z.enum(["location", "weather", "pairing", "animal", "disaster", "temple"]),
+  strength: StrengthSchema,
+  status: z.array(StatusPartViewSchema),
+});
+
 const StageViewSchema = z.discriminatedUnion("tag", [
   z.strictObject({ tag: z.literal("muster"), ballots: z.array(BallotViewSchema) }),
   z.strictObject({
     tag: z.literal("loadout"),
     camp: CampPreviewViewSchema,
+    mods: z.array(ModViewSchema),
     yourSlots: z.number().int().min(0),
     shop: ShopViewSchema.nullable(),
     readySeatIds: z.array(z.string().min(1)),
   }),
-  z.strictObject({ tag: z.literal("camp"), camp: CampPreviewViewSchema, attempt: AttemptViewSchema }),
+  z.strictObject({ tag: z.literal("camp"), camp: CampPreviewViewSchema, mods: z.array(ModViewSchema), attempt: AttemptViewSchema }),
   z.strictObject({
     tag: z.literal("draft"),
     cleared: CampIndexSchema,

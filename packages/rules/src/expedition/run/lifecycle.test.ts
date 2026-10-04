@@ -8,9 +8,9 @@
 import { describe, expect, it } from "vitest";
 import { campPhase, currentActorSeatId, guard } from "../camp";
 import { ability, defineCharacter, defineItem, defineUpgrade, itemAbility } from "../content/source-def";
-import { attemptOf, withAttempt } from "./attempt";
+import { attemptOf, nextAttemptNumber, withAttempt } from "./attempt";
 import { rulesFor } from "./compose";
-import { createRun, dealCamp, nextAttemptNumber, runStatus, settleCamp } from "./lifecycle";
+import { createRun, dealCamp, runStatus, settleCamp } from "./lifecycle";
 import { campIndex } from "./plan";
 import { applyRunAction } from "./stages/registry";
 import { advanceTo, plainItem, setupRun, testCatalog } from "./run-test-support";
@@ -323,7 +323,7 @@ describe("between camps: draft, route vote and event", () => {
     expect(run.stage.from).toBe(1);
     expect(run.stage.ballots).toEqual({});
     expect([2, 3]).toContain(run.stage.options.length);
-    expect(run.stage.options[0]).toEqual({ id: "a", next: { index: 2, location: "jungle", weather: "fair", event: "event", slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }] } });
+    expect(run.stage.options[0]).toEqual({ id: "a", next: { index: 2, location: "clifftop", weather: "fair", event: "event", slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }] } });
   });
 
   it("the last route ballot opens the chosen route's event, and the last ready opens its loadout", () => {
@@ -525,7 +525,7 @@ describe("the in-trick window", () => {
       apply: (ctx) => [{ op: "add-modifier", lasts: "trick", params: { seatId: ctx.self }, audience: "public" }],
       effect: (effect) => ({
         trickWinner: (prev) => (plays, led) => {
-          const eligible = plays.filter((play) => play.seatId !== effect.seatId);
+          const eligible = plays.filter((play) => play.seatId !== effect.origin.seatId);
           return eligible.length === 0 || eligible.length === plays.length ? prev(plays, led) : prev(eligible, led);
         },
       }),

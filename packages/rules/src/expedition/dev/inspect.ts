@@ -9,6 +9,8 @@ import { rulesFor } from "../run/compose";
 import { runStatus } from "../run/lifecycle";
 import { campCount } from "../run/plan";
 import { backpackOf } from "../run/usage";
+import { campStack, modCtx, pairingOf, specOf } from "../run/stack";
+import type { StatusPart } from "../content/mods/mod-def";
 import type { CampSpec } from "../run/route";
 import type { Catalog, PerSeat, RunState } from "../run/types";
 import type { ResolvedPlay } from "../state";
@@ -19,33 +21,54 @@ function playLabel(play: ResolvedPlay): string {
   return `${play.seatId} ${cardLabel(play.card.identity)}${countsAs}${play.burned ? " (burned)" : ""}`;
 }
 
-function specLabel(spec: CampSpec): string {
-  return `camp ${spec.index}: ${spec.location}, ${spec.weather}, event ${spec.event ?? "none"}, slots [${spec.slots.map((s) => s.kind).join(", ")}]`;
+function specLabel(spec: CampSpec, catalog: Catalog): string {
+  const pairing = pairingOf(spec, catalog);
+  return `camp ${spec.index}: ${spec.location}, ${spec.weather}${pairing === null ? "" : `, pairing ${pairing}`}, event ${spec.event ?? "none"}, slots [${spec.slots.map((s) => s.kind).join(", ")}]`;
+}
+
+function statusLabel(part: StatusPart): string {
+  return part.kind === "chance" ? `${part.percent}% next, ${part.strikesLeft} strikes left` : "strike on this trick";
+}
+
+/** The camp's modifier stack in fold order with each layer's status, then
+ * the attempt's effects with their origins. */
+function stackLines(run: RunState, catalog: Catalog): string[] {
+  const spec = specOf(run);
+  if (spec === null) return [];
+  const layers = campStack(run, catalog).map((layer) => {
+    const status = layer.body.status?.(modCtx(run, spec, layer)) ?? [];
+    return `mod ${layer.def.id} (${layer.def.kind}, ${layer.strength})${status.length === 0 ? "" : `: ${status.map(statusLabel).join("; ")}`}`;
+  });
+  const effects = (run.stage.tag === "camp" ? run.stage.attempt.effects : []).map((e) => {
+    const origin = e.origin.kind === "seat" ? `${e.origin.seatId} ${e.origin.sourceId}` : `mod ${e.origin.modId}`;
+    return `effect from ${origin} at trick ${e.atTrick + 1}, lasts ${e.lasts}${e.deferIfFatal ? ", waits if fatal" : ""}`;
+  });
+  return [...layers, ...effects];
 }
 
 function perSeat<V>(run: RunState, values: PerSeat<V>): string {
   return run.seatIds.map((seatId) => `${seatId} ${Object.hasOwn(values, seatId) ? String(values[seatId] ?? "abstain") : "-"}`).join(", ");
 }
 
-function stageLines(run: RunState): string[] {
+function stageLines(run: RunState, catalog: Catalog): string[] {
   const stage = run.stage;
   switch (stage.tag) {
     case "muster":
       return [`length ballots: ${perSeat(run, stage.ballots)}`];
     case "loadout":
       return [
-        specLabel(stage.camp),
+        specLabel(stage.camp, catalog),
         `shop: ${stage.stock === null ? "closed" : stage.stock.map((e) => `${e.stockId} ${e.what.kind === "item" ? e.what.itemId : "supply"} ${e.price}${e.soldTo === null ? "" : ` sold to ${e.soldTo}`}`).join(", ")}`,
         `ready: ${perSeat(run, stage.ready)}`,
       ];
     case "camp":
-      return [specLabel(stage.camp), `attempt ${stage.attempt.attemptNumber}`];
+      return [specLabel(stage.camp, catalog), `attempt ${stage.attempt.attemptNumber}`];
     case "draft":
       return [`cleared camp ${stage.cleared}, paid ${stage.payout}`];
     case "route":
-      return [...stage.options.map((o) => `route ${o.id}: ${specLabel(o.next)}`), `route ballots: ${perSeat(run, stage.ballots)}`];
+      return [...stage.options.map((o) => `route ${o.id}: ${specLabel(o.next, catalog)}`), `route ballots: ${perSeat(run, stage.ballots)}`];
     case "event":
-      return [`event ${stage.route.next.event ?? "none"} on route ${stage.route.id}`, specLabel(stage.route.next), `ready: ${perSeat(run, stage.ready)}`];
+      return [`event ${stage.route.next.event ?? "none"} on route ${stage.route.id}`, specLabel(stage.route.next, catalog), `ready: ${perSeat(run, stage.ready)}`];
     case "ended":
       return [`run ${stage.result}`];
   }
@@ -62,7 +85,8 @@ export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[]
         `bosses: ${run.plan?.bosses.map((b) => `${b.tier} at ${b.at} (${b.modId ?? "none drawn"})`).join(", ") || "none"}`,
         `history: ${run.history.map((h) => `${h.camp}.${h.attempt} ${h.status}${h.coins > 0 ? ` +${h.coins}` : ""}`).join(", ") || "empty"}`,
         `last vote: ${vote === null ? "none" : `${vote.topic} -> ${vote.result.winner}${vote.result.tied === null ? "" : ` (flip between ${vote.result.tied.join(", ")})`}`}`,
-        ...stageLines(run),
+        ...stageLines(run, catalog),
+        ...stackLines(run, catalog),
       ],
     },
     {

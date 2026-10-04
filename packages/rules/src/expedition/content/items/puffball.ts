@@ -13,7 +13,7 @@ export const puffball = defineItem({
     targets: [{ kind: "self" }],
     apply: () => [{ op: "add-modifier", lasts: "trick", audience: "public", params: {} }],
     effect: (effect) => ({
-      trickWinner: (prev) => (plays, led) => winnerExcluding(prev, plays, led, (play) => play.seatId === effect.seatId),
+      trickWinner: (prev) => (plays, led) => winnerExcluding(prev, plays, led, (play) => play.seatId === effect.origin.seatId),
     }),
   }),
 });

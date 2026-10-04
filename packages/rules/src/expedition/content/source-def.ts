@@ -8,7 +8,7 @@
 import type { RuleModifier, RunRules } from "../run/run-rules";
 import type { TargetSpec, TargetsOf } from "../run/targets";
 import type { ToolkitOp } from "../run/toolkit";
-import type { ActiveEffect, RunState } from "../run/types";
+import type { RunState, SeatEffect } from "../run/types";
 import type { ActiveWindow } from "../run/windows";
 import type { CampState, ExpeditionCard } from "../state";
 
@@ -57,7 +57,7 @@ export type ActiveAbility<S extends readonly TargetSpec[] = readonly TargetSpec[
   canTarget?(ctx: AbilityContext<S>): true | string;
   apply(ctx: AbilityContext<S>): readonly ToolkitOp<P>[];
   /** Required if and only if apply can emit add-modifier: the rule layer that op activates, for this run. */
-  effect?(effect: ActiveEffect<P>, run: RunState): RuleModifier;
+  effect?(effect: SeatEffect<P>, run: RunState): RuleModifier;
 };
 
 /** An item's ability: its `uses` stand in for the limit. */

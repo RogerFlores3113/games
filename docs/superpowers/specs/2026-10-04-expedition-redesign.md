@@ -1321,3 +1321,42 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
   canvas also presses the canvas button under it (seen: a dev panel shortcut pressed Set out).
   `expedition-loadout.spec.ts` presses dev buttons with a DOM click event. The underlying issue
   is not fixed.
+
+### Implementation notes (unit 5)
+
+- `Catalog` gains `mods` and `pairings`. The pairing table lives in the catalogue, not only in
+  `PAIRINGS`, so a test can rule a pair out with test mods (`route.property.test.ts`).
+  `PAIRINGS` is empty until unit 7 registers the defs its rows name.
+- `StatusPart` has only `chance` and `strike`, and `ModBody` has no `grants`: each later unit
+  adds the parts and channels its defs use, with the schema mirror. `liveSourceKeys` is
+  unchanged until the temple grants an ability (unit 10).
+- `campStack` stacks location, weather, the pairing's def and the planned boss at full
+  strength; helpers at half arrive with the temple. The contract test drives full bodies only
+  and checks half bodies for shape, hook keys and event keys.
+- "Status stable under a later roll": the contract test moves every `t{i}` roll label for a
+  trick after the current one and asserts the status does not change, and that no card id
+  appears in it.
+- `SeatOrigin` carries `sourceId` beside `sourceKey` (unit 4's note). An ability's `effect`
+  receives a `SeatEffect` (`effect.origin.seatId`). `applyToolkitOps(run, origin, ops, rules)`
+  keeps the rules argument (unit 2's note). The effect view carries `origin` as
+  `{ kind: "seat", seatId, sourceId }` or `{ kind: "mod", modId, strength }`, without the key.
+- The deferral moves only `lasts: "trick"` effects; an attempt-long effect cannot wait a trick.
+- `dealCamp` folds the stack's `slots` into the spec's before resolving trick-count slots, then
+  reacts to `camp-dealt`. `nextAttemptNumber` moved to `run/attempt.ts` so `stack.ts` can name
+  a loadout's coming attempt without importing the lifecycle.
+- `discard-round` stamps its discards `afterTrick: completedTricks.length`.
+- Fair's display name is "Fair". Mosquito Net reads "Rain can't stop your whispers." It is
+  the same passive, which folds after Rain's layer. `ROOM_SCHEMA_VERSION` is 11.
+- Web: a location without a backdrop file draws the Jungle's backdrop tinted with its
+  registered placeholder colour rather than the registry's flat labelled rectangle, whose
+  centred label the stump would cover. `bg-clearing` and `bg-clifftop` are registered at
+  `locations/bg-<id>.png` for unit 6. The strip of modifier chips (icon, name, live reading,
+  strike pips; hover for the rules) sits in the top bar between the purse and the camp, and
+  drops the readings when the bar is too narrow. A strike lights the sky once per
+  `camp:attempt:trick` key, turns the storm chip into "Lowest wins", and takes the ticker line
+  under the stump. Rain and storm draw falling rain behind the table, the storm darker. Route
+  cards, the event and the loadout preview show location, weather and any pairing with
+  pixel icons. The Whisper button names Rain when Rain is why it is blocked.
+- e2e: `dev-mode.spec.ts` no longer expects camp 4 in the Jungle, since a camp's location is
+  drawn now. The tour gains `camp-storm-strike`, `camp-rain` and `route-weather` from
+  rewritten views.

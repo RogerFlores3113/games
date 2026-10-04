@@ -101,7 +101,7 @@ function makeView({ attempt, campIndex = 2, ...overrides }: ViewOverrides = {}):
     yourAbilities: [],
     history: [],
     lastVote: null,
-    stage: { tag: "camp", camp: { index: campIndex, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null, shop: false }, attempt: attempt ?? makeAttempt() },
+    stage: { tag: "camp", camp: { index: campIndex, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false }, mods: [], attempt: attempt ?? makeAttempt() },
     ...overrides,
   };
 }
@@ -115,14 +115,14 @@ function ui(overrides: Partial<LocalUiState> = {}): LocalUiState {
 }
 
 describe("sceneKeyFor", () => {
-  const preview = { index: 1, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null, shop: false };
+  const preview = { index: 1, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false };
   const stages: [ExpeditionStageView, string][] = [
     [{ tag: "muster", ballots: [] }, "trail"],
-    [{ tag: "loadout", camp: preview, yourSlots: 2, shop: null, readySeatIds: [] }, "trail"],
+    [{ tag: "loadout", camp: preview, mods: [], yourSlots: 2, shop: null, readySeatIds: [] }, "trail"],
     [{ tag: "draft", cleared: 1, payout: 8, yourOffer: null, pendingSeatIds: [] }, "trail"],
     [{ tag: "route", options: [], ballots: [] }, "trail"],
     [{ tag: "event", event: "storm", next: preview, readySeatIds: [] }, "trail"],
-    [{ tag: "camp", camp: preview, attempt: makeAttempt() }, "camp"],
+    [{ tag: "camp", camp: preview, mods: [], attempt: makeAttempt() }, "camp"],
     [{ tag: "ended", result: "won" }, "run-end"],
   ];
   it.each(stages)("maps the %j stage to the %s scene", (stage, key) => {
@@ -420,7 +420,7 @@ describe("trick and lastTrick", () => {
     expect(model.trick!.plays[1]!.isLed).toBe(false);
     expect(model.trick!.plays[0]!.card.objectId).toBe(trickObjectId(AS));
 
-    const noAttempt = makeView({ stage: { tag: "loadout", camp: { index: 2, location: "jungle", weather: "fair", event: null, slotKinds: [], bossId: null, shop: false }, yourSlots: 2, shop: null, readySeatIds: [] } });
+    const noAttempt = makeView({ stage: { tag: "loadout", camp: { index: 2, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false }, mods: [], yourSlots: 2, shop: null, readySeatIds: [] } });
     const model2 = buildSceneModel(server(noAttempt), ui(), "big-index");
     expect(model2.trick).toBeNull();
   });
@@ -729,6 +729,13 @@ describe("whisper status", () => {
   it("blocked: says whispers are blocked", () => {
     const view = whisperView({ yourWhisper: { allowed: false, left: 1 } });
     expect(buildSceneModel(server(view), ui(), "big-index").whisper).toMatchObject({ visible: false, state: "blocked", reason: "Blocked right now" });
+  });
+
+  it("blocked under rain: says the rain stops whispers", () => {
+    const view = whisperView({ yourWhisper: { allowed: false, left: 1 } });
+    if (view.stage.tag !== "camp") throw new Error("camp fixture");
+    const rainy: ExpeditionView = { ...view, stage: { ...view.stage, mods: [{ id: "rain", kind: "weather", strength: "full", status: [] }] } };
+    expect(buildSceneModel(server(rainy), ui(), "big-index").whisper).toMatchObject({ state: "blocked", reason: "Rain stops whispers" });
   });
 
   it("active reflects ui.targeting.mode === whisper", () => {

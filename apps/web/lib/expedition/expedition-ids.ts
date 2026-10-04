@@ -138,6 +138,11 @@ export function gateUseObjectId(sourceId: string): string {
   return `gate-use:${sourceId}`;
 }
 
+/** A camp modifier's chip on the top bar. */
+export function modObjectId(modId: string): string {
+  return `mod:${modId}`;
+}
+
 export function interactableObjectId(id: string): string {
   return `interactable:${id}`;
 }

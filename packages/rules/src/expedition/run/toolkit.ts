@@ -6,16 +6,17 @@
 // content-author defect and THROWS (POLICY A3), matching actions.ts's
 // composed-hook throw policy.
 //
-// Ops fold over RunState: supplies and coins are run-level, every other op
-// changes only the attempt.
+// Ops fold over RunState: supplies, coins and items are run-level, every
+// other op changes only the attempt. An op's origin is a seat acting through
+// a source, or a camp modifier reacting to the engine.
 
 import { identitiesEqual } from "../deck";
 import type { CoreRules } from "../rules";
 import type { CampState, Objective } from "../state";
 import { SUPPLIES_MAX } from "./balance";
 import { attemptOf, withAttempt } from "./attempt";
-import type { EffectParams, SourceId } from "../content/source-def";
-import type { ActiveEffect, AttemptState, LogEntry, Reveal, RunState } from "./types";
+import type { EffectParams } from "../content/source-def";
+import type { ActiveEffect, AttemptState, LogEntry, Origin, Reveal, RunState } from "./types";
 
 export type ToolkitOp<P extends EffectParams = EffectParams> =
   | { readonly op: "move-card"; readonly cardId: string; readonly fromSeatId: string; readonly toSeatId: string }
@@ -29,7 +30,9 @@ export type ToolkitOp<P extends EffectParams = EffectParams> =
   | { readonly op: "swap-objectives"; readonly seatA: string; readonly seatB: string }
   | { readonly op: "remove-objective"; readonly objectiveId: string }
   | { readonly op: "reveal"; readonly cardId: string; readonly audience: readonly string[] }
-  | { readonly op: "add-modifier"; readonly lasts: "attempt" | "trick"; readonly params: P; readonly audience: "public" | "owner" }
+  | { readonly op: "add-modifier"; readonly lasts: "attempt" | "trick"; readonly params: P; readonly audience: "public" | "owner"; readonly deferIfFatal?: true }
+  | { readonly op: "break-item"; readonly seatId: string; readonly uid: string } // an equipped instance leaves its owner
+  | { readonly op: "discard-round"; readonly cardIds: readonly string[] } // one card from every hand; the camp loses a trick
   | { readonly op: "set-next-leader"; readonly seatId: string }
   | { readonly op: "log"; readonly event: string; readonly subjectSeatIds: readonly string[]; readonly audience: "public" | readonly string[] };
 
@@ -64,8 +67,13 @@ function assertAudience(run: RunState, audience: readonly string[], opName: stri
   }
 }
 
-/** Supplies and coins are run-level; every other op changes only the attempt. */
-function applyOp(run: RunState, actorSeatId: string, sourceId: SourceId, op: ToolkitOp, rules: CoreRules): RunState {
+/** The id a reveal or log entry names: the source's def id or the mod id. */
+function originId(origin: Origin): string {
+  return origin.kind === "seat" ? origin.sourceId : origin.modId;
+}
+
+/** Supplies, coins and items are run-level; every other op changes only the attempt. */
+function applyOp(run: RunState, origin: Origin, op: ToolkitOp, rules: CoreRules): RunState {
   if (op.op === "adjust-supplies") {
     // The crew keeps at least one supply and never exceeds the cap.
     const supplies = run.supplies + op.delta;
@@ -81,15 +89,25 @@ function applyOp(run: RunState, actorSeatId: string, sourceId: SourceId, op: Too
     }
     return { ...run, purse };
   }
-  return withAttempt(run, applyAttemptOp(run, attemptOf(run)!, actorSeatId, sourceId, op, rules));
+  if (op.op === "break-item") {
+    // Only an equipped instance breaks; the backpack is out of reach.
+    const seat = run.seats.find((s) => s.seatId === op.seatId);
+    if (seat === undefined || !seat.equipped.includes(op.uid)) {
+      throw new Error(`toolkit: break-item: ${op.uid} is not equipped by ${op.seatId}`);
+    }
+    const seats = run.seats.map((s) =>
+      s.seatId === op.seatId ? { ...s, items: s.items.filter((item) => item.uid !== op.uid), equipped: s.equipped.filter((uid) => uid !== op.uid) } : s,
+    );
+    return { ...run, seats };
+  }
+  return withAttempt(run, applyAttemptOp(run, attemptOf(run)!, origin, op, rules));
 }
 
 function applyAttemptOp(
   run: RunState,
   attempt: AttemptState,
-  actorSeatId: string,
-  sourceId: SourceId,
-  op: Exclude<ToolkitOp, { readonly op: "adjust-supplies" | "adjust-coins" }>,
+  origin: Origin,
+  op: Exclude<ToolkitOp, { readonly op: "adjust-supplies" | "adjust-coins" | "break-item" }>,
   rules: CoreRules,
 ): AttemptState {
   switch (op.op) {
@@ -232,7 +250,7 @@ function applyAttemptOp(
         throw new Error(`toolkit: share-reveal: no whisper ${op.whisperOrdinal}`);
       }
       assertAudience(run, op.audience, "share-reveal");
-      const reveal: Reveal = { cardId: whisper.cardId, fromSeatId: whisper.fromSeatId, audience: op.audience, source: sourceId };
+      const reveal: Reveal = { cardId: whisper.cardId, fromSeatId: whisper.fromSeatId, audience: op.audience, source: originId(origin) };
       return { ...attempt, reveals: [...attempt.reveals, reveal] };
     }
 
@@ -267,14 +285,28 @@ function applyAttemptOp(
       if (!holder) {
         throw new Error(`toolkit: reveal: card ${op.cardId} not in any hand`);
       }
-      const reveal: Reveal = { cardId: op.cardId, fromSeatId: holder.seatId, audience: op.audience, source: sourceId };
+      const reveal: Reveal = { cardId: op.cardId, fromSeatId: holder.seatId, audience: op.audience, source: originId(origin) };
       return { ...attempt, reveals: [...attempt.reveals, reveal] };
     }
 
     case "add-modifier": {
       const atTrick = attempt.camp.currentTrick.index;
-      const effect: ActiveEffect = { sourceId, seatId: actorSeatId, atTrick, lasts: op.lasts, params: op.params, audience: op.audience };
+      const effect: ActiveEffect = { origin, atTrick, lasts: op.lasts, deferIfFatal: op.deferIfFatal === true, params: op.params, audience: op.audience };
       return { ...attempt, effects: [...attempt.effects, effect] };
+    }
+
+    case "discard-round": {
+      // Exactly one card from every hand leaves for the discards, so every
+      // hand stays the same size and the camp is one trick shorter.
+      const camp = attempt.camp;
+      const taken = camp.hands.map((hand) => hand.cards.filter((card) => op.cardIds.includes(card.id)));
+      if (op.cardIds.length !== camp.hands.length || taken.some((cards) => cards.length !== 1)) {
+        throw new Error("toolkit: discard-round: needs exactly one card from every hand");
+      }
+      const afterTrick = camp.completedTricks.length;
+      const hands = camp.hands.map((hand) => ({ seatId: hand.seatId, cards: hand.cards.filter((card) => !op.cardIds.includes(card.id)) }));
+      const discards = [...camp.discards, ...taken.map((cards) => ({ card: cards[0]!, afterTrick }))];
+      return { ...attempt, camp: { ...camp, hands, discards, totalTricks: camp.totalTricks - 1 } };
     }
 
     case "set-next-leader": {
@@ -298,9 +330,9 @@ function applyAttemptOp(
       }
       const entry: LogEntry = {
         event: op.event,
-        actorSeatId,
+        actorSeatId: origin.kind === "seat" ? origin.seatId : null,
         subjectSeatIds: op.subjectSeatIds,
-        sourceId,
+        sourceId: originId(origin),
         audience: op.audience,
       };
       return { ...attempt, log: [...attempt.log, entry] };
@@ -313,13 +345,13 @@ function applyAttemptOp(
   }
 }
 
-/** The sole executor of ability effects (spec §6.3). Folds `ops` over the
- * RunState in order, never mutating `run` or any of its nested objects, and
- * asserts card conservation once the fold completes (T-10-13): a broken op
- * is a content-author defect and THROWS (POLICY A3), never silently
- * corrupting state. `rules` are the camp's composed rules before the ops,
- * which the objective guards read. */
-export function applyToolkitOps(run: RunState, actorSeatId: string, sourceId: SourceId, ops: readonly ToolkitOp[], rules: CoreRules): RunState {
+/** The sole executor of ability and camp-modifier effects (spec §6.3).
+ * Folds `ops` over the RunState in order, never mutating `run` or any of its
+ * nested objects, and asserts card conservation once the fold completes
+ * (T-10-13): a broken op is a content-author defect and THROWS (POLICY A3),
+ * never silently corrupting state. `rules` are the camp's composed rules
+ * before the ops, which the objective guards read. */
+export function applyToolkitOps(run: RunState, origin: Origin, ops: readonly ToolkitOp[], rules: CoreRules): RunState {
   const attempt = attemptOf(run);
   if (attempt === null) {
     throw new Error("toolkit: applyToolkitOps: no attempt in progress");
@@ -329,7 +361,7 @@ export function applyToolkitOps(run: RunState, actorSeatId: string, sourceId: So
 
   let next = run;
   for (const op of ops) {
-    next = applyOp(next, actorSeatId, sourceId, op, rules);
+    next = applyOp(next, origin, op, rules);
   }
 
   const afterIds = campCardIds(attemptOf(next)!.camp);
