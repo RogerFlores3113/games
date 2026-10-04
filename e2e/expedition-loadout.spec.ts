@@ -30,6 +30,8 @@ test("a seat equips by tap and drag, and buys supplies and an item at a boss cam
   await waitForBridge(page);
 
   await shortcut(page, "jump-to-camp", { length: "standard", camp: "3", stage: "loadout" }, (m) => shopEntry(m, "supplies") !== null);
+  // A Rats boss would take a slot; this camp plays plain.
+  await shortcut(page, "set-plan-boss", { camp: "3", boss: "none" }, (m) => shopEntry(m, "supplies") !== null && (gearOf(m)?.slots.length ?? 0) === 2);
   const you = await page.evaluate(() => (window.__expeditionTest?.model as { crew: { seatId: string; isYou: boolean }[] }).crew.find((c) => c.isYou)!.seatId);
   await shortcut(page, "set-purse", { purse: "20" }, (m) => m.topBar?.purse === 20);
   await shortcut(page, "set-supplies", { supplies: "2" }, (m) => m.topBar?.supplies === 2);

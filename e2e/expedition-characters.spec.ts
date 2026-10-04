@@ -326,9 +326,13 @@ test.describe("the nine characters", () => {
     const panel = await soloTable(page, 2);
     let model = await campAs(page, panel, "perfumist", null);
     // The first trick is yours to lead: the state editor hands you the lead.
-    const json = JSON.parse(await panel.getByTestId("dev-state-json").inputValue());
+    const editor = panel.getByTestId("dev-state-json");
+    type Editable = { seats: { seatId: string; characterId: string }[]; stage: { attempt: { camp: { objectives: { ownerSeatId: string | null }[]; currentTrick: { leaderSeatId: string } } } } };
+    const current = (state: Editable) => state.seats.some((s) => s.seatId === model.youSeatId && s.characterId === "perfumist") && state.stage.attempt.camp.objectives.every((o) => o.ownerSeatId !== null);
+    await expect.poll(async () => current(JSON.parse(await editor.inputValue()) as Editable)).toBe(true);
+    const json = JSON.parse(await editor.inputValue()) as Editable;
     json.stage.attempt.camp.currentTrick.leaderSeatId = model.youSeatId;
-    await panel.getByTestId("dev-state-json").fill(JSON.stringify(json));
+    await editor.fill(JSON.stringify(json));
     await panel.getByTestId("dev-apply-state").click();
     await expect(panel.getByTestId("dev-result")).toHaveText(/^State loaded/);
     const leading = (m: CampModel) => m.sceneKey === "camp" && (sourceOf(m, "perfumist")?.usable ?? false);

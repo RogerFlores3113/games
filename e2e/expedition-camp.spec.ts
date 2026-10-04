@@ -847,6 +847,15 @@ test("a forced Cave: teammates' cards lie face down showing only their suit, and
   await panel.getByTestId("dev-shortcut-set-spec").click();
   await expect.poll(async () => (await model()).mods.map((m) => m.id)).toEqual(["cave", "fair"]);
 
+  // One objective no single trick can settle, so the camp is still open
+  // when the first trick completes.
+  await expect(panel.getByTestId("dev-state-json")).toHaveValue(/"location":\s*"cave"/);
+  const json = JSON.parse(await panel.getByTestId("dev-state-json").inputValue());
+  json.stage.attempt.camp.objectives = [{ id: "steady", kind: "exactly-n", n: 3, ownerSeatId: (await model()).youSeatId }];
+  await panel.getByTestId("dev-state-json").fill(JSON.stringify(json));
+  await panel.getByTestId("dev-apply-state").click();
+  await expect(panel.getByTestId("dev-result")).toHaveText(/^State loaded/);
+
   // One step at a time until a teammate's card is on the stump.
   await panel.getByTestId("dev-autoplay-scope").selectOption("everyone");
   await panel.getByTestId("dev-autoplay-steps").fill("1");

@@ -164,6 +164,8 @@ test.describe("animal bosses on the table", () => {
   test("the snake bites the seat that whispers", async ({ page }) => {
     const panel = await soloTable(page);
     await bossCamp(panel, "snake");
+    // Rain or fog would block or hide the whisper this test needs.
+    await shortcut(panel, "set-spec", { location: "jungle", weather: "fair" });
     await pickAll(page, panel);
     await page.waitForFunction(() => window.__expeditionTest?.positionOf("whisper") != null);
     await page.getByTestId("dev-toggle").click();
