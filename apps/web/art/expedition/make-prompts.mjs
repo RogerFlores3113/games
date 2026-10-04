@@ -128,6 +128,77 @@ const mascotStrip = (display_name, description) => ({
   scale: 1,
 });
 
+/** One sprite per animal and disaster boss, drawn on the table from unit 8:
+ * [id, width, height, seed, job, description, extra params?]. */
+const BOSSES = [
+  ["tiger", 112, 96, 11, "34b2d6e7-b963-4421-9c81-505fb6334328",
+    "fierce orange jungle tiger crouching ready to pounce, facing the viewer at three-quarter angle, black stripes, glowing amber eyes, warm night firelight, isolated sprite on plain background"],
+  ["rats", 112, 80, 11, "d66cb5c9-79dd-4fd3-978e-ebe189e5d9a9",
+    "pack of three scruffy grey jungle rats huddled together, one standing on hind legs sniffing, long pink tails, beady red eyes, warm night firelight, isolated sprite on plain background"],
+  ["snake", 96, 96, 11, "bbf6cee1-b871-4eac-b999-598db9c2049f",
+    "large green jungle python coiled up with its head raised high, mouth open showing fangs, forked tongue, yellow diamond pattern scales, warm night firelight, isolated sprite on plain background"],
+  ["crocodile", 160, 64, 11, "a1bb18f7-306e-40f9-bb45-e7311ac07aaf",
+    "big dark green crocodile lying low with its long toothy jaws open, side view facing right, bumpy scaled back and tail, yellow eyes, warm night firelight, isolated sprite on plain background"],
+  ["capybara", 96, 80, 11, "0732ce68-8fbc-4f69-a3c1-fca3afea0e37",
+    "calm round brown capybara sitting peacefully facing the viewer, eyes half closed, a small orange on its head, friendly and serene, warm night firelight, isolated sprite on plain background"],
+  ["beaver", 96, 96, 23, "40c8d861-60b3-4d09-816b-573433b64602",
+    "busy brown beaver standing on its hind legs hugging a gnawed wooden log, big orange front teeth, flat paddle tail, small dam of sticks at its feet, warm night firelight, isolated sprite on plain background"],
+  ["tornado", 96, 112, 11, "4ae9d920-f4b4-48dd-b644-7b7b3a4c294b",
+    "swirling grey tornado funnel twister with leaves and twigs caught in it, wide at the top narrow at the bottom, isolated sprite on plain background"],
+  ["earthquake", 128, 80, 11, "89d8d851-456f-4a65-b8d8-eff9413270ee",
+    "earthquake: a jagged glowing crack splitting brown rocky ground with tumbling boulders and dust clouds, isolated sprite on plain background"],
+  ["wildfire", 144, 96, 31, "ce6cb5a7-061c-4e15-85d2-9cc620387cbc",
+    "wildfire spreading through jungle: several burning palm trees and bushes in a row with tall wild orange flames and thick black smoke billowing up, no campfire, no logs, isolated sprite on plain background"],
+  ["meteor", 112, 112, 11, "9fa8e4f0-e50b-4aae-9ade-bfb8602d800f",
+    "meteor shower: three flaming meteors streaking diagonally downward with long fiery orange tails, rocky glowing cores, isolated sprite on plain background"],
+  ["blood-moon", 96, 96, 11, "258ae4a8-3c50-45a8-8f3e-429c3ba2ec21",
+    "blood moon: a huge glowing deep red full moon with dark craters and a faint crimson halo, wisps of dark cloud across its lower edge, isolated sprite on plain background"],
+  ["locusts", 128, 96, 47, "722a08b6-c27f-4157-9956-b3bba44d4b1e",
+    "five large flying grasshoppers in a loose group, each clearly drawn with long jumping hind legs, antennae and spread brown wings, yellow-green bodies, isolated sprite on plain background", { detail: "highly detailed" }],
+  ["monsoon", 112, 112, 11, "238c1702-3cc9-41f2-9f20-b39d7712f660",
+    "monsoon: a dark heavy storm cloud pouring sheets of blue rain into a rising swirling river wave below, isolated sprite on plain background"],
+];
+const bossSpec = ([, width, height, seed, job, description, extra = {}]) => ({
+  tool: "create_image_pixflux",
+  params: {
+    description,
+    width,
+    height,
+    view: "side",
+    outline: "single color black outline",
+    shading: "medium shading",
+    ...extra,
+    no_background: true,
+    seed,
+  },
+  job,
+  scale: 1,
+  note: "natively transparent; fetched with `fetch-art.mjs boss-<id> bosses/<id>.png https://api.pixellab.ai/mcp/images/<job>/download 1`",
+});
+
+/** Each location's backdrop, fetched at scale 2 to locations/bg-<id>.png.
+ * The Jungle keeps bg-jungle-night. */
+const LOCATIONS = {
+  "bg-desert": { ...backdrop(
+    "side view backdrop of a sandy desert oasis edge at night: rolling dunes, a few dry palms and cacti framing the left and right edges, starry blue-black sky with a moon, calm flat sand filling the centre and bottom with no objects, no people, no text",
+  ), job: "6f464938-55b5-4151-876b-c61c5a8e2de7" },
+  "bg-cave": { ...backdrop(
+    "side view backdrop inside a dark cave: rocky walls and hanging stalactites framing the left, right and top edges, faint blue glowing crystals, a little torchlight, calm dark stone floor filling the centre and bottom with no objects, no people, no text",
+  ), job: "3a152b2f-422a-48cc-a8f1-8d693cefbf17" },
+  "bg-magma": { ...backdrop(
+    "side view backdrop of a volcanic magma pool at night: black basalt rocks framing the left and right edges, glowing orange lava streams and a bubbling lava pool in the distance, red smoky sky, calm dark rock ground filling the centre and bottom with no objects, no people, no text",
+  ), job: "9a18e06a-b38a-40ee-9275-ac77eabc561a" },
+  "bg-clifftop": { ...backdrop(
+    "side view backdrop of a windswept jungle clifftop at night: a sheer rocky cliff edge on the right dropping to a misty valley of treetops far below, a few bent trees on the left edge, wide open starry sky with clouds, calm grassy rock ground filling the centre and bottom with no objects, no people, no text",
+  ), job: "38114b84-10e1-4843-9739-0af6a04b5b72" },
+  "bg-clearing": { ...backdrop(
+    "side view backdrop of an open grassy jungle clearing at night: short soft grass and wildflowers, distant tree line along the horizon, large open starry sky with a bright moon, fireflies, calm flat grass filling the centre and bottom with no objects, no people, no text",
+  ), job: "6583aa14-7a93-431d-ba61-9dbbdbfb372f" },
+  "bg-temple": { ...backdrop(
+    "side view backdrop inside an ancient jungle temple chamber at night: carved stone pillars and vine-covered walls framing the left and right edges, glowing golden sun glyphs carved above, flickering torches, a stone floor of square pressure plate tiles filling the centre and bottom with no objects, no people, no text",
+  ), job: "82638f20-7863-4ed8-b98a-6312500ccbaa" },
+};
+
 const specs = {
   "bg-jungle-night": backdrop(
     "side view backdrop of a dense jungle clearing at night: canopy silhouettes and hanging vines framing the left, right and top edges, a few stars and a thin moon in a blue-black sky, calm dark mossy ground filling the centre and bottom with no objects. Night jungle, deep greens, blue-black sky, moss browns, no people, no text",
@@ -209,6 +280,8 @@ const specs = {
   ...Object.fromEntries(
     SOURCE_ICONS.map(([id, item], i) => [`source-${id}`, { ...SOURCE_BATCH, item_description: item, batch_index: SOURCE_FRAMES[i], scale: 1 }]),
   ),
+  ...LOCATIONS,
+  ...Object.fromEntries(BOSSES.map((boss) => [`boss-${boss[0]}`, bossSpec(boss)])),
   ...Object.fromEntries(CREW.map(([id, description, seed, job]) => [`crew-${id}`, crewSpec(description, seed, job)])),
   "icon-tricks": {
     tool: "hand-drawn",

@@ -1360,3 +1360,22 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
 - e2e: `dev-mode.spec.ts` no longer expects camp 4 in the Jungle, since a camp's location is
   drawn now. The tour gains `camp-storm-strike`, `camp-rain` and `route-weather` from
   rewritten views.
+
+### Implementation notes (unit 6)
+
+- The art was fetched with `fetch-art.mjs` from each job's download URL (sprites at scale 1,
+  backdrops at scale 2); every file matches the staged copy byte for byte, and every sprite is
+  natively transparent (no `--matte`). `make-prompts.mjs` records the full job id per spec.
+  `fetch-art.mjs` now inserts its CREDITS row into the art table; it appended after the audio
+  table that was added since.
+- `modArtId(mod)` in `art-registry.ts` names a location's backdrop or a boss's sprite (null for
+  other kinds or a missing id); `backdropArtId` reads it and falls back to the Jungle's.
+  `mod-art.test.ts` iterates `MOD_DISPLAY`, the projection of `MODS`. That is the boss sprite
+  slot: no table zone is added before unit 8 has something to place in it.
+- The tinted-Jungle fallback is deleted; a location with no file draws the registry's labelled
+  placeholder. Each backdrop gets a shade from `BACKDROP_SHADE` in `draw-table.ts`, a flat dim
+  plus an edge vignette (the Jungle none, the desert and the temple the most), so the panels and
+  hand stay readable on bright art.
+- The loadout draws the backdrop of the camp it sets out for; the draft, route and event keep the
+  fireside. `bg-temple` is registered, but nothing draws it until unit 10 decides whether the
+  temple camp shows it over its location.

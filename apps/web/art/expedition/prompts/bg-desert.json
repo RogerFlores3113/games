@@ -1,0 +1,15 @@
+{
+  "id": "bg-desert",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "side view backdrop of a sandy desert oasis edge at night: rolling dunes, a few dry palms and cacti framing the left and right edges, starry blue-black sky with a moon, calm flat sand filling the centre and bottom with no objects, no people, no text",
+    "width": 320,
+    "height": 180,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "medium shading",
+    "no_background": false
+  },
+  "scale": 2,
+  "job": "6f464938-55b5-4151-876b-c61c5a8e2de7"
+}

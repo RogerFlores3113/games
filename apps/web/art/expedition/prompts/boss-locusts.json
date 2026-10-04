@@ -1,0 +1,18 @@
+{
+  "id": "boss-locusts",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "five large flying grasshoppers in a loose group, each clearly drawn with long jumping hind legs, antennae and spread brown wings, yellow-green bodies, isolated sprite on plain background",
+    "width": 128,
+    "height": 96,
+    "view": "side",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "detail": "highly detailed",
+    "no_background": true,
+    "seed": 47
+  },
+  "job": "722a08b6-c27f-4157-9956-b3bba44d4b1e",
+  "scale": 1,
+  "note": "natively transparent; fetched with `fetch-art.mjs boss-<id> bosses/<id>.png https://api.pixellab.ai/mcp/images/<job>/download 1`"
+}

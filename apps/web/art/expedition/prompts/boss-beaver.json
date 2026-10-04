@@ -1,0 +1,17 @@
+{
+  "id": "boss-beaver",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "busy brown beaver standing on its hind legs hugging a gnawed wooden log, big orange front teeth, flat paddle tail, small dam of sticks at its feet, warm night firelight, isolated sprite on plain background",
+    "width": 96,
+    "height": 96,
+    "view": "side",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "seed": 23
+  },
+  "job": "40c8d861-60b3-4d09-816b-573433b64602",
+  "scale": 1,
+  "note": "natively transparent; fetched with `fetch-art.mjs boss-<id> bosses/<id>.png https://api.pixellab.ai/mcp/images/<job>/download 1`"
+}

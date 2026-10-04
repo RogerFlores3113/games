@@ -1,0 +1,17 @@
+{
+  "id": "boss-wildfire",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "wildfire spreading through jungle: several burning palm trees and bushes in a row with tall wild orange flames and thick black smoke billowing up, no campfire, no logs, isolated sprite on plain background",
+    "width": 144,
+    "height": 96,
+    "view": "side",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "seed": 31
+  },
+  "job": "ce6cb5a7-061c-4e15-85d2-9cc620387cbc",
+  "scale": 1,
+  "note": "natively transparent; fetched with `fetch-art.mjs boss-<id> bosses/<id>.png https://api.pixellab.ai/mcp/images/<job>/download 1`"
+}

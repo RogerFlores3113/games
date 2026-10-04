@@ -63,6 +63,25 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | crew-medic | sprites/crew/medic.png | PixelLab generation, spec `prompts/crew-medic.json`; alpha thresholded locally | PixelLab ToS | 2026-10-03 |
 | crew-signaller | sprites/crew/signaller.png | PixelLab generation, spec `prompts/crew-signaller.json`; alpha thresholded locally | PixelLab ToS | 2026-10-03 |
 | crew-cartographer | sprites/crew/cartographer.png | PixelLab generation, spec `prompts/crew-cartographer.json`; alpha thresholded locally | PixelLab ToS | 2026-10-03 |
+| boss-tiger | sprites/bosses/tiger.png | PixelLab generation, spec `prompts/boss-tiger.json` | PixelLab ToS | 2026-10-04 |
+| boss-rats | sprites/bosses/rats.png | PixelLab generation, spec `prompts/boss-rats.json` | PixelLab ToS | 2026-10-04 |
+| boss-snake | sprites/bosses/snake.png | PixelLab generation, spec `prompts/boss-snake.json` | PixelLab ToS | 2026-10-04 |
+| boss-crocodile | sprites/bosses/crocodile.png | PixelLab generation, spec `prompts/boss-crocodile.json` | PixelLab ToS | 2026-10-04 |
+| boss-capybara | sprites/bosses/capybara.png | PixelLab generation, spec `prompts/boss-capybara.json` | PixelLab ToS | 2026-10-04 |
+| boss-beaver | sprites/bosses/beaver.png | PixelLab generation, spec `prompts/boss-beaver.json` | PixelLab ToS | 2026-10-04 |
+| boss-tornado | sprites/bosses/tornado.png | PixelLab generation, spec `prompts/boss-tornado.json` | PixelLab ToS | 2026-10-04 |
+| boss-earthquake | sprites/bosses/earthquake.png | PixelLab generation, spec `prompts/boss-earthquake.json` | PixelLab ToS | 2026-10-04 |
+| boss-wildfire | sprites/bosses/wildfire.png | PixelLab generation, spec `prompts/boss-wildfire.json` | PixelLab ToS | 2026-10-04 |
+| boss-meteor | sprites/bosses/meteor.png | PixelLab generation, spec `prompts/boss-meteor.json` | PixelLab ToS | 2026-10-04 |
+| boss-blood-moon | sprites/bosses/blood-moon.png | PixelLab generation, spec `prompts/boss-blood-moon.json` | PixelLab ToS | 2026-10-04 |
+| boss-locusts | sprites/bosses/locusts.png | PixelLab generation, spec `prompts/boss-locusts.json` | PixelLab ToS | 2026-10-04 |
+| boss-monsoon | sprites/bosses/monsoon.png | PixelLab generation, spec `prompts/boss-monsoon.json` | PixelLab ToS | 2026-10-04 |
+| bg-desert | sprites/locations/bg-desert.png | PixelLab generation, spec `prompts/bg-desert.json` | PixelLab ToS | 2026-10-04 |
+| bg-cave | sprites/locations/bg-cave.png | PixelLab generation, spec `prompts/bg-cave.json` | PixelLab ToS | 2026-10-04 |
+| bg-magma | sprites/locations/bg-magma.png | PixelLab generation, spec `prompts/bg-magma.json` | PixelLab ToS | 2026-10-04 |
+| bg-clifftop | sprites/locations/bg-clifftop.png | PixelLab generation, spec `prompts/bg-clifftop.json` | PixelLab ToS | 2026-10-04 |
+| bg-clearing | sprites/locations/bg-clearing.png | PixelLab generation, spec `prompts/bg-clearing.json` | PixelLab ToS | 2026-10-04 |
+| bg-temple | sprites/locations/bg-temple.png | PixelLab generation, spec `prompts/bg-temple.json` | PixelLab ToS | 2026-10-04 |
 
 ## Audio
 

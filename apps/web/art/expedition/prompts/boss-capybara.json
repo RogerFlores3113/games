@@ -1,0 +1,17 @@
+{
+  "id": "boss-capybara",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "calm round brown capybara sitting peacefully facing the viewer, eyes half closed, a small orange on its head, friendly and serene, warm night firelight, isolated sprite on plain background",
+    "width": 96,
+    "height": 80,
+    "view": "side",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "seed": 11
+  },
+  "job": "0732ce68-8fbc-4f69-a3c1-fca3afea0e37",
+  "scale": 1,
+  "note": "natively transparent; fetched with `fetch-art.mjs boss-<id> bosses/<id>.png https://api.pixellab.ai/mcp/images/<job>/download 1`"
+}

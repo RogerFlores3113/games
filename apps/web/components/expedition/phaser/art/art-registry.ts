@@ -48,11 +48,28 @@ const CREW_ART = Object.fromEntries(
 ) as Record<CrewArtId, ArtDef>;
 
 /** Locations with their own 640x360 backdrop under locations/bg-<id>.png.
- * The Jungle keeps the camp's own backdrop. */
+ * The Jungle keeps the camp's own backdrop; the temple's waits for its camp. */
 const LOCATION_ART = {
-  "bg-clearing": { file: "locations/bg-clearing.png", w: 640, h: 360, fallback: { color: c(PALETTE.coinShine), label: "clearing" } },
-  "bg-clifftop": { file: "locations/bg-clifftop.png", w: 640, h: 360, fallback: { color: c(PALETTE.rain), label: "clifftop" } },
+  "bg-clearing": { file: "locations/bg-clearing.png", w: 640, h: 360, fallback: { color: c(PALETTE.night), label: "clearing" } },
+  "bg-clifftop": { file: "locations/bg-clifftop.png", w: 640, h: 360, fallback: { color: c(PALETTE.night), label: "clifftop" } },
+  "bg-desert": { file: "locations/bg-desert.png", w: 640, h: 360, fallback: { color: c(PALETTE.coinEdge), label: "desert" } },
+  "bg-cave": { file: "locations/bg-cave.png", w: 640, h: 360, fallback: { color: c(PALETTE.letterbox), label: "cave" } },
+  "bg-magma": { file: "locations/bg-magma.png", w: 640, h: 360, fallback: { color: c(PALETTE.destructive), label: "magma" } },
+  "bg-temple": { file: "locations/bg-temple.png", w: 640, h: 360, fallback: { color: c(PALETTE.moss), label: "temple" } },
 } as const satisfies Readonly<Record<string, ArtDef>>;
+
+/** Every animal and disaster boss, each a sprite under bosses/<id>.png. */
+const BOSS_SIZES = {
+  tiger: [112, 96], rats: [112, 80], snake: [96, 96], crocodile: [160, 64], capybara: [96, 80], beaver: [96, 96],
+  tornado: [96, 112], earthquake: [128, 80], wildfire: [144, 96], meteor: [112, 112], "blood-moon": [96, 96],
+  locusts: [128, 96], monsoon: [112, 112],
+} as const;
+
+type BossArtId = `boss-${keyof typeof BOSS_SIZES}`;
+
+const BOSS_ART = Object.fromEntries(
+  Object.entries(BOSS_SIZES).map(([id, [w, h]]) => [`boss-${id}`, { file: `bosses/${id}.png`, w, h, fallback: { color: c(PALETTE.destructive), label: id } }]),
+) as Record<BossArtId, ArtDef>;
 
 export const ART = {
   "bg-jungle-night": { file: "camp/bg-jungle-night.png", w: 640, h: 360, fallback: { color: c(PALETTE.jungle), label: "" } },
@@ -78,6 +95,7 @@ export const ART = {
   "bg-temple-dawn": { file: "run-end/bg-temple-dawn.png", w: 640, h: 360, fallback: { color: c(PALETTE.jungle), label: "" } },
   "bg-trail-dusk": { file: "run-end/bg-trail-dusk.png", w: 640, h: 360, fallback: { color: c(PALETTE.letterbox), label: "" } },
   ...LOCATION_ART,
+  ...BOSS_ART,
   ...SOURCE_ART,
   ...CREW_ART,
 } as const satisfies Readonly<Record<string, ArtDef>>;
@@ -96,10 +114,16 @@ export function sourceArtId(sourceId: string): ArtId | null {
   return id in ART ? (id as ArtId) : null;
 }
 
+/** The art a camp modifier draws: a location's backdrop or a boss's sprite.
+ * Null for other kinds, and for an id with no art. */
+export function modArtId(mod: { readonly id: string; readonly kind: string }): ArtId | null {
+  const id = mod.kind === "location" ? (mod.id === "jungle" ? "bg-jungle-night" : `bg-${mod.id}`) : mod.kind === "animal" || mod.kind === "disaster" ? `boss-${mod.id}` : null;
+  return id !== null && id in ART ? (id as ArtId) : null;
+}
+
 /** A location's backdrop: its own, or the Jungle's. */
 export function backdropArtId(location: string): ArtId {
-  const id = `bg-${location}`;
-  return id in ART ? (id as ArtId) : "bg-jungle-night";
+  return modArtId({ id: location, kind: "location" }) ?? "bg-jungle-night";
 }
 
 /** The seated silhouette for a character, or null when it has none. */

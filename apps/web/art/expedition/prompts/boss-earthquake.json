@@ -1,0 +1,17 @@
+{
+  "id": "boss-earthquake",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "earthquake: a jagged glowing crack splitting brown rocky ground with tumbling boulders and dust clouds, isolated sprite on plain background",
+    "width": 128,
+    "height": 80,
+    "view": "side",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "seed": 11
+  },
+  "job": "89d8d851-456f-4a65-b8d8-eff9413270ee",
+  "scale": 1,
+  "note": "natively transparent; fetched with `fetch-art.mjs boss-<id> bosses/<id>.png https://api.pixellab.ai/mcp/images/<job>/download 1`"
+}

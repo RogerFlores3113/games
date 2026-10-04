@@ -1,0 +1,17 @@
+{
+  "id": "boss-crocodile",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "big dark green crocodile lying low with its long toothy jaws open, side view facing right, bumpy scaled back and tail, yellow eyes, warm night firelight, isolated sprite on plain background",
+    "width": 160,
+    "height": 64,
+    "view": "side",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "seed": 11
+  },
+  "job": "a1bb18f7-306e-40f9-bb45-e7311ac07aaf",
+  "scale": 1,
+  "note": "natively transparent; fetched with `fetch-art.mjs boss-<id> bosses/<id>.png https://api.pixellab.ai/mcp/images/<job>/download 1`"
+}

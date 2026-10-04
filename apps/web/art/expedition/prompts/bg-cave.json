@@ -1,0 +1,15 @@
+{
+  "id": "bg-cave",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "side view backdrop inside a dark cave: rocky walls and hanging stalactites framing the left, right and top edges, faint blue glowing crystals, a little torchlight, calm dark stone floor filling the centre and bottom with no objects, no people, no text",
+    "width": 320,
+    "height": 180,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "medium shading",
+    "no_background": false
+  },
+  "scale": 2,
+  "job": "3a152b2f-422a-48cc-a8f1-8d693cefbf17"
+}

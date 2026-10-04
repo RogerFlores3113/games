@@ -1,0 +1,17 @@
+{
+  "id": "boss-snake",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "large green jungle python coiled up with its head raised high, mouth open showing fangs, forked tongue, yellow diamond pattern scales, warm night firelight, isolated sprite on plain background",
+    "width": 96,
+    "height": 96,
+    "view": "side",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "seed": 11
+  },
+  "job": "bbf6cee1-b871-4eac-b999-598db9c2049f",
+  "scale": 1,
+  "note": "natively transparent; fetched with `fetch-art.mjs boss-<id> bosses/<id>.png https://api.pixellab.ai/mcp/images/<job>/download 1`"
+}

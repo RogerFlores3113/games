@@ -1,0 +1,15 @@
+{
+  "id": "bg-clearing",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "side view backdrop of an open grassy jungle clearing at night: short soft grass and wildflowers, distant tree line along the horizon, large open starry sky with a bright moon, fireflies, calm flat grass filling the centre and bottom with no objects, no people, no text",
+    "width": 320,
+    "height": 180,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "medium shading",
+    "no_background": false
+  },
+  "scale": 2,
+  "job": "6583aa14-7a93-431d-ba61-9dbbdbfb372f"
+}

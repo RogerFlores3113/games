@@ -1,0 +1,17 @@
+{
+  "id": "boss-tiger",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "fierce orange jungle tiger crouching ready to pounce, facing the viewer at three-quarter angle, black stripes, glowing amber eyes, warm night firelight, isolated sprite on plain background",
+    "width": 112,
+    "height": 96,
+    "view": "side",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "seed": 11
+  },
+  "job": "34b2d6e7-b963-4421-9c81-505fb6334328",
+  "scale": 1,
+  "note": "natively transparent; fetched with `fetch-art.mjs boss-<id> bosses/<id>.png https://api.pixellab.ai/mcp/images/<job>/download 1`"
+}

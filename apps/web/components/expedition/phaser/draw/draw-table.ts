@@ -10,25 +10,58 @@ import { SUPPLIES_ID } from "../../../../lib/expedition/expedition-ids";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL, SIGN_CELL, WORLD_SIGN_FONT } from "../font/font-keys";
 import { placeArt } from "../art/place-art";
-import { ART, backdropArtId, resolveArt } from "../art/art-registry";
-import { ART_FILES } from "../art/art-files.generated";
+import { ART, backdropArtId, type ArtId } from "../art/art-registry";
 import type { Tooltip, TopBar } from "../../../../lib/expedition/build-scene-model";
 import type { Prompt, PromptTone } from "../../../../lib/expedition/build-prompt";
 import { PANEL_ALPHA, coin, labelWidth, plate, text, type Layer } from "./ui-kit";
 import { wrapWords } from "./text-fit";
 
-const ART_FILE_SET: ReadonlySet<string> = new Set(ART_FILES);
 const MAX_CRATES = 8;
 const EMPTY_CRATE_ALPHA = 0.3;
 
-/** The location's backdrop. The stump is drawn with the seats, over their
- * silhouettes. A location whose art has not landed draws the Jungle's,
- * tinted with its placeholder colour. */
-export function drawBackdrop(scene: Phaser.Scene, location: string): Phaser.GameObjects.Sprite {
+/** How much a location's backdrop is shaded so the table and its text stay
+ * readable over it: a flat dim and an edge vignette, as alphas. A bright or
+ * busy backdrop gets more. */
+const BACKDROP_SHADE: Readonly<Partial<Record<ArtId, { dim: number; vignette: number }>>> = {
+  "bg-jungle-night": { dim: 0, vignette: 0 },
+  "bg-clearing": { dim: 0.25, vignette: 0.55 },
+  "bg-clifftop": { dim: 0.25, vignette: 0.55 },
+  "bg-desert": { dim: 0.45, vignette: 0.6 },
+  "bg-cave": { dim: 0, vignette: 0.4 },
+  "bg-magma": { dim: 0.2, vignette: 0.55 },
+  "bg-temple": { dim: 0.4, vignette: 0.6 },
+};
+const DEFAULT_SHADE = { dim: 0.3, vignette: 0.5 };
+const VIGNETTE_KEY = "backdrop-vignette";
+
+/** Transparent around the stump, the letterbox colour at the edges. */
+function ensureVignette(scene: Phaser.Scene): void {
+  if (scene.textures.exists(VIGNETTE_KEY)) return;
+  const texture = scene.textures.createCanvas(VIGNETTE_KEY, STAGE.w, STAGE.h);
+  if (!texture) return;
+  const ctx = texture.context;
+  const cx = STAGE.w / 2;
+  const cy = STAGE.h * 0.55;
+  const gradient = ctx.createRadialGradient(cx, cy, STAGE.h * 0.35, cx, cy, STAGE.w * 0.62);
+  gradient.addColorStop(0, "rgba(6, 13, 8, 0)");
+  gradient.addColorStop(1, "rgba(6, 13, 8, 1)");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, STAGE.w, STAGE.h);
+  texture.refresh();
+}
+
+/** The location's backdrop with its shade. The stump is drawn with the
+ * seats, over their silhouettes. */
+export function drawBackdrop(scene: Phaser.Scene, location: string): Phaser.GameObjects.GameObject[] {
   const id = backdropArtId(location);
-  const backdrop = resolveArt(id, ART_FILE_SET);
-  if (backdrop.kind === "file") return placeArt(scene, id, STAGE.w / 2, STAGE.h / 2);
-  return placeArt(scene, "bg-jungle-night", STAGE.w / 2, STAGE.h / 2).setTint(backdrop.def.fallback.color);
+  const shade = BACKDROP_SHADE[id] ?? DEFAULT_SHADE;
+  const objects: Phaser.GameObjects.GameObject[] = [placeArt(scene, id, STAGE.w / 2, STAGE.h / 2)];
+  if (shade.dim > 0) objects.push(scene.add.rectangle(0, 0, STAGE.w, STAGE.h, toPhaserColor(PALETTE.letterbox), shade.dim).setOrigin(0, 0));
+  if (shade.vignette > 0) {
+    ensureVignette(scene);
+    objects.push(scene.add.image(0, 0, VIGNETTE_KEY).setOrigin(0, 0).setAlpha(shade.vignette));
+  }
+  return objects;
 }
 
 /** Supplies as crates of their cap, the purse as a coin, and the camp on

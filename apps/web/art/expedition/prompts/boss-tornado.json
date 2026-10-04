@@ -1,0 +1,17 @@
+{
+  "id": "boss-tornado",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "swirling grey tornado funnel twister with leaves and twigs caught in it, wide at the top narrow at the bottom, isolated sprite on plain background",
+    "width": 96,
+    "height": 112,
+    "view": "side",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "seed": 11
+  },
+  "job": "4ae9d920-f4b4-48dd-b644-7b7b3a4c294b",
+  "scale": 1,
+  "note": "natively transparent; fetched with `fetch-art.mjs boss-<id> bosses/<id>.png https://api.pixellab.ai/mcp/images/<job>/download 1`"
+}

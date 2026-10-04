@@ -1,0 +1,17 @@
+{
+  "id": "boss-rats",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "pack of three scruffy grey jungle rats huddled together, one standing on hind legs sniffing, long pink tails, beady red eyes, warm night firelight, isolated sprite on plain background",
+    "width": 112,
+    "height": 80,
+    "view": "side",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "seed": 11
+  },
+  "job": "d66cb5c9-79dd-4fd3-978e-ebe189e5d9a9",
+  "scale": 1,
+  "note": "natively transparent; fetched with `fetch-art.mjs boss-<id> bosses/<id>.png https://api.pixellab.ai/mcp/images/<job>/download 1`"
+}

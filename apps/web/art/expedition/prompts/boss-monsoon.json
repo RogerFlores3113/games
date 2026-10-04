@@ -1,0 +1,17 @@
+{
+  "id": "boss-monsoon",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "monsoon: a dark heavy storm cloud pouring sheets of blue rain into a rising swirling river wave below, isolated sprite on plain background",
+    "width": 112,
+    "height": 112,
+    "view": "side",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "seed": 11
+  },
+  "job": "238c1702-3cc9-41f2-9f20-b39d7712f660",
+  "scale": 1,
+  "note": "natively transparent; fetched with `fetch-art.mjs boss-<id> bosses/<id>.png https://api.pixellab.ai/mcp/images/<job>/download 1`"
+}

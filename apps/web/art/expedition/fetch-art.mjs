@@ -46,9 +46,13 @@ if (!fs.existsSync(credits)) {
   );
 }
 const row = `| ${artId} | sprites/${file} | PixelLab generation, spec \`prompts/${artId}.json\` | PixelLab ToS | ${new Date().toLocaleDateString("en-CA")} |\n`;
-const existing = fs.readFileSync(credits, "utf8");
-const lines = existing.split("\n").filter((l) => !l.startsWith(`| ${artId} |`));
-fs.writeFileSync(credits, lines.join("\n").replace(/\n*$/, "\n") + row);
+const lines = fs.readFileSync(credits, "utf8").split("\n").filter((l) => !l.startsWith(`| ${artId} |`));
+// The art table comes first; later sections (audio) have tables of their own.
+const header = lines.findIndex((l) => l.startsWith("| Asset |"));
+let end = header;
+while (lines[end + 1]?.startsWith("|")) end++;
+lines.splice(end + 1, 0, row.trimEnd());
+fs.writeFileSync(credits, lines.join("\n"));
 console.log(`${artId}: ${meta.width}x${meta.height} x${scale} -> ${out}`);
 
 function keyOutBorderColour(rgba, w, h) {

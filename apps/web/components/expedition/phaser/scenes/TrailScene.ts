@@ -8,7 +8,7 @@ import Phaser from "phaser";
 import { ensurePixelFonts } from "../font/pixel-font";
 import { preloadArt, placeArt } from "../art/place-art";
 import { STAGE, TRAIL_ZONES, gearLayout, pointInRect, type Point } from "../layout";
-import { drawPrompt, drawTooltip, drawTopBar } from "../draw/draw-table";
+import { drawBackdrop, drawPrompt, drawTooltip, drawTopBar } from "../draw/draw-table";
 import { drawTrailScene, type FlipClock, type TrailHandlers } from "../draw/draw-trail";
 import { gearTile } from "../draw/draw-loadout";
 import { PALETTE, toPhaserColor } from "../palette";
@@ -61,6 +61,9 @@ export class TrailScene extends Phaser.Scene {
   private readonly flips: FlipClock = new Map();
   private unsubscribe: (() => void) | null = null;
   private layer: Phaser.GameObjects.Container | null = null;
+  private backdropLayer: Phaser.GameObjects.Container | null = null;
+  /** The location drawn behind the trail, null for the fireside; undefined until drawn. */
+  private backdrop: string | null | undefined = undefined;
   private dragLayer: Phaser.GameObjects.Container | null = null;
   private gesture: GearGesture | null = null;
   /** The object whose rules the tooltip shows. */
@@ -121,7 +124,8 @@ export class TrailScene extends Phaser.Scene {
 
   create(): void {
     ensurePixelFonts(this);
-    placeArt(this, "bg-fireside", STAGE.w / 2, STAGE.h / 2);
+    this.backdropLayer = this.add.container(0, 0);
+    this.backdrop = undefined;
     this.layer = this.add.container(0, 0);
     this.dragLayer = this.add.container(0, 0);
     this.input.on("pointermove", () => this.onPointerMove());
@@ -152,10 +156,21 @@ export class TrailScene extends Phaser.Scene {
     this.time.removeAllEvents();
     this.layer.removeAll(true);
     this.index.clearScene("trail");
+    this.renderBackdrop(model);
     drawTopBar(this, this.layer, model.topBar);
     drawPrompt(this, this.layer, model.prompt);
     drawTrailScene(this, this.layer, model, this.index, this.handlers, this.flips);
     if (model.panel.kind !== "muster") drawTooltip(this, this.layer, model.tooltip, TRAIL_ZONES.tooltip);
+  }
+
+  /** The loadout shows the camp it sets out for; the rest of the trail
+   * rests at the fireside. */
+  private renderBackdrop(model: TrailModel): void {
+    const backdrop = model.panel.kind === "loadout" ? model.panel.next.locationId : null;
+    if (this.backdropLayer === null || backdrop === this.backdrop) return;
+    this.backdropLayer.removeAll(true);
+    this.backdropLayer.add(backdrop === null ? placeArt(this, "bg-fireside", STAGE.w / 2, STAGE.h / 2) : drawBackdrop(this, backdrop));
+    this.backdrop = backdrop;
   }
 
   private pointerAt(): Point {

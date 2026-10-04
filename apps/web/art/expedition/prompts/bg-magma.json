@@ -1,0 +1,15 @@
+{
+  "id": "bg-magma",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "side view backdrop of a volcanic magma pool at night: black basalt rocks framing the left and right edges, glowing orange lava streams and a bubbling lava pool in the distance, red smoky sky, calm dark rock ground filling the centre and bottom with no objects, no people, no text",
+    "width": 320,
+    "height": 180,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "medium shading",
+    "no_background": false
+  },
+  "scale": 2,
+  "job": "9a18e06a-b38a-40ee-9275-ac77eabc561a"
+}

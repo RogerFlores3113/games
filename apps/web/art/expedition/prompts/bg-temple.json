@@ -1,0 +1,15 @@
+{
+  "id": "bg-temple",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "side view backdrop inside an ancient jungle temple chamber at night: carved stone pillars and vine-covered walls framing the left and right edges, glowing golden sun glyphs carved above, flickering torches, a stone floor of square pressure plate tiles filling the centre and bottom with no objects, no people, no text",
+    "width": 320,
+    "height": 180,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "medium shading",
+    "no_background": false
+  },
+  "scale": 2,
+  "job": "82638f20-7863-4ed8-b98a-6312500ccbaa"
+}

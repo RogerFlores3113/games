@@ -1,0 +1,15 @@
+{
+  "id": "bg-clifftop",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "side view backdrop of a windswept jungle clifftop at night: a sheer rocky cliff edge on the right dropping to a misty valley of treetops far below, a few bent trees on the left edge, wide open starry sky with clouds, calm grassy rock ground filling the centre and bottom with no objects, no people, no text",
+    "width": 320,
+    "height": 180,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "medium shading",
+    "no_background": false
+  },
+  "scale": 2,
+  "job": "38114b84-10e1-4843-9739-0af6a04b5b72"
+}
