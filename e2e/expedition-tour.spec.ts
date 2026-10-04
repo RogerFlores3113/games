@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { Page } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { auditLayout, type LayoutEntry, type Violation } from "../apps/web/lib/expedition/layout-audit";
 import {
@@ -17,7 +17,7 @@ import {
 } from "./expedition-driver";
 import { clickObject, getModel, getScene, hoverObject, startExpeditionGame } from "./expedition-helpers";
 import { PICKER_SCENARIOS, playing, rescue, rewriteViews, scenarioKey, type Game } from "./expedition-scenarios";
-import { autoplay, shortcut } from "./expedition-dev-panel";
+import { autoplay, shortcut, soloTable } from "./expedition-dev-panel";
 
 /**
  * UI tour. Plays 3-player runs and screenshots each phase from player 1's
@@ -61,6 +61,7 @@ const RARE = [
   "camp-tiger", "camp-rats", "camp-snake", "camp-crocodile", "camp-capybara", "camp-beaver", "route-boss",
   "camp-tornado", "camp-earthquake", "camp-wildfire", "camp-meteor", "camp-blood-moon", "camp-locusts", "camp-monsoon", "long-camp-6",
   "temple-short", "temple-standard", "temple-long", "temple-rescue",
+  "five-route", "five-camp", "five-temple",
 ];
 
 interface Identity { kind: "standard" | "joker"; suit?: string; rank?: number; joker?: "sun" | "moon" }
@@ -849,6 +850,42 @@ async function longCamp6(host: Page, tour: Tour, rewrite: Rewriter): Promise<voi
   await tour.shot("long-camp-6");
 }
 
+/** A five-seat table (you and four bots, through the dev panel): the route
+ * vote into a boss camp, that camp mid-trick, and a Long run's temple, where
+ * the back row's plates are narrowest. */
+async function fiveSeats(browser: Browser, tour: Tour, size: { width: number; height: number }): Promise<void> {
+  const context = await browser.newContext({ viewport: { width: size.width, height: size.height } });
+  try {
+    const page = await context.newPage();
+    const panel = await soloTable(page, 4);
+    const shot = async (name: string): Promise<void> => {
+      await page.getByTestId("dev-toggle").click();
+      await page.mouse.move(5, 5);
+      await tour.shot(name, page);
+      await page.getByTestId("dev-toggle").click();
+    };
+    const midTrick = async (): Promise<void> => {
+      const objectives = (await getModel<CampModel>(page)).faceUpObjectives.length;
+      await autoplay(panel, "everyone", objectives + 7);
+    };
+    await shortcut(panel, "jump-to-camp", { length: "long", camp: "2", stage: "camp" });
+    await shortcut(panel, "set-plan-boss", { camp: "3", boss: "crocodile" });
+    await shortcut(panel, "force-camp", { outcome: "cleared" });
+    await autoplay(panel, "everyone", 5);
+    await expect.poll(async () => (await getModel<TrailView>(page)).panel?.kind).toBe("route");
+    await shot("five-route");
+    await shortcut(panel, "jump-to-camp", { length: "long", camp: "3", stage: "camp" });
+    await midTrick();
+    if ((await getScene(page)) === "camp") await shot("five-camp");
+    await shortcut(panel, "set-supplies", { supplies: "4" });
+    await shortcut(panel, "jump-to-camp", { length: "long", camp: "8", stage: "camp" });
+    await midTrick();
+    if ((await getScene(page)) === "camp") await shot("five-temple");
+  } finally {
+    await context.close();
+  }
+}
+
 test.describe("@tour Expedition UI tour", () => {
   test.skip(process.env.EXPEDITION_TOUR !== "1", "set EXPEDITION_TOUR=1 (npm run tour:expedition)");
 
@@ -872,6 +909,7 @@ test.describe("@tour Expedition UI tour", () => {
           if (outcome === null || missing().length === 0 || Date.now() > deadline) break;
         }
         await captureRare(page, tour, rewrite);
+        await fiveSeats(browser, tour, size);
       } finally {
         const notes: string[] = [];
         if (!tour.has("between-camps-draft")) notes.push(`no camp was cleared in ${outcomes.length} run(s), so the draft after a cleared camp was not reached`);
