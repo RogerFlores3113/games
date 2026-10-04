@@ -1,0 +1,1161 @@
+# Expedition: routing, camps, bosses and items
+
+Design, 2026-10-04. Synthesized from candidate A (one camp-modifier catalogue over a journaled
+run) and candidate B (a staged run with reactive hazards). Replaces the six-camp run, the four
+boss twists, the kit and the upgrade draft. Characters are redesigned last, in their own units.
+
+---
+
+## Problem
+
+The owner redesigned the run on 2026-10-03/04. The crew votes a run length (4, 6 or 8 camps).
+Bosses are drawn once per run. Between cleared camps the crew earns coins, drafts item bundles,
+votes a route, meets an event and, before a boss camp, a shop. Every camp has a location and a
+weather. There are six animal bosses, seven disasters and a temple finale where earlier bosses
+return at half strength. Items have uses and slots. Nine new characters follow.
+
+Five things in today's engine make the shape non-obvious.
+
+- Camp identity is a number. `CampNumber = 1..6`, `BOSS_CAMPS`, `FINAL_CAMP`, `BALANCE_TABLE`
+  and `bossTwists: {3, 6}` assume one length. A replay must reuse location, weather and boss.
+- The run phase is decoded from nullable fields (`runPhase` in `run/lifecycle.ts`). The new loop
+  has seven waiting points, each with its own data (ballots, private offers, shop stock).
+- A boss is a `RuleModifier` only (`boss/boss-def.ts`). Half the new bosses act at a moment
+  (Tornado moves cards, Locusts eat items, the Snake bites a whisperer). Hands are stored, so a
+  hook cannot say "three cards blew right".
+- The trick record cannot say a card burned or counted as another card. `trickContaining`
+  matches printed identities, and `trickWinner` reads the led suit from `plays[0]`, which a burn
+  or `winnerExcluding` (Bait) can remove.
+- `SeatRun.kit` fuses ownership and use. Items now have slots, a backpack and per-instance uses.
+
+Kept: the pure rules package; toolkit ops as the only mutation surface, with card conservation;
+`RuleModifier` layering with card-reading hooks folded first (WR-03); seeded named RNG streams,
+seed never projected (A1); strict per-seat views with the independent leak check; one file plus
+one registry line per entry, with contract tests that need no edits. No compatibility layer:
+`ROOM_SCHEMA_VERSION` bumps and in-flight rooms reset.
+
+## Usage (caller's view)
+
+### README excerpt: the run loop
+
+> A run is a stored stage. `applyRunAction` is still the one transition: it checks the stage
+> accepts the action, runs the stage's handler, then advances stages to a fixed point.
+>
+> 1. **Muster.** Each seat sends `pick-character` and `vote { choice }` ("short", "standard",
+>    "long"). A ballot may change until the vote resolves. The last missing input resolves it
+>    (majority, else a seeded coin flip the view shows), draws the run plan and opens the loadout
+>    for camp 1 (Jungle, fair weather).
+> 2. **Loadout.** Each seat sends `equip { itemUids }`, before a boss camp `buy { stockId }`, then
+>    `ready`. The last `ready` deals the camp.
+> 3. **Camp.** As today. Camp modifiers react to the Core's events. The camp ends the moment every
+>    objective and every goal is done.
+> 4. **Settle.** A failure costs supplies and reopens the loadout for the same camp spec with a
+>    fresh deal; 0 supplies ends the run. A clear pays `5 + min(3, unplayed tricks)` into the
+>    purse and deals every seat a private draft offer, or wins the run at the final camp.
+> 5. **Draft.** Each seat sends `pick-bundle { bundle }`.
+> 6. **Route.** Each seat votes over 2 or 3 options. Each previews its event and the next camp's
+>    location, weather, objective types and, for a boss camp, the boss.
+> 7. **Event.** A stub. Each seat sends `ready`, then the next camp's loadout opens.
+>
+> A disconnected seat's ballot is cast as an abstention by the worker's auto-pass after the
+> existing grace (`ABSENT_SEAT_PASS_GRACE_MS`).
+
+```ts
+run = act(run, "p0", { type: "vote", choice: "standard" });   // last ballot: plan, loadout of camp 1
+run = act(run, "p1", { type: "equip", itemUids: ["it3"] });  // replaces the equipped set
+run = act(run, "p2", { type: "pick-bundle", bundle: 1 });     // draft
+run = act(run, "p0", { type: "vote", choice: "b" });          // route
+```
+
+### README excerpt: add a camp modifier
+
+> Locations, weathers, pairings, bosses and the temple are all `ModDef`s: one file in
+> `content/mods/<id>.ts`, one line in `content/mods/registry.ts`. A def has a `kind`, a draw
+> `weight`, one sentence of `text` and a `full` body. A boss also has a `half` body, used when it
+> returns as a temple helper. A body has any of: `rules(ctx)`, a `RuleModifier` for any question
+> the engine asks; `on`, reactions to engine events returning toolkit ops, only when something
+> must happen at a moment; `effect(e, ctx)`, the layer an `add-modifier` from `on` switches on;
+> `slots(prev)`, the camp's objective slots at plan time; `status(ctx)`, public entity state for
+> the table; `grants`, an ability every seat may use. `ctx.roll(label, n)` and `ctx.draw(n)` are
+> seeded and the engine names the stream. `mods.contract.test.ts` drives every registered body
+> through a camp at 3, 4 and 5 players with no edits.
+
+```ts
+// content/mods/thunderstorm.ts: a weather that rolls at a moment
+export const thunderstorm = defineMod({
+  id: "thunderstorm", kind: "weather", name: "Thunderstorm", weight: 1,
+  text: "Lightning may strike before a trick, and then the lowest card wins it.",
+  full: {
+    on: {
+      "trick-started": (ctx) => {
+        const t = ctx.event.trickIndex;
+        const strikes = strikesOf(ctx.run, "thunderstorm");
+        if (strikes.length >= 2 || strikes.some((s) => s.atTrick === t)) return [];
+        if (ctx.draw(100) >= Math.min(100, 20 + 10 * t)) return [];
+        return [{ op: "add-modifier", lasts: "trick", audience: "public", params: { strike: true }, deferIfFatal: true }];
+      },
+    },
+    effect: () => ({ trickWinner: () => (plays) => lowestSeat(plays) }),
+    status: (ctx) => stormStatus(ctx), // next chance, strikes left, "strike" while one is pending
+  },
+});
+
+// content/mods/crocodile.ts: an animal boss, a derived rule with a half body
+const crocodileBody = (every: number): ModBody => ({
+  rules: (ctx) => ({
+    goals: (prev) => (camp) => [
+      ...prev(camp),
+      guard("crocodile", camp.completedTricks.some((t) => t.winnerSeatId === facing(ctx, t.index, every))),
+    ],
+  }),
+  status: (ctx) => {
+    const seatId = ctx.camp === null ? null : facing(ctx, ctx.camp.currentTrick.index, every);
+    return seatId === null ? [] : [{ kind: "facing", seatId }];
+  },
+});
+const facing = (ctx: ModCtx, trick: number, every: number): string | null =>
+  trick % every !== 0 ? null : ctx.run.seatIds[(ctx.roll("start", ctx.run.seatIds.length) + trick) % ctx.run.seatIds.length]!;
+
+export const crocodile = defineBoss({
+  id: "crocodile", kind: "animal", name: "Crocodile", weight: 1,
+  text: "The crocodile watches one player each trick, and if they win it the camp is lost.",
+  full: crocodileBody(1),
+  half: crocodileBody(2), // as a temple helper it watches every other trick
+});
+```
+
+A location that changes the deal is one `rules` line (`magma`: `deckFor: () => heatDeck`). A
+disaster that moves cards is an `on` handler: Tornado's draws each hand's cards first
+(`ctx.randomCards`), reveals each sent card to its sender, then moves them right.
+
+### README excerpt: add an item
+
+```ts
+// content/items/bait.ts
+export const bait = defineItem({
+  id: "bait", name: "Bait", rarity: "common", price: 2, // placeholder price
+  uses: { kind: "single-use" },                        // or per-camp, or { kind: "charges", n }
+  text: "A card on the table can't win this trick.",
+  active: itemAbility({
+    window: "in-trick",
+    targets: [{ kind: "card", where: "board" }],
+    apply: (ctx) => [{ op: "add-modifier", lasts: "trick", audience: "public", params: { cardId: ctx.targets[0].cardId } }],
+    effect: (e) => ({ trickWinner: (prev) => (plays, led) => winnerExcluding(prev, plays, led, (p) => p.card.id === e.params.cardId) }),
+  }),
+});
+```
+
+An item's `uses` is its limit, so an item ability has no `limit`. The engine counts uses per
+instance and removes a spent instance from its owner.
+
+### Call sites
+
+```ts
+// run/stages/camp.ts: the only new steps inside an accepted camp action
+const result = applyCampAction(camp, seatId, action, rules);            // now also returns events
+const settled = deferFatalEffects(run, seatId, action, result, catalog); // Thunderstorm, below
+return ok(react(settled.run, settled.events, catalog));                // applyRunAction then advances
+// adapter/view.ts and view-leak-check.ts read the same stack and the same hook
+const mods = campStack(run, catalog).map((layer) => toModView(layer, modCtx(run, layer)));
+const hidden = rules.hides(run, viewerSeatId, { kind: "play", trickIndex, position, seatId });
+```
+
+---
+
+## Shape
+
+The public surface stays `createRun`, `applyRunAction`, `toExpeditionPlayerView`, the define
+helpers and four registries (`ITEMS`, `CHARACTERS`, `MODS`, `EVENTS`). Stage transitions, the
+stack, composition order, reactions, the fatal deferral, RNG naming and leak derivation hide
+behind them. A content author learns one body type and one channel rule.
+
+### Module map
+
+```
+expedition/
+  state.ts actions.ts camp.ts trick.ts rules.ts objectives.ts deck.ts   Core: CampEvents, ResolvedPlay,
+                       discards, goals, identityOf, burns, objectiveDeckFor, objectiveStatus, trickWinner(plays, led)
+  content/
+    source-def.ts      ItemDef (uses, rarity, price), ItemAbility, UsageLimit (+ crew-tokens)
+    items/, characters/                 as today (13 items remapped; six characters until unit 13)
+    mods/mod-def.ts    ModDef, ModBody, ModCtx, ReactionCtx, StatusPart, defineMod, defineBoss
+    mods/<id>.ts + registry.ts          MODS; mods/pairings.ts PAIRINGS; mods/mods.contract.test.ts
+    events/<id>.ts + registry.ts        EVENTS (one stub)
+  run/
+    types.ts           RunState, Stage, RunAt, SeatRun, ItemInstance, AttemptState, Origin, ActiveEffect
+    stages/registry.ts STAGES, applyRunAction, advance to a fixed point (replaces run-actions.ts)
+    stages/<tag>.ts    muster, loadout, camp, draft, route, event
+    lifecycle.ts       createRun, runStatus, dealCamp, settleCamp, nextAttemptNumber
+    balance.ts plan.ts vote.ts route.ts draft.ts shop.ts   tuning, plan, votes, routes, offers, stock
+    stack.ts react.ts  NEW   campStack (the one composition list); react (one pass, no cascade)
+    compose.ts run-rules.ts toolkit.ts usage.ts windows.ts abilities.ts targets.ts whisper.ts rng.ts
+  dev/                 shortcuts, check, inspect, autoplay, hooks (updated by every unit)
+  adapter/             view.ts, view-types.ts, view-leak-check.ts, request-guards.ts, adapter.ts
+  boss/                DELETED
+```
+
+A camp play is three files deep: `stages/registry.ts`, `stages/camp.ts`, then `react.ts` or
+`toolkit.ts`.
+
+### Run state and stages
+
+```ts
+// run/types.ts
+export type RunLength = "short" | "standard" | "long";
+export type CampIndex = number & { readonly __brand: "CampIndex" }; // 1-based; minted only by plan.ts
+export type SeatId = string;
+export type PerSeat<T> = Readonly<Partial<Record<SeatId, T>>>;      // each seat writes only its key
+
+export type RunState = {
+  readonly seed: string;                      // never projected
+  readonly seatIds: readonly SeatId[];
+  readonly seats: readonly SeatRun[];         // seatIds order
+  readonly purse: number;                     // shared coins, >= 0
+  readonly supplies: number;                  // 0..SUPPLIES_MAX
+  readonly plan: RunPlan | null;              // null only in muster
+  readonly history: readonly CampResult[];    // one per decided attempt
+  readonly lastVote: VoteRecord | null;       // the latest resolved vote, for the flip animation
+  readonly itemSerial: number;                // next item instance number
+  readonly stage: Stage;
+};
+export type Stage =
+  | { readonly tag: "muster"; readonly ballots: PerSeat<RunLength | null> }  // null abstains
+  | { readonly tag: "loadout"; readonly camp: CampSpec; readonly stock: readonly StockEntry[] | null; readonly ready: PerSeat<true> }
+  | { readonly tag: "camp"; readonly camp: CampSpec; readonly attempt: AttemptState }
+  | { readonly tag: "draft"; readonly cleared: CampIndex; readonly payout: number }
+  | { readonly tag: "route"; readonly from: CampIndex; readonly options: readonly RouteOption[]; readonly ballots: PerSeat<RouteChoice | null> }
+  | { readonly tag: "event"; readonly route: RouteOption; readonly ready: PerSeat<true> }
+  | { readonly tag: "ended"; readonly result: "won" | "lost" };
+export type StageTag = Stage["tag"];
+/** The run narrowed to one stage. Stage handlers take this and never re-check the tag. */
+export type RunAt<T extends StageTag> = RunState & { readonly stage: Extract<Stage, { tag: T }> };
+
+export type CampResult = { readonly camp: CampIndex; readonly attempt: number; readonly status: "cleared" | "failed"; readonly suppliesSpent: number; readonly coins: number };
+export type AttemptState = {
+  readonly attemptNumber: number;
+  readonly camp: CampState;                   // always dealt: the pre-deal window is deleted
+  readonly effects: readonly ActiveEffect[];
+  readonly reveals: readonly Reveal[];
+  readonly log: readonly LogEntry[];
+};
+```
+
+The stage tag is the phase; `runPhase` is deleted and `runStatus` reads `ended`. Draft offers
+live on `SeatRun.offers`, not on the stage, so a later Treasure Map can queue special drafts.
+
+```ts
+// run/stages/registry.ts
+export type StageDef<T extends StageTag> = {
+  readonly accepts: readonly RunAction["type"][];  // any other type is refused wrong_stage
+  apply(run: RunAt<T>, seatId: SeatId, action: RunAction, catalog: Catalog): AdapterResult<RunState, RunError>;
+  /** Idempotent: returns run unchanged until the stage is done. */
+  advance(run: RunAt<T>, catalog: Catalog): RunState;
+};
+export const STAGES: { readonly [T in StageTag]: StageDef<T> } = { /* six files; ended accepts [] */ } as never;
+/** invalid_action, not_a_seat, run_over, wrong_stage, STAGES[tag].apply, then advance until the
+ * tag stops changing (bounded by the stage count). */
+export function applyRunAction(run: RunState, seatId: SeatId, action: RunAction, catalog: Catalog): AdapterResult<RunState, RunError> {
+  throw new Error("not implemented");
+}
+```
+
+| Stage | Accepts | Advances when | To |
+|---|---|---|---|
+| muster | pick-character, vote | every seat has a character and a ballot | loadout(camp 1) |
+| loadout | equip, buy, ready | every seat ready | camp, dealt, `camp-dealt` reacted |
+| camp | use-ability, skip-window, whisper, pick-objective, play-card | decided, no rescue pending | draft, loadout (replay) or ended |
+| draft | pick-bundle | no seat has an offer | route |
+| route | vote | every seat has a ballot | event |
+| event | ready | every seat ready | loadout(next) |
+
+**Why stored stages.** Each stage carries data that exists only there (ballots, options, stock,
+the chosen route). A stored union makes stale data unrepresentable, and the web switches on one
+tag per screen. Purse, supplies and history are stored plainly: four writers (settle, buy,
+`adjust-supplies`, `adjust-coins`), and every reader (HUD, dev panel, shop) wants the number, so
+a fold buys nothing. `itemSerial` mints opaque ids (`it7`), so an id never names its item and a
+fogged loadout cannot leak through one.
+
+### The plan, routes and votes
+
+```ts
+// run/balance.ts (the one tuning file; placeholders unless the brief fixed the number)
+export const RUN_LENGTHS = {
+  short:    { camps: 4, bossCamps: [{ at: 4, tier: "temple" }] },
+  standard: { camps: 6, bossCamps: [{ at: 3, tier: "animal" }, { at: 6, tier: "temple" }] },
+  long:     { camps: 8, bossCamps: [{ at: 3, tier: "animal" }, { at: 6, tier: "disaster" }, { at: 8, tier: "temple" }] },
+} as const;
+/** Seat objectives per camp, before boss and temple slot layers. The temple adds the Sun. */
+export const OBJECTIVE_RAMP: Record<RunLength, readonly number[]> = {
+  short: [2, 3, 4, 3], standard: [2, 3, 3, 4, 4, 4], long: [2, 3, 3, 4, 4, 4, 5, 4],
+};
+export const MIX_FROM_CAMP = 4;            // ordered pairs and trick-count slots from camp 4
+export const SUPPLIES_START = 3, SUPPLIES_MAX = 4, SUPPLY_PRICE = 6;
+export const PAYOUT = { base: 5, perUnplayedTrick: 1, unplayedCap: 3 };
+export const NORMAL_WEATHER_CHANCE = 80;   // percent; a location may override (Clifftop 50)
+export const ROUTE_OPTIONS = { min: 2, max: 3 };
+export const DRAFT = { options: 3, bundleSize: 2, rareChance: 15 };
+export const SHOP = { items: 3, upgradePrice: 8 };
+export const TRICK_COUNT_N_RANGE = { min: 2, max: 4 };
+```
+
+```ts
+// run/plan.ts
+export type BossTier = "animal" | "disaster" | "temple";
+export type PlannedBoss = { readonly at: CampIndex; readonly tier: BossTier; readonly modId: ModId | null };
+export type RunPlan = { readonly length: RunLength; readonly bosses: readonly PlannedBoss[] };
+/** Once, at the length vote. Animal and disaster from their pools (ids sorted, seeded index); the
+ * temple tier is "temple". null when the pool is empty: the camp plays plain. */
+export function drawPlan(seed: string, length: RunLength, catalog: Catalog): RunPlan;
+export function bossAt(plan: RunPlan, at: CampIndex): PlannedBoss | null;
+export function isFinalCamp(plan: RunPlan, at: CampIndex): boolean;
+/** At the temple: every earlier planned boss, in order. Short none, Standard one, Long two. */
+export function helpersFor(plan: RunPlan, at: CampIndex): readonly PlannedBoss[];
+/** The furthest camp previewed: muster 0, loadout and camp spec.index, draft cleared, route
+ * from + 1, event route.next.index, ended Infinity. A boss id is public iff at <= horizon. */
+export function horizon(run: RunState): number;
+
+// run/route.ts
+export type CampSpec = {
+  readonly index: CampIndex;
+  readonly location: ModId;
+  readonly weather: ModId;
+  readonly event: EventId | null;           // the event on the route that led here; null at camp 1
+  readonly slots: readonly SlotTemplate[];  // seat objective types; boss and temple layers add theirs
+};
+export type RouteChoice = "a" | "b" | "c";
+export type RouteOption = { readonly id: RouteChoice; readonly next: CampSpec }; // shop and boss derive from the plan
+export function firstCampSpec(length: RunLength): CampSpec; // Jungle, fair, all win-card
+/** 2 or 3 options (seeded count). Each: location by weight; fair at the location's normal chance,
+ * else a weighted non-fair weather that PAIRINGS allows there (none: fair); a uniform event; a mix. */
+export function routeOptions(run: RunAt<"draft">, catalog: Catalog): readonly RouteOption[];
+/** The preview's objective types: the spec's slots after every stack layer's `slots`. */
+export function slotKindsFor(run: RunState, spec: CampSpec, catalog: Catalog): readonly SlotTemplate["kind"][];
+
+// run/vote.ts
+export type VoteResult<C extends string> = {
+  readonly tally: readonly { readonly choice: C; readonly votes: number }[];
+  readonly tied: readonly C[] | null;       // non-null: settled by the seeded flip the view shows
+  readonly winner: C;
+};
+export type VoteRecord = { readonly topic: "length" | "route"; readonly result: VoteResult<string> };
+/** null until every seat has a ballot. Abstentions count for nothing; all abstaining ties every
+ * choice. A tie draws seededIndex over the tied choices on `stream`. */
+export function tally<C extends string>(seed: string, stream: string, choices: readonly C[], seatIds: readonly SeatId[], ballots: PerSeat<C | null>): VoteResult<C> | null;
+```
+
+**Slot mixes.** Camp `k` gets `OBJECTIVE_RAMP[length][k-1]` seat slots, all win-card below
+`MIX_FROM_CAMP`. From camp 4 on each route option draws a mix: plain, an ordered pair (two slots
+become ordered 1 and 2), a trick-count slot (resolved per attempt, as today), or both when the camp
+has 4 or more slots. A replay keeps the spec, so it keeps its mix.
+
+### Seats, items, upgrades, draft and shop
+
+```ts
+// run/types.ts
+export type ItemUid = string;                         // "it7", minted from run.itemSerial
+export type ItemInstance = { readonly uid: ItemUid; readonly itemId: ItemId };
+export type SourceKey = CharacterId | UpgradeId | ItemUid | ModId; // ModId: a granted ability
+export type SeatRun = {
+  readonly seatId: SeatId;
+  readonly characterId: CharacterId | null;          // null only in muster
+  readonly upgradeId: UpgradeId | null;              // one per player, bought at the shop
+  readonly items: readonly ItemInstance[];           // owned; a spent instance leaves
+  readonly equipped: readonly ItemUid[];             // subset of items, <= rules.itemSlots(run, seatId)
+  readonly offers: readonly DraftOffer[];            // PRIVATE to seatId; the head is the one to pick
+  readonly ledger: readonly LedgerEntry[];           // never projected raw
+};
+export type Stamp = { readonly camp: CampIndex; readonly attempt: number; readonly trick: number | null };
+// LedgerEntry as today, keyed by sourceKey instead of sourceId; "regained" goes in unit 13.
+export function backpackOf(seat: SeatRun): readonly ItemInstance[];   // usage.ts: items not equipped
+/** usage.ts: [character, upgrade?, ...equipped uids, ...granted mod ids]. */
+export function liveSourceKeys(run: RunState, seat: SeatRun, catalog: Catalog): readonly SourceKey[];
+
+// content/source-def.ts
+export type Rarity = "common" | "rare";
+export type ItemUses = { readonly kind: "single-use" } | { readonly kind: "per-camp" } | { readonly kind: "charges"; readonly n: number };
+export type ItemAbility = Omit<ActiveAbility, "limit">;
+export type ItemDef = SourceBase & { readonly kind: "item"; readonly rarity: Rarity; readonly price: number; readonly exclusiveTo?: CharacterId }
+  & ({ readonly uses: ItemUses; readonly active: ItemAbility } | { readonly uses?: never; readonly active?: never; readonly passive: PassiveAbility });
+export type UsageLimit =
+  | { readonly kind: "per-camp"; readonly times: number }
+  | { readonly kind: "per-run"; readonly times: number }
+  | { readonly kind: "pool"; readonly cost: number }         // deleted in unit 13
+  | { readonly kind: "supplies"; readonly cost: number }
+  | { readonly kind: "crew-tokens"; earned(run: RunState): number }; // earned this attempt minus every seat's uses
+```
+
+Item remaining folds `used` entries keyed by the uid: per-camp counts the current
+`(camp, attempt)` stamp, charges count all time, single-use is one charge. `useAbility` removes the
+instance from `items` and `equipped` on the use that spends its last charge.
+
+**Equip.** `equip { itemUids }` replaces the equipped set: owned and distinct (`not_owned_item`),
+within `rules.itemSlots` for the loadout's camp (`too_many_items`). `ready` re-checks the count,
+since a Rats camp lowers slots under a set carried from the last camp. Equip only in the loadout.
+
+**Upgrades.** Every upgrade gives its owner one more whisper per camp: the base
+`whispersPerCamp` is `1 + (upgradeId === null ? 0 : 1)`. `ownerOf(seat).hasUpgrade(id)` reads
+`upgradeId === id`. Until unit 13 the six characters keep two upgrades each; a seat buys one.
+
+```ts
+// run/draft.ts
+export type DraftOffer = { readonly kind: "standard"; readonly bundles: readonly (readonly ItemId[])[] };
+/** Seeded per (camp, seat, ordinal). Each bundle: rarity first (rareChance), then an item of that
+ * rarity; distinct within a bundle; exclusiveTo filters by character. Never an upgrade. */
+export function draftOfferFor(seed: string, cleared: CampIndex, seat: SeatRun, ordinal: number, catalog: Catalog): DraftOffer;
+
+// run/shop.ts
+export type StockEntry = {
+  readonly stockId: string;                                    // "supplies" | "item0".."item2"
+  readonly what: { readonly kind: "supplies" } | { readonly kind: "item"; readonly itemId: ItemId };
+  readonly price: number;
+  readonly soldTo: SeatId | null;                              // items only, one copy each
+};
+/** Opened on every visit to the loadout before a boss camp; a replay is a visit with the same
+ * stock. Upgrades are not stock: each seat sees its own character's upgrades at
+ * SHOP.upgradePrice while its upgradeId is null. No blacksmith. */
+export function stockFor(seed: string, at: CampIndex, catalog: Catalog): readonly StockEntry[];
+```
+
+`pick-bundle` mints one instance per item and drops the offer. A draft follows every cleared camp
+but the final one. `buy` spends the shared purse (`cannot_afford`): supplies refuse at max
+(`supplies_full`); an item mints into the buyer's backpack (`sold_out` after); `upgrade:<id>`
+sets `upgradeId` (`upgrade_owned`, `not_your_upgrade`). The Durable Object serializes actions, so
+two buyers never both spend the last coins.
+
+### Camp modifiers: def, stack and composition
+
+```ts
+// content/mods/mod-def.ts
+export type ModId = string;               // also the web art id
+export type ModKind = "location" | "weather" | "pairing" | "animal" | "disaster" | "temple";
+export type Strength = "full" | "half";
+export type ModCtx = {
+  readonly run: RunState; readonly spec: CampSpec; readonly strength: Strength;
+  readonly camp: CampState | null;          // null in the loadout, before the deal
+  /** Seeded 0..n-1 on expedition-mod:{id}:{strength}:camp{k}:attempt{a}:rule:{label}. The same
+   * label gives the same value within an attempt. */
+  roll(label: string, n: number): number;
+};
+export type ReactionCtx<E extends EngineEventType> = ModCtx & {
+  readonly camp: CampState; readonly event: Extract<EngineEvent, { type: E }>; readonly rules: RunRules;
+  draw(n: number): number;                  // seeded, numbered per call: ...:on:{eventKey}:draw{j}
+  randomCards(seatId: string, n: number): readonly string[];
+};
+export type Reactions = { readonly [E in EngineEventType]?: (ctx: ReactionCtx<E>) => readonly ToolkitOp[] };
+
+/** Public table state. Carries no card id or identity by type. */
+export type StatusPart =
+  | { readonly kind: "facing"; readonly seatId: string }                              // Crocodile
+  | { readonly kind: "dam"; readonly suit: Suit }                                      // Beaver
+  | { readonly kind: "streak"; readonly seatId: string; readonly count: number }      // Tiger
+  | { readonly kind: "bitten"; readonly seatId: string; readonly tricksLeft: number } // Snake
+  | { readonly kind: "meter"; readonly left: number; readonly of: number }            // Monsoon, Flooding
+  | { readonly kind: "chance"; readonly percent: number; readonly strikesLeft: number } // Thunderstorm
+  | { readonly kind: "strike" }                                                        // a strike sits on this trick
+  | { readonly kind: "countdown"; readonly tricks: number }                           // Tornado, Earthquake
+  | { readonly kind: "alternating"; readonly activeNow: boolean }                     // Blood Moon, half bodies
+  | { readonly kind: "path"; readonly plates: readonly (Suit | "sun")[]; readonly pressed: number }; // Temple
+
+export type ModBody = {
+  readonly rules?: (ctx: ModCtx) => RuleModifier;
+  readonly on?: Reactions;
+  readonly effect?: (effect: ActiveEffect, ctx: ModCtx) => RuleModifier; // required iff `on` can add-modifier
+  readonly slots?: (prev: readonly SlotTemplate[]) => readonly SlotTemplate[];
+  readonly status?: (ctx: ModCtx) => readonly StatusPart[];
+  readonly grants?: ActiveAbility;
+};
+type DefBase<K extends ModKind> = { readonly id: ModId; readonly kind: K; readonly name: string; readonly text: string; readonly weight: number; readonly full: ModBody };
+export type LocationDef = DefBase<"location"> & { readonly normalWeatherChance?: number };
+export type BossDef = DefBase<"animal" | "disaster"> & { readonly half: ModBody };
+export type ModDef = LocationDef | DefBase<"weather"> | DefBase<"pairing"> | BossDef | DefBase<"temple">; // weight 0: never drawn
+
+// run/stack.ts
+export type StackLayer = { readonly def: ModDef; readonly strength: Strength; readonly body: ModBody };
+/** Fold order: location (unless a pairing cancels it), weather (unless cancelled), the pairing's
+ * added def, the planned boss (full) or the temple, then helpers (half) in the order faced. Reads
+ * the loadout or camp stage's spec; [] in every other stage. */
+export function campStack(run: RunState, catalog: Catalog): readonly StackLayer[];
+```
+
+Half strength is a hand-written body per boss, not arithmetic: a generic halving means nothing for
+Rats or Capybara, and the owner can read and tune a body.
+
+**Composition order** (`run/compose.ts`): base, then each stack layer's `rules(ctx)`, then each
+seat's live passives (seat order, then `[character, upgrade, ...equipped]`), then each live
+effect in stored order (a seat effect's `active.effect`, a mod effect's `body.effect`). The
+card-reading hooks `identityOf`, `isTrump` and `rankOf` fold first, in that order. Bosses fold
+after weather so a boss can refine a weather. Passives fold after both so an item can lift a camp
+rule for its owner (Mosquito Net under Rain). Effects win last. Compose, the view, the route
+preview and the leak check all read `campStack`.
+
+```ts
+// content/mods/pairings.ts
+export type PairingRule = { readonly location: ModId; readonly weathers: readonly ModId[]; readonly result: "never" | { readonly cancels: readonly ModId[]; readonly adds: ModId | null } };
+export const PAIRINGS: readonly PairingRule[] = [
+  { location: "magma", weathers: ["rain", "thunderstorm"], result: { cancels: ["magma"], adds: "steam" } },
+  { location: "cave", weathers: ["rain"], result: { cancels: [], adds: "flooding" } },
+  { location: "cave", weathers: ["night"], result: "never" },
+  { location: "desert", weathers: ["rain"], result: "never" },
+];
+```
+
+`steam` is a pairing def with an empty body. `flooding` carries the river guard and meter. The
+route generator filters "never" weathers before the draw, so there is no rejection loop.
+
+### Hooks
+
+Core (`CoreRules`):
+
+| Hook | Signature | Base | Users |
+|---|---|---|---|
+| `deckFor` | unchanged | | Magma |
+| `objectiveDeckFor` NEW | `(deck) => StandardIdentity[]` | standard cards ranked above the deck's lowest rank | every camp (the floor); Meteor drops aces |
+| `identityOf` NEW, folded first | `(card) => CardIdentity` | printed | Blood Moon; Explorer later |
+| `isTrump`, `rankOf` | unchanged; the base reads `identityOf(card)` | | items |
+| `trickWinner` CHANGED | `(plays, led: CardIdentity) => seatId` | see trick resolution | Thunderstorm, Bait, Puffball, Howler Call |
+| `legalPlays`, `nextLeader`, `leaderFor` | unchanged | | Tiger, Beaver (`legalPlays`) |
+| `burns` NEW | `(plays, led, winnerOf) => cardId[]` | `[]` | Wildfire, Meteor |
+| `objectiveStatus` NEW | `(camp, objective) => ObjectiveStatus` | `evaluateObjective` | Snake |
+| `goals` REPLACES `failureChecks` | `(camp) => Goal[]` | `[]` | Crocodile, Monsoon, Flooding, Temple, Camouflage |
+
+Run (`RunHooks`):
+
+| Hook | Signature | Base | Users |
+|---|---|---|---|
+| `hides` NEW | `(run, viewerSeatId, subject: Concealable) => boolean` | false | Desert, Cave, Night, Heavy fog |
+| `itemSlots` NEW | `(run, seatId) => number` | 2 | Rats; Pack Rat later |
+| `whispersPerCamp` | unchanged signature | 1 + owned upgrade | Heavy Pack, Rain Poncho, Smoke Signal |
+| `whisperAllowed`, `whisperAudience`, `failureCost` | unchanged | | Rain, Mosquito Net |
+| `objectiveAssignment` | DELETED | | |
+
+```ts
+export type Concealable =
+  | { readonly kind: "play"; readonly trickIndex: number; readonly position: number; readonly seatId: string } // current trick
+  | { readonly kind: "objective"; readonly objectiveId: string }  // its kind and target, not its existence
+  | { readonly kind: "loadout"; readonly seatId: string };        // unused equipped items and the backpack
+export type Goal = { readonly id: string; readonly status: "pending" | "done" | "failed" };
+/** A guard is done until broken. A task is pending until achieved and failed once unreachable. */
+export function guard(id: string, broken: boolean): Goal;
+```
+
+`objectiveStatuses(state, rules)` and every caller of `evaluateObjective` outside `objectives.ts`
+(toolkit `swap-objectives` and `replace-objective`, `content/helpers.ts`, windows, the view, the
+leak check) read `rules.objectiveStatus`.
+
+### Events and reactions
+
+```ts
+// state.ts: values the Core already computes, never stored
+export type CampEvent =
+  | { readonly type: "objective-picked"; readonly seatId: string; readonly objectiveId: string }
+  | { readonly type: "card-played"; readonly trickIndex: number; readonly position: number; readonly seatId: string; readonly cardId: string }
+  | { readonly type: "trick-completed"; readonly trickIndex: number; readonly winnerSeatId: string; readonly burnedCardIds: readonly string[] }
+  | { readonly type: "trick-started"; readonly trickIndex: number; readonly leaderSeatId: string }; // after the last pick and each non-final trick
+// actions.ts
+export type CampActionResult = { readonly ok: true; readonly state: CampState; readonly events: readonly CampEvent[] } | { readonly ok: false; readonly error: CampError };
+
+// run/react.ts
+export type EngineEvent =
+  | CampEvent
+  | { readonly type: "camp-dealt" }                     // lifecycle.dealCamp
+  | { readonly type: "whisper-sent"; readonly ordinal: number; readonly fromSeatId: string; readonly toSeatId: string }; // whisper.ts
+export type EngineEventType = EngineEvent["type"];
+/** One pass: events in order; for each, every stack layer with a handler, in stack order, each
+ * seeing the previous layer's ops. Ops never emit events, so a reaction never triggers one. Each
+ * reactor's ops fold through applyToolkitOps (conservation per reactor). trick-completed and
+ * trick-started reactions are skipped once the camp is decided or no trick remains. */
+export function react(run: RunAt<"camp">, events: readonly EngineEvent[], catalog: Catalog): RunAt<"camp">;
+```
+
+Reactors are stack layers only; unit 12 may add `on` to `SourceBase` if a character needs it.
+Reactions run before advance, so the camp settles on the post-reaction state.
+
+### Which channel each mechanic uses
+
+A question the engine asks is a `rules` hook, derived from the trick log and seeded rolls. A change
+to stored state at a moment is an `on` reaction. The shape of the deal or the slots is a deal hook
+or `slots`. Half bodies are placeholders for owner review.
+
+| Mod | Kind | Channel | Full | Half |
+|---|---|---|---|---|
+| clearing, jungle | location | none | empty body | |
+| clifftop | location | plan | `normalWeatherChance: 50` | |
+| desert (Mirage) | location | rule | `hides` one objective (`roll("mirage")`) from everyone until the first trick completes | |
+| cave (Darkness) | location | rule | `hides` every current-trick play from all but its player | |
+| magma (Heat) | location | deal | `deckFor`: no 2s or 3s, then 4s (clubs, diamonds, hearts, spades) until the deck divides by the seat count (45, 44, 45 cards); the floor makes targets 5+ | |
+| fair | weather | none | drawn at the location's normal chance | |
+| rain | weather | rule | `whisperAllowed` false | |
+| fog (Heavy fog) | weather | rule | `hides` every other seat's loadout | |
+| thunderstorm | weather | reaction + effect | `trick-started` rolls a strike; the strike's `trickWinner` is the lowest card | |
+| night | weather | rule | `hides` position 0 of the current trick | |
+| steam | pairing | data | magma with rain or thunderstorm cancels Magma | |
+| flooding | pairing | rule | cave with rain: `goals` guard, every objective done by trick `river(total)`; `meter` | |
+| tiger | animal | rule | `legalPlays`: a leader who won the last two tricks has one legal lead, `roll("t{i}")` over the hand; `streak` | pounces only on even trick indices |
+| rats | animal | rule | `itemSlots` - 1 | - 1 only for `seatIds[0]` and `seatIds[1]` |
+| snake | animal | reaction + effect | `whisper-sent` adds an attempt effect `{seatId, from: t, through: t + 1}`; `objectiveStatus` fails a card objective that seat won in that span; `bitten` | the bite lasts one trick |
+| crocodile | animal | rule | `goals` guard; `facing` shifts one seat per trick from `roll("start")` | faces every other trick |
+| capybara | animal | slots | + 2 win-card slots | + 1 |
+| beaver | animal | rule | `legalPlays`: suit `SUITS[(roll("start") + t) % 4]` is out unless no other standard card is legal; jokers are never forced; `dam` | dams every other trick |
+| tornado | disaster | reaction | every 3rd `trick-completed`: 3 random cards per hand pass right, revealed to the sender | every 6th |
+| earthquake | disaster | reaction | at `trick-completed` when completed = `floor(total / 2)`: open owned objectives shuffled and dealt back keeping each seat's count (`reassign-objective` where the owner changes) | `swap-objectives` between two random seats |
+| wildfire | disaster | rule | `burns` the lowest standard card (printed rank; a tie burns the earliest) | odd tricks only |
+| meteor | disaster | rule | `burns` the card `winnerOf(plays)` names, Sun and Moon included; `objectiveDeckFor` drops aces | odd tricks only; aces still dropped |
+| blood-moon | disaster | rule | `identityOf` on odd tricks: spades count as diamonds, clubs as hearts; `alternating` | tricks 3, 7, 11... |
+| locusts | disaster | reaction | each `trick-completed`: `break-item` on the next seat with an equipped item, round-robin from the expedition leader; with none left anywhere, `discard-round` one random card per hand | items only, odd tricks only |
+| monsoon | disaster | rule | `goals` guard, every objective done by trick `river(total)`; `meter` | floods one trick later |
+| temple | temple | slots, rule, status, grants | see the temple | |
+
+`river(total) = ceil(total * 3 / 4)` is a placeholder shared by Monsoon and Flooding.
+
+### Trick resolution, burning, ties and lost targets
+
+```ts
+// state.ts
+export type ResolvedPlay = {
+  readonly seatId: string; readonly card: ExpeditionCard;
+  readonly countsAs: CardIdentity | null;   // identityOf at completion, when it differs from printed
+  readonly burned: boolean;                 // left the trick: never wins, never counts for an objective
+};
+export type CompletedTrick = { readonly index: number; readonly leaderSeatId: string; readonly plays: readonly ResolvedPlay[]; readonly winnerSeatId: string };
+export type Discard = { readonly card: ExpeditionCard; readonly afterTrick: number }; // eaten from a hand
+// CampState gains discards. ObjectiveSlot's win-card gains `fixed?: CardIdentity`.
+// WinCardObjective.target widens to CardIdentity (the Sun).
+```
+
+Completion in `applyPlayCard`:
+
+1. `led = rules.identityOf(plays[0].card)`. The led identity is fixed at the lead.
+2. `burned = rules.burns(plays, led, (p) => rules.trickWinner(p, led))`. Every play burned is a
+   composition defect and throws (A3).
+3. `winner = rules.trickWinner(kept, led)`. Base: the highest trump kept; else the highest kept
+   card following `led`; else the highest kept card. Equal strength goes to the earliest play.
+   This replaces the malformed-trick throw, which a burned lead makes reachable.
+4. Record each play with `countsAs` and `burned`. A trick is resolved once; no rule re-resolves
+   history.
+
+`winnerExcluding(prev, plays, led, excluded)` passes `led` through, so Bait on the led card no
+longer changes the led suit. `lowestOfLedSuit` (Howler Call) takes `led`.
+
+**Conservation.** Burned cards stay in their trick. Eaten cards move to `camp.discards`. Heat
+removes cards before the deal, into `removedCards`. `campCardIds` adds `discards`.
+
+**Lost targets.** `trickContaining` matches `countsAs ?? card.identity` on unburned plays. A target
+is lost when its printed card burned, counted as another identity or was discarded; a lost target
+fails its objective at once. A card objective whose target was never played by the final trick
+also fails, so a camp cannot stick `in_progress`. Failure stays absorbing.
+
+**Objective floor.** The base `objectiveDeckFor` keeps standard cards ranked above the deck's
+lowest rank: 3 and up at 3 or 4 players, 4 and up at 5 players (no 2s in that deck), 5 and up at
+a magma pool. `createCamp` shuffles it on the existing stream. A `fixed` slot draws nothing.
+
+**Outcome.** `checkCampOutcome(camp, rules)`: failed when an objective or a goal failed
+(`{ failedObjectiveIds, failedGoalIds }`); succeeded when every objective and goal is done;
+otherwise in progress. The engine already stops play at success (`campPhase` returns `ended`), so
+a camp ends the moment every objective and goal is done. Rescue opens only on failed objectives
+with no failed goal, as fired checks behave today.
+
+### Thunderstorm: a fatal strike waits
+
+A strike is an `add-modifier` effect, `lasts: "trick"` at the current trick, `deferIfFatal: true`.
+The deferral is generic and lives in `stages/camp.ts`, so it is judged under the fully composed
+rules (Snake, Crocodile, plates and every goal):
+
+1. Apply the play. If it did not complete trick `t`, or no live `deferIfFatal` effect sits on `t`,
+   keep the result.
+2. If the outcome under `rulesFor(next)` is failed, recompute the same play with those effects
+   moved to `t + 1` (dropped after the last trick).
+3. Keep the recomputed result only if its outcome is not failed. Otherwise the strike landed.
+
+The roll never fires while a strike already sits on the trick, and stops after two stored
+strikes; a moved strike is the same effect, so it counts once. The roll happens at
+`trick-started`, before the lead, so the table sees the strike while the trick is played.
+
+### The temple
+
+```ts
+// content/mods/temple.ts
+export const temple = defineMod({
+  id: "temple", kind: "temple", name: "The Temple", weight: 0,
+  text: "Lead each plate's suit in order, ending with the Sun.",
+  full: {
+    slots: (prev) => [...prev, { kind: "win-card", fixed: { kind: "joker", joker: "sun" } }],
+    rules: (ctx) => ({ goals: (prev) => (camp) => [...prev(camp), platesGoal(camp, platePath(ctx, camp))] }),
+    status: (ctx) => (ctx.camp === null ? [] : [{ kind: "path", plates: platePath(ctx, ctx.camp), pressed: pressedCount(ctx.camp, platePath(ctx, ctx.camp)) }]),
+    grants: ability({
+      window: ["between-tricks", "rescue"],
+      limit: { kind: "crew-tokens", earned: (run) => (sunObjectiveDone(run) ? 1 : 0) },
+      targets: [{ kind: "objective", whose: "open" }], // new `whose`: any owned pending or failed
+      apply: (ctx) => [{ op: "remove-objective", objectiveId: ctx.targets[0].objective.id }],
+    }),
+  },
+});
+```
+
+- **Plates.** `platePath` draws `floor(totalTricks / 2) - 1` suits with `roll("plate{i}", 4)`, then
+  `"sun"`. A completed trick whose led identity matches the next plate presses it; another suit
+  does nothing. The plates goal is a task: done when all are pressed, failed when fewer tricks
+  remain than plates.
+- **The Sun objective** is a win-card objective on the Sun, picked and required like any other.
+- **The skip** is a crew token earned by winning the Sun. Any seat spends it between tricks or in
+  rescue to drop one open objective. `ActiveAbility.window` widens to `ActiveWindow | readonly
+  ActiveWindow[]`. While the token is unspent, rescue waits on every seat.
+- **Helpers.** `campStack` appends the half bodies of `helpersFor(plan, at)`, `slots` included.
+
+### Toolkit ops
+
+```ts
+export type Origin =
+  | { readonly kind: "seat"; readonly seatId: SeatId; readonly sourceKey: SourceKey }
+  | { readonly kind: "mod"; readonly modId: ModId; readonly strength: Strength };
+export type ActiveEffect<P extends EffectParams = EffectParams> = {
+  readonly origin: Origin; readonly atTrick: number; readonly lasts: "attempt" | "trick";
+  readonly deferIfFatal: boolean; readonly params: P; readonly audience: "public" | "owner";
+};
+export function applyToolkitOps(run: RunAt<"camp">, origin: Origin, ops: readonly ToolkitOp[]): RunAt<"camp">;
+// LogEntry.actorSeatId becomes string | null (null for a mod); sourceId carries the item, upgrade
+// or mod id. Reveal.source is "whisper", a source id or a mod id.
+```
+
+| Op | Change |
+|---|---|
+| `add-modifier` | gains `deferIfFatal?: true` |
+| `adjust-supplies` | bounds `[1, SUPPLIES_MAX]` |
+| `adjust-coins` NEW | purse += delta; never below 0 |
+| `break-item` NEW | `{ seatId, uid }`: removes an equipped instance |
+| `discard-round` NEW | `{ cardIds }`: exactly one card from every hand to `discards`, `totalTricks - 1`; anything else throws |
+| `cancel-boss-twist` | DELETED |
+
+### Windows and abilities
+
+`pre-deal` is deleted (Rain Poncho was its only user), so `AttemptState.camp` is never null.
+Windows keep `objective-pick`, `between-tricks`, `in-trick` and `rescue`. `abilityStatus` reads
+`window` as a list. Abilities are keyed by `SourceKey`; granted abilities come from `campStack`'s
+`grants`, keyed by the mod id. Unit 12 adds stage windows (`loadout`, `draft`, `route`).
+
+### RNG streams
+
+Two different draws never share a name. A shop visit and its replay share names on purpose.
+
+| Draw | Stream |
+|---|---|
+| Length vote tie | `expedition-vote:length` |
+| Route vote tie | `expedition-vote:route:camp{k}` (k = the next camp) |
+| Planned boss | `expedition-plan:{animal\|disaster}` |
+| Route option count | `expedition-route:camp{k}:count` |
+| Route option field | `expedition-route:camp{k}:reroll{r}:option{i}:{location\|fair\|weather\|event\|mix}` (r = 0 until Cartographer) |
+| Draft item | `expedition-draft:camp{k}:seat{id}:offer{o}:bundle{b}:item{j}:{rarity\|pick}` |
+| Shop item | `expedition-shop:camp{k}:item{i}:{rarity\|pick}` |
+| Attempt deal | `{seed}:camp{k}:attempt{a}` (unchanged) |
+| Trick-count kind and N | `expedition-trickcount-{kind\|n}:camp{k}:attempt{a}` (unchanged) |
+| Mod rule roll | `expedition-mod:{id}:{strength}:camp{k}:attempt{a}:rule:{label}` |
+| Mod reaction draw | `expedition-mod:{id}:{strength}:camp{k}:attempt{a}:on:{eventKey}:draw{j}` |
+| Ability draws | unchanged |
+
+`eventKey` is `dealt`, `pick{n}`, `t{i}-start`, `t{i}-p{position}`, `t{i}-done` or
+`whisper{ordinal}`; the `rule:` and `on:` prefixes keep labels and event keys apart. Deleted:
+`draftUpgrade`, `draftItems`, `boss(N)`, `faceDown`. `rng.test.ts`'s grid gains every builder.
+
+### Actions and errors
+
+```ts
+export type RunAction =
+  | { readonly type: "pick-character"; readonly characterId: string }       // muster
+  | { readonly type: "vote"; readonly choice: string | null }              // muster, route; null abstains
+  | { readonly type: "equip"; readonly itemUids: readonly string[] }       // loadout
+  | { readonly type: "buy"; readonly stockId: string }                     // loadout before a boss camp
+  | { readonly type: "pick-bundle"; readonly bundle: number }              // draft
+  | { readonly type: "ready" }                                             // loadout, event
+  | { readonly type: "use-ability"; readonly sourceKey: string; readonly targets: readonly string[] }
+  | { readonly type: "skip-window" }
+  | { readonly type: "whisper"; readonly targetSeatId: string; readonly cardId: string }
+  | { readonly type: "pick-objective"; readonly objectiveId: string }
+  | { readonly type: "play-card"; readonly cardId: string };
+// RunError gains wrong_stage, not_a_choice, not_owned_item, too_many_items, sold_out,
+// supplies_full, upgrade_owned, not_your_upgrade; loses draft_pending, no_draft_pending, not_offered.
+```
+
+`vote`, `equip` and `pick-bundle` converge when repeated. `ready` refuses `already_ready`, and so
+does `equip` after `ready`. `autoPassRequest` returns `{ type: "vote", choice: null }` for a seat
+with no ballot in muster or route, and `skip-window` in a gated window, as today.
+
+### Views and schema
+
+`ExpeditionView` becomes a header plus one stage view, mirrored field for field in
+`packages/schema/src/games/expedition.ts` (strict objects) and bound by the `extends` assertions in
+`apps/worker/src/game-registration.ts`.
+
+```ts
+export type ExpeditionView = {
+  yourSeatId: string | null;
+  runStatus: "in_progress" | "won" | "lost";
+  length: RunLength | null; campCount: number | null;
+  purse: number; supplies: { count: number; max: number };
+  plan: { at: number; tier: BossTier; bossId: string | null }[];   // bossId null beyond the horizon
+  seats: ExpeditionSeatView[];
+  yourAbilities: ExpeditionAbilityView[];
+  history: { camp: number; attempt: number; status: "cleared" | "failed"; coins: number }[];
+  lastVote: { topic: "length" | "route"; tally: { choice: string; votes: number }[]; tied: string[] | null; winner: string } | null;
+  stage: ExpeditionStageView;
+};
+export type CampPreviewView = { index: number; location: string; weather: string; pairing: string | null; event: string | null; slotKinds: string[]; bossId: string | null; shop: boolean };
+export type ModView = { id: string; kind: ModKind; strength: "full" | "half"; status: StatusPartView[] };
+export type ExpeditionStageView =
+  | { tag: "muster"; ballots: { seatId: string; choice: string | null }[] }
+  | { tag: "loadout"; camp: CampPreviewView; mods: ModView[]; yourSlots: number; shop: ShopView | null; readySeatIds: string[] }
+  | { tag: "camp"; camp: CampPreviewView; mods: ModView[]; attempt: ExpeditionAttemptView }
+  | { tag: "draft"; cleared: number; payout: number; yourOffer: { bundles: string[][] } | null; pendingSeatIds: string[] }
+  | { tag: "route"; options: { id: string; next: CampPreviewView }[]; ballots: { seatId: string; choice: string | null }[] }
+  | { tag: "event"; event: string; next: CampPreviewView; readySeatIds: string[] }
+  | { tag: "ended"; result: "won" | "lost" };
+// ShopView: stock entries plus yourUpgrades { stockId, upgradeId, price }[]. ItemView: { uid, itemId, remaining }.
+export type ExpeditionSeatView = {
+  seatId: string; characterId: string | null; upgradeId: string | null;
+  /** concealed under Heavy fog: equipped lists only items used this attempt; backpack is null. */
+  items: { equipped: ItemView[]; backpack: ItemView[] | null; concealed: boolean };
+  usage: { sourceKey: string; remaining: ExpeditionRemainingView }[];
+};
+```
+
+Camp-level changes: a current-trick play is `{ seatId; hidden: false; card; effectiveRank }` or
+`{ seatId; hidden: true; suit: Suit | "joker" }` (the effective follow key, no rank, no id).
+Completed plays gain `countsAs` and `burned`; `yourHand` cards gain `countsAs`. Objectives gain
+`{ id; kind: "hidden"; ownerSeatId; status }`, and a win-card target may be a joker. The camp view
+gains `goals` and `discards` and loses `objectiveAssignment`. The attempt view loses
+`bossCancelled`, `window` loses `pre-deal`, `rescue` gains `failedGoalIds`, and effect views carry
+`origin`. Removed: `runPhase`, `campNumber`, `bossTwists`, `activeBossTwistId`, `yourDraftOffer`,
+`seats[].kit`, `seats[].draftPending`, `seats[].ready`.
+
+`ROOM_SCHEMA_VERSION` goes 6 to 7 in unit 1 and up by one in each later unit that changes the
+persisted `RunState`.
+
+### Leak check additions
+
+Every secret is derived independently through `rulesFor` and `campStack`, never through `view.ts`.
+
+| Secret | Derivation | Rule |
+|---|---|---|
+| Concealed plays | `rules.hides` over `currentTrick.plays` | card id in `hiddenIds`; identity not counted |
+| Hidden objective | `rules.hides` per objective | target identity not counted; the id stays visible |
+| Fogged loadouts | `rules.hides` per seat | unused equipped and backpack uids in `hiddenIds`; `items.backpack` null |
+| Other seats' offers | `SeatRun.offers` | `ownDraft` replaces `ownDraftOffer`; another seat's bundles are a leak |
+| Unrevealed bosses | `plan.bosses` with `at > horizon(run)` | the boss id is a hidden string leaf |
+| Discards and burns | public | counted for everyone |
+
+`FORBIDDEN_VIEW_KEYS` gains `offers`, `itemSerial` and `bosses` (the view's `plan` is the filtered
+array) and loses `readySeatIds`. A `StatusPart` cannot carry a card by type, and a status reads
+only the current trick; the contract test perturbs a later trick's roll and asserts the status is
+unchanged. Each new secret gets a canary: a view that shows it must be flagged.
+
+## Synthesis decision
+
+**Base: candidate A** for the camp model: one `ModDef` with explicit `full` and `half` bodies; one
+`campStack` order read by compose, view, preview and leak check; the `PAIRINGS` table; one `hides`
+hook read by view and leak check; item instances with uses; derived rules over the trick log for
+every mechanic that is a question; `goals` replacing `failureChecks`; `burned` and `countsAs` on
+`ResolvedPlay`; `discards`; the temple as slots, a goal and a granted ability.
+
+**Grafted from B.** Typed `CampEvent`s from `applyCampAction` plus `camp-dealt` and
+`whisper-sent`, feeding a one-pass, non-cascading reaction channel that emits toolkit ops. It
+replaces A's untyped `atBoundary` trigger ("the deal is boundary 0"). The stored stage union with
+a `STAGES` registry replaces A's journal and its eight-branch `runPhase` fold, whose event step
+depended on the absence of a result since the last arrival: hard to trace and to set from the dev
+panel. Also `trickWinner(plays, led)`, deleting the pre-deal window, the `Origin` union and
+private offers per seat.
+
+**Rejected from A.** The derive-everything journal (reader load). `stormAt`, which inferred a strike
+from "the winner is the lowest seat" and miscounts a lowest card that would have won anyway. "The
+first surviving card sets the led suit" (overruled by the lead). Clifftop fair weather at 40%.
+
+**Rejected from B.** Per-kind registries and helpers (five catalogues for compose, view and leak
+check to learn). `playConcealed` plus `itemsVisible` (one `hides`). Stored `veils`, `firedChecks`
+and `spoiledObjectiveIds` (derived instead). Crocodile and Tiger as reactions (they are questions).
+A `plate-path` crew objective kind that changed `campPhase` (a goal instead). The `skip-objective`
+action (a granted ability reuses the ability UI and rescue gating). `Span` effects: B's Snake layer
+vanished after its span and flipped a failed objective back to done; the bite is an attempt-long
+effect with a trick range in its params. Votes that wait forever on a disconnected seat.
+
+**Defects in both.** Reworking Rain Poncho into "nothing can stop your whispers" collides with
+Mosquito Net; Poncho becomes a whisper item and Mosquito Net the Rain counter. Neither judged the
+Thunderstorm fatal check under composed rules; the generic `deferIfFatal` retry does.
+
+**Deviations from the lead's direction.**
+
+- The shop is a panel of the loadout before a boss camp, not its own stage. Equipping follows
+  buying, and a separate stage would put three ready screens in a row before a boss. The players
+  still see event, then shop, then camp.
+- The shop reopens on a boss-camp replay with the same stock. Undecided by the lead; buying a
+  supply before a retry is the natural want.
+- `camp-dealt` and `card-played` are reported though no map mod reacts to them. The lead asked,
+  the Core computes them for free, and unit 12 is their first reader.
+
+## Tradeoffs accepted
+
+- We accept two authoring channels per mod in exchange for each mechanic reading as what it is.
+  The channel table is the rule.
+- We accept that reactions never react (a Tornado move does not trigger Locusts) in exchange for no
+  cascade and one conservation check per reactor.
+- We accept a stored stage and plain counters in exchange for per-stage data that cannot exist in
+  the wrong stage and a dev panel that can set them.
+- We accept duplicate item instances in exchange for drafts and stock that never depend on what a
+  seat owns.
+- We accept hand-written half bodies in exchange for half strength the owner can read and tune,
+  where a multiplier ("fire half as often") means nothing for Rats or Capybara.
+- We accept a shared purse spent first come, first served, in exchange for no approval flow.
+- We accept that rescue waits on every seat while a temple token is unspent.
+- We accept recomputing a struck final play once in exchange for judging "would lose the camp"
+  under every composed rule.
+- We accept tricks with no follower after a burned lead; the highest kept card then wins.
+
+## Alternatives considered
+
+- **A journal with every counter folded (A's run).** No total can drift, but every reader learns
+  the fold order and the dev panel must forge entries: a wide derivation surface hiding little.
+- **Hooks only, the house style.** Stored hands give Tornado, Earthquake and Locusts no derived form.
+- **An event bus with cascades.** Every pair of reactors becomes an ordering question. No mechanic
+  reacts to a reaction.
+- **Events by diffing camps in the run layer.** The run layer would re-derive every Core rule
+  (burns, the final trick, pick to play). The Core already knows.
+
+## Open questions and risks
+
+- Must every temple plate be pressed? The spec fails the camp otherwise (lead decision, unconfirmed).
+- Is Monsoon in the disaster pool? It lands in unit 9 with the river at `ceil(total * 3 / 4)`,
+  shared with Flooding.
+- Should a disconnected seat be auto-readied in loadout and event, and auto-picked in the draft?
+  Only votes are auto-passed; the others wait, as fireside `ready` does today.
+- Half bodies, prices, rarities, `rareChance`, the river and the slot mixes are placeholders.
+- Risk: `hides` makes three view paths conditional. Unit 7's canaries prove the leak check covers
+  them.
+- Risk: unit 3 is the widest (stage machine, view header, web screens); units 1 and 2 go first.
+- Risk: `discard-round` shrinks `totalTricks`; exactly-n, plates and the river recompute against it.
+- Risk: each `RunState` change breaks the concurrent dev sandbox; each unit's done list names it.
+
+### Lead decisions (2026-10-04)
+
+- Camp 1 is Jungle with fair weather. Bosses are drawn at the length vote and revealed in the route
+  preview that leads to their camp.
+- Concealed plays (Cave, Night) show their suit; rank and id stay hidden until the trick completes.
+- A burned lead keeps the led suit. If nothing kept follows, the highest kept card wins.
+- Thunderstorm: 20% before the first trick, +10% per trick, at most 2 strikes; a strike that would
+  lose the camp waits one trick, judged under the composed rules.
+- Locusts eat items round-robin; with none left, one random card from every hand (a trick is lost).
+- The Sun's skip is a crew token any seat spends between tricks or in rescue to drop an open objective.
+- Using an item reveals it, even under Heavy fog.
+- A disconnected seat's vote is cast as an abstention after the existing auto-pass grace.
+- Every plate must be pressed before the camp ends, or the camp fails. Flagged for the owner.
+- Half-strength bodies are placeholders for owner review.
+- Ramp: Short 2, 3, 4, temple 4; Standard 2, 3, 3 + animal, 4, 4, temple 5; Long 2, 3, 3 + animal,
+  4, 4, 4 + disaster, 5, temple 5 (temples count the Sun). Mixes add ordered pairs and trick-count
+  slots from camp 4.
+- Weather: 80% fair, Clifftop 50%. J.D.'s hidden luck later adds 5 points.
+- Shop stub: supplies at 6 (cap 4), 3 placeholder items, own character's upgrades at 8. No selling,
+  no blacksmith.
+- Characters land last, in their own units; until then the six current characters keep working
+  with one upgrade per player bought at the shop.
+- The 13 items take the new kinds with placeholder price and rarity; Rain Poncho's cancel is deleted.
+
+## Next implementation step
+
+Unit 1: delete `boss/`, `bossTwists`, `bossCancelled`, `cancel-boss-twist`, `objectiveAssignment`
+with face-down assignment, and the pre-deal window, and get typecheck, Vitest and the expedition
+e2e green with plain boss camps.
+
+---
+
+## Catalogue
+
+Mod text is one sentence per def, written in the unit that registers it from the channel table's
+"Full" column. Mod ids match the staged art: `clearing`, `jungle`, `clifftop`, `desert`, `cave`,
+`magma`, `fair`, `rain`, `fog`, `thunderstorm`, `night`, `steam`, `flooding`, `tiger`, `rats`,
+`snake`, `crocodile`, `capybara`, `beaver`, `tornado`, `earthquake`, `wildfire`, `meteor`,
+`blood-moon`, `locusts`, `monsoon`, `temple`. Location and non-fair weather weights start at 1.
+
+| Item | Uses | Rarity | Price | Change |
+|---|---|---|---|---|
+| Trained Monkey, Pack Mule, Parrot | per-camp | common | 3 | |
+| Trail Map | single-use | rare | 5 | was once per run |
+| Rain Poncho | charges 2 | common | 3 | now "Whisper once more this camp."; the boss cancel is deleted |
+| Smoke Signal | charges 2 | rare | 5 | the supplies cost is dropped |
+| Whetstone, Puffball, Bait | single-use | common | 2 | Bait keeps the led suit fixed |
+| Camouflage | single-use | rare | 4 | its failure check becomes a guard goal |
+| Rope Ladder | single-use | common | 3 | |
+| Heavy Pack | passive | common | 3 | |
+| Mosquito Net | passive | rare | 4 | now "Rain can't stop your whispers." (the same layer) |
+
+Events: one stub, `{ id: "event", name: "Event", text: "Nothing happens here yet." }`. Character
+events arrive later as blank templates with the same shape.
+
+## Delete list
+
+- `boss/` entirely (four twists, `BOSS_REGISTRY`, `BossId`, the old `BossDef`,
+  `boss.contract.test.ts`, `radio-eclipse.test.ts`, `fog-mutiny.test.ts`) and README "Add a boss twist".
+- `RunState.campNumber`, `bossTwists`, `readySeatIds`, top-level `attempt`; `CampNumber`,
+  `BossCampNumber`, `BOSS_CAMPS`, `FINAL_CAMP`, the 1..6 `BALANCE_TABLE`, `DRAFT_OFFER_SIZE`,
+  `STARTING_SUPPLIES`.
+- `runPhase`, `RunPhase`, the `fireside` name, `activeBossId`, `drawBossTwist`, `run-actions.ts`.
+- `AttemptState.bossCancelled`, `cancel-boss-twist`, the pre-deal window, `AttemptState.camp:
+  null` and the gated deal hold in `advanceRun`.
+- `objectiveAssignment`, `assignFaceDown`, `STREAMS.faceDown`, and the face-down branches in
+  `visibility.ts`, `trail-map.ts`, the view and the leak check.
+- `SeatRun.kit`, `SeatRun.draftOffer`, the draft upgrade slot, `pick-draft`, `STREAMS.draftUpgrade`,
+  `STREAMS.draftItems`.
+- `failureChecks`, `firedFailureCheckIds`, `ActiveEffect.sourceId` and `seatId`, and the
+  malformed-trick throw in `trickWinner`.
+- In unit 13: the six characters, `PoolDef`, the `pool` limit, `regained`, their art and icons.
+- View keys listed under Views and schema.
+
+## Implementation units (in order; each ends green)
+
+Every unit ends with `npm run typecheck`, `npm test` and every e2e spec it touches green, and is
+one commit or a short series. A unit that changes `RunState` or `ExpeditionView` changes
+`view-types.ts`, the schema, the worker's `extends` assertions and enough web code to compile in
+the same unit, so main never holds a view the client cannot parse.
+
+**Dev sandbox, in every unit's definition of done.** The dev-mode sandbox (`dev/` in the rules
+package, the worker dev hook, the web panel) is being built concurrently. Every unit that changes
+`RunState` updates `dev/shortcuts.ts`, `dev/check.ts`, `dev/inspect.ts`, `dev/autoplay.ts` and the
+`milestone` in `dev/hooks.ts` in the same commit, plus any shortcut id named in
+`apps/worker/src/dev-room.test.ts` or `packages/schema/src/messages.test.ts`. Surviving ids keep
+their names (`jump-to-camp`, `end-run`, `force-camp`, `set-supplies`, `set-character`,
+`move-card`, `set-objective-owner`). The checker accepts every reachable state; `dev/*.test.ts`
+stays green.
+
+**1. Subtract.** Delete the four bosses, `bossTwists`, `bossCancelled`, `cancel-boss-twist`,
+`objectiveAssignment` with face-down assignment, and the pre-deal window (`startAttempt` deals at
+once). Rain Poncho becomes "Whisper once more this camp" (per-run, 2). Boss camps play plain.
+`ROOM_SCHEMA_VERSION` 7. Check: the run property ends every run; `view.test.ts` and the leak
+property pass without the removed keys. Web: drop the boss banner and twist names, face-down
+objectives, the pre-deal banner and the PD badge. e2e: `expedition-driver.ts` stops waiting on
+pre-deal; `expedition-abilities.spec.ts`. Dev: delete `set-boss`; drop boss lines in `check.ts`
+and `inspect.ts`.
+
+**2. Core seams.** `identityOf`, `objectiveDeckFor` with the floor, `burns`, `ResolvedPlay`,
+`trickWinner(plays, led)` with the highest-kept fallback, `objectiveStatus`, `goals` replacing
+`failureChecks` (Camouflage becomes a guard), `discards`, the lost-target and never-played rules,
+`CardIdentity` targets with `fixed` slots, `CampEvent`s from `applyCampAction`;
+`winnerExcluding` and `lowestOfLedSuit` take `led`. Check: `trick.test.ts` gains "a burned card
+cannot win", "a counted-as identity follows its new suit", "a burned lead keeps the led suit",
+"with no follower kept the highest kept card wins"; `trick.property.test.ts` gains "ties go to the
+earliest play under arbitrary rankOf and identityOf layers"; `objectives.property.test.ts`
+restates monotonicity over lost and never-played targets; the camp property never sticks
+`in_progress`; an events test pins a full camp's event sequence. Web: completed plays render
+`burned` dimmed and `countsAs` as a corner pip; goals replace fired-check text. Dev: `check.ts`
+counts `discards`; `inspect.ts` shows burned and counts-as.
+
+**3. Staged run, length vote, routes and events.** `Stage`, `STAGES`, `RunAt`, the table
+dispatcher, muster with the length vote and `tally`, `RunPlan` (pools empty, so boss camps play
+plain), `CampIndex`, `RUN_LENGTHS`, `OBJECTIVE_RAMP` and mixes, supplies 3 of 4, purse and payout,
+replay of the same spec, `ended`, `lastVote`, the route stage (`firstCampSpec`; `routeOptions`
+with only Jungle and fair, so options differ by event and mix), `EVENTS` and the event stage, the
+loadout stage with `ready` only. The draft stage keeps today's single-pick kit offer for this one
+unit. `autoPassRequest` abstains votes; `checkGameEnd` reports the spec index. Check:
+`lifecycle.test.ts` covers "a failure replays the same spec with a fresh deal", "supplies at 0 end
+the run", "a clear pays 5 + min(3, unplayed)", "a tie resolves by the seeded flip", "an
+abstention does not block"; the run property runs all three lengths; `vote.test.ts`; the RNG grid.
+Web: muster gains the length vote (three cards, ballots, the flip from `lastVote`); the fireside
+scene becomes the trail scene hosting the draft, route vote (option cards with location, weather,
+objective types, boss), event and loadout panels; the HUD shows purse, supplies of 4 and camp k of
+N; run-end reads `stage.ended`. e2e: `expedition-driver.ts` and `expedition-scenarios.ts` learn
+vote, route, event and loadout; `expedition-create.spec.ts`, `expedition-camp.spec.ts`,
+`expedition-tour.spec.ts`. Dev: `jump-to-camp` takes a length and an index and builds the loadout
+or camp stage; new `set-purse`; `force-camp` and `end-run` go through `settleCamp`; `autoplay.ts`
+votes and readies per stage; `milestone` reads the tag and spec index.
+
+**4. Items, loadout, bundles, shop and upgrades.** `ItemDef` uses, rarity and price; instances,
+`itemSerial`, `equipped`, `backpackOf`; `itemSlots`; `equip`; bundle drafts with no upgrade;
+`SeatRun.offers` (kit and `draftOffer` deleted); the shop in the loadout before boss camps;
+`upgradeId` with +1 whisper; `SourceKey`; `adjust-coins`; the 13 items remapped; the six
+characters' upgrades sold at the shop. Check: `sources.contract.test.ts` gains per item "uses
+exhaust as declared", "a per-camp item resets on replay", "a spent instance leaves its owner";
+`shop.test.ts` covers price, `sold_out`, `supplies_full`, `upgrade_owned`, `not_your_upgrade` and
+the replay visit; `draft.test.ts` covers bundles and rarity. Web: the loadout screen (backpack
+grid, two slots, tap or drag to equip, charge badges), bundle draft cards, the shop panel. e2e:
+the driver equips and buys; `expedition-abilities.spec.ts` uses source keys. Dev: `set-kit` and
+`give-source` become `give-item` and `set-upgrade`; `check.ts` validates instances, slots and
+offers.
+
+**5. Camp modifier engine and routes.** `ModDef`, `MODS`, `campStack`, the composition order,
+`PAIRINGS`, weather draws, `slotKindsFor`, `ModView`, `react` with `camp-dealt` and
+`whisper-sent` wired, `Origin`, `applyToolkitOps(run, origin, ops)`, `deferIfFatal` and the
+deferral, `break-item`, `discard-round`. Registers clearing, jungle, clifftop, fair, rain and
+thunderstorm; Mosquito Net becomes the Rain counter. Check: `mods.contract.test.ts` iterates the
+registry (shape, kind rules, `half` on bosses, `rules` keys in `HOOK_NAMES`, `on` keys in
+`EngineEventType`, a driven camp at 3, 4 and 5 players with the def forced into the stack:
+conservation, JSON round-trip, determinism, the leak check every step, status stable under a later
+roll); `route.property.test.ts` (no "never" pair over 500 seeds); "a fatal strike waits a trick",
+"at most two strikes", "a strike that is not the cause lands". Web: route cards show location,
+weather and pairing; backdrops by labelled fallback; the weather overlay slot (rain, the storm
+chance badge, a lightning flash on a strike); the mods status strip. e2e: a forced Thunderstorm
+scenario in `expedition-camp.spec.ts`. Dev: new `set-spec` (location, weather), re-dealing a
+camp; `inspect.ts` lists the stack and statuses.
+
+**6. Map art.** Integrates the staged art in `/home/rflor/.claude/jobs/5e5ee5f4/tmp/bossart/`:
+13 boss sprites to `apps/web/public/expedition/sprites/bosses/<id>.png`, six backdrops to
+`sprites/locations/bg-<id>.png` (Jungle keeps `camp/bg-jungle-night.png`). Register them in
+`art-registry.ts`, regenerate `art-files.generated.ts`, and record each id, job, size, seed and
+prompt from `prompts.json` and `MANIFEST.md` in `apps/web/art/expedition/make-prompts.mjs`. Check:
+`mod-art.test.ts` asserts every `MODS` id of kind animal, disaster or location has an art id
+naming a file in `ART_FILES`. Web: the loadout and camp scenes draw the backdrop; the boss sprite
+slot is ready for unit 8. Dev: none.
+
+**7. Concealment and the remaining locations and weather.** `hides`, `Concealable`; desert, cave,
+magma, night, fog; steam, flooding and the "never" rules; the view's hidden variants and fogged
+seats; the leak-check additions. Check: the contract test covers the new defs with no edits;
+canaries prove each new secret is checked; "using an item reveals it under fog"; "a magma camp's
+objectives start at 5". Web: face-down trick cards with a suit pip, a hidden objective card, fog
+over other seats' slots, the magma removed-cards note, the flood meter. e2e: a Cave scenario.
+Dev: `set-spec` gains the new ids; `inspect.ts` marks hidden things.
+
+**8. Animal bosses.** Tiger, Rats, Snake, Crocodile, Capybara and Beaver with halves; `drawPlan`
+draws the animal pool; `horizon` gates the reveal. Check: the contract test covers all six and
+their halves with no edits; one behaviour test per boss; "a boss id is hidden until the route
+preview leads to it". Web: the boss entity on the table (sprite plus gaze arrow, dam chip, streak
+badge, bite marker); the route card's boss portrait. e2e: one animal camp. Dev: new
+`set-plan-boss`.
+
+**9. Disaster bosses.** Tornado, Earthquake, Wildfire, Meteor, Blood Moon, Locusts and Monsoon
+with halves. Check: as unit 8, plus "Meteor never deals an ace objective", "Locusts with no items
+shorten the camp by one trick", "Tornado keeps hand sizes", "Earthquake keeps each seat's open
+count". Web: burned and vaporized animations, the tornado card flight with the sent-card reveal,
+the earthquake shuffle, the river meter, the blood-moon tint and swapped pips in hand, the locust
+toast. e2e: the tour reaches camp 6 of a Long run. Dev: `set-plan-boss` covers disasters.
+
+**10. Temple.** The temple def, plates, the Sun slot, `crew-tokens`, list windows, helpers at
+half. Check: "Short has no helpers, Standard one, Long two", "plates press only on the next suit",
+"an unpressed plate fails the camp", "the skip unlocks only after the Sun is won", "a spent token
+ends rescue's wait", a full Long run in the property suite. Web: the plate path along the table
+edge, the Sun objective card, the skip in the ability bar, half-size helper sprites. e2e: the tour
+reaches the temple. Dev: `jump-to-camp` to the final camp lands in the temple.
+
+**11. Run polish and docs.** README recipes (a camp modifier, an item, an event, the channel rule),
+the rules modal pages for locations, weather and bosses (`rules-reference.ts`), route and run-end
+copy, and a balance pass over the placeholders with the owner. Check: `rules-reference.test.ts`,
+`catalog-display.test.ts`, `expedition-rules.spec.ts`.
+
+**12. Character seams.** Engine pieces the nine need, each with a base equal to today, so the six
+stay green: stage windows (`loadout`, `draft`, `route`); RunHooks `normalWeatherChance` (J.D.'s
+hidden luck, never projected), `routeOptionCount`, `draftShape`, `shopPrice`, `affectsSeat(run,
+seatId, origin)`; Core `voidsTrick` (a hallucination returns every card to its hand); ops
+`grant-item`, `give-item`, `swap-slots`, `reroll-route` (bumps `r`), `add-objective`; a `coins`
+usage limit; `RouteOption.swapBoss` (Cartographer's third route rewrites `plan` at the next boss
+camp); `on` on `SourceBase` if needed. Check: each seam has a test with a test-only source. Web:
+compile only. Dev: shortcuts for any new field.
+
+**13. The nine characters.** Replace the six with the nine and their upgrades; delete pools,
+`regained` and the six characters' files and art. One commit per character group. Check:
+`sources.contract.test.ts` over the new registry; one behaviour test per power. Web: crew sprites
+and icons (`CREW_IDS`, `SOURCE_ICON_IDS`), muster silhouettes, the Pop-up Shop panel, the
+Magician's fanned-hand picker, the route reroll button. e2e: `expedition-abilities.spec.ts` per
+group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
+
+| Character | Fits on |
+|---|---|
+| J.D. | `grant-item` at muster; `normalWeatherChance` + 5; Blend In `affectsSeat`; Free Spirit an `objectiveStatus` effect; Rule Breaker a `legalPlays` effect |
+| Businessman | settle-time coins by empty slots; a draft-window skip for 4 coins; selling in the loadout; Pop-up Shop a private stock with a `coins` limit; Buyout in rescue; Haggle `shopPrice` |
+| Magician | `swap-cards` with a fanned-hand target kind; Double Act `whispersPerCamp`; Misdirection two other seats; Switcheroo `swap-objectives` |
+| Perfumist | a `voidsTrick` effect; Turncoat an `identityOf` effect on the led card; Upside Down a `trickWinner` effect; Smelling Salts in rescue |
+| Cartographer | `routeOptionCount` 3, `swapBoss`, `reroll-route` for supplies; Redraw `replace-objective`; Survey a private preview; Treasure Map queues two special offers and `adjust-coins` |
+| Explorer | a `rankOf` effect; True Form an `identityOf` effect; Reshape shifts an objective target |
+| Leader | `whispersPerCamp` 2; Open Ears `whisperAudience`; Delegate; Momentum reads won tricks |
+| Hermit | `remove-objective` plus a `goals` guard (wins no tricks); Burden `add-objective`; First Pick an objective-pick window; Alms `whispersPerCamp` |
+| Pack Rat | `draftShape` with `exclusiveTo` items; `itemSlots` 3; Quartermaster `give-item`; Pack Animal `swap-slots`; Sturdy Straps a first-use exemption |
