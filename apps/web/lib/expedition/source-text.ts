@@ -41,11 +41,11 @@ export function sourceKind(sourceId: string): SourceKind {
 }
 
 /** When it works and how often: ["Between tricks", "1 per camp"], or
- * ["Always"] for a passive. */
+ * ["Always on"] for a passive. */
 export function sourceBadges(sourceId: string): string[] {
   const display = SOURCE_DISPLAY[sourceId];
   if (display === undefined) return [];
-  if (display.active === null) return ["Always"];
+  if (display.active === null) return ["Always on"];
   return [display.active.windowPhrase, display.active.limitBadge];
 }
 
@@ -68,19 +68,47 @@ function poolUnit(sourceId: string): string {
   return (pool?.name ?? "uses").toLowerCase();
 }
 
-/** What is left of a source right now: "1 left", "used", "2/3 herbs",
- * "1 supply". A passive is always on. */
-export function chargeText(sourceId: string, remaining: ExpeditionRemainingView | null): string {
-  if (remaining === null) return SOURCE_DISPLAY[sourceId]?.active === null ? "always on" : "";
+/** What is left of a source, the one wording every screen uses: `full`
+ * where there is room ("Once per camp", "1 of 2 charges", "Always on"),
+ * `short` where there is not ("1 per camp", "1/2 charges"). */
+export interface UsesLabel {
+  full: string;
+  short: string;
+}
+
+const both = (full: string, short: string = full): UsesLabel => ({ full, short });
+
+function countLeft(left: number, of: number, per: "camp" | "run"): UsesLabel {
+  if (left === 0) return both(`Used this ${per}`, "Used");
+  if (of === 1) return both(`Once per ${per}`, `1 per ${per}`);
+  return both(`${left} of ${of} this ${per}`, `${left} left`);
+}
+
+export function usesLabel(sourceId: string, remaining: ExpeditionRemainingView | null): UsesLabel {
+  const display = SOURCE_DISPLAY[sourceId];
+  if (remaining === null) return both(display?.active === null ? "Always on" : (display?.active?.limitBadge ?? ""));
   switch (remaining.kind) {
     case "uses":
-      return remaining.left === 0 ? "used" : `${remaining.left} left`;
+      switch (display?.active?.limitKind) {
+        case "single-use":
+          return both("Single use");
+        case "charges":
+          return both(`${remaining.left} of ${remaining.of} ${remaining.of === 1 ? "charge" : "charges"}`, `${remaining.left}/${remaining.of} charges`);
+        case "per-camp":
+          return countLeft(remaining.left, remaining.of, "camp");
+        case "per-run":
+          return countLeft(remaining.left, remaining.of, "run");
+        default:
+          return both(remaining.left === 0 ? "Used" : `${remaining.left} left`);
+      }
     case "pool":
-      return `${remaining.balance}/${remaining.max} ${poolUnit(sourceId)}`;
-    case "supplies":
-      return `${remaining.cost} ${remaining.cost === 1 ? "supply" : "supplies"}`;
+      return both(`${remaining.balance}/${remaining.max} ${poolUnit(sourceId)}`);
+    case "supplies": {
+      const supplies = `${remaining.cost} ${remaining.cost === 1 ? "supply" : "supplies"}`;
+      return both(`Costs ${supplies}`, supplies);
+    }
     case "crew":
-      return remaining.earned === 0 ? "not earned" : remaining.left === 0 ? "used" : `${remaining.left} left`;
+      return both(remaining.earned === 0 ? "Not earned" : remaining.left === 0 ? "Used" : `${remaining.left} left`);
   }
 }
 

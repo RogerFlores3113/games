@@ -16,7 +16,7 @@ import type { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel, SeatModel, SourceChip } from "../../../../lib/expedition/build-scene-model";
 import type { SeatBossMark } from "../../../../lib/expedition/boss-model";
 import type { CampHandlers } from "./camp-handlers";
-import { fitLabel } from "./text-fit";
+import { fitLabel, fitUses } from "./text-fit";
 import { DIM_ALPHA, PANEL_ALPHA, labelWidth, objectiveItem, objectiveItemWidth, plate, text, type Layer } from "./ui-kit";
 
 const ROW_H = 12;
@@ -133,10 +133,22 @@ function fogOverItems(ctx: Ctx, group: Layer, seat: SeatModel, x: number, y: num
   return ICON + 1;
 }
 
+/** A plate's hand and trick counts, from the longest wording to the
+ * shortest that keeps a cell between them in `w`: "10 cards", "0 tricks",
+ * then "0 won", then "10" with "0 won" on a spectator's narrowest plate. */
+function countsFor(seat: Pick<SeatModel, "handSize" | "tricksWon">, w: number): { cards: string; tricks: string } {
+  const cards = plural(seat.handSize, "card", "cards");
+  const forms = [
+    { cards, tricks: plural(seat.tricksWon, "trick", "tricks") },
+    { cards, tricks: `${seat.tricksWon} won` },
+    { cards: String(seat.handSize), tricks: `${seat.tricksWon} won` },
+  ];
+  return forms.find((f) => labelWidth(f.cards) + 4 + LABEL_CELL.w + labelWidth(f.tricks) <= w) ?? forms.at(-1)!;
+}
+
 /** "12 cards": the seat's hand, a target for hand picks. */
-function handCount(ctx: Ctx, group: Layer, seat: SeatModel, x: number, y: number): void {
+function handCount(ctx: Ctx, group: Layer, seat: SeatModel, x: number, y: number, label: string): void {
   const { scene, index, handlers } = ctx;
-  const label = plural(seat.handSize, "card", "cards");
   const w = labelWidth(label) + 4;
   const container = scene.add.container(x, y);
   if (seat.handPick.targetable || seat.handPick.selected) container.add(outline(scene, 0, 0, w, LABEL_CELL.h + 2));
@@ -209,9 +221,9 @@ function drawPlate(ctx: Ctx, layer: Layer, seat: SeatModel, box: Rect): void {
   nameRow(ctx, group, seat, { x: x0, y: box.y + 2, w: iw, h: ROW_H }, badge);
 
   const countsY = box.y + 15;
-  handCount(ctx, group, seat, x0, countsY);
-  const tricks = plural(seat.tricksWon, "trick", "tricks");
-  group.add(text(scene, x0 + iw - labelWidth(tricks) - 1, countsY + 1, tricks, PALETTE.textDim));
+  const counts = countsFor(seat, iw - 1);
+  handCount(ctx, group, seat, x0, countsY, counts.cards);
+  group.add(text(scene, x0 + iw - labelWidth(counts.tricks) - 1, countsY + 1, counts.tricks, PALETTE.textDim));
 
   const rowY = box.y + PLATE_H - MINI_H - 3;
   let iconsW = kitIcons(ctx, group, seat, x0 + iw, rowY + MINI_H / 2, Math.floor(iw / 2));
@@ -303,7 +315,7 @@ function kitRow(ctx: Ctx, layer: Layer, chip: SourceChip, x: number, y: number, 
   const chars = Math.floor((w - textX - 1) / LABEL_CELL.w);
   container.add(text(scene, textX, 1, fitLabel(chip.name, chars)));
   const chargeColor = chip.usable ? PALETTE.turn : chip.spent ? PALETTE.destructive : PALETTE.textDim;
-  container.add(text(scene, textX, KIT_ROW_H - LABEL_CELL.h - 1, fitLabel(chip.charge, chars), chargeColor));
+  container.add(text(scene, textX, KIT_ROW_H - LABEL_CELL.h - 1, fitUses(chip.charge, chars), chargeColor));
   container.setSize(w, KIT_ROW_H);
   container.setAlpha(chip.spent ? DIM_ALPHA + 0.2 : 1);
   const hit = scene.add.zone(0, 0, w, KIT_ROW_H).setOrigin(0, 0);

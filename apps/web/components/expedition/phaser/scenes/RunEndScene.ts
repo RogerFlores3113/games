@@ -10,6 +10,7 @@ import { preloadArt, placeArt } from "../art/place-art";
 import { PALETTE, toPhaserColor } from "../palette";
 import { RUN_END_ZONES, STAGE, rowBoxes } from "../layout";
 import { PANEL_ALPHA, button, labelWidth, plate, text, type Layer } from "../draw/ui-kit";
+import { fitLabel } from "../draw/text-fit";
 import { LEAVE_ID, NEW_EXPEDITION_ID } from "../../../../lib/expedition/expedition-ids";
 import type { RunEndCamp, RunEndModel } from "../../../../lib/expedition/run-end-model";
 import type { ObjectIndex } from "../object-index";
@@ -103,14 +104,17 @@ export class RunEndScene extends Phaser.Scene {
     rowBoxes(zone.x + 4, zone.w - 8, model.history.length, COLUMN_GAP, zone.w).forEach((box, i) => {
       const camp = model.history[i]!;
       const cx = box.x + Math.floor(box.w / 2);
-      const marker = camp.cleared ? "marker-cleared" : camp.boss ? "marker-boss" : "marker-camp";
+      const marker = camp.cleared ? "marker-cleared" : camp.boss !== null ? "marker-boss" : "marker-camp";
       const art = placeArt(this, marker, cx, zone.y + 14);
       if (camp.attempts === 0) art.setAlpha(0.5);
       layer.add(art);
-      layer.add(centred(this, cx, zone.y + 28, camp.boss ? `Camp ${camp.index} boss` : `Camp ${camp.index}`));
-      layer.add(centred(this, cx, zone.y + 28 + LABEL_CELL.h + 3, camp.caption, camp.attempts === 0 ? PALETTE.textDim : PALETTE.text));
+      const row = (n: number) => zone.y + 28 + (LABEL_CELL.h + 3) * n;
+      const chars = Math.floor(box.w / LABEL_CELL.w);
+      layer.add(centred(this, cx, row(0), `Camp ${camp.index}`));
+      if (camp.boss !== null) layer.add(centred(this, cx, row(1), fitLabel(camp.boss, chars), PALETTE.destructive));
+      layer.add(centred(this, cx, row(2), camp.caption, camp.attempts === 0 ? PALETTE.textDim : PALETTE.text));
       const status = campStatus(camp);
-      if (status.label !== "") layer.add(centred(this, cx, zone.y + 28 + (LABEL_CELL.h + 3) * 2, status.label, status.color));
+      if (status.label !== "") layer.add(centred(this, cx, row(3), status.label, status.color));
     });
   }
 

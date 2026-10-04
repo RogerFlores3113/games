@@ -27,7 +27,7 @@ import { objectiveTooltip } from "./objective-tooltip";
 import { buildModChips, buildSky, modTooltip, whisperBlocker, type ModChip, type Sky } from "./weather-model";
 import { bossBlockReason, bossHappenings, buildBoss, buildHelpers, latestGust, seatMarks, type BossHappening, type BossModel, type Gust, type SeatBossMark, type SeatNamer } from "./boss-model";
 import { buildTemplePath, type TemplePath } from "./temple-model";
-import { chargeText, isSpent, liveSourceKeys, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, type SourceKind } from "./source-text";
+import { isSpent, liveSourceKeys, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, usesLabel, type SourceKind, type UsesLabel } from "./source-text";
 
 const TORNADO_ID = "tornado";
 
@@ -129,15 +129,14 @@ export interface ObjectiveChip {
 
 /** A character, upgrade or equipped item. `sourceKey` is what the seat
  * acts through (an item's instance uid); `sourceId` names the def, for art
- * and text. `usable`/`reason` are yours only. `charge` is what is left:
- * "1 left", "used", "2/3 herbs", "always on". */
+ * and text. `usable`/`reason` are yours only. `charge` is what is left. */
 export interface SourceChip {
   sourceKey: string;
   sourceId: string;
   objectId: string;
   name: string;
   kind: SourceKind;
-  charge: string;
+  charge: UsesLabel;
   spent: boolean;
   usable: boolean;
   pulse: boolean;
@@ -376,7 +375,7 @@ function sourceChipFor(sourceKey: string, seatId: string, view: ExpeditionView, 
     objectId: sourceObjectId(sourceKey),
     name: sourceName(sourceId),
     kind: sourceKind(sourceId),
-    charge: chargeText(sourceId, remaining),
+    charge: usesLabel(sourceId, remaining),
     spent: isSpent(remaining),
     usable,
     pulse,

@@ -60,23 +60,30 @@ function drawCards(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: 
 }
 
 /** The newest whispers under the stump. The boss's rule and a lightning
- * strike on the trick in play are pinned to the bottom lines. */
+ * strike on the trick in play are pinned to the bottom lines, each on a
+ * solid plate edged in its colour, since the stump's roots behind them are
+ * as dark and busy as the text is bright. */
 function drawTicker(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
   const pinned = [
-    ...(model.boss === null || model.boss.rule === "" ? [] : [{ line: model.boss.rule, color: model.boss.alert ? PALETTE.destructive : PALETTE.sun }]),
-    ...(model.sky.notice === null ? [] : [{ line: model.sky.notice, color: PALETTE.coin }]),
+    ...(model.boss === null || model.boss.rule === "" ? [] : [{ line: model.boss.rule, color: model.boss.alert ? PALETTE.destructive : PALETTE.sun, pinned: true }]),
+    ...(model.sky.notice === null ? [] : [{ line: model.sky.notice, color: PALETTE.coin, pinned: true }]),
   ].slice(-TICKER_LINES);
   const room = TICKER_LINES - pinned.length;
   const whispers = room === 0 ? [] : model.whisperLog.slice(-room);
-  const lines = [...whispers.map((line, i) => ({ line, color: i === whispers.length - 1 && pinned.length === 0 ? PALETTE.text : PALETTE.textDim })), ...pinned];
+  const lines = [...whispers.map((line, i) => ({ line, color: i === whispers.length - 1 && pinned.length === 0 ? PALETTE.text : PALETTE.textDim, pinned: false })), ...pinned];
   const zone = ZONES.ticker;
-  const chars = Math.floor((zone.w - 4) / LABEL_CELL.w);
-  lines.forEach(({ line, color }, i) => {
+  const chars = Math.floor((zone.w - 6) / LABEL_CELL.w);
+  lines.forEach(({ line, color, pinned: rule }, i) => {
     const age = lines.length - 1 - i;
     const shown = truncateLabel(line, chars);
     const y = zone.y + zone.h - TICKER_LINE_H * (age + 1) + 1;
     const x = zone.x + Math.floor((zone.w - labelWidth(shown)) / 2);
-    layer.add(platedText(scene, x, y, shown, color));
+    if (!rule) {
+      layer.add(platedText(scene, x, y, shown, color));
+      return;
+    }
+    layer.add(plate(scene, x - 3, y - 2, labelWidth(shown) + 5, TICKER_LINE_H + 2).setStrokeStyle(1, toPhaserColor(color)));
+    layer.add(text(scene, x, y, shown, color));
   });
 }
 

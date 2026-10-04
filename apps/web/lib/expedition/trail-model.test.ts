@@ -258,11 +258,6 @@ describe("draft", () => {
     return p;
   };
 
-  it("headlines the cleared camp and its payout", () => {
-    expect(panel(at(draftStage())).heading).toBe("Camp 1 cleared: +8 coins");
-    expect(panel(at(draftStage({ cleared: 3, payout: 12 }))).heading).toBe("Camp 3 cleared: +12 coins");
-  });
-
   it("offers each bundle as one card naming its items, with their text, uses and rarity", () => {
     expect(panel(at(draftStage({ yourOffer: { bundles: [["rain-poncho", "trail-map"], ["heavy-pack"]] } }))).draft).toEqual({
       kind: "offer",
@@ -406,7 +401,7 @@ describe("event and loadout panels", () => {
           {
             index: 0,
             objectId: "slot:0",
-            item: { uid: "trained-monkey", itemId: "trained-monkey", objectId: "slot:0", name: "Trained Monkey", uses: "Always on", rare: false },
+            item: { uid: "trained-monkey", itemId: "trained-monkey", objectId: "slot:0", name: "Trained Monkey", uses: "Once per camp", rare: false },
           },
           { index: 1, objectId: "slot:1", item: null },
         ],
@@ -626,14 +621,14 @@ describe("kit", () => {
       }),
     });
     expect(model(view).kit).toEqual([
-      { sourceKey: "guide", sourceId: "guide", objectId: "kit:guide", name: "Machete", kind: "character", charge: "used" },
-      { sourceKey: "trained-monkey", sourceId: "trained-monkey", objectId: "kit:trained-monkey", name: "Trained Monkey", kind: "item", charge: "1 left" },
+      { sourceKey: "guide", sourceId: "guide", objectId: "kit:guide", name: "Machete", kind: "character", charge: { full: "Used this camp", short: "Used" } },
+      { sourceKey: "trained-monkey", sourceId: "trained-monkey", objectId: "kit:trained-monkey", name: "Trained Monkey", kind: "item", charge: { full: "Once per camp", short: "1 per camp" } },
     ]);
   });
 
   it("marks a passive-only character as always on", () => {
     const view = makeView({ seats: seatsWith({ characterId: "signaller", upgradeId: null, items: { equipped: [], backpack: [], concealed: false } }) });
-    expect(model(view).kit).toEqual([{ sourceKey: "signaller", sourceId: "signaller", objectId: "kit:signaller", name: "Talking Drum", kind: "character", charge: "always on" }]);
+    expect(model(view).kit).toEqual([{ sourceKey: "signaller", sourceId: "signaller", objectId: "kit:signaller", name: "Talking Drum", kind: "character", charge: { full: "Always on", short: "Always on" } }]);
   });
 
   it("is null for a spectator", () => {
@@ -716,7 +711,7 @@ describe("tooltip", () => {
     expect(model(makeView(), ui({ tooltipSourceId: "scout" })).tooltip).toEqual({
       title: "Spyglass",
       text: "See a random card in a teammate's hand.",
-      badges: ["Between tricks", "1 per camp"],
+      badges: ["Between tricks", "Once per camp"],
       reason: null,
     });
   });

@@ -5,6 +5,8 @@
  * each other. No `phaser` import, so Vitest loads this module directly.
  */
 
+import { LABEL_CELL } from "./font/font-keys";
+
 export interface Rect {
   x: number;
   y: number;
@@ -68,6 +70,48 @@ export const ROUTE_ZONES = {
   ready: TRAIL_ZONES.ready,
 } as const satisfies Record<string, Rect>;
 
+/** The draft while your offer is open: the bundles take the panel and crew
+ * row, so every item's rules fit in full. */
+export const DRAFT_ZONES = {
+  topBar: TRAIL_ZONES.topBar,
+  prompt: TRAIL_ZONES.prompt,
+  trail: TRAIL_ZONES.trail,
+  offer: ROUTE_ZONES.routes,
+  tooltip: TRAIL_ZONES.tooltip,
+  backpack: TRAIL_ZONES.backpack,
+  ready: TRAIL_ZONES.ready,
+} as const satisfies Record<string, Rect>;
+
+const BUNDLE_GAP = 8;
+const BUNDLE_MAX_W = 200;
+/** Lines of rules text a bundle item has room for; `layout.test.ts` checks
+ * every item's text wraps within it at the narrowest bundle card. */
+export const BUNDLE_TEXT_LINES = 3;
+
+/** The bundle cards of a draft offer, centred in the offer zone. */
+export function bundleBoxes(count: number): { x: number; w: number }[] {
+  const zone = DRAFT_ZONES.offer;
+  const boxes = rowBoxes(0, zone.w - 12, count, BUNDLE_GAP, BUNDLE_MAX_W);
+  const span = boxes.length === 0 ? 0 : boxes.at(-1)!.x + boxes.at(-1)!.w;
+  const left = zone.x + Math.floor((zone.w - span) / 2);
+  return boxes.map((box) => ({ x: left + box.x, w: box.w }));
+}
+
+const BUNDLE_LINE_H = LABEL_CELL.h + 2;
+/** A bundle card's Take button, at its foot. */
+export const BUNDLE_TAKE_H = 14;
+export const BUNDLE_ITEM_TEXT_Y = 14;
+
+/** A bundle item's height: its name row, its rules, then its uses chips. */
+export function bundleItemH(lines: number): number {
+  return BUNDLE_ITEM_TEXT_Y + lines * BUNDLE_LINE_H + 2 + BUNDLE_LINE_H + 2;
+}
+
+/** Characters of rules text per line in a bundle card `w` wide. */
+export function bundleTextChars(w: number): number {
+  return Math.floor((w - 8) / LABEL_CELL.w);
+}
+
 /** The muster before camp 1: the characters, the crew and the length vote. */
 export const MUSTER_ZONES = {
   topBar: { x: 0, y: 0, w: 576, h: 22 },
@@ -90,6 +134,7 @@ export const SCENE_ZONES: Readonly<Record<string, Readonly<Record<string, Rect>>
   camp: ZONES,
   trail: TRAIL_ZONES,
   route: ROUTE_ZONES,
+  draft: DRAFT_ZONES,
   muster: MUSTER_ZONES,
   "run-end": RUN_END_ZONES,
 };
@@ -166,11 +211,11 @@ export function seatSpots(count: number): readonly SeatSpot[] {
 }
 
 /** The name plate above a seat's head: as wide as fits between its
- * neighbours on the same row, and never outside the crowd zone. */
+ * neighbours whose plates share its rows, and never outside the crowd zone. */
 export function plateRect(spots: readonly SeatSpot[], i: number): Rect {
   const spot = spots[i]!;
   const y = spot.bottom - SILHOUETTE_H - PLATE_GAP - PLATE_H;
-  const sameRow = spots.filter((s) => s !== spot && Math.abs(s.bottom - spot.bottom) < PLATE_H + PLATE_GAP * 2);
+  const sameRow = spots.filter((s) => s !== spot && Math.abs(s.bottom - spot.bottom) < PLATE_H);
   const gap = Math.min(...sameRow.map((s) => Math.abs(s.x - spot.x) - 4), 128);
   const zone = ZONES.crowd;
   const w = Math.min(gap, 2 * (spot.x - zone.x), 2 * (zone.x + zone.w - spot.x));

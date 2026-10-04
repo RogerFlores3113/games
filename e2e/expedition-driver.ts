@@ -60,7 +60,7 @@ export interface ShopEntry {
 
 export type TrailPanel =
   | { kind: "muster"; characters: MusterCard[]; lengths: VoteOption[] }
-  | { kind: "draft"; heading: string; draft: { kind: "offer"; bundles: DraftTile[] } | { kind: "taken" | "none" } }
+  | { kind: "draft"; draft: { kind: "offer"; bundles: DraftTile[] } | { kind: "taken" | "none" } }
   | { kind: "route"; options: VoteOption[] }
   | { kind: "event" }
   | { kind: "loadout"; gear: Gear | null; shop: { purse: number; entries: ShopEntry[] } | null };

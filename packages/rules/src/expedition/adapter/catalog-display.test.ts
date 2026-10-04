@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { CATALOG } from "../run/catalog";
-import { CHARACTER_DISPLAY, MOD_DISPLAY, SOURCE_DISPLAY } from "./catalog-display";
+import { BALANCE_DISPLAY, CHARACTER_DISPLAY, MOD_DISPLAY, SOURCE_DISPLAY } from "./catalog-display";
 
 describe("SOURCE_DISPLAY", () => {
   it("has exactly one entry per source in the catalogue, plus the temple's granted skip", () => {
@@ -19,7 +19,7 @@ describe("SOURCE_DISPLAY", () => {
       text: "Drop one open objective.",
       kind: "grant",
       characterId: null,
-      active: { windows: ["between-tricks", "rescue"], windowPhrase: "Between tricks or when an objective fails", limitBadge: "Crew token", targets: ["objective"] },
+      active: { windows: ["between-tricks", "rescue"], windowPhrase: "Between tricks or when an objective fails", limitBadge: "Crew token", limitKind: "crew-tokens", targets: ["objective"] },
       passive: false,
       item: null,
     });
@@ -32,7 +32,7 @@ describe("SOURCE_DISPLAY", () => {
       text: "See a random card in a teammate's hand.",
       kind: "character",
       characterId: "scout",
-      active: { windows: ["between-tricks"], windowPhrase: "Between tricks", limitBadge: "1 per camp", targets: ["hand"] },
+      active: { windows: ["between-tricks"], windowPhrase: "Between tricks", limitBadge: "Once per camp", limitKind: "per-camp", targets: ["hand"] },
       passive: false,
       item: null,
     });
@@ -43,7 +43,7 @@ describe("SOURCE_DISPLAY", () => {
     expect(SOURCE_DISPLAY["scout.eavesdrop"]).toMatchObject({
       kind: "upgrade",
       characterId: "scout",
-      active: { windowPhrase: "Between tricks", limitBadge: "1 per camp", targets: ["whisper"] },
+      active: { windowPhrase: "Between tricks", limitBadge: "Once per camp", targets: ["whisper"] },
     });
   });
 
@@ -62,7 +62,7 @@ describe("SOURCE_DISPLAY", () => {
   });
 
   it("phrases each limit kind, and an item's uses as its badge", () => {
-    expect(SOURCE_DISPLAY.scout!.active!.limitBadge).toBe("1 per camp");
+    expect(SOURCE_DISPLAY.scout!.active!.limitBadge).toBe("Once per camp");
     expect(SOURCE_DISPLAY["guide.howler-call"]!.active!.limitBadge).toBe("Once per run");
     expect(SOURCE_DISPLAY["trail-map"]!.active!.limitBadge).toBe("Single use");
     expect(SOURCE_DISPLAY["rain-poncho"]!.active!.limitBadge).toBe("2 charges");
@@ -70,6 +70,14 @@ describe("SOURCE_DISPLAY", () => {
     expect(SOURCE_DISPLAY.whetstone!.active!.limitBadge).toBe("Single use");
     expect(SOURCE_DISPLAY.botanist!.active!.limitBadge).toBe("1 herb");
     expect(SOURCE_DISPLAY["botanist.antidote"]!.active!.limitBadge).toBe("2 herbs");
+    expect(["guide.howler-call", "rain-poncho", "parrot", "trail-map", "botanist", "medic"].map((id) => SOURCE_DISPLAY[id]!.active!.limitKind)).toEqual([
+      "per-run",
+      "charges",
+      "per-camp",
+      "single-use",
+      "pool",
+      "supplies",
+    ]);
     expect(SOURCE_DISPLAY.medic!.active!.limitBadge).toBe("1 supply");
   });
 
@@ -112,5 +120,21 @@ describe("MOD_DISPLAY", () => {
     expect(Object.keys(MOD_DISPLAY).sort()).toEqual(Object.keys(CATALOG.mods).sort());
     expect(MOD_DISPLAY.thunderstorm).toEqual({ id: "thunderstorm", name: "Thunderstorm", kind: "weather", text: "Lightning may strike before a trick, and then the lowest card wins it." });
     expect(JSON.parse(JSON.stringify(MOD_DISPLAY))).toEqual(MOD_DISPLAY);
+  });
+});
+
+describe("BALANCE_DISPLAY", () => {
+  it("carries the run's numbers as plain data", () => {
+    expect(BALANCE_DISPLAY).toEqual({
+      suppliesStart: 3,
+      suppliesMax: 4,
+      supplyPrice: 6,
+      failureCost: 1,
+      payout: { base: 5, perUnplayedTrick: 1, unplayedCap: 3 },
+      draftOptions: 3,
+      itemSlots: 2,
+      upgradePrice: 8,
+      whispersPerUpgrade: 1,
+    });
   });
 });

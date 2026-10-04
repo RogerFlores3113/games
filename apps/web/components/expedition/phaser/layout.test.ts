@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { SOURCE_DISPLAY } from "@games/rules";
+import { wrapWords } from "./draw/text-fit";
 import {
+  BUNDLE_TAKE_H,
+  BUNDLE_TEXT_LINES,
   CARD_H,
+  DRAFT_ZONES,
+  bundleBoxes,
+  bundleItemH,
+  bundleTextChars,
   CARD_W,
   HAND_CARD_Y,
   HAND_MARKER_H,
@@ -53,6 +61,20 @@ describe.each(Object.entries(SCENE_ZONES))("%s zones", (_scene, zones) => {
   it("every zone has whole-pixel edges", () => {
     const fractional = zoneEntries.filter(([, r]) => ![r.x, r.y, r.w, r.h].every(Number.isInteger)).map(([id]) => id);
     expect(fractional).toEqual([]);
+  });
+});
+
+describe("bundle cards", () => {
+  const items = Object.values(SOURCE_DISPLAY).filter((d) => d.kind === "item");
+
+  it("fit every item's rules in full at the narrowest offer", () => {
+    const narrowest = Math.min(...bundleBoxes(3).map((b) => b.w));
+    const long = items.filter((d) => wrapWords(d.text, bundleTextChars(narrowest)).length > BUNDLE_TEXT_LINES).map((d) => d.id);
+    expect(long).toEqual([]);
+  });
+
+  it("hold two items at full length and the Take button in the offer zone", () => {
+    expect(2 * bundleItemH(BUNDLE_TEXT_LINES) + 1 + BUNDLE_TAKE_H + 3).toBeLessThanOrEqual(DRAFT_ZONES.offer.h - 4);
   });
 });
 
@@ -110,6 +132,13 @@ describe("seats around the stump", () => {
       for (let j = i + 1; j < plates.length; j++) expect(rectsIntersect(plates[i]!, plates[j]!)).toBe(false);
       for (const s of spots) expect(rectsIntersect(plates[i]!, silhouette(s))).toBe(false);
     }
+  });
+
+  // A hand and its tricks never both reach two digits, so "14 cards" beside
+  // "0 tricks", or "4 cards" beside "10 tricks", is the longest counts row.
+  it.each([1, 2, 3, 4])("count=%i: every plate is wide enough for the full counts row", (count) => {
+    const spots = seatSpots(count);
+    expect(spots.map((_, i) => plateRect(spots, i).w).filter((w) => w < 112)).toEqual([]);
   });
 
   it.each([2, 3, 4, 5])("count=%i: every played card lands on the stump, clear of the others and of yours", (count) => {

@@ -1,4 +1,6 @@
-import { SOURCE_DISPLAY, type ExpeditionView } from "@games/rules";
+import { BALANCE_DISPLAY, MOD_DISPLAY, RUN_LENGTH_DISPLAY, SOURCE_DISPLAY, type ExpeditionView } from "@games/rules";
+import { ART, ART_URL_PREFIX, modArtId, type ArtId } from "../../components/expedition/phaser/art/art-registry";
+import { modIconRows } from "../../components/expedition/phaser/art/mod-icons";
 import { characterName, sourceBadges, sourceName } from "./source-text";
 
 export interface RulesItem {
@@ -7,7 +9,7 @@ export interface RulesItem {
 }
 
 export interface RulesSection {
-  id: "goal" | "tricks" | "objectives" | "whisper" | "explorers" | "kit";
+  id: "goal" | "between" | "tricks" | "objectives" | "whisper" | "gear" | "temple" | "kit";
   heading: string;
   paragraphs: string[];
   items: RulesItem[];
@@ -19,7 +21,7 @@ function kitSection(view: RulesView | null): RulesSection {
   const you = view?.seats.find((s) => s.seatId === view.yourSeatId);
   const itemIds = you === undefined ? [] : [...you.items.equipped, ...(you.items.backpack ?? [])].map((item) => item.itemId);
   const owned = you === undefined ? [] : [...(you.characterId === null ? [] : [you.characterId]), ...(you.upgradeId === null ? [] : [you.upgradeId]), ...new Set(itemIds)];
-  const paragraphs = ["Your explorer's power and everything you draft stay with you for the run."];
+  const paragraphs = ["Your explorer's power, its upgrades and every item you carry stay with you for the run."];
   const items: RulesItem[] = [];
   for (const id of owned) {
     const source = SOURCE_DISPLAY[id];
@@ -31,15 +33,29 @@ function kitSection(view: RulesView | null): RulesSection {
   return { id: "kit", heading: "Your kit", paragraphs, items };
 }
 
+const { short, standard, long } = RUN_LENGTH_DISPLAY;
+const B = BALANCE_DISPLAY;
+const count = (n: number, one: string, many: string): string => `${n === 1 ? "one" : n} ${n === 1 ? one : many}`;
+
 export function buildRulesReference(view: ExpeditionView | null): RulesSection[] {
   return [
     {
       id: "goal",
       heading: "Goal",
       paragraphs: [
-        "Before camp 1 the crew votes on the run: Short (4 camps), Standard (6) or Long (8). Clear every camp to reach the temple. A camp is cleared when every objective is done.",
-        "A cleared camp pays coins into the crew's purse. Then everyone drafts, the crew votes on the route to the next camp, and an event waits on the trail. A tied vote is settled by a coin flip.",
-        "A failed camp costs a supply and is replayed with a fresh deal. Run out of supplies and the run ends.",
+        `Before camp 1 the crew votes on the run: ${short.name} (${short.camps} camps), ${standard.name} (${standard.camps}) or ${long.name} (${long.camps}). The last camp is the temple.`,
+        `A camp is cleared when every objective is done. A failed camp costs ${count(B.failureCost, "supply", "supplies")} and is replayed with a fresh deal. The crew starts with ${B.suppliesStart} supplies and holds at most ${B.suppliesMax}. With none left, the run ends.`,
+      ],
+      items: [],
+    },
+    {
+      id: "between",
+      heading: "Between camps",
+      paragraphs: [
+        `A cleared camp pays ${B.payout.base} coins into the crew's purse, plus ${B.payout.perUnplayedTrick} for each unplayed trick, up to ${B.payout.unplayedCap * B.payout.perUnplayedTrick} more.`,
+        `Everyone then drafts one of ${B.draftOptions} bundles of items. The crew votes on the route to the next camp, and a tied vote is settled by a coin flip. An event waits on the trail.`,
+        `Before a boss camp the crew shops with the purse: supplies (${B.supplyPrice} coins), items, and your own character's upgrades (${B.upgradePrice} coins). An upgrade also gives you ${count(B.whispersPerUpgrade, "more whisper", "more whispers")} each camp.`,
+        `Each explorer has ${B.itemSlots} item slots. Extra items wait in the backpack, and you choose your loadout between camps.`,
       ],
       items: [],
     },
@@ -74,21 +90,116 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       items: [],
     },
     {
-      id: "explorers",
+      id: "gear",
       heading: "Explorers and gear",
       paragraphs: [
-        "Each player picks one of six explorers before camp 1. Each explorer has a base power.",
-        "After every cleared camp, take one of three offers: an upgrade to your explorer's power, or an item.",
-        "Every power says when it works and how often. Click it in your kit to use it, then pick its targets and confirm.",
+        "Each player picks one explorer before camp 1, and each has a base power. Click a power or item in your kit to use it, then pick its targets and confirm.",
+        "Every power and item says when it works and how often.",
       ],
       items: [
-        { label: "1 per camp", body: "Works again in the next camp, or when a camp is replayed." },
         { label: "Once per run", body: "One use for the whole expedition." },
         { label: "Single use", body: "The item is used up. You may draft it again later." },
-        { label: "Herbs and supplies", body: "Some powers spend the Botanist's herbs or the crew's supplies. Herbs come back after a cleared camp." },
+        { label: "Once per camp", body: "A power or item that works again in the next camp, or when a camp is replayed." },
+        { label: "N charges", body: "The item can be used N times, then it is spent." },
+        { label: "Always on", body: "Nothing to click. It works for as long as you carry it." },
         { label: "Rescue", body: "When an objective fails, anyone with a rescue power may save it. The table waits for them to use it or pass; if nobody saves it, the camp fails." },
       ],
     },
+    {
+      id: "temple",
+      heading: "The temple",
+      paragraphs: [
+        "At the last camp, lead each plate's suit in order, ending with the Sun. Every plate must be pressed, or the camp fails. The Sun is also an objective someone must win.",
+        "Winning the Sun earns the crew a Skip. Any seat can spend it between tricks or in rescue to drop one open objective.",
+        "Bosses you beat earlier return as helpers at half strength.",
+      ],
+      items: [],
+    },
     kitSection(view),
+  ];
+}
+
+/** `icon` is the 9x9 pixel icon the canvas draws for it, as rows of palette letters. */
+export type ModEntry = { id: string; name: string; text: string; imageUrl: string | null; icon: readonly string[] };
+export type ModGroup = { id: string; heading: string; note: string | null; entries: ModEntry[] };
+export type ModPage = { id: "locations" | "weather" | "bosses"; label: string; groups: ModGroup[] };
+export type ReferencePageId = "rules" | ModPage["id"];
+
+export const REFERENCE_PAGES: readonly { id: ReferencePageId; label: string }[] = [
+  { id: "rules", label: "Rules" },
+  { id: "locations", label: "Locations" },
+  { id: "weather", label: "Weather" },
+  { id: "bosses", label: "Bosses" },
+];
+
+const artUrl = (id: ArtId): string => `${ART_URL_PREFIX}${ART[id].file}`;
+
+function entriesOf(kind: string, imageOf: (id: string, kind: string) => string | null): ModEntry[] {
+  return Object.values(MOD_DISPLAY)
+    .filter((mod) => mod.kind === kind)
+    .map((mod) => ({ id: mod.id, name: mod.name, text: mod.text, imageUrl: imageOf(mod.id, mod.kind), icon: modIconRows(mod.id, mod.kind) }));
+}
+
+function modImage(id: string, kind: string): string | null {
+  const art = modArtId({ id, kind });
+  return art === null ? null : artUrl(art);
+}
+
+/** Where a boss tier waits: "One waits at camp 3 of a Standard or Long run." */
+function tierNote(tier: "animal" | "disaster"): string {
+  const byCamp = new Map<number, string[]>();
+  for (const length of Object.values(RUN_LENGTH_DISPLAY)) {
+    for (const boss of length.bossCamps) if (boss.tier === tier) byCamp.set(boss.at, [...(byCamp.get(boss.at) ?? []), length.name]);
+  }
+  return `One waits at ${[...byCamp].map(([at, names]) => `camp ${at} of a ${names.join(" or ")} run`).join(", or ")}.`;
+}
+
+/** Weather has no art file: its entries show the pixel icon the canvas draws. */
+export function buildModPages(): ModPage[] {
+  return [
+    {
+      id: "locations",
+      label: "Locations",
+      groups: [
+        {
+          id: "location",
+          heading: "Locations",
+          note: "The route shows where each camp is. Camp 1 is always the Jungle.",
+          entries: entriesOf("location", modImage),
+        },
+      ],
+    },
+    {
+      id: "weather",
+      label: "Weather",
+      groups: [
+        {
+          id: "weather",
+          heading: "Weather",
+          note: "Most camps have fair weather. Other weather is drawn for the route.",
+          entries: entriesOf("weather", () => null),
+        },
+        {
+          id: "pairing",
+          heading: "Pairings",
+          note: "Some weather changes a location. These are never drawn on their own.",
+          entries: entriesOf("pairing", () => null),
+        },
+      ],
+    },
+    {
+      id: "bosses",
+      label: "Bosses",
+      groups: [
+        { id: "animal", heading: "Animal bosses", note: tierNote("animal"), entries: entriesOf("animal", modImage) },
+        { id: "disaster", heading: "Disaster bosses", note: tierNote("disaster"), entries: entriesOf("disaster", modImage) },
+        {
+          id: "temple",
+          heading: "The temple",
+          note: null,
+          entries: entriesOf("temple", (id) => (id === "temple" ? artUrl("bg-temple") : null)),
+        },
+      ],
+    },
   ];
 }

@@ -1,7 +1,7 @@
 import type { ExpeditionItemView, ExpeditionSeatView, ExpeditionShopView } from "@games/rules";
 import { SOURCE_DISPLAY } from "@games/rules";
 import { packObjectId, shopInfoObjectId, shopObjectId, slotObjectId } from "./expedition-ids";
-import { sourceName } from "./source-text";
+import { sourceName, usesLabel } from "./source-text";
 
 /**
  * The loadout's gear (your slots and backpack) and the shop before a boss
@@ -39,27 +39,13 @@ export interface Gear {
 
 export type GearMove = { uid: string; to: { kind: "slot"; index: number } | { kind: "backpack" } };
 
-function usesText(item: ExpeditionItemView): string {
-  const display = SOURCE_DISPLAY[item.itemId]?.item;
-  const remaining = item.remaining;
-  if (remaining === null || remaining.kind !== "uses" || display === undefined || display === null) return "Always on";
-  switch (display.usesKind) {
-    case "per-camp":
-      return remaining.left === 0 ? "Used this camp" : "Once per camp";
-    case "charges":
-      return `${remaining.left} of ${remaining.of} ${remaining.of === 1 ? "charge" : "charges"}`;
-    default:
-      return "Single use";
-  }
-}
-
 function gearItem(item: ExpeditionItemView, objectId: string): GearItem {
   return {
     uid: item.uid,
     itemId: item.itemId,
     objectId,
     name: sourceName(item.itemId),
-    uses: usesText(item),
+    uses: usesLabel(item.itemId, item.remaining).full,
     rare: SOURCE_DISPLAY[item.itemId]?.item?.rarity === "rare",
   };
 }

@@ -4,7 +4,7 @@ import type { Prompt } from "./build-prompt";
 import { buildTrailPrompt } from "./build-prompt";
 import type { SceneServerInput, Tooltip, TopBar } from "./build-scene-model";
 import { buildTopBar } from "./build-scene-model";
-import { characterName, chargeText, liveSourceKeys, sourceBadges, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, type SourceKind } from "./source-text";
+import { characterName, usesLabel, type UsesLabel, liveSourceKeys, sourceBadges, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, type SourceKind } from "./source-text";
 import { bundleItemObjectId, bundleObjectId, draftObjectId, kitObjectId, lengthObjectId, READY_ID, routeObjectId } from "./expedition-ids";
 import { buildGear, buildShop, type Gear, type ShopPanel } from "./loadout-model";
 import type { LocalUiState } from "./local-ui";
@@ -151,7 +151,7 @@ export type DraftPanel =
 
 export type TrailPanel =
   | { kind: "muster"; characters: CharacterCard[]; lengths: LengthOption[]; crew: MusterCrewRow[]; votes: string }
-  | { kind: "draft"; heading: string; draft: DraftPanel }
+  | { kind: "draft"; draft: DraftPanel }
   | { kind: "route"; options: RouteCard[] }
   | { kind: "event"; name: string; text: string; next: CampPreview }
   /** `gear` is null for a spectator; `shop` is open before a boss camp. */
@@ -165,8 +165,8 @@ export interface KitItem {
   objectId: string;
   name: string;
   kind: SourceKind;
-  /** What is left: "2/3 herbs", "1 left", "always on". */
-  charge: string;
+  /** What is left. */
+  charge: UsesLabel;
 }
 
 export interface CrewRow {
@@ -394,7 +394,7 @@ function buildPanel(server: SceneServerInput, ui: LocalUiState): TrailPanel {
     case "muster":
       return buildMuster(server, stage.ballots);
     case "draft":
-      return { kind: "draft", heading: `Camp ${stage.cleared} cleared: +${stage.payout} coins`, draft: buildDraft(view, stage.yourOffer, ui.takenBundle) };
+      return { kind: "draft", draft: buildDraft(view, stage.yourOffer, ui.takenBundle) };
     case "route":
       return { kind: "route", options: buildRoutes(server, stage) };
     case "event": {
@@ -406,7 +406,7 @@ function buildPanel(server: SceneServerInput, ui: LocalUiState): TrailPanel {
     case "camp":
       return { kind: "loadout", next: campPreview(view, stage.camp), gear: null, shop: null };
     case "ended":
-      return { kind: "draft", heading: "", draft: { kind: "none", text: "" } };
+      return { kind: "draft", draft: { kind: "none", text: "" } };
   }
 }
 
@@ -464,7 +464,7 @@ function buildKit(view: View): KitItem[] | null {
       objectId: kitObjectId(sourceKey),
       name: sourceName(sourceId),
       kind: sourceKind(sourceId),
-      charge: chargeText(sourceId, you.usage.find((u) => u.sourceKey === sourceKey)?.remaining ?? null),
+      charge: usesLabel(sourceId, you.usage.find((u) => u.sourceKey === sourceKey)?.remaining ?? null),
     };
   });
 }

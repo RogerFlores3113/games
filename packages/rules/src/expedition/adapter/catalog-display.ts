@@ -10,7 +10,7 @@ import { resolveTuned, windowsOf, type ActiveAbility, type CharacterDef, type It
 import { CATALOG } from "../run/catalog";
 import type { TargetKind } from "../run/targets";
 import { WINDOWS, type ActiveWindow } from "../run/windows";
-import { RUN_LENGTHS } from "../run/balance";
+import { DRAFT, FAILURE_COST, ITEM_SLOTS, PAYOUT, RUN_LENGTHS, SHOP, SUPPLIES_MAX, SUPPLIES_START, SUPPLY_PRICE, WHISPERS_PER_UPGRADE } from "../run/balance";
 import type { BossTier } from "../run/plan";
 import type { RunLength } from "../run/types";
 import { EVENTS } from "../content/events/registry";
@@ -23,8 +23,10 @@ export type SourceActiveDisplay = {
   windows: ActiveWindow[];
   /** Badge text, e.g. "Between tricks", or "Between tricks or when an objective fails". */
   windowPhrase: string;
-  /** Badge text for the base limit, e.g. "1 per camp", "1 herb". */
+  /** Badge text for the base limit, e.g. "Once per camp", "1 herb". */
   limitBadge: string;
+  /** How the uses come back: an item's uses kind, else its limit's kind. */
+  limitKind: ItemUses["kind"] | UsageLimit["kind"];
   targets: ExpeditionTargetKind[];
 };
 
@@ -85,7 +87,7 @@ function usesBadge(uses: ItemUses): string {
 function limitBadge(limit: UsageLimit, character: CharacterDef | null): string {
   switch (limit.kind) {
     case "per-camp":
-      return `${limit.times} per camp`;
+      return limit.times === 1 ? "Once per camp" : `${limit.times} per camp`;
     case "per-run":
       return limit.times === 1 ? "Once per run" : `${limit.times} per run`;
     case "pool": {
@@ -104,12 +106,18 @@ function badgeOf(def: SourceDef, character: CharacterDef | null): string {
   return def.active === undefined ? "" : limitBadge(resolveTuned(def.active.limit, BASE_OWNER), character);
 }
 
-function activeDisplay(active: ItemAbility, limitBadge: string): SourceActiveDisplay {
+function limitKindOf(def: SourceDef): SourceActiveDisplay["limitKind"] {
+  if (def.kind === "item") return def.uses?.kind ?? "single-use";
+  return def.active === undefined ? "per-camp" : resolveTuned(def.active.limit, BASE_OWNER).kind;
+}
+
+function activeDisplay(active: ItemAbility, limitBadge: string, limitKind: SourceActiveDisplay["limitKind"]): SourceActiveDisplay {
   const windows = [...windowsOf(active)];
   return {
     windows,
     windowPhrase: windows.map((w, i) => (i === 0 ? WINDOWS[w].phrase : WINDOWS[w].phrase.toLowerCase())).join(" or "),
     limitBadge,
+    limitKind,
     targets: active.targets.map((spec) => spec.kind),
   };
 }
@@ -122,7 +130,7 @@ function toSourceDisplay(def: SourceDef): SourceDisplay {
     text: def.text,
     kind: def.kind,
     characterId: character?.id ?? null,
-    active: def.active === undefined ? null : activeDisplay(def.active, badgeOf(def, character)),
+    active: def.active === undefined ? null : activeDisplay(def.active, badgeOf(def, character), limitKindOf(def)),
     passive: def.passive !== undefined,
     item:
       def.kind === "item"
@@ -132,7 +140,8 @@ function toSourceDisplay(def: SourceDef): SourceDisplay {
 }
 
 function toGrantDisplay(id: string, grant: ActiveAbility & { readonly name: string; readonly text: string }): SourceDisplay {
-  const active = activeDisplay(grant, limitBadge(resolveTuned(grant.limit, BASE_OWNER), null));
+  const limit = resolveTuned(grant.limit, BASE_OWNER);
+  const active = activeDisplay(grant, limitBadge(limit, null), limit.kind);
   return { id, name: grant.name, text: grant.text, kind: "grant", characterId: null, active, passive: false, item: null };
 }
 
@@ -184,3 +193,17 @@ export type ModDisplay = { id: string; name: string; text: string; kind: ModKind
 export const MOD_DISPLAY: Readonly<Record<string, ModDisplay>> = Object.fromEntries(
   Object.values(CATALOG.mods).map((def) => [def.id, { id: def.id, name: def.name, text: def.text, kind: def.kind }]),
 );
+
+/** The run's numbers the rules reference states, read from `run/balance.ts`
+ * so the copy follows a balance pass. */
+export const BALANCE_DISPLAY = {
+  suppliesStart: SUPPLIES_START,
+  suppliesMax: SUPPLIES_MAX,
+  supplyPrice: SUPPLY_PRICE,
+  failureCost: FAILURE_COST,
+  payout: { ...PAYOUT },
+  draftOptions: DRAFT.options,
+  itemSlots: ITEM_SLOTS,
+  upgradePrice: SHOP.upgradePrice,
+  whispersPerUpgrade: WHISPERS_PER_UPGRADE,
+} as const;

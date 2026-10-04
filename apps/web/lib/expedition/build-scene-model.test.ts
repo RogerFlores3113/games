@@ -611,7 +611,7 @@ describe("source chips", () => {
     expect(buildSceneModel(server(blocked), ui({ tooltipSourceId: "scout" }), "big-index").tooltip).toEqual({
       title: "Spyglass",
       text: "See a random card in a teammate's hand.",
-      badges: ["Between tricks", "1 per camp"],
+      badges: ["Between tricks", "Once per camp"],
       reason: "Already used this camp",
     });
 
@@ -619,7 +619,7 @@ describe("source chips", () => {
     expect(buildSceneModel(server(usable), ui({ tooltipSourceId: "scout" }), "big-index").tooltip).toEqual({
       title: "Spyglass",
       text: "See a random card in a teammate's hand.",
-      badges: ["Between tricks", "1 per camp"],
+      badges: ["Between tricks", "Once per camp"],
       reason: null,
     });
     expect(buildSceneModel(server(usable), ui(), "big-index").tooltip).toBeNull();
@@ -989,11 +989,11 @@ describe("charges and shown cards", () => {
     });
     const model = buildSceneModel(server(view), ui(), "big-index");
     expect(model.seats.find((s) => s.seatId === "s1")!.sources.map((c) => [c.name, c.charge, c.spent])).toEqual([
-      ["Herb Tonic", "2/3 herbs", false],
-      ["Bait", "1 left", false],
-      ["Heavy Pack", "always on", false],
+      ["Herb Tonic", { full: "2/3 herbs", short: "2/3 herbs" }, false],
+      ["Bait", { full: "Single use", short: "Single use" }, false],
+      ["Heavy Pack", { full: "Always on", short: "Always on" }, false],
     ]);
-    expect(model.seats.find((s) => s.seatId === "s2")!.sources[0]).toMatchObject({ charge: "used", spent: true });
+    expect(model.seats.find((s) => s.seatId === "s2")!.sources[0]).toMatchObject({ charge: { full: "Used this camp", short: "Used" }, spent: true });
   });
 
   it("cards an ability showed you are listed with the source and the hand they came from", () => {
@@ -1237,15 +1237,15 @@ describe("the temple", () => {
   it("puts the crew's Skip in every seat's kit: locked with its reason until the Sun is won, then 1 left", () => {
     const locked = buildSceneModel(server(templeView()), ui({ tooltipSourceId: "temple" }), "big-index");
     const skipOf = (m: typeof locked, seatId: string) => m.seats.find((s) => s.seatId === seatId)?.sources.find((c) => c.sourceKey === "temple");
-    expect(skipOf(locked, "s2")).toMatchObject({ sourceId: "temple", objectId: "source:temple", name: "Skip", kind: "grant", charge: "not earned", usable: false, reason: "Win the Sun to earn it" });
-    expect(skipOf(locked, "s1")).toMatchObject({ name: "Skip", charge: "not earned", usable: false });
+    expect(skipOf(locked, "s2")).toMatchObject({ sourceId: "temple", objectId: "source:temple", name: "Skip", kind: "grant", charge: { full: "Not earned", short: "Not earned" }, usable: false, reason: "Win the Sun to earn it" });
+    expect(skipOf(locked, "s1")).toMatchObject({ name: "Skip", charge: { full: "Not earned", short: "Not earned" }, usable: false });
     expect(locked.tooltip).toEqual({ title: "Skip", text: "Drop one open objective.", badges: ["Between tricks or when an objective fails", "Crew token"], reason: "Win the Sun to earn it" });
 
     const earned = templeView({ token: [1, 1], abilities: [ability("temple", { kind: "objective", choices: ["objective:o2"] })] });
     const m = buildSceneModel(server(earned), ui(), "big-index");
-    expect(skipOf(m, "s2")).toMatchObject({ charge: "1 left", usable: true, pulse: true });
-    expect(skipOf(m, "s3")).toMatchObject({ charge: "1 left", usable: false });
-    expect(skipOf(buildSceneModel(server(templeView({ token: [0, 1] })), ui(), "big-index"), "s1")).toMatchObject({ charge: "used", spent: true });
+    expect(skipOf(m, "s2")).toMatchObject({ charge: { full: "1 left", short: "1 left" }, usable: true, pulse: true });
+    expect(skipOf(m, "s3")).toMatchObject({ charge: { full: "1 left", short: "1 left" }, usable: false });
+    expect(skipOf(buildSceneModel(server(templeView({ token: [0, 1] })), ui(), "big-index"), "s1")).toMatchObject({ charge: { full: "Used", short: "Used" }, spent: true });
   });
 
   it("offers the Skip in rescue like any rescue ability", () => {

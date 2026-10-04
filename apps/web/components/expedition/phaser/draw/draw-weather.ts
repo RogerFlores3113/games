@@ -11,61 +11,21 @@ import { STAGE, STUMP_CENTRE, ZONES } from "../layout";
 import type { ObjectIndex } from "../object-index";
 import type { Haze, ModChip, Precipitation, Sky } from "../../../../lib/expedition/weather-model";
 import { labelWidth, plate, text, type Layer } from "./ui-kit";
+import { MOD_ICON_INK, MOD_ICON_SIZE, modIconRows } from "../art/mod-icons";
 
 // ---------------------------------------------------------------------------
 // Icons
 // ---------------------------------------------------------------------------
 
-/** 9x9 pixel icons; each letter is a palette colour, "." is clear. */
-const ICON_INK: Readonly<Record<string, string>> = {
-  o: PALETTE.sun,
-  y: PALETTE.coin,
-  w: PALETTE.moon,
-  g: PALETTE.textDim,
-  d: PALETTE.plateEdge,
-  b: PALETTE.rain,
-  t: PALETTE.done,
-  k: PALETTE.bark,
-  m: PALETTE.moss,
-  r: PALETTE.destructive,
-  c: PALETTE.cardFace,
-};
-
-const ICONS: Readonly<Record<string, readonly string[]>> = {
-  fair: ["....o....", ".o.....o.", "...ooo...", "..ooooo..", "o.ooooo.o", "..ooooo..", "...ooo...", ".o.....o.", "....o...."],
-  rain: ["...www...", ".wwwwwww.", "wwwwwwwww", ".wwwwwww.", ".........", ".b..b..b.", "b..b..b..", ".........", ".b..b..b."],
-  thunderstorm: ["...ggg...", ".ggggggg.", "ggggggggg", ".gggyggg.", "....yy...", "...yy....", "..yyyyy..", "....yy...", "...y....."],
-  jungle: ["...ttt...", "..ttttt..", ".ttttttt.", "ttttttttt", ".ttttttt.", "...kkk...", "....k....", "....k....", "mmmmmmmmm"],
-  clearing: [".........", ".........", "....o....", "...ooo...", ".........", "t..t...t.", "tt.tt.ttt", "mmmmmmmmm", "mmmmmmmmm"],
-  clifftop: ["....w....", "...www...", "...gwg...", "..ggggg..", "..gdggg..", ".ggggdgg.", ".gdggggg.", "ggggggdgg", "ddddddddd"],
-  desert: ["......o..", ".....ooo.", "......o..", "..t......", ".ttt.....", "..t...cc.", "..t..cccc", "ccccccccc", "ccccccccc"],
-  cave: ["...ggg...", ".ggggggg.", "ggg...ggg", "gg.....gg", "gg..b..gg", "g...b...g", "g..bbb..g", "g.......g", "ggggggggg"],
-  magma: ["...r.r...", "....r....", "...kkk...", "..kkokk..", "..kkokk..", ".kkkokkk.", ".kkoookk.", "kkoooookk", "ooooooooo"],
-  fog: [".........", "wwwww....", "...wwwwww", ".........", ".wwwwww..", "....wwwww", ".........", "wwwww....", "..wwwwww."],
-  night: ["..www....", ".ww......", "ww.....y.", "ww.......", "ww....y..", "ww.......", ".ww.....y", "..www....", "........."],
-  steam: [".w...w...", "..w...w..", ".w...w...", "..w...w..", ".........", "..rrrrr..", ".rrooorr.", "rrooooorr", "rrrrrrrrr"],
-  flooding: [".b..b..b.", "b..b..b..", ".........", "bb...bb..", "..bbb..bb", ".........", "bb...bb..", "..bbb..bb", "bbbbbbbbb"],
-};
-
-/** A shape for each kind when its def has no icon of its own. */
-const KIND_ICON: Readonly<Record<ModChip["kind"], readonly string[]>> = {
-  location: ICONS.clearing!,
-  weather: ICONS.fair!,
-  pairing: ["....y....", "...yyy...", "..yy.yy..", ".yy...yy.", "yy.....yy", ".yy...yy.", "..yy.yy..", "...yyy...", "....y...."],
-  animal: ["..k...k..", ".kkk.kkk.", ".kkkkkkk.", "kk.kkk.kk", "kkkkkkkkk", ".kkkkkkk.", "..kkkkk..", "...kkk...", "........."],
-  disaster: ["....o....", "...ooo...", "...ooo...", "..ooooo..", "..oo.oo..", ".ooo.ooo.", ".ooooooo.", "ooooooooo", "........."],
-  temple: ["....w....", "...www...", "wwwwwwwww", ".w.w.w.w.", ".w.w.w.w.", ".w.w.w.w.", ".w.w.w.w.", "wwwwwwwww", "ddddddddd"],
-};
-
-export const ICON_SIZE = 9;
+export const ICON_SIZE = MOD_ICON_SIZE;
 
 /** The icon of a camp modifier, its top-left at (x, y). */
 export function modIcon(scene: Phaser.Scene, id: string, kind: ModChip["kind"], x: number, y: number): Phaser.GameObjects.Graphics {
-  const rows = ICONS[id] ?? KIND_ICON[kind];
+  const rows = modIconRows(id, kind);
   const g = scene.add.graphics();
   rows.forEach((row, ry) => {
     Array.from(row).forEach((ch, rx) => {
-      const ink = ICON_INK[ch];
+      const ink = MOD_ICON_INK[ch];
       if (ink === undefined) return;
       g.fillStyle(toPhaserColor(ink), 1);
       g.fillRect(Math.round(x) + rx, Math.round(y) + ry, 1, 1);

@@ -18,7 +18,7 @@ const SIZES = [
 ];
 
 interface Chip { objectiveId: string; objectId: string; kind: string; label: string; status: string; targetable: boolean }
-interface Source { sourceKey: string; name: string; charge: string; usable: boolean; reason: string | null; objectId: string }
+interface Source { sourceKey: string; name: string; charge: { full: string; short: string }; usable: boolean; reason: string | null; objectId: string }
 interface CampModel {
   sceneKey: string;
   topBar: { camp: string };
@@ -122,7 +122,7 @@ test.describe("the temple", () => {
       for (const helper of start.helpers) expect(helper.name).toMatch(/ \(half\)$/);
       expect(start.topBar.camp).toBe(`Camp ${temple.at} of ${temple.at}`);
       expect(start.faceUpObjectives.filter((o) => o.kind === "sun")).toMatchObject([{ label: "Sun", status: "pending" }]);
-      expect(skipOf(start)).toMatchObject({ name: "Skip", charge: "not earned", usable: false });
+      expect(skipOf(start)).toMatchObject({ name: "Skip", charge: { full: "Not earned" }, usable: false });
       for (const seat of start.seats) expect(seat.sources.map((s) => s.sourceKey)).toContain("temple");
 
       await pickAll(page, panel);
@@ -153,11 +153,11 @@ test.describe("the temple", () => {
         await autoplay(panel, "everyone", 1);
         after = await camp(page);
       }
-      if (after.sceneKey === "camp" && after.temple?.status === "done" && skipOf(after)?.charge === "1 left") won = after;
+      if (after.sceneKey === "camp" && after.temple?.status === "done" && skipOf(after)?.charge.full === "1 left") won = after;
     }
     expect(won, "the Sun was won on the last plate with the camp still open").not.toBeNull();
     expect(won!.temple).toMatchObject({ hint: "Every plate pressed", status: "done" });
-    expect(skipOf(won!)).toMatchObject({ name: "Skip", charge: "1 left", usable: true });
+    expect(skipOf(won!)).toMatchObject({ name: "Skip", charge: { full: "1 left" }, usable: true });
     await capture(page, "temple-skip-earned");
 
     await idle(panel);
@@ -171,8 +171,8 @@ test.describe("the temple", () => {
     model = await clickUntilChanged<CampModel>(page, "confirm", (m) => m.sceneKey !== "camp" || !objectives(m).some((o) => o.objectiveId === target.objectiveId));
     // Dropping the last open objective clears the camp; otherwise the token shows spent on every seat.
     if (model.sceneKey === "camp") {
-      expect(skipOf(model)).toMatchObject({ charge: "used", usable: false });
-      for (const seat of model.seats) expect(seat.sources.find((s) => s.sourceKey === "temple")?.charge).toBe("used");
+      expect(skipOf(model)).toMatchObject({ charge: { full: "Used" }, usable: false });
+      for (const seat of model.seats) expect(seat.sources.find((s) => s.sourceKey === "temple")?.charge.full).toBe("Used");
     } else {
       expect(await getScene(page)).toBe("trail");
     }

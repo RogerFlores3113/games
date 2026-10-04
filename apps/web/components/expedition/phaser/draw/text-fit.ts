@@ -25,3 +25,8 @@ export function wrapWords(value: string, maxChars: number): string[] {
   if (current !== "") lines.push(current);
   return lines;
 }
+
+/** A source's uses in `maxChars`: the full wording, else the short one. */
+export function fitUses(uses: { full: string; short: string }, maxChars: number): string {
+  return Array.from(uses.full).length <= maxChars ? uses.full : truncateLabel(uses.short, Math.max(1, maxChars));
+}
