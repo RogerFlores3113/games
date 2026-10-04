@@ -18,7 +18,7 @@ interface Camp extends Json {
   objectives: Objective[];
   yourHand: Card[];
   yourLegalCardIds: string[];
-  completedTricks: { index: number; leaderSeatId: string; plays: Play[]; winnerSeatId: string }[];
+  completedTricks: { index: number; leaderSeatId: string; plays: (Play & { countsAs: Identity | null; burned: boolean })[]; winnerSeatId: string }[];
   currentTrick: { index: number; leaderSeatId: string; plays: Play[] };
   campPhase: string;
   currentActorSeatId: string | null;
@@ -71,7 +71,7 @@ export function playing(game: Game, opts: { plays: number; window: "between-tric
   camp.completedTricks = [0, 1].map((index) => ({
     index,
     leaderSeatId: mates[0]!,
-    plays: [mates[0]!, ...mates.slice(1), game.yourSeatId].map((seat, j) => play(seat, 20 + index * 5 + j)),
+    plays: [mates[0]!, ...mates.slice(1), game.yourSeatId].map((seat, j) => ({ ...play(seat, 20 + index * 5 + j), countsAs: null, burned: false })),
     winnerSeatId: game.yourSeatId,
   }));
   const leaders = opts.window === "in-trick" ? mates.slice(0, opts.plays) : [];

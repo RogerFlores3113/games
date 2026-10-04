@@ -43,13 +43,17 @@ export type RuleModifier = { readonly [K in HookName]?: (prev: RunRules[K]) => R
 // objectives.ts's KindRegistry exhaustiveness idiom).
 const HOOK_NAME_SET: Record<HookName, true> = {
   deckFor: true,
+  objectiveDeckFor: true,
   leaderFor: true,
+  identityOf: true,
   isTrump: true,
   rankOf: true,
   trickWinner: true,
   legalPlays: true,
+  burns: true,
   nextLeader: true,
-  failureChecks: true,
+  objectiveStatus: true,
+  goals: true,
   whisperAllowed: true,
   whisperAudience: true,
   whispersPerCamp: true,

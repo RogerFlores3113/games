@@ -74,6 +74,7 @@ function minimalCampStateFor(hands: readonly Hand[], currentTrickPlays: readonly
     expeditionLeaderSeatId: hands[0]!.seatId,
     objectives: [],
     objectiveDeck: [],
+    discards: [],
     completedTricks: [],
     currentTrick: { index: 0, leaderSeatId: hands[0]!.seatId, plays: currentTrickPlays },
   };
@@ -87,8 +88,8 @@ describe("composeRules([])", () => {
       { seatId: "p2", card: card("c2", HEARTS_2) },
     ];
     const composed = composeRules([]);
-    expect(composed.trickWinner(plays)).toBe(trickWinner(plays, isTrump));
-    expect(composed.trickWinner(plays)).toBe("p0");
+    expect(composed.trickWinner(plays, HEARTS_5)).toBe(trickWinner(plays, HEARTS_5));
+    expect(composed.trickWinner(plays, HEARTS_5)).toBe("p0");
   });
 
   it("legalPlays matches the base resolver", () => {
@@ -131,8 +132,8 @@ describe("composeRules layer folding", () => {
       { seatId: "p1", card: card("c1", SPADES_3) },
       { seatId: "p2", card: card("c2", HEARTS_2) },
     ];
-    expect(composeRules([]).trickWinner(plays)).toBe("p0");
-    expect(composeRules([spadesAlsoTrump]).trickWinner(plays)).toBe("p1");
+    expect(composeRules([]).trickWinner(plays, HEARTS_5)).toBe("p0");
+    expect(composeRules([spadesAlsoTrump]).trickWinner(plays, HEARTS_5)).toBe("p1");
   });
 
   it("a rankOf layer changes the composed trickWinner, folded in layer order", () => {
@@ -143,9 +144,26 @@ describe("composeRules layer folding", () => {
     ];
     const twoUpFive: RuleModifier = { rankOf: (prev) => (c) => (c.id === "c2" ? prev(c) + 5 : prev(c)) };
     const twoUpThree: RuleModifier = { rankOf: (prev) => (c) => (c.id === "c2" ? prev(c) + 3 : prev(c)) };
-    expect(composeRules([]).trickWinner(plays)).toBe("p1");
-    expect(composeRules([twoUpFive]).trickWinner(plays)).toBe("p1"); // 7 < 9
-    expect(composeRules([twoUpFive, twoUpThree]).trickWinner(plays)).toBe("p2"); // 10 > 9
+    expect(composeRules([]).trickWinner(plays, HEARTS_5)).toBe("p1");
+    expect(composeRules([twoUpFive]).trickWinner(plays, HEARTS_5)).toBe("p1"); // 7 < 9
+    expect(composeRules([twoUpFive, twoUpThree]).trickWinner(plays, HEARTS_5)).toBe("p2"); // 10 > 9
+  });
+
+  it("an identityOf layer folds first: the composed trickWinner, rankOf and legalPlays read what a card counts as", () => {
+    const sevenAsHeart: RuleModifier = {
+      identityOf: (prev) => (c) => (c.id === "s7" ? { kind: "standard", suit: "hearts", rank: 7 } : prev(c)),
+    };
+    const plays: TrickPlay[] = [
+      { seatId: "p0", card: card("c0", HEARTS_5) },
+      { seatId: "p1", card: card("s7", SPADES_7) },
+    ];
+    expect(composeRules([]).trickWinner(plays, HEARTS_5)).toBe("p0");
+    expect(composeRules([sevenAsHeart]).trickWinner(plays, HEARTS_5)).toBe("p1");
+
+    const hands: Hand[] = [{ seatId: "p0", cards: [card("s7", SPADES_7), card("c9", HEARTS_9)] }];
+    const state = minimalCampStateFor(hands, [{ seatId: "p9", card: card("led", HEARTS_2) }]);
+    expect(composeRules([sevenAsHeart]).legalPlays(state, "p0").map((c) => c.id)).toEqual(["s7", "c9"]);
+    expect(composeRules([]).legalPlays(state, "p0").map((c) => c.id)).toEqual(["c9"]);
   });
 
   it("an isTrump-only layer changes the composed legalPlays (WR-03)", () => {
@@ -347,7 +365,7 @@ describe("trick-scoped effects", () => {
         targets: [],
         apply: () => [{ op: "add-modifier", lasts, params: {}, audience: "public" }],
         effect: (effect) => ({
-          trickWinner: (prev) => (plays) => winnerExcluding(prev, plays, (play) => play.seatId === effect.seatId),
+          trickWinner: (prev) => (plays, led) => winnerExcluding(prev, plays, led, (play) => play.seatId === effect.seatId),
         }),
       }),
     });
@@ -381,15 +399,15 @@ describe("trick-scoped effects", () => {
 
   it("a trick-scoped effect bends exactly one trick", () => {
     const { afterUse, afterTrick } = useThenPlayOneTrick("sit-out-trick");
-    expect(rulesFor(afterUse, catalog).trickWinner(probe)).toBe("p2");
+    expect(rulesFor(afterUse, catalog).trickWinner(probe, probe[0]!.card.identity)).toBe("p2");
     expect(afterTrick.attempt!.camp.completedTricks[0]!.winnerSeatId).not.toBe("p0");
     expect(afterTrick.attempt!.camp.completedTricks).toHaveLength(1);
-    expect(rulesFor(afterTrick, catalog).trickWinner(probe)).toBe("p0");
+    expect(rulesFor(afterTrick, catalog).trickWinner(probe, probe[0]!.card.identity)).toBe("p0");
   });
 
   it("an attempt-scoped effect keeps bending after that trick", () => {
     const { afterTrick } = useThenPlayOneTrick("sit-out-camp");
-    expect(rulesFor(afterTrick, catalog).trickWinner(probe)).toBe("p2");
+    expect(rulesFor(afterTrick, catalog).trickWinner(probe, probe[0]!.card.identity)).toBe("p2");
   });
 });
 
@@ -412,7 +430,7 @@ describe("property: winnerExcluding", () => {
           const excludedSeatId = plays[excludedPick % plays.length]!.seatId;
           const prev = composeRules(spadesTrump ? [spadesAlsoTrump] : []).trickWinner;
 
-          const winner = winnerExcluding(prev, plays, (play) => play.seatId === excludedSeatId);
+          const winner = winnerExcluding(prev, plays, plays[0]!.card.identity, (play) => play.seatId === excludedSeatId);
 
           expect(seatIds).toContain(winner);
           expect(winner).not.toBe(excludedSeatId);

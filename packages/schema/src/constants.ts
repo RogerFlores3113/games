@@ -37,8 +37,9 @@
  *
  * Bumped to 7 when Expedition dropped its boss twists, face-down objectives
  * and the pre-deal window; each later Expedition redesign unit that changes
- * the persisted run bumps it again. */
-export const ROOM_SCHEMA_VERSION = 7;
+ * the persisted run bumps it again: 8 for resolved trick plays, discards
+ * and card-identity objective targets. */
+export const ROOM_SCHEMA_VERSION = 8;
 
 /** D-01: 32 uppercase-safe characters — no `I`, `O`, `0`, `1` — because the
  * room code is read aloud over a voice call. Do not add lowercase. */

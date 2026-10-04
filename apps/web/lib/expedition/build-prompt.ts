@@ -135,15 +135,25 @@ function gatePrompt(view: ExpeditionView, nameOf: (seatId: string | null) => str
   return { text: `An objective failed: waiting for ${nameOf(pending[0]!)}`, tone: "waiting" };
 }
 
+/** Who won the trick an unburned card counting as `target` landed in. */
 function trickWinnerOf(camp: ExpeditionCampView, target: ExpeditionCardIdentityView): string | null {
   const label = cardLabel(target);
-  const trick = camp.completedTricks.find((t) => t.plays.some((p) => cardLabel(p.card.identity) === label));
+  const trick = camp.completedTricks.find((t) => t.plays.some((p) => !p.burned && cardLabel(p.countsAs ?? p.card.identity) === label));
   return trick?.winnerSeatId ?? null;
+}
+
+/** A goal's id names the rule that set it, then the seat it watches. */
+function goalName(goalId: string): string {
+  const sourceId = goalId.split(":")[0]!;
+  return SOURCE_DISPLAY[sourceId]?.name ?? "A camp rule";
 }
 
 function campOverPrompt(camp: ExpeditionCampView, nameOf: (seatId: string | null) => string): Prompt {
   const failed = camp.objectives.find((o) => o.status === "failed");
-  if (failed === undefined) return { text: "Camp cleared!", tone: "info" };
+  if (failed === undefined) {
+    const broken = camp.goals.find((g) => g.status === "failed");
+    return broken === undefined ? { text: "Camp cleared!", tone: "info" } : { text: `Camp failed: ${goalName(broken.id)} broke`, tone: "alert" };
+  }
   if (failed.kind === "win-card" || failed.kind === "ordered") {
     const winner = trickWinnerOf(camp, failed.target);
     if (winner !== null && winner !== failed.ownerSeatId) {

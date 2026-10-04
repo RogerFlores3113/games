@@ -51,7 +51,7 @@ describe("property: stacked can't-win effects", () => {
         const rules = composeRules(effects.map((effect) => sourceDef(CATALOG, effect.sourceId).active!.effect!(effect, run)));
         const excluded = new Set(exclusions.map((exclusion) => plays[exclusion.index % plays.length]!.seatId));
 
-        const winner = rules.trickWinner(plays);
+        const winner = rules.trickWinner(plays, plays[0]!.card.identity);
 
         expect(plays.map((play) => play.seatId)).toContain(winner);
         if (plays.some((play) => !excluded.has(play.seatId))) expect(excluded.has(winner)).toBe(false);

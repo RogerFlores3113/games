@@ -54,11 +54,11 @@ export const WINDOWS: { readonly [W in ActiveWindow]: WindowDef } = {
     id: "rescue",
     phrase: "When an objective fails",
     gated: true,
-    // Only failed objectives open it; a fired failure check never does.
+    // Only failed objectives open it; a failed goal never does.
     isOpen: (run, rules) => {
       if (run.attempt === null) return false;
       const outcome = checkCampOutcome(run.attempt.camp, rules);
-      return outcome.status === "failed" && outcome.failedObjectiveIds.length > 0 && outcome.firedFailureCheckIds.length === 0;
+      return outcome.status === "failed" && outcome.failedObjectiveIds.length > 0 && outcome.failedGoalIds.length === 0;
     },
     mayAct: anySeat,
   },

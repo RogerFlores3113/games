@@ -4,8 +4,9 @@
 
 import { describe, expect, it } from "vitest";
 import { baseDeckFor, buildFullDeck, buildObjectiveDeck, identitiesEqual } from "./deck";
-import { baseRules, type CoreRules } from "./rules";
-import { campPhase, checkCampOutcome, createCamp, currentActorSeatId } from "./camp";
+import { baseObjectiveDeckFor, baseRules, type CoreRules } from "./rules";
+import { campPhase, checkCampOutcome, createCamp, currentActorSeatId, guard } from "./camp";
+import { resolvedPlay } from "./test-support";
 import type { CampState, CompletedTrick, ObjectiveSlot, StandardIdentity } from "./state";
 
 const SEATS_3 = ["a", "b", "c"] as const;
@@ -65,7 +66,7 @@ describe("createCamp — leader and objectives", () => {
     expect(camp.objectives.map((o) => o.kind)).toEqual(["win-card", "ordered", "ordered", "no-tricks", "exactly-n"]);
     expect(camp.objectives.every((o) => o.ownerSeatId === null)).toBe(true);
 
-    const fullObjectiveDeck = buildObjectiveDeck({ deck: baseDeckFor(3), seed: SEED });
+    const fullObjectiveDeck = buildObjectiveDeck({ identities: baseObjectiveDeckFor(baseDeckFor(3)), seed: SEED });
     const [first, second, third] = fullObjectiveDeck;
     const winCard = camp.objectives[0]!;
     const ordered1 = camp.objectives[1]!;
@@ -84,8 +85,27 @@ describe("createCamp — leader and objectives", () => {
     }
 
     // The undrawn remainder stays in objectiveDeck: objectives + objectiveDeck
-    // together are the full standard-identity pool.
+    // together are the full objective pool.
     expect(camp.objectiveDeck).toHaveLength(fullObjectiveDeck.length - 3);
+  });
+
+  it("objectives start above the deck's lowest rank: 3 and up at 3 or 4 players, 4 and up at 5", () => {
+    const lowest = (seatIds: readonly string[]) => {
+      const camp = createCamp({ seatIds, seed: SEED, objectiveSlots: [{ kind: "win-card" }] });
+      const pool = [...camp.objectiveDeck, ...camp.objectives.flatMap((o) => (o.kind === "win-card" && o.target.kind === "standard" ? [o.target] : []))];
+      return { size: pool.length, lowest: Math.min(...pool.map((identity) => identity.rank)) };
+    };
+    expect(lowest(SEATS_3)).toEqual({ size: 48, lowest: 3 });
+    expect(lowest(SEATS_4)).toEqual({ size: 48, lowest: 3 });
+    expect(lowest(SEATS_5)).toEqual({ size: 44, lowest: 4 });
+  });
+
+  it("a fixed win-card slot targets its card and draws nothing from the objective deck", () => {
+    const sun = { kind: "joker", joker: "sun" } as const;
+    const fixed = createCamp({ seatIds: SEATS_3, seed: SEED, objectiveSlots: [{ kind: "win-card", fixed: sun }, { kind: "win-card" }] });
+    const drawn = createCamp({ seatIds: SEATS_3, seed: SEED, objectiveSlots: [{ kind: "win-card" }] });
+    expect(fixed.objectives.map((o) => (o.kind === "win-card" ? o.target : null))).toEqual([sun, drawn.objectives[0]!.kind === "win-card" ? drawn.objectives[0]!.target : null]);
+    expect(fixed.objectiveDeck).toEqual(drawn.objectiveDeck);
   });
 
   it("objective ids are 8-letter minted ids, unique, and never equal to any card id", () => {
@@ -255,10 +275,7 @@ function trick(index: number, leaderSeatId: string, winnerSeatId: string): Compl
     index,
     leaderSeatId,
     winnerSeatId,
-    plays: SEATS_3.map((seatId) => ({
-      seatId,
-      card: { id: `dummy-${index}-${seatId}`, identity: std("clubs", 5) },
-    })),
+    plays: SEATS_3.map((seatId) => resolvedPlay(seatId, { id: `dummy-${index}-${seatId}`, identity: std("clubs", 5) })),
   };
 }
 
@@ -345,22 +362,14 @@ describe("checkCampOutcome", () => {
     expect(outcome.status).toBe("failed");
     if (outcome.status === "failed") {
       expect(outcome.failedObjectiveIds).toContain(camp.objectives[0]!.id);
-      expect(outcome.firedFailureCheckIds).toEqual([]);
+      expect(outcome.failedGoalIds).toEqual([]);
     }
   });
 
-  it("a fired custom failureChecks yields failed even with every objective still pending", () => {
+  it("a broken guard fails the camp even with every objective still pending", () => {
     const camp = baseCamp();
-    const firingRules: CoreRules = {
-      ...baseRules,
-      failureChecks: () => ["test-check"],
-    };
-    const outcome = checkCampOutcome(camp, firingRules);
-    expect(outcome.status).toBe("failed");
-    if (outcome.status === "failed") {
-      expect(outcome.failedObjectiveIds).toEqual([]);
-      expect(outcome.firedFailureCheckIds).toEqual(["test-check"]);
-    }
+    const broken: CoreRules = { ...baseRules, goals: () => [guard("test-guard", true)] };
+    expect(checkCampOutcome(camp, broken)).toEqual({ status: "failed", failedObjectiveIds: [], failedGoalIds: ["test-guard"] });
   });
 
   it("every objective done yields succeeded", () => {
@@ -380,6 +389,9 @@ describe("checkCampOutcome", () => {
     };
     const outcome = checkCampOutcome(done);
     expect(outcome.status).toBe("succeeded");
+    const pendingTask: CoreRules = { ...baseRules, goals: () => [guard("held", false), { id: "task", status: "pending" }] };
+    expect(checkCampOutcome(done, pendingTask)).toEqual({ status: "in_progress" });
+    expect(campPhase(done, pendingTask)).toBe("playing");
   });
 
   it("otherwise in_progress", () => {

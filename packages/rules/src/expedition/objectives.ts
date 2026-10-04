@@ -24,6 +24,12 @@
 // still win more tricks before the camp ends, so an early "reached N"/"still
 // zero" state is reported "pending", not "done", until the camp is over.
 //
+// A-LOST: a card objective's target is lost when its printed card burned,
+// counted as another identity, or was discarded from a hand. A lost target
+// fails its objective at once, and a target never played by the final trick
+// fails too, so a camp can never stick in progress. Whichever came first, a
+// win of the target or its loss, decides; later tricks cannot reorder them.
+//
 // Monotonicity (WR-01): for a fixed ownership assignment, "failed" is
 // absorbing for all four objective kinds as completedTricks grows — at ANY
 // CampState, not only up to the first failure (contrast with base play,
@@ -39,8 +45,10 @@
 // (those halt at the first failure).
 
 import { cardLabel, identitiesEqual } from "./deck";
+import type { CoreRules } from "./rules";
 import type {
   CampState,
+  CardIdentity,
   CompletedTrick,
   ExactlyNObjective,
   NoTricksObjective,
@@ -49,7 +57,6 @@ import type {
   OrderedObjective,
   OrderMarker,
   ObjectiveStatus,
-  StandardIdentity,
   WinCardObjective,
 } from "./state";
 
@@ -75,16 +82,36 @@ export function isCampFinished(state: CampState): boolean {
   return state.completedTricks.length === state.totalTricks;
 }
 
-/** The completed trick holding a play with this identity, else undefined. A
- * card only in the in-progress currentTrick is NOT yet won — this function
- * only searches completedTricks. */
-export function trickContaining(
-  state: CampState,
-  target: StandardIdentity,
-): CompletedTrick | undefined {
+/** The completed trick holding an unburned play that counts as `target`,
+ * else undefined. A card only in the in-progress currentTrick is NOT yet won
+ * — this function only searches completedTricks. */
+export function trickContaining(state: CampState, target: CardIdentity): CompletedTrick | undefined {
   return state.completedTricks.find((trick) =>
-    trick.plays.some((play) => identitiesEqual(play.card.identity, target)),
+    trick.plays.some((play) => !play.burned && identitiesEqual(play.countsAs ?? play.card.identity, target)),
   );
+}
+
+/** When the printed `target` card was lost, on the trick timeline: the
+ * trick it burned in or counted as another identity in, or just before the
+ * trick after which it was discarded. Undefined while it is not lost. */
+function lostAt(state: CampState, target: CardIdentity): number | undefined {
+  const inTrick = state.completedTricks.find((trick) =>
+    trick.plays.some((play) => identitiesEqual(play.card.identity, target) && (play.burned || play.countsAs !== null)),
+  );
+  if (inTrick !== undefined) return inTrick.index;
+  const discard = state.discards.find((d) => identitiesEqual(d.card.identity, target));
+  return discard === undefined ? undefined : discard.afterTrick - 0.5;
+}
+
+type TargetFate = { readonly kind: "won"; readonly trick: CompletedTrick } | { readonly kind: "lost" } | { readonly kind: "open" };
+
+/** A-LOST: whichever came first, the target's win or its loss. */
+function targetFate(state: CampState, target: CardIdentity): TargetFate {
+  const trick = trickContaining(state, target);
+  const lost = lostAt(state, target);
+  if (trick !== undefined && (lost === undefined || trick.index <= lost)) return { kind: "won", trick };
+  if (lost !== undefined) return { kind: "lost" };
+  return { kind: "open" };
 }
 
 export const winCardKind: ObjectiveKindDef<WinCardObjective> = {
@@ -94,9 +121,10 @@ export const winCardKind: ObjectiveKindDef<WinCardObjective> = {
   },
   evaluate(state, objective) {
     if (objective.ownerSeatId === null) return "pending";
-    const trick = trickContaining(state, objective.target);
-    if (trick === undefined) return "pending";
-    return trick.winnerSeatId === objective.ownerSeatId ? "done" : "failed";
+    const fate = targetFate(state, objective.target);
+    if (fate.kind === "won") return fate.trick.winnerSeatId === objective.ownerSeatId ? "done" : "failed";
+    if (fate.kind === "lost" || isCampFinished(state)) return "failed";
+    return "pending";
   },
 };
 
@@ -144,7 +172,7 @@ function orderedPrefix(order: OrderMarker): string {
 
 /** Ordered evaluation order (spec §5.2 "ordered" row, RESEARCH.md Pitfall 4):
  * (1) unowned -> pending; (2) base win-card check on its own target (won by
- * someone else -> failed); (3) relative-order checks against every OTHER
+ * someone else, or lost -> failed); (3) relative-order checks against every OTHER
  * ordered objective in state.objectives, comparing the completed-trick
  * index each one's card was won at ("last" compares as +Infinity, A-LAST).
  * The check is SYMMETRIC (WR-01): this objective fails if EITHER a
@@ -155,7 +183,7 @@ function orderedPrefix(order: OrderMarker): string {
  * back to done as more tricks complete; same-trick-index counts as in order
  * (A-TIE); (4) the "last" marker additionally fails if its card is won at
  * any trick index other than totalTricks - 1 (A-LAST); (5) otherwise done
- * once won, else pending. */
+ * once won, failed if never won by the final trick, else pending. */
 export const orderedKind: ObjectiveKindDef<OrderedObjective> = {
   id: "ordered",
   describe(objective) {
@@ -164,15 +192,17 @@ export const orderedKind: ObjectiveKindDef<OrderedObjective> = {
   evaluate(state, objective) {
     if (objective.ownerSeatId === null) return "pending";
 
-    const myTrick = trickContaining(state, objective.target);
-    if (myTrick !== undefined && myTrick.winnerSeatId !== objective.ownerSeatId) return "failed";
-    const myTrickIndex = myTrick?.index;
+    const mine = targetFate(state, objective.target);
+    if (mine.kind === "lost") return "failed";
+    if (mine.kind === "won" && mine.trick.winnerSeatId !== objective.ownerSeatId) return "failed";
+    const myTrickIndex = mine.kind === "won" ? mine.trick.index : undefined;
     const myMarker = markerValue(objective.order);
 
     for (const other of state.objectives) {
       if (other.kind !== "ordered" || other.id === objective.id) continue;
       const otherMarker = markerValue(other.order);
-      const otherTrickIndex = trickContaining(state, other.target)?.index;
+      const theirs = targetFate(state, other.target);
+      const otherTrickIndex = theirs.kind === "won" ? theirs.trick.index : undefined;
 
       if (myTrickIndex !== undefined) {
         // My card has resolved: every lower-marker objective must have
@@ -199,7 +229,8 @@ export const orderedKind: ObjectiveKindDef<OrderedObjective> = {
       return "failed";
     }
 
-    return myTrickIndex === undefined ? "pending" : "done";
+    if (myTrickIndex !== undefined) return "done";
+    return isCampFinished(state) ? "failed" : "pending";
   },
 };
 
@@ -226,12 +257,10 @@ export function evaluateObjective(state: CampState, objective: Objective): Objec
   return def.evaluate(state, objective);
 }
 
-export function objectiveStatuses(
-  state: CampState,
-): Array<{ objectiveId: string; status: ObjectiveStatus }> {
+export function objectiveStatuses(state: CampState, rules: Pick<CoreRules, "objectiveStatus">): Array<{ objectiveId: string; status: ObjectiveStatus }> {
   return state.objectives.map((objective) => ({
     objectiveId: objective.id,
-    status: evaluateObjective(state, objective),
+    status: rules.objectiveStatus(state, objective),
   }));
 }
 

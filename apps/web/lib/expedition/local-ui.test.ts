@@ -73,14 +73,16 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
         expeditionLeaderSeatId: "p0",
         totalTricks: 5,
         removedCards: [],
+        goals: [],
+        discards: [],
         objectives: [
           { id: "o1", kind: "no-tricks", ownerSeatId: null, status: "pending" },
           { id: "o2", kind: "no-tricks", ownerSeatId: "p0", status: "pending" },
           { id: "o3", kind: "no-tricks", ownerSeatId: "p0", status: "done" },
         ],
         yourHand: [
-          { id: "c1", identity: { kind: "standard", suit: "hearts", rank: 12 }, effectiveRank: null },
-          { id: "c2", identity: { kind: "standard", suit: "spades", rank: 10 }, effectiveRank: null },
+          { id: "c1", identity: { kind: "standard", suit: "hearts", rank: 12 }, effectiveRank: null, countsAs: null },
+          { id: "c2", identity: { kind: "standard", suit: "spades", rank: 10 }, effectiveRank: null, countsAs: null },
         ],
         yourLegalCardIds: ["c1", "c2"],
         handSizes: [
@@ -100,7 +102,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
 
 const handWithoutC1 = (view: ExpeditionView) => ({
   ...view.attempt!,
-  camp: { ...view.attempt!.camp!, yourHand: [{ id: "c2", identity: { kind: "standard" as const, suit: "spades" as const, rank: 10 as const }, effectiveRank: null }] },
+  camp: { ...view.attempt!.camp!, yourHand: [{ id: "c2", identity: { kind: "standard" as const, suit: "spades" as const, rank: 10 as const }, effectiveRank: null, countsAs: null }] },
 });
 
 function deepFreeze<T>(value: T): T {

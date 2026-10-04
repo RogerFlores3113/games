@@ -17,9 +17,10 @@ const CardIdentitySchema = z.discriminatedUnion("kind", [
 ]);
 const CardSchema = z.strictObject({ id: z.string().min(1), identity: CardIdentitySchema });
 const PlaySchema = z.strictObject({ seatId: z.string().min(1), card: CardSchema });
+const ResolvedPlaySchema = z.strictObject({ seatId: z.string().min(1), card: CardSchema, countsAs: CardIdentitySchema.nullable(), burned: z.boolean() });
 
 const ObjectiveSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ id: z.string().min(1), kind: z.literal("win-card"), target: StandardIdentitySchema, ownerSeatId: z.string().nullable() }),
+  z.strictObject({ id: z.string().min(1), kind: z.literal("win-card"), target: CardIdentitySchema, ownerSeatId: z.string().nullable() }),
   z.strictObject({
     id: z.string().min(1),
     kind: z.literal("ordered"),
@@ -44,11 +45,12 @@ const CampStateSchema = z.strictObject({
     z.strictObject({
       index: z.number().int().min(0),
       leaderSeatId: z.string().min(1),
-      plays: z.array(PlaySchema),
+      plays: z.array(ResolvedPlaySchema),
       winnerSeatId: z.string().min(1),
     }),
   ),
   currentTrick: z.strictObject({ index: z.number().int().min(0), leaderSeatId: z.string().min(1), plays: z.array(PlaySchema) }),
+  discards: z.array(z.strictObject({ card: CardSchema, afterTrick: z.number().int().min(0) })),
 });
 
 const CampNumberSchema = z.literal([1, 2, 3, 4, 5, 6]);

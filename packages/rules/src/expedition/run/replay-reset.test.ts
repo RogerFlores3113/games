@@ -1,12 +1,13 @@
 // The Phase 10 integration proofs (RUN-06/COMM-01/COMM-02), driven on the
 // production catalogue plus one local fixture item ("test-sabotage":
-// between-tricks, single-use, always fires a failure check) that fails a camp
+// between-tricks, single-use, always breaks a guard) that fails a camp
 // on demand without depending on a specific deal.
 //
 // The fail-then-replay fixture proves its two attempt-1 effects via Rain
 // Poncho (one more whisper for its owner) and Camouflage.
 
 import { describe, expect, it } from "vitest";
+import { guard } from "../camp";
 import { ability, defineItem } from "../content/source-def";
 import { buildCatalog, CATALOG as PRODUCTION } from "./catalog";
 import { rulesFor } from "./compose";
@@ -26,7 +27,7 @@ const testSabotage = defineItem({
     limit: { kind: "single-use" },
     targets: [],
     apply: () => [{ op: "add-modifier", lasts: "attempt", params: {}, audience: "public" }],
-    effect: () => ({ failureChecks: (prev) => (state) => [...prev(state), "sabotage"] }),
+    effect: () => ({ goals: (prev) => (state) => [...prev(state), guard("sabotage", true)] }),
   }),
 });
 

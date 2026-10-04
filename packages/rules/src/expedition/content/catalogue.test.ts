@@ -14,6 +14,7 @@ import { CATALOG } from "../run/catalog";
 import { rulesFor } from "../run/compose";
 import { applyRunAction } from "../run/run-actions";
 import { advanceTo, setupRun, testCatalog } from "../run/run-test-support";
+import { resolvedPlay } from "../test-support";
 import { defineItem } from "./source-def";
 import { campCardIds } from "../run/toolkit";
 import type { CampNumber, RunAction, RunState } from "../run/types";
@@ -34,8 +35,8 @@ function winCard(id: string, target: StandardIdentity, ownerSeatId: string | nul
 }
 
 function trick(index: number, leaderSeatId: string, plays: readonly (readonly [string, ExpeditionCard])[]): CompletedTrick {
-  const played = plays.map(([seatId, card]) => ({ seatId, card }));
-  return { index, leaderSeatId, plays: played, winnerSeatId: trickWinner(played) };
+  const played = plays.map(([seatId, card]) => resolvedPlay(seatId, card));
+  return { index, leaderSeatId, plays: played, winnerSeatId: trickWinner(played, played[0]!.card.identity) };
 }
 
 const X14 = std("x", "spades", 14);
@@ -481,13 +482,13 @@ describe("items", () => {
       { seatId: "p2", card: hands.p2[0]! },
       { seatId: "p0", card: hands.p0[0]! },
     ];
-    expect(rules(baited).trickWinner(plays)).toBe("p0");
+    expect(rules(baited).trickWinner(plays, plays[0]!.card.identity)).toBe("p0");
     const next = play(play(baited, "p0", "a9"), "p1", "b6");
     expect(camp(next).completedTricks[0]!.winnerSeatId).toBe("p0");
-    expect(rules(next).trickWinner(plays)).toBe("p2");
+    expect(rules(next).trickWinner(plays, plays[0]!.card.identity)).toBe("p2");
   });
 
-  it("Camouflage removes the objective and later fails the camp via a fired check, with no rescue", () => {
+  it("Camouflage removes the objective and later fails the camp via a broken guard, with no rescue", () => {
     const objectives = [winCard("mine", ident("hearts", 5), "p0"), PENDING];
     const hands = { p0: [std("a", "spades", 14)], p1: [std("b", "spades", 3)], p2: [std("c", "spades", 4)] };
     const hidden = use(table({ kit: ["camouflage"], objectives, hands, leader: "p0", supplies: 3 }), "p0", "camouflage", ["objective:mine"]);
@@ -495,7 +496,7 @@ describe("items", () => {
     expect(campOutcome(hidden)).toEqual({ status: "in_progress" });
 
     const exposed = { ...hidden, attempt: { ...hidden.attempt!, camp: { ...camp(hidden), completedTricks: [WON_BY_P0] } } };
-    expect(campOutcome(exposed)).toEqual({ status: "failed", failedObjectiveIds: [], firedFailureCheckIds: ["camouflage-broke-cover"] });
+    expect(campOutcome(exposed)).toEqual({ status: "failed", failedObjectiveIds: [], failedGoalIds: ["camouflage:p0"] });
     expect(currentWindow(exposed, rules(exposed))).not.toBe("rescue");
 
     const failed = playOut(hidden);

@@ -28,7 +28,7 @@
 //      or ownership before ever building its literal.
 
 import { campPhase, currentActorSeatId } from "../camp";
-import { evaluateObjective } from "../objectives";
+import { identitiesEqual } from "../deck";
 import { rulesFor } from "../run/compose";
 import { runPhase, runStatus } from "../run/lifecycle";
 import { whispersUsedBy } from "../run/whisper";
@@ -38,13 +38,14 @@ import { currentWindow, gatedPendingSeatIds } from "../run/windows";
 import type { RunRules } from "../run/run-rules";
 import type { ActiveEffect, Catalog, LogEntry, Reveal, RunState, SeatRun } from "../run/types";
 import { rankOf } from "../trick";
-import type { CampState, CardIdentity, ExpeditionCard, Objective, StandardIdentity } from "../state";
+import type { CampState, CardIdentity, ExpeditionCard, Objective, ResolvedPlay, StandardIdentity } from "../state";
 import type {
   ExpeditionAttemptView,
   ExpeditionCampResultView,
   ExpeditionCampView,
   ExpeditionCardIdentityView,
   ExpeditionCardView,
+  ExpeditionCompletedPlayView,
   ExpeditionCompletedTrickView,
   ExpeditionCurrentTrickView,
   ExpeditionAbilityView,
@@ -75,13 +76,13 @@ function toCardView(card: ExpeditionCard): ExpeditionCardView {
   return { id: card.id, identity: toIdentityView(card.identity) };
 }
 
-function toObjectiveView(camp: CampState, objective: Objective): ExpeditionObjectiveView {
-  const status = evaluateObjective(camp, objective);
+function toObjectiveView(camp: CampState, objective: Objective, rules: RunRules): ExpeditionObjectiveView {
+  const status = rules.objectiveStatus(camp, objective);
   if (objective.kind === "win-card") {
     return {
       id: objective.id,
       kind: "win-card",
-      target: toStandardIdentityView(objective.target),
+      target: toIdentityView(objective.target),
       ownerSeatId: objective.ownerSeatId,
       status,
     };
@@ -108,19 +109,36 @@ function effectiveRank(card: ExpeditionCard, rules: RunRules): number | null {
   return composed === rankOf(card) ? null : composed;
 }
 
+/** What the composed identityOf reads the card as, when that differs from
+ * the printed identity, else null. */
+function countsAs(card: ExpeditionCard, rules: RunRules): ExpeditionCardIdentityView | null {
+  const identity = rules.identityOf(card);
+  return identitiesEqual(identity, card.identity) ? null : toIdentityView(identity);
+}
+
 function toRankedCardView(card: ExpeditionCard, rules: RunRules): ExpeditionRankedCardView {
-  return { id: card.id, identity: toIdentityView(card.identity), effectiveRank: effectiveRank(card, rules) };
+  return { id: card.id, identity: toIdentityView(card.identity), effectiveRank: effectiveRank(card, rules), countsAs: countsAs(card, rules) };
 }
 
 function toTrickPlayView(play: { seatId: string; card: ExpeditionCard }, rules: RunRules): ExpeditionTrickPlayView {
   return { seatId: play.seatId, card: toCardView(play.card), effectiveRank: effectiveRank(play.card, rules) };
 }
 
+function toCompletedPlayView(play: ResolvedPlay, rules: RunRules): ExpeditionCompletedPlayView {
+  return {
+    seatId: play.seatId,
+    card: toCardView(play.card),
+    effectiveRank: effectiveRank(play.card, rules),
+    countsAs: play.countsAs === null ? null : toIdentityView(play.countsAs),
+    burned: play.burned,
+  };
+}
+
 function toCompletedTrickView(trick: CampState["completedTricks"][number], rules: RunRules): ExpeditionCompletedTrickView {
   return {
     index: trick.index,
     leaderSeatId: trick.leaderSeatId,
-    plays: trick.plays.map((play) => toTrickPlayView(play, rules)),
+    plays: trick.plays.map((play) => toCompletedPlayView(play, rules)),
     winnerSeatId: trick.winnerSeatId,
   };
 }
@@ -130,7 +148,7 @@ function toCurrentTrickView(trick: CampState["currentTrick"], rules: RunRules): 
 }
 
 /** Looks up a card's identity by id across a camp's hands, completed
- * tricks, and the in-progress trick. Returns null (never throws) when the
+ * tricks, the in-progress trick and the discards. Returns null (never throws) when the
  * card cannot be found — a reveal whose card cannot be located is skipped
  * by the caller (fail closed), never thrown. */
 function findCardIdentity(camp: CampState, cardId: string): CardIdentity | null {
@@ -144,7 +162,7 @@ function findCardIdentity(camp: CampState, cardId: string): CardIdentity | null 
   }
   const currentPlay = camp.currentTrick.plays.find((p) => p.card.id === cardId);
   if (currentPlay !== undefined) return currentPlay.card.identity;
-  return null;
+  return camp.discards.find((d) => d.card.id === cardId)?.card.identity ?? null;
 }
 
 /** A reveal is for its audience, and a whisper is also for the seat that
@@ -289,7 +307,7 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
 
     const rescue: ExpeditionAttemptView["rescue"] =
       window === "rescue"
-        ? { failedObjectiveIds: campState.objectives.filter((o) => evaluateObjective(campState, o) === "failed").map((o) => o.id) }
+        ? { failedObjectiveIds: campState.objectives.filter((o) => rules.objectiveStatus(campState, o) === "failed").map((o) => o.id) }
         : null;
 
     const yourHandRaw = seated ? campState.hands.find((h) => h.seatId === seatId) : undefined;
@@ -316,7 +334,9 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
       expeditionLeaderSeatId: campState.expeditionLeaderSeatId,
       totalTricks: campState.totalTricks,
       removedCards: campState.removedCards.map(toIdentityView),
-      objectives: campState.objectives.map((o) => toObjectiveView(campState, o)),
+      objectives: campState.objectives.map((o) => toObjectiveView(campState, o, rules)),
+      goals: rules.goals(campState).map((g) => ({ id: g.id, status: g.status })),
+      discards: campState.discards.map((d) => ({ card: toCardView(d.card), afterTrick: d.afterTrick })),
       yourHand,
       yourLegalCardIds,
       handSizes,

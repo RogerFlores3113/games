@@ -1,33 +1,35 @@
 // Pure helpers shared by catalogue effects.
 
 import { identitiesEqual } from "../deck";
-import { evaluateObjective } from "../objectives";
 import { rankOf } from "../trick";
-import type { CampState, TrickPlay } from "../state";
+import type { CampState, CardIdentity, TrickPlay } from "../state";
+import type { CoreRules } from "../rules";
 import type { RuleModifier } from "../run/run-rules";
 import type { RunState } from "../run/types";
 
 /** The previous trickWinner, decided as if the excluded plays were never
- * made. When stacked effects have already excluded every other play, this
- * exclusion is ignored, so `prev` never sees an empty trick and always names
- * a seat that played (WR-05). */
+ * made, for the same led identity. When stacked effects have already
+ * excluded every other play, this exclusion is ignored, so `prev` never sees
+ * an empty trick and always names a seat that played (WR-05). */
 export function winnerExcluding(
-  prev: (plays: readonly TrickPlay[]) => string,
+  prev: CoreRules["trickWinner"],
   plays: readonly TrickPlay[],
+  led: CardIdentity,
   excluded: (play: TrickPlay) => boolean,
 ): string {
   const eligible = plays.filter((play) => !excluded(play));
-  return prev(eligible.length > 0 ? eligible : plays);
+  return prev(eligible.length > 0 ? eligible : plays, led);
 }
 
 /** The seat whose card of the led suit has the lowest printed rank. A joker
- * lead makes the jokers the led suit. */
-export function lowestOfLedSuit(plays: readonly TrickPlay[]): string {
-  const led = plays[0]!.card.identity;
-  const following = plays.filter((play) => {
+ * lead makes the jokers the led suit. With no card of the led suit kept,
+ * the lowest card wins. */
+export function lowestOfLedSuit(plays: readonly TrickPlay[], led: CardIdentity): string {
+  const matching = plays.filter((play) => {
     const identity = play.card.identity;
     return led.kind === "joker" ? identity.kind === "joker" : identity.kind === "standard" && identity.suit === led.suit;
   });
+  const following = matching.length > 0 ? matching : plays;
   return following.reduce((low, play) => (rankOf(play.card) < rankOf(low.card) ? play : low)).seatId;
 }
 
@@ -39,8 +41,8 @@ export function freshObjectiveAvailable(camp: CampState | null): boolean {
 }
 
 /** True when the seat holds a pending objective in this camp. */
-export function hasPendingObjective(camp: CampState, seatId: string): boolean {
-  return camp.objectives.some((o) => o.ownerSeatId === seatId && evaluateObjective(camp, o) === "pending");
+export function hasPendingObjective(camp: CampState, seatId: string, rules: CoreRules): boolean {
+  return camp.objectives.some((o) => o.ownerSeatId === seatId && rules.objectiveStatus(camp, o) === "pending");
 }
 
 /** This attempt's whispers by `fromSeatId` that named `toSeatId`. */

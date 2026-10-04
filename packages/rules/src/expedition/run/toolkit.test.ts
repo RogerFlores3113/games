@@ -11,6 +11,7 @@ import { evaluateObjective } from "../objectives";
 import { campPhase, createCamp, currentActorSeatId } from "../camp";
 import { baseRules } from "../rules";
 import type { CampState, WinCardObjective } from "../state";
+import { resolvedPlay } from "../test-support";
 import { baseRunHooks } from "./run-rules";
 import type { RunRules } from "./run-rules";
 import type { AttemptState, RunState, SeatRun } from "./types";
@@ -127,7 +128,7 @@ describe("campCardIds", () => {
 describe("applyToolkitOps", () => {
   it("throws when there is no attempt in progress", () => {
     const run = makeRun({ camp: null });
-    expect(() => applyToolkitOps(run, "p0", "some-gear", [])).toThrow();
+    expect(() => applyToolkitOps(run, "p0", "some-gear", [], rules)).toThrow();
   });
 
   it("never mutates the input RunState across a multi-op list", () => {
@@ -140,7 +141,7 @@ describe("applyToolkitOps", () => {
       { op: "add-modifier", lasts: "attempt", params: {}, audience: "public" },
       { op: "log", event: "test-event", subjectSeatIds: ["p0"], audience: "public" },
     ];
-    applyToolkitOps(run, "p0", "test-gear", ops);
+    applyToolkitOps(run, "p0", "test-gear", ops, rules);
     expect(run).toEqual(before);
   });
 
@@ -150,7 +151,7 @@ describe("applyToolkitOps", () => {
     const card = camp.hands.find((h) => h.seatId === "p0")!.cards[0]!;
     const result = applyToolkitOps(run, "p0", "test-gear", [
       { op: "move-card", cardId: card.id, fromSeatId: "p0", toSeatId: "p1" },
-    ]);
+    ], rules);
     const p0Hand = result.attempt!.camp.hands.find((h) => h.seatId === "p0")!;
     const p1Hand = result.attempt!.camp.hands.find((h) => h.seatId === "p1")!;
     expect(p0Hand.cards.some((c) => c.id === card.id)).toBe(false);
@@ -164,7 +165,7 @@ describe("applyToolkitOps", () => {
     expect(() =>
       applyToolkitOps(run, "p0", "test-gear", [
         { op: "move-card", cardId: "not-a-real-card", fromSeatId: "p0", toSeatId: "p1" },
-      ]),
+      ], rules),
     ).toThrow();
   });
 
@@ -175,7 +176,7 @@ describe("applyToolkitOps", () => {
     expect(() =>
       applyToolkitOps(run, "p0", "test-gear", [
         { op: "move-card", cardId: card.id, fromSeatId: "p0", toSeatId: "p0" },
-      ]),
+      ], rules),
     ).toThrow();
   });
 
@@ -186,7 +187,7 @@ describe("applyToolkitOps", () => {
     const cardB = camp.hands.find((h) => h.seatId === "p1")!.cards[0]!;
     const result = applyToolkitOps(run, "p0", "test-gear", [
       { op: "swap-cards", seatA: "p0", cardIdA: cardA.id, seatB: "p1", cardIdB: cardB.id },
-    ]);
+    ], rules);
     const p0Hand = result.attempt!.camp.hands.find((h) => h.seatId === "p0")!;
     const p1Hand = result.attempt!.camp.hands.find((h) => h.seatId === "p1")!;
     expect(p0Hand.cards.some((c) => c.id === cardB.id)).toBe(true);
@@ -201,7 +202,7 @@ describe("applyToolkitOps", () => {
     expect(() =>
       applyToolkitOps(run, "p0", "test-gear", [
         { op: "swap-cards", seatA: "p0", cardIdA: "not-real", seatB: "p1", cardIdB: cardB.id },
-      ]),
+      ], rules),
     ).toThrow();
   });
 
@@ -217,7 +218,7 @@ describe("applyToolkitOps", () => {
     const run = makeRun({ camp });
     const objective = camp.objectives[0]!;
     const nextCard = camp.objectiveDeck[0]!;
-    const result = applyToolkitOps(run, "p0", "compass", [{ op: "replace-objective", objectiveId: objective.id }]);
+    const result = applyToolkitOps(run, "p0", "compass", [{ op: "replace-objective", objectiveId: objective.id }], rules);
     const updated = result.attempt!.camp.objectives[0]!;
     expect(updated.id).toBe(objective.id);
     expect(updated.kind).toBe(objective.kind);
@@ -238,7 +239,7 @@ describe("applyToolkitOps", () => {
     const run = makeRun({ camp });
     const objective = camp.objectives[0]!;
     const nextCard = camp.objectiveDeck[0]!;
-    const result = applyToolkitOps(run, "p0", "compass", [{ op: "replace-objective", objectiveId: objective.id }]);
+    const result = applyToolkitOps(run, "p0", "compass", [{ op: "replace-objective", objectiveId: objective.id }], rules);
     const updated = result.attempt!.camp.objectives[0]!;
     expect(updated.id).toBe(objective.id);
     expect(updated.kind).toBe("win-card");
@@ -253,7 +254,7 @@ describe("applyToolkitOps", () => {
     const run = makeRun({ camp });
     const objective = camp.objectives[0]!;
     expect(() =>
-      applyToolkitOps(run, "p0", "compass", [{ op: "replace-objective", objectiveId: objective.id }]),
+      applyToolkitOps(run, "p0", "compass", [{ op: "replace-objective", objectiveId: objective.id }], rules),
     ).toThrow();
   });
 
@@ -265,7 +266,7 @@ describe("applyToolkitOps", () => {
     const run = makeRun({ camp });
     const objective = camp.objectives[0]!;
     expect(() =>
-      applyToolkitOps(run, "p0", "compass", [{ op: "replace-objective", objectiveId: objective.id }]),
+      applyToolkitOps(run, "p0", "compass", [{ op: "replace-objective", objectiveId: objective.id }], rules),
     ).toThrow();
   });
 
@@ -278,7 +279,7 @@ describe("applyToolkitOps", () => {
     const run = makeRun({ camp: emptied });
     const objective = emptied.objectives[0]!;
     expect(() =>
-      applyToolkitOps(run, "p0", "compass", [{ op: "replace-objective", objectiveId: objective.id }]),
+      applyToolkitOps(run, "p0", "compass", [{ op: "replace-objective", objectiveId: objective.id }], rules),
     ).toThrow();
   });
 
@@ -297,10 +298,10 @@ describe("applyToolkitOps", () => {
       ...camp,
       hands: camp.hands.map((h) => (h.seatId === "p0" ? { ...h, cards: h.cards.filter((c) => c.id !== p0Card.id) } : h)),
       objectives: [doneObjective, pendingObjective],
-      completedTricks: [{ index: 0, leaderSeatId: "p0", plays: [{ seatId: "p0", card: p0Card }], winnerSeatId: "p0" }],
+      completedTricks: [{ index: 0, leaderSeatId: "p0", plays: [resolvedPlay("p0", p0Card)], winnerSeatId: "p0" }],
     };
     const run = makeRun({ camp: rigged });
-    const result = applyToolkitOps(run, "p0", "trail-map", [{ op: "swap-objectives", seatA: "p0", seatB: "p1" }]);
+    const result = applyToolkitOps(run, "p0", "trail-map", [{ op: "swap-objectives", seatA: "p0", seatB: "p1" }], rules);
     const objectives = result.attempt!.camp.objectives;
     expect(objectives.find((o) => o.id === doneObjective.id)!.ownerSeatId).toBe("p0"); // unchanged — done
     expect(objectives.find((o) => o.id === pendingObjective.id)!.ownerSeatId).toBe("p0"); // swapped — pending
@@ -310,7 +311,7 @@ describe("applyToolkitOps", () => {
     const camp = pickAllObjectives(freshCamp());
     const run = makeRun({ camp });
     const objective = camp.objectives[0]!;
-    const result = applyToolkitOps(run, "p0", "camouflage", [{ op: "remove-objective", objectiveId: objective.id }]);
+    const result = applyToolkitOps(run, "p0", "camouflage", [{ op: "remove-objective", objectiveId: objective.id }], rules);
     expect(result.attempt!.camp.objectives.some((o) => o.id === objective.id)).toBe(false);
   });
 
@@ -318,7 +319,7 @@ describe("applyToolkitOps", () => {
     const camp = pickAllObjectives(freshCamp());
     const run = makeRun({ camp });
     expect(() =>
-      applyToolkitOps(run, "p0", "camouflage", [{ op: "remove-objective", objectiveId: "no-such-id" }]),
+      applyToolkitOps(run, "p0", "camouflage", [{ op: "remove-objective", objectiveId: "no-such-id" }], rules),
     ).toThrow();
   });
 
@@ -326,7 +327,7 @@ describe("applyToolkitOps", () => {
     const camp = pickAllObjectives(freshCamp());
     const run = makeRun({ camp });
     const card = camp.hands.find((h) => h.seatId === "p1")!.cards[0]!;
-    const result = applyToolkitOps(run, "p0", "scout", [{ op: "reveal", cardId: card.id, audience: ["p0"] }]);
+    const result = applyToolkitOps(run, "p0", "scout", [{ op: "reveal", cardId: card.id, audience: ["p0"] }], rules);
     const reveal = result.attempt!.reveals[0]!;
     expect(reveal.cardId).toBe(card.id);
     expect(reveal.fromSeatId).toBe("p1");
@@ -339,7 +340,7 @@ describe("applyToolkitOps", () => {
     const run = makeRun({ camp });
     const card = camp.hands.find((h) => h.seatId === "p1")!.cards[0]!;
     expect(() =>
-      applyToolkitOps(run, "p0", "whisper", [{ op: "reveal", cardId: card.id, audience: [] }]),
+      applyToolkitOps(run, "p0", "whisper", [{ op: "reveal", cardId: card.id, audience: [] }], rules),
     ).toThrow();
   });
 
@@ -348,7 +349,7 @@ describe("applyToolkitOps", () => {
     const run = makeRun({ camp });
     const card = camp.hands.find((h) => h.seatId === "p1")!.cards[0]!;
     expect(() =>
-      applyToolkitOps(run, "p0", "whisper", [{ op: "reveal", cardId: card.id, audience: ["not-a-seat"] }]),
+      applyToolkitOps(run, "p0", "whisper", [{ op: "reveal", cardId: card.id, audience: ["not-a-seat"] }], rules),
     ).toThrow();
   });
 
@@ -357,7 +358,7 @@ describe("applyToolkitOps", () => {
     const run = makeRun({ camp });
     const card = camp.hands.find((h) => h.seatId === "p1")!.cards[0]!;
     expect(() =>
-      applyToolkitOps(run, "p0", "whisper", [{ op: "reveal", cardId: card.id, audience: ["p0", "p0"] }]),
+      applyToolkitOps(run, "p0", "whisper", [{ op: "reveal", cardId: card.id, audience: ["p0", "p0"] }], rules),
     ).toThrow();
   });
 
@@ -365,7 +366,7 @@ describe("applyToolkitOps", () => {
     const camp = pickAllObjectives(freshCamp());
     const run = makeRun({ camp });
     expect(() =>
-      applyToolkitOps(run, "p0", "whisper", [{ op: "reveal", cardId: "not-a-real-card", audience: ["p0"] }]),
+      applyToolkitOps(run, "p0", "whisper", [{ op: "reveal", cardId: "not-a-real-card", audience: ["p0"] }], rules),
     ).toThrow();
   });
 
@@ -374,7 +375,7 @@ describe("applyToolkitOps", () => {
     const run = makeRun({ camp });
     const result = applyToolkitOps(run, "p0", "energy-tonic", [
       { op: "add-modifier", lasts: "trick", params: { cardId: "c9" }, audience: "owner" },
-    ]);
+    ], rules);
     expect(result.attempt!.effects).toEqual([
       { sourceId: "energy-tonic", seatId: "p0", atTrick: 1, lasts: "trick", params: { cardId: "c9" }, audience: "owner" },
     ]);
@@ -383,7 +384,7 @@ describe("applyToolkitOps", () => {
   it("set-next-leader sets the leader before trick 1 is allowed (D-09)", () => {
     const camp = pickAllObjectives(freshCamp());
     const run = makeRun({ camp });
-    const result = applyToolkitOps(run, "p1", "machete", [{ op: "set-next-leader", seatId: "p1" }]);
+    const result = applyToolkitOps(run, "p1", "machete", [{ op: "set-next-leader", seatId: "p1" }], rules);
     expect(result.attempt!.camp.currentTrick.leaderSeatId).toBe("p1");
   });
 
@@ -396,7 +397,7 @@ describe("applyToolkitOps", () => {
     camp = played.state;
     const run = makeRun({ camp });
     expect(() =>
-      applyToolkitOps(run, "p1", "machete", [{ op: "set-next-leader", seatId: "p1" }]),
+      applyToolkitOps(run, "p1", "machete", [{ op: "set-next-leader", seatId: "p1" }], rules),
     ).toThrow();
   });
 
@@ -405,7 +406,7 @@ describe("applyToolkitOps", () => {
     const run = makeRun({ camp });
     const result = applyToolkitOps(run, "p0", "some-gear", [
       { op: "log", event: "used-ability", subjectSeatIds: ["p1"], audience: "public" },
-    ]);
+    ], rules);
     expect(result.attempt!.log).toEqual([
       { event: "used-ability", actorSeatId: "p0", subjectSeatIds: ["p1"], sourceId: "some-gear", audience: "public" },
     ]);
@@ -417,7 +418,7 @@ describe("applyToolkitOps", () => {
     expect(() =>
       applyToolkitOps(run, "p0", "some-gear", [
         { op: "log", event: "used-ability", subjectSeatIds: [], audience: ["not-a-seat"] },
-      ]),
+      ], rules),
     ).toThrow();
   });
 });
@@ -465,7 +466,7 @@ describe("applyToolkitOps: rescue and sharing ops", () => {
     const deck = [{ kind: "standard", suit: "hearts", rank: 99 } as never, ...failing.objectiveDeck];
     const result = applyToolkitOps({ ...run, attempt: { ...run.attempt!, camp: { ...failing, objectiveDeck: deck } } }, loser, "antidote", [
       { op: "replace-objective", objectiveId: "obj-failed" },
-    ]);
+    ], rules);
     const after = result.attempt!.camp;
     expect(after.objectives).toEqual([
       { id: "obj-failed", kind: "win-card", target: failing.objectiveDeck[freshIndex], ownerSeatId: loser },
@@ -482,7 +483,7 @@ describe("applyToolkitOps: rescue and sharing ops", () => {
     for (const c of [pending, noFresh]) {
       const objectiveId = c.objectives[0]!.id;
       expect(() =>
-        applyToolkitOps({ ...run, attempt: { ...run.attempt!, camp: c } }, loser, "antidote", [{ op: "replace-objective", objectiveId }]),
+        applyToolkitOps({ ...run, attempt: { ...run.attempt!, camp: c } }, loser, "antidote", [{ op: "replace-objective", objectiveId }], rules),
       ).toThrow(/replace-objective/);
     }
   });
@@ -492,7 +493,7 @@ describe("applyToolkitOps: rescue and sharing ops", () => {
     const { camp: failing } = withFailedObjective(camp, loser);
     const result = applyToolkitOps({ ...run, attempt: { ...run.attempt!, camp: failing } }, loser, "rally", [
       { op: "reassign-objective", objectiveId: "obj-failed", toSeatId: winner },
-    ]);
+    ], rules);
     const objective = result.attempt!.camp.objectives[0]!;
     expect(objective.ownerSeatId).toBe(winner);
     expect(evaluateObjective(result.attempt!.camp, objective)).toBe("done");
@@ -510,14 +511,14 @@ describe("applyToolkitOps: rescue and sharing ops", () => {
     ];
     for (const [c, objectiveId, toSeatId] of cases) {
       expect(() =>
-        applyToolkitOps({ ...run, attempt: { ...run.attempt!, camp: c } }, "p0", "detour", [{ op: "reassign-objective", objectiveId, toSeatId }]),
+        applyToolkitOps({ ...run, attempt: { ...run.attempt!, camp: c } }, "p0", "detour", [{ op: "reassign-objective", objectiveId, toSeatId }], rules),
       ).toThrow(/reassign-objective/);
     }
   });
 
   it("reassign-trick changes a completed trick's winner and moves no card", () => {
     const { run, camp, winner, loser } = afterOneTrick();
-    const result = applyToolkitOps(run, winner, "pack-mule", [{ op: "reassign-trick", trickIndex: 0, toSeatId: loser }]);
+    const result = applyToolkitOps(run, winner, "pack-mule", [{ op: "reassign-trick", trickIndex: 0, toSeatId: loser }], rules);
     const after = result.attempt!.camp;
     expect(after.completedTricks[0]).toEqual({ ...camp.completedTricks[0]!, winnerSeatId: loser });
     expect(campCardIds(after)).toEqual(campCardIds(camp));
@@ -525,35 +526,35 @@ describe("applyToolkitOps: rescue and sharing ops", () => {
 
   it("reassign-trick throws for a trick not yet completed or the current winner", () => {
     const { run, winner, loser } = afterOneTrick();
-    expect(() => applyToolkitOps(run, winner, "pack-mule", [{ op: "reassign-trick", trickIndex: 1, toSeatId: loser }])).toThrow(/reassign-trick/);
-    expect(() => applyToolkitOps(run, winner, "pack-mule", [{ op: "reassign-trick", trickIndex: 0, toSeatId: winner }])).toThrow(/reassign-trick/);
+    expect(() => applyToolkitOps(run, winner, "pack-mule", [{ op: "reassign-trick", trickIndex: 1, toSeatId: loser }], rules)).toThrow(/reassign-trick/);
+    expect(() => applyToolkitOps(run, winner, "pack-mule", [{ op: "reassign-trick", trickIndex: 0, toSeatId: winner }], rules)).toThrow(/reassign-trick/);
   });
 
   it("share-reveal copies the nth whisper's card and pinned holder to a new audience", () => {
     const { run } = afterOneTrick();
     const whisper = run.attempt!.reveals[0]!;
-    const result = applyToolkitOps(run, "p0", "loud-call", [{ op: "share-reveal", whisperOrdinal: 0, audience: ["p1", "p2"] }]);
+    const result = applyToolkitOps(run, "p0", "loud-call", [{ op: "share-reveal", whisperOrdinal: 0, audience: ["p1", "p2"] }], rules);
     expect(result.attempt!.reveals[2]).toEqual({ cardId: whisper.cardId, fromSeatId: "p0", audience: ["p1", "p2"], source: "loud-call" });
   });
 
   it("share-reveal counts whispers only and throws past the last one or for a bad audience", () => {
     const { run } = afterOneTrick();
-    expect(() => applyToolkitOps(run, "p0", "loud-call", [{ op: "share-reveal", whisperOrdinal: 1, audience: ["p2"] }])).toThrow(/share-reveal/);
-    expect(() => applyToolkitOps(run, "p0", "loud-call", [{ op: "share-reveal", whisperOrdinal: 0, audience: [] }])).toThrow(/share-reveal/);
-    expect(() => applyToolkitOps(run, "p0", "loud-call", [{ op: "share-reveal", whisperOrdinal: 0, audience: ["p2", "p2"] }])).toThrow(/share-reveal/);
+    expect(() => applyToolkitOps(run, "p0", "loud-call", [{ op: "share-reveal", whisperOrdinal: 1, audience: ["p2"] }], rules)).toThrow(/share-reveal/);
+    expect(() => applyToolkitOps(run, "p0", "loud-call", [{ op: "share-reveal", whisperOrdinal: 0, audience: [] }], rules)).toThrow(/share-reveal/);
+    expect(() => applyToolkitOps(run, "p0", "loud-call", [{ op: "share-reveal", whisperOrdinal: 0, audience: ["p2", "p2"] }], rules)).toThrow(/share-reveal/);
   });
 
   it("adjust-supplies changes the crew's supplies within [1, STARTING_SUPPLIES]", () => {
     const { run } = afterOneTrick();
-    expect(applyToolkitOps(run, "p0", "field-kit", [{ op: "adjust-supplies", delta: 1 }]).supplies).toBe(3);
-    expect(applyToolkitOps(run, "p0", "triage", [{ op: "adjust-supplies", delta: -1 }]).supplies).toBe(1);
+    expect(applyToolkitOps(run, "p0", "field-kit", [{ op: "adjust-supplies", delta: 1 }], rules).supplies).toBe(3);
+    expect(applyToolkitOps(run, "p0", "triage", [{ op: "adjust-supplies", delta: -1 }], rules).supplies).toBe(1);
   });
 
   it("adjust-supplies throws when the result would spend the last supply or pass the start", () => {
     const { run } = afterOneTrick();
-    expect(() => applyToolkitOps(run, "p0", "triage", [{ op: "adjust-supplies", delta: -2 }])).toThrow(/adjust-supplies/);
-    expect(() => applyToolkitOps(run, "p0", "field-kit", [{ op: "adjust-supplies", delta: 2 }])).toThrow(/adjust-supplies/);
-    expect(() => applyToolkitOps(run, "p0", "field-kit", [{ op: "adjust-supplies", delta: 0.5 }])).toThrow(/adjust-supplies/);
+    expect(() => applyToolkitOps(run, "p0", "triage", [{ op: "adjust-supplies", delta: -2 }], rules)).toThrow(/adjust-supplies/);
+    expect(() => applyToolkitOps(run, "p0", "field-kit", [{ op: "adjust-supplies", delta: 2 }], rules)).toThrow(/adjust-supplies/);
+    expect(() => applyToolkitOps(run, "p0", "field-kit", [{ op: "adjust-supplies", delta: 0.5 }], rules)).toThrow(/adjust-supplies/);
   });
 
   it("property: a random op batch either throws its own op's invariant or conserves every card and keeps supplies in range", () => {
@@ -582,7 +583,7 @@ describe("applyToolkitOps: rescue and sharing ops", () => {
         const before = structuredClone(run);
         let after: RunState;
         try {
-          after = applyToolkitOps(run, "p0", "batch", ops);
+          after = applyToolkitOps(run, "p0", "batch", ops, rules);
         } catch (error) {
           expect((error as Error).message).toMatch(/^toolkit: /);
           expect((error as Error).message).not.toMatch(/conservation/);

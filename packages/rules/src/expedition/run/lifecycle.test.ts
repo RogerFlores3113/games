@@ -6,7 +6,7 @@
 // characters through testCatalog.
 
 import { describe, expect, it } from "vitest";
-import { campPhase, currentActorSeatId } from "../camp";
+import { campPhase, currentActorSeatId, guard } from "../camp";
 import { ability, defineCharacter, defineItem, defineUpgrade } from "../content/source-def";
 import { rulesFor } from "./compose";
 import {
@@ -29,7 +29,7 @@ const FORCED_FAILURE = defineItem({
   id: "always-fails",
   name: "Always Fails",
   text: "The camp fails.",
-  passive: { modifier: () => ({ failureChecks: () => () => ["forced"] }) },
+  passive: { modifier: () => ({ goals: () => () => [guard("forced", true)] }) },
 });
 
 /** A fireside run past muster with every seat ready, so startAttempt can run. */
@@ -173,7 +173,7 @@ describe("settleIfDecided on failure", () => {
       id: "zero",
       name: "Zero",
       text: "Failures are free.",
-      passive: { modifier: () => ({ failureChecks: () => () => ["forced"], failureCost: () => () => 0 }) },
+      passive: { modifier: () => ({ goals: () => () => [guard("forced", true)], failureCost: () => () => 0 }) },
     });
     const cat = testCatalog({ items: { zero } });
     expect(() => lastReady(readyRun(cat, { readySeatIds: ["p0", "p1"] }, { p0: ["zero"] }), cat)).toThrow();
@@ -417,9 +417,9 @@ describe("the in-trick window", () => {
       targets: [{ kind: "self" }],
       apply: (ctx) => [{ op: "add-modifier", lasts: "trick", params: { seatId: ctx.self }, audience: "public" }],
       effect: (effect) => ({
-        trickWinner: (prev) => (plays) => {
+        trickWinner: (prev) => (plays, led) => {
           const eligible = plays.filter((play) => play.seatId !== effect.seatId);
-          return eligible.length === 0 || eligible.length === plays.length ? prev(plays) : prev(eligible);
+          return eligible.length === 0 || eligible.length === plays.length ? prev(plays, led) : prev(eligible, led);
         },
       }),
     }),

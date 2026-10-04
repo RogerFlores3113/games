@@ -2,11 +2,17 @@
 
 import { currentActorSeatId, checkCampOutcome } from "../camp";
 import { cardLabel } from "../deck";
-import { describeObjective, evaluateObjective } from "../objectives";
+import { describeObjective } from "../objectives";
 import { rulesFor } from "../run/compose";
 import { runPhase, runStatus } from "../run/lifecycle";
 import type { Catalog, RunState } from "../run/types";
+import type { ResolvedPlay } from "../state";
 import type { DevInspectSection } from "../../adapter";
+
+function playLabel(play: ResolvedPlay): string {
+  const countsAs = play.countsAs === null ? "" : ` as ${cardLabel(play.countsAs)}`;
+  return `${play.seatId} ${cardLabel(play.card.identity)}${countsAs}${play.burned ? " (burned)" : ""}`;
+}
 
 export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[] {
   const sections: DevInspectSection[] = [
@@ -39,7 +45,8 @@ export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[]
     title: "Objectives",
     lines: [
       `camp outcome: ${checkCampOutcome(camp, rules).status}`,
-      ...camp.objectives.map((o) => `${o.id}: ${describeObjective(o)}, owner ${o.ownerSeatId ?? "none"}, ${evaluateObjective(camp, o)}`),
+      ...camp.objectives.map((o) => `${o.id}: ${describeObjective(o)}, owner ${o.ownerSeatId ?? "none"}, ${rules.objectiveStatus(camp, o)}`),
+      ...rules.goals(camp).map((g) => `goal ${g.id}: ${g.status}`),
     ],
   });
   sections.push({
@@ -47,6 +54,8 @@ export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[]
     lines: [
       `trick ${camp.currentTrick.index + 1} of ${camp.totalTricks}, ${camp.completedTricks.length} completed, leader ${camp.currentTrick.leaderSeatId}`,
       `played: ${camp.currentTrick.plays.map((p) => `${p.seatId} ${cardLabel(p.card.identity)}`).join(", ") || "nothing"}`,
+      ...camp.completedTricks.map((t) => `trick ${t.index + 1}: ${t.plays.map(playLabel).join(", ")}, ${t.winnerSeatId} won`),
+      `discards: ${camp.discards.map((d) => `${cardLabel(d.card.identity)} after trick ${d.afterTrick}`).join(", ") || "none"}`,
       `current actor: ${currentActorSeatId(camp, rules) ?? "none"}`,
     ],
   });

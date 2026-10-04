@@ -57,13 +57,14 @@ const CardViewSchema = z.strictObject({
 });
 
 // `effectiveRank` is set only when the composed rank differs from the
-// printed one.
+// printed one, and `countsAs` only when the composed identity does.
 const EffectiveRankSchema = z.number().int().nullable();
 
 const RankedCardViewSchema = z.strictObject({
   id: z.string().min(1),
   identity: CardIdentityViewSchema,
   effectiveRank: EffectiveRankSchema,
+  countsAs: CardIdentityViewSchema.nullable(),
 });
 
 const TrickPlayViewSchema = z.strictObject({
@@ -72,10 +73,18 @@ const TrickPlayViewSchema = z.strictObject({
   effectiveRank: EffectiveRankSchema,
 });
 
+const CompletedPlayViewSchema = z.strictObject({
+  seatId: z.string().min(1),
+  card: CardViewSchema,
+  effectiveRank: EffectiveRankSchema,
+  countsAs: CardIdentityViewSchema.nullable(),
+  burned: z.boolean(),
+});
+
 const CompletedTrickViewSchema = z.strictObject({
   index: z.number().int().min(0),
   leaderSeatId: z.string().min(1),
-  plays: z.array(TrickPlayViewSchema),
+  plays: z.array(CompletedPlayViewSchema),
   winnerSeatId: z.string().min(1),
 });
 
@@ -90,7 +99,7 @@ const ObjectiveStatusSchema = z.enum(["pending", "done", "failed"]);
 const WinCardObjectiveViewSchema = z.strictObject({
   id: z.string().min(1),
   kind: z.literal("win-card"),
-  target: StandardIdentityViewSchema,
+  target: CardIdentityViewSchema,
   ownerSeatId: z.string().min(1).nullable(),
   status: ObjectiveStatusSchema,
 });
@@ -130,6 +139,10 @@ const HandSizeViewSchema = z.strictObject({
   seatId: z.string().min(1),
   size: z.number().int().min(0),
 });
+
+const GoalViewSchema = z.strictObject({ id: z.string().min(1), status: ObjectiveStatusSchema });
+
+const DiscardViewSchema = z.strictObject({ card: CardViewSchema, afterTrick: z.number().int().min(0) });
 
 // Deliberately no `audience` key: a reveal's audience-gating already happened
 // before this shape is ever populated (only reveals addressed to the viewer
@@ -186,6 +199,8 @@ const CampViewSchema = z.strictObject({
   // Deliberately no `objectiveDeck` key: the undrawn objective deck order
   // must never be projected.
   objectives: z.array(ObjectiveViewSchema),
+  goals: z.array(GoalViewSchema),
+  discards: z.array(DiscardViewSchema),
   yourHand: z.array(RankedCardViewSchema),
   yourLegalCardIds: z.array(z.string().min(1)),
   handSizes: z.array(HandSizeViewSchema),

@@ -1181,3 +1181,31 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
   dark-sky boss effects and the rules modal's "This camp" section are deleted; units 5 and 11
   bring weather overlays and camp pages back. Boss-camp markers and the "Boss camp" label stay,
   since camps 3 and 6 are still boss camps by position until unit 3.
+
+### Implementation notes (unit 2)
+
+- Trick completion lives in `trick.ts`'s `resolveTrick(plays, rules)`, which `applyPlayCard`
+  calls, so `trick.test.ts` tests burns and counted-as identities directly. The card reading is
+  one value, `CardReading { identityOf, isTrump, rankOf }`, built by `cardReading(parts)`; its
+  default `rankOf` reads the strength of what the card counts as. `baseRulesWith(reading)` and
+  `compose.ts` both build from it. `ledIdentity` is deleted: the led identity is always
+  `identityOf(plays[0].card)`.
+- `applyToolkitOps` takes the composed rules as a trailing parameter, because `swap-objectives`
+  and `replace-objective` must read `rules.objectiveStatus`. Unit 5's `(run, origin, ops)`
+  signature should keep a rules argument for the same reason.
+- `lowestOfLedSuit` falls back to the lowest kept card when no kept card follows the led identity;
+  a burned lead made its old `reduce` over an empty list throw.
+- The rescue view does not gain `failedGoalIds`: rescue opens only while no goal has failed, so
+  the list would always be empty. Unit 10 can add it if the temple's token changes that.
+- Goal ids are `<rule id>:<seat id>` (Camouflage: `camouflage:<seatId>`). The camp-over prompt
+  names a broken goal by its rule's display name ("Camp failed: Camouflage broke"); before this
+  unit a fired failure check showed "Camp cleared!".
+- `applyCampAction` emits `trick-started` after the last pick even if that pick decided the camp;
+  `react` skips decided camps, so the run layer needs no extra check. The run layer ignores events
+  until unit 5.
+- The objective floor changes which objectives a seed deals (3 and up at 3 or 4 players, 4 and up
+  at 5), so seeded fixtures that named objective targets moved.
+- Web: a burned card in the last-trick fan is dimmed; a counted-as card wears a pip under it with
+  the counted suit (or S/M for a joker) in that suit's colour. A rank change is not drawn; unit 13
+  (True Form) may need the full label. The pip sits inside the card's fan column, so neighbours
+  never overlap.

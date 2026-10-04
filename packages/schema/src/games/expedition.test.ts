@@ -138,10 +138,13 @@ const midCampView = {
         },
         { id: "o3", kind: "no-tricks", ownerSeatId: "seat-2", status: "done" },
         { id: "o4", kind: "exactly-n", n: 2, ownerSeatId: "seat-3", status: "failed" },
+        { id: "o5", kind: "win-card", target: { kind: "joker", joker: "sun" }, ownerSeatId: "seat-2", status: "pending" },
       ],
+      goals: [{ id: "camouflage:seat-2", status: "done" }],
+      discards: [{ card: { id: "card-9", identity: { kind: "standard", suit: "diamonds", rank: 4 } }, afterTrick: 1 }],
       yourHand: [
-        { id: "card-1", identity: { kind: "standard", suit: "spades", rank: 14 }, effectiveRank: null },
-        { id: "card-2", identity: { kind: "joker", joker: "sun" }, effectiveRank: null },
+        { id: "card-1", identity: { kind: "standard", suit: "spades", rank: 14 }, effectiveRank: null, countsAs: null },
+        { id: "card-2", identity: { kind: "joker", joker: "sun" }, effectiveRank: null, countsAs: { kind: "standard", suit: "hearts", rank: 9 } },
       ],
       yourLegalCardIds: ["card-1"],
       handSizes: [
@@ -153,7 +156,7 @@ const midCampView = {
         {
           index: 0,
           leaderSeatId: "seat-1",
-          plays: [{ seatId: "seat-1", card: { id: "card-3", identity: { kind: "standard", suit: "clubs", rank: 5 } }, effectiveRank: 6 }],
+          plays: [{ seatId: "seat-1", card: { id: "card-3", identity: { kind: "standard", suit: "clubs", rank: 5 } }, effectiveRank: 6, countsAs: null, burned: true }],
           winnerSeatId: "seat-1",
         },
       ],

@@ -64,7 +64,7 @@ function checkCamp(run: RunState, problems: string[]): void {
     if (!run.seatIds.includes(play.seatId)) problems.push(`trick play by unknown seat ${play.seatId}`);
   }
 
-  const cards = [...camp.hands.flatMap((h) => h.cards), ...plays.map((p) => p.card)];
+  const cards = [...camp.hands.flatMap((h) => h.cards), ...plays.map((p) => p.card), ...camp.discards.map((d) => d.card)];
   for (const id of duplicates(cards.map((c) => c.id))) problems.push(`card id ${id} appears more than once`);
 
   const have = counts([...cards.map((c) => cardLabel(c.identity)), ...camp.removedCards.map(cardLabel)]);

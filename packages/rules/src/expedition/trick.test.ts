@@ -1,10 +1,10 @@
-// Unit tests (RED phase) for trick.ts's follow-suit resolver, trump check
-// and trick winner. Hand-written example cases from the plan's <behavior>
-// block; fast-check property coverage lives in trick.property.test.ts.
+// Unit tests for trick.ts's follow-suit resolver, trump check, trick winner
+// and trick resolution. Hand-written example cases; fast-check property
+// coverage lives in trick.property.test.ts.
 
 import { describe, expect, it } from "vitest";
-import { isTrump, ledIdentity, legalPlaysFor, rankOf, trickWinner } from "./trick";
-import { baseRulesWith } from "./rules";
+import { cardReading, isTrump, legalPlaysFor, rankOf, resolveTrick, trickWinner } from "./trick";
+import { baseRules, baseRulesWith } from "./rules";
 import type { CampState, CardIdentity, ExpeditionCard, TrickPlay } from "./state";
 
 function card(id: string, identity: CardIdentity): ExpeditionCard {
@@ -77,23 +77,11 @@ describe("isTrump", () => {
   });
 });
 
-describe("ledIdentity", () => {
-  it("returns null for an empty trick", () => {
-    expect(ledIdentity([])).toBeNull();
-  });
-
-  it("returns the first play's identity", () => {
-    const plays: TrickPlay[] = [
-      { seatId: "seat-a", card: heartsFive },
-      { seatId: "seat-b", card: heartsKing },
-    ];
-    expect(ledIdentity(plays)).toEqual(heartsFive.identity);
-  });
-});
+const led = (plays: readonly TrickPlay[]): CardIdentity => plays[0]!.card.identity;
 
 describe("trickWinner", () => {
   it("throws on empty plays", () => {
-    expect(() => trickWinner([])).toThrow();
+    expect(() => trickWinner([], heartsFive.identity)).toThrow();
   });
 
   it("[5♥ led, K♥, A♠] → K♥'s seat (off-suit Ace loses)", () => {
@@ -102,7 +90,7 @@ describe("trickWinner", () => {
       { seatId: "seat-b", card: heartsKing },
       { seatId: "seat-c", card: spadesKing },
     ];
-    expect(trickWinner(plays)).toBe("seat-b");
+    expect(trickWinner(plays, led(plays))).toBe("seat-b");
   });
 
   it("[2♥ led, Moon, A♥] → Moon's seat", () => {
@@ -112,7 +100,7 @@ describe("trickWinner", () => {
       { seatId: "seat-b", card: moon },
       { seatId: "seat-c", card: heartsAce },
     ];
-    expect(trickWinner(plays)).toBe("seat-b");
+    expect(trickWinner(plays, led(plays))).toBe("seat-b");
   });
 
   it("[Moon led, Sun] → Sun's seat", () => {
@@ -120,7 +108,7 @@ describe("trickWinner", () => {
       { seatId: "seat-a", card: moon },
       { seatId: "seat-b", card: sun },
     ];
-    expect(trickWinner(plays)).toBe("seat-b");
+    expect(trickWinner(plays, led(plays))).toBe("seat-b");
   });
 
   it("[Sun led, Moon] → Sun's seat", () => {
@@ -128,7 +116,7 @@ describe("trickWinner", () => {
       { seatId: "seat-a", card: sun },
       { seatId: "seat-b", card: moon },
     ];
-    expect(trickWinner(plays)).toBe("seat-a");
+    expect(trickWinner(plays, led(plays))).toBe("seat-a");
   });
 
   it("[2♦ led, Sun, Moon] → Sun's seat", () => {
@@ -137,7 +125,7 @@ describe("trickWinner", () => {
       { seatId: "seat-b", card: sun },
       { seatId: "seat-c", card: moon },
     ];
-    expect(trickWinner(plays)).toBe("seat-b");
+    expect(trickWinner(plays, led(plays))).toBe("seat-b");
   });
 
   it("never compares a joker by rank: highest led-suit standard card wins when no joker played", () => {
@@ -147,16 +135,15 @@ describe("trickWinner", () => {
       { seatId: "seat-c", card: heartsKing },
       { seatId: "seat-d", card: spadesKing },
     ];
-    expect(trickWinner(plays)).toBe("seat-c");
+    expect(trickWinner(plays, led(plays))).toBe("seat-c");
   });
 });
 
 describe("generic trump predicate (WR-03)", () => {
-  const spadesTrump = (identity: CardIdentity): boolean =>
-    identity.kind === "joker" || identity.suit === "spades";
+  const spadesTrump = cardReading({ isTrump: (identity: CardIdentity): boolean => identity.kind === "joker" || identity.suit === "spades" });
 
   it("default predicate: trick.test.ts's other describes prove base semantics are unchanged (no assertion here)", () => {
-    expect(trickWinner([{ seatId: "s", card: sun }])).toBe("s");
+    expect(trickWinner([{ seatId: "s", card: sun }], sun.identity)).toBe("s");
   });
 
   it("spades-trump: [5♥ led, 2♠, A♥] → the only trump play (2♠) wins", () => {
@@ -165,7 +152,7 @@ describe("generic trump predicate (WR-03)", () => {
       { seatId: "p1", card: spadesTwo },
       { seatId: "p2", card: heartsAce },
     ];
-    expect(trickWinner(plays, spadesTrump)).toBe("p1");
+    expect(trickWinner(plays, led(plays), spadesTrump)).toBe("p1");
   });
 
   it("spades-trump: two trumps played, the higher trump strength wins", () => {
@@ -174,7 +161,7 @@ describe("generic trump predicate (WR-03)", () => {
       { seatId: "p1", card: spadesTwo },
       { seatId: "p2", card: spadesKing },
     ];
-    expect(trickWinner(plays, spadesTrump)).toBe("p2");
+    expect(trickWinner(plays, led(plays), spadesTrump)).toBe("p2");
   });
 
   it("spades-trump: hearts led, hand holds 3♥ and 9♠ — must follow suit with 3♥ only", () => {
@@ -206,7 +193,7 @@ describe("generic trump predicate (WR-03)", () => {
   it("default predicate unchanged: a Sun lead still forces the Moon", () => {
     const hand = [moon, heartsAce];
     const led: CardIdentity = { kind: "joker", joker: "sun" };
-    expect(legalPlaysFor(hand, led, isTrump)).toEqual([moon]);
+    expect(legalPlaysFor(hand, led)).toEqual([moon]);
   });
 
   it("baseRulesWith(spadesTrump).legalPlays honors the predicate", () => {
@@ -230,18 +217,17 @@ describe("generic trump predicate (WR-03)", () => {
         leaderSeatId: "p0",
         plays: [{ seatId: "p1", card: heartsFive }],
       },
+      discards: [],
     };
     expect(rules.legalPlays(state, "p0")).toEqual([heartsThree]);
   });
 
-  it("baseRulesWith(spadesTrump).trickWinner matches trickWinner(plays, spadesTrump)", () => {
+  it("baseRulesWith(spadesTrump).trickWinner honors the predicate", () => {
     const plays: TrickPlay[] = [
       { seatId: "p0", card: heartsFive },
       { seatId: "p1", card: spadesTwo },
     ];
-    const rules = baseRulesWith(spadesTrump);
-    expect(rules.trickWinner(plays)).toBe(trickWinner(plays, spadesTrump));
-    expect(rules.trickWinner(plays)).toBe("p1");
+    expect(baseRulesWith(spadesTrump).trickWinner(plays, led(plays))).toBe("p1");
   });
 });
 
@@ -253,24 +239,88 @@ describe("rankOf hook", () => {
   ];
 
   it("a shifted rank changes the trick winner", () => {
-    const threeIsAce = (c: ExpeditionCard) => (c.id === heartsThree.id ? 14 : rankOf(c));
-    expect(trickWinner(plays)).toBe("p1");
-    expect(trickWinner(plays, isTrump, threeIsAce)).toBe("p2");
-    expect(baseRulesWith(isTrump, threeIsAce).trickWinner(plays)).toBe("p2");
+    const threeIsAce = cardReading({ rankOf: (c: ExpeditionCard) => (c.id === heartsThree.id ? 14 : rankOf(c)) });
+    expect(trickWinner(plays, led(plays))).toBe("p1");
+    expect(trickWinner(plays, led(plays), threeIsAce)).toBe("p2");
+    expect(baseRulesWith(threeIsAce).trickWinner(plays, led(plays))).toBe("p2");
   });
 
   it("a rank tie goes to the earliest play", () => {
-    const threeIsKing = (c: ExpeditionCard) => (c.id === heartsThree.id ? 13 : rankOf(c));
+    const threeIsKing = cardReading({ rankOf: (c: ExpeditionCard) => (c.id === heartsThree.id ? 13 : rankOf(c)) });
     const kingLast: TrickPlay[] = [
       { seatId: "p0", card: heartsFive },
       { seatId: "p1", card: heartsThree },
       { seatId: "p2", card: heartsKing },
     ];
-    expect(trickWinner(plays, isTrump, threeIsKing)).toBe("p1");
-    expect(trickWinner(kingLast, isTrump, threeIsKing)).toBe("p1");
+    expect(trickWinner(plays, led(plays), threeIsKing)).toBe("p1");
+    expect(trickWinner(kingLast, led(kingLast), threeIsKing)).toBe("p1");
   });
 
   it("the default ranks Sun over Moon over the Ace", () => {
     expect([rankOf(sun), rankOf(moon), rankOf(heartsAce), rankOf(clubsTwo)]).toEqual([16, 15, 14, 2]);
+  });
+});
+
+describe("resolveTrick", () => {
+  const spadesNine = card("c12", { kind: "standard", suit: "spades", rank: 9 });
+  const heartsSeven = card("c13", { kind: "standard", suit: "hearts", rank: 7 });
+  const diamondsKing = card("c14", { kind: "standard", suit: "diamonds", rank: 13 });
+  const spadesThree = card("c15", { kind: "standard", suit: "spades", rank: 3 });
+  const burning = (...ids: string[]) => ({ ...baseRules, burns: () => ids });
+
+  it("a burned card cannot win", () => {
+    const plays: TrickPlay[] = [
+      { seatId: "p0", card: heartsFive },
+      { seatId: "p1", card: heartsKing },
+      { seatId: "p2", card: heartsThree },
+    ];
+    const resolved = resolveTrick(plays, burning(heartsKing.id));
+    expect(resolved.winnerSeatId).toBe("p0");
+    expect(resolved.plays.map((p) => [p.seatId, p.burned, p.countsAs])).toEqual([
+      ["p0", false, null],
+      ["p1", true, null],
+      ["p2", false, null],
+    ]);
+  });
+
+  it("a counted-as identity follows its new suit", () => {
+    const spadesAsHearts = (c: ExpeditionCard): CardIdentity =>
+      c.identity.kind === "standard" && c.identity.suit === "spades" ? { kind: "standard", suit: "hearts", rank: c.identity.rank } : c.identity;
+    const rules = baseRulesWith(cardReading({ identityOf: spadesAsHearts }));
+    const plays: TrickPlay[] = [
+      { seatId: "p0", card: heartsFive },
+      { seatId: "p1", card: spadesNine },
+      { seatId: "p2", card: heartsSeven },
+    ];
+    const resolved = resolveTrick(plays, rules);
+    expect(resolved.winnerSeatId).toBe("p1");
+    expect(resolved.plays.map((p) => p.countsAs)).toEqual([null, { kind: "standard", suit: "hearts", rank: 9 }, null]);
+  });
+
+  it("a burned lead keeps the led suit", () => {
+    const plays: TrickPlay[] = [
+      { seatId: "p0", card: heartsFive },
+      { seatId: "p1", card: heartsThree },
+      { seatId: "p2", card: spadesKing },
+    ];
+    expect(resolveTrick(plays, burning(heartsFive.id)).winnerSeatId).toBe("p1");
+  });
+
+  it("with no follower kept the highest kept card wins", () => {
+    const plays: TrickPlay[] = [
+      { seatId: "p0", card: heartsFive },
+      { seatId: "p1", card: spadesThree },
+      { seatId: "p2", card: diamondsKing },
+    ];
+    expect(resolveTrick(plays, burning(heartsFive.id)).winnerSeatId).toBe("p2");
+  });
+
+  it("throws when every play burns, or a burn names a card nobody played", () => {
+    const plays: TrickPlay[] = [
+      { seatId: "p0", card: heartsFive },
+      { seatId: "p1", card: spadesThree },
+    ];
+    expect(() => resolveTrick(plays, burning(heartsFive.id, spadesThree.id))).toThrow("burns removed every play");
+    expect(() => resolveTrick(plays, burning("nope"))).toThrow("burns named nope");
   });
 });

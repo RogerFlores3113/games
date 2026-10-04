@@ -152,7 +152,7 @@ export function useAbility(
   const ops: ToolkitOp[] = [...active.apply(abilityContext(run, seat, sourceId, rules, resolved.targets, true))];
   const limit = status.remaining;
   if (limit.kind === "supplies") ops.push({ op: "adjust-supplies", delta: -limit.cost });
-  const applied = applyToolkitOps(run, seatId, sourceId, ops);
+  const applied = applyToolkitOps(run, seatId, sourceId, ops, rules);
 
   const used: LedgerEntry = { kind: "used", sourceId, at: currentStamp(run)!, poolCost: limit.kind === "pool" ? limit.cost : 0 };
   const seats = applied.seats.map((s) => {

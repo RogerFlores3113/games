@@ -18,6 +18,8 @@ function camp(over: Partial<Camp> = {}): Camp {
     expeditionLeaderSeatId: "a",
     totalTricks: 10,
     removedCards: [],
+    goals: [],
+    discards: [],
     objectives: [objective("o1", "pending")],
     yourHand: [],
     yourLegalCardIds: [],
@@ -73,7 +75,7 @@ describe("cuesFor", () => {
   it("plays card-play once when the last card closes the trick", () => {
     const prev = game({}, { currentTrick: { index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: club3, effectiveRank: null }] } });
     const next = game({}, {
-      completedTricks: [{ index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: club3, effectiveRank: null }, { seatId: "b", card: club4, effectiveRank: null }], winnerSeatId: "b" }],
+      completedTricks: [{ index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: club3, effectiveRank: null, countsAs: null, burned: false }, { seatId: "b", card: club4, effectiveRank: null, countsAs: null, burned: false }], winnerSeatId: "b" }],
       currentTrick: { index: 1, leaderSeatId: "b", plays: [] },
     });
     expect(cuesFor(prev, next)).toEqual(["sfx-card-play"]);

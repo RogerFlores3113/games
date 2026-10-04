@@ -20,10 +20,12 @@ function camp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampView {
     expeditionLeaderSeatId: "me",
     totalTricks: 1,
     removedCards: [],
+    goals: [],
+    discards: [],
     objectives: [],
     yourHand: [
-      { id: "h7", identity: H7, effectiveRank: null },
-      { id: "s9", identity: S9, effectiveRank: null },
+      { id: "h7", identity: H7, effectiveRank: null, countsAs: null },
+      { id: "s9", identity: S9, effectiveRank: null, countsAs: null },
     ],
     yourLegalCardIds: ["h7", "s9"],
     handSizes: [],
@@ -144,7 +146,7 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
     "your turn, cannot follow",
     view(
       camp({
-        yourHand: [{ id: "s9", identity: S9, effectiveRank: null }],
+        yourHand: [{ id: "s9", identity: S9, effectiveRank: null, countsAs: null }],
         yourLegalCardIds: ["s9"],
         currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", card: { id: "h2", identity: H2 }, effectiveRank: null }] },
       }),
@@ -270,8 +272,8 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
             leaderSeatId: "bo",
             winnerSeatId: "bo",
             plays: [
-              { seatId: "bo", card: { id: "s9", identity: S9 }, effectiveRank: null },
-              { seatId: "me", card: { id: "h7", identity: H7 }, effectiveRank: null },
+              { seatId: "bo", card: { id: "s9", identity: S9 }, effectiveRank: null, countsAs: null, burned: false },
+              { seatId: "me", card: { id: "h7", identity: H7 }, effectiveRank: null, countsAs: null, burned: false },
             ],
           },
         ],
@@ -280,6 +282,44 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
     ui(),
     playing,
     { text: "Camp failed: 7♥ was won by Bo", tone: "alert" },
+  ],
+  [
+    "camp failed on a broken guard with every objective done",
+    view(
+      camp({
+        campPhase: "ended",
+        currentActorSeatId: null,
+        objectives: [{ id: "o1", kind: "win-card", target: H7, ownerSeatId: "me", status: "done" }],
+        goals: [{ id: "camouflage:me", status: "failed" }],
+      }),
+    ),
+    ui(),
+    playing,
+    { text: "Camp failed: Camouflage broke", tone: "alert" },
+  ],
+  [
+    "a burned card does not count as winning its objective",
+    view(
+      camp({
+        campPhase: "ended",
+        currentActorSeatId: null,
+        objectives: [{ id: "o1", kind: "win-card", target: H7, ownerSeatId: "me", status: "failed" }],
+        completedTricks: [
+          {
+            index: 0,
+            leaderSeatId: "bo",
+            winnerSeatId: "bo",
+            plays: [
+              { seatId: "bo", card: { id: "s9", identity: S9 }, effectiveRank: null, countsAs: null, burned: false },
+              { seatId: "me", card: { id: "h7", identity: H7 }, effectiveRank: null, countsAs: null, burned: true },
+            ],
+          },
+        ],
+      }),
+    ),
+    ui(),
+    playing,
+    { text: "Camp failed: 7♥ objective broke", tone: "alert" },
   ],
 ];
 

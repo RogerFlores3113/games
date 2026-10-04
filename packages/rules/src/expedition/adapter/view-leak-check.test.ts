@@ -10,7 +10,10 @@ import { CATALOG } from "../run/catalog";
 import { draftOfferFor } from "../run/draft";
 import { createRun } from "../run/lifecycle";
 import { applyRunAction } from "../run/run-actions";
-import { advanceTo, setupRun } from "../run/run-test-support";
+import { advanceTo, setupRun, testCatalog } from "../run/run-test-support";
+import { currentActorSeatId } from "../camp";
+import { defineItem } from "../content/source-def";
+import { rulesFor } from "../run/compose";
 import { toExpeditionPlayerView } from "./view";
 import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "./view-leak-check";
 import type { RunState } from "../run/types";
@@ -86,6 +89,38 @@ describe("view-leak-check: clean baseline", () => {
   });
 });
 
+describe("view-leak-check: cards that count as others", () => {
+  it("allows your own hand's counted-as identities and a resolved trick's, and nothing more", () => {
+    const spadesAsHearts = defineItem({
+      id: "spades-as-hearts",
+      name: "Spades as hearts",
+      text: "Spades count as hearts.",
+      passive: { modifier: () => ({ identityOf: (prev) => (card) => (card.identity.kind === "standard" && card.identity.suit === "spades" ? { ...card.identity, suit: "hearts" } : prev(card)) }) },
+    });
+    const catalog = testCatalog({ characters: CATALOG.characters, items: { ...CATALOG.items, "spades-as-hearts": spadesAsHearts } });
+    let state = advanceTo(setupRun({ seatIds: SEAT_IDS, seed: SEED, catalog, kits: { p2: ["spades-as-hearts"] } }), "between-tricks", catalog);
+    for (let i = 0; i < SEAT_IDS.length; i++) {
+      const rules = rulesFor(state, catalog);
+      const actor = currentActorSeatId(state.attempt!.camp, rules)!;
+      const played = applyRunAction(state, actor, { type: "play-card", cardId: rules.legalPlays(state.attempt!.camp, actor)[0]!.id }, catalog);
+      if (!played.ok) throw new Error(played.error);
+      state = played.state;
+    }
+    const viewer = "p0";
+    const view = toExpeditionPlayerView(state, viewer, catalog);
+    expect(view.attempt!.camp.yourHand.some((c) => c.countsAs !== null)).toBe(true);
+    const secrets = secretsForExpeditionSeat(state, viewer, catalog, SEED);
+    expect(checkExpeditionViewForLeaks({ view, serialized: JSON.stringify(view), secrets })).toEqual([]);
+
+    const leaky = structuredClone(view);
+    const hidden = state.attempt!.camp.hands.find((h) => h.seatId !== viewer)!.cards[0]!;
+    leaky.attempt!.camp.yourHand[0]!.countsAs = hidden.identity as never;
+    expect(checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets })).toContain(
+      `typed:identity-count-exceeded:${hidden.identity.kind === "joker" ? `joker:${hidden.identity.joker}` : `standard:${hidden.identity.suit}:${hidden.identity.rank}`}`,
+    );
+  });
+});
+
 describe("view-leak-check: canary suite", () => {
   it("Canary A: another seat's card inserted into camp.yourHand", () => {
     const state = dealtFaceUpCamp();
@@ -97,7 +132,7 @@ describe("view-leak-check: canary suite", () => {
     const otherCard = otherHand.cards[0]!;
 
     const leaky = structuredClone(view);
-    leaky.attempt!.camp.yourHand.push({ id: otherCard.id, identity: otherCard.identity as never, effectiveRank: null });
+    leaky.attempt!.camp.yourHand.push({ id: otherCard.id, identity: otherCard.identity as never, effectiveRank: null, countsAs: null });
 
     const reasons = checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets });
     expect(reasons).toContain(`structural:hidden-id:${otherCard.id}`);

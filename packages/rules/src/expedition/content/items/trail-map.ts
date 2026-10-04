@@ -11,7 +11,7 @@ export const trailMap = defineItem({
     targets: [{ kind: "player", who: "teammate" }],
     canTarget: (ctx) => {
       const camp = ctx.camp;
-      return hasPendingObjective(camp, ctx.self) || hasPendingObjective(camp, ctx.targets[0].seatId)
+      return hasPendingObjective(camp, ctx.self, ctx.rules) || hasPendingObjective(camp, ctx.targets[0].seatId, ctx.rules)
         ? true
         : "Neither of you has an open objective";
     },

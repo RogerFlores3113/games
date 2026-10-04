@@ -48,15 +48,25 @@ export type ExpeditionStandardIdentityView = { kind: "standard"; suit: Suit; ran
 export type ExpeditionCardView = { id: string; identity: ExpeditionCardIdentityView };
 
 /** `effectiveRank` is set only when the composed rankOf differs from the
- * printed rank. */
-export type ExpeditionRankedCardView = { id: string; identity: ExpeditionCardIdentityView; effectiveRank: number | null };
+ * printed rank, and `countsAs` only when the composed identityOf differs
+ * from the printed identity. */
+export type ExpeditionRankedCardView = {
+  id: string;
+  identity: ExpeditionCardIdentityView;
+  effectiveRank: number | null;
+  countsAs: ExpeditionCardIdentityView | null;
+};
 
 export type ExpeditionTrickPlayView = { seatId: string; card: ExpeditionCardView; effectiveRank: number | null };
+
+/** A play as its trick was resolved: what it counted as, and whether it
+ * burned. */
+export type ExpeditionCompletedPlayView = ExpeditionTrickPlayView & { countsAs: ExpeditionCardIdentityView | null; burned: boolean };
 
 export type ExpeditionCompletedTrickView = {
   index: number;
   leaderSeatId: string;
-  plays: ExpeditionTrickPlayView[];
+  plays: ExpeditionCompletedPlayView[];
   winnerSeatId: string;
 };
 
@@ -72,7 +82,7 @@ export type ExpeditionObjectiveView =
   | {
       id: string;
       kind: "win-card";
-      target: ExpeditionStandardIdentityView;
+      target: ExpeditionCardIdentityView;
       ownerSeatId: string | null;
       status: ExpeditionObjectiveStatusView;
     }
@@ -99,6 +109,11 @@ export type ExpeditionObjectiveView =
     };
 
 export type ExpeditionHandSizeView = { seatId: string; size: number };
+
+export type ExpeditionGoalView = { id: string; status: ExpeditionObjectiveStatusView };
+
+/** A card that left a hand without being played. Public. */
+export type ExpeditionDiscardView = { card: ExpeditionCardView; afterTrick: number };
 
 // Deliberately no `audience` key: a reveal's audience-gating already
 // happened before this literal is ever built (only reveals addressed to the
@@ -141,6 +156,9 @@ export type ExpeditionCampView = {
   // Deliberately no `objectiveDeck` key: the undrawn objective deck order
   // must never be projected.
   objectives: ExpeditionObjectiveView[];
+  /** Camp-wide conditions beside the objectives; every one must be done. */
+  goals: ExpeditionGoalView[];
+  discards: ExpeditionDiscardView[];
   yourHand: ExpeditionRankedCardView[];
   yourLegalCardIds: string[];
   handSizes: ExpeditionHandSizeView[];

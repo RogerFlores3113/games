@@ -16,8 +16,10 @@ import fc from "fast-check";
 import { identitiesEqual } from "./deck";
 import { checkCampOutcome, createCamp } from "./camp";
 import { objectiveStatuses } from "./objectives";
+import { baseRules, baseRulesWith, type CoreRules } from "./rules";
+import { cardReading } from "./trick";
 import { driveCamp, enumerateLegalActions, locateAllCards } from "./test-support";
-import type { CardIdentity, ObjectiveSlot, PlayerCount } from "./state";
+import type { CardIdentity, ExpeditionCard, ObjectiveSlot, PlayerCount } from "./state";
 
 const HAND_SIZE: Record<PlayerCount, number> = { 3: 18, 4: 13, 5: 10 };
 const DEAL_SIZE: Record<PlayerCount, number> = { 3: 54, 4: 52, 5: 50 };
@@ -230,9 +232,9 @@ describe("property: whole-camp simulation", () => {
           }
         }
 
-        let previousStatuses = new Map(objectiveStatuses(states[0]!).map((s) => [s.objectiveId, s.status]));
+        let previousStatuses = new Map(objectiveStatuses(states[0]!, baseRules).map((s) => [s.objectiveId, s.status]));
         for (let i = 1; i < states.length; i++) {
-          const currentStatuses = new Map(objectiveStatuses(states[i]!).map((s) => [s.objectiveId, s.status]));
+          const currentStatuses = new Map(objectiveStatuses(states[i]!, baseRules).map((s) => [s.objectiveId, s.status]));
           for (const [id, prevStatus] of previousStatuses) {
             const nowStatus = currentStatuses.get(id)!;
             if (prevStatus === "failed") expect(nowStatus).toBe("failed");
@@ -243,5 +245,37 @@ describe("property: whole-camp simulation", () => {
       }),
       { numRuns: 200 },
     );
+  });
+
+  it("never sticks in progress, and conserves every card, when tricks burn and recount cards", () => {
+    const spadesAsDiamonds = (card: ExpeditionCard): CardIdentity =>
+      card.identity.kind === "standard" && card.identity.suit === "spades" ? { ...card.identity, suit: "diamonds" } : card.identity;
+    const reading = cardReading({ identityOf: spadesAsDiamonds });
+    const base = baseRulesWith(reading);
+    const burning: CoreRules = {
+      ...base,
+      burns: (plays) => {
+        const standard = plays.filter((p) => p.card.identity.kind === "standard");
+        if (standard.length === 0) return [];
+        const lowest = standard.reduce((low, p) => (reading.rankOf(p.card) < reading.rankOf(low.card) ? p : low));
+        return [lowest.card.id];
+      },
+    };
+    let burnedRuns = 0;
+
+    fc.assert(
+      fc.property(campInputArb, ({ playerCount, seed, choices, objectiveSlots }) => {
+        const initial = createCamp({ seatIds: seatIdsFor(playerCount), seed, objectiveSlots }, burning);
+        const { states } = driveCamp(initial, choices, burning);
+        const final = states[states.length - 1]!;
+
+        expect(checkCampOutcome(final, burning).status).not.toBe("in_progress");
+        expect(locateAllCards(final).size).toBe(DEAL_SIZE[playerCount]);
+        expect([...locateAllCards(final).values()].every((where) => !where.includes("+"))).toBe(true);
+        if (final.completedTricks.some((t) => t.plays.some((p) => p.burned))) burnedRuns++;
+      }),
+      { numRuns: 150 },
+    );
+    expect(burnedRuns).toBeGreaterThan(0);
   });
 });

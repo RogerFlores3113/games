@@ -11,7 +11,7 @@ export const bait = defineItem({
     targets: [{ kind: "card", where: "board" }],
     apply: (ctx) => [{ op: "add-modifier", lasts: "trick", audience: "public", params: { cardId: ctx.targets[0].cardId } }],
     effect: (effect) => ({
-      trickWinner: (prev) => (plays) => winnerExcluding(prev, plays, (play) => play.card.id === effect.params.cardId),
+      trickWinner: (prev) => (plays, led) => winnerExcluding(prev, plays, led, (play) => play.card.id === effect.params.cardId),
     }),
   }),
 });

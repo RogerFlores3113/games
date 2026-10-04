@@ -6,13 +6,12 @@
 // layer's answer to its own, per hook (run-rules.ts's own header repeats
 // this contract; this file is what actually folds it).
 //
-// isTrump AND rankOf ARE FOLDED FIRST, separately from every other hook (WR-03,
-// Plan 10-01): composeRules first folds every layer's isTrump mapper over
-// trick.ts's default isTrump, THEN builds the base CoreRules layer via
-// baseRulesWith(composedIsTrump). This is what lets an isTrump-only layer
-// (e.g. "spades are trump") change trickWinner and legalPlays with no other
-// code path — those two hooks are DERIVED from baseRulesWith's isTrumpFn
-// closure, not independently folded like the rest of RunRules.
+// THE CARD-READING HOOKS ARE FOLDED FIRST, separately from every other hook
+// (WR-03): identityOf, then isTrump, then rankOf, whose default reads the
+// strength of what the card counts as. The base CoreRules layer is built
+// from that reading, so a layer changing only how a card reads (e.g.
+// "spades are trump") changes trickWinner, legalPlays and burns with no
+// other code path.
 //
 // NO CACHE (T-10-08): this module holds no Map, WeakMap or module-level
 // mutable state. rulesFor recomputes ruleLayersFor and composeRules fresh on
@@ -29,31 +28,35 @@
 // effects layer — there is nothing here to reset by hand.
 
 import { baseRulesWith } from "../rules";
-import { isTrump, rankOf } from "../trick";
+import { cardReading, isTrump } from "../trick";
 import { HOOK_NAMES, baseRunHooks, type HookName, type RuleModifier, type RunRules } from "./run-rules";
 import type { Catalog, RunState } from "./types";
 import { liveSourceIds, ownerOf, sourceDef } from "./usage";
 
+const CARD_HOOKS = ["identityOf", "isTrump", "rankOf"] as const;
+type CardHook = (typeof CARD_HOOKS)[number];
+
 /** Folds one card-reading hook across every layer, in order, over its
  * Core default. Layers with no entry pass the previous answer through. */
-function foldCardHook<K extends "isTrump" | "rankOf">(layers: readonly RuleModifier[], key: K, initial: RunRules[K]): RunRules[K] {
+function foldCardHook<K extends CardHook>(layers: readonly RuleModifier[], key: K, initial: RunRules[K]): RunRules[K] {
   return layers.reduce<RunRules[K]>((prev, layer) => {
     const mapper = layer[key] as ((prev: RunRules[K]) => RunRules[K]) | undefined;
     return mapper === undefined ? prev : mapper(prev);
   }, initial);
 }
 
-/** Folds `layers` into one RunRules value. The card-reading hooks (isTrump
- * and rankOf) are folded first and separately (WR-03); every other hook in
- * HOOK_NAMES is folded over the base layer built from them. */
+/** Folds `layers` into one RunRules value. The card-reading hooks are folded
+ * first and separately (WR-03); every other hook in HOOK_NAMES is folded over
+ * the base layer built from them. */
 export function composeRules(layers: readonly RuleModifier[]): RunRules {
+  const identityOf = foldCardHook(layers, "identityOf", (card) => card.identity);
   const composedIsTrump = foldCardHook(layers, "isTrump", isTrump);
-  const composedRankOf = foldCardHook(layers, "rankOf", rankOf);
-  const base: RunRules = { ...baseRulesWith(composedIsTrump, composedRankOf), ...baseRunHooks };
+  const rankOf = foldCardHook(layers, "rankOf", cardReading({ identityOf }).rankOf);
+  const base: RunRules = { ...baseRulesWith(cardReading({ identityOf, isTrump: composedIsTrump, rankOf })), ...baseRunHooks };
 
   let result = base;
   for (const name of HOOK_NAMES) {
-    if (name === "isTrump" || name === "rankOf") continue; // already folded above
+    if ((CARD_HOOKS as readonly string[]).includes(name)) continue; // already folded above
     const key = name as HookName;
     result = layers.reduce<RunRules>((acc, layer) => {
       const mapper = layer[key];

@@ -19,10 +19,6 @@ export const STANDARD_RANKS: readonly StandardRank[] = [
 
 export const RANK_ACE: StandardRank = 14;
 
-function isStandard(identity: CardIdentity): identity is StandardIdentity {
-  return identity.kind === "standard";
-}
-
 /** Structural equality; joker vs standard never equal. */
 export function identitiesEqual(a: CardIdentity, b: CardIdentity): boolean {
   if (a.kind !== b.kind) return false;
@@ -102,7 +98,7 @@ export function removedCardsFor(playerCount: PlayerCount): CardIdentity[] {
 
 /** buildFullDeck() filtered to exclude removedCardsFor(playerCount). This is
  * the base-layer implementation of the §6.1 deckFor hook; it must never
- * reference a boss or source id. */
+ * reference a source id. */
 export function baseDeckFor(playerCount: PlayerCount): CardIdentity[] {
   const removed = removedCardsFor(playerCount);
   return buildFullDeck().filter((card) => !removed.some((r) => identitiesEqual(r, card)));
@@ -159,15 +155,9 @@ export function dealHands(input: {
   return { hands, handSize };
 }
 
-/** Filters deck to standard identities (drops Sun/Moon), then shuffles on
- * its own stream (spec §3: "a second, separately shuffled deck of the same
- * card identities as the play deck, minus removed cards and minus the Sun
- * and Moon"). */
-export function buildObjectiveDeck(input: {
-  deck: readonly CardIdentity[];
-  seed: string;
-}): StandardIdentity[] {
-  const { deck, seed } = input;
-  const standardOnly = deck.filter(isStandard);
-  return shuffleWithSeed(standardOnly, seed, "expedition-objective-deck");
+/** Shuffles the objective identities on their own stream (spec §3: "a
+ * second, separately shuffled deck"). Which identities qualify is the
+ * objectiveDeckFor hook's call. */
+export function buildObjectiveDeck(input: { identities: readonly StandardIdentity[]; seed: string }): StandardIdentity[] {
+  return shuffleWithSeed(input.identities, input.seed, "expedition-objective-deck");
 }

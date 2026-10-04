@@ -4,6 +4,8 @@
 
 import { describe, expect, it } from "vitest";
 import { cardLabel } from "./deck";
+import { baseRules } from "./rules";
+import { resolvedPlay } from "./test-support";
 import type {
   CampState,
   CardIdentity,
@@ -55,10 +57,7 @@ function trick(
   return {
     index,
     leaderSeatId: plays[0]![0],
-    plays: plays.map(([seatId, identity], i) => ({
-      seatId,
-      card: card(identity, `c${index}-${i}`),
-    })),
+    plays: plays.map(([seatId, identity], i) => resolvedPlay(seatId, card(identity, `c${index}-${i}`))),
     winnerSeatId,
   };
 }
@@ -75,13 +74,14 @@ function makeState(overrides: Partial<CampState> = {}): CampState {
     objectiveDeck: [],
     completedTricks: [],
     currentTrick: { index: 0, leaderSeatId: "a", plays: [] },
+    discards: [],
     ...overrides,
   };
 }
 
 function winCardObjective(
   id: string,
-  target: StandardIdentity,
+  target: CardIdentity,
   ownerSeatId: string | null,
 ): WinCardObjective {
   return { id, kind: "win-card", target, ownerSeatId };
@@ -171,6 +171,65 @@ describe("win-card", () => {
     const objective = winCardObjective("o1", CARD_A, null);
     const state = makeState({ completedTricks: [trick(0, [["a", CARD_A]], "b")] });
     expect(winCardKind.evaluate(state, objective)).toBe("pending");
+  });
+});
+
+describe("lost and never-played targets", () => {
+  /** A trick where `a` leads CARD_A, read as `fate` says, and `b` wins with CARD_B. */
+  function trickWith(index: number, fate: { burned?: boolean; countsAs?: CardIdentity }): CompletedTrick {
+    return {
+      index,
+      leaderSeatId: "a",
+      plays: [
+        { seatId: "a", card: card(CARD_A, `t${index}-a`), countsAs: fate.countsAs ?? null, burned: fate.burned ?? false },
+        resolvedPlay("b", card(CARD_B, `t${index}-b`)),
+      ],
+      winnerSeatId: "b",
+    };
+  }
+  const orderedA = orderedObjective("o1", CARD_A, 1, "a");
+
+  it("a burned target fails its objective at once", () => {
+    const state = makeState({ completedTricks: [trickWith(0, { burned: true })] });
+    expect(winCardKind.evaluate(state, winCardObjective("o1", CARD_A, "a"))).toBe("failed");
+    expect(orderedKind.evaluate(state, orderedA)).toBe("failed");
+  });
+
+  it("a target that counted as another identity fails its objective", () => {
+    const state = makeState({ completedTricks: [trickWith(0, { countsAs: std("hearts", 14) })] });
+    expect(winCardKind.evaluate(state, winCardObjective("o1", CARD_A, "a"))).toBe("failed");
+  });
+
+  it("a card counting as the target settles it for whoever won that trick", () => {
+    const state = makeState({ completedTricks: [trickWith(0, { countsAs: CARD_C })] });
+    expect(winCardKind.evaluate(state, winCardObjective("o1", CARD_C, "b"))).toBe("done");
+    expect(winCardKind.evaluate(state, winCardObjective("o2", CARD_C, "a"))).toBe("failed");
+  });
+
+  it("a discarded target fails, and stays failed when a card later counts as it", () => {
+    const discarded = makeState({ discards: [{ card: card(CARD_A, "gone"), afterTrick: 0 }] });
+    expect(winCardKind.evaluate(discarded, winCardObjective("o1", CARD_A, "a"))).toBe("failed");
+    const later = { ...discarded, completedTricks: [{ index: 0, leaderSeatId: "a", plays: [{ ...resolvedPlay("a", card(CARD_B, "x")), countsAs: CARD_A }], winnerSeatId: "a" }] };
+    expect(winCardKind.evaluate(later, winCardObjective("o1", CARD_A, "a"))).toBe("failed");
+  });
+
+  it("a target won before it was lost stays done", () => {
+    const won = trick(0, [["a", CARD_C], ["b", CARD_A]], "a");
+    const state = makeState({ completedTricks: [won, trickWith(1, { burned: true })] });
+    expect(winCardKind.evaluate(state, winCardObjective("o1", CARD_A, "a"))).toBe("done");
+  });
+
+  it("a target never played by the final trick fails", () => {
+    const finished = makeState({ totalTricks: 1, completedTricks: [trick(0, [["a", CARD_B]], "a")] });
+    expect(winCardKind.evaluate(finished, winCardObjective("o1", CARD_A, "a"))).toBe("failed");
+    expect(orderedKind.evaluate(finished, orderedA)).toBe("failed");
+    expect(winCardKind.evaluate({ ...finished, totalTricks: 2 }, winCardObjective("o1", CARD_A, "a"))).toBe("pending");
+  });
+
+  it("a joker target is won like any card", () => {
+    const sun: CardIdentity = { kind: "joker", joker: "sun" };
+    const state = makeState({ completedTricks: [trick(0, [["a", sun], ["b", CARD_B]], "a")] });
+    expect(winCardKind.evaluate(state, winCardObjective("o1", sun, "a"))).toBe("done");
   });
 });
 
@@ -460,7 +519,7 @@ describe("objectiveStatuses", () => {
     const o1 = winCardObjective("o1", CARD_A, "a");
     const o2 = noTricksObjective("o2", "b");
     const state = makeState({ objectives: [o1, o2] });
-    expect(objectiveStatuses(state)).toEqual([
+    expect(objectiveStatuses(state, baseRules)).toEqual([
       { objectiveId: "o1", status: "pending" },
       { objectiveId: "o2", status: "pending" },
     ]);
@@ -470,7 +529,7 @@ describe("objectiveStatuses", () => {
     const o1 = winCardObjective("o1", CARD_A, "a");
     const o2 = exactlyNObjective("o2", 2, "b");
     const state = makeState({ objectives: [o1, o2], totalTricks: 5 });
-    expect(objectiveStatuses(state).every((s) => s.status === "pending")).toBe(true);
+    expect(objectiveStatuses(state, baseRules).every((s) => s.status === "pending")).toBe(true);
   });
 });
 

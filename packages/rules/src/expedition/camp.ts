@@ -12,10 +12,16 @@ import { assertPlayerCount, buildObjectiveDeck, complementOf, dealHands } from "
 import { objectiveStatuses, nextObjectivePicker } from "./objectives";
 import { baseRules, type CoreRules } from "./rules";
 import { mintCardId, seedToRngState } from "../shuffle";
-import type { CampOutcome, CampPhase, CampState, Objective, ObjectiveSlot } from "./state";
+import type { CampOutcome, CampPhase, CampState, Goal, Objective, ObjectiveSlot } from "./state";
 
-function isCardBearingSlot(slot: ObjectiveSlot): boolean {
-  return slot.kind === "win-card" || slot.kind === "ordered";
+/** A slot that draws its target from the objective deck. */
+function drawsTarget(slot: ObjectiveSlot): boolean {
+  return (slot.kind === "win-card" && slot.fixed === undefined) || slot.kind === "ordered";
+}
+
+/** A goal that holds until `broken`: done until then, failed after. */
+export function guard(id: string, broken: boolean): Goal {
+  return { id, status: broken ? "failed" : "done" };
 }
 
 /** Validates objectiveSlots before any work that could index out of range
@@ -30,10 +36,10 @@ function validateSlots(
     throw new Error("createCamp: objectiveSlots must not be empty");
   }
 
-  const cardBearingCount = slots.filter(isCardBearingSlot).length;
-  if (cardBearingCount > availableObjectiveCards) {
+  const drawingCount = slots.filter(drawsTarget).length;
+  if (drawingCount > availableObjectiveCards) {
     throw new Error(
-      `createCamp: ${cardBearingCount} card-bearing objective slots requested but only ${availableObjectiveCards} objective-deck cards are available`,
+      `createCamp: ${drawingCount} card-bearing objective slots requested but only ${availableObjectiveCards} objective-deck cards are available`,
     );
   }
 
@@ -89,7 +95,7 @@ export function createCamp(
   const removedCards = complementOf(deck);
   const totalTricks = handSize;
 
-  const objectiveDeck = buildObjectiveDeck({ deck, seed });
+  const objectiveDeck = buildObjectiveDeck({ identities: rules.objectiveDeckFor(deck), seed });
   validateSlots(objectiveSlots, totalTricks, objectiveDeck.length);
 
   const objectiveDeckRemaining = objectiveDeck.slice();
@@ -107,7 +113,7 @@ export function createCamp(
     const id = minted.id;
 
     if (slot.kind === "win-card") {
-      const target = objectiveDeckRemaining.shift()!;
+      const target = slot.fixed ?? objectiveDeckRemaining.shift()!;
       return { id, kind: "win-card", target, ownerSeatId: null };
     }
     if (slot.kind === "ordered") {
@@ -138,21 +144,23 @@ export function createCamp(
     objectiveDeck: objectiveDeckRemaining,
     completedTricks: [],
     currentTrick: { index: 0, leaderSeatId: expeditionLeaderSeatId, plays: [] },
+    discards: [],
   };
 }
 
-/** Any failed objective, or any fired failure check, makes the outcome
- * failed; every objective done makes it succeeded; otherwise in_progress.
- * Recomputed fresh from state on every call — nothing cached. */
+/** Any failed objective or goal makes the outcome failed; every objective
+ * and goal done makes it succeeded; otherwise in_progress. Recomputed fresh
+ * from state on every call — nothing cached. */
 export function checkCampOutcome(state: CampState, rules: CoreRules = baseRules): CampOutcome {
-  const statuses = objectiveStatuses(state);
+  const statuses = objectiveStatuses(state, rules);
+  const goals = rules.goals(state);
   const failedObjectiveIds = statuses.filter((s) => s.status === "failed").map((s) => s.objectiveId);
-  const firedFailureCheckIds = [...rules.failureChecks(state)];
+  const failedGoalIds = goals.filter((g) => g.status === "failed").map((g) => g.id);
 
-  if (failedObjectiveIds.length > 0 || firedFailureCheckIds.length > 0) {
-    return { status: "failed", failedObjectiveIds, firedFailureCheckIds };
+  if (failedObjectiveIds.length > 0 || failedGoalIds.length > 0) {
+    return { status: "failed", failedObjectiveIds, failedGoalIds };
   }
-  if (statuses.every((s) => s.status === "done")) {
+  if (statuses.every((s) => s.status === "done") && goals.every((g) => g.status === "done")) {
     return { status: "succeeded" };
   }
   return { status: "in_progress" };

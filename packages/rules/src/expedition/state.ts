@@ -14,7 +14,7 @@
 //
 // Per-seat trick counts and objective statuses are always DERIVED from
 // completedTricks, never stored as their own field. This is deliberate: a
-// Phase 10 holder swap (e.g. a "Trail Map" item or boss twist that reassigns an
+// Phase 10 holder swap (e.g. a "Trail Map" item that reassigns an
 // objective's owner mid-camp) recomputes correctly from completedTricks with
 // no new field to keep in sync, and CampState carries no stale "tricks won"
 // counter that could drift from the trick log.
@@ -38,10 +38,19 @@ export type PlayerCount = 3 | 4 | 5;
 export type Hand = { readonly seatId: string; readonly cards: readonly ExpeditionCard[] };
 
 export type TrickPlay = { readonly seatId: string; readonly card: ExpeditionCard };
+/** A play in a completed trick, as the trick was resolved. */
+export type ResolvedPlay = TrickPlay & {
+  /** What the card counted as when the trick completed, when that differs
+   * from its printed identity. */
+  readonly countsAs: CardIdentity | null;
+  /** The card left the trick: it never wins and never counts for an
+   * objective. It stays in the trick for card conservation. */
+  readonly burned: boolean;
+};
 export type CompletedTrick = {
   readonly index: number;
   readonly leaderSeatId: string;
-  readonly plays: readonly TrickPlay[];
+  readonly plays: readonly ResolvedPlay[];
   readonly winnerSeatId: string;
 };
 export type CurrentTrick = {
@@ -57,7 +66,7 @@ export type OrderMarker = number | "last";
 export type WinCardObjective = {
   readonly id: string;
   readonly kind: "win-card";
-  readonly target: StandardIdentity;
+  readonly target: CardIdentity;
   readonly ownerSeatId: string | null;
 };
 export type OrderedObjective = {
@@ -85,12 +94,21 @@ export type ObjectiveKind = Objective["kind"];
 /** The camp-setup input describing which objectives to flip face-up.
  * Phase 10's balance table produces a list of these per camp. */
 export type ObjectiveSlot =
-  | { readonly kind: "win-card" }
+  /** `fixed` names the target instead of drawing one from the objective deck. */
+  | { readonly kind: "win-card"; readonly fixed?: CardIdentity }
   | { readonly kind: "ordered"; readonly order: OrderMarker }
   | { readonly kind: "no-tricks" }
   | { readonly kind: "exactly-n"; readonly n: number };
 
 export type ObjectiveStatus = "pending" | "done" | "failed";
+
+/** A camp-wide condition a rule adds beside the objectives. A guard is done
+ * until broken; a task is pending until achieved and failed once
+ * unreachable. Every goal must be done for the camp to succeed. */
+export type Goal = { readonly id: string; readonly status: ObjectiveStatus };
+
+/** A card that left a hand without being played. */
+export type Discard = { readonly card: ExpeditionCard; readonly afterTrick: number };
 
 /** ASSUMPTION A-HOLDER: an objective's holder is the seat that TOOK it
  * during objective-pick (ownerSeatId), not the seat whose hand holds the
@@ -117,6 +135,7 @@ export type CampState = {
   readonly objectiveDeck: readonly StandardIdentity[];
   readonly completedTricks: readonly CompletedTrick[];
   readonly currentTrick: CurrentTrick;
+  readonly discards: readonly Discard[];
 };
 // Deliberately NO stored phase, outcome, status or tricks-won field on
 // CampState: phase/outcome are derived (see CampPhase/CampOutcome below and
@@ -145,7 +164,16 @@ export type CampOutcome =
   | {
       readonly status: "failed";
       readonly failedObjectiveIds: readonly string[];
-      readonly firedFailureCheckIds: readonly string[];
+      readonly failedGoalIds: readonly string[];
     };
 
 export type CampPhase = "objective-pick" | "playing" | "ended";
+
+/** What an accepted camp action did, in order. Values the Core already
+ * computes; never stored. trick-started follows the last objective pick and
+ * every trick but the final one. */
+export type CampEvent =
+  | { readonly type: "objective-picked"; readonly seatId: string; readonly objectiveId: string }
+  | { readonly type: "card-played"; readonly trickIndex: number; readonly position: number; readonly seatId: string; readonly cardId: string }
+  | { readonly type: "trick-completed"; readonly trickIndex: number; readonly winnerSeatId: string; readonly burnedCardIds: readonly string[] }
+  | { readonly type: "trick-started"; readonly trickIndex: number; readonly leaderSeatId: string };

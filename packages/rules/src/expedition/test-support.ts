@@ -15,7 +15,12 @@ import { currentActorSeatId as campCurrentActorSeatId } from "./camp";
 import { canPickObjective, canPlayCard } from "./legality";
 import { applyCampAction } from "./actions";
 import { baseRules, type CoreRules } from "./rules";
-import type { CampAction, CampState } from "./state";
+import type { CampAction, CampEvent, CampState, ExpeditionCard, ResolvedPlay } from "./state";
+
+/** A completed-trick play that kept its printed identity and did not burn. */
+export function resolvedPlay(seatId: string, card: ExpeditionCard): ResolvedPlay {
+  return { seatId, card, countsAs: null, burned: false };
+}
 
 /** The seat whose turn it currently is — a thin re-export of camp.ts's
  * currentActorSeatId so property tests need only import from this module. */
@@ -57,7 +62,7 @@ export function enumerateLegalActions(state: CampState, rules: CoreRules = baseR
 
 /** Every card dealt into this camp, located exactly once: "hand" | "trick"
  * (a completed trick's play) | "current-trick" (an in-progress trick's
- * play). A REAL card id seen in more than one location is recorded as the
+ * play) | "discard". A REAL card id seen in more than one location is recorded as the
  * "+"-joined list of every location it was seen in (Hanabi's collision
  * convention), rather than throwing, so a caller can detect the collision
  * without this helper aborting mid-walk. */
@@ -75,6 +80,7 @@ export function locateAllCards(state: CampState): Map<string, string> {
     for (const play of trick.plays) record(play.card.id, "trick");
   }
   for (const play of state.currentTrick.plays) record(play.card.id, "current-trick");
+  for (const discard of state.discards) record(discard.card.id, "discard");
 
   return locations;
 }
@@ -100,9 +106,10 @@ export function driveCamp(
   initial: CampState,
   choices: readonly number[],
   rules: CoreRules = baseRules,
-): { states: CampState[]; actions: Array<{ seatId: string; action: CampAction }> } {
+): { states: CampState[]; actions: Array<{ seatId: string; action: CampAction }>; events: CampEvent[] } {
   const states: CampState[] = [initial];
   const actions: Array<{ seatId: string; action: CampAction }> = [];
+  const events: CampEvent[] = [];
 
   let state = initial;
   let step = 0;
@@ -130,8 +137,9 @@ export function driveCamp(
     state = result.state;
     states.push(state);
     actions.push({ seatId, action });
+    events.push(...result.events);
     step++;
   }
 
-  return { states, actions };
+  return { states, actions, events };
 }

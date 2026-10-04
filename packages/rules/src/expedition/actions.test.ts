@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { applyCampAction } from "./actions";
 import { campPhase, checkCampOutcome, createCamp, currentActorSeatId } from "./camp";
 import { baseRules, type CoreRules } from "./rules";
+import { driveCamp } from "./test-support";
 import type { CampAction, CampState, ExpeditionCard } from "./state";
 
 /** Drives every seat's pick-objective action (first available objective, by
@@ -52,6 +53,7 @@ function buildAboutToFailState(): CampState {
     expeditionLeaderSeatId: "y",
     objectives: [{ id: "obj1", kind: "no-tricks", ownerSeatId: "x" }],
     objectiveDeck: [],
+    discards: [],
     completedTricks: [],
     currentTrick: {
       index: 0,
@@ -164,7 +166,7 @@ describe("applyCampAction — play-card", () => {
     const completed = state.completedTricks[0]!;
     expect(completed.index).toBe(0);
     expect(completed.plays).toHaveLength(3);
-    const expectedWinner = baseRules.trickWinner(completed.plays);
+    const expectedWinner = baseRules.trickWinner(completed.plays, completed.plays[0]!.card.identity);
     expect(completed.winnerSeatId).toBe(expectedWinner);
     expect(state.currentTrick).toEqual({ index: 1, leaderSeatId: expectedWinner, plays: [] });
   });
@@ -300,6 +302,7 @@ describe("applyCampAction — play-card", () => {
       expeditionLeaderSeatId: "y",
       objectives: [{ id: "obj1", kind: "no-tricks", ownerSeatId: "z" }],
       objectiveDeck: [],
+      discards: [],
       completedTricks: [],
       currentTrick: {
         index: 0,
@@ -439,5 +442,61 @@ describe("applyCampAction — immutability", () => {
     const rejected = applyCampAction(state, nonActor, { type: "play-card", cardId });
     expect(rejected.ok).toBe(false);
     expect(state).toEqual(before);
+  });
+});
+
+describe("camp events", () => {
+  it("a full two-trick camp reports every pick, play, completion and start in order", () => {
+    const card = (id: string, suit: "spades" | "hearts", rank: 2 | 3 | 5 | 7 | 13 | 14): ExpeditionCard => ({ id, identity: { kind: "standard", suit, rank } });
+    const camp: CampState = {
+      seatIds: ["a", "b", "c"],
+      playerCount: 3,
+      removedCards: [],
+      totalTricks: 2,
+      hands: [
+        { seatId: "a", cards: [card("a1", "spades", 14), card("a2", "hearts", 2)] },
+        { seatId: "b", cards: [card("b1", "spades", 5), card("b2", "hearts", 3)] },
+        { seatId: "c", cards: [card("c1", "spades", 7), card("c2", "hearts", 13)] },
+      ],
+      expeditionLeaderSeatId: "a",
+      objectives: [{ id: "o", kind: "win-card", target: { kind: "standard", suit: "hearts", rank: 13 }, ownerSeatId: null }],
+      objectiveDeck: [],
+      completedTricks: [],
+      currentTrick: { index: 0, leaderSeatId: "a", plays: [] },
+      discards: [],
+    };
+    const { events, states } = driveCamp(camp, [0]);
+    expect(events).toEqual([
+      { type: "objective-picked", seatId: "a", objectiveId: "o" },
+      { type: "trick-started", trickIndex: 0, leaderSeatId: "a" },
+      { type: "card-played", trickIndex: 0, position: 0, seatId: "a", cardId: "a1" },
+      { type: "card-played", trickIndex: 0, position: 1, seatId: "b", cardId: "b1" },
+      { type: "card-played", trickIndex: 0, position: 2, seatId: "c", cardId: "c1" },
+      { type: "trick-completed", trickIndex: 0, winnerSeatId: "a", burnedCardIds: [] },
+      { type: "trick-started", trickIndex: 1, leaderSeatId: "a" },
+      { type: "card-played", trickIndex: 1, position: 0, seatId: "a", cardId: "a2" },
+      { type: "card-played", trickIndex: 1, position: 1, seatId: "b", cardId: "b2" },
+      { type: "card-played", trickIndex: 1, position: 2, seatId: "c", cardId: "c2" },
+      { type: "trick-completed", trickIndex: 1, winnerSeatId: "c", burnedCardIds: [] },
+    ]);
+    expect(checkCampOutcome(states[states.length - 1]!).status).toBe("failed");
+  });
+
+  it("a burning rule names the burned cards on trick-completed", () => {
+    const burnLowest: CoreRules = { ...baseRules, burns: (plays) => [plays[plays.length - 1]!.card.id] };
+    let state = driveObjectivePicks(createCamp({ seatIds: ["p0", "p1", "p2"], seed: "burn-events", objectiveSlots: [{ kind: "no-tricks" }] }), burnLowest);
+    const played: string[] = [];
+    let last: ReturnType<typeof applyCampAction> | null = null;
+    for (let i = 0; i < 3; i++) {
+      const actor = currentActorSeatId(state, burnLowest)!;
+      const cardId = burnLowest.legalPlays(state, actor)[0]!.id;
+      played.push(cardId);
+      last = applyCampAction(state, actor, { type: "play-card", cardId }, burnLowest);
+      if (!last.ok) throw new Error(last.error);
+      state = last.state;
+    }
+    if (last === null || !last.ok) throw new Error("no play");
+    expect(last.events.find((e) => e.type === "trick-completed")).toMatchObject({ trickIndex: 0, burnedCardIds: [played[2]] });
+    expect(state.completedTricks[0]!.plays.map((p) => p.burned)).toEqual([false, false, true]);
   });
 });

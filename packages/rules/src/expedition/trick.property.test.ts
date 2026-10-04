@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { baseDeckFor, dealHands } from "./deck";
-import { legalPlaysFor, trickWinner } from "./trick";
+import { cardReading, legalPlaysFor, trickWinner } from "./trick";
 import type { CardIdentity, ExpeditionCard, Hand, TrickPlay } from "./state";
 
 function seatIdsFor(n: number): string[] {
@@ -151,7 +151,7 @@ describe("property: trickWinner", () => {
             );
           }
 
-          const winnerSeatId = trickWinner(plays);
+          const winnerSeatId = trickWinner(plays, plays[0]!.card.identity);
 
           // The winner is always one of the trick's seats.
           expect(plays.some((p) => p.seatId === winnerSeatId)).toBe(true);
@@ -181,6 +181,49 @@ describe("property: trickWinner", () => {
         },
       ),
       { numRuns: 200 },
+    );
+  });
+});
+
+describe("property: trickWinner ties", () => {
+  const SUITS = ["spades", "hearts", "diamonds", "clubs"] as const;
+  const identityArb: fc.Arbitrary<CardIdentity> = fc.oneof(
+    fc.record({ kind: fc.constant("standard" as const), suit: fc.constantFrom(...SUITS), rank: fc.constantFrom(2, 5, 9, 14 as const) }),
+    fc.record({ kind: fc.constant("joker" as const), joker: fc.constantFrom("sun" as const, "moon" as const) }),
+  ) as fc.Arbitrary<CardIdentity>;
+  const followKey = (identity: CardIdentity): string => (identity.kind === "joker" ? "joker" : identity.suit);
+
+  it("ties go to the earliest play under arbitrary rankOf and identityOf layers", () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(3, 4, 5),
+        fc.stringMatching(/^[0-9a-f]{32}$/),
+        fc.array(fc.option(identityArb, { nil: null }), { minLength: 5, maxLength: 5 }),
+        fc.array(fc.integer({ min: 0, max: 2 }), { minLength: 5, maxLength: 5 }),
+        (playerCount, seed, countsAs, strengths) => {
+          const { hands } = buildHands(playerCount as 3 | 4 | 5, seed);
+          const plays: TrickPlay[] = hands.map((hand) => ({ seatId: hand.seatId, card: hand.cards[0]! }));
+          const position = (card: ExpeditionCard) => plays.findIndex((p) => p.card.id === card.id);
+          const reading = cardReading({
+            identityOf: (card) => countsAs[position(card)] ?? card.identity,
+            rankOf: (card) => strengths[position(card)]!,
+          });
+          const led = reading.identityOf(plays[0]!.card);
+
+          const tier = (p: TrickPlay): number => {
+            const identity = reading.identityOf(p.card);
+            if (reading.isTrump(identity)) return 2;
+            return followKey(identity) === followKey(led) ? 1 : 0;
+          };
+          const bestTier = Math.max(...plays.map(tier));
+          const contenders = plays.filter((p) => tier(p) === bestTier);
+          const bestStrength = Math.max(...contenders.map((p) => reading.rankOf(p.card)));
+          const earliest = contenders.find((p) => reading.rankOf(p.card) === bestStrength)!;
+
+          expect(trickWinner(plays, led, reading)).toBe(earliest.seatId);
+        },
+      ),
+      { numRuns: 300 },
     );
   });
 });

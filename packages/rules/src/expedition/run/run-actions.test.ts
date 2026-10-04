@@ -66,6 +66,7 @@ function decidingCamp(): CampState {
     expeditionLeaderSeatId: "p1",
     objectives: [{ id: "obj-1", kind: "win-card", target: { kind: "standard", suit: "spades", rank: 14 }, ownerSeatId: "p0" }],
     objectiveDeck: [],
+    discards: [],
     completedTricks: [],
     currentTrick: {
       index: 0,

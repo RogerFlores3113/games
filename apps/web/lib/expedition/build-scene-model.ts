@@ -207,6 +207,10 @@ export interface TrickPlayModel {
   seatId: string;
   card: CardModel;
   isLed: boolean;
+  /** Left its completed trick: it never won and counts for nothing. */
+  burned: boolean;
+  /** What a completed play counted as, when not its printed card. */
+  countsAs: ExpeditionCardIdentityView | null;
 }
 
 export interface SceneModel {
@@ -360,13 +364,15 @@ function objectivesForOwner(camp: ExpeditionCampView | null, ownerSeatId: string
 }
 
 function buildTrickPlayModel(
-  play: { seatId: string; card: { id: string; identity: ExpeditionCardIdentityView } },
+  play: { seatId: string; card: { id: string; identity: ExpeditionCardIdentityView }; burned?: boolean; countsAs?: ExpeditionCardIdentityView | null },
   isLed: boolean,
   pick: PickState = { targetable: false, selected: false },
 ): TrickPlayModel {
   return {
     seatId: play.seatId,
     isLed,
+    burned: play.burned ?? false,
+    countsAs: play.countsAs ?? null,
     card: {
       id: play.card.id,
       identity: play.card.identity,

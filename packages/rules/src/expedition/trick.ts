@@ -1,145 +1,164 @@
-// The trick-taking heart of Expedition (Phase 9, Plan 02; hardened Phase 10,
-// Plan 01 — WR-03): follow-suit legality and the trick winner are now the
-// DEFAULT-PREDICATE case of a generic trump rule. Both trickWinner and
-// legalPlaysFor take an optional last `isTrumpFn` parameter (defaulting to
-// this file's `isTrump`, i.e. "Sun and Moon are trump"); Phase 10's
-// composed rule layers can supply a different predicate (e.g. a boss twist
-// that makes a suit trump) and both ranking and follow-suit legality honor
-// it uniformly. The Sun-over-Moon precedence and the joker two-card suit
-// are the default predicate's specific behavior, not hardcoded in the
-// resolvers themselves.
+// The trick-taking heart of Expedition. Follow-suit legality and the trick
+// winner read every card through a CardReading: what the card counts as
+// (identityOf), whether that identity is trump (isTrump) and its strength
+// (rankOf). The printed reading makes the Sun and Moon trump; composed rule
+// layers supply other readings and both resolvers honor them uniformly
+// (WR-03).
 //
-// legalPlaysFor is the ONE shared follow-suit resolver: canPlayCard
-// (Plan 05), the base legalPlays hook (Plan 04) and any future UI dimming
-// must call it, never re-derive follow-suit (RESEARCH.md, T-09-04). The
-// trump branch is checked BEFORE the follow-suit filter (RESEARCH Pitfall
-// 1): trump cards have no "led suit" and must never fall through a
-// `followKey ===` filter.
+// legalPlaysFor is the ONE shared follow-suit resolver: canPlayCard, the
+// base legalPlays hook and any UI dimming must call it, never re-derive
+// follow-suit (T-09-04). The trump branch is checked BEFORE the follow-suit
+// filter (RESEARCH Pitfall 1): trump cards have no "led suit" and must never
+// fall through a `followKey ===` filter.
+//
+// resolveTrick is the one place a completed trick is resolved: the led
+// identity is read from the lead, burned plays leave the trick, and the
+// winner is decided among the plays kept. A trick is resolved once; no rule
+// re-resolves history.
 
-import type { CardIdentity, ExpeditionCard, TrickPlay } from "./state";
-
-/** plays[0]'s identity, or null when the trick has not started. */
-export function ledIdentity(plays: readonly TrickPlay[]): CardIdentity | null {
-  return plays.length === 0 ? null : plays[0]!.card.identity;
-}
+import type { CardIdentity, ExpeditionCard, ResolvedPlay, TrickPlay } from "./state";
 
 /** True for the Sun and Moon jokers only (the DEFAULT predicate for the
- * §6.1 isTrump hook). Phase 10 composes other predicates on top of this. */
+ * isTrump hook). */
 export function isTrump(identity: CardIdentity): boolean {
   return identity.kind === "joker";
 }
 
-/** The DEFAULT rank of a card for the §6.1 rankOf hook: Sun beats Moon
- * beats every standard card (ranked by its own rank). A composed rankOf may
- * shift a card's rank, so two plays can tie; a tie goes to the earliest
- * play. */
-export function rankOf(card: ExpeditionCard): number {
-  const identity = card.identity;
+/** The DEFAULT strength of an identity: Sun beats Moon beats every standard
+ * card (ranked by its own rank). */
+export function identityRank(identity: CardIdentity): number {
   if (identity.kind === "joker") {
     return identity.joker === "sun" ? 16 : 15;
   }
   return identity.rank;
 }
 
-/** The non-trump "suit" a card follows: a standard card's own suit, or the
- * literal string "joker" for either joker (so a non-trump joker still forms
- * its own two-card suit, matching Phase 9's Sun/Moon-follows-itself rule
- * under the default predicate). */
+/** A card's printed strength. A composed rankOf may shift a card's rank, so
+ * two plays can tie; a tie goes to the earliest play. */
+export function rankOf(card: ExpeditionCard): number {
+  return identityRank(card.identity);
+}
+
+/** How the rules read a card. */
+export type CardReading = {
+  readonly identityOf: (card: ExpeditionCard) => CardIdentity;
+  readonly isTrump: (identity: CardIdentity) => boolean;
+  readonly rankOf: (card: ExpeditionCard) => number;
+};
+
+/** A reading with the given parts; the default rankOf reads the strength of
+ * what the card counts as, so an identityOf change moves its rank too. */
+export function cardReading(parts: Partial<CardReading> = {}): CardReading {
+  const identityOf = parts.identityOf ?? ((card: ExpeditionCard) => card.identity);
+  return {
+    identityOf,
+    isTrump: parts.isTrump ?? isTrump,
+    rankOf: parts.rankOf ?? ((card) => identityRank(identityOf(card))),
+  };
+}
+
+export const PRINTED: CardReading = cardReading();
+
+/** The non-trump "suit" an identity follows: a standard card's own suit, or
+ * "joker" for either joker, so a non-trump joker still forms its own
+ * two-card suit. */
 function followKey(identity: CardIdentity): string {
   return identity.kind === "joker" ? "joker" : identity.suit;
 }
 
-/** Deep-equality for CardIdentity. Every identity in a single deck is
- * unique, so a hand can never hold two cards equal to this under real play
- * — but legalPlaysFor must still exclude the exact led identity from its
- * own "held trump"/"held other joker" check, since callers may (as fast-
- * check's property suite does) pass the STATIC dealt hand rather than one
- * with the already-played led card already removed. */
 function identityEquals(a: CardIdentity, b: CardIdentity): boolean {
   if (a.kind !== b.kind) return false;
   return a.kind === "joker" && b.kind === "joker" ? a.joker === b.joker : a.kind === "standard" && b.kind === "standard" && a.suit === b.suit && a.rank === b.rank;
 }
 
-/** The set of cards in `hand` that are legal to play given `led`, under
- * `isTrumpFn` (defaults to the base Sun/Moon predicate).
+/** The cards in `hand` that are legal to play given the `led` identity.
  *
  * - led === null (leading): every card in hand is legal.
- * - isTrumpFn(led) is true (a trump was led): the trump cards in hand are
- *   legal; if the hand holds none, the whole hand is legal (void of trump).
- * - Otherwise (a non-trump card was led): the cards in hand whose
- *   followKey matches led's AND that are not trump are legal; if none, the
- *   whole hand is legal (void of that suit, spec §3: "play anything,
- *   including the Sun or Moon").
+ * - a trump was led: the trump cards in hand are legal; void of trump, the
+ *   whole hand is.
+ * - otherwise: the non-trump cards following the led suit are legal; void
+ *   of that suit, the whole hand is ("play anything, including the Sun or
+ *   Moon").
  *
- * Hand order is preserved in every branch. */
-export function legalPlaysFor(
-  hand: readonly ExpeditionCard[],
-  led: CardIdentity | null,
-  isTrumpFn: (identity: CardIdentity) => boolean = isTrump,
-): ExpeditionCard[] {
+ * A card equal to the led identity is never counted as a held trump, since
+ * callers may pass a hand that still holds the led card. Hand order is
+ * preserved in every branch. */
+export function legalPlaysFor(hand: readonly ExpeditionCard[], led: CardIdentity | null, reading: CardReading = PRINTED): ExpeditionCard[] {
   if (led === null) return [...hand];
 
-  if (isTrumpFn(led)) {
-    const trumps = hand.filter((c) => isTrumpFn(c.identity) && !identityEquals(c.identity, led));
+  if (reading.isTrump(led)) {
+    const trumps = hand.filter((c) => {
+      const identity = reading.identityOf(c);
+      return reading.isTrump(identity) && !identityEquals(identity, led);
+    });
     return trumps.length > 0 ? trumps : [...hand];
   }
 
   const ledKey = followKey(led);
-  const sameSuit = hand.filter((c) => !isTrumpFn(c.identity) && followKey(c.identity) === ledKey);
+  const sameSuit = hand.filter((c) => {
+    const identity = reading.identityOf(c);
+    return !reading.isTrump(identity) && followKey(identity) === ledKey;
+  });
   return sameSuit.length > 0 ? sameSuit : [...hand];
 }
 
-/** The winning seatId of a completed trick, under `isTrumpFn` and
- * `rankOfFn` (defaulting to the base Sun/Moon predicate and `rankOf`).
- *
- * - If any play is trump, the trump play with the highest rankOfFn wins
- *   (Sun beats Moon beats a trump standard card, by the default ranks).
- * - Otherwise, among plays whose followKey matches the led card's, the
- *   highest rankOfFn wins.
- * - Equal ranks go to the earliest play.
- *
- * Throws on empty plays, or when the trick is malformed (nothing follows
- * the led card and no trump was played). */
-export function trickWinner(
-  plays: readonly TrickPlay[],
-  isTrumpFn: (identity: CardIdentity) => boolean = isTrump,
-  rankOfFn: (card: ExpeditionCard) => number = rankOf,
-): string {
+/** The strongest play by rankOf; equal strength goes to the earliest. */
+function strongest(plays: readonly TrickPlay[], reading: CardReading): TrickPlay {
+  let winner = plays[0]!;
+  let best = reading.rankOf(winner.card);
+  for (const play of plays.slice(1)) {
+    const strength = reading.rankOf(play.card);
+    if (strength > best) {
+      best = strength;
+      winner = play;
+    }
+  }
+  return winner;
+}
+
+/** The winning seat among `plays` for the `led` identity: the highest trump;
+ * else the highest card following `led`; else the highest card. Equal
+ * strength goes to the earliest play. Throws on empty plays. */
+export function trickWinner(plays: readonly TrickPlay[], led: CardIdentity, reading: CardReading = PRINTED): string {
   if (plays.length === 0) {
     throw new Error("trickWinner: plays must not be empty");
   }
+  const trumps = plays.filter((p) => reading.isTrump(reading.identityOf(p.card)));
+  if (trumps.length > 0) return strongest(trumps, reading).seatId;
 
-  const trumpPlays = plays.filter((p) => isTrumpFn(p.card.identity));
-  if (trumpPlays.length > 0) {
-    let winner = trumpPlays[0]!;
-    let bestStrength = rankOfFn(winner.card);
-    for (const play of trumpPlays.slice(1)) {
-      const strength = rankOfFn(play.card);
-      if (strength > bestStrength) {
-        bestStrength = strength;
-        winner = play;
-      }
-    }
-    return winner.seatId;
-  }
-
-  const led = ledIdentity(plays)!;
   const ledKey = followKey(led);
+  const following = plays.filter((p) => followKey(reading.identityOf(p.card)) === ledKey);
+  return strongest(following.length > 0 ? following : plays, reading).seatId;
+}
 
-  let winner: TrickPlay | null = null;
-  let bestStrength = -Infinity;
-  for (const play of plays) {
-    if (followKey(play.card.identity) === ledKey) {
-      const strength = rankOfFn(play.card);
-      if (strength > bestStrength) {
-        bestStrength = strength;
-        winner = play;
-      }
-    }
-  }
+/** The hooks resolveTrick reads. */
+export type TrickRules = {
+  identityOf(card: ExpeditionCard): CardIdentity;
+  trickWinner(plays: readonly TrickPlay[], led: CardIdentity): string;
+  burns(plays: readonly TrickPlay[], led: CardIdentity, winnerOf: (plays: readonly TrickPlay[]) => string): readonly string[];
+};
 
-  if (winner === null) {
-    throw new Error("trickWinner: malformed trick — no play follows the led suit");
+/** Resolves a full trick: the led identity is what the lead counts as, the
+ * plays `burns` names leave the trick, and the winner is decided among the
+ * plays kept. Burning a card that was not played, burning every play, or a
+ * winner outside the kept plays is a composition defect and throws (A3). */
+export function resolveTrick(plays: readonly TrickPlay[], rules: TrickRules): { readonly plays: readonly ResolvedPlay[]; readonly winnerSeatId: string } {
+  const led = rules.identityOf(plays[0]!.card);
+  const burnedIds = rules.burns(plays, led, (p) => rules.trickWinner(p, led));
+  for (const id of burnedIds) {
+    if (!plays.some((p) => p.card.id === id)) throw new Error(`resolveTrick: burns named ${id}, which was not played`);
   }
-  return winner.seatId;
+  const kept = plays.filter((p) => !burnedIds.includes(p.card.id));
+  if (kept.length === 0) throw new Error("resolveTrick: burns removed every play");
+  const winnerSeatId = rules.trickWinner(kept, led);
+  if (!kept.some((p) => p.seatId === winnerSeatId)) {
+    throw new Error(`resolveTrick: trickWinner returned ${winnerSeatId}, which has no kept play`);
+  }
+  return {
+    plays: plays.map((p) => {
+      const identity = rules.identityOf(p.card);
+      return { seatId: p.seatId, card: p.card, countsAs: identityEquals(identity, p.card.identity) ? null : identity, burned: burnedIds.includes(p.card.id) };
+    }),
+    winnerSeatId,
+  };
 }

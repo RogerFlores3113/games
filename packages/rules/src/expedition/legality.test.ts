@@ -207,6 +207,7 @@ function buildPlayingState(): CampState {
     expeditionLeaderSeatId: "a",
     objectives,
     objectiveDeck: [],
+    discards: [],
     completedTricks: [],
     currentTrick: { index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: a1 }] },
   };
@@ -231,7 +232,7 @@ function buildFailedState(): CampState {
   const losingTrick: CompletedTrick = {
     index: 0,
     leaderSeatId: owner,
-    plays: [{ seatId: otherSeat, card: { id: "fake-winning-card", identity: target } }],
+    plays: [{ seatId: otherSeat, card: { id: "fake-winning-card", identity: target }, countsAs: null, burned: false }],
     winnerSeatId: otherSeat,
   };
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { cardLabel } from "../deck";
 import { CATALOG } from "../run/catalog";
 import { createRun } from "../run/lifecycle";
 import type { RunState } from "../run/types";
@@ -51,5 +52,16 @@ describe("checkRunState", () => {
       "ready list holds unknown seat zed",
       "supplies must be a non-negative integer, got -1",
     ]);
+  });
+
+  it("counts discarded cards toward conservation", () => {
+    const run = dealt();
+    const camp = run.attempt!.camp;
+    const [gone, ...rest] = camp.hands[0]!.cards;
+    const hands = camp.hands.map((h, i) => (i === 0 ? { ...h, cards: rest } : h));
+    const discarded = { ...run, attempt: { ...run.attempt!, camp: { ...camp, hands, discards: [{ card: gone!, afterTrick: 0 }] } } };
+    expect(checkRunState(discarded, CATALOG)).toEqual([]);
+    const lost = { ...run, attempt: { ...run.attempt!, camp: { ...camp, hands } } };
+    expect(checkRunState(lost, CATALOG)).toContain(`card conservation: ${cardLabel(gone!.identity)} appears 0 times, expected 1`);
   });
 });

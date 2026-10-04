@@ -27,8 +27,10 @@ function makeCamp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampVi
     expeditionLeaderSeatId: "s1",
     totalTricks: 17,
     removedCards: [],
+    goals: [],
+    discards: [],
     objectives: [],
-    yourHand: [{ id: "c-as", identity: AS, effectiveRank: null }],
+    yourHand: [{ id: "c-as", identity: AS, effectiveRank: null, countsAs: null }],
     yourLegalCardIds: ["c-as"],
     handSizes: [
       { seatId: "s1", size: 17 },
@@ -247,7 +249,7 @@ describe("objectives", () => {
 });
 
 describe("hand: dimming, sort, lift, targeting", () => {
-  function handView(cards: { id: string; identity: ExpeditionCardIdentityView; effectiveRank: null }[], legalIds: string[], patch: Partial<ExpeditionCampView> = {}): ExpeditionView {
+  function handView(cards: { id: string; identity: ExpeditionCardIdentityView; effectiveRank: null; countsAs: null }[], legalIds: string[], patch: Partial<ExpeditionCampView> = {}): ExpeditionView {
     return makeView({
       attempt: {
         attemptNumber: 1,
@@ -265,11 +267,11 @@ describe("hand: dimming, sort, lift, targeting", () => {
 
   it("sorts spades, hearts, clubs, diamonds ascending, then moon, then sun", () => {
     const cards = [
-      { id: "sun", identity: SUN, effectiveRank: null },
-      { id: "moon", identity: MOON, effectiveRank: null },
-      { id: "kd", identity: KD, effectiveRank: null },
-      { id: "as", identity: AS, effectiveRank: null },
-      { id: "th", identity: TH, effectiveRank: null },
+      { id: "sun", identity: SUN, effectiveRank: null, countsAs: null },
+      { id: "moon", identity: MOON, effectiveRank: null, countsAs: null },
+      { id: "kd", identity: KD, effectiveRank: null, countsAs: null },
+      { id: "as", identity: AS, effectiveRank: null, countsAs: null },
+      { id: "th", identity: TH, effectiveRank: null, countsAs: null },
     ];
     const model = buildSceneModel(server(handView(cards, [])), ui(), "big-index");
     expect(model.hand.map((c) => c.id)).toEqual(["as", "th", "kd", "moon", "sun"]);
@@ -277,8 +279,8 @@ describe("hand: dimming, sort, lift, targeting", () => {
 
   it("dims exactly the illegal cards on your turn to play", () => {
     const cards = [
-      { id: "as", identity: AS, effectiveRank: null },
-      { id: "kd", identity: KD, effectiveRank: null },
+      { id: "as", identity: AS, effectiveRank: null, countsAs: null },
+      { id: "kd", identity: KD, effectiveRank: null, countsAs: null },
     ];
     const model = buildSceneModel(server(handView(cards, ["as"], { currentActorSeatId: "s2" })), ui(), "big-index");
     expect(model.hand.find((c) => c.id === "as")!.dimmed).toBe(false);
@@ -287,21 +289,21 @@ describe("hand: dimming, sort, lift, targeting", () => {
   });
 
   it("dims nothing when it is not your turn", () => {
-    const cards = [{ id: "kd", identity: KD, effectiveRank: null }];
+    const cards = [{ id: "kd", identity: KD, effectiveRank: null, countsAs: null }];
     const model = buildSceneModel(server(handView(cards, [], { currentActorSeatId: "s1" })), ui(), "big-index");
     expect(model.hand[0]!.dimmed).toBe(false);
   });
 
   it("lifted reflects hoveredCardId", () => {
-    const cards = [{ id: "as", identity: AS, effectiveRank: null }];
+    const cards = [{ id: "as", identity: AS, effectiveRank: null, countsAs: null }];
     const model = buildSceneModel(server(handView(cards, [])), ui({ hoveredCardId: "as" }), "big-index");
     expect(model.hand[0]!.lifted).toBe(true);
   });
 
   it("dims non-candidate cards during own-card targeting", () => {
     const cards = [
-      { id: "as", identity: AS, effectiveRank: null },
-      { id: "kd", identity: KD, effectiveRank: null },
+      { id: "as", identity: AS, effectiveRank: null, countsAs: null },
+      { id: "kd", identity: KD, effectiveRank: null, countsAs: null },
     ];
     const view = handView(cards, [], { currentActorSeatId: "s1" });
     const model = buildSceneModel(server(view), ui({ targeting: { mode: "whisper", selected: [] } }), "big-index");
@@ -314,8 +316,8 @@ describe("hand: dimming, sort, lift, targeting", () => {
 
 describe("drag and drop", () => {
   const cards = [
-    { id: "as", identity: AS, effectiveRank: null },
-    { id: "kd", identity: KD, effectiveRank: null },
+    { id: "as", identity: AS, effectiveRank: null, countsAs: null },
+    { id: "kd", identity: KD, effectiveRank: null, countsAs: null },
   ];
   function dragView(patch: Partial<ExpeditionCampView>): ExpeditionView {
     return makeView({
@@ -410,7 +412,7 @@ describe("trick and lastTrick", () => {
         yourWhisper: { allowed: true, left: 1 },
         camp: makeCamp({
           completedTricks: [
-            { index: 0, leaderSeatId: "s1", winnerSeatId: "s3", plays: [{ seatId: "s1", card: { id: "c1", identity: AS }, effectiveRank: null }] },
+            { index: 0, leaderSeatId: "s1", winnerSeatId: "s3", plays: [{ seatId: "s1", card: { id: "c1", identity: AS }, effectiveRank: null, countsAs: null, burned: false }] },
           ],
         }),
       },
@@ -420,6 +422,34 @@ describe("trick and lastTrick", () => {
     expect(model.lastTrick!.leaderSeatId).toBe("s1");
     expect(model.lastTrick!.winnerSeatId).toBe("s3");
     expect(model.lastTrick!.open).toBe(true);
+  });
+
+  it("lastTrick plays carry burned and counts-as; the current trick's never do", () => {
+    const view = makeView({
+      attempt: {
+        ...makeView().attempt!,
+        camp: makeCamp({
+          completedTricks: [
+            {
+              index: 0,
+              leaderSeatId: "s1",
+              winnerSeatId: "s2",
+              plays: [
+                { seatId: "s1", card: { id: "c1", identity: AS }, effectiveRank: null, countsAs: null, burned: true },
+                { seatId: "s2", card: { id: "c2", identity: KD }, effectiveRank: null, countsAs: { kind: "standard", suit: "hearts", rank: 13 }, burned: false },
+              ],
+            },
+          ],
+          currentTrick: { index: 1, leaderSeatId: "s2", plays: [{ seatId: "s2", card: { id: "c3", identity: TH }, effectiveRank: null }] },
+        }),
+      },
+    });
+    const model = buildSceneModel(server(view), ui(), "big-index");
+    expect(model.lastTrick!.plays.map((p) => [p.card.label, p.burned, p.countsAs])).toEqual([
+      ["A♠", true, null],
+      ["K♦", false, { kind: "standard", suit: "hearts", rank: 13 }],
+    ]);
+    expect(model.trick!.plays.map((p) => [p.burned, p.countsAs])).toEqual([[false, null]]);
   });
 
   it("a board card step makes the offered card on the table targetable", () => {
@@ -776,8 +806,8 @@ describe("pick tray", () => {
             leaderSeatId: "s2",
             winnerSeatId: "s2",
             plays: [
-              { seatId: "s2", card: { id: "c1", identity: AS }, effectiveRank: null },
-              { seatId: "s3", card: { id: "c2", identity: TH }, effectiveRank: null },
+              { seatId: "s2", card: { id: "c1", identity: AS }, effectiveRank: null, countsAs: null, burned: false },
+              { seatId: "s3", card: { id: "c2", identity: TH }, effectiveRank: null, countsAs: null, burned: false },
             ],
           },
         ],
@@ -910,7 +940,7 @@ describe("targeting", () => {
       yourAbilities: [ability("trained-monkey", { kind: "card", choices: ["card:c-as"] })],
       attempt: {
         ...makeView().attempt!,
-        camp: makeCamp({ yourHand: [{ id: "c-as", identity: AS, effectiveRank: null }, { id: "c-kd", identity: KD, effectiveRank: null }], yourLegalCardIds: ["c-as", "c-kd"] }),
+        camp: makeCamp({ yourHand: [{ id: "c-as", identity: AS, effectiveRank: null, countsAs: null }, { id: "c-kd", identity: KD, effectiveRank: null, countsAs: null }], yourLegalCardIds: ["c-as", "c-kd"] }),
       },
     });
     const model = buildSceneModel(server(view), ui({ targeting: { mode: "ability", sourceId: "trained-monkey", selected: [], valueCardId: null } }), "big-index");

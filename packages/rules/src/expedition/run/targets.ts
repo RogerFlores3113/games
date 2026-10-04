@@ -9,7 +9,7 @@
 // step never depend on earlier picks; rules that span steps belong to the
 // ability's own `canTarget`.
 
-import { evaluateObjective, trickContaining } from "../objectives";
+import { trickContaining } from "../objectives";
 import type { CampState, CompletedTrick, Objective, ObjectiveStatus, StandardRank } from "../state";
 import { STARTING_SUPPLIES } from "./balance";
 import type { RunRules } from "./run-rules";
@@ -81,7 +81,7 @@ export type AbilityStep = { readonly kind: TargetKind; readonly prompt: string; 
 function objectivesWithStatus(scope: SeatScope, status: ObjectiveStatus): readonly Objective[] {
   const camp = scope.camp;
   if (camp === null) return [];
-  return camp.objectives.filter((o) => evaluateObjective(camp, o) === status);
+  return camp.objectives.filter((o) => scope.rules.objectiveStatus(camp, o) === status);
 }
 
 /** Whisper reveals in log order; the ordinal counts whispers only, matching

@@ -24,7 +24,8 @@ import {
   type Point,
 } from "../layout";
 import { cardTextureKey } from "../card-packs/card-pack-def";
-import { BOARD_ID, LAST_TRICK_ID } from "../../../../lib/expedition/expedition-ids";
+import { BOARD_ID, LAST_TRICK_ID, SUIT_GLYPH } from "../../../../lib/expedition/expedition-ids";
+import type { ExpeditionCardIdentityView } from "@games/rules";
 import type { ObjectIndex } from "../object-index";
 import type { CardModel, SceneModel } from "../../../../lib/expedition/build-scene-model";
 import type { CampHandlers } from "./camp-handlers";
@@ -196,8 +197,19 @@ export function drawBoardPick(scene: Phaser.Scene, layer: Layer, model: SceneMod
   index.register("camp", BOARD_ID, container);
 }
 
-/** The last trick's cards, the winner's outlined. Hovering the panel marks
- * the led card too. */
+/** A completed play that counted as another card wears that card's suit
+ * (or joker initial) in a pip under it, inside its own fan column. */
+function countsAsPip(scene: Phaser.Scene, x: number, y: number, countsAs: ExpeditionCardIdentityView): Phaser.GameObjects.GameObject[] {
+  const glyph = countsAs.kind === "joker" ? (countsAs.joker === "sun" ? "S" : "M") : SUIT_GLYPH[countsAs.suit];
+  const color = countsAs.kind === "joker" ? PALETTE.sun : PALETTE.suitBigIndex[countsAs.suit];
+  const w = LABEL_CELL.w + 2;
+  const px = x + Math.floor((MINI_W - w) / 2);
+  return [plate(scene, px, y, w, LABEL_CELL.h + 1), text(scene, px + 1, y, glyph, color)];
+}
+
+/** The last trick's cards, the winner's outlined; a burned card is dimmed
+ * and a recounted one wears a pip. Hovering the panel marks the led card
+ * too. */
 export function drawLastTrick(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   const last = model.lastTrick;
   if (last === null) return;
@@ -211,7 +223,8 @@ export function drawLastTrick(scene: Phaser.Scene, layer: Layer, model: SceneMod
   const left = Math.floor((zone.w - (MINI_W + FAN_STEP * (n - 1))) / 2);
   last.plays.forEach((play, i) => {
     const x = left + FAN_STEP * i;
-    panel.add(miniCard(scene, x, fanY, play.card.label, model.cardPackId));
+    panel.add(miniCard(scene, x, fanY, play.card.label, model.cardPackId).setAlpha(play.burned ? DIM_ALPHA : 1));
+    if (play.countsAs !== null) panel.add(countsAsPip(scene, x, fanY + MINI_H + 4, play.countsAs));
     if (play.seatId === last.winnerSeatId) {
       panel.add(scene.add.rectangle(x, fanY, MINI_W, MINI_H, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
     }

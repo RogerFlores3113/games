@@ -16,10 +16,13 @@
 // for the server seed (T-11-03), which cannot legitimately appear in any
 // view.
 //
-// Type-only imports from "../run/types" and "../state"; the only runtime
-// import is the default catalogue.
+// Type-only imports from "../run/types" and "../state", except rulesFor: the
+// viewer's own hand may count as other identities, which only the composed
+// rules can say.
 
+import { identitiesEqual } from "../deck";
 import { CATALOG } from "../run/catalog";
+import { rulesFor } from "../run/compose";
 import type { Catalog, RunState } from "../run/types";
 import type { CardIdentity } from "../state";
 
@@ -66,7 +69,7 @@ function typedKeyFromObj(obj: Record<string, unknown>): string | null {
 }
 
 /** Looks up a card's identity by id across a camp's hands, completed tricks,
- * and the in-progress trick. Mirrors view.ts's findCardIdentity exactly
+ * the in-progress trick and the discards. Mirrors view.ts's findCardIdentity exactly
  * (this file must not call view.ts, so it is re-derived here, independently,
  * from RunState). Returns null (never throws) when not found. */
 function findCardIdentity(camp: NonNullable<RunState["attempt"]>["camp"], cardId: string): CardIdentity | null {
@@ -80,19 +83,17 @@ function findCardIdentity(camp: NonNullable<RunState["attempt"]>["camp"], cardId
   }
   const currentPlay = camp.currentTrick.plays.find((p) => p.card.id === cardId);
   if (currentPlay !== undefined) return currentPlay.card.identity;
-  return null;
+  return camp.discards.find((d) => d.card.id === cardId)?.card.identity ?? null;
 }
 
 /** Derives the secrets a given seat's view must never leak, INDEPENDENTLY of
  * the view-projection function (T-11-16). `seed` is passed only when the
  * caller wants the seed substring scan active (mirrors secretsForHanabiSeat's
- * own optional-seed contract). `catalog` is unread while every objective is
- * public; it stays in the signature because camp modifiers that hide things
- * compose their rules from it. */
+ * own optional-seed contract). */
 export function secretsForExpeditionSeat(
   state: RunState,
   seatId: string,
-  _catalog: Catalog = CATALOG,
+  catalog: Catalog = CATALOG,
   seed?: string,
 ): ExpeditionSeatSecrets {
   const seated = state.seatIds.includes(seatId);
@@ -125,10 +126,15 @@ export function secretsForExpeditionSeat(
 
   const camp = state.attempt?.camp;
   if (camp !== undefined) {
+    const rules = rulesFor(state, catalog);
     for (const hand of camp.hands) {
       if (hand.seatId === seatId) {
         if (seated) {
-          for (const card of hand.cards) bump(card.identity);
+          for (const card of hand.cards) {
+            bump(card.identity);
+            const identity = rules.identityOf(card);
+            if (!identitiesEqual(identity, card.identity)) bump(identity);
+          }
         }
         continue;
       }
@@ -143,9 +149,13 @@ export function secretsForExpeditionSeat(
     }
 
     for (const trick of camp.completedTricks) {
-      for (const play of trick.plays) bump(play.card.identity);
+      for (const play of trick.plays) {
+        bump(play.card.identity);
+        if (play.countsAs !== null) bump(play.countsAs);
+      }
     }
     for (const play of camp.currentTrick.plays) bump(play.card.identity);
+    for (const discard of camp.discards) bump(discard.card.identity);
 
     for (const identity of camp.removedCards) bump(identity);
 

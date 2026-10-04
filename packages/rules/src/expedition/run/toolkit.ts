@@ -10,7 +10,7 @@
 // only the attempt.
 
 import { identitiesEqual } from "../deck";
-import { evaluateObjective } from "../objectives";
+import type { CoreRules } from "../rules";
 import type { CampState, Objective } from "../state";
 import { STARTING_SUPPLIES } from "./balance";
 import type { EffectParams, SourceId } from "../content/source-def";
@@ -31,8 +31,8 @@ export type ToolkitOp<P extends EffectParams = EffectParams> =
   | { readonly op: "set-next-leader"; readonly seatId: string }
   | { readonly op: "log"; readonly event: string; readonly subjectSeatIds: readonly string[]; readonly audience: "public" | readonly string[] };
 
-/** Every card id currently in play (hands, completed tricks, the
- * in-progress trick), sorted. Every successful applyToolkitOps call must
+/** Every card id dealt this camp (hands, completed tricks, the in-progress
+ * trick, discards), sorted. Every successful applyToolkitOps call must
  * leave this list unchanged (T-10-13). */
 export function campCardIds(camp: CampState): string[] {
   const ids: string[] = [];
@@ -43,6 +43,7 @@ export function campCardIds(camp: CampState): string[] {
     for (const play of trick.plays) ids.push(play.card.id);
   }
   for (const play of camp.currentTrick.plays) ids.push(play.card.id);
+  for (const discard of camp.discards) ids.push(discard.card.id);
   return ids.sort();
 }
 
@@ -62,7 +63,7 @@ function assertAudience(run: RunState, audience: readonly string[], opName: stri
 }
 
 /** Supplies are run-level; every other op changes only the attempt. */
-function applyOp(run: RunState, actorSeatId: string, sourceId: SourceId, op: ToolkitOp): RunState {
+function applyOp(run: RunState, actorSeatId: string, sourceId: SourceId, op: ToolkitOp, rules: CoreRules): RunState {
   if (op.op === "adjust-supplies") {
     // The crew keeps at least one supply and never exceeds the start.
     const supplies = run.supplies + op.delta;
@@ -71,7 +72,7 @@ function applyOp(run: RunState, actorSeatId: string, sourceId: SourceId, op: Too
     }
     return { ...run, supplies };
   }
-  return { ...run, attempt: applyAttemptOp(run, run.attempt!, actorSeatId, sourceId, op) };
+  return { ...run, attempt: applyAttemptOp(run, run.attempt!, actorSeatId, sourceId, op, rules) };
 }
 
 function applyAttemptOp(
@@ -80,6 +81,7 @@ function applyAttemptOp(
   actorSeatId: string,
   sourceId: SourceId,
   op: Exclude<ToolkitOp, { readonly op: "adjust-supplies" }>,
+  rules: CoreRules,
 ): AttemptState {
   switch (op.op) {
     case "move-card": {
@@ -153,7 +155,7 @@ function applyAttemptOp(
       if (objective.ownerSeatId !== null) {
         // An owned objective is replaceable only once failed: it becomes a
         // plain win-card for the same owner on a card still in some hand.
-        if (evaluateObjective(camp, objective) !== "failed") {
+        if (rules.objectiveStatus(camp, objective) !== "failed") {
           throw new Error("toolkit: replace-objective: an owned objective must have failed");
         }
         const deckIndex = camp.objectiveDeck.findIndex((identity) =>
@@ -167,7 +169,7 @@ function applyAttemptOp(
         const objectiveDeck = camp.objectiveDeck.filter((_, i) => i !== deckIndex);
         return { ...attempt, camp: { ...camp, objectives, objectiveDeck } };
       }
-      // Must match camp.ts's isCardBearingSlot and Redraw's canTarget
+      // Must match camp.ts's card-bearing kinds and Redraw's canTarget
       // (CR-01): win-card and ordered are the only card-bearing kinds.
       if (objective.kind !== "ordered" && objective.kind !== "win-card") {
         throw new Error("toolkit: replace-objective: objective has no card to replace");
@@ -229,7 +231,7 @@ function applyAttemptOp(
       // D-10: only PENDING objectives move; an already-done one stays put.
       const camp = attempt.camp;
       const objectives = camp.objectives.map((o) => {
-        if (evaluateObjective(camp, o) !== "pending") return o;
+        if (rules.objectiveStatus(camp, o) !== "pending") return o;
         if (o.ownerSeatId === op.seatA) return { ...o, ownerSeatId: op.seatB };
         if (o.ownerSeatId === op.seatB) return { ...o, ownerSeatId: op.seatA };
         return o;
@@ -306,8 +308,9 @@ function applyAttemptOp(
  * RunState in order, never mutating `run` or any of its nested objects, and
  * asserts card conservation once the fold completes (T-10-13): a broken op
  * is a content-author defect and THROWS (POLICY A3), never silently
- * corrupting state. */
-export function applyToolkitOps(run: RunState, actorSeatId: string, sourceId: SourceId, ops: readonly ToolkitOp[]): RunState {
+ * corrupting state. `rules` are the camp's composed rules before the ops,
+ * which the objective guards read. */
+export function applyToolkitOps(run: RunState, actorSeatId: string, sourceId: SourceId, ops: readonly ToolkitOp[], rules: CoreRules): RunState {
   if (run.attempt === null) {
     throw new Error("toolkit: applyToolkitOps: no attempt in progress");
   }
@@ -316,7 +319,7 @@ export function applyToolkitOps(run: RunState, actorSeatId: string, sourceId: So
 
   let next = run;
   for (const op of ops) {
-    next = applyOp(next, actorSeatId, sourceId, op);
+    next = applyOp(next, actorSeatId, sourceId, op, rules);
   }
 
   const afterIds = campCardIds(next.attempt!.camp);

@@ -17,6 +17,12 @@
 // evaluator branch for branch, so it reproduced the evaluator's own bugs
 // (WR-01) instead of catching them.
 //
+// A-LOST: the oracles treat a target as lost when its printed card burned,
+// counted as another identity, or was discarded, and whichever of its win or
+// its loss came first decides; a target unresolved after the final trick
+// fails. The raw sequence marks random plays burned or counted-as and
+// discards a random card, so monotonicity is proven over those too.
+//
 // The "raw trick sequence" property below builds CampState prefixes
 // directly from a hand-rolled trick sequence, NOT via driveCamp or
 // applyCampAction. Those helpers halt play at the first objective failure
@@ -31,7 +37,9 @@ import { evaluateObjective } from "./objectives";
 import { driveCamp } from "./test-support";
 import type {
   CampState,
+  CardIdentity,
   CompletedTrick,
+  Discard,
   ExactlyNObjective,
   ExpeditionCard,
   Hand,
@@ -42,8 +50,8 @@ import type {
   OrderedObjective,
   OrderMarker,
   PlayerCount,
+  ResolvedPlay,
   StandardIdentity,
-  TrickPlay,
 } from "./state";
 
 const HAND_SIZE: Record<PlayerCount, number> = { 3: 18, 4: 13, 5: 10 };
@@ -62,18 +70,41 @@ function remainingTricks(state: CampState): number {
   return state.totalTricks - state.completedTricks.length;
 }
 
-function trickResolutionFor(
-  state: CampState,
-  target: StandardIdentity,
-): { index: number; winnerSeatId: string } | undefined {
+/** The first completed trick an unburned play counting as `target` sits
+ * in, unless the printed target card was lost before it (A-LOST). */
+function trickResolutionFor(state: CampState, target: CardIdentity): { index: number; winnerSeatId: string } | undefined {
+  const lost = lossOf(state, target);
   for (const trick of state.completedTricks) {
+    if (lost !== undefined && trick.index > lost) return undefined;
     for (const play of trick.plays) {
-      if (identitiesEqual(play.card.identity, target)) {
+      if (!play.burned && identitiesEqual(play.countsAs ?? play.card.identity, target)) {
         return { index: trick.index, winnerSeatId: trick.winnerSeatId };
       }
     }
   }
   return undefined;
+}
+
+/** When the printed target card left play: the trick it burned in or was
+ * read as another card in, or between the tricks around its discard. */
+function lossOf(state: CampState, target: CardIdentity): number | undefined {
+  for (const trick of state.completedTricks) {
+    for (const play of trick.plays) {
+      if (identitiesEqual(play.card.identity, target) && (play.burned || play.countsAs !== null)) return trick.index;
+    }
+  }
+  const discard = state.discards.find((d) => identitiesEqual(d.card.identity, target));
+  return discard === undefined ? undefined : discard.afterTrick - 0.5;
+}
+
+/** Win-card per spec §5.2 plus A-LOST: decided by the earlier of its win and
+ * its loss; unresolved after the final trick, it failed. */
+function winCardOracle(state: CampState, objective: { ownerSeatId: string | null; target: CardIdentity }): ObjectiveStatus {
+  if (objective.ownerSeatId === null) return "pending";
+  const mine = trickResolutionFor(state, objective.target);
+  if (mine !== undefined) return mine.winnerSeatId === objective.ownerSeatId ? "done" : "failed";
+  if (lossOf(state, objective.target) !== undefined || remainingTricks(state) === 0) return "failed";
+  return "pending";
 }
 
 /** True iff marker `a` must be won no later than marker `b` (spec §5.2's
@@ -112,6 +143,8 @@ function noTricksOracle(state: CampState, objective: { ownerSeatId: string | nul
 /** WR-02: a pair-based restatement of spec §5.2's "ordered" row, sharing no
  * control flow with orderedKind.evaluate's unresolved/resolved branch split.
  * Failure holds iff any of:
+ *   F0 (A-LOST) — this objective's card was lost before any win of it, or
+ *      it is unresolved after the final trick;
  *   F1 (base win-card rule) — this objective's own card was resolved by a
  *      trick whose winner is not this objective's owner;
  *   F2 (A-LAST) — this objective is marked "last", its own card is resolved,
@@ -130,6 +163,9 @@ function orderedOracle(
   if (objective.ownerSeatId === null) return "pending";
 
   const mine = trickResolutionFor(state, objective.target);
+
+  // F0: A-LOST.
+  if (mine === undefined && lossOf(state, objective.target) !== undefined) return "failed";
 
   // F1: base win-card rule.
   if (mine !== undefined && mine.winnerSeatId !== objective.ownerSeatId) return "failed";
@@ -154,7 +190,8 @@ function orderedOracle(
     }
   }
 
-  return mine === undefined ? "pending" : "done";
+  if (mine !== undefined) return "done";
+  return remainingTricks(state) === 0 ? "failed" : "pending";
 }
 
 // --- Generators ---
@@ -266,6 +303,8 @@ const rawSequenceCampArb = fc
     fc.array(fc.nat(), { minLength: 8, maxLength: 8 }),
     fc.array(fc.nat(), { minLength: 90, maxLength: 90 }),
     fc.array(fc.nat(), { minLength: 18, maxLength: 18 }),
+    fc.array(fc.nat({ max: 11 }), { minLength: 90, maxLength: 90 }),
+    fc.option(fc.tuple(fc.nat(), fc.nat(), fc.nat()), { nil: undefined }),
   )
   .map(
     ([
@@ -278,6 +317,8 @@ const rawSequenceCampArb = fc
       ownerPicks,
       playPicks,
       winnerPicks,
+      fatePicks,
+      discardPick,
     ]) => {
       const seatIds = seatIdsFor(playerCount);
       const totalTricks = HAND_SIZE[playerCount];
@@ -312,16 +353,38 @@ const rawSequenceCampArb = fc
         initial.hands.map((hand) => [hand.seatId, [...hand.cards]]),
       );
 
+      // One optional discard: a random card leaves a random hand after a
+      // random trick and is never played.
+      let discard: Discard | undefined;
+      if (discardPick !== undefined) {
+        const [seatPick, cardPick, afterPick] = discardPick;
+        const seatId = seatIds[seatPick % playerCount]!;
+        const hand = workingHands.get(seatId)!;
+        const [gone] = hand.splice(cardPick % hand.length, 1);
+        discard = { card: gone!, afterTrick: afterPick % totalTricks };
+      }
+
+      /** Mostly plain; sometimes burned, sometimes read as another card. */
+      const fateFor = (pick: number, card: ExpeditionCard, seatId: string): ResolvedPlay => {
+        if (pick === 0) return { seatId, card, countsAs: null, burned: true };
+        if (pick === 1 && card.identity.kind === "standard") {
+          return { seatId, card, countsAs: { kind: "standard", suit: card.identity.suit === "hearts" ? "spades" : "hearts", rank: card.identity.rank }, burned: false };
+        }
+        return { seatId, card, countsAs: null, burned: false };
+      };
+
       let cursor = 0;
       let leaderSeatId = seatIds[0]!;
       const tricks: CompletedTrick[] = [];
       for (let t = 0; t < totalTricks; t++) {
-        const plays: TrickPlay[] = seatIds.map((seatId) => {
+        const plays: ResolvedPlay[] = seatIds.flatMap((seatId) => {
           const hand = workingHands.get(seatId)!;
+          if (hand.length === 0) return [];
           const idx = playPicks[cursor % playPicks.length]! % hand.length;
+          const fate = fatePicks[cursor % fatePicks.length]!;
           cursor++;
           const [playedCard] = hand.splice(idx, 1);
-          return { seatId, card: playedCard! };
+          return [fateFor(fate, playedCard!, seatId)];
         });
         const winnerSeatId = seatIds[winnerPicks[t % winnerPicks.length]! % playerCount]!;
         tricks.push({ index: t, leaderSeatId, plays, winnerSeatId });
@@ -332,6 +395,7 @@ const rawSequenceCampArb = fc
       const prefixes: CampState[] = [];
       for (let k = 0; k <= totalTricks; k++) {
         const completedTricks = tricks.slice(0, k);
+        const discarded = discard !== undefined && k >= discard.afterTrick;
         const playedCardIds = new Set(completedTricks.flatMap((tr) => tr.plays.map((p) => p.card.id)));
         const hands: Hand[] = initial.hands.map((hand) => ({
           seatId: hand.seatId,
@@ -341,7 +405,8 @@ const rawSequenceCampArb = fc
           ...initial,
           objectives,
           completedTricks,
-          hands,
+          hands: discarded ? hands.map((hand) => ({ ...hand, cards: hand.cards.filter((c) => c.id !== discard!.card.id) })) : hands,
+          discards: discarded ? [discard!] : [],
           currentTrick: {
             index: k,
             leaderSeatId: k === 0 ? initial.expeditionLeaderSeatId : tricks[k - 1]!.winnerSeatId,
@@ -462,8 +527,9 @@ describe("property: objective failure timing", () => {
     );
   });
 
-  it("every objective kind's failed status is absorbing across every prefix of a raw trick sequence that keeps playing past the first failure, and ordered statuses match the independent oracle", () => {
+  it("every objective kind's failed status is absorbing across every prefix of a raw trick sequence that keeps playing past the first failure, burning, recounting and discarding cards, and card statuses match the independent oracles", () => {
     let failedThenOwnWonByOwnerRuns = 0;
+    let lostFailures = 0;
     const failedBeforeEnd: Record<ObjectiveKind, number> = {
       "win-card": 0,
       ordered: 0,
@@ -488,8 +554,11 @@ describe("property: objective failure timing", () => {
             const status = evaluateObjective(state, objective);
 
             if (objective.kind === "ordered") {
-              const expected = orderedOracle(state, objective, allOrdered);
-              expect(status).toBe(expected);
+              expect(status).toBe(orderedOracle(state, objective, allOrdered));
+            }
+            if (objective.kind === "win-card") {
+              expect(status).toBe(winCardOracle(state, objective));
+              if (status === "failed" && trickResolutionFor(state, objective.target) === undefined) lostFailures++;
             }
 
             // Monotonicity: failed is absorbing for every kind, at every
@@ -527,6 +596,8 @@ describe("property: objective failure timing", () => {
     // Non-vacuity A (WR-01 shape): the failed-then-own-card-won-by-owner
     // scenario actually occurred in the generated runs.
     expect(failedThenOwnWonByOwnerRuns).toBeGreaterThan(0);
+    // A-LOST: a win-card failed with its target lost or never played.
+    expect(lostFailures).toBeGreaterThan(0);
 
     // Non-vacuity B: each of the four kinds failed at some prefix before
     // the camp's final trick, so later prefixes genuinely exercised the

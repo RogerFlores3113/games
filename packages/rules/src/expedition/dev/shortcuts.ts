@@ -5,6 +5,7 @@
 import { cardLabel } from "../deck";
 import { FINAL_CAMP } from "../run/balance";
 import { recordCampFailure, recordCampSuccess, runStatus, startAttempt } from "../run/lifecycle";
+import { rulesFor } from "../run/compose";
 import { applyToolkitOps } from "../run/toolkit";
 import type { CampNumber, Catalog, RunState } from "../run/types";
 import { describeObjective } from "../objectives";
@@ -171,14 +172,14 @@ export const DEV_SHORTCUTS = {
       { name: "card", label: "Card", kind: "choice", options: allCardHolders(run).map((c) => ({ value: c.id, label: c.label })) },
       { name: "to", label: "To", kind: "choice", options: seatOptions(run) },
     ],
-    apply: (run, params) => {
+    apply: (run, params, catalog) => {
       if (run.attempt === null) throw new Error("there is no dealt camp to move cards in");
       const holders = allCardHolders(run);
       const cardId = readChoice(params, "card", holders.map((c) => ({ value: c.id, label: c.label })));
       const to = readChoice(params, "to", seatOptions(run));
       const from = holders.find((c) => c.id === cardId)!.seatId;
       if (from === to) throw new Error(`the card is already in ${to}'s hand`);
-      return applyToolkitOps(run, to, "dev", [{ op: "move-card", cardId, fromSeatId: from, toSeatId: to }]);
+      return applyToolkitOps(run, to, "dev", [{ op: "move-card", cardId, fromSeatId: from, toSeatId: to }], rulesFor(run, catalog));
     },
   },
   "set-objective-owner": {

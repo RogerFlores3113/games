@@ -16,13 +16,28 @@ files and identifiers involved.
 ## Layout
 
 - **Core** (this directory's top level): `state.ts` (the type vocabulary:
-  `CampState`, the `Objective`/`ObjectiveSlot` unions, `CampAction`/
-  `CampError`), `camp.ts` (`createCamp`, `checkCampOutcome`, `campPhase`,
-  `currentActorSeatId`), `actions.ts` (`applyCampAction`), `objectives.ts`
-  (`OBJECTIVE_KINDS`, `evaluateObjective`), `rules.ts` (`CoreRules` with
-  `isTrump` and `rankOf`, `baseRules`), `deck.ts`, `trick.ts`, `leader.ts`,
-  `legality.ts`. The Core never imports a source id; it only calls through
-  a `CoreRules` value.
+  `CampState` with its `discards`, `ResolvedPlay`, the `Objective`/
+  `ObjectiveSlot` unions, `Goal`, `CampEvent`, `CampAction`/`CampError`),
+  `camp.ts` (`createCamp`, `checkCampOutcome`, `campPhase`,
+  `currentActorSeatId`, `guard`), `actions.ts` (`applyCampAction`, which
+  also reports the action's `CampEvent`s), `objectives.ts`
+  (`OBJECTIVE_KINDS`, `evaluateObjective`), `rules.ts` (`CoreRules`,
+  `baseRules`), `deck.ts`, `trick.ts` (`legalPlaysFor`, `trickWinner`,
+  `resolveTrick`), `leader.ts`, `legality.ts`. The Core never imports a
+  source id; it only calls through a `CoreRules` value.
+
+**Core hooks** (`rules.ts`'s `CoreRules`): `deckFor`, `objectiveDeckFor`
+(base: standard cards ranked above the deck's lowest rank), `leaderFor`, the
+card reading `identityOf`, `isTrump` and `rankOf`, `trickWinner(plays,
+led)`, `legalPlays`, `burns(plays, led, winnerOf)`, `nextLeader`,
+`objectiveStatus` (base: `evaluateObjective`) and `goals` (camp-wide
+conditions; every one must be done). A full trick resolves once, in
+`resolveTrick`: the led identity is what the lead counts as, burned plays
+leave the trick (and never count for an objective), and the winner is the
+highest trump kept, else the highest kept card following the led identity,
+else the highest kept card; equal strength goes to the earliest play. A card
+objective fails at once when its printed card burned, counted as another
+card or was discarded, and fails if never played by the final trick.
 - **`content/`**: the catalogue. `content/source-def.ts` holds the def types
   (`CharacterDef`, `UpgradeDef`, `ItemDef`, `ActiveAbility`,
   `PassiveAbility`, `UsageLimit`, `PoolDef`, `AbilityContext`) and the
@@ -50,8 +65,9 @@ files and identifiers involved.
 each live source's passive in `[character, ...kit]` order, then each live
 effect's layer in `attempt.effects` order.**
 Each layer's `RuleModifier` maps the previous layer's answer to its own, hook
-by hook. The card-reading hooks `isTrump` and `rankOf` fold first (WR-03);
-every other hook folds over the base built from them. A trick-scoped effect
+by hook. The card-reading hooks `identityOf`, `isTrump` and `rankOf` fold
+first, in that order (WR-03); every other hook folds over the base built
+from them. A trick-scoped effect
 (`lasts: "trick"`) is live only while `currentTrick.index === atTrick`.
 
 **The toolkit is the only mutation surface** (`run/toolkit.ts`'s
@@ -108,7 +124,7 @@ one `apply`; the context builds both, so an ability never names a stream.
 **Worked example (Bait, `content/items/bait.ts`):** window `"in-trick"`,
 limit `single-use`, one `{ kind: "card", where: "board" }` target. `apply`
 returns one trick-scoped `add-modifier` whose params name the card, and
-`effect` overrides `trickWinner` with `winnerExcluding(prev, plays, ...)`, so
+`effect` overrides `trickWinner` with `winnerExcluding(prev, plays, led, ...)`, so
 that card can't win this one trick.
 
 ## Add a character
@@ -189,8 +205,8 @@ that card can't win this one trick.
 5. Honestly: `camp.ts`'s `createCamp` builds each `Objective` from its
    `ObjectiveSlot` in a single `objectiveSlots.map(...)` with one branch per
    card-bearing vs. cardless kind (`slot.kind === "win-card"` /
-   `"ordered"` both pull from `objectiveDeckRemaining`; anything else is
-   assumed cardless). A genuinely new *shape* of slot (neither
+   `"ordered"` both pull from `objectiveDeckRemaining`, unless a win-card
+   slot names a `fixed` target; anything else is assumed cardless). A genuinely new *shape* of slot (neither
    card-bearing nor a bare cardless flag) may need one more branch there —
    the existing four kinds needed none beyond that split, but this is not
    a promise that every future kind is literally zero extra lines in

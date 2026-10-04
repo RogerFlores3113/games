@@ -164,20 +164,19 @@ describe("dealHands", () => {
 });
 
 describe("buildObjectiveDeck", () => {
-  it("contains exactly the standard identities of deck, no Sun/Moon", () => {
-    const deck = baseDeckFor(3);
-    const objectiveDeck = buildObjectiveDeck({ deck, seed: "seed-a" });
-    const expectedStandard = deck.filter(isStandard);
-    expect(objectiveDeck.length).toBe(expectedStandard.length);
-    for (const identity of expectedStandard) {
+  it("is a reordering of exactly the identities it is given", () => {
+    const identities = baseDeckFor(3).filter(isStandard);
+    const objectiveDeck = buildObjectiveDeck({ identities, seed: "seed-a" });
+    expect(objectiveDeck.length).toBe(identities.length);
+    for (const identity of identities) {
       expect(objectiveDeck.some((c) => identitiesEqual(c, identity))).toBe(true);
     }
-    expect(objectiveDeck.every((c) => c.kind === "standard")).toBe(true);
+    expect(objectiveDeck).not.toEqual(identities);
   });
 
   it("order differs from the play-deck shuffle order for the same seed (separate stream)", () => {
     const deck = baseDeckFor(3);
-    const objectiveDeck = buildObjectiveDeck({ deck, seed: "shared-seed" });
+    const objectiveDeck = buildObjectiveDeck({ identities: deck.filter(isStandard), seed: "shared-seed" });
     const { hands } = dealHands({ seatIds: ["a", "b", "c"], seed: "shared-seed", deck });
     const playOrderIdentities = hands.flatMap((h) => h.cards.map((c) => c.identity)).filter(isStandard);
     // Compare the first N standard identities in each order; independent
