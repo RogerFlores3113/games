@@ -75,6 +75,7 @@ const TrickPlayViewSchema = z.discriminatedUnion("hidden", [
     hidden: z.literal(false),
     card: CardViewSchema,
     effectiveRank: EffectiveRankSchema,
+    countsAs: CardIdentityViewSchema.nullable(),
   }),
   z.strictObject({
     seatId: z.string().min(1),
@@ -349,6 +350,9 @@ const StatusPartViewSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("dam"), suit: SuitSchema }),
   z.strictObject({ kind: z.literal("streak"), seatId: z.string().min(1), count: z.number().int().min(1) }),
   z.strictObject({ kind: z.literal("bitten"), seatId: z.string().min(1), tricksLeft: z.number().int().min(1) }),
+  z.strictObject({ kind: z.literal("countdown"), tricks: z.number().int().min(1) }),
+  z.strictObject({ kind: z.literal("alternating"), activeNow: z.boolean() }),
+  z.strictObject({ kind: z.literal("swarm"), seatId: z.string().min(1).nullable() }),
 ]);
 
 const ModViewSchema = z.strictObject({

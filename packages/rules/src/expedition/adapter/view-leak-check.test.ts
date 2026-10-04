@@ -374,7 +374,7 @@ describe("view-leak-check: concealment canaries", () => {
     expect(leaks(state, viewer, clean)).toEqual([]);
     const tampered = structuredClone(clean);
     const trick = attemptViewOf(tampered).camp.currentTrick;
-    trick.plays = [{ seatId: trick.plays[0]!.seatId, hidden: false, card: { id: card.id, identity: card.identity }, effectiveRank: null }];
+    trick.plays = [{ seatId: trick.plays[0]!.seatId, hidden: false, card: { id: card.id, identity: card.identity }, effectiveRank: null, countsAs: null }];
     expect(leaks(state, viewer, tampered)).toEqual([`structural:hidden-id:${card.id}`, `typed:identity-count-exceeded:${key(card.identity)}`]);
   });
 

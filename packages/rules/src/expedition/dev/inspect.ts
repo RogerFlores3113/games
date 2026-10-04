@@ -43,6 +43,12 @@ function statusLabel(part: StatusPart): string {
       return `${part.seatId} won ${part.count} in a row`;
     case "bitten":
       return `${part.seatId} bitten for ${part.tricksLeft} more`;
+    case "countdown":
+      return `strikes in ${part.tricks} tricks`;
+    case "alternating":
+      return part.activeNow ? "active this trick" : "resting this trick";
+    case "swarm":
+      return part.seatId === null ? "eats a card from every hand next" : `eats an item of ${part.seatId} next`;
   }
 }
 

@@ -38,6 +38,10 @@ export const NORMAL_WEATHER_CHANCE = 80;
 /** A strike's chance before trick t is firstChance + perTrick * t percent. */
 export const THUNDERSTORM = { firstChance: 20, perTrick: 10, maxStrikes: 2 } as const;
 
+/** Tornado: after every `every`th trick, `cards` random cards from every
+ * hand pass to the player on the right. The half body blows every 2 * every. */
+export const TORNADO = { every: 3, cards: 3 } as const;
+
 /** Flooding (and Monsoon): every objective must be done once this share of
  * the camp's tricks is played. Placeholder. */
 export const RIVER_SHARE = 3 / 4;

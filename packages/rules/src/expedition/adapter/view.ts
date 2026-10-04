@@ -149,7 +149,7 @@ function toTrickPlayView(play: { seatId: string; card: ExpeditionCard }, hidden:
     const identity = rules.identityOf(play.card);
     return { seatId: play.seatId, hidden: true, suit: identity.kind === "joker" ? "joker" : identity.suit };
   }
-  return { seatId: play.seatId, hidden: false, card: toCardView(play.card), effectiveRank: effectiveRank(play.card, rules) };
+  return { seatId: play.seatId, hidden: false, card: toCardView(play.card), effectiveRank: effectiveRank(play.card, rules), countsAs: countsAs(play.card, rules) };
 }
 
 function toCompletedPlayView(play: ResolvedPlay, rules: RunRules): ExpeditionCompletedPlayView {
@@ -356,6 +356,12 @@ function toStatusPartView(part: StatusPart): ExpeditionStatusPartView {
       return { kind: "streak", seatId: part.seatId, count: part.count };
     case "bitten":
       return { kind: "bitten", seatId: part.seatId, tricksLeft: part.tricksLeft };
+    case "countdown":
+      return { kind: "countdown", tricks: part.tricks };
+    case "alternating":
+      return { kind: "alternating", activeNow: part.activeNow };
+    case "swarm":
+      return { kind: "swarm", seatId: part.seatId };
   }
 }
 

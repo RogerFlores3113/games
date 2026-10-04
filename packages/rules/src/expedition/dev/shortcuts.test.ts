@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CATALOG } from "../run/catalog";
 import { attemptOf } from "../run/attempt";
 import { createRun, runStatus } from "../run/lifecycle";
+import { campStack } from "../run/stack";
 import type { RunState } from "../run/types";
 import { checkRunState } from "./check";
 import { DEV_SHORTCUTS } from "./shortcuts";
@@ -180,5 +181,16 @@ describe("dev shortcuts", () => {
     expect(DEV_SHORTCUTS["set-plan-boss"].fields(atCamp, CATALOG)[0]).toMatchObject({ options: [{ value: "3" }] });
     expect(() => run("set-plan-boss", atCamp, { camp: "6", boss: "tiger" })).toThrow(/camp must be one of: 3/);
     expect(run("set-plan-boss", atCamp, { camp: "3", boss: "none" }).plan?.bosses[0]?.modId).toBeNull();
+  });
+
+  it("set-plan-boss sets a Long run's disaster, which a jump to camp 6 deals", () => {
+    const loadout = run("jump-to-camp", fresh(), { length: "long", camp: 5, stage: "loadout" });
+    const planned = run("set-plan-boss", loadout, { camp: "6", boss: "tornado" });
+    expect(planned.plan?.bosses[1]).toEqual({ at: 6, tier: "disaster", modId: "tornado" });
+    expect(() => run("set-plan-boss", loadout, { camp: "6", boss: "tiger" })).toThrow(/tiger is not a disaster boss/);
+    const atCamp = run("jump-to-camp", planned, { length: "long", camp: 6, stage: "camp" });
+    expect(atCamp.stage.tag === "camp" && atCamp.stage.camp.index).toBe(6);
+    expect(campStack(atCamp, CATALOG).map((l) => l.def.id)).toContain("tornado");
+    expect(checkRunState(atCamp, CATALOG)).toEqual([]);
   });
 });

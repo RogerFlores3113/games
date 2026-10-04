@@ -160,8 +160,11 @@ export function secretsForExpeditionSeat(
     // not count, since the table can't see what it names.
     const trick = camp.currentTrick;
     trick.plays.forEach((play, position) => {
-      if (!rules.hides(state, seatId, { kind: "play", trickIndex: trick.index, position, seatId: play.seatId })) bump(play.card.identity);
-      else if (!revealedToViewer.has(play.card.id)) hiddenIds.push(play.card.id);
+      if (!rules.hides(state, seatId, { kind: "play", trickIndex: trick.index, position, seatId: play.seatId })) {
+        bump(play.card.identity);
+        const identity = rules.identityOf(play.card);
+        if (!identitiesEqual(identity, play.card.identity)) bump(identity);
+      } else if (!revealedToViewer.has(play.card.id)) hiddenIds.push(play.card.id);
     });
     for (const discard of camp.discards) bump(discard.card.identity);
 

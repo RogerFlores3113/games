@@ -50,7 +50,10 @@ export type StatusPart =
   | { readonly kind: "facing"; readonly seatId: string } // Crocodile: the seat it watches this trick
   | { readonly kind: "dam"; readonly suit: Suit } // Beaver: the suit dammed this trick
   | { readonly kind: "streak"; readonly seatId: string; readonly count: number } // Tiger: the last winner's run of tricks
-  | { readonly kind: "bitten"; readonly seatId: string; readonly tricksLeft: number }; // Snake: a bite counting this trick
+  | { readonly kind: "bitten"; readonly seatId: string; readonly tricksLeft: number } // Snake: a bite counting this trick
+  | { readonly kind: "countdown"; readonly tricks: number } // Tornado, Earthquake: tricks to finish, this one included, before it strikes
+  | { readonly kind: "alternating"; readonly activeNow: boolean } // Blood Moon and the half bodies: whether it acts on this trick
+  | { readonly kind: "swarm"; readonly seatId: string | null }; // Locusts: whose item they eat next; null: a card from every hand
 
 export type ModBody = {
   readonly rules?: (ctx: ModCtx) => RuleModifier;

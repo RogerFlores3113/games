@@ -12,13 +12,13 @@ import type { Page } from "@playwright/test";
 type Json = Record<string, unknown>;
 interface Identity { kind: "standard" | "joker"; suit?: string; rank?: number; joker?: string }
 interface Card { id: string; identity: Identity; effectiveRank?: number | null }
-interface Play { seatId: string; hidden?: false; card: Card; effectiveRank: number | null }
+interface Play { seatId: string; hidden?: false; card: Card; effectiveRank: number | null; countsAs: Identity | null }
 interface Objective { id: string; kind: string; ownerSeatId: string | null; status: string; target?: Identity }
 interface Camp extends Json {
   objectives: Objective[];
   yourHand: Card[];
   yourLegalCardIds: string[];
-  completedTricks: { index: number; leaderSeatId: string; plays: (Play & { countsAs: Identity | null; burned: boolean })[]; winnerSeatId: string }[];
+  completedTricks: { index: number; leaderSeatId: string; plays: (Play & { burned: boolean })[]; winnerSeatId: string }[];
   currentTrick: { index: number; leaderSeatId: string; plays: Play[] };
   campPhase: string;
   currentActorSeatId: string | null;
@@ -91,7 +91,7 @@ export function playing(game: Game, opts: { plays: number; window: "between-tric
   const camp = attempt(next).camp;
   const mates = others(game);
   const fake = (i: number): Card => ({ id: `fake-${i}`, identity: { kind: "standard", suit: ["spades", "hearts", "clubs", "diamonds"][i % 4]!, rank: 2 + (i % 13) } });
-  const play = (seatId: string, i: number): Play => ({ seatId, hidden: false, card: fake(i), effectiveRank: null });
+  const play = (seatId: string, i: number): Play => ({ seatId, hidden: false, card: fake(i), effectiveRank: null, countsAs: null });
   camp.campPhase = "playing";
   camp.completedTricks = [0, 1].map((index) => ({
     index,

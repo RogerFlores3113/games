@@ -1470,3 +1470,38 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
   that shows it (the crocodile camp plays to its settle); with `BOSS_SCREENSHOT_DIR` it captures
   each at 1280x720 and 1920x1080. The tour gains `camp-tiger`, `camp-rats`, `camp-snake`,
   `camp-crocodile`, `camp-capybara`, `camp-beaver` and `route-boss` from rewritten views.
+
+### Implementation notes (unit 9)
+
+- Status parts gain `countdown { tricks }` (tricks still to finish, the current one included,
+  before the boss acts), `alternating { activeNow }` and, beyond the spec, `swarm { seatId | null }`:
+  the seat whose equipped item the Locusts eat next, or null when they will eat a card from every
+  hand. Tornado shows no countdown once no gust remains (none blows after the final trick), and
+  Earthquake none after the quake. Wildfire and Meteor at full strength have no status.
+- Deviation: a current-trick play the viewer sees carries `countsAs` like a completed play, so a
+  Blood Moon trick shows what a played spade or club counts as while the trick is open. The leak
+  check counts that identity for the current trick as it already did for hands and completed tricks.
+- Tornado: "the player on the right" is the previous seat in turn order (turn order runs to the
+  left; the web seats the next player on your left). Every hand's cards are drawn first, then each
+  sent card is revealed to its sender only (`reveal`, source `tornado`), then moved. Up to three
+  cards each, so equal hands stay equal. A public `log` entry `gust` marks each gust.
+- Earthquake: the open (pending under the composed rules) owned objectives are permuted over the
+  same list of owners with `ctx.draw`, and `reassign-objective` moves each whose owner changed; a
+  done or failed objective stays. Log `quake`. The half body logs `quake` and swaps two random
+  seats' open objectives.
+- Wildfire burns the lowest printed standard card; the Sun and Moon never burn. Meteor burns the
+  card the composed `trickWinner` names among the cards not already burned. Display names "Meteor
+  shower" and "Locust swarm".
+- Blood Moon reads the trick in play from `ctx.camp.currentTrick.index`; the full moon is up on odd
+  indices, the half on indices 3, 7, 11. Trick completion composes the rules before the play, so
+  `countsAs` records the moon of the trick being completed.
+- Locusts: the meal goes round the table after the last seat eaten from (the latest public
+  `ate-item:<itemId>` log entry), starting at the expedition leader; the item is a seeded pick of
+  that seat's equipped instances. With no equipped item anywhere, `discard-round` takes a seeded card
+  from every hand (log `ate-cards`). That can end a camp with one trick left, failing its unplayed
+  targets; a placeholder for the balance pass. The item id in the log is public: eaten is gone.
+- Monsoon shares `river` with Flooding; the half body floods one trick later. Goal id `monsoon`.
+- Half bodies are tested by a catalogue whose def plays its half body as `full`, since the stack
+  adds helpers only in unit 10. `TORNADO` (every 3, 3 cards) joins `balance.ts`.
+- `RunState` is unchanged, so `ROOM_SCHEMA_VERSION` stays 11. Dev: `set-plan-boss` already listed
+  every boss kind; a test sets a Long run's disaster and jumps to camp 6.

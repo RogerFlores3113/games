@@ -124,8 +124,8 @@ folds after the weather so it can refine it; passives fold after both, so an
 item can lift a camp rule for its owner (Mosquito Net under Rain). A
 backpack item is not live: no passive, no ability.
 
-**Camp modifiers.** A camp's location and weather (and later its pairing
-and boss) are `ModDef`s, stacked by `run/stack.ts`'s `campStack`. A body's
+**Camp modifiers.** A camp's location, weather, pairing and boss are
+`ModDef`s, stacked by `run/stack.ts`'s `campStack`. A body's
 `rules(ctx)` answers the engine's questions, `on` reacts to an event with
 toolkit ops (under the origin `{ kind: "mod" }`), `effect` is the layer an
 `add-modifier` from `on` switches on, `slots` reshapes the camp's
@@ -133,7 +133,14 @@ objective slots, and `status` is public table state the view projects.
 The run hook `hides(run, viewer, subject)` keeps a current-trick play, an
 objective's kind and target, or a seat's unused items from a viewer (Cave,
 Night, Desert, Heavy fog); the view and the leak check both read it, so a
-new concealment needs no change to either.
+new concealment needs no change to either. A boss uses whichever channel
+its mechanic is: a question is a rule (Crocodile's guard, Wildfire's and
+Meteor's `burns`, Blood Moon's `identityOf`, Monsoon's river guard), a
+moment is a reaction (Snake's bite on `whisper-sent`; Tornado, Earthquake
+and Locusts on `trick-completed`, moving cards with `move-card` and
+`reveal`, owners with `reassign-objective`, items with `break-item` and
+cards with `discard-round`, each with a public `log` entry the table can
+animate).
 `ctx.roll(label, n)` and a reaction's `ctx.draw(n)` are seeded. A trick
 effect added with `deferIfFatal` (a Thunderstorm strike) waits one trick
 when, under the fully composed rules, it is what lost the camp

@@ -62,8 +62,9 @@ export type ExpeditionRankedCardView = {
   countsAs: ExpeditionCardIdentityView | null;
 };
 
-/** A play whose card the viewer sees. */
-export type ExpeditionShownPlayView = { seatId: string; card: ExpeditionCardView; effectiveRank: number | null };
+/** A play whose card the viewer sees, and what it counts as when that
+ * differs from the printed card (a Blood Moon trick). */
+export type ExpeditionShownPlayView = { seatId: string; card: ExpeditionCardView; effectiveRank: number | null; countsAs: ExpeditionCardIdentityView | null };
 
 /** A current-trick play: shown, or face down (a Cave, the Night's lead)
  * with only the suit it follows as ("joker" for the Sun or Moon), never
@@ -72,7 +73,7 @@ export type ExpeditionTrickPlayView = (ExpeditionShownPlayView & { hidden: false
 
 /** A play as its trick was resolved: what it counted as, and whether it
  * burned. Completed plays are always face up. */
-export type ExpeditionCompletedPlayView = ExpeditionShownPlayView & { countsAs: ExpeditionCardIdentityView | null; burned: boolean };
+export type ExpeditionCompletedPlayView = ExpeditionShownPlayView & { burned: boolean };
 
 export type ExpeditionCompletedTrickView = {
   index: number;
@@ -289,7 +290,10 @@ export type ExpeditionStatusPartView =
   | { kind: "facing"; seatId: string }
   | { kind: "dam"; suit: Suit }
   | { kind: "streak"; seatId: string; count: number }
-  | { kind: "bitten"; seatId: string; tricksLeft: number };
+  | { kind: "bitten"; seatId: string; tricksLeft: number }
+  | { kind: "countdown"; tricks: number }
+  | { kind: "alternating"; activeNow: boolean }
+  | { kind: "swarm"; seatId: string | null };
 
 /** One layer of the camp's modifier stack, in fold order. */
 export type ExpeditionModView = { id: string; kind: ModKind; strength: Strength; status: ExpeditionStatusPartView[] };

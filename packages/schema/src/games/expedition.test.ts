@@ -44,6 +44,8 @@ const CAMP_MODS = [
   { id: "jungle", kind: "location", strength: "full", status: [] },
   { id: "thunderstorm", kind: "weather", strength: "full", status: [{ kind: "chance", percent: 30, strikesLeft: 1 }, { kind: "strike" }] },
   { id: "flooding", kind: "pairing", strength: "full", status: [{ kind: "meter", left: 3, of: 12 }] },
+  { id: "tornado", kind: "disaster", strength: "full", status: [{ kind: "countdown", tricks: 2 }] },
+  { id: "locusts", kind: "disaster", strength: "half", status: [{ kind: "alternating", activeNow: true }, { kind: "swarm", seatId: null }] },
 ];
 const preview = { index: 2, location: "jungle", weather: "fair", pairing: null, event: "event", slotKinds: ["win-card", "ordered", "ordered"], bossId: null, shop: false };
 const noItems = { equipped: [], backpack: [], concealed: false };
@@ -193,7 +195,7 @@ const midAttempt = {
         index: 1,
         leaderSeatId: "seat-1",
         plays: [
-          { seatId: "seat-1", hidden: false, card: { id: "card-4", identity: { kind: "standard", suit: "hearts", rank: 9 } }, effectiveRank: null },
+          { seatId: "seat-1", hidden: false, card: { id: "card-4", identity: { kind: "standard", suit: "hearts", rank: 9 } }, effectiveRank: null, countsAs: { kind: "standard", suit: "diamonds", rank: 9 } },
           { seatId: "seat-2", hidden: true, suit: "joker" },
         ],
       },
