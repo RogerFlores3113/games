@@ -14,7 +14,7 @@ test.describe("Expedition Phaser mount (SCENE-01, SCENE-10, criterion 3)", () =>
         expect(liveGames).toBe(1);
         expect(await getScene(p)).toBe("trail");
         const model = await p.evaluate(() => window.__expeditionTest?.model as TrailView | null);
-        expect(draftOffer(model ?? {})).toHaveLength(6);
+        expect(draftOffer(model ?? {})).toHaveLength(9);
       }
     } finally {
       for (const context of contexts) await context.close();
