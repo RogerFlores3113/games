@@ -71,6 +71,9 @@ import {
 import { computeRoomTimers, dueTimers, nextDueAt, type TimerEvent } from "./scheduler";
 import { loadRoom, loadTimers, saveRoom } from "./persistence";
 import { isOriginAllowed } from "./origin";
+import { nanoid } from "nanoid";
+import { DEV_MODE_OFF_MESSAGE, devModeEnabled } from "./dev-mode";
+import { applyDevCommand, devStateFrame } from "./dev-room";
 import { projectSeatView, toWireGameError, type OutboundFrame, type ProjectedRoomView } from "./seat-projection";
 import {
   isHeartbeatPing,
@@ -93,6 +96,9 @@ export interface Env {
    * wrangler dev `--var`; never set in production. */
   SOCKET_STALE_MS?: string;
   ZOMBIE_SWEEP_INTERVAL_MS?: string;
+  /** Dev mode: `wrangler dev --var DEV_MODE:1` only, never in wrangler.jsonc
+   * (see dev-mode.ts). */
+  DEV_MODE?: string;
 }
 
 
@@ -270,6 +276,28 @@ export class RoomDO extends Server<Env> {
         }
         await this.#commit(result.state, now);
         await this.#pushState();
+        return;
+      }
+
+      if (msg.type === "dev") {
+        if (!devModeEnabled(this.env)) {
+          this.#send(connection, { type: "dev_result", ok: false, message: DEV_MODE_OFF_MESSAGE });
+          return;
+        }
+        const outcome = applyDevCommand(room, actorSeatId, msg.command, {
+          now,
+          mintSeatId,
+          mintSeatToken,
+          mintActionId: () => `dev:${nanoid()}`,
+        });
+        if (outcome.state !== room) {
+          await this.#commit(outcome.state, now);
+          await this.#pushState();
+        }
+        this.#send(connection, { type: "dev_result", ...outcome.reply });
+        // Whole-state frame for this one dev socket only, never #pushState.
+        const frame = devStateFrame(outcome.state);
+        if (frame !== null) this.#send(connection, frame);
         return;
       }
 

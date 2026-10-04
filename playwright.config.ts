@@ -76,7 +76,7 @@ export default defineConfig({
           },
         },
         {
-          command: `npx wrangler dev --port ${WORKER_PORT} --var SOCKET_STALE_MS:${E2E_SOCKET_STALE_MS} --var ZOMBIE_SWEEP_INTERVAL_MS:${E2E_ZOMBIE_SWEEP_INTERVAL_MS}`,
+          command: `npx wrangler dev --port ${WORKER_PORT} --var SOCKET_STALE_MS:${E2E_SOCKET_STALE_MS} --var ZOMBIE_SWEEP_INTERVAL_MS:${E2E_ZOMBIE_SWEEP_INTERVAL_MS} --var DEV_MODE:1`,
           cwd: "apps/worker",
           port: WORKER_PORT,
           reuseExistingServer: !process.env.CI,

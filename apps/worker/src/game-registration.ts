@@ -28,8 +28,8 @@ import type {
 } from "@games/rules";
 import { HANABI_GAME_ID, HanabiViewSchema } from "@games/schema/games/hanabi";
 import type { HanabiViewWire, HanabiErrorCode } from "@games/schema/games/hanabi";
-import { EXPEDITION_GAME_ID, ExpeditionViewSchema, ExpeditionConfigSchema } from "@games/schema/games/expedition";
-import type { ExpeditionViewWire, ExpeditionErrorCode } from "@games/schema/games/expedition";
+import { EXPEDITION_GAME_ID, ExpeditionViewSchema, ExpeditionConfigSchema, ExpeditionRunStateSchema } from "@games/schema/games/expedition";
+import type { ExpeditionViewWire, ExpeditionErrorCode, ExpeditionRunStateWire } from "@games/schema/games/expedition";
 import { VariantSchema, type GameErrorDetail, type GameId } from "@games/schema";
 import type { z } from "zod";
 
@@ -194,6 +194,21 @@ type _AssertExpeditionKeysMutuallyAssignable = [keyof ExpeditionView] extends [k
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _assertExpeditionKeysMutuallyAssignable: _AssertExpeditionKeysMutuallyAssignable = true;
 
+// Dev mode loads an edited RunState through ExpeditionRunStateSchema, so a
+// parsed value must be a RunState, with the same top-level keys. A RunState
+// redesign fails here until the schema follows it.
+type _AssertRunStateParses = [ExpeditionRunStateWire] extends [RunState] ? true : never;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _assertRunStateParses: _AssertRunStateParses = true;
+
+type _AssertRunStateKeys = [keyof RunState] extends [keyof ExpeditionRunStateWire]
+  ? [keyof ExpeditionRunStateWire] extends [keyof RunState]
+    ? true
+    : never
+  : never;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _assertRunStateKeys: _AssertRunStateKeys = true;
+
 // ---------------------------------------------------------------------------
 // The registry (D-08)
 // ---------------------------------------------------------------------------
@@ -212,6 +227,9 @@ export interface GameRegistryEntry {
   readonly configSchema: z.ZodType;
   readonly defaultConfig: unknown;
   readonly limits: { readonly min: number; readonly max: number };
+  /** Dev mode only: parses a whole edited game state before the adapter's
+   * `dev.check`. A game without one cannot load edited states. */
+  readonly devStateSchema?: z.ZodType;
   mapError(error: string): GameErrorDetail;
 }
 
@@ -230,6 +248,7 @@ export function defineGame<TState, TAction, TConfig, TEndResult, TError extends 
   configSchema: z.ZodType<TConfig>;
   defaultConfig: TConfig;
   limits: { min: number; max: number };
+  devStateSchema?: z.ZodType<TState>;
   mapError(error: TError): GameErrorDetail;
 }): GameRegistryEntry {
   return entry as unknown as GameRegistryEntry;
@@ -260,6 +279,7 @@ export const GAME_REGISTRY = Object.freeze({
     configSchema: ExpeditionConfigSchema,
     defaultConfig: null,
     limits: { min: 3, max: 5 }, // MGR-02
+    devStateSchema: ExpeditionRunStateSchema,
     mapError: mapExpeditionError,
   }),
 }) satisfies Readonly<Record<GameId, GameRegistryEntry>>;

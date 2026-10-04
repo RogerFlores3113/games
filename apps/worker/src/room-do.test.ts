@@ -568,6 +568,31 @@ describe("RoomDO integration (live wrangler dev)", () => {
     ws1.close();
   });
 
+  it("dev gate: a worker started without DEV_MODE refuses every dev command and changes nothing", async () => {
+    const code = mintRoomCode();
+    const ws1 = await openSocket(code);
+    const c1 = collectMessages(ws1);
+    send(ws1, { type: "join", displayName: "Alice", gameId: "expedition" });
+    await c1.waitFor((m) => m.type === "joined");
+
+    send(ws1, { type: "dev", command: { kind: "add-bot" } });
+    const refused = await c1.waitFor((m) => m.type === "dev_result");
+    expect(refused).toEqual({
+      type: "dev_result",
+      ok: false,
+      message: "Dev mode is off on this worker. Restart it with `wrangler dev --var DEV_MODE:1` (npm run dev in apps/worker).",
+    });
+    send(ws1, { type: "dev", command: { kind: "snapshot" } });
+    await c1.waitFor((m) => m.type === "dev_result" && m !== refused);
+    expect(c1.parsed.filter((m) => m.type === "dev_state")).toEqual([]);
+
+    send(ws1, { type: "set_config", config: null });
+    const after = await c1.waitFor((m) => m.type === "state", 5000);
+    expect((after.view as { seats: unknown[] }).seats).toHaveLength(1);
+
+    ws1.close();
+  });
+
   it("robustness: a join carrying an extra client-asserted key (seatId) yields an error message and the connection stays usable", async () => {
     const code = mintRoomCode();
     const ws1 = await openSocket(code);
