@@ -23,10 +23,18 @@ export const OBJECTIVE_RAMP: Readonly<Record<RunLength, readonly number[]>> = {
 /** Ordered pairs and trick-count slots appear from this camp on. */
 export const MIX_FROM_CAMP = 4;
 
+/** A route may mix in both an ordered pair and a trick-count slot only at a
+ * camp with at least this many seat slots. */
+export const BOTH_MIX_MIN_SLOTS = 4;
+
 export const SUPPLIES_START = 3;
 export const SUPPLIES_MAX = 4;
 /** Coins for one supply at the shop. */
 export const SUPPLY_PRICE = 6;
+/** Supplies a failed camp costs before items add to it (Heavy Pack). */
+export const FAILURE_COST = 1;
+
+export const PURSE_START = 0;
 
 export const PAYOUT = { base: 5, perUnplayedTrick: 1, unplayedCap: 3 } as const;
 
@@ -56,6 +64,11 @@ export const SHOP = { items: 3, upgradePrice: 8 } as const;
 
 /** Item slots a seat starts with; camp rules and passives move it. */
 export const ITEM_SLOTS = 2;
+
+/** Whispers each seat has per camp, before items add to it. */
+export const WHISPERS_PER_CAMP = 1;
+/** Extra whispers per camp for a seat that owns an upgrade. */
+export const WHISPERS_PER_UPGRADE = 1;
 
 /** Placeholder: an exactly-n slot draws N uniformly from this range. */
 export const TRICK_COUNT_N_RANGE = { min: 2, max: 4 } as const;

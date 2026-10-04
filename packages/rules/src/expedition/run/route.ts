@@ -6,7 +6,7 @@ import { EVENTS } from "../content/events/registry";
 import type { EventId } from "../content/events/event-def";
 import type { ModDef, ModId } from "../content/mods/mod-def";
 import type { ObjectiveSlot } from "../state";
-import { MIX_FROM_CAMP, NORMAL_WEATHER_CHANCE, OBJECTIVE_RAMP, ROUTE_OPTIONS } from "./balance";
+import { BOTH_MIX_MIN_SLOTS, MIX_FROM_CAMP, NORMAL_WEATHER_CHANCE, OBJECTIVE_RAMP, ROUTE_OPTIONS } from "./balance";
 import { campIndex } from "./plan";
 import { STREAMS, seededIndex } from "./rng";
 import { campSlots, pairingRuleFor } from "./stack";
@@ -79,7 +79,7 @@ function optionsAfter(seed: string, length: RunLength, cleared: CampIndex, catal
   const next = campIndex(cleared + 1);
   const count = ROUTE_OPTIONS.min + seededIndex(seed, STREAMS.routeCount(next), ROUTE_OPTIONS.max - ROUTE_OPTIONS.min + 1);
   const slotCount = OBJECTIVE_RAMP[length][next - 1]!;
-  const mixes: readonly Mix[] = next < MIX_FROM_CAMP ? ["plain"] : ["plain", "ordered", "trick-count", ...(slotCount >= 4 ? (["both"] as const) : [])];
+  const mixes: readonly Mix[] = next < MIX_FROM_CAMP ? ["plain"] : ["plain", "ordered", "trick-count", ...(slotCount >= BOTH_MIX_MIN_SLOTS ? (["both"] as const) : [])];
   const events = Object.keys(EVENTS).sort();
   return ROUTE_CHOICES.slice(0, count).map((id, i) => {
     const place = drawPlace(seed, next, i, catalog);

@@ -22,7 +22,7 @@
 // rule objects.
 
 import type { CoreRules } from "../rules";
-import { ITEM_SLOTS } from "./balance";
+import { FAILURE_COST, ITEM_SLOTS, WHISPERS_PER_CAMP, WHISPERS_PER_UPGRADE } from "./balance";
 import type { RunState } from "./types";
 
 /** A thing a camp rule may keep from a viewer. */
@@ -88,12 +88,12 @@ export const baseRunHooks: RunHooks = {
   whisperAudience(_run, _seatId, targetSeatId) {
     return [targetSeatId];
   },
-  /** One, and one more for a seat that owns an upgrade. */
   whispersPerCamp(run, seatId) {
-    return run.seats.some((seat) => seat.seatId === seatId && seat.upgradeId !== null) ? 2 : 1;
+    const upgraded = run.seats.some((seat) => seat.seatId === seatId && seat.upgradeId !== null);
+    return WHISPERS_PER_CAMP + (upgraded ? WHISPERS_PER_UPGRADE : 0);
   },
   failureCost(_run) {
-    return 1;
+    return FAILURE_COST;
   },
   itemSlots(_run, _seatId) {
     return ITEM_SLOTS;

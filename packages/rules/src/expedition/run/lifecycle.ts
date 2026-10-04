@@ -7,7 +7,7 @@ import { rulesFor } from "./compose";
 import { draftOfferFor } from "./draft";
 import { resolveTuned } from "../content/source-def";
 import { currentStamp, ownerOf } from "./usage";
-import { SUPPLIES_START, objectiveSlotsFor, payoutFor } from "./balance";
+import { PURSE_START, SUPPLIES_START, objectiveSlotsFor, payoutFor } from "./balance";
 import { bossAt, isFinalCamp } from "./plan";
 import { planOf, type CampSpec } from "./route";
 import { attemptSeed } from "./rng";
@@ -31,7 +31,7 @@ export function createRun(input: { seatIds: readonly string[]; seed: string }): 
     seed,
     seatIds: [...seatIds],
     seats,
-    purse: 0,
+    purse: PURSE_START,
     supplies: SUPPLIES_START,
     plan: null,
     history: [],
