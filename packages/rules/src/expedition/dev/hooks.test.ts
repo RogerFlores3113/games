@@ -28,6 +28,10 @@ describe("expeditionDevHooks", () => {
       ["give-item", "Crew"],
       ["set-upgrade", "Crew"],
       ["move-card", "Cards"],
+      ["void-last-trick", "Cards"],
+      ["reroll-route", "Run"],
+      ["set-route-swap", "Run"],
+      ["queue-offer", "Crew"],
       ["set-objective-owner", "Cards"],
     ]);
   });

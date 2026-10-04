@@ -87,6 +87,8 @@ function settleFailure(run: RunAt<"camp">, catalog: Catalog): RunState {
   return supplies === 0 ? { ...settled, stage: { tag: "ended", result: "lost" } } : openLoadout(settled, spec, catalog);
 }
 
+/** A cleared camp deals each seat the offer its composed draftShape names,
+ * behind any offer an ability queued. */
 function settleClear(run: RunAt<"camp">, catalog: Catalog): RunState {
   const spec = run.stage.camp;
   const coins = payoutFor(run.stage.attempt.camp);
@@ -99,14 +101,17 @@ function settleClear(run: RunAt<"camp">, catalog: Catalog): RunState {
   });
   const settled: RunState = { ...run, purse: run.purse + coins, seats: regained, history: [...run.history, result] };
   if (isFinalCamp(planOf(run), spec.index)) return { ...settled, stage: { tag: "ended", result: "won" } };
-  const seats = regained.map((seat) => ({ ...seat, offers: [draftOfferFor(run.seed, spec.index, seat, 0, catalog)] }));
+  const rules = rulesFor(run, catalog);
+  const seats = regained.map((seat) => ({ ...seat, offers: [...seat.offers, draftOfferFor(run.seed, spec.index, seat, 0, catalog, rules.draftShape(run, seat.seatId))] }));
   return { ...settled, seats, stage: { tag: "draft", cleared: spec.index, payout: coins } };
 }
 
-/** A failure spends rules.failureCost (computed before the attempt is torn
- * down) and reopens the loadout for the same spec, or ends the run at 0
- * supplies. A clear pays into the purse, regains pools, and deals every seat
- * a private draft offer, or wins the run at the final camp. */
+/** The camp-settled reactions run first, at the camp. A failure spends
+ * rules.failureCost (computed before the attempt is torn down) and reopens
+ * the loadout for the same spec, or ends the run at 0 supplies. A clear pays
+ * into the purse, regains pools, and deals every seat a private draft
+ * offer, or wins the run at the final camp. */
 export function settleCamp(run: RunAt<"camp">, status: CampResult["status"], catalog: Catalog): RunState {
-  return status === "failed" ? settleFailure(run, catalog) : settleClear(run, catalog);
+  const reacted = react(run, [{ type: "camp-settled", status }], catalog);
+  return status === "failed" ? settleFailure(reacted, catalog) : settleClear(reacted, catalog);
 }

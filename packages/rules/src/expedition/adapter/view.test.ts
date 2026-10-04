@@ -60,7 +60,7 @@ describe("toExpeditionPlayerView", () => {
     const own = toExpeditionPlayerView(run, "p0", CATALOG);
     const other = toExpeditionPlayerView(run, "p1", CATALOG);
 
-    expect(own.stage).toEqual({ tag: "draft", cleared: 2, payout: 6, yourOffer: { bundles: offer.bundles.map((b) => [...b]) }, pendingSeatIds: ["p0"] });
+    expect(own.stage).toEqual({ tag: "draft", cleared: 2, payout: 6, yourOffer: { kind: "standard", bundles: offer.bundles.map((b) => [...b]) }, pendingSeatIds: ["p0"] });
     expect(other.stage).toEqual({ tag: "draft", cleared: 2, payout: 6, yourOffer: null, pendingSeatIds: ["p0"] });
     expect(JSON.stringify(own).includes(seed)).toBe(false);
     expect(JSON.stringify(own).includes(JSON.stringify(queued.bundles))).toBe(false);

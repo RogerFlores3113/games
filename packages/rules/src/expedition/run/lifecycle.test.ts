@@ -325,7 +325,12 @@ describe("between camps: draft, route vote and event", () => {
     expect(run.stage.from).toBe(1);
     expect(run.stage.ballots).toEqual({});
     expect([2, 3]).toContain(run.stage.options.length);
-    expect(run.stage.options[0]).toEqual({ id: "a", next: { index: 2, location: "clifftop", weather: "fair", event: "event", slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }] } });
+    expect(run.stage.options[0]).toEqual({
+      id: "a",
+      next: { index: 2, location: "clifftop", weather: "fair", event: "event", slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }] },
+      reroll: 0,
+      swapBoss: null,
+    });
   });
 
   it("the last route ballot opens the chosen route's event, and the last ready opens its loadout", () => {

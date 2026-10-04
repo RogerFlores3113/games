@@ -133,6 +133,8 @@ export type ExpeditionGoalView = { id: string; status: ExpeditionObjectiveStatus
 
 /** A card that left a hand without being played. Public. */
 export type ExpeditionDiscardView = { card: ExpeditionCardView; afterTrick: number };
+/** A hallucination: the cards played, each back in its player's hand. */
+export type ExpeditionVoidedTrickView = { index: number; leaderSeatId: string; plays: { seatId: string; card: ExpeditionCardView }[] };
 
 // Deliberately no `audience` key: a reveal's audience-gating already
 // happened before this literal is ever built (only reveals addressed to the
@@ -181,6 +183,7 @@ export type ExpeditionCampView = {
   /** Camp-wide conditions beside the objectives; every one must be done. */
   goals: ExpeditionGoalView[];
   discards: ExpeditionDiscardView[];
+  voidedTricks: ExpeditionVoidedTrickView[];
   yourHand: ExpeditionRankedCardView[];
   yourLegalCardIds: string[];
   handSizes: ExpeditionHandSizeView[];
@@ -210,7 +213,9 @@ export type ExpeditionRemainingView =
   | { kind: "pool"; balance: number; max: number; cost: number }
   | { kind: "supplies"; cost: number }
   /** A crew token (the temple's skip): `left` of `earned` this attempt. */
-  | { kind: "crew"; left: number; earned: number };
+  | { kind: "crew"; left: number; earned: number }
+  /** Coins from the purse: the least a use costs, before its targets. */
+  | { kind: "coins"; cost: number };
 
 /** One owned item instance. `remaining` is null for a passive item. */
 export type ExpeditionItemView = { uid: string; itemId: string; remaining: ExpeditionRemainingView | null };
@@ -255,7 +260,16 @@ export type ExpeditionCampPreviewView = {
   slotKinds: ExpeditionSlotKindView[];
   bossId: string | null;
   shop: boolean;
+  /** The objectives the camp's next deal holds, for a seat that surveys; null otherwise. */
+  survey: ExpeditionSurveyedObjectiveView[] | null;
 };
+
+/** An objective a coming camp will deal, before anyone owns it. */
+export type ExpeditionSurveyedObjectiveView =
+  | { kind: "win-card"; target: ExpeditionCardIdentityView }
+  | { kind: "ordered"; target: ExpeditionCardIdentityView; order: number | "last" }
+  | { kind: "no-tricks" }
+  | { kind: "exactly-n"; n: number };
 
 export type ExpeditionStockView = {
   stockId: string;
@@ -306,8 +320,9 @@ export type ExpeditionStageView =
   | { tag: "muster"; ballots: ExpeditionBallotView[] }
   | { tag: "loadout"; camp: ExpeditionCampPreviewView; mods: ExpeditionModView[]; yourSlots: number; shop: ExpeditionShopView | null; readySeatIds: string[] }
   | { tag: "camp"; camp: ExpeditionCampPreviewView; mods: ExpeditionModView[]; attempt: ExpeditionAttemptView }
-  | { tag: "draft"; cleared: number; payout: number; yourOffer: { bundles: string[][] } | null; pendingSeatIds: string[] }
-  | { tag: "route"; options: { id: string; next: ExpeditionCampPreviewView }[]; ballots: ExpeditionBallotView[] }
+  | { tag: "draft"; cleared: number; payout: number; yourOffer: { kind: "standard" | "special"; bundles: string[][] } | null; pendingSeatIds: string[] }
+  /** `swapsBoss`: the option leads to a different boss at the next boss camp. */
+  | { tag: "route"; options: { id: string; next: ExpeditionCampPreviewView; swapsBoss: boolean }[]; ballots: ExpeditionBallotView[] }
   | { tag: "event"; event: string; next: ExpeditionCampPreviewView; readySeatIds: string[] }
   | { tag: "ended"; result: "won" | "lost" };
 

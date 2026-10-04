@@ -14,7 +14,7 @@ const body = (every: number): ModBody => ({
     legalPlays: (prev) => (state, seatId) => {
       const legal = prev(state, seatId);
       const suit = dammed(ctx, state.currentTrick.index, every);
-      if (suit === null) return legal;
+      if (suit === null || !ctx.affects(seatId)) return legal;
       const open = legal.filter((card) => card.identity.kind !== "standard" || card.identity.suit !== suit);
       // The dammed suit stays playable when no other suit is; a joker is never the only way out.
       return open.some((card) => card.identity.kind === "standard") ? open : legal;

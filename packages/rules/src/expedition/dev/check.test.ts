@@ -4,6 +4,8 @@ import { CATALOG } from "../run/catalog";
 import { attemptOf, withAttempt } from "../run/attempt";
 import { createRun } from "../run/lifecycle";
 import type { RunState } from "../run/types";
+import { campIndex } from "../run/plan";
+import { applyRunAction } from "../run/stages/registry";
 import { checkRunState } from "./check";
 import { DEV_SHORTCUTS } from "./shortcuts";
 
@@ -107,5 +109,29 @@ describe("checkRunState", () => {
     if (run.stage.tag !== "camp") throw new Error("expected a camp");
     const odd: RunState = { ...run, stage: { ...run.stage, camp: { ...run.stage.camp, location: "rain", weather: "volcano" } } };
     expect(checkRunState(odd, CATALOG)).toEqual(["the loadout or camp: rain is not a location", "the loadout or camp: volcano is not a weather"]);
+  });
+});
+
+describe("checkRunState: the character seams' fields", () => {
+  it("flags a route swap to a boss of another tier, and a negative reroll", () => {
+    let run = DEV_SHORTCUTS["force-camp"].apply(dealt(), { outcome: "cleared" }, CATALOG);
+    while (run.stage.tag === "draft") {
+      const seat = run.seats.find((s) => s.offers.length > 0)!;
+      const picked = applyRunAction(run, seat.seatId, { type: "pick-bundle", bundle: 0 }, CATALOG);
+      if (!picked.ok) throw new Error(picked.error);
+      run = picked.state;
+    }
+    if (run.stage.tag !== "route") throw new Error("expected the route vote");
+    const options = run.stage.options.map((o, i) => (i === 0 ? { ...o, reroll: -1, swapBoss: { at: campIndex(o.next.index + 1), modId: "tornado" } } : o));
+    const broken: RunState = { ...run, stage: { ...run.stage, options } };
+    expect(checkRunState(broken, CATALOG)).toEqual(["route a: reroll must be a non-negative whole number, got -1", "route a: swaps in tornado, not an animal boss"]);
+  });
+
+  it("flags a hallucination naming a card dealt in no camp", () => {
+    const run = dealt();
+    const camp = attemptOf(run)!.camp;
+    const card = { id: "zzzzzzzz", identity: camp.hands[0]!.cards[0]!.identity };
+    const broken = withAttempt(run, { ...attemptOf(run)!, camp: { ...camp, voidedTricks: [{ index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card }] }], currentTrick: { ...camp.currentTrick, index: 1 } } });
+    expect(checkRunState(broken, CATALOG)).toContain("hallucination at trick 1 names card zzzzzzzz, not in this camp");
   });
 });

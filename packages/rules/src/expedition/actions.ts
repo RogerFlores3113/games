@@ -64,6 +64,18 @@ function applyPlayCard(state: CampState, actorSeatId: string, cardId: string, ru
     return { ok: true, state: { ...state, hands, currentTrick }, events };
   }
 
+  if (rules.voidsTrick(state, plays)) {
+    // A hallucination: each card goes back to the hand that played it, nobody
+    // wins, and the same leader leads the next trick.
+    const restored = hands.map((h) => ({ seatId: h.seatId, cards: [...h.cards, ...plays.filter((p) => p.seatId === h.seatId).map((p) => p.card)] }));
+    const leaderSeatId = state.currentTrick.leaderSeatId;
+    const voidedTricks = [...state.voidedTricks, { index: trickIndex, leaderSeatId, plays }];
+    const currentTrick: CurrentTrick = { index: trickIndex + 1, leaderSeatId, plays: [] };
+    events.push({ type: "trick-voided", trickIndex, leaderSeatId });
+    events.push({ type: "trick-started", trickIndex: trickIndex + 1, leaderSeatId });
+    return { ok: true, state: { ...state, hands: restored, voidedTricks, currentTrick }, events };
+  }
+
   // The last seat's play completes the trick — resolve it and open the next
   // trick, never playing a card for anyone (XRULE-08).
   const resolved = resolveTrick(plays, rules);

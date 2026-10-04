@@ -129,6 +129,9 @@ function withLedger(state: RunState, seatId: string, extra: readonly LedgerEntry
   return { ...state, seats: state.seats.map((s) => (s.seatId === seatId ? { ...s, ledger: [...s.ledger, ...extra] } : s)) };
 }
 
+/** Target kinds unit 12 added for the nine characters; unit 13's characters use them. */
+const AWAITING_CHARACTERS = ["item", "route-option", "fanned-card", "objective-value", "option"];
+
 const USABLE = new Map<string, RunState>(ACTIVE_SOURCES.map((def) => [def.id, findUsable(def)]));
 
 describe("source shape", () => {
@@ -169,9 +172,9 @@ describe("source shape", () => {
     expect(Number.isInteger(def.price) && def.price > 0).toBe(true);
   });
 
-  it("the catalogue uses every one of the twelve target kinds", () => {
+  it("the catalogue uses every target kind but those added for the nine characters", () => {
     const used = new Set(ACTIVE_SOURCES.flatMap((def) => def.active!.targets.map((spec) => spec.kind)));
-    expect([...used].sort()).toEqual(Object.keys(TARGET_KINDS).sort());
+    expect([...used].sort()).toEqual(Object.keys(TARGET_KINDS).filter((kind) => !AWAITING_CHARACTERS.includes(kind)).sort());
   });
 });
 

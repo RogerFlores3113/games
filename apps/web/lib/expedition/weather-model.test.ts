@@ -24,7 +24,7 @@ function campView(weather: string, mods: ExpeditionModView[], trick = 0, removed
     lastVote: null,
     stage: {
       tag: "camp",
-      camp: { index: 2, location: "clifftop", weather, pairing: null, event: null, slotKinds: [], bossId: null, shop: false },
+      camp: { index: 2, location: "clifftop", weather, pairing: null, event: null, slotKinds: [], bossId: null, shop: false, survey: null },
       mods,
       attempt: { attemptNumber: 1, camp: { currentTrick: { index: trick }, removedCards } } as never,
     },

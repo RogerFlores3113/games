@@ -62,7 +62,7 @@ describe("Cave", () => {
     const rules = rulesFor(first.run, CATALOG);
     const camp = attemptOf(first.run)!.camp;
     const viewer = SEATS.find((s) => s !== first.seatId)!;
-    const scope = (seatId: string) => ({ run: first.run, seatId, camp, rules });
+    const scope = (seatId: string) => ({ run: first.run, seatId, camp, rules, catalog: CATALOG });
     expect(choicesFor(scope(viewer), { kind: "card", where: "board" })).toEqual([]);
     expect(choicesFor(scope(first.seatId), { kind: "card", where: "board" }).map((c) => c.id)).toEqual([`card:${first.cardId}`]);
   });
@@ -139,7 +139,7 @@ describe("Flooding", () => {
     objectiveDeck: [],
     completedTricks: Array.from({ length: played }, (_, index) => ({ index, leaderSeatId: "p0", plays: [], winnerSeatId: "p0" })),
     currentTrick: { index: played, leaderSeatId: "p0", plays: [] },
-    discards: [],
+    discards: [], voidedTricks: [],
   });
 
   it("rain in the cave adds the flood beside the dark and the rain", () => {

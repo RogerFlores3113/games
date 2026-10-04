@@ -59,7 +59,7 @@ function table(
     objectives: [...(parts.objectives ?? [WAITING])],
     objectiveDeck: [],
     completedTricks: Array.from({ length: done }, (_, i) => filler(i)),
-    discards: [],
+    discards: [], voidedTricks: [],
     currentTrick: { index: done, leaderSeatId: parts.leader ?? "p0", plays: [...(parts.plays ?? [])] },
   };
   return { ...loadout, stage: { tag: "camp", camp: loadout.stage.camp, attempt: { attemptNumber: 1, effects: [], reveals: [], log: [], camp } } };

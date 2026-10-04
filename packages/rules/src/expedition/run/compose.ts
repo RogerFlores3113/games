@@ -3,9 +3,10 @@
 // COMPOSITION ORDER: base -> each camp-stack layer's `rules` (location,
 // weather, pairing, boss) -> each seat's live passives (seat order, then
 // [character, upgrade, ...equipped] order) -> live effects (in the order
-// stored on the attempt). Bosses fold after weather so a boss can refine a
-// weather; passives fold after both so an item can lift a camp rule for its
-// owner (Mosquito Net under Rain); effects win last. Every layer's
+// stored on the attempt) -> the passives marked foldsLast. Bosses fold after
+// weather so a boss can refine a weather; passives fold after both so an
+// item can lift a camp rule for its owner (Mosquito Net under Rain);
+// effects win over them, and a foldsLast passive over everything. Every layer's
 // RuleModifier maps the PREVIOUS layer's answer to its own, per hook.
 //
 // THE CARD-READING HOOKS ARE FOLDED FIRST, separately from every other hook
@@ -88,45 +89,52 @@ function effectLayer(run: RunState, effect: ActiveEffect, catalog: Catalog): Rul
   const toLayer = bodyOf(def, origin.strength).effect;
   const spec = specOf(run);
   if (toLayer === undefined || spec === null) throw new Error(`ruleLayersFor: effect from "${origin.modId}" has no body.effect`);
-  return toLayer(effect, modCtx(run, spec, { def, strength: origin.strength }));
+  return toLayer(effect, modCtx(run, spec, { def, strength: origin.strength }, catalog));
+}
+
+/** Each seat's live passives, in seat order and then [character, upgrade,
+ * ...equipped] order; `last` picks the passives that fold after the effects. */
+function passiveLayers(run: RunState, catalog: Catalog, last: boolean): RuleModifier[] {
+  return run.seats.flatMap((seat) => {
+    const owner = ownerOf(seat);
+    return liveSourceKeys(seat).flatMap((key) => {
+      const passive = defOfKey(seat, key, catalog).passive;
+      return passive === undefined || (passive.foldsLast === true) !== last ? [] : [passive.modifier(owner)];
+    });
+  });
+}
+
+/** The attempt's live effects, in stored order; `seatOnly` drops the camp
+ * modifiers' own. */
+function effectLayers(run: RunState, catalog: Catalog, seatOnly: boolean): RuleModifier[] {
+  const attempt = attemptOf(run);
+  if (attempt === null) return [];
+  const trickIndex = attempt.camp.currentTrick.index;
+  // A trick-scoped effect bends only the trick it was stamped with:
+  // applyCampAction resolves trickWinner while currentTrick.index still
+  // equals atTrick, and the next trick's index drops the layer.
+  return attempt.effects
+    .filter((effect) => !(effect.lasts === "trick" && effect.atTrick !== trickIndex) && !(seatOnly && effect.origin.kind === "mod"))
+    .map((effect) => effectLayer(run, effect, catalog));
 }
 
 /** Builds the ordered layer list for `run` under `catalog`: each camp-stack
  * layer's `rules` -> each seat's live passives (seat order, then
  * [character, upgrade, ...equipped] order) -> each live attempt effect's
- * layer, in attempt.effects order. Throws a named Error for any id missing
- * from the catalog (POLICY A3). */
+ * layer, in attempt.effects order -> the passives marked `foldsLast`, so a
+ * rule that must have the last word (Momentum's whisper count) gets it.
+ * Throws a named Error for any id missing from the catalog (POLICY A3). */
 export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
-  const layers: RuleModifier[] = [];
-
   const spec = specOf(run);
-  if (spec !== null) {
-    for (const layer of campStack(run, catalog)) {
-      if (layer.body.rules !== undefined) layers.push(layer.body.rules(modCtx(run, spec, layer)));
-    }
-  }
+  const stack = spec === null ? [] : campStack(run, catalog).flatMap((layer) => (layer.body.rules === undefined ? [] : [layer.body.rules(modCtx(run, spec, layer, catalog))]));
+  return [...stack, ...passiveLayers(run, catalog, false), ...effectLayers(run, catalog, false), ...passiveLayers(run, catalog, true)];
+}
 
-  for (const seat of run.seats) {
-    const owner = ownerOf(seat);
-    for (const key of liveSourceKeys(seat)) {
-      const passive = defOfKey(seat, key, catalog).passive;
-      if (passive !== undefined) layers.push(passive.modifier(owner));
-    }
-  }
-
-  const attempt = attemptOf(run);
-  if (attempt !== null) {
-    const trickIndex = attempt.camp.currentTrick.index;
-    for (const effect of attempt.effects) {
-      // A trick-scoped effect bends only the trick it was stamped with:
-      // applyCampAction resolves trickWinner while currentTrick.index still
-      // equals atTrick, and the next trick's index drops the layer.
-      if (effect.lasts === "trick" && effect.atTrick !== trickIndex) continue;
-      layers.push(effectLayer(run, effect, catalog));
-    }
-  }
-
-  return layers;
+/** The rules the seats alone make: passives and seat effects, without the
+ * camp modifiers. A camp modifier asks these (`ctx.affects`) while its own
+ * layer is being built. */
+export function seatRulesFor(run: RunState, catalog: Catalog): RunRules {
+  return composeRules([...passiveLayers(run, catalog, false), ...effectLayers(run, catalog, true), ...passiveLayers(run, catalog, true)]);
 }
 
 /** The single entry point every later Phase 10 plan calls: RunRules composed

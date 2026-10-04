@@ -96,6 +96,8 @@ function limitBadge(limit: UsageLimit, character: CharacterDef | null): string {
     }
     case "supplies":
       return `${limit.cost} ${limit.cost === 1 ? "supply" : "supplies"}`;
+    case "coins":
+      return "Costs coins";
     case "crew-tokens":
       return "Crew token";
   }

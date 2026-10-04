@@ -57,7 +57,7 @@ function camp(parts: Partial<CampState>): CampState {
     objectives: [],
     objectiveDeck: [],
     completedTricks: [],
-    discards: [],
+    discards: [], voidedTricks: [],
     currentTrick: { index: 0, leaderSeatId: "p0", plays: [] },
     ...parts,
   };
@@ -109,7 +109,7 @@ describe("Rats", () => {
     const atEvent: RunState = {
       ...run,
       plan: { ...run.plan!, bosses: [{ at: campIndex(3), tier: "animal", modId: "rats" }] },
-      stage: { tag: "event", route: { id: "a", next }, ready: {} },
+      stage: { tag: "event", route: { id: "a", next, reroll: 0, swapBoss: null }, ready: {} },
     };
     const loadout = SEATS.reduce<RunState>((acc, seatId) => {
       const result = applyRunAction(acc, seatId, { type: "ready" }, CATALOG);
@@ -222,7 +222,7 @@ describe("planned bosses", () => {
     expect(atLoadout.plan[0]).toEqual({ at: 3, tier: "animal", bossId: null });
     expect(seen(atLoadout)).toBe(false);
 
-    const atRoute: RunState = { ...run, stage: { tag: "route", from: campIndex(2), options: [{ id: "a", next: campSpecAt("horizon", "standard", campIndex(3), CATALOG) }], ballots: {} } };
+    const atRoute: RunState = { ...run, stage: { tag: "route", from: campIndex(2), options: [{ id: "a", next: campSpecAt("horizon", "standard", campIndex(3), CATALOG), reroll: 0, swapBoss: null }], ballots: {} } };
     const routeView = toExpeditionPlayerView(atRoute, "p0", CATALOG);
     expect(routeView.plan[0]!.bossId).toBe(boss);
     expect(routeView.stage.tag === "route" && routeView.stage.options[0]!.next.bossId).toBe(boss);

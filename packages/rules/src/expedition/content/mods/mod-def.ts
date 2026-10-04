@@ -29,6 +29,9 @@ export type ModCtx = {
   /** Seeded 0..n-1 on expedition-mod:{id}:{strength}:camp{k}:attempt{a}:rule:{label}.
    * The same label gives the same value within an attempt. */
   roll(label: string, n: number): number;
+  /** Whether this modifier's effect aimed at `seatId` reaches it (the
+   * seats' composed affectsSeat). A boss asks before it singles a seat out. */
+  affects(seatId: string): boolean;
 };
 
 export type ReactionCtx<E extends EngineEventType = EngineEventType> = ModCtx & {

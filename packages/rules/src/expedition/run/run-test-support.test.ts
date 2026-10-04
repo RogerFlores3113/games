@@ -167,7 +167,7 @@ describe("enumerateLegalRunActions", () => {
     const next = base.stage.tag === "loadout" ? base.stage.camp : null;
     const run: RunState = {
       ...base,
-      stage: { tag: "route", from: campIndex(1), options: [{ id: "a", next: next! }, { id: "b", next: next! }], ballots: { p0: "a" } },
+      stage: { tag: "route", from: campIndex(1), options: [{ id: "a", next: next!, reroll: 0, swapBoss: null }, { id: "b", next: next!, reroll: 0, swapBoss: null }], ballots: { p0: "a" } },
     };
     const votes = enumerateLegalRunActions(run, catalog);
     expect(votes.filter((c) => c.seatId === "p0")).toEqual([]);

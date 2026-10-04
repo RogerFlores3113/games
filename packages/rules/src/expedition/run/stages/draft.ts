@@ -1,10 +1,12 @@
 import { mintItems } from "../items";
 import { routeOptions } from "../route";
+import { useAbility } from "../abilities";
 import { err, ok, type StageDef } from "./stage-def";
 
 /** Each seat with an offer takes one bundle of its head offer. */
 export const draft: StageDef<"draft"> = {
   on: {
+    "use-ability": (run, seatId, action, catalog) => useAbility(run, seatId, action.sourceKey, action.targets, catalog),
     "pick-bundle": (run, seatId, action, catalog) => {
       const seat = run.seats.find((s) => s.seatId === seatId)!;
       const bundle = seat.offers[0]?.bundles[action.bundle];

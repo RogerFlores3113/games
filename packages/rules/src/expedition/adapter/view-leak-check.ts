@@ -25,6 +25,7 @@ import { CATALOG } from "../run/catalog";
 import { attemptOf } from "../run/attempt";
 import { rulesFor } from "../run/compose";
 import { horizon } from "../run/plan";
+import { surveyObjectives, surveyedCamps } from "../run/survey";
 import type { AttemptState, Catalog, RunState } from "../run/types";
 import type { CardIdentity } from "../state";
 
@@ -40,7 +41,7 @@ export interface ExpeditionSeatSecrets {
    * seed). */
   readonly forbiddenTokens: readonly string[];
   /** This seat's own head draft offer (null if unseated or none due). */
-  readonly ownDraft: { readonly bundles: readonly (readonly string[])[] } | null;
+  readonly ownDraft: { readonly kind: "standard" | "special"; readonly bundles: readonly (readonly string[])[] } | null;
   /** Other seats' offers' bundle lists, as JSON, that this view must never
    * carry (an equal copy of the viewer's own is not counted). */
   readonly foreignOffers: readonly string[];
@@ -49,6 +50,9 @@ export interface ExpeditionSeatSecrets {
   /** Seats whose loadout is kept from this viewer (Heavy fog): their
    * `items.backpack` must be null. */
   readonly concealedSeatIds: readonly string[];
+  /** Whether this seat may see a coming camp's objectives; otherwise every
+   * preview's `survey` must be null. */
+  readonly surveys: boolean;
 }
 
 /** Keys a view object literal must never carry, at ANY nesting level. */
@@ -128,6 +132,8 @@ export function secretsForExpeditionSeat(
   const rules = rulesFor(state, catalog);
   const camp = attempt?.camp;
   if (camp !== undefined) {
+    // A hallucination's cards were played face up, so their ids are public.
+    const shownInVoided = new Set(camp.voidedTricks.flatMap((voided) => voided.plays.map((play) => play.card.id)));
     for (const hand of camp.hands) {
       if (hand.seatId === seatId) {
         if (seated) {
@@ -140,7 +146,7 @@ export function secretsForExpeditionSeat(
         continue;
       }
       for (const card of hand.cards) {
-        if (!revealedToViewer.has(card.id) && !namedByVisibleEffects.has(card.id)) hiddenIds.push(card.id);
+        if (!revealedToViewer.has(card.id) && !namedByVisibleEffects.has(card.id) && !shownInVoided.has(card.id)) hiddenIds.push(card.id);
       }
     }
 
@@ -167,6 +173,8 @@ export function secretsForExpeditionSeat(
       } else if (!revealedToViewer.has(play.card.id)) hiddenIds.push(play.card.id);
     });
     for (const discard of camp.discards) bump(discard.card.identity);
+    // A hallucination was played face up; its cards are back in their hands.
+    for (const voided of camp.voidedTricks) for (const play of voided.plays) bump(play.card.identity);
 
     for (const identity of camp.removedCards) bump(identity);
 
@@ -190,14 +198,28 @@ export function secretsForExpeditionSeat(
     }
   }
 
-  // A planned boss is a secret until a route preview leads the crew to its camp.
+  // A planned boss is a secret until a route preview leads the crew to its
+  // camp, and so is the boss a route option would swap in further on.
   for (const boss of state.plan?.bosses ?? []) {
     if (boss.modId !== null && boss.tier !== "temple" && boss.at > horizon(state)) hiddenIds.push(boss.modId);
+  }
+  for (const option of state.stage.tag === "route" ? state.stage.options : []) {
+    if (option.swapBoss !== null && option.swapBoss.at > horizon(state)) hiddenIds.push(option.swapBoss.modId);
+  }
+
+  // A seat that surveys sees each previewed camp's coming objectives.
+  const surveys = seated && rules.surveys(state, seatId);
+  if (surveys) {
+    for (const surveyed of surveyedCamps(state)) {
+      for (const objective of surveyObjectives(surveyed, catalog)) {
+        if (objective.kind === "win-card" || objective.kind === "ordered") bump(objective.target);
+      }
+    }
   }
 
   const forbiddenTokens = seed !== undefined ? [seed] : [];
   const ownHead = seated ? ownSeat?.offers[0] : undefined;
-  const ownDraft = ownHead === undefined ? null : { bundles: ownHead.bundles };
+  const ownDraft = ownHead === undefined ? null : { kind: ownHead.kind, bundles: ownHead.bundles };
   const ownJson = ownDraft === null ? null : JSON.stringify(ownDraft.bundles);
   const foreignOffers = state.seats
     .filter((seat) => !seated || seat.seatId !== seatId)
@@ -211,7 +233,7 @@ export function secretsForExpeditionSeat(
           (entry) => entry.audience === "public" || (seated && entry.audience.includes(seatId)),
         ).length;
 
-  return { hiddenIds, allowedIdentityCounts: counts, forbiddenTokens, ownDraft, foreignOffers, visibleLogEntryCount, concealedSeatIds };
+  return { hiddenIds, allowedIdentityCounts: counts, forbiddenTokens, ownDraft, foreignOffers, visibleLogEntryCount, concealedSeatIds, surveys };
 }
 
 /** Recursively walks `subtree`, collecting structural leak reasons: any
@@ -220,10 +242,10 @@ export function secretsForExpeditionSeat(
  * equal to a hiddenIds entry, and any array equal to another seat's offer's
  * bundles. Uses Object.keys/the `in` operator (key presence), never a
  * truthiness/undefined comparison. */
-function walkStructural(subtree: unknown, hiddenIds: ReadonlySet<string>, foreignOffers: ReadonlySet<string>, reasons: Set<string>): void {
+function walkStructural(subtree: unknown, hiddenIds: ReadonlySet<string>, foreignOffers: ReadonlySet<string>, surveys: boolean, reasons: Set<string>): void {
   if (Array.isArray(subtree)) {
     if (foreignOffers.size > 0 && foreignOffers.has(JSON.stringify(subtree))) reasons.add("structural:foreign-offer");
-    for (const item of subtree) walkStructural(item, hiddenIds, foreignOffers, reasons);
+    for (const item of subtree) walkStructural(item, hiddenIds, foreignOffers, surveys, reasons);
     return;
   }
   if (typeof subtree === "string") {
@@ -240,9 +262,10 @@ function walkStructural(subtree: unknown, hiddenIds: ReadonlySet<string>, foreig
       reasons.add(`structural:forbidden-key:${key}`);
     }
   }
+  if (!surveys && "survey" in obj && obj.survey !== null) reasons.add("structural:survey");
 
   for (const value of Object.values(obj)) {
-    walkStructural(value, hiddenIds, foreignOffers, reasons);
+    walkStructural(value, hiddenIds, foreignOffers, surveys, reasons);
   }
 }
 
@@ -282,7 +305,7 @@ export function checkExpeditionViewForLeaks(input: {
 }): string[] {
   const reasons = new Set<string>();
   const hiddenIds = new Set(input.secrets.hiddenIds);
-  walkStructural(input.view, hiddenIds, new Set(input.secrets.foreignOffers), reasons);
+  walkStructural(input.view, hiddenIds, new Set(input.secrets.foreignOffers), input.secrets.surveys, reasons);
 
   const counts = new Map<string, number>();
   collectIdentityCounts(input.view, counts);

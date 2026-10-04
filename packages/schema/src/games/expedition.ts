@@ -164,6 +164,13 @@ const GoalViewSchema = z.strictObject({ id: z.string().min(1), status: Objective
 
 const DiscardViewSchema = z.strictObject({ card: CardViewSchema, afterTrick: z.number().int().min(0) });
 
+// A hallucination: the cards it showed, each back in its player's hand.
+const VoidedTrickViewSchema = z.strictObject({
+  index: z.number().int().min(0),
+  leaderSeatId: z.string().min(1),
+  plays: z.array(z.strictObject({ seatId: z.string().min(1), card: CardViewSchema })),
+});
+
 // Deliberately no `audience` key: a reveal's audience-gating already happened
 // before this shape is ever populated (only reveals addressed to the viewer
 // are mapped at all).
@@ -186,7 +193,7 @@ const LogEntryViewSchema = z.strictObject({
   private: z.boolean(),
 });
 
-const ActiveWindowSchema = z.enum(["objective-pick", "between-tricks", "in-trick", "rescue"]);
+const ActiveWindowSchema = z.enum(["objective-pick", "between-tricks", "in-trick", "rescue", "loadout", "draft", "route"]);
 
 const TargetKindSchema = z.enum([
   "self",
@@ -201,6 +208,11 @@ const TargetKindSchema = z.enum([
   "card-value",
   "board",
   "supplies",
+  "item",
+  "route-option",
+  "fanned-card",
+  "objective-value",
+  "option",
 ]);
 
 const StrengthSchema = z.enum(["full", "half"]);
@@ -228,6 +240,7 @@ const CampViewSchema = z.strictObject({
   objectives: z.array(ObjectiveViewSchema),
   goals: z.array(GoalViewSchema),
   discards: z.array(DiscardViewSchema),
+  voidedTricks: z.array(VoidedTrickViewSchema),
   yourHand: z.array(RankedCardViewSchema),
   yourLegalCardIds: z.array(z.string().min(1)),
   handSizes: z.array(HandSizeViewSchema),
@@ -254,6 +267,7 @@ const RemainingViewSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("pool"), balance: z.number().int(), max: z.number().int().min(0), cost: z.number().int().min(0) }),
   z.strictObject({ kind: z.literal("supplies"), cost: z.number().int().min(0) }),
   z.strictObject({ kind: z.literal("crew"), left: z.number().int().min(0), earned: z.number().int().min(0) }),
+  z.strictObject({ kind: z.literal("coins"), cost: z.number().int().min(0) }),
 ]);
 
 // `remaining` is null for a passive item.
@@ -304,6 +318,14 @@ const CampResultViewSchema = z.strictObject({
 
 const RunLengthSchema = z.enum(["short", "standard", "long"]);
 
+// An objective a coming camp will deal, shown only to a seat that surveys.
+const SurveyedObjectiveViewSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("win-card"), target: CardIdentityViewSchema }),
+  z.strictObject({ kind: z.literal("ordered"), target: CardIdentityViewSchema, order: z.union([z.number().int().min(1), z.literal("last")]) }),
+  z.strictObject({ kind: z.literal("no-tricks") }),
+  z.strictObject({ kind: z.literal("exactly-n"), n: z.number().int().min(0) }),
+]);
+
 const CampPreviewViewSchema = z.strictObject({
   index: CampIndexSchema,
   location: z.string().min(1),
@@ -313,6 +335,7 @@ const CampPreviewViewSchema = z.strictObject({
   slotKinds: z.array(z.enum(["win-card", "ordered", "no-tricks", "exactly-n", "trick-count"])),
   bossId: z.string().min(1).nullable(),
   shop: z.boolean(),
+  survey: z.array(SurveyedObjectiveViewSchema).nullable(),
 });
 
 const StockViewSchema = z.strictObject({
@@ -379,12 +402,12 @@ const StageViewSchema = z.discriminatedUnion("tag", [
     tag: z.literal("draft"),
     cleared: CampIndexSchema,
     payout: z.number().int().min(0),
-    yourOffer: z.strictObject({ bundles: z.array(z.array(z.string().min(1))) }).nullable(),
+    yourOffer: z.strictObject({ kind: z.enum(["standard", "special"]), bundles: z.array(z.array(z.string().min(1))) }).nullable(),
     pendingSeatIds: z.array(z.string().min(1)),
   }),
   z.strictObject({
     tag: z.literal("route"),
-    options: z.array(z.strictObject({ id: z.string().min(1), next: CampPreviewViewSchema })),
+    options: z.array(z.strictObject({ id: z.string().min(1), next: CampPreviewViewSchema, swapsBoss: z.boolean() })),
     ballots: z.array(BallotViewSchema),
   }),
   z.strictObject({ tag: z.literal("event"), event: z.string().min(1), next: CampPreviewViewSchema, readySeatIds: z.array(z.string().min(1)) }),

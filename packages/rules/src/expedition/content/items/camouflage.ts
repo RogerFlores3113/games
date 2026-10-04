@@ -12,7 +12,7 @@ export const camouflage = defineItem({
   active: itemAbility({
     window: "between-tricks",
     targets: [{ kind: "objective", whose: "mine" }],
-    canUse: (ctx) => (countTricksWon(ctx.camp, ctx.self) > 0 ? "You have already won a trick this camp" : true),
+    canUse: (ctx) => (countTricksWon(ctx.camp!, ctx.self) > 0 ? "You have already won a trick this camp" : true),
     apply: (ctx) => [
       { op: "remove-objective", objectiveId: ctx.targets[0].objective.id },
       { op: "add-modifier", lasts: "attempt", audience: "public", params: {} },

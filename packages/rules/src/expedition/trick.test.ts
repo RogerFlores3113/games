@@ -217,7 +217,7 @@ describe("generic trump predicate (WR-03)", () => {
         leaderSeatId: "p0",
         plays: [{ seatId: "p1", card: heartsFive }],
       },
-      discards: [],
+      discards: [], voidedTricks: [],
     };
     expect(rules.legalPlays(state, "p0")).toEqual([heartsThree]);
   });

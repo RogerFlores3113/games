@@ -9,7 +9,8 @@
 // COMPOSITION ORDER (spec §6.1, "each hook receives the previous layer's
 // answer"): base -> camp-stack layers (location, weather, pairing, boss) ->
 // live passives (seat order, then each seat's [character, upgrade,
-// ...equipped] order) -> active effects (in the order they were added).
+// ...equipped] order) -> active effects (in the order they were added) ->
+// the passives marked foldsLast.
 // A RuleModifier is a function from the previous layer's hook to this
 // layer's hook; composing a full RunRules means folding every layer's
 // RuleModifier, hook by hook, in that fixed order.
@@ -23,7 +24,8 @@
 
 import type { CoreRules } from "../rules";
 import { FAILURE_COST, ITEM_SLOTS, WHISPERS_PER_CAMP, WHISPERS_PER_UPGRADE } from "./balance";
-import type { RunState } from "./types";
+import { BASE_DRAFT_SHAPE, type DraftShape } from "./draft";
+import type { Origin, RunState, SourceKey } from "./types";
 
 /** A thing a camp rule may keep from a viewer. */
 export type Concealable =
@@ -43,6 +45,26 @@ export type RunHooks = {
   whispersPerCamp(run: RunState, seatId: string): number;
   failureCost(run: RunState): number;
   itemSlots(run: RunState, seatId: string): number;
+  /** Percent chance of fair weather on a route, given the location's own. */
+  normalWeatherChance(run: RunState, chance: number): number;
+  /** How many options a route vote offers, given the seeded count (1 to 3). */
+  routeOptionCount(run: RunState, count: number): number;
+  /** Whether route option `option` (0-based) leads to a different boss at
+   * the next animal or disaster boss camp. */
+  swapsBoss(run: RunState, option: number): boolean;
+  /** The offer a seat is dealt after a cleared camp. */
+  draftShape(run: RunState, seatId: string): DraftShape;
+  /** What `seatId` pays at the shop for something listed at `price`. */
+  shopPrice(run: RunState, seatId: string, price: number): number;
+  /** Whether a camp modifier's effect aimed at `seatId` reaches it. Camp
+   * modifiers ask it through `ctx.affects`, which folds the seat layers
+   * only, since the modifiers' own layers are being built. */
+  affectsSeat(run: RunState, seatId: string, origin: Origin): boolean;
+  /** Whether this use of `sourceKey` is free: it counts against no limit
+   * and spends nothing. */
+  freeUse(run: RunState, seatId: string, sourceKey: SourceKey): boolean;
+  /** Whether `seatId` sees the objectives a coming camp will deal. */
+  surveys(run: RunState, seatId: string): boolean;
 };
 
 export type RunRules = CoreRules & RunHooks;
@@ -74,6 +96,16 @@ const HOOK_NAME_SET: Record<HookName, true> = {
   whispersPerCamp: true,
   failureCost: true,
   itemSlots: true,
+  voidsTrick: true,
+  objectivePicker: true,
+  normalWeatherChance: true,
+  routeOptionCount: true,
+  swapsBoss: true,
+  draftShape: true,
+  shopPrice: true,
+  affectsSeat: true,
+  freeUse: true,
+  surveys: true,
 };
 
 export const HOOK_NAMES: readonly HookName[] = Object.keys(HOOK_NAME_SET) as HookName[];
@@ -97,5 +129,29 @@ export const baseRunHooks: RunHooks = {
   },
   itemSlots(_run, _seatId) {
     return ITEM_SLOTS;
+  },
+  normalWeatherChance(_run, chance) {
+    return chance;
+  },
+  routeOptionCount(_run, count) {
+    return count;
+  },
+  swapsBoss(_run, _option) {
+    return false;
+  },
+  draftShape(_run, _seatId) {
+    return BASE_DRAFT_SHAPE;
+  },
+  shopPrice(_run, _seatId, price) {
+    return price;
+  },
+  affectsSeat(_run, _seatId, _origin) {
+    return true;
+  },
+  freeUse(_run, _seatId, _sourceKey) {
+    return false;
+  },
+  surveys(_run, _seatId) {
+    return false;
   },
 };

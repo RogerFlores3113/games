@@ -51,13 +51,14 @@ const CampStateSchema = z.strictObject({
   ),
   currentTrick: z.strictObject({ index: z.number().int().min(0), leaderSeatId: z.string().min(1), plays: z.array(PlaySchema) }),
   discards: z.array(z.strictObject({ card: CardSchema, afterTrick: z.number().int().min(0) })),
+  voidedTricks: z.array(z.strictObject({ index: z.number().int().min(0), leaderSeatId: z.string().min(1), plays: z.array(PlaySchema) })),
 });
 
 const CampIndexSchema = z.number().int().min(1).transform((n) => n as number & { readonly __brand: "CampIndex" });
 const StampSchema = z.strictObject({ camp: CampIndexSchema, attempt: z.number().int().min(1), trick: z.number().int().min(0) });
 
 const LedgerEntrySchema = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("used"), sourceKey: z.string().min(1), at: StampSchema, poolCost: z.number().int().min(0) }),
+  z.strictObject({ kind: z.literal("used"), sourceKey: z.string().min(1), at: StampSchema, poolCost: z.number().int().min(0), free: z.literal(true).optional() }),
   z.strictObject({ kind: z.literal("passed"), sourceKey: z.string().min(1), at: StampSchema, failedObjectiveIds: z.array(z.string()) }),
   z.strictObject({ kind: z.literal("regained"), amount: z.number().int(), at: StampSchema }),
 ]);
@@ -119,7 +120,12 @@ const CampSpecSchema = z.strictObject({
 });
 
 const RouteChoiceSchema = z.enum(["a", "b", "c"]);
-const RouteOptionSchema = z.strictObject({ id: RouteChoiceSchema, next: CampSpecSchema });
+const RouteOptionSchema = z.strictObject({
+  id: RouteChoiceSchema,
+  next: CampSpecSchema,
+  reroll: z.number().int().min(0),
+  swapBoss: z.strictObject({ at: CampIndexSchema, modId: z.string().min(1) }).nullable(),
+});
 
 const PerSeatSchema = <T extends z.ZodType>(value: T) => z.record(z.string().min(1), value);
 const ReadySchema = PerSeatSchema(z.literal(true));
@@ -157,7 +163,7 @@ export const ExpeditionRunStateSchema = z.strictObject({
       upgradeId: z.string().min(1).nullable(),
       items: z.array(z.strictObject({ uid: z.string().min(1), itemId: z.string().min(1) })),
       equipped: z.array(z.string().min(1)),
-      offers: z.array(z.strictObject({ kind: z.literal("standard"), bundles: z.array(z.array(z.string().min(1))) })),
+      offers: z.array(z.strictObject({ kind: z.enum(["standard", "special"]), bundles: z.array(z.array(z.string().min(1))) })),
       ledger: z.array(LedgerEntrySchema),
     }),
   ),

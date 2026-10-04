@@ -32,7 +32,7 @@ function templeCamp(camp: Partial<CampState>): RunAt<"camp"> {
     objectives: [],
     objectiveDeck: [],
     completedTricks: [],
-    discards: [],
+    discards: [], voidedTricks: [],
     currentTrick: { index: 0, leaderSeatId: "p0", plays: [] },
     ...camp,
   };

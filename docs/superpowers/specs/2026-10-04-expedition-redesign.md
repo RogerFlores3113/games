@@ -1734,3 +1734,119 @@ Web and test notes:
   it now expects the run end. `expedition-overlay-input.spec.ts` dispatched clicks on dev panel
   buttons that are disabled until the room answers, and under eight workers the click was
   dropped; it now waits for each button to be enabled.
+
+### Implementation notes (unit 12)
+
+- Seams beyond the "Fits on" table, each added because a character in the
+  owner's brief needs it: the run hooks `swapsBoss` (which option carries
+  Cartographer's boss swap), `freeUse` (Sturdy Straps) and `surveys` with
+  each camp preview's `survey` (Survey); the Core hook `objectivePicker`
+  (First Pick); `PassiveAbility.foldsLast` (Momentum's "no other bonus
+  whispers apply" must outrank items and effects); the ops `drop-item`
+  (selling), `drop-offer` (the draft skip), `add-offer` (Treasure Map),
+  `retarget-objective` (Reshape) and `void-trick` (Smelling Salts); the
+  target kinds `item`, `route-option`, `fanned-card`, `objective-value` and
+  `option`; `ctx.catalog` and `ctx.drawOffer` on abilities; `ctx.affects`
+  on camp modifiers; the events `run-started` (sources only) and
+  `camp-settled`.
+- Deviation: First Pick fits on a Core hook, not an objective-pick window
+  ability. Taking an unowned objective through the toolkit would count as a
+  pick and shift the rotation, so the leader would lose the first pick.
+  `objectivePicker(state, picked)` lets the Hermit pick before the leader,
+  with the usual rotation after.
+- `applyToolkitOps` takes the catalogue (`reroll-route` draws locations,
+  `grant-item` mints) and `RunRules` (`swap-slots` and `give-item` read
+  `itemSlots`). Supplies, coins, items, offers and routes are run ops that
+  work in any stage; the others throw outside a camp. Conservation is
+  checked only in a camp.
+- A stage window stamps trick 0 of the camp it belongs to: the loadout the
+  attempt it will deal (so a per-camp limit shares the camp's count), the
+  draft and route the attempt that cleared. In those windows `ctx.camp` is
+  null; use-ability is accepted by the loadout, draft and route stages, and
+  a use there writes no log entry (the log lives on the attempt).
+- An item instance's uses are counted on every seat's ledger, so an
+  instance given away keeps what it has spent.
+- A voided trick keeps its index: `currentTrick.index` moves on while
+  `completedTricks.length` does not, and the trick is kept in
+  `CampState.voidedTricks` (the view's `camp.voidedTricks`). Its cards are
+  public; the leak check exempts their ids. `void-trick` voids only the last
+  completed trick between tricks, and its leader leads again.
+- Behaviour change: an item with `exclusiveTo` is drafted only through
+  `draftShape.exclusive` (`exclusive` items per bundle after the open ones).
+  Before, it joined that character's ordinary pool. No production item has
+  `exclusiveTo`, so only `draft.test.ts`'s catalogue changed.
+- A cleared camp appends its standard offer behind any special offers an
+  ability queued, instead of replacing the queue.
+- `shopPrice` prices every purchase (supplies, items, upgrades), and the
+  shop view shows each viewer its own prices.
+- `affectsSeat` is folded from the seat layers only (passives, seat
+  effects, `foldsLast` passives), since the camp modifiers ask it while their
+  own layers are being built. Tiger, Rats, Snake, Crocodile and Beaver ask
+  it; the Crocodile still faces an unaffected seat but its win breaks
+  nothing. The base answers true, so the bosses behave as before.
+- The `coins` limit is `cost({ run, seatId, uses: { thisCamp, thisRun },
+  targets })`; `targets` is null before they are picked (the view's
+  remaining `{ kind: "coins", cost }`), so a price may depend on the pick
+  (Pop-up Shop's price map, Buyout's 10 per open objective).
+- A source's `on` reacts after the camp modifiers; an `add-modifier` from it
+  resolves its layer through the source's `active.effect`.
+- `sources.contract.test.ts` lists the five new target kinds as awaiting the
+  nine characters; unit 13 deletes the list.
+- `RunState` changed (voided tricks, `free` ledger entries, route `reroll`
+  and `swapBoss`, offer `kind`), so `ROOM_SCHEMA_VERSION` is 13. The view
+  gains the coins remaining, the three stage windows, the five target kinds,
+  `survey`, `swapsBoss`, the offer's `kind` and `voidedTricks`.
+- Dev: `void-last-trick`, `reroll-route`, `set-route-swap` and `queue-offer`;
+  `check.ts` validates rerolls, swaps and hallucinations; `inspect.ts`
+  shows them and special offers. A `free` ledger entry has no shortcut: only
+  `freeUse` at the moment of a use writes one.
+- Web: compile only. `usesLabel` reads a coins price ("Costs 3 coins").
+
+How each of the nine fits (for unit 13):
+
+| Character | Power or upgrade | Seams |
+|---|---|---|
+| J.D. | extra random item at the start | `on["run-started"]`, `ctx.drawOffer`, `grant-item` |
+| J.D. | hidden luck | `normalWeatherChance` passive (+5; never projected) |
+| J.D. | Blend In | `affectsSeat` passive, deciding by `run.plan` tier `animal` |
+| J.D. | Free Spirit | `add-modifier` effect on `objectiveStatus` (existing) |
+| J.D. | Rule Breaker | `in-trick` `add-modifier` effect on `legalPlays` (existing) |
+| Businessman | +2 coins for 1 empty slot, +5 for 2 | `on["camp-dealt"]` or `on["camp-settled"]`, `adjust-coins` |
+| Businessman | skip a draft for +4 | `draft` window, `drop-offer`, `adjust-coins` |
+| Businessman | sell items at the shop | `loadout` window, `canUse` on `stage.stock`, `item` target, `drop-item`, `adjust-coins`, `ctx.catalog` for the price |
+| Businessman | Pop-up Shop | camp windows, `option` target (stock from `scope.roll`, refresh as an option), `coins` limit priced by the pick and the uses, `grant-item` into a `player` target |
+| Businessman | Buyout | `rescue` window, `coins` limit (10 per failed objective), `remove-objective` |
+| Businessman | Haggle | `shopPrice` passive |
+| Magician | swap from a fanned hand | `fanned-card` target, `swap-cards` |
+| Magician | Double Act | `whispersPerCamp` passive plus `canUse` over the shared count |
+| Magician | Misdirection | two `fanned-card` targets, `swap-cards` |
+| Magician | Switcheroo | `swap-objectives` |
+| Magician | 2 swaps with any upgrade | `Tuned` per-camp limit |
+| Perfumist | mist as leader | `between-tricks`, `canUse` on the leader, trick `add-modifier` whose effect is `voidsTrick` |
+| Perfumist | can't whisper until upgraded | `whispersPerCamp` passive |
+| Perfumist | Turncoat | `in-trick` effect on `identityOf` of the lead |
+| Perfumist | Upside Down | `in-trick` effect on `trickWinner` |
+| Perfumist | Smelling Salts | `rescue` window, per-run, `void-trick` |
+| Cartographer | 3 routes, the third to another boss | `routeOptionCount`, `swapsBoss`, `RouteOption.swapBoss` |
+| Cartographer | reroll for supplies | `route` window, `route-option` target, supplies limit, `reroll-route` |
+| Cartographer | Redraw | `objective-pick`, `replace-objective` (existing) |
+| Cartographer | Survey | `surveys` passive |
+| Cartographer | Treasure Map | per-run, `ctx.drawOffer` with 1-item bundles and a high `rareChance`, `add-offer` twice per seat, `adjust-coins` 10 |
+| Explorer | a card counts 1 higher or lower | `card-value` target, effect on `rankOf` (existing) |
+| Explorer | Second Wind | `Tuned` limit |
+| Explorer | True Form | effect on `identityOf` |
+| Explorer | Reshape | `objective-value` target, `retarget-objective` |
+| Leader | 2 whispers | `whispersPerCamp` passive |
+| Leader | Open Ears | `whisperAudience` passive |
+| Leader | Delegate | effect on `whispersPerCamp` for a `player` target (`canTarget` on `whisperAllowed`) |
+| Leader | Momentum | `foldsLast` passive on `whispersPerCamp` reading won tricks |
+| Hermit | drop an objective | `objective` target (`mine`), `canUse` on tricks won, `remove-objective`, attempt effect with a `goals` guard |
+| Hermit | Burden | `add-objective` |
+| Hermit | First Pick | `objectivePicker` passive |
+| Hermit | Alms | the drop's apply adds an extra-whisper effect for a teammate |
+| Pack Rat | 2 items plus 2 Pack Rat items | `draftShape` (`exclusive: 2`), `exclusiveTo` items |
+| Pack Rat | 3 slots | `itemSlots` passive |
+| Pack Rat | Quartermaster | `loadout` window, `item` and `player` targets, `give-item` |
+| Pack Rat | Pack Animal | camp window, `item` targets, `swap-slots` |
+| Pack Rat | Sturdy Straps | `freeUse` passive over the attempt's ledger |
+| Every upgrade | +1 whisper | base `whispersPerCamp` (unit 4) |

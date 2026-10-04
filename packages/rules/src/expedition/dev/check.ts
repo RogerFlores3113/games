@@ -89,7 +89,17 @@ function checkSpec(what: string, spec: CampSpec, catalog: Catalog, problems: str
 function checkSpecs(run: RunState, catalog: Catalog, problems: string[]): void {
   const stage = run.stage;
   if (stage.tag === "loadout" || stage.tag === "camp") checkSpec("the loadout or camp", stage.camp, catalog, problems);
-  if (stage.tag === "route") for (const option of stage.options) checkSpec(`route ${option.id}`, option.next, catalog, problems);
+  if (stage.tag === "route") {
+    for (const option of stage.options) {
+      checkSpec(`route ${option.id}`, option.next, catalog, problems);
+      if (!Number.isInteger(option.reroll) || option.reroll < 0) problems.push(`route ${option.id}: reroll must be a non-negative whole number, got ${option.reroll}`);
+      const swap = option.swapBoss;
+      if (swap === null) continue;
+      const planned = run.plan?.bosses.find((b) => b.at === swap.at);
+      if (planned === undefined || planned.tier === "temple" || swap.at < option.next.index) problems.push(`route ${option.id}: swaps the boss of camp ${swap.at}, not an animal or disaster boss camp ahead`);
+      else if (!Object.hasOwn(catalog.mods, swap.modId) || catalog.mods[swap.modId]!.kind !== planned.tier) problems.push(`route ${option.id}: swaps in ${swap.modId}, not a${planned.tier === "animal" ? "n animal" : " disaster"} boss`);
+    }
+  }
   if (stage.tag === "event") checkSpec("the chosen route", stage.route.next, catalog, problems);
   for (const boss of run.plan?.bosses ?? []) {
     if (boss.modId !== null && !Object.hasOwn(catalog.mods, boss.modId)) problems.push(`the ${boss.tier} boss at camp ${boss.at} is unknown mod ${boss.modId}`);
@@ -154,6 +164,19 @@ function checkCamp(run: RunState, problems: string[]): void {
   for (const id of duplicates(camp.objectives.map((o) => o.id))) problems.push(`objective id ${id} appears more than once`);
   for (const o of camp.objectives) {
     if (o.ownerSeatId !== null && !run.seatIds.includes(o.ownerSeatId)) problems.push(`objective ${o.id} is owned by unknown seat ${o.ownerSeatId}`);
+  }
+
+  // A hallucination's cards went back to their hands, so they are counted
+  // there; the record only has to name cards and seats of this camp.
+  const dealt = new Set(cards.map((c) => c.id));
+  const usedIndices = new Set(camp.completedTricks.map((t) => t.index));
+  for (const voided of camp.voidedTricks) {
+    if (usedIndices.has(voided.index) || voided.index >= camp.currentTrick.index) problems.push(`hallucination at trick ${voided.index + 1} shares its index with another trick`);
+    usedIndices.add(voided.index);
+    for (const play of voided.plays) {
+      if (!run.seatIds.includes(play.seatId)) problems.push(`hallucination at trick ${voided.index + 1} names unknown seat ${play.seatId}`);
+      if (!dealt.has(play.card.id)) problems.push(`hallucination at trick ${voided.index + 1} names card ${play.card.id}, not in this camp`);
+    }
   }
 }
 

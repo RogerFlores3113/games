@@ -21,7 +21,7 @@ function camp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampView {
     totalTricks: 1,
     removedCards: [],
     goals: [],
-    discards: [],
+    discards: [], voidedTricks: [],
     objectives: [],
     yourHand: [
       { id: "h7", identity: H7, effectiveRank: null, countsAs: null },
@@ -37,7 +37,7 @@ function camp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampView {
   };
 }
 
-const PREVIEW: ExpeditionCampPreviewView = { index: 1, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false };
+const PREVIEW: ExpeditionCampPreviewView = { index: 1, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false, survey: null };
 
 function withAttempt(v: ExpeditionView, patch: Partial<ExpeditionAttemptView>): ExpeditionView {
   if (v.stage.tag !== "camp") throw new Error("fixture is not in a camp");
@@ -420,7 +420,7 @@ describe("buildTrailPrompt", () => {
   });
 
   it("at the draft announces the cleared camp, its payout and the pick", () => {
-    const v = trail({ tag: "draft", cleared: 1, payout: 8, yourOffer: { bundles: [["trained-monkey"]] }, pendingSeatIds: ["me", "bo"] });
+    const v = trail({ tag: "draft", cleared: 1, payout: 8, yourOffer: { kind: "standard", bundles: [["trained-monkey"]] }, pendingSeatIds: ["me", "bo"] });
     expect(at(v)).toEqual({ text: "Camp 1 cleared! +8 coins. Take a bundle", tone: "your-move" });
   });
 
@@ -435,12 +435,12 @@ describe("buildTrailPrompt", () => {
   });
 
   it("at the route vote asks for your vote with the camp it leads to", () => {
-    const v = trail({ tag: "route", options: [{ id: "a", next: { ...PREVIEW, index: 3 } }, { id: "b", next: { ...PREVIEW, index: 3 } }], ballots: [{ seatId: "ana", choice: "a" }] });
+    const v = trail({ tag: "route", options: [{ id: "a", next: { ...PREVIEW, index: 3 }, swapsBoss: false }, { id: "b", next: { ...PREVIEW, index: 3 }, swapsBoss: false }], ballots: [{ seatId: "ana", choice: "a" }] });
     expect(at(v)).toEqual({ text: "Vote on the route to camp 3", tone: "your-move" });
   });
 
   it("at the route vote names who has not voted once you have", () => {
-    const v = trail({ tag: "route", options: [{ id: "a", next: { ...PREVIEW, index: 3 } }], ballots: [{ seatId: "me", choice: "a" }, { seatId: "ana", choice: "a" }] });
+    const v = trail({ tag: "route", options: [{ id: "a", next: { ...PREVIEW, index: 3 }, swapsBoss: false }], ballots: [{ seatId: "me", choice: "a" }, { seatId: "ana", choice: "a" }] });
     expect(at(v)).toEqual({ text: "Waiting for Bo", tone: "waiting" });
   });
 

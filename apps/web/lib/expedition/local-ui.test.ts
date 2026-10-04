@@ -73,7 +73,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     lastVote: null,
     stage: {
       tag: "camp",
-      camp: { index: 1, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false },
+      camp: { index: 1, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false, survey: null },
       mods: [],
       attempt: {
       attemptNumber: 1,
@@ -90,7 +90,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
         totalTricks: 5,
         removedCards: [],
         goals: [],
-        discards: [],
+        discards: [], voidedTricks: [],
         objectives: [
           { id: "o1", kind: "no-tricks", ownerSeatId: null, status: "pending" },
           { id: "o2", kind: "no-tricks", ownerSeatId: "p0", status: "pending" },

@@ -7,17 +7,19 @@
 // an ability. Effects, logs and reveals carry the def id instead (defIdOf),
 // since a spent instance is gone by the time they are read.
 
-import { resolveTuned, type ItemAbility, type ItemUses, type Owner, type SourceDef, type SourceId, type UsageLimit } from "../content/source-def";
+import { resolveTuned, type CoinCost, type ItemAbility, type ItemUses, type Owner, type SourceDef, type SourceId, type UsageLimit } from "../content/source-def";
 import type { Grant } from "../content/mods/mod-def";
+import { nextAttemptNumber } from "./attempt";
 import { rulesFor } from "./compose";
 import { campStack } from "./stack";
-import type { Catalog, ItemInstance, RunState, SeatRun, SourceKey, Stamp } from "./types";
+import type { Catalog, ItemInstance, LedgerEntry, RunState, SeatRun, SourceKey, Stamp } from "./types";
 
 export type Remaining =
   | { readonly kind: "uses"; readonly left: number; readonly of: number } // per-camp, per-run, item uses
   | { readonly kind: "pool"; readonly balance: number; readonly max: number; readonly cost: number }
   | { readonly kind: "supplies"; readonly cost: number }
-  | { readonly kind: "crew"; readonly left: number; readonly earned: number; readonly locked: string };
+  | { readonly kind: "crew"; readonly left: number; readonly earned: number; readonly locked: string }
+  | { readonly kind: "coins"; readonly cost: number }; // the least a use costs, before targets
 
 export function seatOf(run: RunState, seatId: string): SeatRun {
   const seat = run.seats.find((s) => s.seatId === seatId);
@@ -57,14 +59,32 @@ export function backpackOf(seat: SeatRun): readonly ItemInstance[] {
   return seat.items.filter((item) => !seat.equipped.includes(item.uid));
 }
 
-/** The stamp a ledger entry written now would carry; null outside a camp. */
-export function currentStamp(run: RunState): Stamp | null {
-  if (run.stage.tag !== "camp") return null;
-  const attempt = run.stage.attempt;
-  return { camp: run.stage.camp.index, attempt: attempt.attemptNumber, trick: attempt.camp.completedTricks.length };
+/** The latest attempt recorded at a camp the run has left. */
+function lastAttemptAt(run: RunState, camp: number): number {
+  return Math.max(1, ...run.history.filter((entry) => entry.camp === camp).map((entry) => entry.attempt));
 }
 
-/** Whether the seat used `key` in the attempt being played; false outside a camp. */
+/** The stamp a ledger entry written now would carry. A stage window stamps
+ * the camp it belongs to at trick 0: the loadout the attempt it will deal,
+ * the draft and the route the attempt that cleared. null in muster, the
+ * event and once the run has ended. */
+export function currentStamp(run: RunState): Stamp | null {
+  const stage = run.stage;
+  switch (stage.tag) {
+    case "camp":
+      return { camp: stage.camp.index, attempt: stage.attempt.attemptNumber, trick: stage.attempt.camp.completedTricks.length };
+    case "loadout":
+      return { camp: stage.camp.index, attempt: nextAttemptNumber(run, stage.camp.index), trick: 0 };
+    case "draft":
+      return { camp: stage.cleared, attempt: lastAttemptAt(run, stage.cleared), trick: 0 };
+    case "route":
+      return { camp: stage.from, attempt: lastAttemptAt(run, stage.from), trick: 0 };
+    default:
+      return null;
+  }
+}
+
+/** Whether the seat used `key` in the attempt its stamp names. */
 export function usedThisAttempt(run: RunState, seat: SeatRun, key: SourceKey): boolean {
   const stamp = currentStamp(run);
   return stamp !== null && seat.ledger.some((entry) => entry.kind === "used" && entry.sourceKey === key && entry.at.camp === stamp.camp && entry.at.attempt === stamp.attempt);
@@ -135,16 +155,38 @@ export function spendsInstance(seat: SeatRun, key: SourceKey, catalog: Catalog):
   return def.kind === "item" && def.uses !== undefined && def.uses.kind !== "per-camp";
 }
 
+/** The `used` entries that count against `key`'s limit: free uses never
+ * do. An item instance's are counted on every seat's ledger, since an
+ * instance given away keeps the uses it has spent. */
+export function countedUses(run: RunState, seat: SeatRun, key: SourceKey): readonly LedgerEntry[] {
+  const ledgers = itemOf(seat, key) === undefined ? [seat.ledger] : run.seats.map((s) => s.ledger);
+  return ledgers.flat().filter((entry) => entry.kind === "used" && entry.sourceKey === key && entry.free !== true);
+}
+
+function sameAttempt(entry: LedgerEntry, stamp: Stamp | null): boolean {
+  return stamp !== null && entry.kind !== "regained" && entry.at.camp === stamp.camp && entry.at.attempt === stamp.attempt;
+}
+
+/** A coins limit's price for this seat now; `targets` null before they are picked. */
+export function coinCost(run: RunState, seat: SeatRun, key: SourceKey, limit: Extract<UsageLimit, { kind: "coins" }>, targets: CoinCost["targets"]): number {
+  const uses = countedUses(run, seat, key);
+  const stamp = currentStamp(run);
+  const cost = limit.cost({ run, seatId: seat.seatId, uses: { thisCamp: uses.filter((entry) => sameAttempt(entry, stamp)).length, thisRun: uses.length }, targets });
+  if (!Number.isInteger(cost) || cost < 0) throw new Error(`usage: "${key}" costs ${cost} coins`);
+  return cost;
+}
+
 /** crew-tokens: earned this attempt minus every seat's `used` entries
  * stamped (camp, attempt). per-camp: times minus `used` entries stamped (camp, attempt). per-run:
  * times minus all `used` entries. pool: the character's balance. supplies:
- * the crew's, which a use never spends to zero. Counted per key, so two
- * instances of one item have separate uses. */
+ * the crew's, which a use never spends to zero. coins: the least a use
+ * costs. Counted per key, so two instances of one item have separate uses;
+ * free uses count for nothing. */
 export function remaining(run: RunState, seatId: string, key: SourceKey, catalog: Catalog): Remaining {
   const seat = seatOf(run, seatId);
   const grant = grantOf(run, key, catalog);
   const limit = grant === undefined ? limitOf(seat, key, catalog) : resolveTuned(grant.limit, ownerOf(seat));
-  const uses = seat.ledger.filter((entry) => entry.kind === "used" && entry.sourceKey === key);
+  const uses = countedUses(run, seat, key);
   switch (limit.kind) {
     case "crew-tokens": {
       const stamp = currentStamp(run);
@@ -152,13 +194,12 @@ export function remaining(run: RunState, seatId: string, key: SourceKey, catalog
       const earned = limit.earned(run, rulesFor(run, catalog));
       const spent = run.seats
         .flatMap((s) => s.ledger)
-        .filter((e) => e.kind === "used" && e.sourceKey === key && e.at.camp === stamp.camp && e.at.attempt === stamp.attempt).length;
+        .filter((e) => e.kind === "used" && e.sourceKey === key && e.free !== true && sameAttempt(e, stamp)).length;
       return { kind: "crew", left: Math.max(0, earned - spent), earned, locked: limit.locked };
     }
     case "per-camp": {
       const stamp = currentStamp(run);
-      const thisCamp =
-        stamp === null ? 0 : uses.filter((entry) => entry.at.camp === stamp.camp && entry.at.attempt === stamp.attempt).length;
+      const thisCamp = uses.filter((entry) => sameAttempt(entry, stamp)).length;
       return { kind: "uses", left: Math.max(0, limit.times - thisCamp), of: limit.times };
     }
     case "per-run":
@@ -173,6 +214,8 @@ export function remaining(run: RunState, seatId: string, key: SourceKey, catalog
     }
     case "supplies":
       return { kind: "supplies", cost: limit.cost };
+    case "coins":
+      return { kind: "coins", cost: coinCost(run, seat, key, limit, null) };
   }
 }
 
@@ -187,5 +230,7 @@ export function limitBlock(run: RunState, left: Remaining): { readonly error: "a
       return run.supplies > left.cost ? null : { error: "cannot_afford", reason: "The crew can't spare the supplies" };
     case "crew":
       return left.left > 0 ? null : { error: "ability_spent", reason: left.earned === 0 ? left.locked : "The crew has used it" };
+    case "coins":
+      return run.purse >= left.cost ? null : { error: "cannot_afford", reason: `Needs ${left.cost} coins, the crew has ${run.purse}` };
   }
 }

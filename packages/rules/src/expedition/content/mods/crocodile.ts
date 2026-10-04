@@ -15,7 +15,7 @@ const body = (every: number): ModBody => ({
   rules: (ctx) => ({
     goals: (prev) => (camp, statuses) => [
       ...prev(camp, statuses),
-      guard(ID, camp.completedTricks.some((t) => t.winnerSeatId === facing(ctx, t.index, every))),
+      guard(ID, camp.completedTricks.some((t) => t.winnerSeatId === facing(ctx, t.index, every) && ctx.affects(t.winnerSeatId))),
     ],
   }),
   status: (ctx) => {

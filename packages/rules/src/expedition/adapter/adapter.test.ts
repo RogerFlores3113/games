@@ -198,7 +198,7 @@ describe("expeditionGame: autoPassRequest", () => {
   it("names an abstention for a seat that has not voted on a route", () => {
     const base = setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, camp: 2 });
     const spec = base.stage.tag === "loadout" ? base.stage.camp : null;
-    const route: RunState = { ...base, stage: { tag: "route", from: campIndex(1), options: [{ id: "a", next: spec! }, { id: "b", next: spec! }], ballots: { p2: "b" } } };
+    const route: RunState = { ...base, stage: { tag: "route", from: campIndex(1), options: [{ id: "a", next: spec!, reroll: 0, swapBoss: null }, { id: "b", next: spec!, reroll: 0, swapBoss: null }], ballots: { p2: "b" } } };
     expect(expeditionGame.autoPassRequest!(route, "p0")).toEqual({ type: "vote", choice: null });
     expect(expeditionGame.autoPassRequest!(route, "p2")).toBeNull();
   });

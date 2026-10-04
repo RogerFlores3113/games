@@ -14,7 +14,9 @@ import { rulesFor } from "./compose";
 import { applyRunAction } from "./stages/registry";
 import { advanceTo, setupRun } from "./run-test-support";
 import { TARGET_KINDS, choicesFor, resolveTargets, stepsFor, type SeatScope, type TargetSpec } from "./targets";
-import type { RunState } from "./types";
+import { campIndex } from "./plan";
+import { routeOptions } from "./route";
+import type { RunAt, RunState } from "./types";
 
 const SEED = "0123456789abcdef0123456789abcdef";
 
@@ -37,10 +39,20 @@ const SPECS: readonly TargetSpec[] = [
   { kind: "card-value", spread: 2 },
   { kind: "board" },
   { kind: "supplies" },
+  { kind: "item", where: "equipped" },
+  { kind: "item", where: "backpack" },
+  { kind: "item", where: "any" },
+  { kind: "route-option" },
+  { kind: "fanned-card" },
+  { kind: "objective-value", spread: 1 },
+  { kind: "option", prompt: "Pick one", options: (scope) => ["first", `rolled${scope.roll("pick", 5)}`] },
 ];
 
+/** The kinds whose choices exist only at a route vote. */
+const AT_ROUTE: readonly TargetSpec["kind"][] = ["route-option"];
+
 function scopeFor(run: RunState, seatId: string): SeatScope {
-  return { run, seatId, camp: attemptOf(run)?.camp ?? null, rules: rulesFor(run, CATALOG) };
+  return { run, seatId, camp: attemptOf(run)?.camp ?? null, rules: rulesFor(run, CATALOG), catalog: CATALOG };
 }
 
 function playOne(run: RunState): RunState {
@@ -61,7 +73,8 @@ function standardTarget(play: TrickPlay): StandardIdentity | null {
  * and unclaimed. */
 function richState(playerCount: 3 | 4 | 5): RunState {
   const seatIds = Array.from({ length: playerCount }, (_, i) => `p${i}`);
-  let run = advanceTo(setupRun({ seatIds, seed: SEED, catalog: CATALOG, camp: 2 }), "between-tricks", CATALOG);
+  const items = Object.fromEntries(seatIds.map((seatId) => [seatId, ["bait", "parrot", "whetstone"]]));
+  let run = advanceTo(setupRun({ seatIds, seed: SEED, catalog: CATALOG, camp: 2, items }), "between-tricks", CATALOG);
   seatIds.forEach((seatId, i) => {
     const cardId = attemptOf(run)!.camp.hands.find((h) => h.seatId === seatId)!.cards[0]!.id;
     const whispered = applyRunAction(run, seatId, { type: "whisper", targetSeatId: seatIds[(i + 1) % playerCount]!, cardId }, CATALOG);
@@ -85,6 +98,14 @@ function richState(playerCount: 3 | 4 | 5): RunState {
     ...perSeat,
   ];
   return withAttempt(run, { ...attemptOf(run)!, camp: { ...camp, objectives } });
+}
+
+/** The route vote after camp 1, for the kinds that pick a route. */
+function routeState(playerCount: 3 | 4 | 5): RunState {
+  const seatIds = Array.from({ length: playerCount }, (_, i) => `p${i}`);
+  const base = setupRun({ seatIds, seed: SEED, catalog: CATALOG });
+  const draft = { ...base, stage: { tag: "draft", cleared: campIndex(1), payout: 5 } } as RunAt<"draft">;
+  return { ...base, stage: { tag: "route", from: campIndex(1), options: routeOptions(draft, CATALOG), ballots: {} } };
 }
 
 describe("target-kind registry", () => {
@@ -141,11 +162,13 @@ describe("target-kind registry", () => {
 
   for (const playerCount of [3, 4, 5] as const) {
     describe(`at ${playerCount} players`, () => {
-      const run = richState(playerCount);
-      const seatIds = run.seatIds;
+      const camp = richState(playerCount);
+      const atRoute = routeState(playerCount);
+      const seatIds = camp.seatIds;
 
       for (const spec of SPECS) {
         const label = JSON.stringify(spec);
+        const run = AT_ROUTE.includes(spec.kind) ? atRoute : camp;
 
         it(`${label}: some seat has a choice, and choices are stable`, () => {
           expect(seatIds.some((seatId) => choicesFor(scopeFor(run, seatId), spec).length > 0)).toBe(true);
@@ -175,7 +198,7 @@ describe("target-kind registry", () => {
       }
 
       it("a view carrying every seat's steps passes the leak check", () => {
-        for (const seatId of seatIds) {
+        for (const run of [camp, atRoute]) for (const seatId of seatIds) {
           const view = toExpeditionPlayerView(run, seatId, CATALOG);
           const carrying = { ...view, steps: stepsFor(scopeFor(run, seatId), SPECS) };
           const secrets = secretsForExpeditionSeat(run, seatId, CATALOG, SEED);

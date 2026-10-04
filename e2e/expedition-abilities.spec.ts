@@ -108,7 +108,7 @@ test.describe("Expedition characters and abilities", () => {
 
       rw.current = (g: Game) => ({
         ...g,
-        stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: { bundles: [["whetstone", "parrot"], ["bait", "puffball"], ["parrot"]] }, pendingSeatIds: [g.yourSeatId] },
+        stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: { kind: "standard", bundles: [["whetstone", "parrot"], ["bait", "puffball"], ["parrot"]] }, pendingSeatIds: [g.yourSeatId] },
         history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }],
       });
       await page.reload();

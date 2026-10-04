@@ -13,7 +13,7 @@ export const packMule = defineItem({
     targets: [{ kind: "won-trick" }, { kind: "player", who: "teammate" }],
     canTarget: (ctx) => {
       const { trick } = ctx.targets[0];
-      const settles = ctx.camp.objectives.some(
+      const settles = ctx.camp!.objectives.some(
         (o) => (o.kind === "win-card" || o.kind === "ordered") && trick.plays.some((play) => !play.burned && identitiesEqual(play.countsAs ?? play.card.identity, o.target)),
       );
       return settles ? "That trick settles a card objective" : true;

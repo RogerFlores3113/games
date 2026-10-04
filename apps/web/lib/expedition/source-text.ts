@@ -109,6 +109,10 @@ export function usesLabel(sourceId: string, remaining: ExpeditionRemainingView |
     }
     case "crew":
       return both(remaining.earned === 0 ? "Not earned" : remaining.left === 0 ? "Used" : `${remaining.left} left`);
+    case "coins": {
+      const coins = `${remaining.cost} ${remaining.cost === 1 ? "coin" : "coins"}`;
+      return both(remaining.cost === 0 ? "Free" : `Costs ${coins}`, coins);
+    }
   }
 }
 

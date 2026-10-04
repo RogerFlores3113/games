@@ -385,7 +385,7 @@ async function newExpedition(pages: Page[]): Promise<void> {
 
 const h = (camp: number, attempt: number, status: "cleared" | "failed") => ({ camp, attempt, status, coins: status === "cleared" ? 7 : 0 });
 
-const PREVIEW = { index: 2, location: "jungle", weather: "fair", pairing: null, event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: null, shop: false };
+const PREVIEW = { index: 2, location: "jungle", weather: "fair", pairing: null, event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: null, shop: false, survey: null };
 
 function wonView(game: Game): Game {
   return {
@@ -577,9 +577,9 @@ function routeWeatherView(game: Game): Game {
     stage: {
       tag: "route",
       options: [
-        { id: "a", next: next("clearing", "thunderstorm", null) },
-        { id: "b", next: next("magma", "rain", "steam") },
-        { id: "c", next: next("cave", "rain", "flooding") },
+        { id: "a", next: next("clearing", "thunderstorm", null), swapsBoss: false },
+        { id: "b", next: next("magma", "rain", "steam"), swapsBoss: false },
+        { id: "c", next: next("cave", "rain", "flooding"), swapsBoss: false },
       ],
       ballots: [],
     },
@@ -663,9 +663,9 @@ function routeBossView(game: Game): Game {
     stage: {
       tag: "route",
       options: [
-        { id: "a", next: next("clearing", "fair", null) },
-        { id: "b", next: next("magma", "rain", "steam") },
-        { id: "c", next: next("cave", "fog", null) },
+        { id: "a", next: next("clearing", "fair", null), swapsBoss: false },
+        { id: "b", next: next("magma", "rain", "steam"), swapsBoss: false },
+        { id: "c", next: next("cave", "fog", null), swapsBoss: false },
       ],
       ballots: [],
     },
@@ -725,7 +725,7 @@ async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<v
       (g) => ({
         ...g,
         history: [h(1, 1, "cleared")],
-        stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: { bundles: [["bait", "smoke-signal"], ["whetstone", "parrot"], ["trail-map"]] }, pendingSeatIds: [g.yourSeatId] },
+        stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: { kind: "standard", bundles: [["bait", "smoke-signal"], ["whetstone", "parrot"], ["trail-map"]] }, pendingSeatIds: [g.yourSeatId] },
       }),
       "trail",
       "between-camps-draft-rewritten",

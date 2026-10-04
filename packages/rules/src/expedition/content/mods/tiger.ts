@@ -24,7 +24,7 @@ const body = (every: number): ModBody => ({
   rules: (ctx) => ({
     legalPlays: (prev) => (state, seatId) => {
       const legal = prev(state, seatId);
-      if (pounceOn(state, every) !== seatId || legal.length === 0) return legal;
+      if (pounceOn(state, every) !== seatId || legal.length === 0 || !ctx.affects(seatId)) return legal;
       return [legal[ctx.roll(`t${state.currentTrick.index}`, legal.length)]!];
     },
   }),

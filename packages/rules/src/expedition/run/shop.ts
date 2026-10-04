@@ -5,8 +5,9 @@
 // while it owns none. Every buy spends the shared purse; the Durable Object
 // serializes actions, so two buyers never both spend the last coins.
 
-import { SHOP, SUPPLIES_MAX, SUPPLY_PRICE } from "./balance";
-import { drawItem, itemPool } from "./draft";
+import { DRAFT, SHOP, SUPPLIES_MAX, SUPPLY_PRICE } from "./balance";
+import { rulesFor } from "./compose";
+import { drawItem, openPool } from "./draft";
 import { mintItems } from "./items";
 import { STREAMS } from "./rng";
 import type { CampIndex, Catalog, RunAt, RunError, RunState, SeatId, SeatRun } from "./types";
@@ -24,11 +25,11 @@ export type UpgradeOffer = { readonly stockId: string; readonly upgradeId: strin
 const UPGRADE_PREFIX = "upgrade:";
 
 export function stockFor(seed: string, at: CampIndex, catalog: Catalog): readonly StockEntry[] {
-  const pool = itemPool(catalog, null);
+  const pool = openPool(catalog);
   const taken = new Set<string>();
   const items: StockEntry[] = [];
   for (let i = 0; i < SHOP.items; i++) {
-    const itemId = drawItem(seed, (part) => STREAMS.shopItem(at, i, part), pool, taken);
+    const itemId = drawItem(seed, (part) => STREAMS.shopItem(at, i, part), pool, taken, DRAFT.rareChance);
     if (itemId === null) break;
     taken.add(itemId);
     items.push({ stockId: `item${i}`, what: { kind: "item", itemId }, price: catalog.items[itemId]!.price, soldTo: null });
@@ -67,9 +68,17 @@ function stockPurchase(run: RunAt<"loadout">, seatId: SeatId, entry: StockEntry,
   };
 }
 
+/** What `seatId` pays for something listed at `price`: the composed
+ * shopPrice. POLICY A3: a negative or fractional price is a rule defect. */
+export function priceFor(run: RunState, seatId: SeatId, price: number, catalog: Catalog): number {
+  const paid = rulesFor(run, catalog).shopPrice(run, seatId, price);
+  if (!Number.isInteger(paid) || paid < 0) throw new Error(`shop: shopPrice gave ${paid} for a price of ${price}`);
+  return paid;
+}
+
 /** not_a_choice (no shop, or no such stock), already_ready, then the
  * entry's own refusal (supplies_full, sold_out, upgrade_owned,
- * not_your_upgrade), then cannot_afford. */
+ * not_your_upgrade), then cannot_afford at the seat's shopPrice. */
 export function buy(run: RunAt<"loadout">, seatId: SeatId, stockId: string, catalog: Catalog): { readonly ok: true; readonly state: RunState } | { readonly ok: false; readonly error: RunError } {
   const stock = run.stage.stock;
   if (stock === null) return { ok: false, error: "not_a_choice" };
@@ -81,6 +90,7 @@ export function buy(run: RunAt<"loadout">, seatId: SeatId, stockId: string, cata
       ? "not_a_choice"
       : stockPurchase(run, seatId, entry, catalog);
   if (typeof purchase === "string") return { ok: false, error: purchase };
-  if (run.purse < purchase.price) return { ok: false, error: "cannot_afford" };
-  return { ok: true, state: purchase.take({ ...run, purse: run.purse - purchase.price }) };
+  const price = priceFor(run, seatId, purchase.price, catalog);
+  if (run.purse < price) return { ok: false, error: "cannot_afford" };
+  return { ok: true, state: purchase.take({ ...run, purse: run.purse - price }) };
 }

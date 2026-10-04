@@ -42,7 +42,7 @@ function stormCamp(objectives: readonly Objective[], totalTricks: number, strike
     objectives,
     objectiveDeck: [],
     completedTricks: [],
-    discards: [],
+    discards: [], voidedTricks: [],
     currentTrick: {
       index: 0,
       leaderSeatId: "p1",
@@ -141,7 +141,7 @@ describe("Thunderstorm", () => {
     const loadout = loadoutIn("thunderstorm");
     const status = (run: RunState) => {
       const layer = campStack(run, CATALOG).find((l) => l.def.id === "thunderstorm")!;
-      return layer.body.status!(modCtx(run, run.stage.tag === "camp" || run.stage.tag === "loadout" ? run.stage.camp : loadout.stage.camp, layer));
+      return layer.body.status!(modCtx(run, run.stage.tag === "camp" || run.stage.tag === "loadout" ? run.stage.camp : loadout.stage.camp, layer, CATALOG));
     };
     expect(status(loadout)).toEqual([{ kind: "chance", percent: 20, strikesLeft: 2 }]);
     const struck = stormCamp([owned("king-goal", HEART_K, "p1")], 2, [STRIKE]);

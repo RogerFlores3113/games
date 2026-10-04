@@ -42,8 +42,10 @@
  * plan, purse, routes and events); 10 for item instances, upgrades, bundle
  * offers and the shop; 11 for effect origins and camp-modifier log entries;
  * 12 because a run planned before the temple has a temple tier with no
- * boss, and a run in flight would reach its final camp without the temple. */
-export const ROOM_SCHEMA_VERSION = 12;
+ * boss, and a run in flight would reach its final camp without the temple;
+ * 13 for the character seams (hallucinated tricks, free uses, route rerolls
+ * and boss swaps, special draft offers). */
+export const ROOM_SCHEMA_VERSION = 13;
 
 /** D-01: 32 uppercase-safe characters — no `I`, `O`, `0`, `1` — because the
  * room code is read aloud over a voice call. Do not add lowercase. */

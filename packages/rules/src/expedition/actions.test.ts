@@ -53,7 +53,7 @@ function buildAboutToFailState(): CampState {
     expeditionLeaderSeatId: "y",
     objectives: [{ id: "obj1", kind: "no-tricks", ownerSeatId: "x" }],
     objectiveDeck: [],
-    discards: [],
+    discards: [], voidedTricks: [],
     completedTricks: [],
     currentTrick: {
       index: 0,
@@ -302,7 +302,7 @@ describe("applyCampAction — play-card", () => {
       expeditionLeaderSeatId: "y",
       objectives: [{ id: "obj1", kind: "no-tricks", ownerSeatId: "z" }],
       objectiveDeck: [],
-      discards: [],
+      discards: [], voidedTricks: [],
       completedTricks: [],
       currentTrick: {
         index: 0,
@@ -463,7 +463,7 @@ describe("camp events", () => {
       objectiveDeck: [],
       completedTricks: [],
       currentTrick: { index: 0, leaderSeatId: "a", plays: [] },
-      discards: [],
+      discards: [], voidedTricks: [],
     };
     const { events, states } = driveCamp(camp, [0]);
     expect(events).toEqual([

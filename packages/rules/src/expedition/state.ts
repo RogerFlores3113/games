@@ -53,6 +53,14 @@ export type CompletedTrick = {
   readonly plays: readonly ResolvedPlay[];
   readonly winnerSeatId: string;
 };
+/** A trick that resolved as a hallucination: every card went back to the
+ * hand that played it. Kept so the table can see what was shown; its cards
+ * are counted in the hands, not here. */
+export type VoidedTrick = {
+  readonly index: number;
+  readonly leaderSeatId: string;
+  readonly plays: readonly TrickPlay[];
+};
 export type CurrentTrick = {
   readonly index: number;
   readonly leaderSeatId: string;
@@ -137,6 +145,9 @@ export type CampState = {
   readonly completedTricks: readonly CompletedTrick[];
   readonly currentTrick: CurrentTrick;
   readonly discards: readonly Discard[];
+  /** Tricks played as hallucinations. Trick indices keep counting through
+   * them, so a voided trick never shares an index with a later one. */
+  readonly voidedTricks: readonly VoidedTrick[];
 };
 // Deliberately NO stored phase, outcome, status or tricks-won field on
 // CampState: phase/outcome are derived (see CampPhase/CampOutcome below and
@@ -171,10 +182,11 @@ export type CampOutcome =
 export type CampPhase = "objective-pick" | "playing" | "ended";
 
 /** What an accepted camp action did, in order. Values the Core already
- * computes; never stored. trick-started follows the last objective pick and
- * every trick but the final one. */
+ * computes; never stored. trick-started follows the last objective pick,
+ * every trick but the final one, and every voided trick. */
 export type CampEvent =
   | { readonly type: "objective-picked"; readonly seatId: string; readonly objectiveId: string }
   | { readonly type: "card-played"; readonly trickIndex: number; readonly position: number; readonly seatId: string; readonly cardId: string }
   | { readonly type: "trick-completed"; readonly trickIndex: number; readonly winnerSeatId: string; readonly burnedCardIds: readonly string[] }
+  | { readonly type: "trick-voided"; readonly trickIndex: number; readonly leaderSeatId: string }
   | { readonly type: "trick-started"; readonly trickIndex: number; readonly leaderSeatId: string };

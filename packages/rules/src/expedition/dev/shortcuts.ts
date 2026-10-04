@@ -8,8 +8,9 @@ import { attemptOf, withAttempt } from "../run/attempt";
 import { mintItems } from "../run/items";
 import { dealCamp, openLoadout, runStatus, settleCamp } from "../run/lifecycle";
 import { rulesFor } from "../run/compose";
+import { draftOfferFor } from "../run/draft";
 import { campIndex, drawPlan } from "../run/plan";
-import { campSpecAt, type CampSpec } from "../run/route";
+import { campSpecAt, rerollOption, type CampSpec, type RouteChoice } from "../run/route";
 import { pairingRuleFor } from "../run/stack";
 import { applyToolkitOps } from "../run/toolkit";
 import type { Catalog, RunAt, RunLength, RunState } from "../run/types";
@@ -166,6 +167,24 @@ function setPlanBoss(run: RunState, at: number, boss: string, catalog: Catalog):
   return next.stage.tag === "camp" ? dealCamp(loadout, catalog) : loadout;
 }
 
+const DEV_ORIGIN = { kind: "seat", seatId: "dev", sourceKey: "dev", sourceId: "dev" } as const;
+
+const routeChoices = (run: RunState): DevOption[] => (run.stage.tag === "route" ? opts(run.stage.options.map((o) => o.id)) : []);
+
+/** The route vote with option `id`'s boss swap set: `boss` at the next
+ * animal or disaster boss camp it leads to, or none. */
+function setRouteSwap(run: RunState, id: string, boss: string, catalog: Catalog): RunState {
+  const stage = run.stage;
+  if (stage.tag !== "route") throw new Error("set-route-swap works at a route vote");
+  const option = stage.options.find((o) => o.id === id)!;
+  const planned = run.plan!.bosses.find((b) => b.at >= option.next.index && b.tier !== "temple");
+  if (boss !== "none" && (planned === undefined || catalog.mods[boss]?.kind !== planned.tier)) {
+    throw new Error(planned === undefined ? `route ${id} leads to no animal or disaster boss camp` : `${boss} is not a${planned.tier === "animal" ? "n animal" : " disaster"} boss`);
+  }
+  const swapBoss = boss === "none" ? null : { at: planned!.at, modId: boss };
+  return { ...run, stage: { ...stage, options: stage.options.map((o) => (o.id === id ? { ...o, swapBoss } : o)) } };
+}
+
 export const DEV_SHORTCUTS = {
   "jump-to-camp": {
     label: "Jump to camp",
@@ -292,7 +311,49 @@ export const DEV_SHORTCUTS = {
       const from = holders.find((c) => c.id === cardId)!.seatId;
       if (from === to) throw new Error(`the card is already in ${to}'s hand`);
       const origin = { kind: "seat", seatId: to, sourceKey: "dev", sourceId: "dev" } as const;
-      return applyToolkitOps(run, origin, [{ op: "move-card", cardId, fromSeatId: from, toSeatId: to }], rulesFor(run, catalog));
+      return applyToolkitOps(run, origin, [{ op: "move-card", cardId, fromSeatId: from, toSeatId: to }], rulesFor(run, catalog), catalog);
+    },
+  },
+  "void-last-trick": {
+    label: "Make the last trick a hallucination",
+    group: "Cards",
+    fields: () => [],
+    apply: (run, _params, catalog) => {
+      const camp = attemptOf(run)?.camp;
+      const last = camp?.completedTricks.at(-1);
+      if (camp === undefined || last === undefined) throw new Error("there is no completed trick to void");
+      if (camp.currentTrick.plays.length > 0) throw new Error("finish the trick in play first");
+      return applyToolkitOps(run, DEV_ORIGIN, [{ op: "void-trick", trickIndex: last.index }], rulesFor(run, catalog), catalog);
+    },
+  },
+  "reroll-route": {
+    label: "Reroll a route option",
+    group: "Run",
+    fields: (run) => [{ name: "option", label: "Route", kind: "choice", options: routeChoices(run) }],
+    apply: (run, params, catalog) => {
+      if (run.stage.tag !== "route") throw new Error("reroll-route works at a route vote");
+      return rerollOption(run as RunAt<"route">, readChoice(params, "option", routeChoices(run)) as RouteChoice, catalog);
+    },
+  },
+  "set-route-swap": {
+    label: "Set a route's boss swap",
+    group: "Run",
+    fields: (run, catalog) => [
+      { name: "option", label: "Route", kind: "choice", options: routeChoices(run) },
+      { name: "boss", label: "Boss", kind: "choice", options: bossOptions(catalog) },
+    ],
+    apply: (run, params, catalog) => setRouteSwap(run, readChoice(params, "option", routeChoices(run)), readChoice(params, "boss", bossOptions(catalog)), catalog),
+  },
+  "queue-offer": {
+    label: "Queue a special draft offer",
+    group: "Crew",
+    fields: (run) => [seatField(run)],
+    apply: (run, params, catalog) => {
+      const seatId = readChoice(params, "seat", seatOptions(run));
+      const seat = run.seats.find((s) => s.seatId === seatId)!;
+      const camp = campIndex(specOfStage(run)?.index ?? run.history.at(-1)?.camp ?? 1);
+      const offer = { ...draftOfferFor(run.seed, camp, seat, seat.offers.length + 1, catalog), kind: "special" as const };
+      return withSeat(run, seatId, { offers: [...seat.offers, offer] });
     },
   },
   "set-objective-owner": {

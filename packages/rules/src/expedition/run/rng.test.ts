@@ -16,13 +16,15 @@ describe("STREAMS distinctness (A1)", () => {
     const useIndices = [0, 1, 2, 3];
     const draws = [0, 1, 2];
     const options = [0, 1, 2];
-    const fields = ["location", "fair", "weather", "event", "mix"] as const;
+    const fields = ["location", "fair", "weather", "event", "mix", "boss"] as const;
     const mods = ["rain", "thunderstorm"];
     const strengths = ["full", "half"];
     const labels = ["start", "t1"];
-    const eventKeys = ["dealt", "pick0", "t0-start", "t0-p1", "t0-done", "whisper0"];
+    const eventKeys = ["dealt", "pick0", "t0-start", "t0-p1", "t0-done", "t0-void", "whisper0", "settled", "started"];
+    const sourceKeys = ["jd", "it3"];
     const parts = ["rarity", "pick"] as const;
 
+    for (const seat of seats) names.push(STREAMS.sourceDraw("jd", seat, "run", "started", 0));
     for (const camp of camps) {
       names.push(STREAMS.routeVote(camp), STREAMS.routeCount(camp));
       for (const reroll of [0, 1]) {
@@ -57,9 +59,23 @@ describe("STREAMS distinctness (A1)", () => {
           for (const seat of seats) {
             for (const draw of draws) {
               names.push(STREAMS.ability(camp, attempt, seat, useIndex, draw));
+              for (const part of parts) names.push(STREAMS.abilityItem(camp, attempt, seat, useIndex, draw, 0, 1, part));
+            }
+            for (const of of seats) names.push(STREAMS.fan(camp, attempt, seat, of, useIndex));
+          }
+        }
+        for (const seat of seats) {
+          for (const label of labels) names.push(STREAMS.option(camp, attempt, seat, label));
+          for (const sourceKey of sourceKeys) {
+            for (const key of eventKeys) {
+              for (const draw of draws) {
+                names.push(STREAMS.sourceDraw(sourceKey, seat, `camp${camp}:attempt${attempt}`, key, draw));
+                for (const part of parts) names.push(STREAMS.sourceItem(sourceKey, seat, `camp${camp}:attempt${attempt}`, key, draw, 1, 0, part));
+              }
             }
           }
         }
+        for (const n of [0, 1, 2]) names.push(STREAMS.addedObjective(camp, attempt, n));
       }
     }
 

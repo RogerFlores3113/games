@@ -32,6 +32,7 @@ function status(run: RunState, trick: number, strength: Strength): readonly Stat
 const body = (tricks: number): ModBody => ({
   on: {
     "whisper-sent": (ctx) => {
+      if (!ctx.affects(ctx.event.fromSeatId)) return [];
       const from = ctx.camp.currentTrick.index;
       return [{ op: "add-modifier", lasts: "attempt", audience: "public", params: { seatId: ctx.event.fromSeatId, from, through: from + tricks - 1 } }];
     },

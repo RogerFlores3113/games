@@ -13,7 +13,7 @@ function roomSeats(): RoomSeatInfo[] {
 }
 
 function preview(index: number, over: Partial<ExpeditionCampPreviewView> = {}): ExpeditionCampPreviewView {
-  return { index, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: ["win-card", "win-card"], bossId: null, shop: false, ...over };
+  return { index, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: ["win-card", "win-card"], bossId: null, shop: false, survey: null, ...over };
 }
 
 const STANDARD_PLAN: ExpeditionView["plan"] = [
@@ -259,7 +259,7 @@ describe("draft", () => {
   };
 
   it("offers each bundle as one card naming its items, with their text, uses and rarity", () => {
-    expect(panel(at(draftStage({ yourOffer: { bundles: [["rain-poncho", "trail-map"], ["heavy-pack"]] } }))).draft).toEqual({
+    expect(panel(at(draftStage({ yourOffer: { kind: "standard", bundles: [["rain-poncho", "trail-map"], ["heavy-pack"]] } }))).draft).toEqual({
       kind: "offer",
       bundles: [
         {
@@ -320,14 +320,14 @@ describe("draft", () => {
 
 describe("route", () => {
   const options: Extract<ExpeditionStageView, { tag: "route" }>["options"] = [
-    { id: "a", next: preview(3, { event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: "tiger", shop: false }) },
-    { id: "b", next: preview(3, { location: "river-delta", weather: "storm", slotKinds: ["ordered", "ordered", "win-card", "trick-count"], shop: true }) },
+    { id: "a", next: preview(3, { event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: "tiger", shop: false }), swapsBoss: false },
+    { id: "b", next: preview(3, { location: "river-delta", weather: "storm", slotKinds: ["ordered", "ordered", "win-card", "trick-count"], shop: true }), swapsBoss: false },
   ];
   const routeView = (ballots: { seatId: string; choice: string | null }[], over: Partial<ExpeditionView> = {}): ExpeditionView =>
     at({ tag: "route", options, ballots }, over);
 
   it("names a route's location, weather and pairing by their display names", () => {
-    const paired = at({ tag: "route", options: [{ id: "a", next: preview(3, { location: "clifftop", weather: "thunderstorm", pairing: "steam" }) }], ballots: [] });
+    const paired = at({ tag: "route", options: [{ id: "a", next: preview(3, { location: "clifftop", weather: "thunderstorm", pairing: "steam" }), swapsBoss: false }], ballots: [] });
     const p = model(paired).panel;
     if (p.kind !== "route") throw new Error("expected the route panel");
     expect(p.options[0]!.next).toMatchObject({ location: "Clifftop", weather: "Thunderstorm", locationId: "clifftop", backdrop: "clifftop", weatherId: "thunderstorm", pairing: "Steam" });
@@ -368,13 +368,13 @@ describe("route", () => {
 
   it("reads the temple as the temple, never as a boss with no portrait, and stands it in the temple", () => {
     const plan: ExpeditionView["plan"] = [{ at: 3, tier: "animal", bossId: "tiger" }, { at: 6, tier: "temple", bossId: "temple" }];
-    const view = at({ tag: "route", options: [{ id: "t", next: preview(6, { location: "desert", bossId: "temple" }) }], ballots: [] }, { plan });
+    const view = at({ tag: "route", options: [{ id: "t", next: preview(6, { location: "desert", bossId: "temple" }), swapsBoss: false }], ballots: [] }, { plan });
     const p = model(view).panel;
     expect(p.kind === "route" && p.options[0]!.next).toMatchObject({ location: "Desert", locationId: "desert", backdrop: "temple", boss: "The Temple", bossId: null, bossName: null });
   });
 
   it("labels a plain camp without a boss", () => {
-    const view = at({ tag: "route", options: [{ id: "c", next: preview(4) }], ballots: [] });
+    const view = at({ tag: "route", options: [{ id: "c", next: preview(4), swapsBoss: false }], ballots: [] });
     const p = model(view).panel;
     expect(p.kind === "route" && p.options[0]!.next.boss).toBeNull();
   });
@@ -428,7 +428,7 @@ describe("loadout gear and shop", () => {
     yourUpgrades: [{ stockId: "upgrade:guide.pathfinder", upgradeId: "guide.pathfinder", price: 8 }],
   };
   const shopView = (over: Partial<ExpeditionView> = {}, readySeatIds: string[] = []) =>
-    at({ tag: "loadout", camp: preview(3, { shop: true }), mods: [], yourSlots: 2, shop, readySeatIds }, over);
+    at({ tag: "loadout", camp: preview(3, { shop: true, survey: null }), mods: [], yourSlots: 2, shop, readySeatIds }, over);
 
   it("lists the backpack with what is left of each item, and the page asked for", () => {
     const seats = seatsWith({
@@ -595,7 +595,7 @@ describe("ready", () => {
 
 describe("status", () => {
   it("counts the route votes cast", () => {
-    const view = at({ tag: "route", options: [{ id: "a", next: preview(3) }], ballots: [{ seatId: "s1", choice: "a" }, { seatId: "s3", choice: null }] });
+    const view = at({ tag: "route", options: [{ id: "a", next: preview(3), swapsBoss: false }], ballots: [{ seatId: "s1", choice: "a" }, { seatId: "s3", choice: null }] });
     expect(model(view).status).toBe("2 of 3 voted");
   });
 
@@ -697,7 +697,7 @@ describe("crew", () => {
 
 describe("tooltip", () => {
   it("shows the hovered source's rules, with its window and limit as badges", () => {
-    const poncho = model(at(draftStage({ yourOffer: { bundles: [["rain-poncho"]] } })), ui({ tooltipSourceId: "rain-poncho" })).tooltip;
+    const poncho = model(at(draftStage({ yourOffer: { kind: "standard", bundles: [["rain-poncho"]] } })), ui({ tooltipSourceId: "rain-poncho" })).tooltip;
     expect(poncho).toEqual({
       title: "Rain Poncho",
       text: "Whisper once more this camp.",
@@ -719,7 +719,7 @@ describe("tooltip", () => {
 
 describe("prompt", () => {
   it("greets a cleared camp with the draft", () => {
-    expect(model(at(draftStage({ yourOffer: { bundles: [["trained-monkey"]] } }))).prompt).toEqual({ text: "Camp 1 cleared! +8 coins. Take a bundle", tone: "your-move" });
+    expect(model(at(draftStage({ yourOffer: { kind: "standard", bundles: [["trained-monkey"]] } }))).prompt).toEqual({ text: "Camp 1 cleared! +8 coins. Take a bundle", tone: "your-move" });
   });
 
   it("says Reconnecting while the socket is down", () => {

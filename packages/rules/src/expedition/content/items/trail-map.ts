@@ -12,7 +12,7 @@ export const trailMap = defineItem({
     window: "between-tricks",
     targets: [{ kind: "player", who: "teammate" }],
     canTarget: (ctx) => {
-      const camp = ctx.camp;
+      const camp = ctx.camp!;
       return hasPendingObjective(camp, ctx.self, ctx.rules) || hasPendingObjective(camp, ctx.targets[0].seatId, ctx.rules)
         ? true
         : "Neither of you has an open objective";

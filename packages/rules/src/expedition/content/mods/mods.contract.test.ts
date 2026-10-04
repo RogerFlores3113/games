@@ -121,7 +121,7 @@ describe.each(DEFS.map((def) => [def.id, def] as const))("camp modifier %s", (id
   it("names only engine hooks in rules and engine events in on, and has effect only beside on", () => {
     const run = forced(def, 3, `${id}-shape`);
     for (const [i, body] of bodies(def).entries()) {
-      const ctx = modCtx(run, run.stage.camp, { def, strength: i === 0 ? "full" : "half" });
+      const ctx = modCtx(run, run.stage.camp, { def, strength: i === 0 ? "full" : "half" }, catalogFor(def));
       for (const hook of Object.keys(body.rules?.(ctx) ?? {})) expect(HOOK_NAMES).toContain(hook);
       for (const event of Object.keys(body.on ?? {})) expect(ENGINE_EVENT_TYPES).toContain(event);
       if (body.effect !== undefined) expect(body.on).toBeDefined();
@@ -157,7 +157,7 @@ describe.each(DEFS.map((def) => [def.id, def] as const))("camp modifier %s", (id
         const layer = layerOf(state, def, catalog);
         const spec = specOf(state);
         if (layer === undefined || spec === null || layer.body.status === undefined) continue;
-        const ctx = modCtx(state, spec, layer);
+        const ctx = modCtx(state, spec, layer, catalog);
         const status = layer.body.status(ctx);
         expect(layer.body.status(laterRollsMoved(ctx))).toEqual(status);
         const ids = attempt === null ? [] : campCardIds(attempt.camp);

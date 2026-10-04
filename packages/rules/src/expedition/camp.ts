@@ -9,7 +9,7 @@
 // exception escaping applyCampAction (WR-04).
 
 import { assertPlayerCount, buildObjectiveDeck, complementOf, dealHands } from "./deck";
-import { objectiveStatuses, nextObjectivePicker } from "./objectives";
+import { objectiveStatuses } from "./objectives";
 import { baseRules, type CoreRules } from "./rules";
 import { mintCardId, seedToRngState } from "../shuffle";
 import type { CampOutcome, CampPhase, CampState, Goal, Objective, ObjectiveSlot } from "./state";
@@ -145,6 +145,7 @@ export function createCamp(
     completedTricks: [],
     currentTrick: { index: 0, leaderSeatId: expeditionLeaderSeatId, plays: [] },
     discards: [],
+    voidedTricks: [],
   };
 }
 
@@ -188,7 +189,11 @@ export function currentActorSeatId(state: CampState, rules: CoreRules = baseRule
 
   if (phase === "objective-pick") {
     const ownedCount = state.objectives.filter((o) => o.ownerSeatId !== null).length;
-    return nextObjectivePicker(state.seatIds, state.expeditionLeaderSeatId, ownedCount);
+    const picker = rules.objectivePicker(state, ownedCount);
+    if (!state.seatIds.includes(picker)) {
+      throw new Error(`currentActorSeatId: objectivePicker returned unknown seat ${picker}`);
+    }
+    return picker;
   }
 
   const leaderIndex = state.seatIds.indexOf(state.currentTrick.leaderSeatId);

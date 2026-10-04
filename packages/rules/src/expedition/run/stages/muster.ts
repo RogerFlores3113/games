@@ -1,5 +1,6 @@
 import { RUN_LENGTHS } from "../balance";
 import { openLoadout } from "../lifecycle";
+import { react } from "../react";
 import { drawPlan } from "../plan";
 import { STREAMS } from "../rng";
 import { firstCampSpec } from "../route";
@@ -11,7 +12,8 @@ const LENGTHS = Object.keys(RUN_LENGTHS) as RunLength[];
 
 /** Every seat picks a character (public, final, unique) and votes a length
  * (changeable until the vote resolves). The last missing input resolves the
- * vote, draws the plan and opens camp 1's loadout. */
+ * vote, draws the plan, opens camp 1's loadout and lets the seats' sources
+ * react to run-started. */
 export const muster: StageDef<"muster"> = {
   on: {
     "pick-character": (run, seatId, action, catalog) => {
@@ -29,6 +31,7 @@ export const muster: StageDef<"muster"> = {
   advance(run, catalog) {
     if (run.seats.some((seat) => seat.characterId === null) || !everySeat(run, run.stage.ballots)) return run;
     const result = tally(run.seed, STREAMS.lengthVote(), LENGTHS, run.seatIds, run.stage.ballots)!;
-    return openLoadout({ ...run, plan: drawPlan(run.seed, result.winner, catalog), lastVote: { topic: "length", result } }, firstCampSpec(result.winner), catalog);
+    const opened = openLoadout({ ...run, plan: drawPlan(run.seed, result.winner, catalog), lastVote: { topic: "length", result } }, firstCampSpec(result.winner), catalog);
+    return react(opened, [{ type: "run-started" }], catalog);
   },
 };

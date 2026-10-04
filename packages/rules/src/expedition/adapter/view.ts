@@ -33,13 +33,14 @@ import { rulesFor } from "../run/compose";
 import { runStatus } from "../run/lifecycle";
 import { SUPPLIES_MAX } from "../run/balance";
 import { bossAt, campCount, visibleBossId } from "../run/plan";
-import { slotKindsFor, type CampSpec } from "../run/route";
+import { slotKindsFor, type CampSpec, type RouteOption } from "../run/route";
+import { surveyObjectives, surveyedCamps } from "../run/survey";
 import { campStack, modCtx, pairingOf, specOf, type StackLayer } from "../run/stack";
 import type { StatusPart } from "../content/mods/mod-def";
 import { whispersUsedBy } from "../run/whisper";
 import { abilityStatus } from "../run/abilities";
 import { abilityKeys, abilityOf, activeOfKey, backpackOf, itemOf, poolBalance, remaining, usedThisAttempt, type Remaining } from "../run/usage";
-import { upgradeOffers, type StockEntry } from "../run/shop";
+import { priceFor, upgradeOffers, type StockEntry } from "../run/shop";
 import { currentWindow, gatedPendingSeatIds } from "../run/windows";
 import type { RunRules } from "../run/run-rules";
 import type { ActiveEffect, AttemptState, Catalog, ItemInstance, LogEntry, PerSeat, Reveal, RunState, SeatRun } from "../run/types";
@@ -72,6 +73,7 @@ import type {
   ExpeditionStageView,
   ExpeditionStatusPartView,
   ExpeditionStockView,
+  ExpeditionSurveyedObjectiveView,
   ExpeditionTrickPlayView,
   ExpeditionView,
 } from "./view-types";
@@ -258,6 +260,8 @@ function toRemainingView(left: Remaining): ExpeditionRemainingView {
       return { kind: "supplies", cost: left.cost };
     case "crew":
       return { kind: "crew", left: left.left, earned: left.earned };
+    case "coins":
+      return { kind: "coins", cost: left.cost };
   }
 }
 
@@ -306,21 +310,23 @@ function toAbilityViews(state: RunState, seat: SeatRun, catalog: Catalog): Exped
   });
 }
 
-function toStockView(entry: StockEntry): ExpeditionStockView {
+function toStockView(entry: StockEntry, price: number): ExpeditionStockView {
   const what = entry.what;
   return {
     stockId: entry.stockId,
     what: what.kind === "supplies" ? { kind: "supplies" } : { kind: "item", itemId: what.itemId },
-    price: entry.price,
+    price,
     soldTo: entry.soldTo,
   };
 }
 
-function toShopView(stock: readonly StockEntry[] | null, ownSeat: SeatRun | undefined, catalog: Catalog): ExpeditionShopView | null {
+/** Prices are what the viewer would pay (the composed shopPrice). */
+function toShopView(state: RunState, stock: readonly StockEntry[] | null, ownSeat: SeatRun | undefined, catalog: Catalog): ExpeditionShopView | null {
   if (stock === null) return null;
+  const price = (listed: number): number => (ownSeat === undefined ? listed : priceFor(state, ownSeat.seatId, listed, catalog));
   return {
-    stock: stock.map(toStockView),
-    yourUpgrades: ownSeat === undefined ? [] : upgradeOffers(ownSeat, catalog).map((o) => ({ stockId: o.stockId, upgradeId: o.upgradeId, price: o.price })),
+    stock: stock.map((entry) => toStockView(entry, price(entry.price))),
+    yourUpgrades: ownSeat === undefined ? [] : upgradeOffers(ownSeat, catalog).map((o) => ({ stockId: o.stockId, upgradeId: o.upgradeId, price: price(o.price) })),
   };
 }
 
@@ -328,8 +334,31 @@ function toCampResultView(result: RunState["history"][number]): ExpeditionCampRe
   return { camp: result.camp, attempt: result.attempt, status: result.status, coins: result.coins };
 }
 
-function toPreviewView(state: RunState, spec: CampSpec, catalog: Catalog): ExpeditionCampPreviewView {
-  const boss = state.plan === null ? null : bossAt(state.plan, spec.index);
+function toSurveyedObjectiveView(objective: Objective): ExpeditionSurveyedObjectiveView {
+  switch (objective.kind) {
+    case "win-card":
+      return { kind: "win-card", target: toIdentityView(objective.target) };
+    case "ordered":
+      return { kind: "ordered", target: toIdentityView(objective.target), order: objective.order };
+    case "no-tricks":
+      return { kind: "no-tricks" };
+    case "exactly-n":
+      return { kind: "exactly-n", n: objective.n };
+  }
+}
+
+/** Each previewed camp's coming objectives, by spec, for a seat that surveys. */
+function surveysFor(state: RunState, seatId: string, rules: RunRules, catalog: Catalog): ReadonlyMap<CampSpec, ExpeditionSurveyedObjectiveView[]> {
+  const surveyed = new Map<CampSpec, ExpeditionSurveyedObjectiveView[]>();
+  if (!state.seatIds.includes(seatId) || !rules.surveys(state, seatId)) return surveyed;
+  for (const camp of surveyedCamps(state)) surveyed.set(camp.spec, surveyObjectives(camp, catalog).map(toSurveyedObjectiveView));
+  return surveyed;
+}
+
+/** `swap` is a route option's boss swap, shown when it lands on this camp. */
+function toPreviewView(state: RunState, spec: CampSpec, catalog: Catalog, survey: ExpeditionSurveyedObjectiveView[] | null, swap: RouteOption["swapBoss"] = null): ExpeditionCampPreviewView {
+  const planned = state.plan === null ? null : bossAt(state.plan, spec.index);
+  const boss = planned !== null && swap !== null && swap.at === spec.index ? { ...planned, modId: swap.modId } : planned;
   return {
     index: spec.index,
     location: spec.location,
@@ -339,6 +368,7 @@ function toPreviewView(state: RunState, spec: CampSpec, catalog: Catalog): Exped
     slotKinds: Array.from(slotKindsFor(state, spec, catalog)),
     bossId: boss === null ? null : visibleBossId(state, boss),
     shop: boss !== null,
+    survey,
   };
 }
 
@@ -369,14 +399,14 @@ function toStatusPartView(part: StatusPart): ExpeditionStatusPartView {
   }
 }
 
-function toModView(state: RunState, spec: CampSpec, layer: StackLayer): ExpeditionModView {
-  const status = layer.body.status === undefined ? [] : layer.body.status(modCtx(state, spec, layer));
+function toModView(state: RunState, spec: CampSpec, layer: StackLayer, catalog: Catalog): ExpeditionModView {
+  const status = layer.body.status === undefined ? [] : layer.body.status(modCtx(state, spec, layer, catalog));
   return { id: layer.def.id, kind: layer.def.kind, strength: layer.strength, status: status.map(toStatusPartView) };
 }
 
 function toModViews(state: RunState, catalog: Catalog): ExpeditionModView[] {
   const spec = specOf(state);
-  return spec === null ? [] : campStack(state, catalog).map((layer) => toModView(state, spec, layer));
+  return spec === null ? [] : campStack(state, catalog).map((layer) => toModView(state, spec, layer, catalog));
 }
 
 function toBallotViews(state: RunState, ballots: PerSeat<string | null>): ExpeditionBallotView[] {
@@ -433,6 +463,7 @@ function toAttemptView(state: RunState, rawAttempt: AttemptState, seatId: string
     objectives: campState.objectives.map((o) => toObjectiveView(state, seatId, campState, o, rules)),
     goals: campGoals(campState, rules).map((g) => ({ id: g.id, status: g.status })),
     discards: campState.discards.map((d) => ({ card: toCardView(d.card), afterTrick: d.afterTrick })),
+    voidedTricks: campState.voidedTricks.map((t) => ({ index: t.index, leaderSeatId: t.leaderSeatId, plays: t.plays.map((p) => ({ seatId: p.seatId, card: toCardView(p.card) })) })),
     yourHand,
     yourLegalCardIds,
     handSizes,
@@ -462,22 +493,24 @@ function toAttemptView(state: RunState, rawAttempt: AttemptState, seatId: string
 
 function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefined, rules: RunRules, catalog: Catalog): ExpeditionStageView {
   const stage = state.stage;
+  const surveys = surveysFor(state, seatId, rules, catalog);
+  const surveyOf = (spec: CampSpec): ExpeditionSurveyedObjectiveView[] | null => surveys.get(spec) ?? null;
   switch (stage.tag) {
     case "muster":
       return { tag: "muster", ballots: toBallotViews(state, stage.ballots) };
     case "loadout":
       return {
         tag: "loadout",
-        camp: toPreviewView(state, stage.camp, catalog),
+        camp: toPreviewView(state, stage.camp, catalog, surveyOf(stage.camp)),
         mods: toModViews(state, catalog),
         yourSlots: ownSeat === undefined ? 0 : rules.itemSlots(state, seatId),
-        shop: toShopView(stage.stock, ownSeat, catalog),
+        shop: toShopView(state, stage.stock, ownSeat, catalog),
         readySeatIds: readySeatIds(state, stage.ready),
       };
     case "camp":
       return {
         tag: "camp",
-        camp: toPreviewView(state, stage.camp, catalog),
+        camp: toPreviewView(state, stage.camp, catalog, null),
         mods: toModViews(state, catalog),
         attempt: toAttemptView(state, stage.attempt, seatId, ownSeat !== undefined, rules, catalog),
       };
@@ -486,20 +519,20 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
         tag: "draft",
         cleared: stage.cleared,
         payout: stage.payout,
-        yourOffer: ownSeat?.offers[0] === undefined ? null : { bundles: ownSeat.offers[0].bundles.map((bundle) => Array.from(bundle)) },
+        yourOffer: ownSeat?.offers[0] === undefined ? null : { kind: ownSeat.offers[0].kind, bundles: ownSeat.offers[0].bundles.map((bundle) => Array.from(bundle)) },
         pendingSeatIds: state.seats.filter((seat) => seat.offers.length > 0).map((seat) => seat.seatId),
       };
     case "route":
       return {
         tag: "route",
-        options: stage.options.map((option) => ({ id: option.id, next: toPreviewView(state, option.next, catalog) })),
+        options: stage.options.map((option) => ({ id: option.id, next: toPreviewView(state, option.next, catalog, surveyOf(option.next), option.swapBoss), swapsBoss: option.swapBoss !== null })),
         ballots: toBallotViews(state, stage.ballots),
       };
     case "event":
       return {
         tag: "event",
         event: stage.route.next.event ?? "",
-        next: toPreviewView(state, stage.route.next, catalog),
+        next: toPreviewView(state, stage.route.next, catalog, surveyOf(stage.route.next)),
         readySeatIds: readySeatIds(state, stage.ready),
       };
     case "ended":

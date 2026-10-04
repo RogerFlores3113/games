@@ -32,9 +32,13 @@ names the exact files and identifiers involved.
 (base: standard cards ranked above the deck's lowest rank), `leaderFor`, the
 card reading `identityOf`, `isTrump` and `rankOf`, `trickWinner(plays,
 led)`, `legalPlays`, `burns(plays, led, winnerOf)`, `nextLeader`,
-`objectiveStatus` (base: `evaluateObjective`) and `goals` (camp-wide
+`objectiveStatus` (base: `evaluateObjective`), `goals` (camp-wide
 conditions, given every objective's composed status; every one must be
-done). A full trick resolves once, in
+done), `voidsTrick` (base: false; a voided trick is a hallucination: every
+card goes back to the hand that played it, it is kept in
+`CampState.voidedTricks`, and the same leader leads the next trick, whose
+index still moves on) and `objectivePicker(state, picked)` (base: the
+rotation from the expedition leader). A full trick resolves once, in
 `resolveTrick`: the led identity is what the lead counts as, burned plays
 leave the trick (and never count for an objective), and the winner is the
 highest trump kept, else the highest kept card following the led identity,
@@ -75,7 +79,8 @@ card or was discarded, and fails if never played by the final trick.
   `run/compose.ts` (`rulesFor`, the rule layers), `run/run-rules.ts` (`RunHooks`,
   `HOOK_NAMES`), `run/toolkit.ts` (`ToolkitOp`, `applyToolkitOps`, the only
   mutation surface for abilities), `run/draft.ts` (`draftOfferFor`,
-  `drawItem`), `run/shop.ts` (`stockFor`, `buy`), `run/whisper.ts`,
+  `drawOffer`, `DraftShape`), `run/shop.ts` (`stockFor`, `buy`, `priceFor`),
+  `run/survey.ts` (`surveyedCamps`, `surveyObjectives`), `run/whisper.ts`,
   `run/balance.ts` (the run's tunable numbers; a number only one def
   reads, such as an item's price or a boss's half-strength parameter,
   lives in that def), `run/rng.ts` (`STREAMS`,
@@ -126,10 +131,12 @@ auto-pass after the existing grace.
 layer's `rules` (location, weather, pairing, the boss or the temple, then
 the temple's helpers at half strength), then per seat (seat
 order) each live source's passive in `[character, upgrade, ...equipped]`
-order, then each live effect's layer in `attempt.effects` order.** A boss
+order, then each live effect's layer in `attempt.effects` order, then the
+passives marked `foldsLast`.** A boss
 folds after the weather so it can refine it; passives fold after both, so an
 item can lift a camp rule for its owner (Mosquito Net under Rain). A
-backpack item is not live: no passive, no ability.
+`foldsLast` passive has the last word over items and effects (Momentum's
+whisper count). A backpack item is not live: no passive, no ability.
 
 **Camp modifiers.** A camp's location, weather, pairing and boss are
 `ModDef`s, stacked by `run/stack.ts`'s `campStack`. A body's
@@ -173,14 +180,17 @@ from them. A trick-scoped effect
 
 **The toolkit is the only mutation surface** (`run/toolkit.ts`'s
 `applyToolkitOps`): an ability's `apply` returns `ToolkitOp` data and never
-touches `RunState` or `CampState` itself. `applyToolkitOps` asserts card
-conservation after every op; a broken op throws (a content-author defect,
+touches `RunState` or `CampState` itself. Supplies, coins, items, offers
+and routes are run-level ops and work in any stage; every other op needs a
+dealt camp and throws outside one. In a camp `applyToolkitOps` asserts card
+conservation after the ops; a broken op throws (a content-author defect,
 POLICY A3).
 
 **Spending is the engine's job.** `useAbility` appends a `used` ledger entry
-(with its pool cost), takes the supplies of a supplies limit, and removes an
-item instance on the use that spends its last charge. Authors never count
-uses.
+(with its pool cost), takes the supplies of a supplies limit and the coins
+of a coins limit, and removes an item instance on the use that spends its
+last charge. A use the composed `freeUse` names is stamped `free`: it
+spends nothing and counts against no limit. Authors never count uses.
 
 **The RNG stream rule (A1):** `RunState` carries only a `seed` string. Every
 draw derives a fresh, uniquely named stream via `run/rng.ts`'s `STREAMS`:
@@ -197,6 +207,11 @@ draw derives a fresh, uniquely named stream via `run/rng.ts`'s `STREAMS`:
 | Attempt deal seed | `{seed}:camp{k}:attempt{A}` |
 | Trick-count kind and N | `expedition-trickcount-{kind\|n}:camp{k}:attempt{A}` |
 | Ability draws (`ctx.randomCards`, `ctx.randomIndex`) | `expedition-ability:camp{k}:attempt{A}:seat{id}:use{u}:draw{j}` |
+| An offer an ability draws (`ctx.drawOffer`) | `expedition-ability:camp{k}:attempt{A}:seat{id}:use{u}:draw{j}:bundle{b}:item{i}:{rarity\|pick}` |
+| A fanned hand's order | `expedition-fan:camp{k}:attempt{A}:seat{id}:of{id}:use{u}` |
+| An option target's `scope.roll` | `expedition-option:camp{k}:attempt{A}:seat{id}:{label}` |
+| An objective an ability adds | `expedition-objective-added:camp{k}:attempt{A}:n{n}` (n = the camp's objective count) |
+| A source reaction's draws (`ctx.draw`, `ctx.drawOffer`) | `expedition-source:{key}:seat{id}:{place}:on:{eventKey}:draw{j}` (place `camp{k}:attempt{A}`, or `run` before a stamp exists), plus `:bundle{b}:item{i}:{part}` for an offer |
 | Mod rule roll (`ctx.roll`) | `expedition-mod:{id}:{strength}:camp{k}:attempt{A}:rule:{label}` |
 | Mod reaction draw (`ctx.draw`, `ctx.randomCards`) | `expedition-mod:{id}:{strength}:camp{k}:attempt{A}:on:{eventKey}:draw{j}` |
 
@@ -204,7 +219,10 @@ draw derives a fresh, uniquely named stream via `run/rng.ts`'s `STREAMS`:
 one `apply`; the context builds both, so an ability never names a stream.
 A camp modifier never names one either: `ctx.roll` gives the same value for
 the same label within an attempt, and `eventKey` is `dealt`, `pick{n}`,
-`t{i}-start`, `t{i}-p{position}`, `t{i}-done` or `whisper{ordinal}`.
+`t{i}-start`, `t{i}-p{position}`, `t{i}-done`, `t{i}-void`,
+`whisper{ordinal}`, `settled` or (sources only) `started`. A stage window
+(loadout, draft, route) stamps trick 0 of the camp it belongs to, so `k`
+and `A` there are that camp's.
 
 ## Add an item
 
@@ -258,7 +276,11 @@ that card can't win this one trick.
    names the base power ("Spyglass"); `text` says what it does. A character
    or upgrade ability gives `ability({ window, limit, targets, apply })`
    with `limit` one of `{ kind: "per-camp", times }`, `{ kind: "per-run",
-   times }`, `{ kind: "pool", cost }` or `{ kind: "supplies", cost }`.
+   times }`, `{ kind: "pool", cost }`, `{ kind: "supplies", cost }` or
+   `{ kind: "coins", cost(ctx) }` (a price from the purse that may read the
+   key's uses this camp and this run, and the picked targets). A
+   character or upgrade may also react to engine events with `on` (see
+   "The character seams").
 2. `pool` (optional) is the character's resource: `{ name, start, max,
    regain }`. Abilities of this character and its upgrades may use
    `{ kind: "pool", cost }`; the engine regains it after each cleared camp.
@@ -273,6 +295,51 @@ that card can't win this one trick.
    in `sources.contract.test.ts`'s first test. Add the 64x80 silhouette as
    `sprites/crew/<id>.png`, the icons for the power and both upgrades under
    `sprites/sources/`, and the ids to `CREW_IDS` and `SOURCE_ICON_IDS`.
+
+## The character seams
+
+The nine characters stand on these. With no source using one, each answers
+as the engine did before them.
+
+- **Stage windows.** `loadout` (until the seat is ready), `draft` (a seat
+  with an offer) and `route`, beside the camp windows. Abilities there get
+  `ctx.camp === null`; the loadout stamps the attempt it will deal, so a
+  per-camp limit counts loadout uses with that camp's.
+- **Run hooks** (`run/run-rules.ts`): `normalWeatherChance(run, chance)`
+  shifts a route's fair-weather chance (never projected);
+  `routeOptionCount(run, count)` (1 to 3); `swapsBoss(run, option)` gives
+  that option a `swapBoss`, another boss of the next animal or disaster
+  boss camp's tier, written into the plan when the route is chosen and
+  hidden while beyond the horizon; `draftShape(run, seatId)` is a cleared
+  camp's offer (`DraftShape`: options, bundle size, items exclusive to the
+  character, rare chance); `shopPrice(run, seatId, price)`, which the shop
+  view shows per viewer; `affectsSeat(run, seatId, origin)`, which the
+  animal bosses ask through `ctx.affects` before singling a seat out (it
+  folds the seat layers only); `freeUse(run, seatId, key)`; and
+  `surveys(run, seatId)`, which puts the objectives a previewed camp will
+  deal into that seat's `survey` (`run/survey.ts`).
+- **Core hooks**: `voidsTrick` and `objectivePicker`, above.
+- **Ops**: `grant-item`, `give-item` (the instance keeps its spent uses),
+  `drop-item`, `swap-slots`, `drop-offer`, `add-offer`, `reroll-route` (the
+  option's place and event again on reroll `r + 1`), `add-objective`,
+  `retarget-objective` and `void-trick` (the last completed trick becomes a
+  hallucination).
+- **Target kinds**: `item` (your own, equipped, backpack or any),
+  `route-option`, `fanned-card` (a teammate's hand as a seeded fan, plus the
+  cards shown to you while that seat held them; one that has left the hand
+  lands on the fan's first place, so the choice never says where it went),
+  `objective-value` (a pending card objective's target one or two ranks
+  along) and `option` (values the spec lists from its scope, with a seeded
+  `scope.roll`).
+- **Limits and context**: the `coins` limit; `ctx.catalog` and
+  `ctx.drawOffer(seatId, shape)` (a special offer for `add-offer`).
+- **Reactions**: a character or upgrade's `on` reacts like a camp
+  modifier's, after the camp's modifiers, to the engine's events plus
+  `run-started` (the length vote opening camp 1) and `camp-settled`
+  (before a decided camp settles). Its ops run under the seat's origin; an
+  `add-modifier` from it resolves its layer through the source's
+  `active.effect`.
+- **Passives**: `foldsLast` (above).
 
 ## The channel rule
 
@@ -568,14 +635,18 @@ to turn it on. The web app shows the panel when `NODE_ENV` is `development`
   give a seat an item (`give-item`: a new instance, equipped while a slot is
   free), set a seat's upgrade (`set-upgrade`, its own character's or none),
   set the camp's location and weather (`set-spec`, dealing a dealt camp
-  again), move a card between hands, set an objective's owner.
+  again), move a card between hands, make the last trick a hallucination
+  (`void-last-trick`), reroll a route option (`reroll-route`), set a route's
+  boss swap (`set-route-swap`), queue a special draft offer
+  (`queue-offer`), set an objective's owner.
 - Reveal all hands: a plain-text dump of every hand, objective and trick,
   naming the seats each concealed thing is hidden from.
 - State: the whole `RunState` as JSON. Edit and Apply; the worker parses it
   with `ExpeditionRunStateSchema` and then `dev/check.ts` (card conservation,
   known ids, seat alignment, item instances below `itemSerial`, equipped
   sets within the slots, draft offers of known items, upgrades of the seat's
-  own character), and answers with a readable error if either fails.
+  own character, route rerolls and boss swaps, hallucinations naming this
+  camp's cards), and answers with a readable error if either fails.
 - Snapshots: named copies of the state in this browser's localStorage. One
   saved in another room loads into any room with the same seat count; its
   seat ids are renamed to the room's.

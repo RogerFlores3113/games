@@ -66,7 +66,7 @@ function stackLines(run: RunState, catalog: Catalog): string[] {
   const spec = specOf(run);
   if (spec === null) return [];
   const layers = campStack(run, catalog).map((layer) => {
-    const status = layer.body.status?.(modCtx(run, spec, layer)) ?? [];
+    const status = layer.body.status?.(modCtx(run, spec, layer, catalog)) ?? [];
     return `mod ${layer.def.id} (${layer.def.kind}, ${layer.strength})${status.length === 0 ? "" : `: ${status.map(statusLabel).join("; ")}`}`;
   });
   const effects = (run.stage.tag === "camp" ? run.stage.attempt.effects : []).map((e) => {
@@ -96,7 +96,13 @@ function stageLines(run: RunState, catalog: Catalog): string[] {
     case "draft":
       return [`cleared camp ${stage.cleared}, paid ${stage.payout}`];
     case "route":
-      return [...stage.options.map((o) => `route ${o.id}: ${specLabel(o.next, catalog)}`), `route ballots: ${perSeat(run, stage.ballots)}`];
+      return [
+        ...stage.options.map(
+          (o) =>
+            `route ${o.id}: ${specLabel(o.next, catalog)}${o.reroll === 0 ? "" : `, rerolled ${o.reroll}x`}${o.swapBoss === null ? "" : `, swaps camp ${o.swapBoss.at}'s boss for ${o.swapBoss.modId}${o.swapBoss.at > horizon(run) ? " (not yet revealed)" : ""}`}`,
+        ),
+        `route ballots: ${perSeat(run, stage.ballots)}`,
+      ];
     case "event":
       return [`event ${stage.route.next.event ?? "none"} on route ${stage.route.id}`, specLabel(stage.route.next, catalog), `ready: ${perSeat(run, stage.ready)}`];
     case "ended":
@@ -124,7 +130,8 @@ export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[]
       title: "Crew",
       lines: run.seats.map((s) => {
         const item = (uid: string) => `${s.items.find((i) => i.uid === uid)?.itemId ?? "?"} ${uid}`;
-        const offer = s.offers[0]?.bundles.map((bundle) => bundle.join(" + ")).join(" | ") ?? "none";
+        const head = s.offers[0];
+        const offer = head === undefined ? "none" : `${head.kind === "special" ? "special: " : ""}${head.bundles.map((bundle) => bundle.join(" + ")).join(" | ")}`;
         return `${s.seatId}: ${s.characterId ?? "no character"}, upgrade ${s.upgradeId ?? "none"}, equipped [${s.equipped.map(item).join(", ")}], backpack [${backpackOf(s).map((i) => item(i.uid)).join(", ")}]${hiddenNote(run, rules, { kind: "loadout", seatId: s.seatId })}, offer ${offer}${s.offers.length > 1 ? ` (+${s.offers.length - 1} queued)` : ""}`;
       }),
     },
@@ -154,6 +161,7 @@ export function inspectRun(run: RunState, catalog: Catalog): DevInspectSection[]
       `trick ${camp.currentTrick.index + 1} of ${camp.totalTricks}, ${camp.completedTricks.length} completed, leader ${camp.currentTrick.leaderSeatId}`,
       `played: ${trick.plays.map((p, position) => `${p.seatId} ${cardLabel(p.card.identity)}${hiddenNote(run, rules, { kind: "play", trickIndex: trick.index, position, seatId: p.seatId })}`).join(", ") || "nothing"}`,
       ...camp.completedTricks.map((t) => `trick ${t.index + 1}: ${t.plays.map(playLabel).join(", ")}, ${t.winnerSeatId} won`),
+      ...camp.voidedTricks.map((t) => `trick ${t.index + 1} was a hallucination: ${t.plays.map((p) => `${p.seatId} ${cardLabel(p.card.identity)}`).join(", ")}, back in hand`),
       `discards: ${camp.discards.map((d) => `${cardLabel(d.card.identity)} after trick ${d.afterTrick}`).join(", ") || "none"}`,
       `current actor: ${currentActorSeatId(camp, rules) ?? "none"}`,
     ],

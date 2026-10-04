@@ -74,7 +74,7 @@ function makeState(overrides: Partial<CampState> = {}): CampState {
     objectiveDeck: [],
     completedTricks: [],
     currentTrick: { index: 0, leaderSeatId: "a", plays: [] },
-    discards: [],
+    discards: [], voidedTricks: [],
     ...overrides,
   };
 }

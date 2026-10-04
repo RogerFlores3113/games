@@ -10,7 +10,7 @@ type Log = Attempt["log"];
 const club3 = { id: "c3", identity: { kind: "standard", suit: "clubs", rank: 3 } } as const;
 const club4 = { id: "c4", identity: { kind: "standard", suit: "clubs", rank: 4 } } as const;
 
-const preview = { index: 1, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false };
+const preview = { index: 1, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false, survey: null };
 
 function objective(id: string, status: Obj["status"], ownerSeatId: string | null = null): Obj {
   return { id, kind: "no-tricks", ownerSeatId, status };
@@ -23,7 +23,7 @@ function camp(over: Partial<Camp> = {}): Camp {
     totalTricks: 10,
     removedCards: [],
     goals: [],
-    discards: [],
+    discards: [], voidedTricks: [],
     objectives: [objective("o1", "pending")],
     yourHand: [],
     yourLegalCardIds: [],

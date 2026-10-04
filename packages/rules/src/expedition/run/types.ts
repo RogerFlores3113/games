@@ -36,7 +36,8 @@ export type SeatId = string;
 /** Each seat writes only its own key. */
 export type PerSeat<T> = Readonly<Partial<Record<SeatId, T>>>;
 
-/** When a ledger entry happened. `trick` is completedTricks.length. */
+/** When a ledger entry happened. `trick` is completedTricks.length; a stage
+ * window stamps trick 0 of the camp it belongs to (usage.ts's currentStamp). */
 export type Stamp = { readonly camp: CampIndex; readonly attempt: number; readonly trick: number };
 
 /** "it7", minted from RunState.itemSerial, so an id never names its item. */
@@ -47,7 +48,8 @@ export type ItemInstance = { readonly uid: ItemUid; readonly itemId: SourceId };
 export type SourceKey = string;
 
 export type LedgerEntry =
-  | { readonly kind: "used"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly poolCost: number } // 0 unless a pool limit
+  /** poolCost is 0 unless a pool limit; a `free` use counts against no limit. */
+  | { readonly kind: "used"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly poolCost: number; readonly free?: true }
   | { readonly kind: "passed"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly failedObjectiveIds: readonly string[] } // gated-window pass; the failures it declined
   | { readonly kind: "regained"; readonly amount: number; readonly at: Stamp }; // pool regain on a clear
 

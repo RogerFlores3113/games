@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { defineItem, type Rarity } from "../content/source-def";
 import { CATALOG } from "./catalog";
-import { draftOfferFor } from "./draft";
+import { BASE_DRAFT_SHAPE, draftOfferFor } from "./draft";
 import { campIndex } from "./plan";
 import { STREAMS, seededIndex } from "./rng";
 import { testCatalog } from "./run-test-support";
@@ -67,12 +67,20 @@ describe("draftOfferFor", () => {
     }
   });
 
-  it("offers an item exclusive to a character only to that character", () => {
+  it("adds an exclusive item to each bundle only when the shape asks, and only for its character", () => {
     const catalog = testCatalog({ items: { "c-1": plain("c-1", "common"), "c-2": plain("c-2", "common"), mine: plain("mine", "common", "plain-1") } });
-    const offered = (characterId: string) =>
-      new Set(Array.from({ length: 20 }, (_, n) => draftOfferFor(`ex-${n}`, CAMP_1, seat("p0", characterId), 0, catalog).bundles.flat()).flat());
-    expect(offered("plain-1")).toEqual(new Set(["c-1", "c-2", "mine"]));
-    expect(offered("plain-2")).toEqual(new Set(["c-1", "c-2"]));
+    const packRat = { ...BASE_DRAFT_SHAPE, exclusive: 1 };
+    const offered = (characterId: string, shape = BASE_DRAFT_SHAPE) =>
+      new Set(Array.from({ length: 20 }, (_, n) => draftOfferFor(`ex-${n}`, CAMP_1, seat("p0", characterId), 0, catalog, shape).bundles.flat()).flat());
+    expect(offered("plain-1")).toEqual(new Set(["c-1", "c-2"]));
+    expect(offered("plain-1", packRat)).toEqual(new Set(["c-1", "c-2", "mine"]));
+    const bundles = draftOfferFor("ex", CAMP_1, seat("p0", "plain-1"), 0, catalog, packRat).bundles;
+    expect(bundles.map((bundle) => [bundle.length, bundle[2]])).toEqual([
+      [3, "mine"],
+      [3, "mine"],
+      [3, "mine"],
+    ]);
+    expect(offered("plain-2", packRat)).toEqual(new Set(["c-1", "c-2"]));
   });
 
   it("never offers an upgrade", () => {

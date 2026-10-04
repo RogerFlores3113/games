@@ -269,7 +269,7 @@ describe("view-leak-check: canary suite", () => {
 
     const leaky = structuredClone(view);
     if (leaky.stage.tag !== "draft") throw new Error("expected the draft stage");
-    leaky.stage.yourOffer = { bundles: other.offers[0]!.bundles.map((b) => [...b]) };
+    leaky.stage.yourOffer = { kind: "standard", bundles: other.offers[0]!.bundles.map((b) => [...b]) };
 
     const reasons = checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets });
     expect(reasons).toEqual(expect.arrayContaining(["structural:draft-offer-mismatch", "structural:foreign-offer"]));

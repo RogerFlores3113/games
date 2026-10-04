@@ -28,7 +28,7 @@ function makeCamp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampVi
     totalTricks: 17,
     removedCards: [],
     goals: [],
-    discards: [],
+    discards: [], voidedTricks: [],
     objectives: [],
     yourHand: [{ id: "c-as", identity: AS, effectiveRank: null, countsAs: null }],
     yourLegalCardIds: ["c-as"],
@@ -64,7 +64,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     lastVote: null,
     stage: {
       tag: "camp",
-      camp: { index: 2, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false },
+      camp: { index: 2, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false, survey: null },
       mods: [],
       attempt: {
         attemptNumber: 1,
@@ -86,7 +86,7 @@ function onTrail(stage: ExpeditionStageView, overrides: Partial<ExpeditionView> 
   return makeView({ stage, ...overrides });
 }
 
-const draftOffer: ExpeditionStageView = { tag: "draft", cleared: 1, payout: 8, yourOffer: { bundles: [["trained-monkey"]] }, pendingSeatIds: ["s2"] };
+const draftOffer: ExpeditionStageView = { tag: "draft", cleared: 1, payout: 8, yourOffer: { kind: "standard", bundles: [["trained-monkey"]] }, pendingSeatIds: ["s2"] };
 const ended: ExpeditionStageView = { tag: "ended", result: "lost" };
 
 function server(view: ExpeditionView, seats = roomSeats()): SceneServerInput {

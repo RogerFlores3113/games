@@ -1,7 +1,8 @@
 // The timing windows abilities fire in. At most one is open; each is
 // derived from the run, never stored. A gated window holds the table until
 // every seat that can act in it has used or passed: rescue holds the settle
-// of a camp failed only by failed objectives.
+// of a camp failed only by failed objectives. The stage windows (loadout,
+// draft, route) are open for their whole stage, between camps.
 
 import { campPhase, checkCampOutcome, currentActorSeatId } from "../camp";
 import { pendingSourceKeys } from "./abilities";
@@ -10,7 +11,7 @@ import { rulesFor } from "./compose";
 import type { RunRules } from "./run-rules";
 import type { Catalog, RunState } from "./types";
 
-export type ActiveWindow = "objective-pick" | "between-tricks" | "in-trick" | "rescue";
+export type ActiveWindow = "objective-pick" | "between-tricks" | "in-trick" | "rescue" | "loadout" | "draft" | "route";
 
 export type WindowDef = {
   readonly id: ActiveWindow;
@@ -67,13 +68,35 @@ export const WINDOWS: { readonly [W in ActiveWindow]: WindowDef } = {
     },
     mayAct: anySeat,
   },
+  loadout: {
+    id: "loadout",
+    phrase: "Before setting out",
+    gated: false,
+    isOpen: (run) => run.stage.tag === "loadout",
+    // After its ready a seat can change nothing.
+    mayAct: (run, _rules, seatId) => run.stage.tag === "loadout" && !Object.hasOwn(run.stage.ready, seatId),
+  },
+  draft: {
+    id: "draft",
+    phrase: "While drafting",
+    gated: false,
+    isOpen: (run) => run.stage.tag === "draft",
+    mayAct: (run, _rules, seatId) => run.seats.some((seat) => seat.seatId === seatId && seat.offers.length > 0),
+  },
+  route: {
+    id: "route",
+    phrase: "While choosing the route",
+    gated: false,
+    isOpen: (run) => run.stage.tag === "route",
+    mayAct: anySeat,
+  },
 };
 
 const WINDOW_ORDER = Object.keys(WINDOWS) as ActiveWindow[];
 
 /** At most one window is open; the isOpen predicates are mutually exclusive
  * by construction (no attempt, picking, playing with or without plays,
- * decided). */
+ * decided, or a stage between camps). */
 export function currentWindow(run: RunState, rules: RunRules): ActiveWindow | null {
   return WINDOW_ORDER.find((id) => WINDOWS[id].isOpen(run, rules)) ?? null;
 }

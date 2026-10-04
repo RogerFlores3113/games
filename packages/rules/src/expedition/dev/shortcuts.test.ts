@@ -5,6 +5,8 @@ import { createRun, runStatus } from "../run/lifecycle";
 import { campStack } from "../run/stack";
 import type { RunState } from "../run/types";
 import { checkRunState } from "./check";
+import { applyRunAction } from "../run/stages/registry";
+import { botMove } from "./autoplay";
 import { DEV_SHORTCUTS } from "./shortcuts";
 
 const SEATS = ["a", "b", "c"];
@@ -197,3 +199,55 @@ describe("dev shortcuts", () => {
     expect(checkRunState(atCamp, CATALOG)).toEqual([]);
   });
 });
+
+describe("dev shortcuts for the character seams", () => {
+  const act = (state: RunState, seatId: string, action: Parameters<typeof applyRunAction>[2]): RunState => {
+    const result = applyRunAction(state, seatId, action, CATALOG);
+    if (!result.ok) throw new Error(result.error);
+    return result.state;
+  };
+  const routeVote = (): RunState => {
+    let state = run("force-camp", run("jump-to-camp", fresh(), { length: "standard", camp: 1, stage: "camp" }), { outcome: "cleared" });
+    while (state.stage.tag === "draft") state = act(state, state.seats.find((s) => s.offers.length > 0)!.seatId, { type: "pick-bundle", bundle: 0 });
+    return state;
+  };
+
+  it("reroll-route draws one option's place and event again and counts the reroll", () => {
+    const vote = routeVote();
+    const rerolled = run("reroll-route", vote, { option: "a" });
+    if (rerolled.stage.tag !== "route" || vote.stage.tag !== "route") throw new Error("expected the route vote");
+    expect(rerolled.stage.options.map((o) => o.reroll)).toEqual(vote.stage.options.map((o, i) => (i === 0 ? 1 : 0)));
+    expect(rerolled.stage.options[0]!.next.slots).toEqual(vote.stage.options[0]!.next.slots);
+    expect(checkRunState(rerolled, CATALOG)).toEqual([]);
+    expect(() => run("reroll-route", fresh(), { option: "a" })).toThrow("reroll-route works at a route vote");
+  });
+
+  it("set-route-swap swaps the next animal boss camp's boss, and refuses a boss of another tier", () => {
+    const swapped = run("set-route-swap", routeVote(), { option: "b", boss: "beaver" });
+    if (swapped.stage.tag !== "route") throw new Error("expected the route vote");
+    expect(swapped.stage.options.find((o) => o.id === "b")!.swapBoss).toEqual({ at: 3, modId: "beaver" });
+    expect(checkRunState(swapped, CATALOG)).toEqual([]);
+    expect(() => run("set-route-swap", routeVote(), { option: "b", boss: "tornado" })).toThrow("tornado is not an animal boss");
+  });
+
+  it("void-last-trick returns the last trick's cards to their hands", () => {
+    let state = run("jump-to-camp", fresh(), { length: "standard", camp: 1, stage: "camp" });
+    while ((attemptOf(state)?.camp.completedTricks.length ?? 0) === 0) {
+      const move = botMove(state, SEATS, CATALOG)!;
+      state = act(state, move.seatId, move.request);
+    }
+    const voided = run("void-last-trick", state);
+    const camp = attemptOf(voided)!.camp;
+    expect([camp.completedTricks.length, camp.voidedTricks.map((t) => t.index)]).toEqual([0, [0]]);
+    expect(checkRunState(voided, CATALOG)).toEqual([]);
+    expect(() => run("void-last-trick", voided)).toThrow("there is no completed trick to void");
+  });
+
+  it("queue-offer queues a special offer behind the seat's own", () => {
+    const queued = run("queue-offer", run("force-camp", run("jump-to-camp", fresh(), camp2), { outcome: "cleared" }), { seat: "b" });
+    expect(queued.seats.find((s) => s.seatId === "b")!.offers.map((o) => o.kind)).toEqual(["standard", "special"]);
+    expect(checkRunState(queued, CATALOG)).toEqual([]);
+  });
+});
+
+const camp2 = { length: "standard", camp: 2, stage: "camp" } as const;

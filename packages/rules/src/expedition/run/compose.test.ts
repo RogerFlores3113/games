@@ -89,7 +89,7 @@ function minimalCampStateFor(hands: readonly Hand[], currentTrickPlays: readonly
     expeditionLeaderSeatId: hands[0]!.seatId,
     objectives: [],
     objectiveDeck: [],
-    discards: [],
+    discards: [], voidedTricks: [],
     completedTricks: [],
     currentTrick: { index: 0, leaderSeatId: hands[0]!.seatId, plays: currentTrickPlays },
   };

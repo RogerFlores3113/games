@@ -207,7 +207,7 @@ function buildPlayingState(): CampState {
     expeditionLeaderSeatId: "a",
     objectives,
     objectiveDeck: [],
-    discards: [],
+    discards: [], voidedTricks: [],
     completedTricks: [],
     currentTrick: { index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: a1 }] },
   };

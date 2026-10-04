@@ -9,12 +9,17 @@
 // step never depend on earlier picks; rules that span steps belong to the
 // ability's own `canTarget`.
 
+import { shuffleWithSeed } from "../../shuffle";
+import { identitiesEqual } from "../deck";
 import { trickContaining } from "../objectives";
-import type { CampState, CompletedTrick, Objective, ObjectiveStatus, StandardRank } from "../state";
+import type { CampState, CompletedTrick, ExpeditionCard, Objective, ObjectiveStatus, StandardIdentity, StandardRank } from "../state";
 import { SUPPLIES_MAX } from "./balance";
 import { attemptOf } from "./attempt";
+import { STREAMS, seededIndex } from "./rng";
+import type { RouteOption } from "./route";
 import type { RunRules } from "./run-rules";
-import type { RunState } from "./types";
+import type { Catalog, RunState } from "./types";
+import { currentStamp, seatOf } from "./usage";
 
 export type TargetKind =
   | "self"
@@ -28,7 +33,12 @@ export type TargetKind =
   | "won-trick"
   | "card-value"
   | "board"
-  | "supplies";
+  | "supplies"
+  | "item"
+  | "route-option"
+  | "fanned-card"
+  | "objective-value"
+  | "option";
 
 /** Per-kind spec parameters (only what the catalogue uses). */
 type SpecParams = {
@@ -44,6 +54,12 @@ type SpecParams = {
   "card-value": { readonly spread: 1 | 2 };
   board: {};
   supplies: {};
+  item: { readonly where: "equipped" | "backpack" | "any" };
+  "route-option": {};
+  "fanned-card": {};
+  "objective-value": { readonly spread: 1 | 2 };
+  /** `options` lists the values on offer; they ship to the client as ids. */
+  option: { readonly prompt: string; options(scope: OptionScope): readonly string[] };
 };
 export type TargetSpec = { [K in TargetKind]: { readonly kind: K } & SpecParams[K] }[TargetKind];
 type SpecOf<K extends TargetKind> = Extract<TargetSpec, { kind: K }>;
@@ -62,11 +78,20 @@ export type TargetOf = {
   "card-value": { readonly kind: "card-value"; readonly cardId: string; readonly rank: StandardRank };
   board: { readonly kind: "board"; readonly trickIndex: number };
   supplies: { readonly kind: "supplies"; readonly current: number; readonly max: number };
+  item: { readonly kind: "item"; readonly seatId: string; readonly uid: string; readonly itemId: string };
+  "route-option": { readonly kind: "route-option"; readonly option: RouteOption };
+  /** The card the pick landed on; the picker saw only its place in the fan. */
+  "fanned-card": { readonly kind: "fanned-card"; readonly seatId: string; readonly cardId: string };
+  "objective-value": { readonly kind: "objective-value"; readonly objective: Objective; readonly target: StandardIdentity };
+  option: { readonly kind: "option"; readonly value: string };
 };
 export type Target = TargetOf[TargetKind];
 export type TargetsOf<S extends readonly TargetSpec[]> = { readonly [I in keyof S]: TargetOf[S[I]["kind"]] };
 
-export type SeatScope = { readonly run: RunState; readonly seatId: string; readonly camp: CampState | null; readonly rules: RunRules };
+export type SeatScope = { readonly run: RunState; readonly seatId: string; readonly camp: CampState | null; readonly rules: RunRules; readonly catalog: Catalog };
+/** An option list's scope: a seeded roll that gives the same value for the
+ * same label within an attempt. */
+export type OptionScope = SeatScope & { roll(label: string, n: number): number };
 export type Choice<K extends TargetKind> = { readonly id: string; readonly target: TargetOf[K] };
 
 export type TargetKindDef<K extends TargetKind> = {
@@ -96,6 +121,33 @@ function whispers(run: RunState): readonly { ordinal: number; fromSeatId: string
 
 const MIN_RANK = 2;
 const MAX_RANK = 14;
+
+function ranksAround(rank: number, spread: number): StandardRank[] {
+  const ranks: StandardRank[] = [];
+  for (let r = rank - spread; r <= rank + spread; r++) {
+    if (r !== rank && r >= MIN_RANK && r <= MAX_RANK) ranks.push(r as StandardRank);
+  }
+  return ranks;
+}
+
+/** Each teammate's hand in the order this seat sees it fanned, seeded per
+ * (attempt, seat, hand, the seat's ledger length): a place in the fan says
+ * nothing about the card. */
+function fanOf(scope: SeatScope, cards: readonly ExpeditionCard[], ofSeatId: string): readonly ExpeditionCard[] {
+  const stamp = currentStamp(scope.run)!;
+  const uses = seatOf(scope.run, scope.seatId).ledger.length;
+  return shuffleWithSeed(cards, scope.run.seed, STREAMS.fan(stamp.camp, stamp.attempt, scope.seatId, ofSeatId, uses));
+}
+
+/** Cards shown to this seat while `ofSeatId` held them, by the holder the
+ * reveal pinned (WR-03): picking one names the card, and if it has left that
+ * hand the pick lands on the fan's first place instead, so the choice never
+ * says where the card went. */
+function knownCardIds(scope: SeatScope, ofSeatId: string): readonly string[] {
+  const reveals = attemptOf(scope.run)?.reveals ?? [];
+  const ids = reveals.filter((r) => r.fromSeatId === ofSeatId && (r.audience.includes(scope.seatId) || (r.source === "whisper" && r.fromSeatId === scope.seatId))).map((r) => r.cardId);
+  return [...new Set(ids)];
+}
 
 export const TARGET_KINDS: { readonly [K in TargetKind]: TargetKindDef<K> } = {
   self: {
@@ -199,11 +251,7 @@ export const TARGET_KINDS: { readonly [K in TargetKind]: TargetKindDef<K> } = {
       return own.flatMap((card) => {
         const identity = card.identity;
         if (identity.kind !== "standard") return [];
-        const ranks: StandardRank[] = [];
-        for (let rank = identity.rank - spec.spread; rank <= identity.rank + spec.spread; rank++) {
-          if (rank !== identity.rank && rank >= MIN_RANK && rank <= MAX_RANK) ranks.push(rank as StandardRank);
-        }
-        return ranks.map((rank) => ({ id: `value:${card.id}:${rank}`, target: { kind: "card-value" as const, cardId: card.id, rank } }));
+        return ranksAround(identity.rank, spec.spread).map((rank) => ({ id: `value:${card.id}:${rank}`, target: { kind: "card-value" as const, cardId: card.id, rank } }));
       });
     },
   },
@@ -219,6 +267,65 @@ export const TARGET_KINDS: { readonly [K in TargetKind]: TargetKindDef<K> } = {
     kind: "supplies",
     describe: () => "Pick the crew's supplies",
     choices: ({ run }) => [{ id: "supplies", target: { kind: "supplies", current: run.supplies, max: SUPPLIES_MAX } }],
+  },
+  item: {
+    kind: "item",
+    describe: (spec) => (spec.where === "equipped" ? "Pick an item you carry" : spec.where === "backpack" ? "Pick an item in your backpack" : "Pick one of your items"),
+    choices: ({ run, seatId }, spec) => {
+      const seat = seatOf(run, seatId);
+      return seat.items
+        .filter((item) => spec.where === "any" || seat.equipped.includes(item.uid) === (spec.where === "equipped"))
+        .map((item) => ({ id: `item:${item.uid}`, target: { kind: "item", seatId, uid: item.uid, itemId: item.itemId } }));
+    },
+  },
+  "route-option": {
+    kind: "route-option",
+    describe: () => "Pick a route",
+    choices: ({ run }) =>
+      run.stage.tag === "route" ? run.stage.options.map((option) => ({ id: `route:${option.id}`, target: { kind: "route-option", option } })) : [],
+  },
+  "fanned-card": {
+    kind: "fanned-card",
+    describe: () => "Pick a card from a teammate's fanned hand",
+    choices: (scope) =>
+      (scope.camp?.hands ?? [])
+        .filter((hand) => hand.seatId !== scope.seatId && hand.cards.length > 0)
+        .flatMap((hand) => {
+          const fan = fanOf(scope, hand.cards, hand.seatId);
+          const places = fan.map((card, i) => ({ id: `fan:${hand.seatId}:${i}`, target: { kind: "fanned-card" as const, seatId: hand.seatId, cardId: card.id } }));
+          const known = knownCardIds(scope, hand.seatId).map((cardId) => ({
+            id: `fan:${hand.seatId}:known:${cardId}`,
+            target: { kind: "fanned-card" as const, seatId: hand.seatId, cardId: hand.cards.some((card) => card.id === cardId) ? cardId : fan[0]!.id },
+          }));
+          return [...places, ...known];
+        }),
+  },
+  "objective-value": {
+    kind: "objective-value",
+    describe: () => "Pick an objective's card to shift",
+    choices: ({ run, seatId, camp, rules }, spec) => {
+      if (camp === null) return [];
+      return camp.objectives.flatMap((objective) => {
+        if (objective.kind !== "win-card" && objective.kind !== "ordered") return [];
+        const target = objective.target;
+        if (target.kind !== "standard" || rules.objectiveStatus(camp, objective) !== "pending") return [];
+        if (rules.hides(run, seatId, { kind: "objective", objectiveId: objective.id })) return [];
+        return ranksAround(target.rank, spec.spread)
+          .map((rank): StandardIdentity => ({ kind: "standard", suit: target.suit, rank }))
+          .filter((shifted) => !camp.removedCards.some((removed) => identitiesEqual(removed, shifted)))
+          .map((shifted) => ({ id: `objective-value:${objective.id}:${shifted.rank}`, target: { kind: "objective-value" as const, objective, target: shifted } }));
+      });
+    },
+  },
+  option: {
+    kind: "option",
+    describe: (spec) => spec.prompt,
+    choices: (scope, spec) => {
+      const stamp = currentStamp(scope.run);
+      if (stamp === null) return [];
+      const roll = (label: string, n: number) => seededIndex(scope.run.seed, STREAMS.option(stamp.camp, stamp.attempt, scope.seatId, label), n);
+      return [...new Set(spec.options({ ...scope, roll }))].map((value) => ({ id: `option:${value}`, target: { kind: "option", value } }));
+    },
   },
 };
 

@@ -6,15 +6,16 @@
 import type { AdapterResult } from "../../adapter";
 import { shuffleWithSeed } from "../../shuffle";
 import { checkCampOutcome } from "../camp";
-import { windowsOf, type AbilityContext, type ItemAbility } from "../content/source-def";
+import { resolveTuned, windowsOf, type AbilityContext, type ItemAbility } from "../content/source-def";
 import { attemptOf, withAttempt } from "./attempt";
 import { rulesFor } from "./compose";
+import { drawOffer } from "./draft";
 import { STREAMS, seededIndex } from "./rng";
 import type { RunRules } from "./run-rules";
 import { resolveTargets, stepsFor, type AbilityStep, type SeatScope, type Target, type TargetSpec } from "./targets";
 import { applyToolkitOps, type ToolkitOp } from "./toolkit";
 import type { Catalog, LedgerEntry, LogEntry, RunError, RunState, SeatRun, SourceKey } from "./types";
-import { abilityKeys, abilityOf, currentStamp, defIdOf, limitBlock, ownerOf, remaining, sameStamp, seatOf, spendsInstance, type Remaining } from "./usage";
+import { abilityKeys, abilityOf, coinCost, currentStamp, defIdOf, grantOf, limitBlock, limitOf, ownerOf, remaining, sameStamp, seatOf, spendsInstance, type Remaining } from "./usage";
 import { WINDOWS, currentWindow, type ActiveWindow } from "./windows";
 
 export type AbilityStatus =
@@ -26,20 +27,21 @@ function abilityContext<S extends readonly TargetSpec[]>(
   seat: SeatRun,
   key: SourceKey,
   rules: RunRules,
+  catalog: Catalog,
   targets: readonly Target[],
   drawsAllowed: boolean,
 ): AbilityContext<S> {
-  const attempt = attemptOf(run);
   const stamp = currentStamp(run);
-  if (attempt === null || stamp === null) throw new Error("abilities: no attempt in progress");
-  const camp = attempt.camp;
+  if (stamp === null) throw new Error("abilities: no window can be open at this stage");
+  const camp = attemptOf(run)?.camp ?? null;
   const self = seat.seatId;
   let draw = 0;
-  const nextStream = (): string => {
+  const nextDraw = (): number => {
     if (!drawsAllowed) throw new Error(`abilities: "${key}" drew randomness outside apply`);
-    return STREAMS.ability(stamp.camp, attempt.attemptNumber, self, seat.ledger.length, draw++);
+    return draw++;
   };
-  const handOf = (seatId: string) => camp.hands.find((h) => h.seatId === seatId)?.cards ?? [];
+  const nextStream = (): string => STREAMS.ability(stamp.camp, stamp.attempt, self, seat.ledger.length, nextDraw());
+  const handOf = (seatId: string) => camp?.hands.find((h) => h.seatId === seatId)?.cards ?? [];
   return {
     self,
     sourceId: defIdOf(seat, key),
@@ -47,12 +49,18 @@ function abilityContext<S extends readonly TargetSpec[]>(
     run,
     camp,
     rules,
+    catalog,
     // The one widening cast: resolveTargets produced these positionally from S.
     targets: targets as AbilityContext<S>["targets"],
     ownHand: () => handOf(self),
     handSize: (seatId) => handOf(seatId).length,
     randomCards: (seatId, n) => shuffleWithSeed(handOf(seatId).map((card) => card.id), run.seed, nextStream()).slice(0, n),
     randomIndex: (n) => seededIndex(run.seed, nextStream(), n),
+    drawOffer: (seatId, shape) => {
+      const j = nextDraw();
+      const character = run.seats.find((s) => s.seatId === seatId)?.characterId ?? null;
+      return drawOffer(run.seed, (bundle, item, part) => STREAMS.abilityItem(stamp.camp, stamp.attempt, self, seat.ledger.length, j, bundle, item, part), character, catalog, shape, "special");
+    },
   };
 }
 
@@ -65,17 +73,17 @@ function statusWith(run: RunState, seat: SeatRun, key: SourceKey, active: ItemAb
   }
   const blocked = limitBlock(run, left);
   if (blocked !== null) return { usable: false, error: blocked.error, reason: blocked.reason, remaining: left };
-  const canUse = active.canUse ? active.canUse(abilityContext<readonly []>(run, seat, key, rules, [], false)) : true;
+  const canUse = active.canUse ? active.canUse(abilityContext<readonly []>(run, seat, key, rules, catalog, [], false)) : true;
   if (canUse !== true) return { usable: false, error: "ability_unavailable", reason: canUse, remaining: left };
-  const steps = stepsFor(scopeOf(run, seat.seatId, rules), active.targets);
+  const steps = stepsFor(scopeOf(run, seat.seatId, rules, catalog), active.targets);
   if (steps.some((step) => step.choices.length === 0)) {
     return { usable: false, error: "ability_unavailable", reason: "Nothing to pick", remaining: left };
   }
   return { usable: true, steps, remaining: left };
 }
 
-function scopeOf(run: RunState, seatId: string, rules: RunRules): SeatScope {
-  return { run, seatId, camp: attemptOf(run)?.camp ?? null, rules };
+function scopeOf(run: RunState, seatId: string, rules: RunRules, catalog: Catalog): SeatScope {
+  return { run, seatId, camp: attemptOf(run)?.camp ?? null, rules, catalog };
 }
 
 /** null for a source with no active ability. `key` must be live for the
@@ -121,13 +129,16 @@ export function pendingSourceKeys(run: RunState, seatId: string, window: ActiveW
 }
 
 function subjectSeatIds(targets: readonly Target[]): string[] {
-  return targets.flatMap((target) => (target.kind === "player" || target.kind === "self" || target.kind === "hand" ? [target.seatId] : []));
+  return targets.flatMap((target) => (target.kind === "player" || target.kind === "self" || target.kind === "hand" || target.kind === "fanned-card" ? [target.seatId] : []));
 }
 
 /** abilityStatus -> resolveTargets (invalid_target) -> canTarget
- * (invalid_target) -> apply with a ctx built from the run before the use ->
- * applyToolkitOps -> spend (ledger, supplies, the instance on its last
- * charge) -> public log entry (actor and subject seats, never a card). */
+ * (invalid_target) -> a coins price at the picked targets (cannot_afford)
+ * -> apply with a ctx built from the run before the use -> applyToolkitOps
+ * -> spend (ledger, supplies, coins, the instance on its last charge) ->
+ * in a camp, a public log entry (actor and subject seats, never a card). A
+ * use the composed freeUse names spends nothing and counts against no
+ * limit. */
 export function useAbility(
   run: RunState,
   seatId: string,
@@ -144,25 +155,34 @@ export function useAbility(
   const status = statusWith(run, seat, key, active, catalog, rules);
   if (!status.usable) return { ok: false, error: status.error };
 
-  const resolved = resolveTargets(scopeOf(run, seatId, rules), active.targets, targetIds);
+  const resolved = resolveTargets(scopeOf(run, seatId, rules, catalog), active.targets, targetIds);
   if (!resolved.ok) return { ok: false, error: "invalid_target" };
-  const canTarget = active.canTarget ? active.canTarget(abilityContext(run, seat, key, rules, resolved.targets, false)) : true;
+  const canTarget = active.canTarget ? active.canTarget(abilityContext(run, seat, key, rules, catalog, resolved.targets, false)) : true;
   if (canTarget !== true) return { ok: false, error: "invalid_target" };
 
-  const sourceId = defIdOf(seat, key);
-  const ops: ToolkitOp[] = [...active.apply(abilityContext(run, seat, key, rules, resolved.targets, true))];
+  const free = rules.freeUse(run, seatId, key);
   const limit = status.remaining;
-  if (limit.kind === "supplies") ops.push({ op: "adjust-supplies", delta: -limit.cost });
-  const applied = applyToolkitOps(run, { kind: "seat", seatId, sourceKey: key, sourceId }, ops, rules);
+  const grant = grantOf(run, key, catalog);
+  const declared = grant === undefined ? limitOf(seat, key, catalog) : resolveTuned(grant.limit, ownerOf(seat));
+  const coins = declared.kind === "coins" && !free ? coinCost(run, seat, key, declared, resolved.targets) : 0;
+  if (run.purse < coins) return { ok: false, error: "cannot_afford" };
 
-  const used: LedgerEntry = { kind: "used", sourceKey: key, at: currentStamp(run)!, poolCost: limit.kind === "pool" ? limit.cost : 0 };
-  const spent = spendsInstance(seat, key, catalog) && limit.kind === "uses" && limit.left === 1;
+  const sourceId = defIdOf(seat, key);
+  const ops: ToolkitOp[] = [...active.apply(abilityContext(run, seat, key, rules, catalog, resolved.targets, true))];
+  if (limit.kind === "supplies" && !free) ops.push({ op: "adjust-supplies", delta: -limit.cost });
+  if (coins > 0) ops.push({ op: "adjust-coins", delta: -coins });
+  const applied = applyToolkitOps(run, { kind: "seat", seatId, sourceKey: key, sourceId }, ops, rules, catalog);
+
+  const at = currentStamp(run)!;
+  const used: LedgerEntry = free ? { kind: "used", sourceKey: key, at, poolCost: 0, free: true } : { kind: "used", sourceKey: key, at, poolCost: limit.kind === "pool" ? limit.cost : 0 };
+  const spent = !free && spendsInstance(seat, key, catalog) && limit.kind === "uses" && limit.left === 1;
   const seats = applied.seats.map((s) => {
     if (s.seatId !== seatId) return s;
     if (!spent) return { ...s, ledger: [...s.ledger, used] };
     return { ...s, items: s.items.filter((item) => item.uid !== key), equipped: s.equipped.filter((uid) => uid !== key), ledger: [...s.ledger, used] };
   });
-  const attempt = attemptOf(applied)!;
+  const attempt = attemptOf(applied);
+  if (attempt === null) return { ok: true, state: { ...applied, seats } };
   const logEntry: LogEntry = { event: "use-ability", actorSeatId: seatId, subjectSeatIds: subjectSeatIds(resolved.targets), sourceId, audience: "public" };
   return { ok: true, state: withAttempt({ ...applied, seats }, { ...attempt, log: [...attempt.log, logEntry] }) };
 }

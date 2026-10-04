@@ -12,6 +12,8 @@ import type { CampSpec, SlotTemplate } from "./route";
 import { attemptOf, nextAttemptNumber } from "./attempt";
 import { bossAt, helpersFor } from "./plan";
 import { STREAMS, seededIndex } from "./rng";
+import { seatRulesFor } from "./compose";
+import type { RunRules } from "./run-rules";
 import type { Catalog, RunState } from "./types";
 
 export type StackLayer = { readonly def: ModDef; readonly strength: Strength; readonly body: ModBody };
@@ -65,14 +67,18 @@ export function campStack(run: RunState, catalog: Catalog): readonly StackLayer[
 
 /** A layer's context. Its rolls belong to the dealt attempt, or in the
  * loadout to the attempt the loadout will deal. */
-export function modCtx(run: RunState, spec: CampSpec, layer: { readonly def: ModDef; readonly strength: Strength }): ModCtx {
+export function modCtx(run: RunState, spec: CampSpec, layer: { readonly def: ModDef; readonly strength: Strength }, catalog: Catalog): ModCtx {
   const attemptNumber = attemptOf(run)?.attemptNumber ?? nextAttemptNumber(run, spec.index);
+  const origin = { kind: "mod", modId: layer.def.id, strength: layer.strength } as const;
+  // Composed at most once per context, on the first ask.
+  let seatRules: RunRules | null = null;
   return {
     run,
     spec,
     strength: layer.strength,
     camp: attemptOf(run)?.camp ?? null,
     roll: (label, n) => seededIndex(run.seed, STREAMS.modRule(layer.def.id, layer.strength, spec.index, attemptNumber, label), n),
+    affects: (seatId) => (seatRules ??= seatRulesFor(run, catalog)).affectsSeat(run, seatId, origin),
   };
 }
 

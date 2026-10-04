@@ -22,7 +22,7 @@ function templeOrder(run: RunAt<"camp">, cards: readonly ExpeditionCard[], catal
   const layer = campStack(run, catalog).find((l) => l.def.kind === "temple");
   if (layer === undefined) return cards;
   const camp = run.stage.attempt.camp;
-  const path = platePath(modCtx(run, run.stage.camp, layer), camp);
+  const path = platePath(modCtx(run, run.stage.camp, layer, catalog), camp);
   const next = path[pressedCount(camp, path)];
   const leading = camp.currentTrick.plays.length === 0;
   const presses = (identity: CardIdentity) => (next === "sun" ? isSun(identity) : identity.kind === "standard" && identity.suit === next);

@@ -47,7 +47,7 @@ const CAMP_MODS = [
   { id: "tornado", kind: "disaster", strength: "full", status: [{ kind: "countdown", tricks: 2 }] },
   { id: "locusts", kind: "disaster", strength: "half", status: [{ kind: "alternating", activeNow: true }, { kind: "swarm", seatId: null }] },
 ];
-const preview = { index: 2, location: "jungle", weather: "fair", pairing: null, event: "event", slotKinds: ["win-card", "ordered", "ordered"], bossId: null, shop: false };
+const preview = { index: 2, location: "jungle", weather: "fair", pairing: null, event: "event", slotKinds: ["win-card", "ordered", "ordered"], bossId: null, shop: false, survey: null };
 const noItems = { equipped: [], backpack: [], concealed: false };
 
 const header = {
@@ -97,7 +97,7 @@ const draftView = {
     tag: "draft",
     cleared: 1,
     payout: 8,
-    yourOffer: { bundles: [["bait", "parrot"], ["whetstone", "trail-map"], ["bait", "puffball"]] },
+    yourOffer: { kind: "standard", bundles: [["bait", "parrot"], ["whetstone", "trail-map"], ["bait", "puffball"]] },
     pendingSeatIds: ["seat-1"],
   },
 };
@@ -173,6 +173,7 @@ const midAttempt = {
       ],
       goals: [{ id: "camouflage:seat-2", status: "done" }],
       discards: [{ card: { id: "card-9", identity: { kind: "standard", suit: "diamonds", rank: 4 } }, afterTrick: 1 }],
+      voidedTricks: [{ index: 2, leaderSeatId: "seat-1", plays: [{ seatId: "seat-1", card: { id: "card-10", identity: { kind: "standard", suit: "hearts", rank: 9 } } }] }],
       yourHand: [
         { id: "card-1", identity: { kind: "standard", suit: "spades", rank: 14 }, effectiveRank: null, countsAs: null },
         { id: "card-2", identity: { kind: "joker", joker: "sun" }, effectiveRank: null, countsAs: { kind: "standard", suit: "hearts", rank: 9 } },
@@ -239,7 +240,17 @@ describe("ExpeditionViewSchema", () => {
         readySeatIds: [],
       },
     ],
-    ["route", { tag: "route", options: [{ id: "a", next: preview }, { id: "b", next: { ...preview, slotKinds: ["win-card", "trick-count"] } }], ballots: [{ seatId: "seat-1", choice: "b" }] }],
+    [
+      "route",
+      {
+        tag: "route",
+        options: [
+          { id: "a", next: { ...preview, survey: [{ kind: "win-card", target: { kind: "standard", suit: "hearts", rank: 9 } }, { kind: "exactly-n", n: 2 }] }, swapsBoss: false },
+          { id: "b", next: { ...preview, slotKinds: ["win-card", "trick-count"] }, swapsBoss: true },
+        ],
+        ballots: [{ seatId: "seat-1", choice: "b" }],
+      },
+    ],
     ["event", { tag: "event", event: "event", next: preview, readySeatIds: [] }],
     ["ended", { tag: "ended", result: "won" }],
   ])("accepts a %s stage", (_name, stage) => {
@@ -444,7 +455,7 @@ describe("ExpeditionViewSchema", () => {
     ],
     ["a modifier of an unknown kind", { ...midCampView, stage: { ...midCampView.stage, mods: [{ id: "x", kind: "volcano", strength: "full", status: [] }] } }],
     ["an effect with no origin", { ...midCampView, stage: { ...midCampView.stage, attempt: { ...midAttempt, effects: [{ sourceId: "bait", seatId: "seat-2", atTrick: 1, lasts: "trick", params: null }] } } }],
-    ["a route option with a bad slot kind", { ...draftView, stage: { tag: "route", options: [{ id: "a", next: { ...preview, slotKinds: ["boss"] } }], ballots: [] } }],
+    ["a route option with a bad slot kind", { ...draftView, stage: { tag: "route", options: [{ id: "a", next: { ...preview, slotKinds: ["boss"] }, swapsBoss: false }], ballots: [] } }],
   ])("rejects: %s", (_name, input) => {
     expect(ExpeditionViewSchema.safeParse(input).success).toBe(false);
   });

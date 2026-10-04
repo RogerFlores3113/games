@@ -68,7 +68,7 @@ function decidingCamp(): CampState {
     expeditionLeaderSeatId: "p1",
     objectives: [{ id: "obj-1", kind: "win-card", target: { kind: "standard", suit: "spades", rank: 14 }, ownerSeatId: "p0" }],
     objectiveDeck: [],
-    discards: [],
+    discards: [], voidedTricks: [],
     completedTricks: [],
     currentTrick: {
       index: 0,
@@ -162,16 +162,16 @@ describe("applyRunAction: each stage accepts only its own actions", () => {
     expect(accepted(musterRun())).toEqual(["pick-character", "vote"]);
   });
 
-  it("loadout: equip, buy and ready", () => {
-    expect(accepted(loadoutRun())).toEqual(["equip", "buy", "ready"]);
+  it("loadout: equip, buy, ready and abilities", () => {
+    expect(accepted(loadoutRun())).toEqual(["equip", "buy", "ready", "use-ability"]);
   });
 
   it("camp: abilities, window passes, whispers and the two camp actions", () => {
     expect(accepted(campRun())).toEqual(["use-ability", "skip-window", "whisper", "pick-objective", "play-card"]);
   });
 
-  it("draft: pick-bundle", () => {
-    expect(accepted(draftRun())).toEqual(["pick-bundle"]);
+  it("draft: pick-bundle and abilities", () => {
+    expect(accepted(draftRun())).toEqual(["pick-bundle", "use-ability"]);
   });
 });
 

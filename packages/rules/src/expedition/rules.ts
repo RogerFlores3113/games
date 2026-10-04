@@ -17,7 +17,7 @@
 
 import { baseDeckFor } from "./deck";
 import { leaderFor } from "./leader";
-import { evaluateObjective } from "./objectives";
+import { evaluateObjective, nextObjectivePicker } from "./objectives";
 import { PRINTED, legalPlaysFor, trickWinner, type CardReading } from "./trick";
 import type {
   CampState,
@@ -50,6 +50,11 @@ export type CoreRules = {
   burns(plays: readonly TrickPlay[], led: CardIdentity, winnerOf: (plays: readonly TrickPlay[]) => string): readonly string[];
   nextLeader(state: CampState, trick: CompletedTrick): string;
   objectiveStatus(state: CampState, objective: Objective): ObjectiveStatus;
+  /** Whether a full trick is a hallucination: no winner, and every card
+   * goes back to the hand that played it. Asked before burns and the winner. */
+  voidsTrick(state: CampState, plays: readonly TrickPlay[]): boolean;
+  /** Who takes the objective after `picked` have been taken. */
+  objectivePicker(state: CampState, picked: number): string;
   /** Camp-wide conditions beside the objectives, given every objective's
    * composed status. */
   goals(state: CampState, statuses: readonly ObjectiveStatusEntry[]): readonly Goal[];
@@ -91,6 +96,12 @@ export function baseRulesWith(reading: CardReading = PRINTED): CoreRules {
       return trick.winnerSeatId;
     },
     objectiveStatus: evaluateObjective,
+    voidsTrick() {
+      return false;
+    },
+    objectivePicker(state, picked) {
+      return nextObjectivePicker(state.seatIds, state.expeditionLeaderSeatId, picked);
+    },
     goals() {
       return [];
     },

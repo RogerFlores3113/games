@@ -12,7 +12,7 @@ export function attemptSeed(seed: string, campIndex: number, attemptNumber: numb
   return `${seed}:camp${campIndex}:attempt${attemptNumber}`;
 }
 
-export type RouteField = "location" | "fair" | "weather" | "event" | "mix";
+export type RouteField = "location" | "fair" | "weather" | "event" | "mix" | "boss";
 /** An item draw rolls its rarity, then picks an item of that rarity. */
 export type ItemDrawPart = "rarity" | "pick";
 
@@ -30,7 +30,7 @@ export const STREAMS = {
   routeCount(nextCamp: number): string {
     return `expedition-route:camp${nextCamp}:count`;
   },
-  /** `reroll` stays 0 until a character can reroll routes. */
+  /** `reroll` counts the option's rerolls; the mix and boss draw at 0 only. */
   routeField(nextCamp: number, reroll: number, option: number, field: RouteField): string {
     return `expedition-route:camp${nextCamp}:reroll${reroll}:option${option}:${field}`;
   },
@@ -49,6 +49,31 @@ export const STREAMS = {
   },
   ability(campIndex: number, attemptNumber: number, seatId: string, useIndex: number, draw: number): string {
     return `expedition-ability:camp${campIndex}:attempt${attemptNumber}:seat${seatId}:use${useIndex}:draw${draw}`;
+  },
+  /** Item `item` of bundle `bundle` of an offer an ability draws (`ctx.drawOffer`), its j-th draw. */
+  abilityItem(campIndex: number, attemptNumber: number, seatId: string, useIndex: number, draw: number, bundle: number, item: number, part: ItemDrawPart): string {
+    return `expedition-ability:camp${campIndex}:attempt${attemptNumber}:seat${seatId}:use${useIndex}:draw${draw}:bundle${bundle}:item${item}:${part}`;
+  },
+  /** The order a seat sees a teammate's hand fanned in, until its next use. */
+  fan(campIndex: number, attemptNumber: number, seatId: string, ofSeatId: string, useIndex: number): string {
+    return `expedition-fan:camp${campIndex}:attempt${attemptNumber}:seat${seatId}:of${ofSeatId}:use${useIndex}`;
+  },
+  /** An option target's `scope.roll(label)`; the same label repeats within an attempt. */
+  option(campIndex: number, attemptNumber: number, seatId: string, label: string): string {
+    return `expedition-option:camp${campIndex}:attempt${attemptNumber}:seat${seatId}:${label}`;
+  },
+  /** The n-th objective added to a camp by an ability, minted after the deal's. */
+  addedObjective(campIndex: number, attemptNumber: number, n: number): string {
+    return `expedition-objective-added:camp${campIndex}:attempt${attemptNumber}:n${n}`;
+  },
+  /** A source's j-th draw while reacting to one event; `place` is
+   * `camp{k}:attempt{A}`, or `muster` before the first camp. */
+  sourceDraw(sourceKey: string, seatId: string, place: string, eventKey: string, draw: number): string {
+    return `expedition-source:${sourceKey}:seat${seatId}:${place}:on:${eventKey}:draw${draw}`;
+  },
+  /** Item `item` of bundle `bundle` of an offer a source draws while reacting. */
+  sourceItem(sourceKey: string, seatId: string, place: string, eventKey: string, draw: number, bundle: number, item: number, part: ItemDrawPart): string {
+    return `expedition-source:${sourceKey}:seat${seatId}:${place}:on:${eventKey}:draw${draw}:bundle${bundle}:item${item}:${part}`;
   },
   /** A camp modifier's `ctx.roll(label)`; the same label repeats within an attempt. */
   modRule(modId: string, strength: string, campIndex: number, attemptNumber: number, label: string): string {
