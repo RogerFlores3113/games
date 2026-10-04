@@ -89,7 +89,7 @@ interface CampModel {
   trick: { leaderSeatId: string; plays: TrickPlayModel[] } | null;
   lastTrick: { plays: TrickPlayModel[]; open: boolean } | null;
   faceUpObjectives: ObjectiveChip[];
-  whisper: { shown: boolean; visible: boolean; active: boolean; state: "ready" | "wait-between-tricks" | "used" | "blocked"; reason: string | null };
+  whisper: { shown: boolean; visible: boolean; active: boolean; state: "ready" | "wait-between-tricks" | "used" | "blocked"; reason: string | null; left: number };
   receivedWhispers: { fromSeatId: string; fromName: string; card: string }[];
   sentWhispers: { toSeatId: string; toName: string; card: string }[];
   whisperLog: string[];
@@ -251,6 +251,7 @@ async function runWhisper(pages: Page[], page: Page): Promise<void> {
   let model = await getModel<CampModel>(page);
   const whispererSeatId = model.youSeatId;
   if (whispererSeatId === null) throw new Error("runWhisper: whisperer has no seat");
+  const leftBefore = model.whisper.left;
 
   model = await clickUntilChanged<CampModel>(page, WHISPER_ID, (m) => m.whisper.active);
 
@@ -304,13 +305,15 @@ async function runWhisper(pages: Page[], page: Page): Promise<void> {
     .toEqual([{ fromSeatId: whispererSeatId, fromName: whispererName, card: whisperedCard }]);
   expect((await getModel<CampModel>(targetPage)).whisperLog).toEqual([`${whispererName} whispered to you`]);
 
-  // The sender is told what they sent and to whom, and the button says it is spent.
+  // The sender is told what they sent and to whom, and the button counts it
+  // (a Heavy Pack or J.D.'s starting item can leave a second whisper).
   await expect
     .poll(async () => (await getModel<CampModel>(page)).sentWhispers.map(({ toSeatId, toName, card }) => ({ toSeatId, toName, card })))
     .toEqual([{ toSeatId: targetSeatId, toName: targetName, card: whisperedCard }]);
   const senderAfter = await getModel<CampModel>(page);
   expect(senderAfter.whisperLog).toEqual([`You whispered ${whisperedCard} to ${targetName}`]);
-  expect(senderAfter.whisper).toMatchObject({ visible: false, state: "used", reason: "Used this camp" });
+  expect(senderAfter.whisper.left).toBe(leftBefore - 1);
+  if (senderAfter.whisper.left === 0) expect(senderAfter.whisper).toMatchObject({ visible: false, state: "used", reason: "Used this camp" });
 
   if (thirdPage !== null) {
     const thirdModel = await getModel<CampModel>(thirdPage);
