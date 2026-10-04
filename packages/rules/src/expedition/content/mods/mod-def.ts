@@ -11,7 +11,7 @@ import type { EngineEvent, EngineEventType } from "../../run/react";
 import type { CampSpec, SlotTemplate } from "../../run/route";
 import type { ToolkitOp } from "../../run/toolkit";
 import type { ActiveEffect, RunState } from "../../run/types";
-import type { CampState } from "../../state";
+import type { CampState, Suit } from "../../state";
 
 /** Also the web art id. */
 export type ModId = string;
@@ -46,7 +46,11 @@ export type Reactions = { readonly [E in EngineEventType]?: (ctx: ReactionCtx<E>
 export type StatusPart =
   | { readonly kind: "chance"; readonly percent: number; readonly strikesLeft: number } // Thunderstorm: the next trick's chance
   | { readonly kind: "strike" } // a strike sits on this trick
-  | { readonly kind: "meter"; readonly left: number; readonly of: number }; // Flooding: tricks left before the river floods
+  | { readonly kind: "meter"; readonly left: number; readonly of: number } // Flooding: tricks left before the river floods
+  | { readonly kind: "facing"; readonly seatId: string } // Crocodile: the seat it watches this trick
+  | { readonly kind: "dam"; readonly suit: Suit } // Beaver: the suit dammed this trick
+  | { readonly kind: "streak"; readonly seatId: string; readonly count: number } // Tiger: the last winner's run of tricks
+  | { readonly kind: "bitten"; readonly seatId: string; readonly tricksLeft: number }; // Snake: a bite counting this trick
 
 export type ModBody = {
   readonly rules?: (ctx: ModCtx) => RuleModifier;

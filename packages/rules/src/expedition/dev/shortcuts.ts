@@ -68,7 +68,9 @@ function assignCharacters(run: RunState, catalog: Catalog): RunState {
 /** The loadout of camp `k` in a run of `length`. */
 function loadoutAt(run: RunState, length: RunLength, k: number, catalog: Catalog): RunAt<"loadout"> {
   if (k > RUN_LENGTHS[length].camps) throw new Error(`a ${length} run has ${RUN_LENGTHS[length].camps} camps, not ${k}`);
-  const crewed: RunState = { ...assignCharacters(run, catalog), plan: drawPlan(length), supplies: Math.max(run.supplies, 1) };
+  // The run's own plan survives a jump within its length, so a boss set with set-plan-boss stays.
+  const plan = run.plan?.length === length ? run.plan : drawPlan(run.seed, length, catalog);
+  const crewed: RunState = { ...assignCharacters(run, catalog), plan, supplies: Math.max(run.supplies, 1) };
   return openLoadout({ ...crewed, history: crewed.history.filter((h) => h.camp < k) }, campSpecAt(run.seed, length, campIndex(k), catalog), catalog);
 }
 
@@ -137,6 +139,33 @@ function setSpec(run: RunState, location: string, weather: string, catalog: Cata
   return dealCamp(openLoadout(run, camp, catalog), catalog);
 }
 
+/** The boss camps a boss can be set at: animal and disaster tiers, the
+ * camp in play first. */
+function bossCampOptions(run: RunState): DevOption[] {
+  const here = specOfStage(run)?.index ?? null;
+  const camps = (run.plan?.bosses ?? []).filter((b) => b.tier !== "temple").sort((a, b) => Number(b.at === here) - Number(a.at === here));
+  return camps.map((b) => ({ value: String(b.at), label: `camp ${b.at} (${b.tier}${b.modId === null ? "" : `, now ${b.modId}`})` }));
+}
+
+const bossOptions = (catalog: Catalog): DevOption[] => [
+  ...Object.values(catalog.mods).filter((def) => def.kind === "animal" || def.kind === "disaster").map((def) => ({ value: def.id, label: `${def.id} (${def.kind})` })),
+  { value: "none", label: "none" },
+];
+
+/** The plan with `boss` at camp `at`. The loadout or camp in play at that
+ * camp opens again under it, a dealt camp with a fresh deal. */
+function setPlanBoss(run: RunState, at: number, boss: string, catalog: Catalog): RunState {
+  const plan = run.plan;
+  const planned = plan?.bosses.find((b) => b.at === at);
+  if (plan === null || planned === undefined || planned.tier === "temple") throw new Error(`camp ${at} is not an animal or disaster boss camp`);
+  if (boss !== "none" && catalog.mods[boss]?.kind !== planned.tier) throw new Error(`${boss} is not a${planned.tier === "animal" ? "n animal" : " disaster"} boss`);
+  const next: RunState = { ...run, plan: { ...plan, bosses: plan.bosses.map((b) => (b.at === at ? { ...b, modId: boss === "none" ? null : boss } : b)) } };
+  const spec = specOfStage(next);
+  if (spec === null || spec.index !== at) return next;
+  const loadout = openLoadout(next, spec, catalog);
+  return next.stage.tag === "camp" ? dealCamp(loadout, catalog) : loadout;
+}
+
 export const DEV_SHORTCUTS = {
   "jump-to-camp": {
     label: "Jump to camp",
@@ -167,6 +196,15 @@ export const DEV_SHORTCUTS = {
     ],
     apply: (run, params, catalog) =>
       setSpec(run, readChoice(params, "location", modOptions(catalog, "location", null)), readChoice(params, "weather", modOptions(catalog, "weather", null)), catalog),
+  },
+  "set-plan-boss": {
+    label: "Set a boss camp's boss",
+    group: "Run",
+    fields: (run, catalog) => [
+      { name: "camp", label: "Boss camp", kind: "choice", options: bossCampOptions(run) },
+      { name: "boss", label: "Boss", kind: "choice", options: bossOptions(catalog) },
+    ],
+    apply: (run, params, catalog) => setPlanBoss(run, Number(readChoice(params, "camp", bossCampOptions(run))), readChoice(params, "boss", bossOptions(catalog)), catalog),
   },
   "end-run": {
     label: "End the run",

@@ -24,6 +24,7 @@ import { identitiesEqual } from "../deck";
 import { CATALOG } from "../run/catalog";
 import { attemptOf } from "../run/attempt";
 import { rulesFor } from "../run/compose";
+import { horizon } from "../run/plan";
 import type { AttemptState, Catalog, RunState } from "../run/types";
 import type { CardIdentity } from "../state";
 
@@ -51,7 +52,7 @@ export interface ExpeditionSeatSecrets {
 }
 
 /** Keys a view object literal must never carry, at ANY nesting level. */
-export const FORBIDDEN_VIEW_KEYS = ["seed", "objectiveDeck", "offers", "itemSerial", "hands", "audience", "ledger"] as const;
+export const FORBIDDEN_VIEW_KEYS = ["seed", "objectiveDeck", "offers", "itemSerial", "bosses", "hands", "audience", "ledger"] as const;
 
 function identityKey(identity: CardIdentity): string {
   return identity.kind === "joker" ? `joker:${identity.joker}` : `standard:${identity.suit}:${identity.rank}`;
@@ -184,6 +185,11 @@ export function secretsForExpeditionSeat(
     for (const item of seat.items) {
       if (!seat.equipped.includes(item.uid) || !used.has(item.uid)) hiddenIds.push(item.uid);
     }
+  }
+
+  // A planned boss is a secret until a route preview leads the crew to its camp.
+  for (const boss of state.plan?.bosses ?? []) {
+    if (boss.modId !== null && boss.at > horizon(state)) hiddenIds.push(boss.modId);
   }
 
   const forbiddenTokens = seed !== undefined ? [seed] : [];

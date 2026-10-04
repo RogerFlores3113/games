@@ -86,7 +86,7 @@ describe("muster and the length vote", () => {
     run = act(run, "p1", { type: "vote", choice: "long" }, catalog);
     expect(run.stage.tag).toBe("muster");
     run = act(run, "p2", { type: "vote", choice: "short" }, catalog);
-    expect(run.plan).toEqual({ length: "long", bosses: [{ at: 3, tier: "animal", modId: null }, { at: 6, tier: "disaster", modId: null }, { at: 8, tier: "temple", modId: null }] });
+    expect(run.plan).toEqual({ length: "long", bosses: [{ at: 3, tier: "animal", modId: "beaver" }, { at: 6, tier: "disaster", modId: null }, { at: 8, tier: "temple", modId: null }] });
     expect(run.lastVote).toEqual({ topic: "length", result: { tally: [{ choice: "short", votes: 1 }, { choice: "standard", votes: 0 }, { choice: "long", votes: 2 }], tied: null, winner: "long" } });
     expect(run.stage).toEqual({
       tag: "loadout",
@@ -154,11 +154,13 @@ describe("dealing a camp", () => {
     expect(applyRunAction(once, "p0", { type: "ready" }, catalog)).toEqual({ ok: false, error: "already_ready" });
   });
 
-  it("deals a boss camp like any other, with the ramp's slot count", () => {
+  it("deals a boss camp with the ramp's slot count plus its boss's slots", () => {
     const catalog = testCatalog();
-    const next = readyAll(setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog, camp: 3 }), catalog);
+    const loadout = setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog, camp: 3 });
+    expect(loadout.plan?.bosses[0]?.modId).toBe("capybara");
+    const next = readyAll(loadout, catalog);
     expect(next.stage.tag).toBe("camp");
-    expect(attemptOf(next)!.camp.objectives).toHaveLength(3);
+    expect(attemptOf(next)!.camp.objectives).toHaveLength(5);
   });
 });
 

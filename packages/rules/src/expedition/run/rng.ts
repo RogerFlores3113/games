@@ -21,6 +21,9 @@ export const STREAMS = {
     return "expedition-vote:length";
   },
   /** `nextCamp` is the camp the route leads to. */
+  plannedBoss(tier: "animal" | "disaster"): string {
+    return `expedition-plan:${tier}`;
+  },
   routeVote(nextCamp: number): string {
     return `expedition-vote:route:camp${nextCamp}`;
   },

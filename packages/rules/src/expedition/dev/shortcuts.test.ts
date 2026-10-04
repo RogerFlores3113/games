@@ -164,4 +164,21 @@ describe("dev shortcuts", () => {
     expect(() => run("set-spec", fresh(), { location: "jungle", weather: "rain" })).toThrow("set-spec works in a loadout or a camp");
     expect(() => run("set-spec", dealt, { location: "rain", weather: "rain" })).toThrow(/location must be one of/);
   });
+
+  it("set-plan-boss sets a boss camp's boss, survives a jump there, and re-deals that camp in play", () => {
+    const loadout = run("jump-to-camp", fresh(), { length: "standard", camp: 2, stage: "loadout" });
+    const planned = run("set-plan-boss", loadout, { camp: "3", boss: "crocodile" });
+    expect(planned.plan?.bosses[0]).toEqual({ at: 3, tier: "animal", modId: "crocodile" });
+    expect(planned.stage).toEqual(loadout.stage);
+
+    const atCamp = run("jump-to-camp", planned, { length: "standard", camp: 3, stage: "camp" });
+    expect(atCamp.plan?.bosses[0]?.modId).toBe("crocodile");
+    const capybara = run("set-plan-boss", atCamp, { camp: "3", boss: "capybara" });
+    expect(attemptOf(capybara)?.camp.objectives.length).toBe((attemptOf(atCamp)?.camp.objectives.length ?? 0) + 2);
+    expect(checkRunState(capybara, CATALOG)).toEqual([]);
+
+    expect(DEV_SHORTCUTS["set-plan-boss"].fields(atCamp, CATALOG)[0]).toMatchObject({ options: [{ value: "3" }] });
+    expect(() => run("set-plan-boss", atCamp, { camp: "6", boss: "tiger" })).toThrow(/camp must be one of: 3/);
+    expect(run("set-plan-boss", atCamp, { camp: "3", boss: "none" }).plan?.bosses[0]?.modId).toBeNull();
+  });
 });

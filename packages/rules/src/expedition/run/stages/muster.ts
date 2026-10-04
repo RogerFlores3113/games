@@ -29,6 +29,6 @@ export const muster: StageDef<"muster"> = {
   advance(run, catalog) {
     if (run.seats.some((seat) => seat.characterId === null) || !everySeat(run, run.stage.ballots)) return run;
     const result = tally(run.seed, STREAMS.lengthVote(), LENGTHS, run.seatIds, run.stage.ballots)!;
-    return openLoadout({ ...run, plan: drawPlan(result.winner), lastVote: { topic: "length", result } }, firstCampSpec(result.winner), catalog);
+    return openLoadout({ ...run, plan: drawPlan(run.seed, result.winner, catalog), lastVote: { topic: "length", result } }, firstCampSpec(result.winner), catalog);
   },
 };

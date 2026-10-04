@@ -19,6 +19,7 @@ describe("expeditionDevHooks", () => {
       ["jump-to-camp", "Run"],
       ["jump-to-final-camp", "Run"],
       ["set-spec", "Camp"],
+      ["set-plan-boss", "Run"],
       ["end-run", "Run"],
       ["force-camp", "Camp"],
       ["set-supplies", "Run"],

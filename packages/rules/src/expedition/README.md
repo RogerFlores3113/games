@@ -86,12 +86,17 @@ until the tag stops changing.
 1. **Muster.** Each seat sends `pick-character` and `vote { choice }`
    ("short", "standard", "long", or null to abstain). A ballot may change
    until the vote resolves. The last missing input resolves it (majority,
-   else a seeded coin flip recorded in `lastVote`), draws the plan and opens
-   the loadout for camp 1 (the Jungle, fair weather).
+   else a seeded coin flip recorded in `lastVote`), draws the plan (each
+   boss camp's boss from its tier's pool, ids sorted, one seeded index) and
+   opens the loadout for camp 1 (the Jungle, fair weather). A planned boss
+   stays out of every view until a route preview leads to its camp
+   (`run/plan.ts`'s `horizon`); the leak check flags it before then.
 2. **Loadout.** Each seat sends `equip { itemUids }` (replaces its equipped
    set, within `rules.itemSlots`), before a boss camp `buy { stockId }` at
    the shop (supplies, three single items, and the seat's own character's
    upgrades while it has none), then `ready`, which re-checks the slots.
+   A loadout opens with each equipped set cut to the camp's slots (Rats
+   take one), the last items going back to the backpack.
    After its `ready` a seat can change nothing. The last `ready` deals the
    camp.
 3. **Camp.** Play as before. The camp's modifiers react to the engine's
@@ -164,6 +169,7 @@ draw derives a fresh, uniquely named stream via `run/rng.ts`'s `STREAMS`:
 | Draw | Stream name |
 |---|---|
 | Length vote tie | `expedition-vote:length` |
+| Planned boss | `expedition-plan:{animal\|disaster}` |
 | Route vote tie | `expedition-vote:route:camp{k}` (k = the next camp) |
 | Route option count | `expedition-route:camp{k}:count` |
 | Route option field | `expedition-route:camp{k}:reroll{r}:option{i}:{event\|mix}` |
@@ -388,14 +394,15 @@ to turn it on. The web app shows the panel when `NODE_ENV` is `development`
   it stops (your decision, or the next camp to settle), with a step cap.
   Bots abstain from votes, so your ballot decides.
   "Bots act automatically" re-runs bot autoplay after every change.
-- Shortcuts: jump to a camp of a chosen run length (arriving at its
-  loadout or dealt), jump to the final camp, end the run won or lost, force
-  the camp to clear or fail (through the real settle), set supplies, set the
-  purse, set a seat's character, give a seat an item (`give-item`: a new
-  instance, equipped while a slot is free), set a seat's upgrade
-  (`set-upgrade`, its own character's or none), set the camp's location and
-  weather (`set-spec`, dealing a dealt camp again), move a card between
-  hands, set an objective's owner.
+- Shortcuts: jump to a camp of a chosen run length (arriving at its loadout
+  or dealt), jump to the final camp, end the run won or lost, force the camp
+  to clear or fail (through the real settle), set supplies, set the purse,
+  set a boss camp's boss (`set-plan-boss`, kept by a later jump in the same
+  length, re-dealing that camp if it is in play), set a seat's character,
+  give a seat an item (`give-item`: a new instance, equipped while a slot is
+  free), set a seat's upgrade (`set-upgrade`, its own character's or none),
+  set the camp's location and weather (`set-spec`, dealing a dealt camp
+  again), move a card between hands, set an objective's owner.
 - Reveal all hands: a plain-text dump of every hand, objective and trick,
   naming the seats each concealed thing is hidden from.
 - State: the whole `RunState` as JSON. Edit and Apply; the worker parses it

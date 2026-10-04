@@ -32,7 +32,7 @@ import { identitiesEqual } from "../deck";
 import { rulesFor } from "../run/compose";
 import { runStatus } from "../run/lifecycle";
 import { SUPPLIES_MAX } from "../run/balance";
-import { bossAt, campCount } from "../run/plan";
+import { bossAt, campCount, visibleBossId } from "../run/plan";
 import { slotKindsFor, type CampSpec } from "../run/route";
 import { campStack, modCtx, pairingOf, specOf, type StackLayer } from "../run/stack";
 import type { StatusPart } from "../content/mods/mod-def";
@@ -335,7 +335,7 @@ function toPreviewView(state: RunState, spec: CampSpec, catalog: Catalog): Exped
     pairing: pairingOf(spec, catalog),
     event: spec.event,
     slotKinds: Array.from(slotKindsFor(state, spec, catalog)),
-    bossId: boss === null ? null : boss.modId,
+    bossId: boss === null ? null : visibleBossId(state, boss),
     shop: boss !== null,
   };
 }
@@ -348,6 +348,14 @@ function toStatusPartView(part: StatusPart): ExpeditionStatusPartView {
       return { kind: "strike" };
     case "meter":
       return { kind: "meter", left: part.left, of: part.of };
+    case "facing":
+      return { kind: "facing", seatId: part.seatId };
+    case "dam":
+      return { kind: "dam", suit: part.suit };
+    case "streak":
+      return { kind: "streak", seatId: part.seatId, count: part.count };
+    case "bitten":
+      return { kind: "bitten", seatId: part.seatId, tricksLeft: part.tricksLeft };
   }
 }
 
@@ -506,7 +514,7 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
     campCount: plan === null ? null : campCount(plan),
     purse: state.purse,
     supplies: { count: state.supplies, max: SUPPLIES_MAX },
-    plan: plan === null ? [] : plan.bosses.map((boss) => ({ at: boss.at, tier: boss.tier, bossId: boss.modId })),
+    plan: plan === null ? [] : plan.bosses.map((boss) => ({ at: boss.at, tier: boss.tier, bossId: visibleBossId(state, boss) })),
     seats: state.seats.map((seat) => toSeatView(state, seat, seatId, rules, catalog)),
     yourAbilities: ownSeat !== undefined ? toAbilityViews(state, ownSeat, catalog) : [],
     history: state.history.map(toCampResultView),

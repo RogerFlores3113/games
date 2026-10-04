@@ -9,7 +9,7 @@ describe("attemptSeed", () => {
 
 describe("STREAMS distinctness (A1)", () => {
   it("produces pairwise-distinct names across the full draw-site grid", () => {
-    const names: string[] = [STREAMS.lengthVote()];
+    const names: string[] = [STREAMS.lengthVote(), STREAMS.plannedBoss("animal"), STREAMS.plannedBoss("disaster")];
     const camps = [1, 2, 3, 4, 5, 6, 7, 8];
     const attempts = [1, 2, 3];
     const seats = ["p0", "p1", "p2", "p3", "p4"];
@@ -70,6 +70,7 @@ describe("STREAMS distinctness (A1)", () => {
 describe("STREAMS names", () => {
   it("builds the documented stream names", () => {
     expect(STREAMS.lengthVote()).toBe("expedition-vote:length");
+    expect(STREAMS.plannedBoss("animal")).toBe("expedition-plan:animal");
     expect(STREAMS.routeVote(4)).toBe("expedition-vote:route:camp4");
     expect(STREAMS.routeCount(4)).toBe("expedition-route:camp4:count");
     expect(STREAMS.routeField(4, 0, 2, "mix")).toBe("expedition-route:camp4:reroll0:option2:mix");

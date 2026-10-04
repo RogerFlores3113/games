@@ -239,7 +239,8 @@ export type ExpeditionSlotKindView = SlotTemplate["kind"];
 
 /** A camp as a preview shows it: before the deal, on a route card, or
  * during play. `pairing` is the def a location and weather add together.
- * `bossId` is null for a plain camp or a boss not drawn. `shop` is true for
+ * `bossId` is null for a plain camp, a boss not drawn, or a boss beyond the
+ * crew's horizon (not yet previewed). `shop` is true for
  * a boss camp, whose loadout opens the shop. */
 export type ExpeditionCampPreviewView = {
   index: number;
@@ -277,10 +278,18 @@ export type ExpeditionVoteView = {
   winner: string;
 };
 
+/** `bossId` is null until a route preview has led the crew to its camp. */
 export type ExpeditionPlanBossView = { at: number; tier: BossTier; bossId: string | null };
 
 /** Public table state of a camp modifier. Carries no card. */
-export type ExpeditionStatusPartView = { kind: "chance"; percent: number; strikesLeft: number } | { kind: "strike" } | { kind: "meter"; left: number; of: number };
+export type ExpeditionStatusPartView =
+  | { kind: "chance"; percent: number; strikesLeft: number }
+  | { kind: "strike" }
+  | { kind: "meter"; left: number; of: number }
+  | { kind: "facing"; seatId: string }
+  | { kind: "dam"; suit: Suit }
+  | { kind: "streak"; seatId: string; count: number }
+  | { kind: "bitten"; seatId: string; tricksLeft: number };
 
 /** One layer of the camp's modifier stack, in fold order. */
 export type ExpeditionModView = { id: string; kind: ModKind; strength: Strength; status: ExpeditionStatusPartView[] };

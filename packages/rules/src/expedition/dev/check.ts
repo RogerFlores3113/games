@@ -93,6 +93,7 @@ function checkSpecs(run: RunState, catalog: Catalog, problems: string[]): void {
   if (stage.tag === "event") checkSpec("the chosen route", stage.route.next, catalog, problems);
   for (const boss of run.plan?.bosses ?? []) {
     if (boss.modId !== null && !Object.hasOwn(catalog.mods, boss.modId)) problems.push(`the ${boss.tier} boss at camp ${boss.at} is unknown mod ${boss.modId}`);
+    else if (boss.modId !== null && catalog.mods[boss.modId]!.kind !== boss.tier) problems.push(`the ${boss.tier} boss at camp ${boss.at} is ${boss.modId}, a ${catalog.mods[boss.modId]!.kind}`);
   }
   for (const effect of stage.tag === "camp" ? stage.attempt.effects : []) {
     const origin = effect.origin;

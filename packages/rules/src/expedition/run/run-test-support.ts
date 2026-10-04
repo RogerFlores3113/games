@@ -110,7 +110,7 @@ export function setupRun(opts: {
   const length = opts.length ?? "standard";
   const crewed = opts.seatIds.reduce<RunState>(
     (acc, seatId) => mintItems(acc, seatId, opts.items?.[seatId] ?? [], opts.catalog),
-    { ...run, plan: drawPlan(length), supplies: opts.supplies ?? run.supplies, purse: opts.purse ?? run.purse, seats },
+    { ...run, plan: drawPlan(opts.seed, length, opts.catalog), supplies: opts.supplies ?? run.supplies, purse: opts.purse ?? run.purse, seats },
   );
   return openLoadout(crewed, campSpecAt(opts.seed, length, campIndex(opts.camp ?? 1), opts.catalog), opts.catalog);
 }

@@ -6,7 +6,7 @@ import { routeOptions } from "./route";
 import type { RunAt } from "./types";
 
 function draftAfter(seed: string): RunAt<"draft"> {
-  return { ...createRun({ seatIds: ["p0", "p1", "p2"], seed }), plan: drawPlan("long"), stage: { tag: "draft", cleared: campIndex(2), payout: 5 } };
+  return { ...createRun({ seatIds: ["p0", "p1", "p2"], seed }), plan: drawPlan(seed, "long", CATALOG), stage: { tag: "draft", cleared: campIndex(2), payout: 5 } };
 }
 
 describe("property: route weather", () => {

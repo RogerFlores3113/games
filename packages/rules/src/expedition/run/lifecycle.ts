@@ -50,7 +50,19 @@ export function runStatus(run: RunState): RunStatus {
  * camp offers the same stock, unsold. */
 export function openLoadout(run: RunState, camp: CampSpec, catalog: Catalog): RunAt<"loadout"> {
   const stock = bossAt(planOf(run), camp.index) === null ? null : stockFor(run.seed, camp.index, catalog);
-  return { ...run, stage: { tag: "loadout", camp, stock, ready: {} } };
+  return withinSlots({ ...run, stage: { tag: "loadout", camp, stock, ready: {} } }, catalog);
+}
+
+/** A camp rule may give fewer slots than the set carried in (Rats): the
+ * last equipped items go back to the backpack, so the loadout never opens
+ * on a set its seat could not ready with. */
+function withinSlots(run: RunAt<"loadout">, catalog: Catalog): RunAt<"loadout"> {
+  const rules = rulesFor(run, catalog);
+  const seats = run.seats.map((seat) => {
+    const slots = Math.max(0, rules.itemSlots(run, seat.seatId));
+    return seat.equipped.length > slots ? { ...seat, equipped: seat.equipped.slice(0, slots) } : seat;
+  });
+  return seats.some((seat, i) => seat !== run.seats[i]) ? { ...run, seats } : run;
 }
 
 /** Deals a fresh attempt of the loadout's camp (RUN-02: a replay is a fresh

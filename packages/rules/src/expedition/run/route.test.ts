@@ -9,7 +9,7 @@ import type { RunAt, RunLength } from "./types";
 
 function draftAfter(seed: string, length: RunLength, cleared: number): RunAt<"draft"> {
   const run = createRun({ seatIds: ["p0", "p1", "p2"], seed });
-  return { ...run, plan: drawPlan(length), stage: { tag: "draft", cleared: campIndex(cleared), payout: 5 } };
+  return { ...run, plan: drawPlan(seed, length, CATALOG), stage: { tag: "draft", cleared: campIndex(cleared), payout: 5 } };
 }
 
 describe("firstCampSpec", () => {
