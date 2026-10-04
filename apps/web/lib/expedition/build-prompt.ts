@@ -84,6 +84,8 @@ export function describeChoice(view: ExpeditionView, choiceId: string, nameOf: (
       const card = objective !== undefined && "target" in objective ? cardLabel(objective.target) : "an objective's card";
       return `${card} shifted to ${rankLabel(Number(rest[1]))}`;
     }
+    case "option":
+      return describeOption(raw, nameOf);
     case "board":
       return "this trick";
     case "supplies":
@@ -91,6 +93,17 @@ export function describeChoice(view: ExpeditionView, choiceId: string, nameOf: (
     default:
       return choiceId;
   }
+}
+
+/** An option an ability offers, in words: a Pop-up Shop buy or refresh, a
+ * suit, or the value itself. */
+export function describeOption(value: string, nameOf: (seatId: string | null) => string): string {
+  const [kind, ...rest] = value.split(":");
+  const coins = (n: string | undefined) => `${n} ${n === "1" ? "coin" : "coins"}`;
+  if (kind === "buy") return `${sourceName(rest[1] ?? "")} for ${nameOf(rest[3] ?? null)}, ${coins(rest[2])}`;
+  if (kind === "refresh") return `a fresh stock, ${coins(rest[0])}`;
+  if (kind === "spades" || kind === "hearts" || kind === "diamonds" || kind === "clubs") return `${SUIT_GLYPH[kind]} ${kind}`;
+  return value;
 }
 
 function joinTargets(parts: string[]): string {

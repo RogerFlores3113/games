@@ -519,7 +519,7 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
    * until some seat's view shows the rescue window. */
   function walkToRescue(): RunState {
     for (let attempt = 0; attempt < 60; attempt++) {
-      let state = setupRun({ seatIds: [...SEATS], seed: `${SEED}${attempt}`.slice(-32), catalog: CATALOG, characters: { p0: "medic" } });
+      let state = setupRun({ seatIds: [...SEATS], seed: `${SEED}${attempt}`.slice(-32), catalog: CATALOG, items: { p0: ["rope-ladder"] } });
       state = advanceTo(state, "objective-pick", CATALOG);
       for (let step = 0; step < 200; step++) {
         const view = toExpeditionPlayerView(state, "p0", CATALOG);
@@ -548,7 +548,7 @@ describe("toExpeditionPlayerView: abilities, effects, rescue and ranks", () => {
     for (const id of rescue.failedObjectiveIds) {
       expect(attemptViewOf(view).camp.objectives.find((o) => o.id === id)!.status).toBe("failed");
     }
-    expect(view.yourAbilities.find((a) => a.sourceKey === "medic")!.usableNow).toBe(true);
+    expect(view.yourAbilities.find((a) => a.sourceKey === "it0")!.usableNow).toBe(true);
 
     const between = advanceTo(setupRun({ seatIds: [...SEATS], seed: SEED, catalog: CATALOG }), "between-tricks", CATALOG);
     expect(attemptViewOf(toExpeditionPlayerView(between, "p0", CATALOG)).rescue).toBeNull();

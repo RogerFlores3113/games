@@ -36,6 +36,7 @@ import {
   cancelTargeting,
   choiceFor,
   nextTrayPage,
+  repickLast,
   selectTarget,
   setDrag,
   setHoveredCard,
@@ -119,7 +120,7 @@ function buildHandlers(store: SceneDeps["store"], pointer: () => Point): CampHan
     onTrayPick(choiceId) {
       const state = store.getState();
       if (state.reconnecting) return;
-      state.updateLocalUi((ui, view) => selectTarget(ui, view, choiceId));
+      state.updateLocalUi((ui, view) => selectTarget(repickLast(ui, view, choiceId), view, choiceId));
     },
     onTrayMore() {
       const state = store.getState();

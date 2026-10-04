@@ -11,7 +11,8 @@ import { MINI_H, MINI_W, OBJECTIVE_POOL_STEP, ZONES, stumpRowXs } from "../layou
 import { CANCEL_ID, CONFIRM_ID, GATE_SKIP_ID, TRAY_MORE_ID, WHISPER_ID, gateUseObjectId } from "../../../../lib/expedition/expedition-ids";
 import type { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
-import type { ArtId } from "../art/art-registry";
+import { sourceArtId, type ArtId } from "../art/art-registry";
+import { placeArt } from "../art/place-art";
 import type { CampHandlers } from "./camp-handlers";
 import { fitLabel, wrapWords } from "./text-fit";
 import { button, hiddenMiniCard, labelWidth, miniCard, plate, platedText, text, type Layer } from "./ui-kit";
@@ -243,6 +244,51 @@ function drawTray(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: O
   }
 }
 
+const POPUP_ROW_H = 17;
+const POPUP_BUY_H = 13;
+
+/** The Pop-up Shop over the stump: a row per item in stock (icon, name,
+ * price, then a button for each player it can go to) and the refresh. */
+function drawPopupShop(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
+  const shop = model.popupShop;
+  if (shop === null) return;
+  const zone = ZONES.stump;
+  layer.add(plate(scene, zone.x, zone.y, zone.w, zone.h).setAlpha(0.95).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
+  layer.add(text(scene, zone.x + 4, zone.y + 3, shop.title, PALETTE.sun));
+  const purse = `Crew: ${shop.purse} coins`;
+  layer.add(text(scene, zone.x + zone.w - 4 - labelWidth(purse), zone.y + 3, purse, PALETTE.coinShine));
+  const nameW = 76;
+  shop.rows.forEach((row, i) => {
+    const y = zone.y + 14 + i * POPUP_ROW_H;
+    const art = sourceArtId(row.itemId);
+    if (art !== null) layer.add(placeArt(scene, art, zone.x + 12, y + 7));
+    const name = text(scene, zone.x + 22, y + 3, fitLabel(row.name, Math.floor((nameW - 4) / LABEL_CELL.w)), row.rare ? PALETTE.rain : PALETTE.text);
+    name.setInteractive();
+    name.on("pointerover", () => handlers.onSourceHover(row.itemId));
+    name.on("pointerout", () => handlers.onSourceHover(null));
+    layer.add(name);
+    index.register("camp", row.infoId, name);
+    const price = `${row.price}c`;
+    layer.add(text(scene, zone.x + 22 + nameW, y + 3, price, PALETTE.coinShine));
+    const left = zone.x + 22 + nameW + labelWidth("99c") + 6;
+    const w = Math.floor((zone.x + zone.w - 4 - left - (row.buys.length - 1) * 2) / Math.max(1, row.buys.length));
+    row.buys.forEach((buy, j) => {
+      const label = fitLabel(buy.label, Math.floor((w - 4) / LABEL_CELL.w));
+      const b = button(scene, left + j * (w + 2) + w / 2, y + 7, w, POPUP_BUY_H, label, { onClick: () => handlers.onTrayPick(buy.choiceId), outline: buy.selected, color: buy.selected ? PALETTE.moss : undefined });
+      layer.add(b);
+      index.register("camp", buy.objectId, b);
+    });
+  });
+  const refresh = shop.refresh;
+  if (refresh !== null) {
+    const w = labelWidth(refresh.label) + 10;
+    const b = button(scene, zone.x + zone.w - 4 - w / 2, zone.y + zone.h - 3 - POPUP_BUY_H / 2, w, POPUP_BUY_H, refresh.label, { onClick: () => handlers.onTrayPick(refresh.choiceId), outline: refresh.selected, color: refresh.selected ? PALETTE.moss : undefined });
+    layer.add(b);
+    index.register("camp", refresh.objectId, b);
+  }
+  if (shop.rows.length === 0) layer.add(text(scene, zone.x + 8, zone.y + 20, "Sold out until you refresh", PALETTE.textDim));
+}
+
 export function drawControls(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   drawObjectivePool(scene, layer, model, index, handlers);
   drawActions(scene, layer, model, index, handlers);
@@ -253,4 +299,5 @@ export function drawControls(scene: Phaser.Scene, layer: Layer, model: SceneMode
 export function drawStumpOverlays(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   drawBanner(scene, layer, model, index, handlers);
   drawTray(scene, layer, model, index, handlers);
+  drawPopupShop(scene, layer, model, index, handlers);
 }

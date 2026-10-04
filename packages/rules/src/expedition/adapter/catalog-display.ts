@@ -8,6 +8,7 @@
 
 import { resolveTuned, windowsOf, type ActiveAbility, type CharacterDef, type ItemAbility, type ItemUses, type Owner, type Rarity, type SourceDef, type UsageLimit } from "../content/source-def";
 import { CATALOG } from "../run/catalog";
+import { salePrice } from "../content/characters/businessman";
 import type { TargetKind } from "../run/targets";
 import { WINDOWS, type ActiveWindow } from "../run/windows";
 import { DRAFT, FAILURE_COST, ITEM_SLOTS, PAYOUT, RUN_LENGTHS, SHOP, SUPPLIES_MAX, SUPPLIES_START, SUPPLY_PRICE, WHISPERS_PER_UPGRADE } from "../run/balance";
@@ -33,6 +34,10 @@ export type SourceActiveDisplay = {
 export type ItemDisplay = {
   rarity: Rarity;
   price: number;
+  /** What the Businessman sells it for at the shop. */
+  sellsFor: number;
+  /** The one character it is drafted for; null for everyone's. */
+  exclusiveTo: string | null;
   /** "Single use", "Once per camp", "2 charges"; null for a passive item. */
   uses: string | null;
   /** How the uses come back, for phrasing what is left; null for a passive item. */
@@ -151,7 +156,14 @@ function toSourceDisplay(def: SourceDef): SourceDisplay {
     passive: def.passive !== undefined,
     item:
       def.kind === "item"
-        ? { rarity: def.rarity, price: def.price, uses: def.uses === undefined ? null : usesBadge(def.uses), usesKind: def.uses?.kind ?? null }
+        ? {
+            rarity: def.rarity,
+            price: def.price,
+            sellsFor: salePrice(def.price),
+            exclusiveTo: def.exclusiveTo ?? null,
+            uses: def.uses === undefined ? null : usesBadge(def.uses),
+            usesKind: def.uses?.kind ?? null,
+          }
         : null,
   };
 }

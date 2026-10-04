@@ -51,7 +51,7 @@ function lcg(seed: number): () => number {
 }
 
 /** A crew where p0 holds `def`: its character, the upgrade itself, or the
- * item as instance it0 beside one more item; the other seats carry items
+ * item as instance it0, beside one more item; the other seats carry items
  * too, so whispers, failures and wins happen under several rule layers. */
 function crewFor(def: SourceDef, seed: string, camp = 1): RunState {
   const character = characterFor(def);
@@ -59,7 +59,7 @@ function crewFor(def: SourceDef, seed: string, camp = 1): RunState {
   const characters: Record<string, string> = { p0: character?.id ?? others.shift()! };
   for (const seat of SEATS.slice(1)) characters[seat] = others.shift()!;
   const spare = ITEM_IDS.filter((id) => id !== def.id);
-  const items: Record<string, string[]> = { p0: def.kind === "item" ? [def.id, spare[0]!] : [] };
+  const items: Record<string, string[]> = { p0: def.kind === "item" ? [def.id, spare[0]!] : [spare[0]!] };
   SEATS.slice(1).forEach((seat, i) => (items[seat] = [spare[i + 1]!, spare[i + 4]!]));
   return setupRun({
     seatIds: SEATS,
@@ -67,6 +67,7 @@ function crewFor(def: SourceDef, seed: string, camp = 1): RunState {
     catalog: CATALOG,
     camp,
     supplies: 2,
+    purse: 40,
     characters,
     upgrades: def.kind === "upgrade" ? { p0: def.id } : {},
     items,
@@ -135,18 +136,18 @@ function withLedger(state: RunState, seatId: string, extra: readonly LedgerEntry
 
 /** Target kinds only characters still to be registered use: the Howler
  * Call's board waits for the Perfumist, unit 12's kinds for the rest. */
-const AWAITING_CHARACTERS = ["board", "item", "route-option", "fanned-card", "option"];
+const AWAITING_CHARACTERS = ["board", "fanned-card"];
 
 const USABLE = new Map<string, RunState>(ACTIVE_SOURCES.map((def) => [def.id, findUsable(def)]));
 
 describe("source shape", () => {
-  it("has 6 characters, 0 powers, 15 upgrades and 13 items with unique ids", () => {
+  it("has 6 characters, 2 powers, 17 upgrades and 17 items with unique ids", () => {
     const kinds = SOURCES.map((def) => def.kind);
     expect(kinds.filter((k) => k === "character")).toHaveLength(6);
-    expect(kinds.filter((k) => k === "power")).toHaveLength(0);
-    expect(kinds.filter((k) => k === "upgrade")).toHaveLength(15);
-    expect(kinds.filter((k) => k === "item")).toHaveLength(13);
-    expect(new Set(SOURCES.map((def) => def.id)).size).toBe(34);
+    expect(kinds.filter((k) => k === "power")).toHaveLength(2);
+    expect(kinds.filter((k) => k === "upgrade")).toHaveLength(17);
+    expect(kinds.filter((k) => k === "item")).toHaveLength(17);
+    expect(new Set(SOURCES.map((def) => def.id)).size).toBe(42);
   });
 
   it.each(SOURCES.map((def) => [def.id, def] as const))("%s: text is one plain sentence about the effect", (_id, def) => {
@@ -235,7 +236,8 @@ describe("each active source in play", () => {
     const key = keyFor(def);
     const state = USABLE.get(id)!;
     const left = remaining(state, "p0", key, CATALOG);
-    if (left.kind !== "uses") return;
+    // A replay is a camp attempt dealt again; a stage window has none to replay.
+    if (left.kind !== "uses" || attemptOf(state) === null) return;
     const perCamp = limitOf(state.seats[0]!, key, CATALOG).kind === "per-camp";
     expect(remaining(replayed(usedTimes(state, key, left.of)), "p0", key, CATALOG)).toEqual({ kind: "uses", left: perCamp ? left.of : 0, of: left.of });
   });

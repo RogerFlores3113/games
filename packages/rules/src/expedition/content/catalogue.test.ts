@@ -9,7 +9,7 @@ import { checkCampOutcome } from "../camp";
 import { evaluateObjective } from "../objectives";
 import type { CampState, CompletedTrick, ExpeditionCard, Objective, StandardIdentity, StandardRank, Suit } from "../state";
 import { trickWinner } from "../trick";
-import { useAbility } from "../run/abilities";
+import { abilityStatus, useAbility } from "../run/abilities";
 import { CATALOG } from "../run/catalog";
 import { rulesFor } from "../run/compose";
 import { attemptOf, withAttempt } from "../run/attempt";
@@ -30,7 +30,7 @@ function attemptViewOf(view: ExpeditionView): ExpeditionAttemptView {
   if (view.stage.tag !== "camp") throw new Error(`expected the camp stage, got ${view.stage.tag}`);
   return view.stage.attempt;
 }
-const FILLERS = ["jd", "explorer", "cartographer", "leader", "medic"];
+const FILLERS = ["jd", "explorer", "cartographer", "leader", "pack-rat"];
 
 const std = (id: string, suit: Suit, rank: StandardRank): ExpeditionCard => ({ id, identity: { kind: "standard", suit, rank } });
 const ident = (suit: Suit, rank: StandardRank): StandardIdentity => ({ kind: "standard", suit, rank });
@@ -59,9 +59,12 @@ type Spec = {
   character?: string;
   /** p1's and p2's characters, instead of the fillers. */
   mates?: readonly [string, string];
+  /** p1's items. */
+  mateKit?: readonly string[];
   kit?: readonly string[];
   camp?: number;
   supplies?: number;
+  purse?: number;
   hands?: Partial<Record<(typeof SEATS)[number], ExpeditionCard[]>>;
   objectives?: Objective[];
   tricks?: CompletedTrick[];
@@ -79,9 +82,10 @@ function crew(spec: Spec): RunState {
     catalog: CATALOG,
     ...(spec.camp === undefined ? {} : { camp: spec.camp }),
     ...(spec.supplies === undefined ? {} : { supplies: spec.supplies }),
+    ...(spec.purse === undefined ? {} : { purse: spec.purse }),
     characters: { p0: character, p1: p1!, p2: p2! },
     upgrades: Object.fromEntries((spec.kit ?? []).filter((id) => CATALOG.sources[id]!.kind === "upgrade").map((id) => ["p0", id])),
-    items: { p0: (spec.kit ?? []).filter((id) => CATALOG.sources[id]!.kind === "item") },
+    items: { p0: (spec.kit ?? []).filter((id) => CATALOG.sources[id]!.kind === "item"), p1: spec.mateKit ?? [] },
   });
 }
 
@@ -179,7 +183,7 @@ describe("J.D.", () => {
   it("J.D.'s hidden luck adds 5 to every route's chance of fair weather, up to 100", () => {
     const run = table({ character: "jd" });
     expect([rules(run).normalWeatherChance(run, 80), rules(run).normalWeatherChance(run, 98)]).toEqual([85, 100]);
-    const without = table({ character: "leader", mates: ["explorer", "medic"] });
+    const without = table({ character: "leader", mates: ["explorer", "cartographer"] });
     expect(rules(without).normalWeatherChance(without, 80)).toBe(80);
   });
 
@@ -221,8 +225,8 @@ describe("Leader", () => {
 
   it("Open Ears lets the Leader hear each teammate's first whisper of the camp, and only the first", () => {
     const hands = { p1: [std("b1", "hearts", 5), std("b2", "hearts", 6)] };
-    const start = table({ character: "leader", kit: ["leader.open-ears"], mates: ["signaller", "jd"], hands });
-    const first = whisper(start, "p1", "p2", "b1");
+    const start = table({ character: "leader", kit: ["leader.open-ears"], mates: ["jd", "explorer"], mateKit: ["rain-poncho"], hands });
+    const first = whisper(use(start, "p1", "rain-poncho", []), "p1", "p2", "b1");
     expect(revealsFor(first, "p0").map((r) => r.cardId)).toEqual(["b1"]);
     const second = whisper(first, "p1", "p2", "b2");
     expect(revealsFor(second, "p0").map((r) => r.cardId)).toEqual(["b1"]);
@@ -277,99 +281,165 @@ describe("Explorer", () => {
   });
 });
 
-describe("Medic", () => {
-  it("Triage removes a failed objective and spends 1 supply, refused at 1 supply", () => {
-    const run = rescue(failedTable({ character: "medic", supplies: 3 }), "p0", "medic", ["objective:o1"]);
-    expect(camp(run).objectives).toEqual([]);
-    expect(run.supplies).toBe(2);
-    expect(refusal(failedTable({ character: "medic", supplies: 1 }), "p0", "medic", ["objective:o1"])).toBe("cannot_afford");
+/** Every seat takes its first bundle until the route vote opens. */
+function toRoute(run: RunState): RunState {
+  let next = run;
+  for (let i = 0; i < 9 && next.stage.tag === "draft"; i++) {
+    const seat = next.seats.find((s) => s.offers.length > 0)!;
+    next = act(next, seat.seatId, { type: "pick-bundle", bundle: 0 });
+  }
+  return next;
+}
+
+describe("Businessman", () => {
+  it("Bottom Line pays 2 coins for one empty slot taken into camp, 5 for two and none for none", () => {
+    expect([[], ["bait"], ["bait", "parrot"]].map((kit) => table({ character: "businessman", kit }).purse)).toEqual([5, 2, 0]);
   });
 
-  it("Rally reassigns a failed win-card objective to its card's winner so it becomes done", () => {
-    const start = failedTable({ character: "medic", kit: ["medic.rally"] });
-    expect(evaluateObjective(camp(start), objectiveOf(start, "o1"))).toBe("failed");
-    const run = rescue(start, "p0", "medic.rally", ["objective:o1"]);
-    expect(objectiveOf(run, "o1").ownerSeatId).toBe("p0");
-    expect(evaluateObjective(camp(run), objectiveOf(run, "o1"))).toBe("done");
+  it("sells an item at the shop for half its price, at least 1, and only at the shop", () => {
+    const shop = crew({ character: "businessman", kit: ["trail-map", "bait"], camp: 3 });
+    const sold = use(shop, "p0", "businessman", ["item:it0"]);
+    expect([sold.seats[0]!.items, sold.purse]).toEqual([[{ uid: "it1", itemId: "bait" }], 2]);
+    expect(use(sold, "p0", "businessman", ["item:it1"]).purse).toBe(3);
+    expect(refusal(crew({ character: "businessman", kit: ["bait"], camp: 2 }), "p0", "businessman", ["item:it0"])).toBe("ability_unavailable");
   });
 
-  it("Rally refuses an ordered objective its card's winner would still fail on order", () => {
-    const ordered = (id: string, target: StandardIdentity, order: number, ownerSeatId: string): Objective => ({ id, kind: "ordered", target, order, ownerSeatId });
-    const inOrder = table({ character: "medic", kit: ["medic.rally"], objectives: [ordered("o1", ident("spades", 14), 1, "p1")], tricks: [WON_BY_P0] });
-    expect(objectiveOf(rescue(inOrder, "p0", "medic.rally", ["objective:o1"]), "o1").ownerSeatId).toBe("p0");
-    const outOfOrder = table({
-      character: "medic",
-      kit: ["medic.rally"],
-      objectives: [ordered("o1", ident("spades", 14), 2, "p1"), ordered("o2", ident("hearts", 5), 1, "p2")],
-      tricks: [WON_BY_P0],
+  it("Cash Out skips the draft for 4 coins", () => {
+    const draft = playOut(clearableTable({ character: "businessman" }));
+    expect(draft.stage.tag).toBe("draft");
+    const skipped = use(draft, "p0", "businessman.cash-out", []);
+    expect([skipped.seats[0]!.offers, skipped.purse - draft.purse]).toEqual([[], 4]);
+  });
+
+  it("the Pop-up Shop sells its stock into anyone's free slot at its own prices, and a refresh costs 1, then 2", () => {
+    const start = table({ character: "businessman", kit: ["businessman.pop-up-shop"], purse: 20 });
+    const shop = (r: RunState) => abilityStatus(r, "p0", "businessman.pop-up-shop", CATALOG);
+    const first = shop(start);
+    if (first === null || !first.usable) throw new Error("expected the shop open");
+    const buys = first.steps[0]!.choices.filter((id) => id.startsWith("option:buy:"));
+    expect(buys).toHaveLength(9);
+    expect(first.steps[0]!.choices.at(-1)).toBe("option:refresh:1");
+    const forP1 = buys.find((id) => id.startsWith("option:buy:0:") && id.endsWith(":p1"))!;
+    const itemId = forP1.split(":")[3]!;
+    const bought = use(start, "p0", "businessman.pop-up-shop", [forP1]);
+    const price = { 1: 2, 2: 4, 3: 5, 4: 7, 5: 9 }[CATALOG.items[itemId]!.price]!;
+    expect(forP1.split(":")[4]).toBe(String(price));
+    expect([bought.purse, bought.seats[1]!.items.map((i) => i.itemId).at(-1)]).toEqual([start.purse - price, itemId]);
+    const after = shop(bought);
+    if (after === null || !after.usable) throw new Error("expected the shop open");
+    expect(after.steps[0]!.choices.some((id) => id.startsWith("option:buy:0:"))).toBe(false);
+    const refreshed = use(bought, "p0", "businessman.pop-up-shop", ["option:refresh:1"]);
+    expect(refreshed.purse).toBe(bought.purse - 1);
+    expect(use(refreshed, "p0", "businessman.pop-up-shop", ["option:refresh:2"]).purse).toBe(refreshed.purse - 2);
+  });
+
+  it("Buyout clears a camp whose tricks ran out with a failed objective, for 10 coins each", () => {
+    const start = table({
+      character: "businessman",
+      kit: ["businessman.buyout"],
+      purse: 25,
+      hands: { p0: [std("a", "spades", 14)], p1: [std("b", "spades", 3)], p2: [std("c", "spades", 4)] },
+      objectives: [winCard("o1", ident("spades", 14), "p1"), winCard("o2", ident("spades", 4), "p2")],
+      totalTricks: 1,
+      leader: "p0",
     });
-    expect(refusal(outOfOrder, "p0", "medic.rally", ["objective:o1"])).toBe("invalid_target");
+    const failed = play(play(play(start, "p0", "a"), "p1", "b"), "p2", "c");
+    expect(currentWindow(failed, rules(failed))).toBe("rescue");
+    const bought = rescue(failed, "p0", "businessman.buyout", []);
+    expect([camp(bought).objectives, bought.purse, checkCampOutcome(camp(bought), rules(bought)).status]).toEqual([[], failed.purse - 20, "succeeded"]);
   });
 
-  it("Field Kit restores a supply and is refused at full supplies", () => {
-    const run = use(table({ character: "medic", kit: ["medic.field-kit"], supplies: 2 }), "p0", "medic.field-kit", ["supplies"]);
-    expect(run.supplies).toBe(3);
-    expect(refusal(table({ character: "medic", kit: ["medic.field-kit"], supplies: 4 }), "p0", "medic.field-kit", ["supplies"])).toBe(
-      "ability_unavailable",
-    );
+  it("Haggle takes 1 coin off everything the Businessman buys at the shop", () => {
+    const shop = crew({ character: "businessman", kit: ["businessman.haggle"], camp: 3, purse: 20 });
+    expect([rules(shop).shopPrice(shop, "p0", 6), rules(shop).shopPrice(shop, "p1", 6), rules(shop).shopPrice(shop, "p0", 1)]).toEqual([5, 6, 1]);
+    expect(act(shop, "p0", { type: "buy", stockId: "supplies" }).purse).toBe(15);
   });
 });
 
-describe("Signaller", () => {
-  it("Talking Drum allows two whispers and the third is refused", () => {
-    const start = table({ character: "signaller" });
-    expect(whisperAllowance(start)).toEqual([2, 1, 1]);
-    const twice = whisper(whisper(start, "p0", "p1", "a"), "p0", "p2", "a");
-    const third = applyRunAction(twice, "p0", { type: "whisper", targetSeatId: "p1", cardId: "a" }, CATALOG);
-    expect(third).toEqual({ ok: false, error: "no_whispers_left" });
+describe("Pack Rat", () => {
+  it("Big Pack carries three items, and each draft bundle holds two Pack Rat items after the open ones", () => {
+    const start = clearableTable({ character: "pack-rat" });
+    expect(SEATS.map((seatId) => rules(start).itemSlots(start, seatId))).toEqual([3, 2, 2]);
+    const draft = playOut(start);
+    const exclusive = Object.values(CATALOG.items).filter((item) => item.exclusiveTo === "pack-rat").map((item) => item.id);
+    for (const bundle of draft.seats[0]!.offers[0]!.bundles) {
+      expect(bundle).toHaveLength(4);
+      expect(bundle.slice(2).every((id) => exclusive.includes(id))).toBe(true);
+      expect(bundle.slice(0, 2).some((id) => exclusive.includes(id))).toBe(false);
+    }
+    expect(draft.seats[1]!.offers[0]!.bundles.flat().some((id) => exclusive.includes(id))).toBe(false);
   });
 
-  it("Loud Call shows a sent whisper to every seat", () => {
-    const whispered = whisper(table({ character: "signaller", kit: ["signaller.loud-call"] }), "p0", "p1", "a");
-    expect(revealsFor(whispered, "p2")).toEqual([]);
-    const run = use(whispered, "p0", "signaller.loud-call", ["whisper:0"]);
-    expect(revealsFor(run, "p2")).toEqual([
-      { cardId: "a", fromSeatId: "p0", source: "signaller.loud-call", identity: ident("spades", 9), toSeatId: null },
+  it("Quartermaster hands an item to a teammate in the loadout", () => {
+    const loadout = crew({ character: "pack-rat", kit: ["pack-rat.quartermaster", "bait", "parrot"] });
+    const given = use(loadout, "p0", "pack-rat.quartermaster", ["item:it0", "seat:p1"]);
+    expect(given.seats.slice(0, 2).map((s) => [s.items.map((i) => i.itemId), s.equipped])).toEqual([
+      [["parrot"], ["it1"]],
+      [["bait"], ["it0"]],
     ]);
   });
 
-  it("Call and Response gives the whispered-to teammate one more whisper", () => {
-    const start = table({ character: "signaller", kit: ["signaller.call-and-response"] });
-    expect(whisperAllowance(start)).toEqual([3, 1, 1]);
-    const run = whisper(start, "p0", "p1", "a");
-    expect(whisperAllowance(run)).toEqual([3, 2, 1]);
-    const heard = whisper(whisper(run, "p1", "p2", "b"), "p1", "p0", "b");
-    expect(attemptOf(heard)!.log.filter((e) => e.event === "whisper" && e.actorSeatId === "p1")).toHaveLength(2);
+  it("Pack Animal swaps a carried item for a backpack one mid-camp, once", () => {
+    const start = table({ character: "pack-rat", kit: ["pack-rat.pack-animal", "bait", "parrot", "whetstone", "puffball"] });
+    expect(start.seats[0]!.equipped).toEqual(["it0", "it1", "it2"]);
+    const swapped = use(start, "p0", "pack-rat.pack-animal", ["item:it0", "item:it3"]);
+    expect(swapped.seats[0]!.equipped).toEqual(["it1", "it2", "it3"]);
+    expect(refusal(swapped, "p0", "pack-rat.pack-animal", ["item:it1", "item:it0"])).toBe("ability_spent");
+  });
+
+  it("Sturdy Straps makes the first item use each camp free", () => {
+    const start = table({ character: "pack-rat", kit: ["pack-rat.sturdy-straps", "rain-poncho", "smoke-signal"] });
+    const once = use(start, "p0", "rain-poncho", []);
+    expect(remaining(once, "p0", "it0", CATALOG)).toEqual({ kind: "uses", left: 2, of: 2 });
+    const twice = use(use(once, "p0", "rain-poncho", []), "p0", "smoke-signal", []);
+    expect([remaining(twice, "p0", "it0", CATALOG), remaining(twice, "p0", "it1", CATALOG)]).toEqual([
+      { kind: "uses", left: 1, of: 2 },
+      { kind: "uses", left: 1, of: 2 },
+    ]);
   });
 });
 
 describe("Cartographer", () => {
+  it("Mapmaker offers three routes, the third to another animal boss, and rerolls one for a supply", () => {
+    const route = toRoute(playOut(clearableTable({ character: "cartographer", supplies: 3 })));
+    if (route.stage.tag !== "route") throw new Error("expected the route vote");
+    expect(route.stage.options.map((o) => [o.id, o.swapBoss?.at ?? null])).toEqual([["a", null], ["b", null], ["c", 3]]);
+    expect(CATALOG.mods[route.stage.options[2]!.swapBoss!.modId]!.kind).toBe("animal");
+    const rerolled = use(route, "p0", "cartographer", ["route:b"]);
+    if (rerolled.stage.tag !== "route") throw new Error("expected the route vote");
+    expect([rerolled.supplies, rerolled.stage.options[1]!.reroll, rerolled.stage.options[0]]).toEqual([2, 1, route.stage.options[0]]);
+  });
+
   it("Redraw replaces an unclaimed card objective's target with the deck's next card", () => {
     const start = advanceTo(crew({ character: "cartographer", camp: 2 }), "objective-pick", CATALOG);
     const before = camp(start);
     const open = before.objectives.find((o) => o.ownerSeatId === null && o.kind === "win-card")!;
-    const run = use(start, "p0", "cartographer", [`objective:${open.id}`]);
+    const run = use(start, "p0", "cartographer.redraw", [`objective:${open.id}`]);
     const after = camp(run);
     expect(objectiveOf(run, open.id)).toEqual({ ...open, target: before.objectiveDeck[0] });
     expect(after.objectiveDeck).toEqual(before.objectiveDeck.slice(1));
   });
 
-  it("Detour gives your open objective to a teammate", () => {
-    const objectives = [winCard("mine", ident("hearts", 5), "p0"), PENDING];
-    const run = use(table({ character: "cartographer", kit: ["cartographer.detour"], objectives }), "p0", "cartographer.detour", [
-      "objective:mine",
-      "seat:p2",
-    ]);
-    expect(objectiveOf(run, "mine").ownerSeatId).toBe("p2");
+  it("Survey shows the Cartographer alone each route's coming objectives", () => {
+    const route = toRoute(playOut(clearableTable({ character: "cartographer", kit: ["cartographer.survey"] })));
+    const surveys = (seatId: string) => {
+      const view = toExpeditionPlayerView(route, seatId, CATALOG);
+      if (view.stage.tag !== "route") throw new Error("expected the route vote");
+      return view.stage.options.map((o) => o.next.survey?.length ?? null);
+    };
+    expect(surveys("p0").every((n) => n !== null && n > 0)).toBe(true);
+    expect(surveys("p1")).toEqual([null, null, null]);
   });
 
-  it("Landmark gives a completed objective's owner one more whisper", () => {
-    const objectives = [winCard("done", ident("spades", 12), "p1"), PENDING];
-    const start = table({ character: "cartographer", kit: ["cartographer.landmark"], objectives, tricks: [WON_BY_P1] });
-    expect(evaluateObjective(camp(start), objectiveOf(start, "done"))).toBe("done");
-    expect(whisperAllowance(start)).toEqual([2, 1, 1]);
-    const run = use(start, "p0", "cartographer.landmark", ["objective:done"]);
-    expect(whisperAllowance(run)).toEqual([2, 2, 1]);
+  it("Treasure Map gives every player two special one-item drafts and the crew 10 coins", () => {
+    const draft = playOut(clearableTable({ character: "cartographer", kit: ["cartographer.treasure-map"] }));
+    const mapped = use(draft, "p0", "cartographer.treasure-map", []);
+    expect(mapped.purse).toBe(draft.purse + 10);
+    for (const seat of mapped.seats) {
+      expect(seat.offers.map((o) => o.kind)).toEqual(["standard", "special", "special"]);
+      for (const offer of seat.offers.slice(1)) expect(offer.bundles.map((b) => b.length)).toEqual([1, 1, 1]);
+    }
+    expect(refusal(mapped, "p0", "cartographer.treasure-map", [])).toBe("ability_spent");
   });
 });
 

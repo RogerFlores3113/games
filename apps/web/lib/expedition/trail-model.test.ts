@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ExpeditionCampPreviewView, ExpeditionStageView, ExpeditionView } from "@games/rules";
+import { CHARACTER_DISPLAY } from "@games/rules";
 import type { RoomSeatInfo, SceneServerInput } from "./build-scene-model";
 import { buildTrailModel } from "./trail-model";
 import { initialLocalUi, type LocalUiState } from "./local-ui";
@@ -218,12 +219,13 @@ describe("muster", () => {
 
     it("shows every character, marking the ones teammates took, all pickable for you until you pick", () => {
       const cards = panel(mustering({ characterId: null })).characters;
+      expect(cards.map((c) => c.characterId)).toEqual(Object.keys(CHARACTER_DISPLAY));
       const ids = ["jd", "leader", "explorer", "cartographer"];
-      expect(cards.filter((c) => ids.includes(c.characterId)).map((c) => [c.characterId, c.takenBy, c.pickable])).toEqual([
+      expect(cards.filter((c) => ids.includes(c.characterId)).map((c) => [c.characterId, c.takenBy, c.pickable]).sort()).toEqual([
+        ["cartographer", null, true],
+        ["explorer", "Alice", false],
         ["jd", "Cara", false],
         ["leader", null, true],
-        ["explorer", "Alice", false],
-        ["cartographer", null, true],
       ]);
     });
 
@@ -268,8 +270,8 @@ describe("draft", () => {
           objectId: "bundle:0",
           name: "Rain Poncho + Trail Map",
           items: [
-            { itemId: "rain-poncho", objectId: "bundle-item:0:0", name: "Rain Poncho", text: "Whisper once more this camp.", uses: "2 charges", rare: false },
-            { itemId: "trail-map", objectId: "bundle-item:0:1", name: "Trail Map", text: "Swap all your open objectives with a teammate's.", uses: "Single use", rare: true },
+            { itemId: "rain-poncho", objectId: "bundle-item:0:0", name: "Rain Poncho", text: "Whisper once more this camp.", uses: "2 charges", rare: false, exclusive: false },
+            { itemId: "trail-map", objectId: "bundle-item:0:1", name: "Trail Map", text: "Swap all your open objectives with a teammate's.", uses: "Single use", rare: true, exclusive: false },
           ],
         },
         {
@@ -286,6 +288,7 @@ describe("draft", () => {
               text: "You may whisper once more each camp, but a failed camp costs 1 more supply.",
               uses: "Always on",
               rare: false,
+              exclusive: false,
             },
           ],
         },
@@ -342,19 +345,23 @@ describe("route", () => {
           id: "a",
           objectId: "route:a",
           label: "Route A",
-          next: { title: "Camp 3 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", backdrop: "jungle", weatherId: "fair", pairing: null, event: "Event", objectives: ["3 cards to win"], boss: "Animal boss", bossId: "tiger", bossName: "Tiger" },
+          next: { title: "Camp 3 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", backdrop: "jungle", weatherId: "fair", pairing: null, event: "Event", objectives: ["3 cards to win"], boss: "Animal boss", bossId: "tiger", bossName: "Tiger", survey: null },
           voters: ["You", "Alice"],
           yours: true,
           votable: true,
+          swapsBoss: null,
+          reroll: null,
         },
         {
           id: "b",
           objectId: "route:b",
           label: "Route B",
-          next: { title: "Camp 3 of 6", shop: true, location: "River Delta", weather: "Storm", locationId: "river-delta", backdrop: "river-delta", weatherId: "storm", pairing: null, event: null, objectives: ["1 card to win", "Win 2 in order", "A trick count"], boss: "Animal boss", bossId: null, bossName: null },
+          next: { title: "Camp 3 of 6", shop: true, location: "River Delta", weather: "Storm", locationId: "river-delta", backdrop: "river-delta", weatherId: "storm", pairing: null, event: null, objectives: ["1 card to win", "Win 2 in order", "A trick count"], boss: "Animal boss", bossId: null, bossName: null, survey: null },
           voters: [],
           yours: false,
           votable: true,
+          swapsBoss: null,
+          reroll: null,
         },
       ],
     });
@@ -386,21 +393,21 @@ describe("event and loadout panels", () => {
       kind: "event",
       name: "Event",
       text: "Nothing happens here yet.",
-      next: { title: "Camp 4 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", backdrop: "jungle", weatherId: "fair", pairing: null, event: "Event", objectives: ["2 cards to win"], boss: null, bossId: null, bossName: null },
+      next: { title: "Camp 4 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", backdrop: "jungle", weatherId: "fair", pairing: null, event: "Event", objectives: ["2 cards to win"], boss: null, bossId: null, bossName: null, survey: null },
     });
   });
 
   it("shows the camp the crew is about to start in the loadout, with your gear and no shop", () => {
     expect(model(makeView()).panel).toEqual({
       kind: "loadout",
-      next: { title: "Camp 2 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", backdrop: "jungle", weatherId: "fair", pairing: null, event: null, objectives: ["2 cards to win"], boss: null, bossId: null, bossName: null },
+      next: { title: "Camp 2 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", backdrop: "jungle", weatherId: "fair", pairing: null, event: null, objectives: ["2 cards to win"], boss: null, bossId: null, bossName: null, survey: null },
       gear: {
         equipped: ["trained-monkey"],
         slots: [
           {
             index: 0,
             objectId: "slot:0",
-            item: { uid: "trained-monkey", itemId: "trained-monkey", objectId: "slot:0", name: "Trained Monkey", uses: "Once per camp", rare: false },
+            item: { uid: "trained-monkey", itemId: "trained-monkey", objectId: "slot:0", name: "Trained Monkey", uses: "Once per camp", rare: false, targetable: false, tag: null },
           },
           { index: 1, objectId: "slot:1", item: null },
         ],
@@ -442,8 +449,8 @@ describe("loadout gear and shop", () => {
     });
     const gear = gearPanel(makeView({ seats }), ui({ packPage: 1 })).gear!;
     expect(gear.backpack).toEqual([
-      { uid: "it4", itemId: "rain-poncho", objectId: "pack:it4", name: "Rain Poncho", uses: "1 of 2 charges", rare: false },
-      { uid: "it5", itemId: "parrot", objectId: "pack:it5", name: "Parrot", uses: "Used this camp", rare: false },
+      { uid: "it4", itemId: "rain-poncho", objectId: "pack:it4", name: "Rain Poncho", uses: "1 of 2 charges", rare: false, targetable: false, tag: null },
+      { uid: "it5", itemId: "parrot", objectId: "pack:it5", name: "Parrot", uses: "Used this camp", rare: false, targetable: false, tag: null },
     ]);
     expect(gear.slots.map((s) => s.item)).toEqual([null, null]);
     expect(gear.page).toBe(1);
@@ -640,6 +647,8 @@ describe("crew", () => {
     expect(model(makeView()).crew).toEqual([
       {
         seatId: "s2",
+        objectId: "crew:s2",
+        targetable: false,
         displayLabel: "Bob",
         isYou: true,
         connected: true,
@@ -653,6 +662,8 @@ describe("crew", () => {
       },
       {
         seatId: "s3",
+        objectId: "crew:s3",
+        targetable: false,
         displayLabel: "Cara",
         isYou: false,
         connected: false,
@@ -664,7 +675,7 @@ describe("crew", () => {
         ],
         itemsHidden: false,
       },
-      { seatId: "s1", displayLabel: "Alice", isYou: false, connected: true, status: "waiting", character: "The Explorer", sources: [{ sourceKey: "explorer", sourceId: "explorer", name: "Compass" }], itemsHidden: false },
+      { seatId: "s1", objectId: "crew:s1", targetable: false, displayLabel: "Alice", isYou: false, connected: true, status: "waiting", character: "The Explorer", sources: [{ sourceKey: "explorer", sourceId: "explorer", name: "Compass" }], itemsHidden: false },
     ]);
   });
 
@@ -723,5 +734,71 @@ describe("prompt", () => {
 
   it("says Reconnecting while the socket is down", () => {
     expect(buildTrailModel(server(makeView()), ui(), true).prompt).toEqual({ text: "Reconnecting…", tone: "alert" });
+  });
+});
+
+describe("powers between camps", () => {
+  const usable = (sourceKey: string, steps: { kind: ExpeditionView["yourAbilities"][number]["steps"][number]["kind"]; prompt: string; choices: string[] }[] = []) => ({ sourceKey, usableNow: true, reason: null, steps });
+
+  it("offers each usable power as a button, the Businessman's sale named for what it does", () => {
+    const view = at(draftStage(), {
+      seats: seatsWith({ characterId: "businessman" }),
+      yourAbilities: [usable("businessman.cash-out"), usable("businessman", [{ kind: "item", prompt: "Pick one of your items", choices: ["item:trained-monkey"] }]), { sourceKey: "jd", usableNow: false, reason: "Already used", steps: [] }],
+    });
+    expect(model(view).powers).toEqual([
+      { sourceKey: "businessman.cash-out", objectId: "power:businessman.cash-out", label: "Cash Out", active: false },
+      { sourceKey: "businessman", objectId: "power:businessman", label: "Sell an item", active: false },
+    ]);
+    expect(model(at({ tag: "ended", result: "won" }, { yourAbilities: [usable("businessman.cash-out")] })).powers).toEqual([]);
+  });
+
+  it("aims a sale at your items, each tagged with what it sells for, and prompts for the pick", () => {
+    const view = makeView({
+      seats: seatsWith({ characterId: "businessman", ...kitOf(["trail-map", "bait"]) }),
+      yourAbilities: [usable("businessman", [{ kind: "item", prompt: "Pick one of your items", choices: ["item:trail-map", "item:bait"] }])],
+    });
+    const aimed = model(view, ui({ targeting: { mode: "ability", sourceKey: "businessman", selected: [], heldId: null } }));
+    const panel = aimed.panel;
+    if (panel.kind !== "loadout" || panel.gear === null) throw new Error("expected your gear");
+    expect(panel.gear.slots.map((slot) => [slot.item?.itemId, slot.item?.targetable, slot.item?.tag])).toEqual([
+      ["trail-map", true, "+2"],
+      ["bait", true, "+1"],
+    ]);
+    expect(aimed.powers[0]!.active).toBe(true);
+    expect(aimed.prompt.text).toBe("Sell an item: Pick one of your items");
+  });
+
+  it("puts the Cartographer's reroll on each route card instead of the power row", () => {
+    const view = at(
+      { tag: "route", options: [{ id: "a", next: preview(3), swapsBoss: false }, { id: "b", next: preview(3), swapsBoss: true }], ballots: [] },
+      { seats: seatsWith({ characterId: "cartographer" }), yourAbilities: [usable("cartographer", [{ kind: "route-option", prompt: "Pick a route", choices: ["route:a", "route:b"] }])] },
+    );
+    const panel = model(view).panel;
+    if (panel.kind !== "route") throw new Error("expected the route vote");
+    expect(panel.options.map((o) => [o.swapsBoss, o.reroll])).toEqual([
+      [null, { objectId: "reroll:a", choiceId: "route:a", label: "Reroll, 1 supply" }],
+      ["Another boss at camp 3", { objectId: "reroll:b", choiceId: "route:b", label: "Reroll, 1 supply" }],
+    ]);
+    expect(model(view).powers).toEqual([]);
+  });
+
+  it("names a surveyed camp's objective cards", () => {
+    const surveyed = preview(3, { survey: [{ kind: "win-card", target: { kind: "standard", suit: "spades", rank: 7 } }, { kind: "ordered", target: { kind: "standard", suit: "hearts", rank: 12 }, order: 1 }, { kind: "exactly-n", n: 2 }, { kind: "no-tricks" }] });
+    const panel = model(at({ tag: "route", options: [{ id: "a", next: surveyed, swapsBoss: false }], ballots: [] })).panel;
+    if (panel.kind !== "route") throw new Error("expected the route vote");
+    expect(panel.options[0]!.next.survey).toEqual(["7♠", "#1 Q♥", "Exactly 2", "No tricks"]);
+  });
+
+  it("makes a teammate's crew row a pick while a gift is aimed at teammates", () => {
+    const view = makeView({
+      seats: seatsWith({ characterId: "pack-rat", upgradeId: "pack-rat.quartermaster" }),
+      yourAbilities: [usable("pack-rat.quartermaster", [{ kind: "item", prompt: "Pick one of your items", choices: ["item:trained-monkey"] }, { kind: "player", prompt: "Pick a teammate", choices: ["seat:s1", "seat:s3"] }])],
+    });
+    const picked = ui({ targeting: { mode: "ability", sourceKey: "pack-rat.quartermaster", selected: ["item:trained-monkey"], heldId: null } });
+    expect(model(view, picked).crew.map((row) => [row.seatId, row.targetable])).toEqual([
+      ["s2", false],
+      ["s3", true],
+      ["s1", true],
+    ]);
   });
 });

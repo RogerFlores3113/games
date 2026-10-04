@@ -143,6 +143,21 @@ export function kitObjectId(sourceId: string): string {
   return `kit:${sourceId}`;
 }
 
+/** A power's button between camps. */
+export function powerObjectId(sourceKey: string): string {
+  return `power:${sourceKey}`;
+}
+
+/** A route card's Reroll button. */
+export function rerollObjectId(routeId: string): string {
+  return `reroll:${routeId}`;
+}
+
+/** A crew row on the trail, a pick for a power aimed at a teammate. */
+export function crewObjectId(seatId: string): string {
+  return `crew:${seatId}`;
+}
+
 /** Using a source in a gated window (a rescue). */
 export function gateUseObjectId(sourceId: string): string {
   return `gate-use:${sourceId}`;

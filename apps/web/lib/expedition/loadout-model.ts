@@ -18,6 +18,10 @@ export interface GearItem {
    * "1 of 2 charges", "Always on". */
   uses: string;
   rare: boolean;
+  /** A choice of the power you are aiming (a sale, a gift). */
+  targetable: boolean;
+  /** What picking it gives you, shown on the tile ("+2" for a sale). */
+  tag: string | null;
 }
 
 export interface GearSlot {
@@ -47,6 +51,8 @@ function gearItem(item: ExpeditionItemView, objectId: string): GearItem {
     name: sourceName(item.itemId),
     uses: usesLabel(item.itemId, item.remaining).full,
     rare: SOURCE_DISPLAY[item.itemId]?.item?.rarity === "rare",
+    targetable: false,
+    tag: null,
   };
 }
 

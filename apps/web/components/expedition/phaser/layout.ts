@@ -121,6 +121,35 @@ export const MUSTER_ZONES = {
   lengths: { x: 144, y: 296, w: 488, h: 60 },
 } as const satisfies Record<string, Rect>;
 
+const MUSTER_COLS = 3;
+const MUSTER_CARD_GAP = 4;
+/** A muster card's portrait column, with the pick or taker under it. */
+export const MUSTER_PORTRAIT_W = 40;
+/** Lines a muster card holds right of its portrait: the name, the theme,
+ * the power's name, then MUSTER_TEXT_LINES of rules, MUSTER_LINE apart
+ * (a pixel closer than elsewhere, so nine cards fit). */
+export const MUSTER_TEXT_LINES = 5;
+export const MUSTER_LINE = LABEL_CELL.h + 1;
+
+/** The muster's character cards, three to a row, the last row centred. */
+export function musterBoxes(count: number): Rect[] {
+  const zone = MUSTER_ZONES.cards;
+  const rows = Math.max(1, Math.ceil(count / MUSTER_COLS));
+  const w = Math.floor((zone.w - (MUSTER_COLS - 1) * MUSTER_CARD_GAP) / MUSTER_COLS);
+  const h = Math.floor((zone.h - (rows - 1) * MUSTER_CARD_GAP) / rows);
+  return Array.from({ length: count }, (_, i) => {
+    const row = Math.floor(i / MUSTER_COLS);
+    const inRow = Math.min(MUSTER_COLS, count - row * MUSTER_COLS);
+    const left = zone.x + Math.floor((zone.w - (inRow * w + (inRow - 1) * MUSTER_CARD_GAP)) / 2);
+    return { x: left + (i % MUSTER_COLS) * (w + MUSTER_CARD_GAP), y: zone.y + row * (h + MUSTER_CARD_GAP), w, h };
+  });
+}
+
+/** Characters per line in a muster card's text column. */
+export function musterTextChars(cardW: number): number {
+  return Math.floor((cardW - MUSTER_PORTRAIT_W - 4) / LABEL_CELL.w);
+}
+
 /** The end of the run: the outcome, the per-camp strip, and the restart. */
 export const RUN_END_ZONES = {
   headline: { x: 32, y: 40, w: 544, h: 44 },

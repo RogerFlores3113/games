@@ -81,7 +81,7 @@ export function testCatalog(parts: {
 /** Characters whose powers change nothing until used: an unnamed seat gets
  * these first, so a test's counts (whispers, slots, coins, routes) are the
  * base rules'. */
-const QUIET_CHARACTERS = ["explorer", "magician", "hermit", "cartographer", "jd"];
+const QUIET_CHARACTERS = ["explorer", "magician", "hermit", "jd"];
 
 /** Builds a run at the loadout of camp `camp` (default 1) of a `length`
  * (default standard) run: each seat gets `characters[seat]` or the

@@ -1,0 +1,17 @@
+{
+  "id": "crew-pack-rat",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "dark silhouette of a porter sitting cross-legged facing the viewer, carrying an enormous overstuffed backpack piled high with pots, rolled blankets and a lantern dangling off it, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background",
+    "width": 64,
+    "height": 80,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "basic shading",
+    "no_background": true,
+    "seed": 7
+  },
+  "job": "b5605be2-a09d-4c0b-8800-8ae6523c95e6",
+  "scale": 1,
+  "note": "natively transparent; used as downloaded"
+}

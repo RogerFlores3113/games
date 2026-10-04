@@ -14,6 +14,10 @@ import { smokeSignal } from "./smoke-signal";
 import { trailMap } from "./trail-map";
 import { trainedMonkey } from "./trained-monkey";
 import { whetstone } from "./whetstone";
+import { firstAidKit } from "./first-aid-kit";
+import { messageBottle } from "./message-bottle";
+import { pocketGlass } from "./pocket-glass";
+import { signalFlare } from "./signal-flare";
 import type { ItemDef } from "../source-def";
 
 export const ITEMS = {
@@ -30,4 +34,8 @@ export const ITEMS = {
   "rope-ladder": ropeLadder,
   "heavy-pack": heavyPack,
   "mosquito-net": mosquitoNet,
+  "pocket-glass": pocketGlass,
+  "message-bottle": messageBottle,
+  "first-aid-kit": firstAidKit,
+  "signal-flare": signalFlare,
 } satisfies Readonly<Record<string, ItemDef>>;

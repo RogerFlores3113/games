@@ -23,7 +23,7 @@ export type Targeting =
 
 /** What a clicked thing on the table is, for matching it to a choice id.
  * Each maps to one id prefix; the board and the supplies are single ids. */
-export type PickEntity = "card" | "seat" | "hand" | "objective" | "whisper" | "trick" | "value" | "board" | "supplies";
+export type PickEntity = "card" | "seat" | "hand" | "objective" | "whisper" | "trick" | "value" | "board" | "supplies" | "item" | "route" | "option";
 
 const ENTITY_PREFIX: Readonly<Record<PickEntity, string | null>> = {
   card: "card",
@@ -35,6 +35,9 @@ const ENTITY_PREFIX: Readonly<Record<PickEntity, string | null>> = {
   value: "value",
   board: null,
   supplies: null,
+  item: "item",
+  route: "route",
+  option: "option",
 };
 
 /** The choice id a clicked entity stands for (`card:<id>`, `board`). */
@@ -193,6 +196,16 @@ export function selectTarget(ui: LocalUiState, view: ExpeditionView, choiceId: s
   if (held !== null && !choiceId.startsWith(rankPrefix(step.kind, held) ?? "")) return ui;
   const picked = { ...targeting, selected: [...targeting.selected, choiceId] };
   return autoPick({ ...ui, trayPage: 0, targeting: picked.mode === "ability" ? { ...picked, heldId: null } : picked }, view);
+}
+
+/** With every step picked, a click on another choice of the last step
+ * takes the place of the last pick (a different Pop-up Shop buy). */
+export function repickLast(ui: LocalUiState, view: ExpeditionView, choiceId: string): LocalUiState {
+  const targeting = ui.targeting;
+  if (targeting === null || currentStep(ui, view) !== null || targeting.selected.length === 0) return ui;
+  const last = targetingSteps(ui, view)[targeting.selected.length - 1];
+  if (last === undefined || !last.choices.includes(choiceId) || targeting.selected.at(-1) === choiceId) return ui;
+  return { ...ui, targeting: { ...targeting, selected: targeting.selected.slice(0, -1) } };
 }
 
 /** Clears the current targeting only. Hover and last-trick state are

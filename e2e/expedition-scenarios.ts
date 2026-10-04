@@ -62,7 +62,9 @@ export function scenarioKey(sourceId: string): string {
   return ITEM_SOURCES.has(sourceId) ? ITEM_UID : sourceId;
 }
 
-const ITEM_SOURCES = new Set(["puffball", "bait", "pack-mule", "trained-monkey", "parrot"]);
+const ITEM_SOURCES = new Set(["puffball", "bait", "pack-mule", "trained-monkey", "parrot", "signal-flare", "rope-ladder", "first-aid-kit"]);
+/** Further powers of a character: live through the character, never an upgrade. */
+const POWER_SOURCES = new Set(["cartographer.redraw"]);
 
 /** Your seat holds `sourceId` with `remaining` uses: as its character for a
  * character id, its upgrade for an upgrade id, else an equipped item. */
@@ -71,7 +73,7 @@ function holding(game: Game, sourceId: string, characterId: string, remaining: J
   const key = scenarioKey(sourceId);
   next.seats = next.seats.map((s) => {
     if (s.seatId !== game.yourSeatId) return s;
-    const upgradeId = sourceId.includes(".") ? sourceId : s.upgradeId;
+    const upgradeId = sourceId.includes(".") && !POWER_SOURCES.has(sourceId) ? sourceId : s.upgradeId;
     const equipped = key === ITEM_UID ? [...s.items.equipped.filter((i) => i.uid !== ITEM_UID), { uid: ITEM_UID, itemId: sourceId, remaining }] : s.items.equipped;
     return { ...s, characterId, upgradeId, items: { ...s.items, equipped }, usage: [{ sourceKey: key, remaining }] };
   });
@@ -138,24 +140,24 @@ export const PICKER_SCENARIOS: Record<string, { sourceId: string; rewrite: Rewri
     },
   },
   objective: {
-    sourceId: "cartographer",
+    sourceId: "cartographer.redraw",
     rewrite: (g) => {
-      const next = holding(g, "cartographer", "cartographer", { kind: "uses", left: 1, of: 1 });
+      const next = holding(g, "cartographer.redraw", "cartographer", { kind: "uses", left: 1, of: 1 });
       const open = attempt(next).camp.objectives.filter((o) => o.ownerSeatId === null);
-      return withAbility(next, "cartographer", [{ kind: "objective", prompt: "Pick a face-up objective", choices: open.map((o) => `objective:${o.id}`) }]);
+      return withAbility(next, "cartographer.redraw", [{ kind: "objective", prompt: "Pick a face-up objective", choices: open.map((o) => `objective:${o.id}`) }]);
     },
   },
   "completed-objective": {
-    sourceId: "cartographer.landmark",
+    sourceId: "signal-flare",
     rewrite: (g) => {
-      const next = holding(playing(g, { plays: 0, window: "between-tricks" }), "cartographer.landmark", "cartographer", { kind: "uses", left: 1, of: 1 });
+      const next = holding(playing(g, { plays: 0, window: "between-tricks" }), "signal-flare", "pack-rat", { kind: "uses", left: 1, of: 1 });
       const done = attempt(next).camp.objectives[0]!;
       done.status = "done";
-      return withAbility(next, "cartographer.landmark", [{ kind: "completed-objective", prompt: "Pick a completed objective", choices: [`objective:${done.id}`] }]);
+      return withAbility(next, "signal-flare", [{ kind: "completed-objective", prompt: "Pick a completed objective", choices: [`objective:${done.id}`] }]);
     },
   },
   "failed-objective": {
-    sourceId: "medic",
+    sourceId: "rope-ladder",
     rewrite: (g) => rescue(g),
   },
   whisper: {
@@ -186,9 +188,9 @@ export const PICKER_SCENARIOS: Record<string, { sourceId: string; rewrite: Rewri
     },
   },
   supplies: {
-    sourceId: "medic.field-kit",
+    sourceId: "first-aid-kit",
     rewrite: (g) => {
-      const next = withAbility(holding(playing(g, { plays: 0, window: "between-tricks" }), "medic.field-kit", "medic", { kind: "uses", left: 1, of: 1 }), "medic.field-kit", [
+      const next = withAbility(holding(playing(g, { plays: 0, window: "between-tricks" }), "first-aid-kit", "pack-rat", { kind: "uses", left: 1, of: 1 }), "first-aid-kit", [
         { kind: "supplies", prompt: "Pick the crew's supplies", choices: ["supplies"] },
       ]);
       return { ...next, supplies: { count: 2, max: 4 } };
@@ -197,10 +199,10 @@ export const PICKER_SCENARIOS: Record<string, { sourceId: string; rewrite: Rewri
 };
 
 /** The rescue window: your objective's card was won by a teammate, the
- * camp waits on you, the Medic. */
+ * camp waits on you and your Rope Ladder. */
 export function rescue(game: Game, opts: { youPending?: boolean } = {}): Game {
   const youPending = opts.youPending ?? true;
-  const next = holding(playing(game, { plays: 0, window: "between-tricks" }), "medic", "medic", { kind: "supplies", cost: 1 });
+  const next = holding(playing(game, { plays: 0, window: "between-tricks" }), "rope-ladder", "explorer", { kind: "uses", left: 1, of: 1 });
   const camp = attempt(next).camp;
   const failed = camp.objectives[0]!;
   failed.status = "failed";
@@ -208,12 +210,11 @@ export function rescue(game: Game, opts: { youPending?: boolean } = {}): Game {
   camp.campPhase = "ended";
   camp.currentActorSeatId = null;
   const mates = others(game);
-  next.seats = next.seats.map((s) => (s.seatId === mates[0] && !youPending ? { ...s, characterId: "medic" } : s));
   attempt(next).window = "rescue";
   attempt(next).pendingSeatIds = [youPending ? game.yourSeatId : mates[0]!];
   attempt(next).rescue = { failedObjectiveIds: [failed.id] };
   next.yourAbilities = youPending
-    ? [{ sourceKey: "medic", usableNow: true, reason: null, steps: [{ kind: "failed-objective", prompt: "Pick a failed objective", choices: [`objective:${failed.id}`] }] }]
+    ? [{ sourceKey: ITEM_UID, usableNow: true, reason: null, steps: [{ kind: "failed-objective", prompt: "Pick a failed objective", choices: [`objective:${failed.id}`] }] }]
     : [];
   return next;
 }

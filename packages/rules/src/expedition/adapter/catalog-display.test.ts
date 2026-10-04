@@ -50,14 +50,16 @@ describe("SOURCE_DISPLAY", () => {
   it("carries an item with a null characterId, and flags passive-only sources", () => {
     expect(SOURCE_DISPLAY["trained-monkey"]).toMatchObject({ kind: "item", characterId: null, active: { targets: ["card", "hand"] } });
     expect(SOURCE_DISPLAY["heavy-pack"]).toMatchObject({ kind: "item", characterId: null, active: null, passive: true });
-    expect(SOURCE_DISPLAY["heavy-pack"]!.item).toEqual({ rarity: "common", price: 3, uses: null, usesKind: null });
-    expect(SOURCE_DISPLAY.signaller).toMatchObject({ kind: "character", active: null, passive: true });
+    expect(SOURCE_DISPLAY["heavy-pack"]!.item).toEqual({ rarity: "common", price: 3, sellsFor: 1, exclusiveTo: null, uses: null, usesKind: null });
+    expect(SOURCE_DISPLAY.leader).toMatchObject({ kind: "character", active: null, passive: true });
+    expect(SOURCE_DISPLAY["cartographer.redraw"]).toMatchObject({ kind: "power", characterId: "cartographer", active: { windows: ["objective-pick"], targets: ["objective"] } });
   });
 
   it("carries an item's rarity, price and uses badge", () => {
-    expect(SOURCE_DISPLAY["trail-map"]!.item).toEqual({ rarity: "rare", price: 5, uses: "Single use", usesKind: "single-use" });
-    expect(SOURCE_DISPLAY["pack-mule"]!.item).toEqual({ rarity: "common", price: 3, uses: "Once per camp", usesKind: "per-camp" });
-    expect(SOURCE_DISPLAY["rain-poncho"]!.item).toEqual({ rarity: "common", price: 3, uses: "2 charges", usesKind: "charges" });
+    expect(SOURCE_DISPLAY["trail-map"]!.item).toEqual({ rarity: "rare", price: 5, sellsFor: 2, exclusiveTo: null, uses: "Single use", usesKind: "single-use" });
+    expect(SOURCE_DISPLAY["pack-mule"]!.item).toEqual({ rarity: "common", price: 3, sellsFor: 1, exclusiveTo: null, uses: "Once per camp", usesKind: "per-camp" });
+    expect(SOURCE_DISPLAY["rain-poncho"]!.item).toEqual({ rarity: "common", price: 3, sellsFor: 1, exclusiveTo: null, uses: "2 charges", usesKind: "charges" });
+    expect(SOURCE_DISPLAY["pocket-glass"]!.item).toMatchObject({ price: 1, sellsFor: 1, exclusiveTo: "pack-rat" });
     expect(SOURCE_DISPLAY["explorer.second-wind"]!.item).toBeNull();
   });
 
@@ -68,8 +70,9 @@ describe("SOURCE_DISPLAY", () => {
     expect(SOURCE_DISPLAY["parrot"]!.active!.limitBadge).toBe("Once per camp");
     expect(SOURCE_DISPLAY.whetstone!.active!.limitBadge).toBe("Single use");
     expect(SOURCE_DISPLAY["explorer.reshape"]!.active!.limitBadge).toBe("Once per camp, shared with Compass");
-    expect(SOURCE_DISPLAY["medic.rally"]!.active!.limitBadge).toBe("Once per run");
-    expect(["medic.rally", "rain-poncho", "parrot", "trail-map", "explorer.reshape", "leader.delegate", "medic"].map((id) => SOURCE_DISPLAY[id]!.active!.limitKind)).toEqual([
+    expect(SOURCE_DISPLAY["cartographer.treasure-map"]!.active!.limitBadge).toBe("Once per run");
+    expect([SOURCE_DISPLAY.businessman!.active!.limitBadge, SOURCE_DISPLAY["businessman.pop-up-shop"]!.active!.limitBadge]).toEqual(["No limit", "Costs coins"]);
+    expect(["cartographer.treasure-map", "rain-poncho", "parrot", "trail-map", "explorer.reshape", "leader.delegate", "cartographer"].map((id) => SOURCE_DISPLAY[id]!.active!.limitKind)).toEqual([
       "per-run",
       "charges",
       "per-camp",
@@ -78,19 +81,22 @@ describe("SOURCE_DISPLAY", () => {
       "whispers",
       "supplies",
     ]);
-    expect(SOURCE_DISPLAY.medic!.active!.limitBadge).toBe("1 supply");
+    expect(SOURCE_DISPLAY.cartographer!.active!.limitBadge).toBe("1 supply");
   });
 
   it("phrases each window", () => {
     expect(SOURCE_DISPLAY["rain-poncho"]!.active!.windowPhrase).toBe("Between tricks");
-    expect(SOURCE_DISPLAY.cartographer!.active!.windowPhrase).toBe("While picking objectives");
+    expect(SOURCE_DISPLAY["cartographer.redraw"]!.active!.windowPhrase).toBe("While picking objectives");
+    expect(SOURCE_DISPLAY.cartographer!.active!.windowPhrase).toBe("While choosing the route");
+    expect(SOURCE_DISPLAY.businessman!.active!.windowPhrase).toBe("Before setting out");
+    expect(SOURCE_DISPLAY["businessman.cash-out"]!.active!.windowPhrase).toBe("While drafting");
     expect(SOURCE_DISPLAY["jd.rule-breaker"]!.active!.windowPhrase).toBe("On your turn");
-    expect(SOURCE_DISPLAY.medic!.active!.windowPhrase).toBe("When an objective fails");
+    expect(SOURCE_DISPLAY["businessman.buyout"]!.active!.windowPhrase).toBe("When an objective fails");
   });
 
   it("lists target kinds in step order", () => {
     expect(SOURCE_DISPLAY["pack-mule"]!.active!.targets).toEqual(["won-trick", "player"]);
-    expect(SOURCE_DISPLAY["cartographer.detour"]!.active!.targets).toEqual(["objective", "player"]);
+    expect(SOURCE_DISPLAY["pack-rat.quartermaster"]!.active!.targets).toEqual(["item", "player"]);
     expect(SOURCE_DISPLAY["rain-poncho"]!.active!.targets).toEqual([]);
   });
 

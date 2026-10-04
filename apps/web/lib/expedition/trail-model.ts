@@ -1,15 +1,17 @@
 import type { ExpeditionCampPreviewView, ExpeditionView } from "@games/rules";
 import { CHARACTER_DISPLAY, EVENT_DISPLAY, RUN_LENGTH_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
 import type { Prompt } from "./build-prompt";
-import { buildTrailPrompt } from "./build-prompt";
+import { buildTrailPrompt, PROMPT_MAX_CHARS } from "./build-prompt";
 import type { SceneServerInput, Tooltip, TopBar } from "./build-scene-model";
 import { buildTopBar } from "./build-scene-model";
-import { characterName, usesLabel, type UsesLabel, liveSourceKeys, sourceBadges, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, type SourceKind } from "./source-text";
-import { bundleItemObjectId, bundleObjectId, draftObjectId, kitObjectId, lengthObjectId, READY_ID, routeObjectId } from "./expedition-ids";
+import { characterName, usesLabel, type UsesLabel, liveSourceKeys, sourceBadges, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, yourSourceId, type SourceKind } from "./source-text";
+import { bundleItemObjectId, bundleObjectId, crewObjectId, draftObjectId, kitObjectId, lengthObjectId, powerObjectId, READY_ID, rerollObjectId, routeObjectId } from "./expedition-ids";
 import { buildGear, buildShop, type Gear, type ShopPanel } from "./loadout-model";
-import type { LocalUiState } from "./local-ui";
+import { choiceFor, currentStep, isPicked, type LocalUiState, type PickEntity } from "./local-ui";
+import { cardLabel } from "./expedition-ids";
 import { bossLabel, focusCampIndex, modName, plannedBossAt } from "./view-access";
 import { campBackdrop, modDisplayName } from "./weather-model";
+import { wrapWords } from "../../components/expedition/phaser/draw/text-fit";
 
 /**
  * The trail before, between and after the camps: the muster with its
@@ -40,6 +42,8 @@ export interface BundleItem {
   /** "Single use", "Once per camp", "2 charges", "Always on". */
   uses: string;
   rare: boolean;
+  /** Drafted only by one character (the Pack Rat's own items). */
+  exclusive: boolean;
 }
 
 /** One bundle of a draft offer: its items arrive together. */
@@ -68,6 +72,24 @@ export interface CharacterCard {
   takenBy: string | null;
   yours: boolean;
   pickable: boolean;
+}
+
+/** One line of a muster card under the power's name. */
+export interface MusterLine {
+  text: string;
+  tone: "rules" | "power" | "badge";
+}
+
+/** A muster card's rules, wrapped to `chars`: the power's text, each
+ * further power as its name then its text, then the power's badges while
+ * there is room for them. */
+export function musterLines(card: CharacterCard, chars: number, room: number): MusterLine[] {
+  const lines: MusterLine[] = wrapWords(card.power.text, chars).map((text) => ({ text, tone: "rules" }));
+  for (const more of card.more) {
+    lines.push(...wrapWords(`${more.name}: ${more.text}`, chars).map((text, i) => ({ text, tone: i === 0 ? ("power" as const) : ("rules" as const) })));
+  }
+  const badges = wrapWords(card.power.badges.join(", "), chars).map((text) => ({ text, tone: "badge" as const }));
+  return lines.length + badges.length <= room ? [...lines, ...badges] : lines;
 }
 
 /** A run length on the muster's ballot. */
@@ -119,6 +141,9 @@ export interface CampPreview {
    * the temple, which `boss` already names. */
   bossId: string | null;
   bossName: string | null;
+  /** The objectives its next deal holds, for a seat that surveys ("7♠",
+   * "Exactly 2"); null otherwise. */
+  survey: string[] | null;
 }
 
 export interface RouteCard {
@@ -129,6 +154,20 @@ export interface RouteCard {
   voters: string[];
   yours: boolean;
   votable: boolean;
+  /** "Another boss at camp 3": this route leads to a different boss than
+   * the plan's (the Cartographer's third route); null otherwise. */
+  swapsBoss: string | null;
+  /** The Cartographer's reroll of this route, while you can afford it. */
+  reroll: { objectId: string; choiceId: string; label: string } | null;
+}
+
+/** A power you can use between camps, as a button. `active` while you are
+ * picking its targets. */
+export interface PowerButton {
+  sourceKey: string;
+  objectId: string;
+  label: string;
+  active: boolean;
 }
 
 /** The vote that just resolved, with the coin flip that settled a tie. */
@@ -171,6 +210,9 @@ export interface KitItem {
 
 export interface CrewRow {
   seatId: string;
+  objectId: string;
+  /** A choice of the power you are aiming (Quartermaster's teammate). */
+  targetable: boolean;
   displayLabel: string;
   isYou: boolean;
   connected: boolean;
@@ -199,6 +241,8 @@ export interface TrailModel {
   status: string | null;
   vote: VoteResult | null;
   tooltip: Tooltip | null;
+  /** The powers you can use now, between camps. */
+  powers: PowerButton[];
 }
 
 type View = ExpeditionView;
@@ -267,7 +311,21 @@ export function campPreview(view: View, camp: ExpeditionCampPreviewView): CampPr
     boss: bossLabel(view, camp.index),
     bossId,
     bossName: bossId === null ? null : modDisplayName(bossId),
+    survey: camp.survey === null ? null : camp.survey.map(surveyLabel),
   };
+}
+
+function surveyLabel(objective: NonNullable<ExpeditionCampPreviewView["survey"]>[number]): string {
+  switch (objective.kind) {
+    case "win-card":
+      return cardLabel(objective.target);
+    case "ordered":
+      return `${objective.order === "last" ? "Last" : `#${objective.order}`} ${cardLabel(objective.target)}`;
+    case "no-tricks":
+      return "No tricks";
+    case "exactly-n":
+      return `Exactly ${objective.n}`;
+  }
 }
 
 function lengthSummary(bossCamps: readonly { tier: string }[]): string {
@@ -343,6 +401,7 @@ function bundleFor(itemIds: readonly string[], bundle: number): DraftBundle {
         text: display?.text ?? "",
         uses: display?.item?.uses ?? "Always on",
         rare: display?.item?.rarity === "rare",
+        exclusive: (display?.item?.exclusiveTo ?? null) !== null,
       };
     }),
   };
@@ -358,18 +417,87 @@ function buildDraft(view: View, yourOffer: { bundles: string[][] } | null, taken
   return newest === undefined ? { kind: "none", text: "Nothing left to take" } : { kind: "taken", items: [{ sourceId: newest.itemId, name: sourceName(newest.itemId) }] };
 }
 
+/** Abilities whose one target is a route option: they ride on the route
+ * cards as a Reroll button rather than in the power row. */
+function rerollAbility(view: View): { sourceKey: string; choices: string[]; label: string } | null {
+  const ability = view.yourAbilities.find((a) => a.usableNow && a.steps.length === 1 && a.steps[0]!.kind === "route-option");
+  if (ability === undefined) return null;
+  const sourceId = yourSourceId(view, ability.sourceKey);
+  const badge = SOURCE_DISPLAY[sourceId]?.active?.limitBadge ?? "";
+  return { sourceKey: ability.sourceKey, choices: ability.steps[0]!.choices, label: badge === "" ? "Reroll" : `Reroll, ${badge}` };
+}
+
+/** Names the boss camp a boss swap changes: the next animal or disaster one. */
+function swapLabel(view: View, from: number): string {
+  const at = view.plan.find((b) => b.at >= from && (b.tier === "animal" || b.tier === "disaster"))?.at;
+  return at === undefined ? "Another boss ahead" : `Another boss at camp ${at}`;
+}
+
 function buildRoutes(server: SceneServerInput, stage: Extract<View["stage"], { tag: "route" }>): RouteCard[] {
   const view = server.game;
   const yourBallot = stage.ballots.find((b) => b.seatId === view.yourSeatId);
-  return stage.options.map((option) => ({
-    id: option.id,
-    objectId: routeObjectId(option.id),
-    label: `Route ${option.id.toUpperCase()}`,
-    next: campPreview(view, option.next),
-    voters: votersFor(server, stage.ballots, option.id),
-    yours: yourBallot?.choice === option.id,
-    votable: view.yourSeatId !== null && view.seats.some((s) => s.seatId === view.yourSeatId),
-  }));
+  const reroll = rerollAbility(view);
+  return stage.options.map((option) => {
+    const choiceId = `route:${option.id}`;
+    return {
+      id: option.id,
+      objectId: routeObjectId(option.id),
+      label: `Route ${option.id.toUpperCase()}`,
+      next: campPreview(view, option.next),
+      voters: votersFor(server, stage.ballots, option.id),
+      yours: yourBallot?.choice === option.id,
+      votable: view.yourSeatId !== null && view.seats.some((s) => s.seatId === view.yourSeatId),
+      swapsBoss: option.swapsBoss ? swapLabel(view, option.next.index) : null,
+      reroll: reroll !== null && reroll.choices.includes(choiceId) ? { objectId: rerollObjectId(option.id), choiceId, label: reroll.label } : null,
+    };
+  });
+}
+
+/** What a power's button says: the base power's name, or its action where
+ * the name alone would not say it. */
+const POWER_ACTION: Readonly<Record<string, string>> = { businessman: "Sell an item" };
+
+function buildPowers(view: View, ui: LocalUiState): PowerButton[] {
+  const stage = view.stage.tag;
+  if (stage !== "loadout" && stage !== "draft" && stage !== "route") return [];
+  const reroll = rerollAbility(view);
+  return view.yourAbilities
+    .filter((a) => a.usableNow && a.sourceKey !== reroll?.sourceKey)
+    .map((a) => {
+      const sourceId = yourSourceId(view, a.sourceKey);
+      return {
+        sourceKey: a.sourceKey,
+        objectId: powerObjectId(a.sourceKey),
+        label: POWER_ACTION[sourceId] ?? sourceName(sourceId),
+        active: ui.targeting?.mode === "ability" && ui.targeting.sourceKey === a.sourceKey,
+      };
+    });
+}
+
+/** Marks what the power being aimed may pick: your items for a sale or a
+ * gift, with a sale's price as the tile's tag. */
+function aimGear(view: View, ui: LocalUiState, gear: Gear | null): Gear | null {
+  if (gear === null || currentStep(ui, view)?.kind !== "item") return gear;
+  const selling = ui.targeting?.mode === "ability" && yourSourceId(view, ui.targeting.sourceKey) === "businessman";
+  const aim = (item: Gear["backpack"][number]): Gear["backpack"][number] => {
+    const targetable = choiceFor(ui, view, "item", item.uid) !== null;
+    const sellsFor = SOURCE_DISPLAY[item.itemId]?.item?.sellsFor;
+    return { ...item, targetable, tag: targetable && selling && sellsFor !== undefined ? `+${sellsFor}` : null };
+  };
+  return { ...gear, slots: gear.slots.map((slot) => ({ ...slot, item: slot.item === null ? null : aim(slot.item) })), backpack: gear.backpack.map(aim) };
+}
+
+/** While a power is aimed: what to pick next. */
+function aimPrompt(view: View, ui: LocalUiState): Prompt | null {
+  const step = currentStep(ui, view);
+  if (step === null || ui.targeting?.mode !== "ability") return null;
+  const sourceId = yourSourceId(view, ui.targeting.sourceKey);
+  const full = `${POWER_ACTION[sourceId] ?? sourceName(sourceId)}: ${step.prompt}`;
+  return { text: full.length <= PROMPT_MAX_CHARS ? full : step.prompt, tone: "your-move" };
+}
+
+function pickOf(ui: LocalUiState, view: View, entity: PickEntity, rawId: string): boolean {
+  return choiceFor(ui, view, entity, rawId) !== null && !isPicked(ui, entity, rawId);
 }
 
 function buildLoadout(server: SceneServerInput, stage: Extract<View["stage"], { tag: "loadout" }>, ui: LocalUiState): TrailPanel {
@@ -379,7 +507,7 @@ function buildLoadout(server: SceneServerInput, stage: Extract<View["stage"], { 
   return {
     kind: "loadout",
     next: campPreview(view, stage.camp),
-    gear: you === undefined ? null : buildGear(you, stage.yourSlots, ready, ui.packPage),
+    gear: you === undefined ? null : aimGear(view, ui, buildGear(you, stage.yourSlots, ready, ui.packPage)),
     shop:
       stage.shop === null
         ? null
@@ -433,12 +561,14 @@ function crewStatus(view: View, seatId: string): CrewRow["status"] {
   }
 }
 
-function buildCrew(server: SceneServerInput): CrewRow[] {
+function buildCrew(server: SceneServerInput, ui: LocalUiState): CrewRow[] {
   const { game: view, roomSeats } = server;
   return orderedSeats(view).map((seat) => {
     const room = roomSeats.find((r) => r.seatId === seat.seatId);
     return {
       seatId: seat.seatId,
+      objectId: crewObjectId(seat.seatId),
+      targetable: pickOf(ui, view, "seat", seat.seatId),
       displayLabel: room?.displayLabel ?? "?",
       isYou: seat.seatId === view.yourSeatId,
       connected: room?.connected ?? false,
@@ -531,14 +661,15 @@ export function buildTrailModel(server: SceneServerInput, ui: LocalUiState, reco
   return {
     sceneKey: "trail",
     topBar: buildTopBar(view),
-    prompt: buildTrailPrompt(view, roomSeats, { reconnecting }),
+    prompt: aimPrompt(view, ui) ?? buildTrailPrompt(view, roomSeats, { reconnecting }),
     trail: buildTrail(view),
     panel: buildPanel(server, ui),
     kit: buildKit(view),
-    crew: buildCrew(server),
+    crew: buildCrew(server, ui),
     ready: buildReady(view),
     status: buildStatus(view),
     vote: buildVote(view),
     tooltip: buildTooltip(view, ui),
+    powers: buildPowers(view, ui),
   };
 }

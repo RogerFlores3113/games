@@ -21,13 +21,14 @@ import { gestureCardId } from "./card-drag";
 import type { LocalUiState, PickEntity } from "./local-ui";
 import { choiceFor, currentStep, isPicked, valueChoices } from "./local-ui";
 import type { Prompt } from "./build-prompt";
-import { buildPrompt } from "./build-prompt";
+import { buildPrompt, describeOption } from "./build-prompt";
 import type { ObjectiveHolder } from "./objective-tooltip";
 import { objectiveTooltip } from "./objective-tooltip";
 import { buildModChips, buildSky, modTooltip, whisperBlocker, type ModChip, type Sky } from "./weather-model";
 import { bossBlockReason, bossHappenings, buildBoss, buildHelpers, latestGust, seatMarks, type BossHappening, type BossModel, type Gust, type SeatBossMark, type SeatNamer } from "./boss-model";
 import { buildTemplePath, type TemplePath } from "./temple-model";
-import { isSpent, liveSourceKeys, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, usesLabel, type SourceKind, type UsesLabel } from "./source-text";
+import { buildPopupShop, POPUP_SHOP, type PopupShopModel } from "./popup-shop-model";
+import { isSpent, liveSourceKeys, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, usesLabel, yourSourceId, type SourceKind, type UsesLabel } from "./source-text";
 
 const TORNADO_ID = "tornado";
 
@@ -70,7 +71,7 @@ export interface TopBar {
   /** The crew's shared coins. */
   purse: number;
   camp: string;
-  /** The supply crates as an ability target (Field Kit); null outside
+  /** The supply crates as an ability target (First Aid Kit); null outside
    * targeting. */
   suppliesPick: PickState | null;
 }
@@ -306,6 +307,8 @@ export interface SceneModel {
   boardPick: PickState | null;
   /** Options that have no other place on the table. */
   tray: { title: string; options: TrayOption[] } | null;
+  /** The Businessman's Pop-up Shop while you are buying from it. */
+  popupShop: PopupShopModel | null;
   trayPage: number;
   /** The card being dragged onto the table; `legal` says whether the stump
    * accepts it. Null when no card is held. */
@@ -775,6 +778,21 @@ function buildTray(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiS
       }),
     };
   }
+  if (step.kind === "option") {
+    if (ui.targeting?.mode === "ability" && yourSourceId(view, ui.targeting.sourceKey) === POPUP_SHOP) return null;
+    return { title: step.prompt, options: step.choices.map((id) => option(id, describeOption(id.slice("option:".length), (seatId) => (seatId === null ? "nobody" : nameOf(seatId))))) };
+  }
+  if (step.kind === "item") {
+    const seat = view.seats.find((s) => s.seatId === view.yourSeatId);
+    const items = [...(seat?.items.equipped ?? []), ...(seat?.items.backpack ?? [])];
+    return {
+      title: step.prompt,
+      options: step.choices.map((id) => {
+        const item = items.find((i) => `item:${i.uid}` === id);
+        return option(id, item === undefined ? "An item" : sourceName(item.itemId));
+      }),
+    };
+  }
   if (step.kind === "card-value" || step.kind === "objective-value") {
     const choices = valueChoices(ui, view);
     if (choices.length === 0) return null;
@@ -850,6 +868,7 @@ export function buildSceneModel(
     banner: ui.targeting === null ? buildBanner(view, roomSeats, ui) : null,
     boardPick: pickOrNull(ui, view, "board"),
     tray: buildTray(view, roomSeats, ui),
+    popupShop: buildPopupShop(view, ui, (seatId) => roomSeatFor(roomSeats, seatId).displayLabel),
     trayPage: ui.trayPage,
     drag,
     targeting,

@@ -50,15 +50,7 @@ const SOURCE_BATCH = {
 };
 
 const SOURCE_ICONS = [
-  ["medic", "rolled white bandage", 44],
-  ["signaller", "hourglass drum", 4],
   ["cartographer", "pencil over a card", 5],
-  ["medic.rally", "raised hand holding a card", 12],
-  ["medic.field-kit", "small crate with a green leaf", 13],
-  ["signaller.loud-call", "conch shell", 14],
-  ["signaller.call-and-response", "two speech arcs facing each other", 15],
-  ["cartographer.detour", "bent arrow", 16],
-  ["cartographer.landmark", "flag on a stone cairn", 17],
   ["trained-monkey", "small monkey holding a card", 18],
   ["pack-mule", "mule head with a pack", 19],
   ["parrot", "red parrot in profile", 20],
@@ -96,12 +88,26 @@ const NINE_ICONS = [
   ["explorer.second-wind", "gust of wind", 22],
   ["explorer.true-form", "framed card with a red mark", 23],
   ["explorer.reshape", "hand shaping a card", 24],
+  ["businessman", "leather briefcase", 1],
+  ["businessman.cash-out", "pouch spilling gold coins", 34],
+  ["businessman.pop-up-shop", "market stall with a striped awning", 11],
+  ["businessman.buyout", "pile of gold coins", 12],
+  ["businessman.haggle", "price tag on a string", 13],
+  ["pack-rat", "overstuffed backpack with goggles", 7],
+  ["pack-rat.quartermaster", "two hands passing a bundle", 31],
+  ["pack-rat.pack-animal", "pack mule", 32],
+  ["pack-rat.sturdy-straps", "coiled leather strap", 33],
+  ["cartographer.redraw", "red book with a quill", 35],
+  ["cartographer.survey", "framed map with a lens", 20],
+  ["cartographer.treasure-map", "treasure map with a red cross", 21],
+  ["pocket-glass", "magnifying glass", 47],
+  ["message-bottle", "corked bottle with a note", 61],
+  ["first-aid-kit", "red first aid kit", 50],
+  ["signal-flare", "red signal flare", 62],
 ];
 
 /** Seated silhouettes behind the stump, one per character. */
 const CREW = [
-  ["medic", "dark silhouette of a field medic sitting cross-legged facing the viewer, a big satchel bag on the hip with a white cross patch, a pith helmet, almost black shape with a thin warm orange firelight rim light on one side, isolated sprite on plain background", 11, "23711889"],
-  ["signaller", "dark silhouette of a drummer sitting cross-legged facing the viewer with a large hourglass-shaped talking drum in the lap, a curved drumstick raised in one hand, almost black shape with a thin warm orange firelight rim light on one side, isolated sprite on plain background", 11, "e2526109"],
   ["cartographer", "dark silhouette of a cartographer sitting cross-legged facing the viewer, holding a large unrolled map open in both hands, a long map tube slung across the back over one shoulder, almost black shape with a thin warm orange firelight rim light on one side, no glowing eyes, isolated sprite on plain background", 11, "b5819dd6"],
 ];
 
@@ -110,6 +116,8 @@ const CREW = [
 const NINE_CREW = [
   ["jd", "dark silhouette of an ordinary tourist sitting cross-legged facing the viewer, baseball cap, t-shirt, a camera hanging on a strap around the neck, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "a796eb43-bbaf-47fd-9ff2-58a274a7bca3"],
   ["explorer", "dark silhouette of a jungle explorer sitting cross-legged facing the viewer, pith helmet, a coiled rope over one shoulder, holding a compass up in one hand, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "d424936a-4ab5-4a3a-8181-45675ed48d63"],
+  ["businessman", "dark silhouette of a wealthy businessman sitting cross-legged facing the viewer, bowler hat, suit with tie, holding a big leather briefcase upright on his lap with both hands, a gold coin glinting, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 11, "3234e29a-aacd-4c87-90ce-26870d519656"],
+  ["pack-rat", "dark silhouette of a porter sitting cross-legged facing the viewer, carrying an enormous overstuffed backpack piled high with pots, rolled blankets and a lantern dangling off it, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "b5605be2-a09d-4c0b-8800-8ae6523c95e6"],
   ["leader", "dark silhouette of an expedition leader sitting cross-legged facing the viewer, wide-brim hat, raising a megaphone to the mouth with one hand, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background", 7, "2fe92e81-3308-421b-a7af-6cc8dd4e870a"],
 ];
 const crewSpec = (description, seed, job, note) => ({

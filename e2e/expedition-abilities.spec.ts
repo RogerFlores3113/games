@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { clickHandCard, clickUntilChanged, draftOffer, trailToCamp, waitForScene, type MusterCard, type TrailView } from "./expedition-driver";
 import { getModel, getScene, startExpeditionGame } from "./expedition-helpers";
+import { shortcut } from "./expedition-dev-panel";
 import { PICKER_SCENARIOS, rewriteViews, scenarioKey, type Game } from "./expedition-scenarios";
 
 /**
@@ -21,7 +22,7 @@ interface CampModel {
   hand: { id: string; objectId: string; label: string; playable: boolean; targetable: boolean }[];
   trick: { plays: { seatId: string; card?: { id: string; objectId: string; targetable: boolean } }[] } | null;
   faceUpObjectives: Chip[];
-  banner: { youPending: boolean; title: string; detail: string } | null;
+  banner: { youPending: boolean; title: string; detail: string; uses: { objectId: string }[] } | null;
   tray: { options: { choiceId: string; objectId: string }[] } | null;
   targeting: { canConfirm: boolean } | null;
   prompt: { text: string };
@@ -37,6 +38,15 @@ async function readyAll(pages: Page[]): Promise<void> {
   for (const p of pages) await waitForScene(p, "camp");
 }
 
+/** Gives the host a Rope Ladder through the dev panel, so a failed
+ * objective asks them to rescue it. */
+async function giveRopeLadder(host: Page): Promise<void> {
+  await host.getByTestId("dev-toggle").click();
+  const seat = (await getModel<CampModel>(host)).youSeatId;
+  await shortcut(host.getByTestId("dev-panel"), "give-item", { seat, item: "rope-ladder" });
+  await host.getByTestId("dev-toggle").click();
+}
+
 async function sentRequests(sent: { request?: unknown }[]): Promise<unknown[]> {
   return sent.map((m) => m.request);
 }
@@ -50,8 +60,9 @@ async function playUntilRescue(host: Page, pages: Page[]): Promise<boolean> {
     if (model.sceneKey !== "camp") {
       if (model.sceneKey !== "trail") return false;
       const fm = await getModel<TrailView>(host);
-      expect(fm.panel?.kind, "a failed camp always asks the Medic first").not.toBe("loadout");
+      expect(fm.panel?.kind, "a failed camp always asks the Rope Ladder's holder first").not.toBe("loadout");
       await readyAll(pages);
+      await giveRopeLadder(host);
       continue;
     }
     if (model.banner !== null) {
@@ -79,15 +90,15 @@ test.describe("Expedition characters and abilities", () => {
     test.setTimeout(90_000);
     const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
     try {
-      await musterPick(pages[0]!, "medic");
+      await musterPick(pages[0]!, "businessman");
       await expect
         .poll(async () => {
           const panel = (await getModel<TrailView>(pages[1]!)).panel;
-          return (panel?.kind === "muster" ? panel.characters : []).find((c) => c.characterId === "medic")?.takenBy;
+          return (panel?.kind === "muster" ? panel.characters : []).find((c) => c.characterId === "businessman")?.takenBy;
         })
         .toBe("Roger");
       const panel = (await getModel<TrailView>(pages[0]!)).panel!;
-      const own = (panel.kind === "muster" ? panel.characters : []).find((c: MusterCard) => c.characterId === "medic")!;
+      const own = (panel.kind === "muster" ? panel.characters : []).find((c: MusterCard) => c.characterId === "businessman")!;
       expect(own).toMatchObject({ yours: true, takenBy: "You", pickable: false });
       await musterPick(pages[1]!, "explorer");
       await musterPick(pages[2]!, "jd");
@@ -218,17 +229,18 @@ test.describe("Expedition characters and abilities", () => {
     }
   });
 
-  test("a real rescue: the Medic drops a failed objective and play goes on", async ({ page, browser }) => {
+  test("a real rescue: a Rope Ladder drops a failed objective and play goes on", async ({ page, browser }) => {
     test.setTimeout(300_000);
     const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
     try {
-      for (const [i, id] of ["medic", "explorer", "leader"].entries()) await musterPick(pages[i]!, id);
+      for (const [i, id] of ["jd", "explorer", "leader"].entries()) await musterPick(pages[i]!, id);
       await readyAll(pages);
+      await giveRopeLadder(page);
 
-      expect(await playUntilRescue(page, pages), "an objective failed and the Medic was asked to rescue it").toBe(true);
+      expect(await playUntilRescue(page, pages), "an objective failed and the Rope Ladder's holder was asked to rescue it").toBe(true);
       expect((await getModel<CampModel>(page)).banner!.title).toMatch(/^Objectives? failed: /);
       await page.screenshot({ path: ".audit/abilities/rescue-banner.png" });
-      await clickUntilChanged<CampModel>(page, "gate-use:medic", (m) => m.targeting !== null);
+      await clickUntilChanged<CampModel>(page, (await getModel<CampModel>(page)).banner!.uses[0]!.objectId, (m) => m.targeting !== null);
       const failed = (await getModel<CampModel>(page)).seats.flatMap((s) => s.objectives).find((o) => o.targetable)!;
       await clickUntilChanged<CampModel>(page, failed.objectId, (m) => m.targeting?.canConfirm === true);
       await clickUntilChanged<CampModel>(page, "confirm", (m) => m.sceneKey !== "camp" || m.targeting === null);
@@ -249,13 +261,14 @@ test.describe("Expedition characters and abilities", () => {
     }
   });
 
-  test("an absent Medic is passed for after the grace period, so the table moves on", async ({ page, browser }) => {
+  test("an absent rescuer is passed for after the grace period, so the table moves on", async ({ page, browser }) => {
     test.setTimeout(300_000);
     const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
     try {
-      for (const [i, id] of ["medic", "explorer", "leader"].entries()) await musterPick(pages[i]!, id);
+      for (const [i, id] of ["jd", "explorer", "leader"].entries()) await musterPick(pages[i]!, id);
       await readyAll(pages);
-      expect(await playUntilRescue(page, pages), "an objective failed and the Medic was asked to rescue it").toBe(true);
+      await giveRopeLadder(page);
+      expect(await playUntilRescue(page, pages), "an objective failed and the Rope Ladder's holder was asked to rescue it").toBe(true);
       const bianca = pages[1]!;
       await expect.poll(async () => (await getModel<CampModel>(bianca)).banner?.detail).toMatch(/Waiting on Roger/);
 

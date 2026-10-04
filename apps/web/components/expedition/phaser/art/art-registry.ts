@@ -25,18 +25,20 @@ const c = toPhaserColor;
  * sources/<id>.png. `source-icons.test.ts` checks this against the catalogue. */
 export const SOURCE_ICON_IDS = [
   "jd", "jd.blend-in", "jd.free-spirit", "jd.rule-breaker",
-  "leader", "leader.open-ears", "leader.delegate", "leader.momentum",
+  "businessman", "businessman.cash-out", "businessman.pop-up-shop", "businessman.buyout", "businessman.haggle",
+  "cartographer", "cartographer.redraw", "cartographer.survey", "cartographer.treasure-map",
   "explorer", "explorer.second-wind", "explorer.true-form", "explorer.reshape",
-  "medic", "signaller", "cartographer",
-  "medic.rally", "medic.field-kit", "signaller.loud-call", "signaller.call-and-response", "cartographer.detour", "cartographer.landmark",
+  "leader", "leader.open-ears", "leader.delegate", "leader.momentum",
+  "pack-rat", "pack-rat.quartermaster", "pack-rat.pack-animal", "pack-rat.sturdy-straps",
   "trained-monkey", "pack-mule", "parrot", "trail-map", "rain-poncho", "smoke-signal", "whetstone",
   "puffball", "bait", "camouflage", "rope-ladder", "heavy-pack", "mosquito-net",
+  "pocket-glass", "message-bottle", "first-aid-kit", "signal-flare",
   "temple",
 ] as const;
 
 /** The characters, each a 64x80 seated silhouette under crew/<id>.png,
  * drawn bottom-centred. */
-export const CREW_IDS = ["jd", "leader", "explorer", "medic", "signaller", "cartographer"] as const;
+export const CREW_IDS = ["jd", "businessman", "cartographer", "explorer", "leader", "pack-rat"] as const;
 
 type SourceIconId = `source-${(typeof SOURCE_ICON_IDS)[number]}`;
 type CrewArtId = `crew-${(typeof CREW_IDS)[number]}`;

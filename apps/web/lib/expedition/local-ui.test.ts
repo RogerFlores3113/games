@@ -18,6 +18,7 @@ import {
   setTooltipObjective,
   setTooltipSource,
   valueChoices,
+  repickLast,
   type LocalUiState,
 } from "./local-ui";
 
@@ -486,5 +487,16 @@ describe("setHoveredCard / setLastTrickOpen / tooltip setters", () => {
       tooltipMateSource: { seatId: "s1", sourceKey: "bait" },
     });
     expect(ui).toEqual(initialLocalUi());
+  });
+});
+
+describe("repickLast", () => {
+  it("lets a click on another choice of the last step replace the last pick, and nothing else", () => {
+    const shop: ExpeditionAbilityView = { sourceKey: "businessman.pop-up-shop", usableNow: true, reason: null, steps: [{ kind: "option", prompt: "Buy", choices: ["option:buy:0:bait:4:p0", "option:refresh:1"] }] };
+    const view = makeView({ yourAbilities: [shop] });
+    const picked = selectTarget(beginAbilityTargeting(initialLocalUi(), view, "businessman.pop-up-shop"), view, "option:buy:0:bait:4:p0");
+    const again = selectTarget(repickLast(picked, view, "option:refresh:1"), view, "option:refresh:1");
+    expect(again.targeting).toEqual({ mode: "ability", sourceKey: "businessman.pop-up-shop", selected: ["option:refresh:1"], heldId: null });
+    expect(repickLast(picked, view, "option:nope")).toBe(picked);
   });
 });

@@ -26,15 +26,7 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | mascot-flop | sprites/camp/mascot-flop.png | PixelLab generation (red panda object, v3 animation), spec `prompts/mascot-flop.json` | PixelLab ToS | 2026-10-02 |
 | trail-map | sprites/fireside/trail-map.png | PixelLab generation, spec `prompts/trail-map.json` | PixelLab ToS | 2026-10-02 |
 | stump-table | sprites/camp/stump-table.png | PixelLab generation, spec `prompts/stump-table.json`; backdrop keyed out offline | PixelLab ToS | 2026-10-03 |
-| source-medic | sprites/sources/medic.png | PixelLab generation, spec `prompts/source-medic.json` | PixelLab ToS | 2026-10-03 |
-| source-signaller | sprites/sources/signaller.png | PixelLab generation, spec `prompts/source-signaller.json` | PixelLab ToS | 2026-10-03 |
 | source-cartographer | sprites/sources/cartographer.png | PixelLab generation, spec `prompts/source-cartographer.json` | PixelLab ToS | 2026-10-03 |
-| source-medic.rally | sprites/sources/medic.rally.png | PixelLab generation, spec `prompts/source-medic.rally.json` | PixelLab ToS | 2026-10-03 |
-| source-medic.field-kit | sprites/sources/medic.field-kit.png | PixelLab generation, spec `prompts/source-medic.field-kit.json` | PixelLab ToS | 2026-10-03 |
-| source-signaller.loud-call | sprites/sources/signaller.loud-call.png | PixelLab generation, spec `prompts/source-signaller.loud-call.json` | PixelLab ToS | 2026-10-03 |
-| source-signaller.call-and-response | sprites/sources/signaller.call-and-response.png | PixelLab generation, spec `prompts/source-signaller.call-and-response.json` | PixelLab ToS | 2026-10-03 |
-| source-cartographer.detour | sprites/sources/cartographer.detour.png | PixelLab generation, spec `prompts/source-cartographer.detour.json` | PixelLab ToS | 2026-10-03 |
-| source-cartographer.landmark | sprites/sources/cartographer.landmark.png | PixelLab generation, spec `prompts/source-cartographer.landmark.json` | PixelLab ToS | 2026-10-03 |
 | source-trained-monkey | sprites/sources/trained-monkey.png | PixelLab generation, spec `prompts/source-trained-monkey.json` | PixelLab ToS | 2026-10-03 |
 | source-pack-mule | sprites/sources/pack-mule.png | PixelLab generation, spec `prompts/source-pack-mule.json` | PixelLab ToS | 2026-10-03 |
 | source-parrot | sprites/sources/parrot.png | PixelLab generation, spec `prompts/source-parrot.json` | PixelLab ToS | 2026-10-03 |
@@ -48,8 +40,6 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | source-rope-ladder | sprites/sources/rope-ladder.png | PixelLab generation, spec `prompts/source-rope-ladder.json` | PixelLab ToS | 2026-10-03 |
 | source-heavy-pack | sprites/sources/heavy-pack.png | PixelLab generation, spec `prompts/source-heavy-pack.json` | PixelLab ToS | 2026-10-03 |
 | source-mosquito-net | sprites/sources/mosquito-net.png | PixelLab generation, spec `prompts/source-mosquito-net.json` | PixelLab ToS | 2026-10-03 |
-| crew-medic | sprites/crew/medic.png | PixelLab generation, spec `prompts/crew-medic.json`; alpha thresholded locally | PixelLab ToS | 2026-10-03 |
-| crew-signaller | sprites/crew/signaller.png | PixelLab generation, spec `prompts/crew-signaller.json`; alpha thresholded locally | PixelLab ToS | 2026-10-03 |
 | crew-cartographer | sprites/crew/cartographer.png | PixelLab generation, spec `prompts/crew-cartographer.json`; alpha thresholded locally | PixelLab ToS | 2026-10-03 |
 | boss-tiger | sprites/bosses/tiger.png | PixelLab generation, spec `prompts/boss-tiger.json` | PixelLab ToS | 2026-10-04 |
 | boss-rats | sprites/bosses/rats.png | PixelLab generation, spec `prompts/boss-rats.json` | PixelLab ToS | 2026-10-04 |
@@ -85,6 +75,24 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | source-explorer.second-wind | sprites/sources/explorer.second-wind.png | PixelLab generation, spec `prompts/source-explorer.second-wind.json` | PixelLab ToS | 2026-10-04 |
 | source-explorer.true-form | sprites/sources/explorer.true-form.png | PixelLab generation, spec `prompts/source-explorer.true-form.json` | PixelLab ToS | 2026-10-04 |
 | source-explorer.reshape | sprites/sources/explorer.reshape.png | PixelLab generation, spec `prompts/source-explorer.reshape.json` | PixelLab ToS | 2026-10-04 |
+| crew-businessman | sprites/crew/businessman.png | PixelLab generation, spec `prompts/crew-businessman.json` | PixelLab ToS | 2026-10-04 |
+| crew-pack-rat | sprites/crew/pack-rat.png | PixelLab generation, spec `prompts/crew-pack-rat.json` | PixelLab ToS | 2026-10-04 |
+| source-businessman | sprites/sources/businessman.png | PixelLab generation, spec `prompts/source-businessman.json` | PixelLab ToS | 2026-10-04 |
+| source-businessman.pop-up-shop | sprites/sources/businessman.pop-up-shop.png | PixelLab generation, spec `prompts/source-businessman.pop-up-shop.json` | PixelLab ToS | 2026-10-04 |
+| source-businessman.buyout | sprites/sources/businessman.buyout.png | PixelLab generation, spec `prompts/source-businessman.buyout.json` | PixelLab ToS | 2026-10-04 |
+| source-businessman.haggle | sprites/sources/businessman.haggle.png | PixelLab generation, spec `prompts/source-businessman.haggle.json` | PixelLab ToS | 2026-10-04 |
+| source-businessman.cash-out | sprites/sources/businessman.cash-out.png | PixelLab generation, spec `prompts/source-businessman.cash-out.json` | PixelLab ToS | 2026-10-04 |
+| source-pack-rat | sprites/sources/pack-rat.png | PixelLab generation, spec `prompts/source-pack-rat.json` | PixelLab ToS | 2026-10-04 |
+| source-pack-rat.quartermaster | sprites/sources/pack-rat.quartermaster.png | PixelLab generation, spec `prompts/source-pack-rat.quartermaster.json` | PixelLab ToS | 2026-10-04 |
+| source-pack-rat.pack-animal | sprites/sources/pack-rat.pack-animal.png | PixelLab generation, spec `prompts/source-pack-rat.pack-animal.json` | PixelLab ToS | 2026-10-04 |
+| source-pack-rat.sturdy-straps | sprites/sources/pack-rat.sturdy-straps.png | PixelLab generation, spec `prompts/source-pack-rat.sturdy-straps.json` | PixelLab ToS | 2026-10-04 |
+| source-cartographer.survey | sprites/sources/cartographer.survey.png | PixelLab generation, spec `prompts/source-cartographer.survey.json` | PixelLab ToS | 2026-10-04 |
+| source-cartographer.treasure-map | sprites/sources/cartographer.treasure-map.png | PixelLab generation, spec `prompts/source-cartographer.treasure-map.json` | PixelLab ToS | 2026-10-04 |
+| source-cartographer.redraw | sprites/sources/cartographer.redraw.png | PixelLab generation, spec `prompts/source-cartographer.redraw.json` | PixelLab ToS | 2026-10-04 |
+| source-pocket-glass | sprites/sources/pocket-glass.png | PixelLab generation, spec `prompts/source-pocket-glass.json` | PixelLab ToS | 2026-10-04 |
+| source-message-bottle | sprites/sources/message-bottle.png | PixelLab generation, spec `prompts/source-message-bottle.json` | PixelLab ToS | 2026-10-04 |
+| source-first-aid-kit | sprites/sources/first-aid-kit.png | PixelLab generation, spec `prompts/source-first-aid-kit.json` | PixelLab ToS | 2026-10-04 |
+| source-signal-flare | sprites/sources/signal-flare.png | PixelLab generation, spec `prompts/source-signal-flare.json` | PixelLab ToS | 2026-10-04 |
 
 ## Audio
 

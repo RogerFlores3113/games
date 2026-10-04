@@ -32,7 +32,20 @@ interface CampModel {
   prompt: { text: string };
 }
 
+interface Trail {
+  sceneKey: string;
+  topBar: { purse: number; supplies: number };
+  panel:
+    | { kind: "draft"; draft: { kind: string; bundles?: { objectId: string; items: { itemId: string; exclusive: boolean }[] }[] } }
+    | { kind: "route"; options: { id: string; objectId: string; swapsBoss: string | null; reroll: { objectId: string } | null; next: { survey: string[] | null } }[] }
+    | { kind: "loadout"; gear: { equipped: string[]; slots: { item: { uid: string; objectId: string; targetable: boolean; tag: string | null } | null }[]; backpack: { uid: string }[] } | null }
+    | { kind: string };
+  powers: { sourceKey: string; objectId: string; label: string }[];
+  crew: { seatId: string; objectId: string; isYou: boolean; targetable: boolean }[];
+}
+
 const camp = (page: Page) => getModel<CampModel>(page);
+const trail = (page: Page) => getModel<Trail>(page);
 const you = (m: CampModel) => m.seats.find((s) => s.isYou)!;
 const sourceOf = (m: CampModel, key: string) => you(m).sources.find((s) => s.sourceKey === key);
 
@@ -60,9 +73,9 @@ async function openPanel(page: Page): Promise<void> {
   if (!(await page.getByTestId("dev-panel").isVisible())) await page.getByTestId("dev-toggle").click();
 }
 
-/** A dealt camp 2 of a Short run with every objective picked, you holding
- * `character` (and `upgrade`), between tricks. */
-async function campAs(page: Page, panel: Locator, character: string, upgrade: string | null): Promise<CampModel> {
+/** Jumps to a dealt camp 2 of a Short run and seats you as `character`
+ * (with `upgrade`), moving a teammate who held it to a free character. */
+async function crewAs(page: Page, panel: Locator, character: string, upgrade: string | null): Promise<CampModel> {
   await shortcut(panel, "jump-to-camp", { length: "short", camp: "2", stage: "camp" });
   await waitForScene(page, "camp");
   const dealt = await camp(page);
@@ -72,13 +85,27 @@ async function campAs(page: Page, panel: Locator, character: string, upgrade: st
     const free = all.find((id) => id !== character && !dealt.seats.some((s) => s.characterId === id))!;
     await shortcut(panel, "set-character", { seat: holder.seatId, character: free });
   }
-  const seat = dealt.youSeatId;
-  await shortcut(panel, "set-character", { seat, character });
-  if (upgrade !== null) await shortcut(panel, "set-upgrade", { seat, upgrade });
+  await shortcut(panel, "set-character", { seat: dealt.youSeatId, character });
+  if (upgrade !== null) await shortcut(panel, "set-upgrade", { seat: dealt.youSeatId, upgrade });
+  return camp(page);
+}
+
+/** A dealt camp 2 of a Short run with every objective picked, you holding
+ * `character` (and `upgrade`), between tricks. */
+async function campAs(page: Page, panel: Locator, character: string, upgrade: string | null): Promise<CampModel> {
+  await crewAs(page, panel, character, upgrade);
   await autoplay(panel, "everyone", (await camp(page)).faceUpObjectives.length);
   await expect.poll(async () => (await camp(page)).faceUpObjectives.length).toBe(0);
-  await expect.poll(async () => sourceOf(await camp(page), upgrade ?? character) !== undefined || upgrade === null).toBe(true);
   return camp(page);
+}
+
+/** Clears the camp through the dev panel and takes the first bundle of
+ * every bot's draft, leaving yours open. */
+async function toDraft(page: Page, panel: Locator): Promise<Trail> {
+  await shortcut(panel, "force-camp", { outcome: "cleared" });
+  await waitForScene(page, "trail");
+  await expect.poll(async () => (await trail(page)).panel.kind).toBe("draft");
+  return trail(page);
 }
 
 /** Starts targeting with `key`'s chip. */
@@ -101,6 +128,7 @@ test.describe("the nine characters", () => {
     const panel = await soloTable(page, 2);
     await closePanel(page);
     await waitForScene(page, "trail");
+    await capture(page, "muster");
     const jd = draftOffer(await getModel<TrailView>(page))!.find((c) => c.sourceId === "jd")!;
     await clickUntilChanged<TrailView>(page, jd.objectId, (m) => draftOffer(m) === null);
     const short = openVote(await getModel<TrailView>(page))!.find((o) => o.id === "short")!;
@@ -162,5 +190,116 @@ test.describe("the nine characters", () => {
     model = await confirm(page, (m) => m.seats.flatMap((s) => s.objectives).find((o) => o.objectiveId === objective.objectiveId)?.label !== objective.label);
     expect(sourceOf(model, "explorer")!.charge.full).toBe("Used this camp");
     await capture(page, "explorer-reshaped");
+  });
+
+  test("the Businessman sells an item at the shop for coins", async ({ page }) => {
+    test.setTimeout(180_000);
+    const panel = await soloTable(page, 2);
+    await crewAs(page, panel, "businessman", null);
+    await shortcut(panel, "jump-to-camp", { length: "standard", camp: "3", stage: "loadout" });
+    await waitForScene(page, "trail");
+    await shortcut(panel, "give-item", { seat: (await trail(page)).crew.find((r) => r.isYou)!.seatId, item: "trail-map" });
+    await closePanel(page);
+    const before = await trail(page);
+    const sell = before.powers.find((p) => p.sourceKey === "businessman")!;
+    expect(sell.label).toBe("Sell an item");
+    const aimed = await clickUntilChanged<Trail>(page, sell.objectId, (m) => m.panel.kind === "loadout" && (m.panel as { gear: { slots: { item: { targetable: boolean } | null }[] } }).gear.slots.some((slot) => slot.item?.targetable === true));
+    const gear = (aimed.panel as Extract<Trail["panel"], { kind: "loadout" }>).gear!;
+    const tile = gear.slots.find((slot) => slot.item?.targetable)!.item!;
+    expect(tile.tag).toBe("+2");
+    await capture(page, "businessman-sell");
+    await clickUntilChanged<Trail>(page, tile.objectId, (m) => m.topBar.purse === before.topBar.purse + 2);
+    await capture(page, "businessman-sold");
+  });
+
+  test("the Businessman skips a draft for 4 coins", async ({ page }) => {
+    test.setTimeout(180_000);
+    const panel = await soloTable(page, 2);
+    await crewAs(page, panel, "businessman", null);
+    const draft = await toDraft(page, panel);
+    await closePanel(page);
+    const cashOut = draft.powers.find((p) => p.sourceKey === "businessman.cash-out")!;
+    expect(cashOut.label).toBe("Cash Out");
+    await capture(page, "businessman-draft");
+    await clickUntilChanged<Trail>(page, cashOut.objectId, (m) => m.topBar.purse === draft.topBar.purse + 4);
+  });
+
+  test("the Pop-up Shop sells the Businessman an item mid-camp", async ({ page }) => {
+    test.setTimeout(180_000);
+    const panel = await soloTable(page, 2);
+    await campAs(page, panel, "businessman", "businessman.pop-up-shop");
+    await shortcut(panel, "set-purse", { purse: "30" });
+    await closePanel(page);
+    await begin(page, "businessman.pop-up-shop");
+    const shop = await getModel<{ popupShop: { rows: { name: string; price: number; buys: { objectId: string; label: string }[] }[]; refresh: { objectId: string } | null } | null }>(page);
+    expect(shop.popupShop!.rows).toHaveLength(3);
+    expect(shop.popupShop!.refresh).not.toBeNull();
+    await capture(page, "businessman-popup-shop");
+    const row = shop.popupShop!.rows[0]!;
+    const forYou = row.buys.find((b) => b.label === "You")!;
+    await clickUntilChanged<CampModel>(page, forYou.objectId, (m) => m.targeting?.canConfirm === true);
+    const before = await getModel<{ topBar: { purse: number } }>(page);
+    await confirm(page, () => true);
+    await expect.poll(async () => (await getModel<{ topBar: { purse: number } }>(page)).topBar.purse).toBe(before.topBar.purse - row.price);
+    expect(you(await camp(page)).sources.some((src) => src.name === row.name)).toBe(true);
+    await capture(page, "businessman-popup-bought");
+  });
+
+  test("the Pack Rat carries three items and drafts Pack Rat items in every bundle", async ({ page }) => {
+    test.setTimeout(180_000);
+    const panel = await soloTable(page, 2);
+    await crewAs(page, panel, "pack-rat", null);
+    await shortcut(panel, "jump-to-camp", { length: "short", camp: "2", stage: "loadout" });
+    await waitForScene(page, "trail");
+    const loadout = await trail(page);
+    expect((loadout.panel as Extract<Trail["panel"], { kind: "loadout" }>).gear!.slots).toHaveLength(3);
+    await capture(page, "pack-rat-slots");
+    await shortcut(panel, "jump-to-camp", { length: "short", camp: "2", stage: "camp" });
+    await waitForScene(page, "camp");
+    const draft = await toDraft(page, panel);
+    await closePanel(page);
+    const bundles = (draft.panel as { draft: { bundles: { items: { exclusive: boolean }[] }[] } }).draft.bundles;
+    for (const bundle of bundles) expect(bundle.items.map((i) => i.exclusive)).toEqual([false, false, true, true]);
+    await capture(page, "pack-rat-draft");
+  });
+
+  test("Quartermaster hands one of the Pack Rat's items to a teammate", async ({ page }) => {
+    test.setTimeout(180_000);
+    const panel = await soloTable(page, 2);
+    await crewAs(page, panel, "pack-rat", "pack-rat.quartermaster");
+    await shortcut(panel, "jump-to-camp", { length: "short", camp: "2", stage: "loadout" });
+    await waitForScene(page, "trail");
+    await shortcut(panel, "give-item", { seat: (await trail(page)).crew.find((r) => r.isYou)!.seatId, item: "bait" });
+    await closePanel(page);
+    const give = (await trail(page)).powers.find((p) => p.sourceKey === "pack-rat.quartermaster")!;
+    const aimed = await clickUntilChanged<Trail>(page, give.objectId, (m) => (m.panel as { gear?: { slots: { item: { targetable: boolean } | null }[] } }).gear?.slots.some((slot) => slot.item?.targetable === true) === true);
+    const tile = (aimed.panel as Extract<Trail["panel"], { kind: "loadout" }>).gear!.slots.find((slot) => slot.item?.targetable)!.item!;
+    const picked = await clickUntilChanged<Trail>(page, tile.objectId, (m) => m.crew.some((r) => r.targetable));
+    await capture(page, "pack-rat-quartermaster");
+    const mate = picked.crew.find((r) => r.targetable)!;
+    await clickUntilChanged<Trail>(page, mate.objectId, (m) => (m.panel as Extract<Trail["panel"], { kind: "loadout" }>).gear!.equipped.length === 0);
+  });
+
+  test("the Cartographer sees three routes, the third to another boss, and rerolls one for a supply", async ({ page }) => {
+    test.setTimeout(180_000);
+    const panel = await soloTable(page, 2);
+    await crewAs(page, panel, "cartographer", "cartographer.survey");
+    await shortcut(panel, "jump-to-camp", { length: "standard", camp: "1", stage: "camp" });
+    await waitForScene(page, "camp");
+    const draft = await toDraft(page, panel);
+    const take = (draft.panel as { draft: { bundles: { objectId: string }[] } }).draft.bundles[0]!;
+    await closePanel(page);
+    await clickUntilChanged<Trail>(page, take.objectId, (m) => (m.panel as { draft?: { kind: string } }).draft?.kind !== "offer");
+    await openPanel(page);
+    await autoplay(panel, "others", 4);
+    await expect.poll(async () => (await trail(page)).panel.kind).toBe("route");
+    await closePanel(page);
+    const route = await trail(page);
+    const options = (route.panel as Extract<Trail["panel"], { kind: "route" }>).options;
+    expect(options.map((o) => o.swapsBoss)).toEqual([null, null, "Another boss at camp 3"]);
+    expect(options.every((o) => o.reroll !== null && o.next.survey !== null)).toBe(true);
+    await capture(page, "cartographer-routes");
+    await clickUntilChanged<Trail>(page, options[1]!.reroll!.objectId, (m) => m.topBar.supplies === route.topBar.supplies - 1);
+    await capture(page, "cartographer-rerolled");
   });
 });

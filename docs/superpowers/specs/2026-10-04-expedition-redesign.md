@@ -1894,3 +1894,51 @@ How each of the nine fits (for unit 13):
   the tray, as a card-value step does with a hand card (`RANK_STEPS` in
   `local-ui.ts`). The muster card drops the power's icon when a long name
   (Beginner's Luck) would not fit beside it.
+- Businessman: the coins for empty slots are paid at `camp-dealt`, so a
+  replay pays again (a failure costs more than it pays). Selling is the
+  base power's own ability in the loadout while the shop is open, for half
+  the item's price rounded down, at least 1 (`salePrice`, projected as
+  `ItemDisplay.sellsFor`); skipping a draft is the power `Cash Out`. The
+  Pop-up Shop is one ability with one option step: `buy:<place>:<item>:
+  <price>:<seat>` for each unsold place and player, and `refresh:<price>`,
+  so the price rides in the value and the coins limit reads it there. Its
+  stock is three distinct open-pool items rolled on `stock-r<refreshes>`;
+  the refreshes and the places sold since are the owner's private `log`
+  entries (`popup-refresh`, `popup-sold:<place>`). It opens while picking,
+  between tricks and on your turn, not in rescue, where a usable ability
+  would hold the table. A buy needs a free slot on its player. Buyout opens
+  only once every hand is empty and costs 10 per failed objective. Haggle
+  takes 1 off every shop price, never below 1.
+- Pack Rat: Big Pack adds a slot (the Rats still take one) and two items
+  exclusive to the Pack Rat per bundle. The four exclusive items reuse
+  retired effects at lower prices: Pocket Glass (the old Spyglass), Message
+  in a Bottle (one extra whisper), First Aid Kit (the old Field Kit) and
+  Signal Flare (the old Landmark), so the `supplies` and
+  `completed-objective` target kinds stay in use. Their icons are spare
+  frames of the same batch. Sturdy Straps frees the first item use of each
+  attempt, whatever the item.
+- Cartographer: Mapmaker is a passive (three routes, the third swapping
+  the boss) and the reroll ability; Redraw is the power
+  `cartographer.redraw`. The owner's doc lists two upgrades, Survey and
+  Treasure Map; the third is still undesigned, so the Cartographer has two.
+  Treasure Map fires while drafting: every player queues two special offers
+  of three one-item bundles at 50% rare, and the purse gains 10. Survey
+  shows each previewed camp's next deal; a replay deals afresh, so the
+  survey names the first attempt only.
+- Tests: the sources contract gives p0 a spare item and 40 coins, so
+  selling and Buyout find a usable state, and skips its replay check in a
+  stage window, which has no attempt to replay.
+- Web: between camps, a usable power is a button under Set out (or in the
+  Ready corner when there is none). Aiming one marks what it can pick: your
+  item tiles (a sale shows the coins, "+2"), or teammates' crew rows; the
+  pick uses it at once. A route-option power (the reroll) is a Reroll
+  button on each route card instead. Route cards show a surveyed camp's
+  objective cards and "Another boss at camp 3" on a swapped route. A
+  bundle with more than two items lists names and tags only (Pack Rat,
+  Rare), its rules on hover. The shop's rows close up to fit seven. The
+  Pop-up Shop is a panel over the stump: a row per item with its price and
+  a button per player, and Refresh. The muster lays the characters out
+  three to a row, the silhouette at half size in a column with the pick
+  under it, sized for nine (`musterBoxes`, `layout.test.ts`).
+- e2e: the rescue tests give the host a Rope Ladder through the dev panel,
+  since no base power rescues now.

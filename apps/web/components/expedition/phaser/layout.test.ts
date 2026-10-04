@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { SOURCE_DISPLAY } from "@games/rules";
+import { CHARACTER_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
+import { buildTrailModel, musterLines } from "../../../lib/expedition/trail-model";
+import { initialLocalUi } from "../../../lib/expedition/local-ui";
 import { wrapWords } from "./draw/text-fit";
 import {
   BUNDLE_TAKE_H,
@@ -9,6 +11,11 @@ import {
   bundleBoxes,
   bundleItemH,
   bundleTextChars,
+  musterBoxes,
+  musterTextChars,
+  MUSTER_LINE,
+  MUSTER_TEXT_LINES,
+  MUSTER_ZONES,
   CARD_W,
   HAND_CARD_Y,
   HAND_MARKER_H,
@@ -323,5 +330,33 @@ describe("a crowded objective row", () => {
     expect([objectiveItemWidth(tag), objectiveItemWidth(tag, true)]).toEqual([58, 16]);
     const room = 108 - 2 * 17 - 4;
     expect(objectiveItemWidth(chip("ordered", "10♠"), true) + 2 + objectiveItemWidth(tag, true)).toBeLessThanOrEqual(room);
+  });
+});
+
+describe("muster cards", () => {
+  it("fit every character's rules in full, and never overlap", () => {
+    // Sized for the nine, so a smaller crew of cards has room to spare.
+    const boxes = musterBoxes(Math.max(9, Object.keys(CHARACTER_DISPLAY).length));
+    const narrowest = Math.min(...boxes.map((b) => b.w));
+    const cards = buildTrailModel(
+      {
+        game: { yourSeatId: null, runStatus: "in_progress", length: null, campCount: null, purse: 0, supplies: { count: 3, max: 4 }, plan: [], seats: [], yourAbilities: [], history: [], lastVote: null, stage: { tag: "muster", ballots: [] } },
+        roomSeats: [],
+        hostSeatId: null,
+      },
+      initialLocalUi(),
+    ).panel;
+    if (cards.kind !== "muster") throw new Error("expected the muster");
+    const chars = musterTextChars(narrowest);
+    const long = cards.characters.filter((c) => musterLines(c, chars, 0).length > MUSTER_TEXT_LINES || [c.name, c.theme, c.power.name].some((line) => line.length > chars)).map((c) => c.characterId);
+    expect(long).toEqual([]);
+    for (const box of boxes) expect(box.y + box.h).toBeLessThanOrEqual(MUSTER_ZONES.cards.y + MUSTER_ZONES.cards.h);
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const [a, b] = [boxes[i]!, boxes[j]!];
+        expect(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y).toBe(true);
+      }
+    }
+    expect(3 + (3 + MUSTER_TEXT_LINES) * MUSTER_LINE).toBeLessThanOrEqual(Math.min(...boxes.map((b) => b.h)));
   });
 });

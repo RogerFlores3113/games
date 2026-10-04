@@ -1,0 +1,17 @@
+{
+  "id": "crew-businessman",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "dark silhouette of a wealthy businessman sitting cross-legged facing the viewer, bowler hat, suit with tie, holding a big leather briefcase upright on his lap with both hands, a gold coin glinting, almost black shape with a thin warm orange firelight rim light on one side, no face details, isolated sprite on plain background",
+    "width": 64,
+    "height": 80,
+    "view": "side",
+    "outline": "lineless",
+    "shading": "basic shading",
+    "no_background": true,
+    "seed": 11
+  },
+  "job": "3234e29a-aacd-4c87-90ce-26870d519656",
+  "scale": 1,
+  "note": "natively transparent; used as downloaded"
+}

@@ -58,10 +58,13 @@ export function gearTile(scene: Phaser.Scene, item: GearItem, w: number, h: numb
   container.add(bg);
   const art = sourceArtId(item.itemId);
   if (art !== null) container.add(placeArt(scene, art, 10, Math.floor(h / 2)));
-  const chars = Math.floor((w - 20) / LABEL_CELL.w);
+  const tagW = item.tag === null ? 0 : labelWidth(item.tag) + 4;
+  const chars = Math.floor((w - 20 - tagW) / LABEL_CELL.w);
   const top = Math.max(0, Math.floor((h - 2 * LABEL_CELL.h - 1) / 2));
   container.add(text(scene, 19, top, fitLabel(item.name, chars)));
   container.add(text(scene, 19, top + LABEL_CELL.h + 1, fitLabel(item.uses, chars), item.rare ? RARE : PALETTE.textDim));
+  if (item.tag !== null) container.add(text(scene, w - tagW + 2, Math.floor((h - LABEL_CELL.h) / 2), item.tag, PALETTE.coinShine));
+  if (item.targetable) container.add(scene.add.rectangle(0, 0, w, h, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
   container.setSize(w, h);
   return container;
 }
@@ -69,8 +72,8 @@ export function gearTile(scene: Phaser.Scene, item: GearItem, w: number, h: numb
 function placeGearTile(ctx: LoadoutCtx, item: GearItem, rect: Rect, locked: boolean): void {
   const tile = gearTile(ctx.scene, item, rect.w, rect.h).setPosition(rect.x, rect.y);
   const bg = tile.list[0] as Phaser.GameObjects.Rectangle;
-  bg.setInteractive({ useHandCursor: !locked });
-  if (!locked) bg.on("pointerdown", () => ctx.handlers.onGearPress(item.uid));
+  bg.setInteractive({ useHandCursor: !locked || item.targetable });
+  if (!locked || item.targetable) bg.on("pointerdown", () => ctx.handlers.onGearPress(item.uid));
   hoverable(bg, ctx, item.uid, item.objectId);
   ctx.layer.add(tile);
   ctx.index.register("trail", item.objectId, tile);
@@ -215,7 +218,9 @@ export function drawShop(ctx: LoadoutCtx, shop: ShopPanel, rect: Rect): void {
   const purseX = rect.x + rect.w - labelWidth(purse);
   layer.add(coin(scene, purseX - 8, rect.y + 5, 5));
   layer.add(text(scene, purseX, rect.y + 2, purse, PALETTE.coin));
-  shop.entries.forEach((entry, i) => shopRow(ctx, entry, rect.x, rect.y + 14 + i * SHOP_ROW_STEP, rect.w));
+  // Three upgrades and full stock need seven rows: they close up to fit.
+  const step = Math.min(SHOP_ROW_STEP, Math.floor((rect.h - 14) / Math.max(1, shop.entries.length)));
+  shop.entries.forEach((entry, i) => shopRow(ctx, entry, rect.x, rect.y + 14 + i * step, rect.w));
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +236,7 @@ export function drawExplorer(ctx: LoadoutCtx, kit: KitItem[], rect: Rect): void 
   const own = kit.filter((k) => k.kind !== "item");
   for (const source of own) {
     const about = sourceRulesText(source.sourceId);
-    const lines = wrapWords(about?.text ?? "", chars).slice(0, 2);
+    const lines = wrapWords(about?.text ?? "", chars).slice(0, 3);
     const h = 2 * LINE + lines.length * LINE + 2;
     const tile = scene.add.container(rect.x, y);
     const bg = scene.add.rectangle(0, 0, rect.w, h, toPhaserColor(source.kind === "upgrade" ? PALETTE.bark : PALETTE.stump)).setOrigin(0, 0);
@@ -250,7 +255,9 @@ export function drawExplorer(ctx: LoadoutCtx, kit: KitItem[], rect: Rect): void 
     y += h + 4;
   }
   if (!own.some((k) => k.kind === "upgrade") && own.length > 0) {
+    // The note gives way to the powers when they fill the card.
     for (const line of wrapWords("No upgrade yet. The shop before a boss camp sells your explorer's upgrades.", Math.floor(rect.w / LABEL_CELL.w)).slice(0, 3)) {
+      if (y + LINE > rect.y + rect.h) break;
       layer.add(text(scene, rect.x, y, line, PALETTE.textDim));
       y += LINE;
     }

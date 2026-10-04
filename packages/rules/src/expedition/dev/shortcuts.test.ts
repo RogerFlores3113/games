@@ -77,7 +77,8 @@ describe("dev shortcuts", () => {
     expect(cleared.stage.tag).toBe("draft");
     expect(cleared.stage.tag === "draft" && cleared.stage.cleared).toBe(1);
     expect(cleared.seats.every((s) => s.offers.length === 1)).toBe(true);
-    expect(cleared.purse).toBe(cleared.history[0]!.coins);
+    // The crew seats the Businessman, whose two empty slots paid 5 at the deal.
+    expect(cleared.purse).toBe(cleared.history[0]!.coins + 5);
     expect(cleared.history[0]).toMatchObject({ camp: 1, attempt: 1, status: "cleared", suppliesSpent: 0 });
   });
 

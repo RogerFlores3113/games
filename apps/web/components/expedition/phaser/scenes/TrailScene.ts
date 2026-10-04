@@ -15,7 +15,7 @@ import { PALETTE, toPhaserColor } from "../palette";
 import type { TrailModel } from "../../../../lib/expedition/trail-model";
 import { equipAfter, tapMove, type Gear, type GearMove } from "../../../../lib/expedition/loadout-model";
 import { DRAG_THRESHOLD } from "../../../../lib/expedition/card-drag";
-import { setTooltipSource } from "../../../../lib/expedition/local-ui";
+import { beginAbilityTargeting, cancelTargeting, currentStep, selectTarget, setTooltipSource } from "../../../../lib/expedition/local-ui";
 import type { ObjectIndex } from "../object-index";
 import type { SceneDeps } from "./scene-registry";
 
@@ -43,6 +43,17 @@ function dropMove(gear: Gear, uid: string, at: Point): GearMove | null {
   if (slot !== -1) return { uid, to: { kind: "slot", index: slot } };
   if (pointInRect(geo.packArea, at)) return { uid, to: { kind: "backpack" } };
   return null;
+}
+
+/** Picks `choiceId` for the power being aimed and uses it once every step
+ * is picked. False when no aimed step offers it. */
+function pickAndUse(store: SceneDeps["store"], choiceId: string): boolean {
+  const state = store.getState();
+  const view = state.server?.game;
+  if (view === undefined || !(currentStep(state.localUi, view)?.choices.includes(choiceId) ?? false)) return false;
+  state.updateLocalUi((ui, v) => selectTarget(ui, v, choiceId));
+  store.getState().confirmTargeting();
+  return true;
 }
 
 /** One press on a gear tile: a tap until the pointer travels, then a drag. */
@@ -104,7 +115,24 @@ export class TrailScene extends Phaser.Scene {
       onPackPage(delta) {
         store.getState().updateLocalUi((ui) => ({ ...ui, packPage: Math.max(0, ui.packPage + delta) }));
       },
+      onPower(sourceKey) {
+        const state = store.getState();
+        const ability = state.server?.game.yourAbilities.find((a) => a.sourceKey === sourceKey && a.usableNow);
+        if (ability === undefined) return;
+        const aiming = state.localUi.targeting?.mode === "ability" && state.localUi.targeting.sourceKey === sourceKey;
+        if (aiming) return state.updateLocalUi((ui) => cancelTargeting(ui));
+        if (ability.steps.length === 0) return state.dispatch({ type: "use-ability", sourceKey, targets: [] });
+        state.updateLocalUi((ui, view) => beginAbilityTargeting(ui, view, sourceKey));
+      },
+      onPickSeat(seatId) {
+        pickAndUse(store, `seat:${seatId}`);
+      },
+      onReroll(choiceId) {
+        const ability = store.getState().server?.game.yourAbilities.find((a) => a.usableNow && a.steps.length === 1 && a.steps[0]!.choices.includes(choiceId));
+        if (ability !== undefined) store.getState().dispatch({ type: "use-ability", sourceKey: ability.sourceKey, targets: [choiceId] });
+      },
       onGearPress: (uid) => {
+        if (pickAndUse(store, `item:${uid}`)) return;
         if (gearOf(store) === null) return;
         this.dropGesture();
         this.gesture = { uid, origin: this.pointerAt(), ghost: null, target: null };
