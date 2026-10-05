@@ -2,24 +2,32 @@
 // registry. The ids are part of the wire contract with the web dev panel.
 // When RunState is redesigned, this file and check.ts are what change.
 
+import { checkCampOutcome } from "../camp";
 import { cardLabel } from "../deck";
 import { RUN_LENGTHS, SUPPLIES_MAX } from "../run/balance";
 import { attemptOf, withAttempt } from "../run/attempt";
+import { MODS } from "../content/mods/registry";
 import { mintItems } from "../run/items";
 import { dealCamp, openLoadout, runStatus, settleCamp } from "../run/lifecycle";
 import { rulesFor } from "../run/compose";
 import { draftOfferFor } from "../run/draft";
 import { campIndex, drawPlan } from "../run/plan";
 import { campSpecAt, rerollOption, type CampSpec, type RouteChoice } from "../run/route";
-import { pairingRuleFor } from "../run/stack";
+import { campStack, pairingRuleFor } from "../run/stack";
+import { advance, applyRunAction } from "../run/stages/registry";
 import { applyToolkitOps } from "../run/toolkit";
 import type { Catalog, RunAt, RunLength, RunState } from "../run/types";
 import { describeObjective } from "../objectives";
-import type { DevField, DevOption, DevParams } from "../../adapter";
+import type { DevField, DevOption, DevParams, DevTarget } from "../../adapter";
+import { botMove } from "./autoplay";
+import { TRIGGERS } from "./triggers";
 
 export type ShortcutDef = {
   readonly label: string;
   readonly group: string;
+  /** The short label on the dev toolbar, for the shortcuts a playtest reaches for. */
+  readonly toolbar?: string;
+  readonly target?: DevTarget;
   fields(run: RunState, catalog: Catalog): readonly DevField[];
   apply(run: RunState, params: DevParams, catalog: Catalog): RunState;
 };
@@ -75,9 +83,18 @@ function loadoutAt(run: RunState, length: RunLength, k: number, catalog: Catalog
   return openLoadout({ ...crewed, history: crewed.history.filter((h) => h.camp < k) }, campSpecAt(run.seed, length, campIndex(k), catalog), catalog);
 }
 
-function jumpToCamp(run: RunState, length: RunLength, k: number, stage: "loadout" | "camp", catalog: Catalog): RunState {
+function jumpToCamp(run: RunState, length: RunLength, k: number, stage: Arrival, catalog: Catalog): RunState {
+  if (stage === "route") {
+    if (k === 1) throw new Error("camp 1 has no route vote before it");
+    const cleared = settleCamp(jumpToCamp(run, length, k - 1, "camp", catalog) as RunAt<"camp">, "cleared", catalog);
+    return advance({ ...cleared, seats: cleared.seats.map((s) => ({ ...s, offers: [] })) }, catalog);
+  }
   const loadout = loadoutAt(run, length, k, catalog);
-  return stage === "loadout" ? loadout : dealCamp(loadout, catalog);
+  if (stage === "shop" && loadout.stage.stock === null) {
+    const shops = (loadout.plan?.bosses ?? []).map((b) => b.at).join(", ");
+    throw new Error(`camp ${k} has no shop: a ${length} run's shops are before camps ${shops}`);
+  }
+  return stage === "camp" ? dealCamp(loadout, catalog) : loadout;
 }
 
 /** The camp the run is in, or the one it is heading to, dealt. */
@@ -122,7 +139,13 @@ const upgradeOptions = (catalog: Catalog): DevOption[] => [
   { value: "none", label: "none" },
   ...Object.values(catalog.characters).flatMap((character) => character.upgrades.map((u) => ({ value: u.id, label: `${u.name} (${character.id})` }))),
 ];
-const STAGE_OPTIONS = opts(["camp", "loadout"]);
+const STAGE_OPTIONS: DevOption[] = [
+  { value: "camp", label: "the table" },
+  { value: "loadout", label: "the loadout" },
+  { value: "shop", label: "the shop" },
+  { value: "route", label: "the route vote" },
+];
+type Arrival = "camp" | "loadout" | "shop" | "route";
 const modOptions = (catalog: Catalog, kind: "location" | "weather", current: string | null): DevOption[] => {
   const ids = Object.values(catalog.mods).filter((def) => def.kind === kind).map((def) => def.id);
   return opts(current === null ? ids : [current, ...ids.filter((id) => id !== current)]);
@@ -185,10 +208,78 @@ function setRouteSwap(run: RunState, id: string, boss: string, catalog: Catalog)
   return { ...run, stage: { ...stage, options: stage.options.map((o) => (o.id === id ? { ...o, swapBoss } : o)) } };
 }
 
+const NEXT_STAGE_STEPS = 2000;
+
+/** Every seat makes the move autoplay would, until the stage moves on or a
+ * camp settles: a camp is played out, a vote is decided by the flip. */
+function nextStage(run: RunState, catalog: Catalog): RunState {
+  requireInProgress(run);
+  const at = (state: RunState) => `${state.stage.tag}:${state.history.length}`;
+  let current = run;
+  for (let step = 0; step < NEXT_STAGE_STEPS; step++) {
+    const move = botMove(current, current.seatIds, catalog);
+    if (move === null) throw new Error(`nobody has a move at the ${current.stage.tag}`);
+    const result = applyRunAction(current, move.seatId, move.request, catalog);
+    if (!result.ok) throw new Error(`${move.seatId}'s ${move.request.type} was refused: ${result.error}`);
+    current = result.state;
+    if (at(current) !== at(run)) return current;
+  }
+  throw new Error(`the ${run.stage.tag} did not end in ${NEXT_STAGE_STEPS} moves`);
+}
+
+const OBJECTIVE_STATUSES: DevOption[] = [
+  { value: "done", label: "done" },
+  { value: "failed", label: "failed" },
+  { value: "play", label: "as played" },
+];
+
+/** The camp with an objective decided done or failed whatever the tricks
+ * say, or back to what they say; a camp this decides settles as play would. */
+function setObjectiveStatus(run: RunState, params: DevParams, catalog: Catalog): RunState {
+  const attempt = attemptOf(run);
+  if (attempt === null) throw new Error("there is no dealt camp with objectives");
+  const objectiveId = readChoice(params, "objective", objectiveOptions(run));
+  const status = readChoice(params, "status", OBJECTIVE_STATUSES);
+  if (checkCampOutcome(attempt.camp, rulesFor(run, catalog)).status !== "in_progress") throw new Error("the camp is already decided");
+  const others = Object.entries(attempt.loaded?.objectives ?? {}).filter(([id]) => id !== objectiveId);
+  const objectives = Object.fromEntries(status === "play" ? others : [...others, [objectiveId, status as "done" | "failed"]]);
+  return advance(withAttempt(run, { ...attempt, loaded: { rolls: attempt.loaded?.rolls ?? {}, objectives } }), catalog);
+}
+
+const triggerShortcuts: Readonly<Record<string, ShortcutDef>> = Object.fromEntries(
+  Object.entries(TRIGGERS).map(([modId, trigger]): [string, ShortcutDef] => {
+    const inStack = (run: RunState, catalog: Catalog): DevOption[] =>
+      campStack(run, catalog)
+        .filter((layer) => layer.def.id === modId)
+        .map((layer) => ({ value: modId, label: `${layer.def.name}${layer.strength === "half" ? " (half)" : ""}` }));
+    const name = Object.values(MODS).find((def) => def.id === modId)?.name ?? modId;
+    return [
+      `trigger-${modId}`,
+      {
+        label: `${name}: ${trigger.label}`,
+        group: "Bosses and weather",
+        target: { kind: "mod", field: "mod" },
+        fields: (run, catalog) => [{ name: "mod", label: "Modifier", kind: "choice", options: inStack(run, catalog) }, ...trigger.fields(run)],
+        apply: (run, params, catalog) => {
+          const here = inStack(run, catalog);
+          if (here.length === 0) throw new Error(`the ${name} is not at this camp`);
+          readChoice(params, "mod", here);
+          const attempt = attemptOf(run);
+          if (attempt === null) throw new Error(`the ${name} acts only in a dealt camp`);
+          if (checkCampOutcome(attempt.camp, rulesFor(run, catalog)).status !== "in_progress") throw new Error("the camp is already decided");
+          const layer = campStack(run, catalog).find((l) => l.def.id === modId)!;
+          return advance(trigger.fire(run as RunAt<"camp">, layer, params, catalog), catalog);
+        },
+      },
+    ];
+  }),
+);
+
 export const DEV_SHORTCUTS = {
   "jump-to-camp": {
     label: "Jump to camp",
     group: "Run",
+    toolbar: "Go",
     fields: (run) => [
       lengthField(run),
       { name: "camp", label: "Camp", kind: "number", min: 1, max: MAX_CAMPS, initial: 1 },
@@ -196,7 +287,7 @@ export const DEV_SHORTCUTS = {
     ],
     apply: (run, params, catalog) => {
       const length = readChoice(params, "length", opts(LENGTHS)) as RunLength;
-      const stage = readChoice(params, "stage", STAGE_OPTIONS) as "loadout" | "camp";
+      const stage = readChoice(params, "stage", STAGE_OPTIONS) as Arrival;
       return jumpToCamp(run, length, readNumber(params, "camp", 1, RUN_LENGTHS[length].camps), stage, catalog);
     },
   },
@@ -209,6 +300,7 @@ export const DEV_SHORTCUTS = {
   "set-spec": {
     label: "Set the camp's location and weather",
     group: "Camp",
+    toolbar: "Set",
     fields: (run, catalog) => [
       { name: "location", label: "Location", kind: "choice", options: modOptions(catalog, "location", specOfStage(run)?.location ?? null) },
       { name: "weather", label: "Weather", kind: "choice", options: modOptions(catalog, "weather", specOfStage(run)?.weather ?? null) },
@@ -242,6 +334,7 @@ export const DEV_SHORTCUTS = {
   "force-camp": {
     label: "Force the camp's outcome",
     group: "Camp",
+    toolbar: "Skip camp",
     fields: () => [{ name: "outcome", label: "Outcome", kind: "choice", options: opts(["cleared", "failed"]) }],
     apply: (run, params, catalog) => {
       const outcome = readChoice(params, "outcome", opts(["cleared", "failed"])) as "cleared" | "failed";
@@ -259,6 +352,30 @@ export const DEV_SHORTCUTS = {
     group: "Run",
     fields: (run) => [{ name: "purse", label: "Coins", kind: "number", min: 0, max: 999, initial: run.purse }],
     apply: (run, params) => ({ ...run, purse: readNumber(params, "purse", 0, 999) }),
+  },
+  "add-coins": {
+    label: "Add 10 coins",
+    group: "Run",
+    toolbar: "+10 coins",
+    fields: () => [],
+    apply: (run) => ({ ...run, purse: Math.min(999, run.purse + 10) }),
+  },
+  "add-supply": {
+    label: "Add a supply",
+    group: "Run",
+    toolbar: "+1 supply",
+    fields: () => [],
+    apply: (run) => {
+      if (run.supplies >= SUPPLIES_MAX) throw new Error(`supplies are full (${run.supplies} of ${SUPPLIES_MAX})`);
+      return { ...run, supplies: run.supplies + 1 };
+    },
+  },
+  "next-stage": {
+    label: "Play on to the next stage",
+    group: "Run",
+    toolbar: "Next stage",
+    fields: () => [],
+    apply: (run, _params, catalog) => nextStage(run, catalog),
   },
   "set-character": {
     label: "Set a seat's character",
@@ -359,6 +476,7 @@ export const DEV_SHORTCUTS = {
   "set-objective-owner": {
     label: "Set an objective's owner",
     group: "Cards",
+    target: { kind: "objective", field: "objective" },
     fields: (run) => [
       { name: "objective", label: "Objective", kind: "choice", options: objectiveOptions(run) },
       { name: "seat", label: "Owner", kind: "choice", options: [...seatOptions(run), { value: "none", label: "none" }] },
@@ -373,5 +491,16 @@ export const DEV_SHORTCUTS = {
       return withAttempt(run, { ...attempt, camp: { ...camp, objectives } });
     },
   },
+  "set-objective-status": {
+    label: "Mark an objective",
+    group: "Cards",
+    target: { kind: "objective", field: "objective" },
+    fields: (run) => [
+      { name: "objective", label: "Objective", kind: "choice", options: objectiveOptions(run) },
+      { name: "status", label: "Status", kind: "choice", options: OBJECTIVE_STATUSES },
+    ],
+    apply: (run, params, catalog) => setObjectiveStatus(run, params, catalog),
+  },
+  ...triggerShortcuts,
 } satisfies Readonly<Record<string, ShortcutDef>>;
 

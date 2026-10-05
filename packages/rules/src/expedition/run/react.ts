@@ -16,7 +16,7 @@ import { attemptOf } from "./attempt";
 import { rulesFor } from "./compose";
 import { drawOffer } from "./draft";
 import { STREAMS, seededIndex } from "./rng";
-import { campStack, modCtx, specOf } from "./stack";
+import { campStack, modCtx, specOf, type StackLayer } from "./stack";
 import { applyToolkitOps, type ToolkitOp } from "./toolkit";
 import type { Catalog, RunAt, RunState } from "./types";
 import { currentStamp, defIdOf, defOfKey, liveSourceKeys, ownerOf } from "./usage";
@@ -74,29 +74,34 @@ function skipped(run: RunState, event: SourceEvent, catalog: Catalog): boolean {
   return camp.completedTricks.length >= camp.totalTricks || checkCampOutcome(camp, rulesFor(run, catalog)).status !== "in_progress";
 }
 
+/** A camp modifier's context for reacting to `event` at `run`. Its draws are
+ * seeded on the event's `key`. */
+export function reactionCtx(run: RunAt<"camp">, layer: StackLayer, event: EngineEvent, key: string, catalog: Catalog): ReactionCtx {
+  const spec = run.stage.camp;
+  const camp = run.stage.attempt.camp;
+  const attemptNumber = run.stage.attempt.attemptNumber;
+  let draws = 0;
+  const nextStream = () => STREAMS.modDraw(layer.def.id, layer.strength, spec.index, attemptNumber, key, draws++);
+  return {
+    ...modCtx(run, spec, layer, catalog),
+    camp,
+    event,
+    rules: rulesFor(run, catalog),
+    draw: (n) => seededIndex(run.seed, nextStream(), n),
+    randomCards: (seatId, n) => shuffleWithSeed((camp.hands.find((h) => h.seatId === seatId)?.cards ?? []).map((c) => c.id), run.seed, nextStream()).slice(0, n),
+  };
+}
+
 function modReactions(run: RunAt<"camp">, event: EngineEvent, key: string, catalog: Catalog): RunAt<"camp"> {
   let current = run;
-  const spec = run.stage.camp;
   for (const layer of campStack(run, catalog)) {
     // One widening cast: `on` is keyed by type, so this handler takes this event.
     const handler = layer.body.on?.[event.type] as ((ctx: ReactionCtx) => readonly ToolkitOp[]) | undefined;
     if (handler === undefined) continue;
-    const before = current;
-    const camp = before.stage.attempt.camp;
-    const attemptNumber = before.stage.attempt.attemptNumber;
-    let draws = 0;
-    const nextStream = () => STREAMS.modDraw(layer.def.id, layer.strength, spec.index, attemptNumber, key, draws++);
-    const rules = rulesFor(before, catalog);
-    const ops = handler({
-      ...modCtx(before, spec, layer, catalog),
-      camp,
-      event,
-      rules,
-      draw: (n) => seededIndex(before.seed, nextStream(), n),
-      randomCards: (seatId, n) => shuffleWithSeed((camp.hands.find((h) => h.seatId === seatId)?.cards ?? []).map((c) => c.id), before.seed, nextStream()).slice(0, n),
-    });
+    const ctx = reactionCtx(current, layer, event, key, catalog);
+    const ops = handler(ctx);
     if (ops.length === 0) continue;
-    current = applyToolkitOps(before, { kind: "mod", modId: layer.def.id, strength: layer.strength }, ops, rules, catalog) as RunAt<"camp">;
+    current = applyToolkitOps(current, { kind: "mod", modId: layer.def.id, strength: layer.strength }, ops, ctx.rules, catalog) as RunAt<"camp">;
   }
   return current;
 }

@@ -103,6 +103,17 @@ export type AttemptState = {
   readonly reveals: readonly Reveal[]; // COMM-02: cleared with the attempt
   readonly log: readonly LogEntry[];
   readonly camp: CampState;
+  /** Only the dev sandbox writes this; play never does. */
+  readonly loaded?: LoadedDice;
+};
+
+/** The dev sandbox's loaded dice for one attempt: the real rules run, with
+ * some outcomes chosen. `rolls` pins a camp modifier's rule roll, keyed
+ * `${modId}:${strength}:${label}`; `objectives` decides an objective's
+ * status over whatever the tricks say. */
+export type LoadedDice = {
+  readonly rolls: Readonly<Record<string, number>>;
+  readonly objectives: Readonly<Record<string, "done" | "failed">>;
 };
 
 /** One per ended attempt. `coins` is the payout of a clear, 0 otherwise. A

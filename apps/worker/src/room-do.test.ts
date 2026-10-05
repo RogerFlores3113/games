@@ -584,6 +584,10 @@ describe("RoomDO integration (live wrangler dev)", () => {
     });
     send(ws1, { type: "dev", command: { kind: "snapshot" } });
     await c1.waitFor((m) => m.type === "dev_result" && m !== refused);
+    // The toolbar's and the right-click menu's shortcuts are refused the same way.
+    send(ws1, { type: "dev", command: { kind: "shortcut", id: "trigger-tornado", params: { mod: "tornado" } } });
+    await c1.waitFor((m) => c1.parsed.filter((p) => p.type === "dev_result").length === 3 && m.type === "dev_result");
+    expect(c1.parsed.filter((m) => m.type === "dev_result").map((m) => m.ok)).toEqual([false, false, false]);
     expect(c1.parsed.filter((m) => m.type === "dev_state")).toEqual([]);
 
     send(ws1, { type: "set_config", config: null });

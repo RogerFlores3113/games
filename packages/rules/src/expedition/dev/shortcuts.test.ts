@@ -3,6 +3,7 @@ import { CATALOG } from "../run/catalog";
 import { attemptOf } from "../run/attempt";
 import { createRun, runStatus } from "../run/lifecycle";
 import { campStack } from "../run/stack";
+import { rulesFor } from "../run/compose";
 import type { RunState } from "../run/types";
 import { checkRunState } from "./check";
 import { applyRunAction } from "../run/stages/registry";
@@ -252,3 +253,58 @@ describe("dev shortcuts for the character seams", () => {
 });
 
 const camp2 = { length: "standard", camp: 2, stage: "camp" } as const;
+
+describe("dev shortcuts for a solo playtest", () => {
+  it("jump-to-camp arrives at the route vote that leads to the camp, its draft skipped", () => {
+    const vote = run("jump-to-camp", fresh(), { length: "long", camp: 6, stage: "route" });
+    expect(vote.stage.tag === "route" && vote.stage.from).toBe(5);
+    expect(vote.history.map((h) => [h.camp, h.status])).toEqual([[5, "cleared"]]);
+    expect(vote.seats.every((s) => s.offers.length === 0)).toBe(true);
+    expect(checkRunState(vote, CATALOG)).toEqual([]);
+    expect(() => run("jump-to-camp", fresh(), { length: "long", camp: 1, stage: "route" })).toThrow("camp 1 has no route vote before it");
+  });
+
+  it("jump-to-camp arrives at the shop before a boss camp, and names the shops when the camp has none", () => {
+    const shop = run("jump-to-camp", fresh(), { length: "long", camp: 6, stage: "shop" });
+    expect(shop.stage.tag === "loadout" && [shop.stage.camp.index, shop.stage.stock?.length]).toEqual([6, 4]);
+    expect(() => run("jump-to-camp", fresh(), { length: "long", camp: 5, stage: "shop" })).toThrow("camp 5 has no shop: a long run's shops are before camps 3, 6, 8");
+  });
+
+  it("next-stage moves every seat on: muster to camp 1's loadout, the loadout to the table, the table to its end", () => {
+    const loadout = run("next-stage", fresh());
+    expect(loadout.stage.tag === "loadout" && loadout.stage.camp.index).toBe(1);
+    expect(loadout.seats.every((s) => s.characterId !== null)).toBe(true);
+    const table = run("next-stage", loadout);
+    expect(table.stage.tag).toBe("camp");
+    const after = run("next-stage", table);
+    expect(after.history).toHaveLength(1);
+    expect(checkRunState(after, CATALOG)).toEqual([]);
+    expect(() => run("next-stage", run("end-run", fresh(), { outcome: "won" }))).toThrow("the run is already won");
+  });
+
+  it("add-coins adds ten, and add-supply adds one until supplies are full", () => {
+    expect(run("add-coins", fresh()).purse).toBe(10);
+    expect(run("add-supply", fresh()).supplies).toBe(4);
+    expect(() => run("add-supply", run("add-supply", fresh()))).toThrow("supplies are full (4 of 4)");
+  });
+
+  it("set-objective-status decides an objective done or failed whatever the tricks say, and back", () => {
+    const dealt = run("jump-to-camp", fresh(), { length: "standard", camp: 2, stage: "camp" });
+    const [first, second] = attemptOf(dealt)!.camp.objectives;
+    const status = (state: RunState, id: string) => rulesFor(state, CATALOG).objectiveStatus(attemptOf(state)!.camp, attemptOf(state)!.camp.objectives.find((o) => o.id === id)!);
+    const done = run("set-objective-status", dealt, { objective: first!.id, status: "done" });
+    expect([status(done, first!.id), status(done, second!.id)]).toEqual(["done", "pending"]);
+    expect(checkRunState(done, CATALOG)).toEqual([]);
+    expect(status(run("set-objective-status", done, { objective: first!.id, status: "play" }), first!.id)).toBe("pending");
+  });
+
+  it("set-objective-status settles a camp it decides: every objective done clears it, a failed one fails it", () => {
+    const dealt = run("jump-to-camp", fresh(), { length: "standard", camp: 2, stage: "camp" });
+    const ids = attemptOf(dealt)!.camp.objectives.map((o) => o.id);
+    const cleared = ids.reduce((state, objective) => run("set-objective-status", state, { objective, status: "done" }), dealt);
+    expect([cleared.stage.tag, cleared.history.at(-1)?.status]).toEqual(["draft", "cleared"]);
+    const failed = run("set-objective-status", dealt, { objective: ids[0]!, status: "failed" });
+    expect([failed.stage.tag, failed.history.at(-1)?.status, failed.supplies]).toEqual(["loadout", "failed", 2]);
+    expect(() => run("set-objective-status", run("force-camp", dealt, { outcome: "cleared" }), { objective: ids[0]!, status: "done" })).toThrow("there is no dealt camp with objectives");
+  });
+});

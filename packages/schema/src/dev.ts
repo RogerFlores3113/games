@@ -37,6 +37,8 @@ export const DevShortcutSchema = z.strictObject({
   label: z.string(),
   group: z.string(),
   fields: z.array(DevFieldSchema).readonly(),
+  toolbar: z.string().min(1).optional(),
+  target: z.strictObject({ kind: z.string().min(1), field: z.string().min(1) }).optional(),
 });
 export type DevShortcutWire = z.infer<typeof DevShortcutSchema>;
 

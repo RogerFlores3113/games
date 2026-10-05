@@ -130,7 +130,15 @@ export type DevShortcut = {
   readonly label: string;
   readonly group: string;
   readonly fields: readonly DevField[];
+  /** A short button label: the shortcut also sits on the always-visible dev toolbar. */
+  readonly toolbar?: string;
+  /** The game thing this shortcut acts on, so right-clicking that thing on
+   * the table offers it with field `field` set to the thing's id. */
+  readonly target?: DevTarget;
 };
+
+/** `kind` is the game's own name for a kind of thing on its table. */
+export type DevTarget = { readonly kind: string; readonly field: string };
 
 /** A shortcut's submitted field values, keyed by `DevField.name`. Untrusted. */
 export type DevParams = Readonly<Record<string, string | number>>;

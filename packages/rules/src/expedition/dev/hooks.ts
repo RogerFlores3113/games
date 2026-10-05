@@ -13,7 +13,14 @@ export const expeditionDevHooks: GameDevHooks<RunState> = {
   check: (run) => checkRunState(run, CATALOG),
 
   shortcuts: (run): DevShortcut[] =>
-    Object.entries<ShortcutDef>(DEV_SHORTCUTS).map(([id, def]) => ({ id, label: def.label, group: def.group, fields: def.fields(run, CATALOG) })),
+    Object.entries<ShortcutDef>(DEV_SHORTCUTS).map(([id, def]) => ({
+      id,
+      label: def.label,
+      group: def.group,
+      fields: def.fields(run, CATALOG),
+      ...(def.toolbar === undefined ? {} : { toolbar: def.toolbar }),
+      ...(def.target === undefined ? {} : { target: def.target }),
+    })),
 
   runShortcut(run, id, params) {
     if (!Object.hasOwn(DEV_SHORTCUTS, id)) return { ok: false, error: `unknown shortcut ${id}` };

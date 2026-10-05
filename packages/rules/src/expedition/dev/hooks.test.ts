@@ -24,6 +24,9 @@ describe("expeditionDevHooks", () => {
       ["force-camp", "Camp"],
       ["set-supplies", "Run"],
       ["set-purse", "Run"],
+      ["add-coins", "Run"],
+      ["add-supply", "Run"],
+      ["next-stage", "Run"],
       ["set-character", "Crew"],
       ["give-item", "Crew"],
       ["set-upgrade", "Crew"],
@@ -33,6 +36,37 @@ describe("expeditionDevHooks", () => {
       ["set-route-swap", "Run"],
       ["queue-offer", "Crew"],
       ["set-objective-owner", "Cards"],
+      ["set-objective-status", "Cards"],
+      ["trigger-tornado", "Bosses and weather"],
+      ["trigger-earthquake", "Bosses and weather"],
+      ["trigger-locusts", "Bosses and weather"],
+      ["trigger-thunderstorm", "Bosses and weather"],
+      ["trigger-snake", "Bosses and weather"],
+      ["trigger-crocodile", "Bosses and weather"],
+      ["trigger-beaver", "Bosses and weather"],
+    ]);
+  });
+
+  it("puts the playtest shortcuts on the toolbar and ties objective and modifier shortcuts to the thing they act on", () => {
+    const shortcuts = hooks.shortcuts(fresh());
+    expect(shortcuts.flatMap((s) => (s.toolbar === undefined ? [] : [[s.id, s.toolbar]]))).toEqual([
+      ["jump-to-camp", "Go"],
+      ["set-spec", "Set"],
+      ["force-camp", "Skip camp"],
+      ["add-coins", "+10 coins"],
+      ["add-supply", "+1 supply"],
+      ["next-stage", "Next stage"],
+    ]);
+    expect(shortcuts.flatMap((s) => (s.target === undefined ? [] : [[s.id, s.target.kind, s.target.field]]))).toEqual([
+      ["set-objective-owner", "objective", "objective"],
+      ["set-objective-status", "objective", "objective"],
+      ["trigger-tornado", "mod", "mod"],
+      ["trigger-earthquake", "mod", "mod"],
+      ["trigger-locusts", "mod", "mod"],
+      ["trigger-thunderstorm", "mod", "mod"],
+      ["trigger-snake", "mod", "mod"],
+      ["trigger-crocodile", "mod", "mod"],
+      ["trigger-beaver", "mod", "mod"],
     ]);
   });
 

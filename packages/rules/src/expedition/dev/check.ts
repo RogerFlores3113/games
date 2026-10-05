@@ -110,6 +110,15 @@ function checkSpecs(run: RunState, catalog: Catalog, problems: string[]): void {
     if (origin.kind === "seat" && !run.seatIds.includes(origin.seatId)) problems.push(`an effect names unknown seat ${origin.seatId}`);
     if (origin.kind === "mod" && !Object.hasOwn(catalog.mods, origin.modId)) problems.push(`an effect names unknown mod ${origin.modId}`);
   }
+  if (stage.tag !== "camp") return;
+  const loaded = stage.attempt.loaded;
+  for (const id of Object.keys(loaded?.objectives ?? {})) {
+    if (!stage.attempt.camp.objectives.some((o) => o.id === id)) problems.push(`loaded dice decide objective ${id}, which is not in this camp`);
+  }
+  for (const key of Object.keys(loaded?.rolls ?? {})) {
+    const [modId = "", strength] = key.split(":");
+    if (!Object.hasOwn(catalog.mods, modId) || (strength !== "full" && strength !== "half")) problems.push(`loaded dice pin ${key}, a roll of no known camp modifier`);
+  }
 }
 
 function checkRunFields(run: RunState, problems: string[]): void {

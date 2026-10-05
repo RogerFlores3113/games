@@ -98,6 +98,12 @@ const AttemptSchema = z.strictObject({
     }),
   ),
   camp: CampStateSchema,
+  loaded: z
+    .strictObject({
+      rolls: z.record(z.string().min(1), z.number().int().min(0)),
+      objectives: z.record(z.string().min(1), z.enum(["done", "failed"])),
+    })
+    .optional(),
 });
 
 const RunLengthSchema = z.enum(["short", "standard", "long"]);

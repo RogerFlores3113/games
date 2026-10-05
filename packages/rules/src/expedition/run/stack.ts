@@ -68,7 +68,8 @@ export function campStack(run: RunState, catalog: Catalog): readonly StackLayer[
 /** A layer's context. Its rolls belong to the dealt attempt, or in the
  * loadout to the attempt the loadout will deal. */
 export function modCtx(run: RunState, spec: CampSpec, layer: { readonly def: ModDef; readonly strength: Strength }, catalog: Catalog): ModCtx {
-  const attemptNumber = attemptOf(run)?.attemptNumber ?? nextAttemptNumber(run, spec.index);
+  const attempt = attemptOf(run);
+  const attemptNumber = attempt?.attemptNumber ?? nextAttemptNumber(run, spec.index);
   const origin = { kind: "mod", modId: layer.def.id, strength: layer.strength } as const;
   // Composed at most once per context, on the first ask.
   let seatRules: RunRules | null = null;
@@ -77,9 +78,12 @@ export function modCtx(run: RunState, spec: CampSpec, layer: { readonly def: Mod
     run,
     spec,
     strength: layer.strength,
-    camp: attemptOf(run)?.camp ?? null,
+    camp: attempt?.camp ?? null,
     exposed: location.kind === "location" && location.exposed === true,
-    roll: (label, n) => seededIndex(run.seed, STREAMS.modRule(layer.def.id, layer.strength, spec.index, attemptNumber, label), n),
+    roll: (label, n) => {
+      const loaded = attempt?.loaded?.rolls[`${layer.def.id}:${layer.strength}:${label}`];
+      return loaded !== undefined ? loaded % n : seededIndex(run.seed, STREAMS.modRule(layer.def.id, layer.strength, spec.index, attemptNumber, label), n);
+    },
     affects: (seatId) => (seatRules ??= seatRulesFor(run, catalog)).affectsSeat(run, seatId, origin),
   };
 }

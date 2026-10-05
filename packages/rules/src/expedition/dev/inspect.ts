@@ -75,7 +75,12 @@ function stackLines(run: RunState, catalog: Catalog): string[] {
     const origin = e.origin.kind === "seat" ? `${e.origin.seatId} ${e.origin.sourceId}` : `mod ${e.origin.modId}`;
     return `effect from ${origin} at trick ${e.atTrick + 1}, lasts ${e.lasts}${e.deferIfFatal ? ", waits if fatal" : ""}`;
   });
-  return [...layers, ...effects];
+  const loaded = run.stage.tag === "camp" ? run.stage.attempt.loaded : undefined;
+  const dice = [
+    ...Object.entries(loaded?.rolls ?? {}).map(([key, value]) => `loaded roll ${key} = ${value}`),
+    ...Object.entries(loaded?.objectives ?? {}).map(([id, status]) => `loaded objective ${id} ${status}`),
+  ];
+  return [...layers, ...effects, ...dice];
 }
 
 function perSeat<V>(run: RunState, values: PerSeat<V>): string {

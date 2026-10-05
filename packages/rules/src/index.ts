@@ -16,6 +16,7 @@ export type {
   DevParams,
   DevResult,
   DevShortcut,
+  DevTarget,
   GameAdapter,
   GameDevHooks,
   GameEndResult,

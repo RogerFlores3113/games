@@ -123,11 +123,18 @@ function effectLayers(run: RunState, catalog: Catalog, seatOnly: boolean): RuleM
  * [character, upgrade, ...equipped] order) -> each live attempt effect's
  * layer, in attempt.effects order -> the passives marked `foldsLast`, so a
  * rule that must have the last word (Momentum's whisper count) gets it.
+ * The dev sandbox's loaded objectives, when set, have the very last word.
  * Throws a named Error for any id missing from the catalog (POLICY A3). */
 export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
   const spec = specOf(run);
   const stack = spec === null ? [] : campStack(run, catalog).flatMap((layer) => (layer.body.rules === undefined ? [] : [layer.body.rules(modCtx(run, spec, layer, catalog))]));
-  return [...stack, ...passiveLayers(run, catalog, false), ...effectLayers(run, catalog, false), ...passiveLayers(run, catalog, true)];
+  return [...stack, ...passiveLayers(run, catalog, false), ...effectLayers(run, catalog, false), ...passiveLayers(run, catalog, true), ...loadedLayers(run)];
+}
+
+function loadedLayers(run: RunState): RuleModifier[] {
+  const decided = attemptOf(run)?.loaded?.objectives;
+  if (decided === undefined || Object.keys(decided).length === 0) return [];
+  return [{ objectiveStatus: (prev) => (camp, objective) => decided[objective.id] ?? prev(camp, objective) }];
 }
 
 /** The rules the seats alone make: passives and seat effects, without the

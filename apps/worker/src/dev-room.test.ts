@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RoomCode, RoomState } from "@games/schema";
+import { DevStateMessageSchema, type RoomCode, type RoomState } from "@games/schema";
 import { EXPEDITION_GAME_ID } from "@games/schema/games/expedition";
 import { applyDevCommand, devStateFrame, type DevInput } from "./dev-room";
 import { createEmptyRoom, joinRoom, startGame, toSeatView } from "./room-state";
@@ -166,6 +166,23 @@ describe("dev-room: shortcuts and states", () => {
     expect(devStateFrame(loaded.state)!.milestone).toBe("0:in_progress");
     expect(devStateFrame(loaded.state)!.inspect[0]!.lines[0]).toBe("stage camp, status in_progress, long run of 8 camps");
     expect(toSeatView(loaded.state, "seat-x").game).not.toBeNull();
+  });
+
+  it("round-trips loaded dice through load-state, and sends toolbar and table targets on the wire", () => {
+    const input = devInput();
+    const camp = applyDevCommand(startedWithBots(2), "host", { kind: "shortcut", id: "jump-to-camp", params: { length: "standard", camp: 2, stage: "camp" } }, input).state;
+    const objective = (camp.game as { stage: { attempt: { camp: { objectives: { id: string }[] } } } }).stage.attempt.camp.objectives[0]!.id;
+    const marked = applyDevCommand(camp, "host", { kind: "shortcut", id: "set-objective-status", params: { objective, status: "done" } }, input);
+    expect(marked.reply).toEqual({ ok: true, message: "Mark an objective: done." });
+    const frame = devStateFrame(marked.state)!;
+    expect(DevStateMessageSchema.safeParse(frame).success).toBe(true);
+    expect((frame.game as { stage: { attempt: { loaded?: unknown } } }).stage.attempt.loaded).toEqual({ rolls: {}, objectives: { [objective]: "done" } });
+    expect(frame.shortcuts.find((s) => s.id === "force-camp")).toMatchObject({ toolbar: "Skip camp" });
+    expect(frame.shortcuts.find((s) => s.id === "trigger-tornado")).toMatchObject({ target: { kind: "mod", field: "mod" } });
+
+    const reloaded = applyDevCommand(camp, "host", { kind: "load-state", state: JSON.parse(JSON.stringify(frame.game)) }, input);
+    expect(reloaded.reply).toEqual({ ok: true, message: "State loaded." });
+    expect(reloaded.state.game).toEqual(marked.state.game);
   });
 
   it("rejects a state that fails the schema with the path of the problem", () => {
