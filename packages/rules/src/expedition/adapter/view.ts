@@ -580,6 +580,7 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
     supplies: { count: state.supplies, max: SUPPLIES_MAX },
     plan: plan === null ? [] : plan.bosses.map((boss) => ({ at: boss.at, tier: boss.tier, bossId: visibleBossId(state, boss) })),
     seats: state.seats.map((seat) => toSeatView(state, seat, seatId, rules, catalog)),
+    kicked: state.kicked.map((k) => ({ seatId: k.seat.seatId, characterId: k.seat.characterId, upgradeId: k.seat.upgradeId, back: k.back })),
     yourAbilities: ownSeat !== undefined ? toAbilityViews(state, ownSeat, catalog) : [],
     history: state.history.map(toCampResultView),
     lastVote:

@@ -54,6 +54,7 @@ function view(campView: ExpeditionCampView, overrides: Partial<ExpeditionView> =
     supplies: { count: 3, max: 5 },
     plan: [],
     seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: "explorer", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] })),
+    kicked: [],
     yourAbilities: [],
     history: [],
     lastVote: null,

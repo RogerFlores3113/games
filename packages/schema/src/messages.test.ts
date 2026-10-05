@@ -151,6 +151,16 @@ describe("ClientMessageSchema", () => {
   });
 });
 
+describe("kick_vote", () => {
+  it("parses a vote and a vote taken back, and nothing else", () => {
+    expect(parseClientMessage(JSON.stringify({ type: "kick_vote", targetSeatId: "s2", kick: true }))).toEqual({ ok: true, message: { type: "kick_vote", targetSeatId: "s2", kick: true } });
+    expect(parseClientMessage(JSON.stringify({ type: "kick_vote", targetSeatId: "s2", kick: false })).ok).toBe(true);
+    expect(parseClientMessage(JSON.stringify({ type: "kick_vote", targetSeatId: "", kick: true })).ok).toBe(false);
+    expect(parseClientMessage(JSON.stringify({ type: "kick_vote", targetSeatId: "s2" })).ok).toBe(false);
+    expect(parseClientMessage(JSON.stringify({ type: "kick_vote", targetSeatId: "s2", kick: true, voterSeatId: "s1" })).ok).toBe(false);
+  });
+});
+
 describe("parseClientMessage", () => {
   it("returns ok:true for a valid join message", () => {
     const result = parseClientMessage(JSON.stringify({ type: "join", displayName: "Roger" }));
@@ -221,7 +231,8 @@ describe("closed unions", () => {
     // `restart_lobby`) and +1 server member (`room_closed`) — see
     // messages.ts's doc comments on each for why they exist. Dev mode adds
     // `dev` (client) and `dev_state`/`dev_result` (server), see dev.ts.
-    expect(ClientMessageSchema.options).toHaveLength(8);
+    // `kick_vote` (client) lets connected players vote a dropped seat out.
+    expect(ClientMessageSchema.options).toHaveLength(9);
     expect(ServerMessageSchema.options).toHaveLength(8);
   });
 });

@@ -340,7 +340,7 @@ describe("muster cards", () => {
     const narrowest = Math.min(...boxes.map((b) => b.w));
     const cards = buildTrailModel(
       {
-        game: { yourSeatId: null, runStatus: "in_progress", length: null, campCount: null, purse: 0, supplies: { count: 3, max: 4 }, plan: [], seats: [], yourAbilities: [], history: [], lastVote: null, stage: { tag: "muster", ballots: [] } },
+        game: { yourSeatId: null, runStatus: "in_progress", length: null, campCount: null, purse: 0, supplies: { count: 3, max: 4 }, plan: [], seats: [], kicked: [], yourAbilities: [], history: [], lastVote: null, stage: { tag: "muster", ballots: [] } },
         roomSeats: [],
         hostSeatId: null,
       },

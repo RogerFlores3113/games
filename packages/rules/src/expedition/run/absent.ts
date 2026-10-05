@@ -3,6 +3,7 @@
 // seat's own action.
 
 import { attemptOf } from "./attempt";
+import { firstFreeCharacter } from "./crew";
 import type { Catalog, RunAction, RunState } from "./types";
 import { gatedPendingSeatIds } from "./windows";
 
@@ -17,9 +18,8 @@ export function absentSeatAction(run: RunState, seatId: string, catalog: Catalog
   switch (stage.tag) {
     case "muster": {
       if (seat.characterId === null) {
-        const taken = new Set(run.seats.map((s) => s.characterId));
-        const free = Object.keys(catalog.characters).find((id) => !taken.has(id));
-        if (free !== undefined) return { type: "pick-character", characterId: free };
+        const free = firstFreeCharacter(run, catalog);
+        if (free !== null) return { type: "pick-character", characterId: free };
       }
       return Object.hasOwn(stage.ballots, seatId) ? null : { type: "vote", choice: null };
     }

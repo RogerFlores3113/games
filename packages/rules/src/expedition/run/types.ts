@@ -105,14 +105,22 @@ export type AttemptState = {
   readonly camp: CampState;
 };
 
-/** One per decided attempt. `coins` is the payout of a clear, 0 on a failure. */
+/** One per ended attempt. `coins` is the payout of a clear, 0 otherwise. A
+ * `restarted` attempt was abandoned when the crew kicked a seat: it costs
+ * nothing and the camp's loadout reopens. */
 export type CampResult = {
   readonly camp: CampIndex;
   readonly attempt: number;
-  readonly status: "cleared" | "failed";
+  readonly status: "cleared" | "failed" | "restarted";
   readonly suppliesSpent: number;
   readonly coins: number;
 };
+
+/** A seat the crew voted out while it was disconnected (run/crew.ts). Its
+ * SeatRun is kept whole for its return; `position` is where it sat in
+ * seatIds. `back` is true while it is connected again, waiting for the next
+ * loadout. */
+export type KickedSeat = { readonly seat: SeatRun; readonly position: number; readonly back: boolean };
 
 export type Stage =
   | { readonly tag: "muster"; readonly ballots: PerSeat<RunLength | null> } // null abstains
@@ -126,8 +134,9 @@ export type StageTag = Stage["tag"];
 
 export type RunState = {
   readonly seed: string; // A1 root of every RNG stream; never projected
-  readonly seatIds: readonly SeatId[];
+  readonly seatIds: readonly SeatId[]; // the crew in play; every per-player rule reads these
   readonly seats: readonly SeatRun[]; // seatIds order
+  readonly kicked: readonly KickedSeat[]; // out of the crew, never in seatIds; characters stay theirs
   readonly purse: number; // shared coins, >= 0
   readonly supplies: number; // 0..SUPPLIES_MAX
   readonly plan: RunPlan | null; // null only in muster

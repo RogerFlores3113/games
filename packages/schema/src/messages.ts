@@ -106,6 +106,15 @@ const RestartLobbyMessageSchema = z.strictObject({
   actionId: z.string().min(ACTION_ID_MIN_LENGTH).max(ACTION_ID_MAX_LENGTH),
 });
 
+/** A connected player in play votes to kick a disconnected seat out of play,
+ * or (`kick: false`) takes the vote back. Setting a ballot is idempotent, so
+ * it needs no actionId. Only the game's `seats` hooks make a kick possible. */
+const KickVoteMessageSchema = z.strictObject({
+  type: z.literal("kick_vote"),
+  targetSeatId: z.string().min(1).max(64),
+  kick: z.boolean(),
+});
+
 export const ClientMessageSchema = z.discriminatedUnion("type", [
   JoinMessageSchema,
   SetConfigMessageSchema,
@@ -114,6 +123,7 @@ export const ClientMessageSchema = z.discriminatedUnion("type", [
   LeaveMessageSchema,
   DeleteRoomMessageSchema,
   RestartLobbyMessageSchema,
+  KickVoteMessageSchema,
   DevMessageSchema,
 ]);
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;

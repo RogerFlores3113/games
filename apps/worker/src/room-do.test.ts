@@ -1679,3 +1679,108 @@ describe("Phase 5 dead-socket detection and reconnect (D-03, D-12, D-13, D-15)",
     60_000,
   );
 });
+
+describe("kick votes on the live wire (Expedition)", () => {
+  type KickView = { targetSeatId: string; voterSeatIds: string[]; needed: number; youCanVote: boolean };
+  type GameView = { yourSeatId: string | null; seats: { seatId: string }[]; kicked: { seatId: string; characterId: string | null; back: boolean }[]; history: { status: string }[]; stage: { tag: string } };
+  type View = { seats: { seatId: string; connected: boolean }[]; kickVotes?: KickView[]; game: GameView | null };
+  type Player = { ws: WebSocket; c: ReturnType<typeof collectMessages>; seatId: string; seatToken: string };
+
+  const latestView = (c: ReturnType<typeof collectMessages>): View => (c.parsed.filter((m) => m.type === "state" || m.type === "joined").at(-1)!.view as View);
+  /** The first view at or after message `since` that matches, so a view
+   * from an earlier round never answers for a later one. */
+  const viewWhere = async (p: Player, predicate: (view: View) => boolean, since = 0, timeoutMs = 8000): Promise<View> =>
+    (await p.c.waitFor((m) => p.c.parsed.indexOf(m) >= since && (m.type === "state" || m.type === "joined") && predicate(m.view as View), timeoutMs)).view as View;
+  const mark = (p: Player): number => p.c.parsed.length;
+
+  async function join(code: string, name: string, extra: Record<string, unknown> = {}): Promise<Player> {
+    const ws = await openSocket(code);
+    const c = collectMessages(ws);
+    send(ws, { type: "join", displayName: name, ...extra });
+    const joined = (await c.waitFor((m) => m.type === "joined")) as Parsed & { seatId: string; seatToken: string };
+    return { ws, c, seatId: joined.seatId, seatToken: joined.seatToken };
+  }
+
+  let actions = 0;
+  function act(p: Player, request: unknown): void {
+    send(p.ws, { type: "game_action", actionId: `k${(actions += 1)}`, request });
+  }
+
+  it(
+    "connected players vote a dropped seat out, the camp restarts for the rest, and the seat rejoins at a loadout with its character",
+    async () => {
+      const code = mintRoomCode();
+      const ana = await join(code, "Ana", { gameId: "expedition" });
+      const ben = await join(code, "Ben");
+      const cy = await join(code, "Cy");
+      let dee = await join(code, "Dee");
+      const crew = [ana, ben, cy, dee];
+      send(ana.ws, { type: "start_game" });
+      await viewWhere(dee, (v) => v.game?.stage.tag === "muster");
+      const characters = ["explorer", "leader", "magician", "hermit"];
+      crew.forEach((p, i) => act(p, { type: "pick-character", characterId: characters[i] }));
+      crew.forEach((p) => act(p, { type: "vote", choice: "short" }));
+      await viewWhere(ana, (v) => v.game?.stage.tag === "loadout");
+      crew.forEach((p) => act(p, { type: "ready" }));
+      await viewWhere(ana, (v) => v.game?.stage.tag === "camp");
+
+      dee.ws.close();
+      const offered = await viewWhere(ana, (v) => v.kickVotes?.some((k) => k.targetSeatId === dee.seatId) === true);
+      expect(offered.kickVotes).toEqual([{ targetSeatId: dee.seatId, voterSeatIds: [], needed: 2, youCanVote: true }]);
+
+      send(ana.ws, { type: "kick_vote", targetSeatId: dee.seatId, kick: true });
+      const tallied = await viewWhere(ben, (v) => v.kickVotes?.[0]?.voterSeatIds.length === 1);
+      expect(tallied.kickVotes).toEqual([{ targetSeatId: dee.seatId, voterSeatIds: [ana.seatId], needed: 2, youCanVote: true }]);
+      expect(tallied.game?.stage.tag).toBe("camp");
+
+      send(ben.ws, { type: "kick_vote", targetSeatId: dee.seatId, kick: true });
+      const kicked = await viewWhere(cy, (v) => (v.game?.kicked.length ?? 0) === 1);
+      expect(kicked.game?.seats.map((s) => s.seatId)).toEqual([ana.seatId, ben.seatId, cy.seatId]);
+      expect(kicked.game?.kicked).toEqual([{ seatId: dee.seatId, characterId: "hermit", upgradeId: null, back: false }]);
+      expect(kicked.game?.stage.tag).toBe("loadout");
+      expect(kicked.game?.history).toEqual([{ camp: 1, attempt: 1, status: "restarted", coins: 0 }]);
+      expect(kicked.kickVotes).toEqual([]);
+
+      const beforeReturn = mark(ana);
+      dee = await join(code, "Dee", { seatToken: dee.seatToken });
+      const rejoined = await viewWhere(ana, (v) => v.game?.seats.length === 4, beforeReturn);
+      expect(rejoined.game?.seats.map((s) => s.seatId)).toEqual([ana.seatId, ben.seatId, cy.seatId, dee.seatId]);
+      expect(rejoined.game?.kicked).toEqual([]);
+      expect(latestView(dee.c).game?.yourSeatId).toBe(dee.seatId);
+
+      let since = mark(ana);
+      [ana, ben, cy, dee].forEach((p) => act(p, { type: "ready" }));
+      await viewWhere(ana, (v) => v.game?.stage.tag === "camp" && v.game.seats.length === 4, since);
+
+      since = mark(ana);
+      dee.ws.close();
+      await viewWhere(ana, (v) => v.kickVotes?.length === 1, since);
+      since = mark(ana);
+      send(ana.ws, { type: "kick_vote", targetSeatId: dee.seatId, kick: true });
+      send(cy.ws, { type: "kick_vote", targetSeatId: dee.seatId, kick: true });
+      await viewWhere(ana, (v) => v.game?.stage.tag === "loadout" && v.game.seats.length === 3, since);
+      since = mark(ana);
+      [ana, ben, cy].forEach((p) => act(p, { type: "ready" }));
+      await viewWhere(ana, (v) => v.game?.stage.tag === "camp" && v.game.seats.length === 3, since);
+
+      dee = await join(code, "Dee", { seatToken: dee.seatToken });
+      const waiting = latestView(dee.c);
+      expect(waiting.game?.yourSeatId).toBeNull();
+      expect(waiting.game?.kicked).toEqual([{ seatId: dee.seatId, characterId: "hermit", upgradeId: null, back: true }]);
+      expect(waiting.kickVotes).toEqual([]);
+      act(dee, { type: "skip-window" });
+      const refused = await dee.c.waitFor((m) => m.type === "error");
+      expect(refused).toMatchObject({ type: "error", code: "bad_request", gameError: { gameId: "expedition", code: "not_a_seat" } });
+
+      since = mark(ana);
+      cy.ws.close();
+      await viewWhere(ana, (v) => v.seats.find((s) => s.seatId === cy.seatId)?.connected === false, since);
+      expect(latestView(ana.c).kickVotes).toEqual([]);
+      send(ana.ws, { type: "kick_vote", targetSeatId: cy.seatId, kick: true });
+      expect(await ana.c.waitFor((m) => m.type === "error")).toEqual({ type: "error", code: "bad_request" });
+
+      [ana, ben, dee].forEach((p) => p.ws.close());
+    },
+    60_000,
+  );
+});

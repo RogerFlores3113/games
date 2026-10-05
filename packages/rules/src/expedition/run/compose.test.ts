@@ -42,6 +42,7 @@ function makeRun(overrides: Partial<RunState> & { attempt?: AttemptState } = {})
     purse: 0,
     supplies: 3,
     seats: seatIds.map((id) => seat(id)),
+    kicked: [],
     plan: { length: "standard", bosses: [] },
     history: [],
     lastVote: null,

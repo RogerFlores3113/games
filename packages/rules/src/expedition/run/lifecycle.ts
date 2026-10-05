@@ -14,6 +14,7 @@ import { nextAttemptNumber } from "./attempt";
 import { react } from "./react";
 import { campSlots } from "./stack";
 import { stockFor } from "./shop";
+import { rejoinBack } from "./crew";
 import type { CampIndex, CampResult, Catalog, RunAt, RunState, RunStatus, SeatRun } from "./types";
 
 /** The run in muster: every seat still picks a character and votes a
@@ -30,6 +31,7 @@ export function createRun(input: { seatIds: readonly string[]; seed: string }): 
     seed,
     seatIds: [...seatIds],
     seats,
+    kicked: [],
     purse: PURSE_START,
     supplies: SUPPLIES_START,
     plan: null,
@@ -46,16 +48,16 @@ export function runStatus(run: RunState): RunStatus {
 
 /** The loadout of `camp`, with the shop open before a boss camp. Every
  * visit draws the stock afresh from the same streams, so a replay of a boss
- * camp offers the same stock, unsold. */
+ * camp offers the same stock, unsold. Kicked seats that are back rejoin here. */
 export function openLoadout(run: RunState, camp: CampSpec, catalog: Catalog): RunAt<"loadout"> {
   const stock = bossAt(planOf(run), camp.index) === null ? null : stockFor(run.seed, camp.index, catalog);
-  return withinSlots({ ...run, stage: { tag: "loadout", camp, stock, ready: {} } }, catalog);
+  return withinSlots({ ...rejoinBack(run, catalog), stage: { tag: "loadout", camp, stock, ready: {} } }, catalog);
 }
 
 /** A camp rule may give fewer slots than the set carried in (Rats): the
  * last equipped items go back to the backpack, so the loadout never opens
  * on a set its seat could not ready with. */
-function withinSlots(run: RunAt<"loadout">, catalog: Catalog): RunAt<"loadout"> {
+export function withinSlots(run: RunAt<"loadout">, catalog: Catalog): RunAt<"loadout"> {
   const rules = rulesFor(run, catalog);
   const seats = run.seats.map((seat) => {
     const slots = Math.max(0, rules.itemSlots(run, seat.seatId));
@@ -107,7 +109,7 @@ function settleClear(run: RunAt<"camp">, catalog: Catalog): RunState {
  * the loadout for the same spec, or ends the run at 0 supplies. A clear pays
  * into the purse and deals every seat a private draft
  * offer, or wins the run at the final camp. */
-export function settleCamp(run: RunAt<"camp">, status: CampResult["status"], catalog: Catalog): RunState {
+export function settleCamp(run: RunAt<"camp">, status: "cleared" | "failed", catalog: Catalog): RunState {
   const reacted = react(run, [{ type: "camp-settled", status }], catalog);
   return status === "failed" ? settleFailure(reacted, catalog) : settleClear(reacted, catalog);
 }

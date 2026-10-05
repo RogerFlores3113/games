@@ -112,6 +112,16 @@ const toyAdapter: GameAdapter<ToyState, ToyAction, ToyConfig, ToyEndResult, ToyE
   autoPassRequest(state, seatId) {
     return state.seatIds[state.turnIndex] === seatId ? { type: "pass" } : null;
   },
+  // A kick drops the seat from turn order; the toy never takes anyone back.
+  seats: {
+    inPlay: (state) => state.seatIds,
+    canKick: (state, seatId) => state.seatIds.includes(seatId) && state.seatIds.length > 2,
+    kick: (state, seatId) => {
+      const seatIds = state.seatIds.filter((id) => id !== seatId);
+      return { ...state, seatIds, turnIndex: state.turnIndex % seatIds.length };
+    },
+    presence: (state) => state,
+  },
 };
 
 export const ToyViewSchema = z.strictObject({

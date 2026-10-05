@@ -19,6 +19,7 @@ export type {
   GameAdapter,
   GameDevHooks,
   GameEndResult,
+  GameSeatHooks,
   Variant,
 } from "./adapter";
 
@@ -73,6 +74,7 @@ export type {
   ExpeditionVoteView,
   ExpeditionPlanBossView,
   ExpeditionCampResultView,
+  ExpeditionKickedSeatView,
   ExpeditionRunLengthView,
   ExpeditionSlotKindView,
 } from "./expedition/adapter/view-types";

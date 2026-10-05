@@ -59,6 +59,7 @@ import {
   restartLobby,
   awaitedSeatIds,
   autoPassAbsentSeats,
+  castKickVote,
 } from "./room-state";
 import {
   mintGameSeed,
@@ -270,6 +271,17 @@ export class RoomDO extends Server<Env> {
 
       if (msg.type === "restart_lobby") {
         const result = restartLobby(room, actorSeatId, msg.actionId, now);
+        if (!result.ok) {
+          this.#send(connection, { type: "error", code: result.reason });
+          return;
+        }
+        await this.#commit(result.state, now);
+        await this.#pushState();
+        return;
+      }
+
+      if (msg.type === "kick_vote") {
+        const result = castKickVote(room, actorSeatId, msg.targetSeatId, msg.kick, now);
         if (!result.ok) {
           this.#send(connection, { type: "error", code: result.reason });
           return;

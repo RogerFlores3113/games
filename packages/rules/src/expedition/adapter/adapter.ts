@@ -13,6 +13,7 @@
 import type { AdapterResult, GameAdapter } from "../../adapter";
 import { createRun, runStatus } from "../run/lifecycle";
 import { applyRunAction } from "../run/stages/registry";
+import { canKick, kickSeat, seatPresence } from "../run/stages/kick";
 import { CATALOG } from "../run/catalog";
 import { absentSeatAction } from "../run/absent";
 import { expeditionDevHooks } from "../dev/hooks";
@@ -61,4 +62,11 @@ export const expeditionGame: GameAdapter<RunState, RunAction, ExpeditionConfig, 
   },
 
   dev: expeditionDevHooks,
+
+  seats: {
+    inPlay: (state) => state.seatIds,
+    canKick,
+    kick: (state, seatId) => kickSeat(state, seatId, CATALOG),
+    presence: (state, seatId, connected) => seatPresence(state, seatId, connected, CATALOG),
+  },
 };

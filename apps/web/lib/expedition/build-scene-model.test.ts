@@ -103,6 +103,7 @@ function makeView({ attempt, campIndex = 2, ...overrides }: ViewOverrides = {}):
       seat("s2", "explorer"),
       seat("s3", "jd"),
     ],
+    kicked: [],
     yourAbilities: [],
     history: [],
     lastVote: null,

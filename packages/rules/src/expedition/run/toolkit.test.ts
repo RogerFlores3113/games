@@ -81,7 +81,7 @@ function makeRun(input: { camp: CampState | null; seed?: string }): RunState {
       ? { tag: "loadout", camp: spec, stock: null, ready: {} }
       : { tag: "camp", camp: spec, attempt: { attemptNumber: 1, effects: [], reveals: [], log: [], camp: input.camp } };
 
-  return { seed, seatIds: [...SEAT_IDS], seats: makeSeats(), purse: 0, supplies: 3, plan: { length: "standard", bosses: [] }, history: [], lastVote: null, itemSerial: 0, stage };
+  return { seed, seatIds: [...SEAT_IDS], seats: makeSeats(), kicked: [], purse: 0, supplies: 3, plan: { length: "standard", bosses: [] }, history: [], lastVote: null, itemSerial: 0, stage };
 }
 
 describe("currentWindow", () => {

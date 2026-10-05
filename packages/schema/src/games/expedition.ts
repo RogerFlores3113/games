@@ -312,8 +312,16 @@ const CampIndexSchema = z.number().int().min(1);
 const CampResultViewSchema = z.strictObject({
   camp: CampIndexSchema,
   attempt: z.number().int().min(1),
-  status: z.enum(["cleared", "failed"]),
+  status: z.enum(["cleared", "failed", "restarted"]),
   coins: z.number().int().min(0),
+});
+
+// A seat the crew voted out while it was away; it rejoins at the next loadout.
+const KickedSeatViewSchema = z.strictObject({
+  seatId: z.string().min(1),
+  characterId: z.string().min(1).nullable(),
+  upgradeId: z.string().min(1).nullable(),
+  back: z.boolean(),
 });
 
 const RunLengthSchema = z.enum(["short", "standard", "long"]);
@@ -427,6 +435,7 @@ export const ExpeditionViewSchema = z.strictObject({
   supplies: z.strictObject({ count: z.number().int().min(0), max: z.number().int().min(1) }),
   plan: z.array(PlanBossViewSchema),
   seats: z.array(SeatViewSchema),
+  kicked: z.array(KickedSeatViewSchema),
   yourAbilities: z.array(AbilityViewSchema),
   history: z.array(CampResultViewSchema),
   lastVote: VoteViewSchema.nullable(),

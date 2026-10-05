@@ -22,6 +22,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
       { at: 6, tier: "temple", bossId: null },
     ],
     seats: [{ seatId: "s1", characterId: "explorer", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] }],
+    kicked: [],
     yourAbilities: [],
     history: [result(1, 1, "failed"), result(1, 2, "cleared"), result(2, 1, "failed"), result(2, 2, "failed")],
     lastVote: null,

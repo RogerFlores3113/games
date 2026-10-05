@@ -90,8 +90,9 @@ const draftView = {
       ],
     },
   ],
+  kicked: [{ seatId: "seat-3", characterId: "hermit", upgradeId: null, back: true }],
   yourAbilities: [{ sourceKey: "leader.delegate", usableNow: false, reason: "Usable between tricks", steps: [] }],
-  history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }],
+  history: [{ camp: 1, attempt: 1, status: "restarted", coins: 0 }, { camp: 1, attempt: 2, status: "cleared", coins: 8 }],
   stage: {
     tag: "draft",
     cleared: 1,
@@ -205,7 +206,7 @@ const midAttempt = {
 };
 
 function campWith(attempt: unknown) {
-  return { ...header, seats: campSeats, ...midCampFields, stage: { tag: "camp", camp: preview, mods: CAMP_MODS, attempt } };
+  return { ...header, seats: campSeats, kicked: [], ...midCampFields, stage: { tag: "camp", camp: preview, mods: CAMP_MODS, attempt } };
 }
 
 const midCampView = campWith(midAttempt);

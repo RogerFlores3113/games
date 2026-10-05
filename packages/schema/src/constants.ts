@@ -45,8 +45,9 @@
  * boss, and a run in flight would reach its final camp without the temple;
  * 13 for the character seams (hallucinated tricks, free uses, route rerolls
  * and boss swaps, special draft offers); 14 for the nine characters, whose
- * ledgers lost the pool's cost and regain entries. */
-export const ROOM_SCHEMA_VERSION = 14;
+ * ledgers lost the pool's cost and regain entries; 15 for kicked seats and
+ * restarted attempts in the run, and kick votes in the room. */
+export const ROOM_SCHEMA_VERSION = 15;
 
 /** D-01: 32 uppercase-safe characters — no `I`, `O`, `0`, `1` — because the
  * room code is read aloud over a voice call. Do not add lowercase. */

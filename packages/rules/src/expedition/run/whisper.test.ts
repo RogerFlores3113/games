@@ -98,6 +98,7 @@ function makeRun(input: {
     seed,
     seatIds: [...SEAT_IDS],
     seats: makeSeats(),
+    kicked: [],
     purse: 0,
     supplies: 3,
     plan: { length: "standard", bosses: [] },

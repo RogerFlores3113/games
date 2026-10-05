@@ -155,6 +155,10 @@ export const RoomStateSchema = z.object({
   seed: z.string().optional(),
   createdAt: z.number(),
   lastActivityAt: z.number(),
+  /** Open votes to kick a disconnected seat out of play, by target. Only the
+   * game's `seats` hooks make a kick possible. Optional so rooms persisted
+   * before kicks existed still parse. */
+  kickVotes: z.array(z.strictObject({ targetSeatId: z.string(), voterSeatIds: z.array(z.string()) })).optional(),
 });
 export type RoomState = z.infer<typeof RoomStateSchema>;
 
@@ -180,6 +184,14 @@ export const PublicSeatSchema = z.object({
 });
 export type PublicSeat = z.infer<typeof PublicSeatSchema>;
 
+export const KickVoteViewSchema = z.strictObject({
+  targetSeatId: z.string(),
+  voterSeatIds: z.array(z.string()),
+  needed: z.number().int().positive(),
+  youCanVote: z.boolean(),
+});
+export type KickVoteView = z.infer<typeof KickVoteViewSchema>;
+
 export const RoomViewSchema = z.strictObject({
   code: RoomCodeSchema,
   gameId: GameIdSchema,
@@ -199,5 +211,10 @@ export const RoomViewSchema = z.strictObject({
   seats: z.array(PublicSeatSchema),
   /** Opaque to this package — the per-seat game view (FDN-01). */
   game: z.unknown(),
+  /** One entry per seat that can be kicked now (disconnected, in play, and
+   * the game allows it): the connected players in play who voted for it,
+   * how many votes kick it, and whether the viewer may vote. Absent for a
+   * game with no kicks. */
+  kickVotes: z.array(KickVoteViewSchema).optional(),
 });
 export type RoomView = z.infer<typeof RoomViewSchema>;

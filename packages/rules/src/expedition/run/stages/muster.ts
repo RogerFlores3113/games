@@ -1,4 +1,5 @@
 import { RUN_LENGTHS } from "../balance";
+import { takenCharacters } from "../crew";
 import { openLoadout } from "../lifecycle";
 import { react } from "../react";
 import { drawPlan } from "../plan";
@@ -20,7 +21,7 @@ export const muster: StageDef<"muster"> = {
       const seat = run.seats.find((s) => s.seatId === seatId)!;
       if (seat.characterId !== null) return err("wrong_phase");
       if (!Object.hasOwn(catalog.characters, action.characterId)) return err("unknown_character");
-      if (run.seats.some((s) => s.characterId === action.characterId)) return err("character_taken");
+      if (takenCharacters(run).has(action.characterId)) return err("character_taken");
       return ok({ ...run, seats: run.seats.map((s) => (s.seatId === seatId ? { ...s, characterId: action.characterId } : s)) });
     },
     vote: (run, seatId, action) => {

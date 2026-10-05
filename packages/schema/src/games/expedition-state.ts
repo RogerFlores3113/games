@@ -152,20 +152,22 @@ const VoteResultSchema = z.strictObject({
   winner: z.string().min(1),
 });
 
+const SeatRunSchema = z.strictObject({
+  seatId: z.string().min(1),
+  characterId: z.string().min(1).nullable(),
+  upgradeId: z.string().min(1).nullable(),
+  items: z.array(z.strictObject({ uid: z.string().min(1), itemId: z.string().min(1) })),
+  equipped: z.array(z.string().min(1)),
+  offers: z.array(z.strictObject({ kind: z.enum(["standard", "special"]), bundles: z.array(z.array(z.string().min(1))) })),
+  ledger: z.array(LedgerEntrySchema),
+});
+
 export const ExpeditionRunStateSchema = z.strictObject({
   seed: z.string().min(1),
   seatIds: z.array(z.string().min(1)),
-  seats: z.array(
-    z.strictObject({
-      seatId: z.string().min(1),
-      characterId: z.string().min(1).nullable(),
-      upgradeId: z.string().min(1).nullable(),
-      items: z.array(z.strictObject({ uid: z.string().min(1), itemId: z.string().min(1) })),
-      equipped: z.array(z.string().min(1)),
-      offers: z.array(z.strictObject({ kind: z.enum(["standard", "special"]), bundles: z.array(z.array(z.string().min(1))) })),
-      ledger: z.array(LedgerEntrySchema),
-    }),
-  ),
+  seats: z.array(SeatRunSchema),
+  // Defaulted so a dev snapshot saved before kicks existed still loads.
+  kicked: z.array(z.strictObject({ seat: SeatRunSchema, position: z.number().int().min(0), back: z.boolean() })).default([]),
   purse: z.number().int().min(0),
   supplies: z.number().int().min(0),
   plan: z
@@ -178,7 +180,7 @@ export const ExpeditionRunStateSchema = z.strictObject({
     z.strictObject({
       camp: CampIndexSchema,
       attempt: z.number().int().min(1),
-      status: z.enum(["cleared", "failed"]),
+      status: z.enum(["cleared", "failed", "restarted"]),
       suppliesSpent: z.number().int().min(0),
       coins: z.number().int().min(0),
     }),

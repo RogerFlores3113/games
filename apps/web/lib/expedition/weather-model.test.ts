@@ -20,6 +20,7 @@ function campView(weather: string, mods: ExpeditionModView[], trick = 0, removed
     supplies: { count: 3, max: 4 },
     plan: [],
     seats: [],
+    kicked: [],
     yourAbilities: [],
     history: [],
     lastVote: null,

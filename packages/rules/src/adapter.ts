@@ -47,7 +47,7 @@ export type GameEndResult = { score: number; reason: string; band?: string };
 
 /**
  * The contract a game plugs into the room layer through. Five required
- * members and two optional hooks, no others — see the file-level invariants
+ * members and three optional hooks, no others — see the file-level invariants
  * above. Generic over
  * each game's own config (`TConfig`), end-result (`TEndResult`) and error
  * (`TError`) types (D-06) — deliberately no default type arguments, so the
@@ -96,6 +96,24 @@ export interface GameAdapter<TState, TAction, TConfig, TEndResult, TError extend
    * room layer never calls it otherwise, so a game without it plays exactly
    * the same. */
   readonly dev?: GameDevHooks<TState>;
+
+  /** Optional. Lets the connected players vote a disconnected seat out of
+   * play. A game without it never offers a kick. */
+  readonly seats?: GameSeatHooks<TState>;
+}
+
+/** What the room's kick vote asks the game. The room owns the ballots and
+ * who is connected; the game owns who is in play and what a kick changes. */
+export interface GameSeatHooks<TState> {
+  /** The seats taking part now: only they vote, and only they can be kicked. */
+  inPlay(state: TState): readonly string[];
+  /** Whether `seatId` may be kicked now (e.g. the game's minimum crew). */
+  canKick(state: TState, seatId: string): boolean;
+  /** Takes `seatId` out of play. Called only when `canKick` holds. */
+  kick(state: TState, seatId: string): TState;
+  /** A seat's connection changed. The game decides when a kicked seat that
+   * is connected again comes back into play. */
+  presence(state: TState, seatId: string, connected: boolean): TState;
 }
 
 /** One input of a dev shortcut, rendered generically by the web dev panel. */

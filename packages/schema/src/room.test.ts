@@ -144,6 +144,13 @@ describe("RoomViewSchema (D-04, D-05, MGR-02)", () => {
     expect(RoomViewSchema.safeParse(view).success).toBe(false);
   });
 
+  it("accepts open kick votes and refuses one with a stray key or no majority", () => {
+    const kickVotes = [{ targetSeatId: "s2", voterSeatIds: ["s1"], needed: 2, youCanVote: true }];
+    expect(RoomViewSchema.safeParse({ ...baseView(), kickVotes }).success).toBe(true);
+    expect(RoomViewSchema.safeParse({ ...baseView(), kickVotes: [{ ...kickVotes[0], seatToken: "x" }] }).success).toBe(false);
+    expect(RoomViewSchema.safeParse({ ...baseView(), kickVotes: [{ ...kickVotes[0], needed: 0 }] }).success).toBe(false);
+  });
+
   it("accepts a RoomView with gameId \"expedition\" and config null", () => {
     const view = { ...baseView(), gameId: "expedition", gameDisplayName: "Expedition", config: null };
     expect(RoomViewSchema.safeParse(view).success).toBe(true);

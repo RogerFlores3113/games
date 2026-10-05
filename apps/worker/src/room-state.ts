@@ -12,9 +12,11 @@
 
 import { DEFAULT_GAME_ID, GAME_REGISTRY, resolveGame } from "./game-registration";
 import type { GameRegistry, GameRegistryEntry } from "./game-registration";
+import type { GameSeatHooks } from "@games/rules";
 import type {
   GameErrorDetail,
   GameId,
+  KickVoteView,
   PublicSeat,
   RefusalReason,
   RoomState,
@@ -133,19 +135,9 @@ export function joinRoom(state: RoomState, input: JoinInput, games: GameRegistry
       : undefined;
   const existing = byToken ?? byJoinId;
   if (existing !== undefined) {
-    const reclaimedSeats = state.seats.map((seat) =>
-      seat.seatId === existing.seatId
-        ? { ...seat, connected: true, disconnectedAt: null }
-        : seat,
-    );
-    const nextState: RoomState = {
-      ...state,
-      seats: reclaimedSeats,
-      lastActivityAt: input.now,
-    };
     return {
       ok: true,
-      state: nextState,
+      state: markConnected(state, existing.seatId, true, input.now, games),
       seatId: existing.seatId,
       seatToken: existing.seatToken,
       wasReclaim: true,
@@ -248,20 +240,118 @@ export function releaseSeat(state: RoomState, seatId: string, now: number): Room
 
 /** Flips a seat's live-connection status, the source of ROOM-04's per-seat
  * connection indicator. `disconnectedAt` is persisted (not memory-only) so
- * Plan 06's grace-period deadlines survive a hibernation eviction. */
+ * Plan 06's grace-period deadlines survive a hibernation eviction. In a game
+ * with seat hooks the game hears of it (a kicked seat may come back), and the
+ * kick votes settle: a reconnect withdraws the votes against that seat, and a
+ * disconnect shrinks the majority the others need. */
 export function markConnected(
   state: RoomState,
   seatId: string,
   connected: boolean,
   now: number,
+  games: GameRegistry = GAME_REGISTRY,
 ): RoomState {
   const seats = state.seats.map((seat) =>
     seat.seatId === seatId
       ? { ...seat, connected, disconnectedAt: connected ? null : now }
       : seat,
   );
+  const flipped: RoomState = { ...state, seats, lastActivityAt: now };
+  const hooks = seatHooksOf(flipped, games);
+  if (hooks === undefined) return flipped;
+  return settleKickVotes({ ...flipped, game: hooks.presence(flipped.game, seatId, connected) }, games);
+}
 
-  return { ...state, seats, lastActivityAt: now };
+// ---------------------------------------------------------------------------
+// Kick votes. The room owns who is connected and the ballots; the game's
+// `seats` hooks own who is in play and what a kick changes (FDN-01).
+// ---------------------------------------------------------------------------
+
+function seatHooksOf(state: RoomState, games: GameRegistry): GameSeatHooks<unknown> | undefined {
+  return state.status === "in_progress" ? resolveGame(state.gameId, games)?.adapter.seats : undefined;
+}
+
+/** Connected players in play; a dev bot never votes. */
+function kickVoterIds(state: RoomState, hooks: GameSeatHooks<unknown>): string[] {
+  const inPlay = hooks.inPlay(state.game);
+  return state.seats.filter((seat) => seat.connected && seat.bot !== true && inPlay.includes(seat.seatId)).map((seat) => seat.seatId);
+}
+
+/** Disconnected seats the game would let the crew kick now. A dev bot is
+ * never disconnected, only playerless, so it is never kickable. */
+function kickableSeatIds(state: RoomState, hooks: GameSeatHooks<unknown>): string[] {
+  return state.seats
+    .filter((seat) => !seat.connected && seat.disconnectedAt !== null && seat.bot !== true && hooks.canKick(state.game, seat.seatId))
+    .map((seat) => seat.seatId);
+}
+
+type KickTally = { targetSeatId: string; voterSeatIds: string[]; needed: number };
+
+/** Each kickable seat's valid votes against the majority of the voters. */
+function kickTallies(state: RoomState, hooks: GameSeatHooks<unknown>): KickTally[] {
+  const voters = kickVoterIds(state, hooks);
+  return kickableSeatIds(state, hooks).map((targetSeatId) => {
+    const ballot = state.kickVotes?.find((vote) => vote.targetSeatId === targetSeatId)?.voterSeatIds ?? [];
+    return { targetSeatId, voterSeatIds: voters.filter((id) => ballot.includes(id)), needed: Math.floor(voters.length / 2) + 1 };
+  });
+}
+
+/** Kicks every seat whose votes reach the majority, one at a time since a
+ * kick can change who else may be kicked, then keeps ballots only against
+ * seats still kickable. Idempotent: a settled room settles to itself. */
+function settleKickVotes(state: RoomState, games: GameRegistry): RoomState {
+  const hooks = seatHooksOf(state, games);
+  if (hooks === undefined) return state;
+  let current = state;
+  for (;;) {
+    const carried = kickTallies(current, hooks).find((tally) => tally.voterSeatIds.length >= tally.needed);
+    if (carried === undefined) break;
+    const game = hooks.kick(current.game, carried.targetSeatId);
+    const ended = roomGame(current, games).adapter.checkGameEnd(game) !== null;
+    current = {
+      ...current,
+      game,
+      status: ended ? "ended" : current.status,
+      kickVotes: (current.kickVotes ?? []).filter((vote) => vote.targetSeatId !== carried.targetSeatId),
+    };
+    if (ended) return current;
+  }
+  const kickable = kickableSeatIds(current, hooks);
+  const kept = (current.kickVotes ?? []).filter((vote) => kickable.includes(vote.targetSeatId));
+  if (kept.length === (current.kickVotes ?? []).length) return current;
+  return { ...current, kickVotes: kept };
+}
+
+/** A connected player in play votes to kick a disconnected seat (`kick:
+ * false` takes the vote back), and a vote that reaches the majority kicks
+ * at once. Refused `bad_request` outside a game with seat hooks, for a voter
+ * not in play, or for a seat that cannot be kicked now. */
+export function castKickVote(
+  state: RoomState,
+  voterSeatId: string,
+  targetSeatId: string,
+  kick: boolean,
+  now: number,
+  games: GameRegistry = GAME_REGISTRY,
+): RoomResult {
+  const hooks = seatHooksOf(state, games);
+  if (hooks === undefined || !kickVoterIds(state, hooks).includes(voterSeatId) || !kickableSeatIds(state, hooks).includes(targetSeatId)) {
+    return { ok: false, reason: "bad_request" };
+  }
+  const others = (state.kickVotes ?? []).filter((vote) => vote.targetSeatId !== targetSeatId);
+  const before = state.kickVotes?.find((vote) => vote.targetSeatId === targetSeatId)?.voterSeatIds ?? [];
+  const voterSeatIds = kick ? [...before.filter((id) => id !== voterSeatId), voterSeatId] : before.filter((id) => id !== voterSeatId);
+  const kickVotes = voterSeatIds.length === 0 ? others : [...others, { targetSeatId, voterSeatIds }];
+  return { ok: true, state: settleKickVotes({ ...state, kickVotes, lastActivityAt: now }, games) };
+}
+
+/** The viewer's picture of the open kick votes, or undefined for a game
+ * with no kicks. */
+function kickVoteViews(state: RoomState, viewerSeatId: string, games: GameRegistry): KickVoteView[] | undefined {
+  const hooks = seatHooksOf(state, games);
+  if (hooks === undefined) return undefined;
+  const youCanVote = kickVoterIds(state, hooks).includes(viewerSeatId);
+  return kickTallies(state, hooks).map((tally) => ({ ...tally, youCanVote }));
 }
 
 /** D-07: reassigns host to the earliest-joined CONNECTED seat. No-op when
@@ -553,6 +643,7 @@ export function toSeatView(state: RoomState, seatId: string, games: GameRegistry
   }));
 
   const entry = roomGame(state, games);
+  const kickVotes = kickVoteViews(state, seatId, games);
 
   return {
     code: state.code,
@@ -565,5 +656,6 @@ export function toSeatView(state: RoomState, seatId: string, games: GameRegistry
     youSeatId: seatId,
     seats,
     game: state.game === null ? null : entry.adapter.toPlayerView(state.game, seatId),
+    ...(kickVotes !== undefined ? { kickVotes } : {}),
   };
 }

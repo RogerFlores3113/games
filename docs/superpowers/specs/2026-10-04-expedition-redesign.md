@@ -2123,3 +2123,59 @@ How each of the nine fits (for unit 13):
   the pick. The tour gains `camp-rain-washed`, `camp-downpour` and
   `draft-pack-rat`; `camp-rain` shows a whisper about to wash away and
   `camp-night` every teammate's card face down.
+
+### Implementation notes (batch 4: players who drop)
+
+- The vote lives in the room, generically. `GameAdapter.seats` (optional)
+  is four hooks: `inPlay` (who votes and who can be kicked), `canKick`,
+  `kick` and `presence` (a seat connected or dropped). The room keeps the
+  ballots (`RoomState.kickVotes`, optional so older rooms parse), knows who
+  is connected, and sends each viewer `RoomView.kickVotes`: one entry per
+  seat that can be kicked now, with the valid votes, the majority needed and
+  whether the viewer may vote. Client message `kick_vote { targetSeatId,
+  kick }` sets or takes back a ballot. Hanabi has no hooks, so it has no
+  kicks; Innovation can add its own four.
+- Lead decisions on the vote. A seat can be kicked as soon as it is
+  disconnected, with no grace: the vote itself is the deliberate step, and
+  votes against a seat vanish when it reconnects, so a refresh never costs
+  a seat. The voters are the connected players in play (a kicked player who
+  is back does not vote; a dev bot is never a voter or a target). The
+  majority is `floor(voters / 2) + 1`, recounted on every ballot and every
+  disconnect, so a voter dropping can carry a vote already cast. Only votes
+  from current voters count.
+- Expedition's kick moves the seat out of `seatIds` and `seats` into
+  `RunState.kicked` (`{ seat, position, back }`), the SeatRun whole except
+  its unpicked draft offers. Every per-player rule (the deck by player
+  count, votes, Rain's washes, objective picks, the leader, every boss that
+  walks the seats) already reads `seatIds`, so the crew in play is the only
+  crew any rule sees; nothing else changed. `ROOM_SCHEMA_VERSION` is 15.
+- What "restart without them" means at each stage (lead decisions):
+  muster, the seat's ballot goes and the vote resolves if the rest have
+  voted, while a character it picked stays its own; loadout, its ready mark
+  goes and the camp deals for the rest when they are ready; camp (picking,
+  mid-trick, between tricks or in rescue), the attempt is abandoned with a
+  `restarted` history entry (no supplies, no coins) and the same camp's
+  loadout reopens, so the next attempt number deals afresh for the crew
+  left; draft, its unpicked offers are dropped and the draft ends when the
+  rest have picked; route and event, its ballot or ready mark goes; an
+  ended run takes no kicks. A restart is a replay that costs nothing:
+  per-camp uses reset as on any replay, while single-use items and charges
+  spent in the abandoned attempt stay spent, and coins paid at the deal
+  (the Businessman's empty slots) stay paid.
+- No kick takes the crew below three (`MIN_CREW`), so the deck rules never
+  see fewer than three players.
+- Return (lead decisions): a kicked seat that reconnects with its token is
+  `back`. It rejoins at the next loadout to open (`openLoadout` reinstates
+  every back seat), or at once while a loadout or the muster is open, with
+  its exact character, items, equipped set (cut to the camp's slots),
+  upgrade and ledger, at its old position. Dropping again before then
+  clears `back`, so an absent player never rejoins. A seat kicked at the
+  muster before it picked a character takes the first free character in
+  registry order when it rejoins after the muster, as the absent-seat pass
+  picks. `pick-character` and the absent-seat pass treat a kicked seat's
+  character as taken.
+- Known edge: a J.D. kicked during the muster misses Lucky Start, which
+  reacts to `run-started` for the seats in the crew. Dev: `dev/check.ts`
+  does not yet validate `kicked` (unique characters across crew and kicked,
+  item uids), and loading a saved state does not rename kicked seat ids;
+  the dev sandbox was being rebuilt concurrently, so it was left alone.
