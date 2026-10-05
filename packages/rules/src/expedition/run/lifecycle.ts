@@ -86,8 +86,8 @@ function settleFailure(run: RunAt<"camp">, catalog: Catalog): RunState {
   return supplies === 0 ? { ...settled, stage: { tag: "ended", result: "lost" } } : openLoadout(settled, spec, catalog);
 }
 
-/** A cleared camp deals each seat the offer its composed draftShape names,
- * behind any offer an ability queued. */
+/** A cleared camp deals each seat the offers its composed draftShapes name,
+ * in order, behind any offer an ability queued. */
 function settleClear(run: RunAt<"camp">, catalog: Catalog): RunState {
   const spec = run.stage.camp;
   const coins = payoutFor(run.stage.attempt.camp);
@@ -95,7 +95,10 @@ function settleClear(run: RunAt<"camp">, catalog: Catalog): RunState {
   const settled: RunState = { ...run, purse: run.purse + coins, history: [...run.history, result] };
   if (isFinalCamp(planOf(run), spec.index)) return { ...settled, stage: { tag: "ended", result: "won" } };
   const rules = rulesFor(run, catalog);
-  const seats = run.seats.map((seat) => ({ ...seat, offers: [...seat.offers, draftOfferFor(run.seed, spec.index, seat, 0, catalog, rules.draftShape(run, seat.seatId))] }));
+  const seats = run.seats.map((seat) => ({
+    ...seat,
+    offers: [...seat.offers, ...rules.draftShapes(run, seat.seatId).map((shape, ordinal) => draftOfferFor(run.seed, spec.index, seat, ordinal, catalog, shape))],
+  }));
   return { ...settled, seats, stage: { tag: "draft", cleared: spec.index, payout: coins } };
 }
 

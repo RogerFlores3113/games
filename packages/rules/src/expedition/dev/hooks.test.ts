@@ -78,7 +78,7 @@ describe("expeditionDevHooks", () => {
     if (!stormy.ok) throw new Error(stormy.error);
     expect(hooks.inspect(stormy.state)[0]!.lines.filter((line) => line.startsWith("mod "))).toEqual([
       "mod clifftop (location, full)",
-      "mod thunderstorm (weather, full): 20% next, 2 strikes left",
+      "mod thunderstorm (weather, full): 20% next, 3 strikes left",
     ]);
   });
 });

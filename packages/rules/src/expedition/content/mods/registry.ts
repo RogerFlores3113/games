@@ -9,6 +9,7 @@ import { clearing } from "./clearing";
 import { clifftop } from "./clifftop";
 import { crocodile } from "./crocodile";
 import { desert } from "./desert";
+import { downpour } from "./downpour";
 import { earthquake } from "./earthquake";
 import { fair } from "./fair";
 import { flooding } from "./flooding";
@@ -39,6 +40,7 @@ export const MODS = {
   magma,
   fair,
   rain,
+  downpour,
   fog,
   thunderstorm,
   night,

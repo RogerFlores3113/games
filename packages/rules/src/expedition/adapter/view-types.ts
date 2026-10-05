@@ -307,6 +307,7 @@ export type ExpeditionStatusPartView =
   | { kind: "chance"; percent: number; strikesLeft: number }
   | { kind: "strike" }
   | { kind: "meter"; left: number; of: number }
+  | { kind: "washes"; left: number; of: number }
   | { kind: "facing"; seatId: string }
   | { kind: "dam"; suit: Suit }
   | { kind: "streak"; seatId: string; count: number }

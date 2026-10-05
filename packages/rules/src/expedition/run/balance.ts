@@ -43,8 +43,17 @@ export const ROUTE_OPTIONS = { min: 2, max: 3 } as const;
 /** Percent chance a route's weather is fair; a location may set its own. */
 export const NORMAL_WEATHER_CHANCE = 80;
 
-/** A strike's chance before trick t is firstChance + perTrick * t percent. */
-export const THUNDERSTORM = { firstChance: 20, perTrick: 10, maxStrikes: 2 } as const;
+/** A strike's chance before trick t is firstChance + perTrick * t percent.
+ * At an exposed location (Clifftop) it may strike `exposedStrikes` more times. */
+export const THUNDERSTORM = { firstChance: 20, perTrick: 10, maxStrikes: 2, exposedStrikes: 1 } as const;
+
+/** Rain and Downpour wash away the crew's first whispers each camp: the
+ * player count less `spared`, plus `exposed` more at an exposed location
+ * (Clifftop). A washed whisper is spent and nobody sees its card. */
+export const WASHES = {
+  rain: { spared: 2, exposed: 2 },
+  downpour: { spared: 1, exposed: 3 },
+} as const;
 
 /** Tornado: after every `every`th trick, `cards` random cards from every
  * hand pass to the player on the right. The half body blows every 2 * every. */

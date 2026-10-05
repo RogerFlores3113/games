@@ -371,6 +371,7 @@ const StatusPartViewSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("chance"), percent: z.number().int().min(0).max(100), strikesLeft: z.number().int().min(0) }),
   z.strictObject({ kind: z.literal("strike") }),
   z.strictObject({ kind: z.literal("meter"), left: z.number().int().min(0), of: z.number().int().min(0) }),
+  z.strictObject({ kind: z.literal("washes"), left: z.number().int().min(0), of: z.number().int().min(0) }),
   z.strictObject({ kind: z.literal("facing"), seatId: z.string().min(1) }),
   z.strictObject({ kind: z.literal("dam"), suit: SuitSchema }),
   z.strictObject({ kind: z.literal("streak"), seatId: z.string().min(1), count: z.number().int().min(1) }),

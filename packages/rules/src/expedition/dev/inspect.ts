@@ -35,6 +35,8 @@ function statusLabel(part: StatusPart): string {
       return "strike on this trick";
     case "meter":
       return `${part.left} of ${part.of} tricks before the flood`;
+    case "washes":
+      return `${part.left} of ${part.of} whispers still wash away`;
     case "facing":
       return `facing ${part.seatId}`;
     case "dam":

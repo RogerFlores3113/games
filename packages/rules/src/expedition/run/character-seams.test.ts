@@ -224,12 +224,14 @@ describe("route hooks: normalWeatherChance, routeOptionCount, swapsBoss and rero
   });
 });
 
-describe("draftShape, shopPrice and the offers ops", () => {
-  it("deals each seat the offer its draftShape names after a clear", () => {
-    const lean = seamCharacter("lean", { passive: passive((self) => ({ draftShape: (prev) => (run, seatId) => (seatId === self ? { ...prev(run, seatId), options: 1, bundleSize: 1 } : prev(run, seatId)) })) });
+describe("draftShapes, shopPrice and the offers ops", () => {
+  it("deals each seat the offers its draftShapes name after a clear, in order", () => {
+    const lean = seamCharacter("lean", {
+      passive: passive((self) => ({ draftShapes: (prev) => (run, seatId) => (seatId === self ? [{ ...prev(run, seatId)[0]!, options: 1, bundleSize: 1 }, { ...prev(run, seatId)[0]!, options: 2 }] : prev(run, seatId)) })),
+    });
     const catalog = catalogWith(lean);
     const draft = draftOf(setupRun({ seatIds: SEATS, seed: "shape", catalog, characters: { p0: "lean" } }), catalog);
-    expect(draft.seats.map((s) => s.offers[0]!.bundles.map((b) => b.length))).toEqual([[1], [2, 2, 2], [2, 2, 2]]);
+    expect(draft.seats.map((s) => s.offers.map((offer) => offer.bundles.map((b) => b.length)))).toEqual([[[1], [2, 2]], [[2, 2, 2]], [[2, 2, 2]]]);
   });
 
   it("charges a seat the price its shopPrice names", () => {
@@ -244,7 +246,7 @@ describe("draftShape, shopPrice and the offers ops", () => {
     expect(view.stage.shop.stock.find((e) => e.stockId === item.stockId)!.price).toBe(item.price - 1);
   });
 
-  it("queues special offers drawn with the ability's shape behind the standard one", () => {
+  it("queues special offers drawn with the ability's shape behind the standard one, never repeating a one-item option", () => {
     const mapper = seamCharacter("mapper", {
       active: ability({
         window: "draft",
@@ -260,13 +262,15 @@ describe("draftShape, shopPrice and the offers ops", () => {
     const draft = draftOf(setupRun({ seatIds: SEATS, seed: "seam-seed-treasure-map", catalog, characters: { p0: "mapper" } }), catalog);
     const after = use(draft, "p0", "mapper", [], catalog);
     expect(after.purse).toBe(draft.purse + 10);
-    for (const seat of after.seats) {
-      expect(seat.offers.map((o) => o.kind)).toEqual(["standard", "special", "special"]);
-      for (const offer of seat.offers.slice(1)) expect(offer.bundles).toEqual([["item-r"], ["item-r"], ["item-r"]]);
-    }
+    for (const seat of after.seats) expect(seat.offers.map((o) => o.kind)).toEqual(["standard", "special", "special"]);
+    expect(after.seats.map((seat) => seat.offers.slice(1).map((offer) => offer.bundles.flat()))).toEqual([
+      [["item-r", "item-b", "item-c"], ["item-r", "item-a", "item-c"]],
+      [["item-r", "item-c", "item-a"], ["item-r", "item-a", "item-b"]],
+      [["item-r", "item-c", "item-b"], ["item-r", "item-c", "item-a"]],
+    ]);
     const view = toExpeditionPlayerView(act(after, "p1", { type: "pick-bundle", bundle: 0 }, catalog), "p1", catalog);
     if (view.stage.tag !== "draft") throw new Error("expected the draft");
-    expect(view.stage.yourOffer).toEqual({ kind: "special", bundles: [["item-r"], ["item-r"], ["item-r"]] });
+    expect(view.stage.yourOffer).toEqual({ kind: "special", bundles: [["item-r"], ["item-c"], ["item-a"]] });
     leakFree(after, catalog);
   });
 });

@@ -127,8 +127,8 @@ describe("Magma pool", () => {
     }
   });
 
-  it("rain or a storm over the pool raises steam, which cancels the heat", () => {
-    for (const weather of ["rain", "thunderstorm"]) {
+  it("rain, a downpour or a storm over the pool raises steam, which cancels the heat", () => {
+    for (const weather of ["rain", "downpour", "thunderstorm"]) {
       const run = loadoutIn("magma", weather);
       expect(campStack(run, CATALOG).map((layer) => layer.def.id)).toEqual([weather, "steam"]);
       expect(attemptOf(advanceTo(run, "objective-pick", CATALOG))!.camp.removedCards).toEqual([]);
@@ -155,8 +155,9 @@ describe("Flooding", () => {
     discards: [], voidedTricks: [],
   });
 
-  it("rain in the cave adds the flood beside the dark and the rain", () => {
+  it("rain or a downpour in the cave adds the flood beside the dark and the rain", () => {
     expect(campStack(run, CATALOG).map((layer) => layer.def.id)).toEqual(["cave", "rain", "flooding"]);
+    expect(campStack(loadoutIn("cave", "downpour"), CATALOG).map((layer) => layer.def.id)).toEqual(["cave", "downpour", "flooding"]);
   });
 
   it("ends the camp once 14 of 18 tricks are played, failing a card objective still open", () => {

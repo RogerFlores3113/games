@@ -90,11 +90,11 @@ describe("toExpeditionPlayerView", () => {
       camp: { location: "clifftop", weather: "thunderstorm", pairing: null },
       mods: [
         { id: "clifftop", kind: "location", strength: "full", status: [] },
-        { id: "thunderstorm", kind: "weather", strength: "full", status: [{ kind: "chance", percent: 20, strikesLeft: 2 }] },
+        { id: "thunderstorm", kind: "weather", strength: "full", status: [{ kind: "chance", percent: 20, strikesLeft: 3 }] },
       ],
     });
     const dealt = toExpeditionPlayerView(advanceTo(stormy, "objective-pick", CATALOG), "spectator", CATALOG).stage;
-    expect(dealt).toMatchObject({ tag: "camp", mods: [{ id: "clifftop" }, { id: "thunderstorm", status: [{ kind: "chance", percent: 20, strikesLeft: 2 }] }] });
+    expect(dealt).toMatchObject({ tag: "camp", mods: [{ id: "clifftop" }, { id: "thunderstorm", status: [{ kind: "chance", percent: 20, strikesLeft: 3 }] }] });
 
     const paired = testCatalog({ characters: CATALOG.characters, items: CATALOG.items, pairings: [{ location: "clifftop", weathers: ["thunderstorm"], result: { cancels: ["clifftop"], adds: "fair" } }] });
     const pairedView = toExpeditionPlayerView(stormy, "p0", paired).stage;

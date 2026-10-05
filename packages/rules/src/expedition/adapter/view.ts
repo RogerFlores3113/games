@@ -386,6 +386,8 @@ function toStatusPartView(part: StatusPart): ExpeditionStatusPartView {
       return { kind: "strike" };
     case "meter":
       return { kind: "meter", left: part.left, of: part.of };
+    case "washes":
+      return { kind: "washes", left: part.left, of: part.of };
     case "facing":
       return { kind: "facing", seatId: part.seatId };
     case "dam":

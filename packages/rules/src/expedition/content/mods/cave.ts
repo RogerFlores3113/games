@@ -5,7 +5,7 @@ export const cave = defineMod({
   kind: "location",
   name: "Cave",
   weight: 1,
-  text: "In the dark, cards are played face down and flip when the trick ends.",
+  text: "Pitch dark in here: every card goes down face down and flips when the trick ends.",
   full: {
     rules: () => ({
       hides: (prev) => (run, viewerSeatId, subject) => prev(run, viewerSeatId, subject) || (subject.kind === "play" && subject.seatId !== viewerSeatId),

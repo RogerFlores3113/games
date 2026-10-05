@@ -374,17 +374,20 @@ describe("Businessman", () => {
 });
 
 describe("Pack Rat", () => {
-  it("Big Pack carries three items, and each draft bundle holds two Pack Rat items after the open ones", () => {
+  it("Big Pack carries three items, and after each draft picks one of three Pack Rat items", () => {
     const start = clearableTable({ character: "pack-rat" });
     expect(SEATS.map((seatId) => rules(start).itemSlots(start, seatId))).toEqual([3, 2, 2]);
     const draft = playOut(start);
     const exclusive = Object.values(CATALOG.items).filter((item) => item.exclusiveTo === "pack-rat").map((item) => item.id);
-    for (const bundle of draft.seats[0]!.offers[0]!.bundles) {
-      expect(bundle).toHaveLength(4);
-      expect(bundle.slice(2).every((id) => exclusive.includes(id))).toBe(true);
-      expect(bundle.slice(0, 2).some((id) => exclusive.includes(id))).toBe(false);
-    }
-    expect(draft.seats[1]!.offers[0]!.bundles.flat().some((id) => exclusive.includes(id))).toBe(false);
+    const [standard, packRat] = draft.seats[0]!.offers;
+    expect(draft.seats[0]!.offers.map((offer) => offer.bundles.map((bundle) => bundle.length))).toEqual([[2, 2, 2], [1, 1, 1]]);
+    expect(standard!.bundles.flat().some((id) => exclusive.includes(id))).toBe(false);
+    expect(packRat!.bundles.flat().filter((id) => exclusive.includes(id))).toHaveLength(3);
+    expect(new Set(packRat!.bundles.flat()).size).toBe(3);
+    expect(draft.seats[1]!.offers.map((offer) => offer.bundles.map((bundle) => bundle.length))).toEqual([[2, 2, 2]]);
+    const both = act(act(draft, "p0", { type: "pick-bundle", bundle: 0 }), "p0", { type: "pick-bundle", bundle: 2 });
+    expect(both.seats[0]!.items.map((item) => item.itemId)).toEqual([...standard!.bundles[0]!, packRat!.bundles[2]![0]!]);
+    expect(both.seats[0]!.offers).toEqual([]);
   });
 
   it("Quartermaster hands an item to a teammate in the loadout", () => {

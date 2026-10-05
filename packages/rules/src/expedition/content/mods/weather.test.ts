@@ -6,7 +6,9 @@ import { react } from "../../run/react";
 import { toExpeditionPlayerView } from "../../adapter/view";
 import { currentActorSeatId } from "../../camp";
 import { advanceTo, enumerateLegalRunActions, setupRun } from "../../run/run-test-support";
-import { campStack, modCtx } from "../../run/stack";
+import { campStack, modCtx, pairingRuleFor } from "../../run/stack";
+import { campIndex } from "../../run/plan";
+import { campSpecAt } from "../../run/route";
 import { STAGES, applyRunAction } from "../../run/stages/registry";
 import type { ActiveEffect, RunAt, RunState } from "../../run/types";
 import type { CampState, CardIdentity, ExpeditionCard, Objective } from "../../state";
@@ -18,10 +20,10 @@ const card = (id: string, identity: CardIdentity): ExpeditionCard => ({ id, iden
 
 const STRIKE: ActiveEffect = { origin: { kind: "mod", modId: "thunderstorm", strength: "full" }, atTrick: 0, lasts: "trick", deferIfFatal: true, params: { strike: true }, audience: "public" };
 
-/** The loadout of camp 2 in the Jungle with the given weather. */
-function loadoutIn(weather: string, items: Record<string, readonly string[]> = {}, seed = "weather"): RunAt<"loadout"> {
-  const run = setupRun({ seatIds: SEATS, seed, catalog: CATALOG, camp: 2, items }) as RunAt<"loadout">;
-  return { ...run, stage: { ...run.stage, camp: { ...run.stage.camp, location: "jungle", weather } } };
+/** The loadout of camp 2 with the given weather, in the Jungle unless named. */
+function loadoutIn(weather: string, items: Record<string, readonly string[]> = {}, seed = "weather", location = "jungle", seatIds: readonly string[] = SEATS): RunAt<"loadout"> {
+  const run = setupRun({ seatIds, seed, catalog: CATALOG, camp: 2, items }) as RunAt<"loadout">;
+  return { ...run, stage: { ...run.stage, camp: { ...run.stage.camp, location, weather } } };
 }
 
 /** Trick 0 of `totalTricks`, with p1 and p2 already on the 2 and 3 of
@@ -130,8 +132,8 @@ describe("Thunderstorm", () => {
   describe("the roll before a trick", () => {
     /** A dealt thunderstorm camp with every objective picked, at trick 8 (a
      * 100% chance), holding `strikes`. */
-    function atTrick8(strikes: readonly ActiveEffect[]): RunAt<"camp"> {
-      const dealt = advanceTo(loadoutIn("thunderstorm"), "between-tricks", CATALOG) as RunAt<"camp">;
+    function atTrick8(strikes: readonly ActiveEffect[], location = "jungle"): RunAt<"camp"> {
+      const dealt = advanceTo(loadoutIn("thunderstorm", {}, "weather", location), "between-tricks", CATALOG) as RunAt<"camp">;
       const attempt = dealt.stage.attempt;
       return { ...dealt, stage: { ...dealt.stage, attempt: { ...attempt, effects: strikes, camp: { ...attempt.camp, currentTrick: { ...attempt.camp.currentTrick, index: 8 } } } } };
     }
@@ -144,6 +146,13 @@ describe("Thunderstorm", () => {
     it("never strikes a third time", () => {
       const two = [STRIKE, { ...STRIKE, atTrick: 3 }];
       expect(start(atTrick8(two)).stage.attempt.effects).toEqual(two);
+    });
+
+    it("strikes a third time on the Clifftop, but never a fourth", () => {
+      const two = [STRIKE, { ...STRIKE, atTrick: 3 }];
+      expect(start(atTrick8(two, "clifftop")).stage.attempt.effects).toEqual([...two, { ...STRIKE, atTrick: 8 }]);
+      const three = [...two, { ...STRIKE, atTrick: 5 }];
+      expect(start(atTrick8(three, "clifftop")).stage.attempt.effects).toEqual(three);
     });
 
     it("never strikes a trick a moved strike already sits on", () => {
@@ -181,21 +190,88 @@ describe("Thunderstorm", () => {
     const struck = stormCamp([owned("king-goal", HEART_K, "p1")], 2, [STRIKE]);
     expect(status(struck)).toEqual([{ kind: "chance", percent: 30, strikesLeft: 1 }, { kind: "strike" }]);
     expect(status(playAce(struck))).toEqual([{ kind: "chance", percent: 0, strikesLeft: 1 }]);
+    expect(status(loadoutIn("thunderstorm", {}, "weather", "clifftop"))).toEqual([{ kind: "chance", percent: 20, strikesLeft: 3 }]);
   });
 });
 
+const cardOf = (run: RunState, seatId: string): string => attemptOf(run)!.camp.hands.find((h) => h.seatId === seatId)!.cards[0]!.id;
+
+function whisper(run: RunState, from: string, to: string): RunState {
+  const result = applyRunAction(run, from, { type: "whisper", targetSeatId: to, cardId: cardOf(run, from) }, CATALOG);
+  if (!result.ok) throw new Error(result.error);
+  return result.state;
+}
+
+/** The weather's status in the loadout's view, with `players` seats. */
+function weatherStatus(weather: string, location: string, players: number) {
+  const run = loadoutIn(weather, {}, "weather", location, ["p0", "p1", "p2", "p3", "p4"].slice(0, players));
+  const view = toExpeditionPlayerView(run, "p0", CATALOG);
+  return view.stage.tag === "loadout" ? view.stage.mods.find((mod) => mod.id === weather)?.status : undefined;
+}
+
 describe("Rain", () => {
-  it("stops every whisper, except its owner's under a Mosquito Net", () => {
-    const run = advanceTo(loadoutIn("rain", { p0: ["mosquito-net"] }), "between-tricks", CATALOG);
-    const cardOf = (seatId: string) => attemptOf(run)!.camp.hands.find((h) => h.seatId === seatId)!.cards[0]!.id;
-    expect(applyRunAction(run, "p1", { type: "whisper", targetSeatId: "p2", cardId: cardOf("p1") }, CATALOG)).toEqual({ ok: false, error: "whisper_blocked" });
-    expect(applyRunAction(run, "p0", { type: "whisper", targetSeatId: "p1", cardId: cardOf("p0") }, CATALOG).ok).toBe(true);
-    expect(rulesFor(run, CATALOG).whisperAllowed(run, "p2")).toBe(false);
+  it("washes away the crew's first whisper at three players: spent, unseen, and told to everyone", () => {
+    const run = advanceTo(loadoutIn("rain"), "between-tricks", CATALOG);
+    const washed = whisper(run, "p1", "p2");
+    expect(attemptOf(washed)!.reveals).toEqual([]);
+    expect(attemptOf(washed)!.log.at(-1)).toEqual({ event: "whisper-washed", actorSeatId: "p1", subjectSeatIds: ["p2"], sourceId: null, audience: "public" });
+    expect(applyRunAction(washed, "p1", { type: "whisper", targetSeatId: "p0", cardId: cardOf(washed, "p1") }, CATALOG)).toEqual({ ok: false, error: "no_whispers_left" });
+    const heard = whisper(washed, "p0", "p2");
+    expect(attemptOf(heard)!.reveals).toEqual([{ cardId: cardOf(washed, "p0"), fromSeatId: "p0", audience: ["p2"], source: "whisper", targetSeatId: "p2" }]);
+  });
+
+  it("washes away the player count less two, and two more on the Clifftop", () => {
+    expect([3, 4, 5].map((players) => weatherStatus("rain", "jungle", players))).toEqual([
+      [{ kind: "washes", left: 1, of: 1 }],
+      [{ kind: "washes", left: 2, of: 2 }],
+      [{ kind: "washes", left: 3, of: 3 }],
+    ]);
+    expect(weatherStatus("rain", "clifftop", 3)).toEqual([{ kind: "washes", left: 3, of: 3 }]);
+  });
+
+  it("counts down as whispers wash away, and stops washing once they are spent", () => {
+    const run = advanceTo(loadoutIn("rain", {}, "weather", "jungle", ["p0", "p1", "p2", "p3"]), "between-tricks", CATALOG);
+    const once = whisper(run, "p0", "p1");
+    const view = toExpeditionPlayerView(once, "p3", CATALOG);
+    expect(view.stage.tag === "camp" ? view.stage.mods.find((mod) => mod.id === "rain")?.status : null).toEqual([{ kind: "washes", left: 1, of: 2 }]);
+    const third = whisper(whisper(once, "p1", "p2"), "p2", "p3");
+    expect(attemptOf(third)!.log.map((entry) => entry.event)).toEqual(["whisper-washed", "whisper-washed", "whisper"]);
+    expect(attemptOf(third)!.reveals.map((reveal) => reveal.fromSeatId)).toEqual(["p2"]);
   });
 
   it("leaves whispers alone in fair weather", () => {
     const run = advanceTo(loadoutIn("fair"), "between-tricks", CATALOG);
-    expect(rulesFor(run, CATALOG).whisperAllowed(run, "p1")).toBe(true);
+    expect(attemptOf(whisper(run, "p1", "p2"))!.reveals.map((reveal) => reveal.targetSeatId)).toEqual(["p2"]);
+  });
+});
+
+describe("Downpour", () => {
+  it("washes away the player count less one, and three more on the Clifftop", () => {
+    expect([3, 4, 5].map((players) => weatherStatus("downpour", "jungle", players))).toEqual([
+      [{ kind: "washes", left: 2, of: 2 }],
+      [{ kind: "washes", left: 3, of: 3 }],
+      [{ kind: "washes", left: 4, of: 4 }],
+    ]);
+    expect(weatherStatus("downpour", "clifftop", 3)).toEqual([{ kind: "washes", left: 5, of: 5 }]);
+  });
+
+  it("washes away two whispers at three players before one is heard", () => {
+    const run = advanceTo(loadoutIn("downpour"), "between-tricks", CATALOG);
+    const three = whisper(whisper(whisper(run, "p0", "p1"), "p1", "p2"), "p2", "p0");
+    expect(attemptOf(three)!.log.map((entry) => entry.event)).toEqual(["whisper-washed", "whisper-washed", "whisper"]);
+  });
+
+  it("pairs like Rain at every location", () => {
+    for (const location of Object.values(CATALOG.mods).filter((def) => def.kind === "location").map((def) => def.id)) {
+      expect([location, pairingRuleFor(location, "downpour", CATALOG)?.result ?? null]).toEqual([location, pairingRuleFor(location, "rain", CATALOG)?.result ?? null]);
+    }
+  });
+
+  it("comes about a third as often as Rain", () => {
+    const weathers = Array.from({ length: 3000 }, (_, i) => campSpecAt(`odds-${i}`, "standard", campIndex(2), CATALOG).weather);
+    const count = (id: string) => weathers.filter((w) => w === id).length;
+    expect(count("downpour") / count("rain")).toBeGreaterThan(0.25);
+    expect(count("downpour") / count("rain")).toBeLessThan(0.42);
   });
 });
 
@@ -217,16 +293,18 @@ function campView(run: RunState, seatId: string) {
 }
 
 describe("Night", () => {
-  it("keeps only the leader's card face down to the others; the next play shows", () => {
+  it("keeps every card face down to the others until the trick ends", () => {
     const lead = playFirst(advanceTo(loadoutIn("night"), "between-tricks", CATALOG));
     const second = playFirst(lead.run);
     const third = SEATS.find((s) => s !== lead.seatId && s !== second.seatId)!;
-    const plays = campView(second.run, third).currentTrick.plays;
-    expect(plays.map((p) => [p.seatId, p.hidden])).toEqual([
+    expect(campView(second.run, third).currentTrick.plays.map((p) => [p.seatId, p.hidden])).toEqual([
       [lead.seatId, true],
-      [second.seatId, false],
+      [second.seatId, true],
     ]);
-    expect(campView(second.run, lead.seatId).currentTrick.plays.map((p) => p.hidden)).toEqual([false, false]);
+    expect(campView(second.run, lead.seatId).currentTrick.plays.map((p) => p.hidden)).toEqual([false, true]);
+    const done = playFirst(second.run);
+    expect(campView(done.run, third).completedTricks[0]!.plays.map((p) => p.seatId)).toEqual([lead.seatId, second.seatId, third]);
+    expect(campView(done.run, third).currentTrick.plays).toEqual([]);
   });
 });
 

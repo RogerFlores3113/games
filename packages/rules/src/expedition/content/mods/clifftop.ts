@@ -6,6 +6,7 @@ export const clifftop = defineMod({
   name: "Clifftop",
   weight: 1,
   normalWeatherChance: 50,
-  text: "Up on the cliffs, bad weather comes twice as often.",
+  exposed: true,
+  text: "Exposed to the elements up here: weather hits harder.",
   full: {},
 });

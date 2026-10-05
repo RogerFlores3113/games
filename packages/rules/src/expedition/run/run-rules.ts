@@ -43,6 +43,9 @@ export type RunHooks = {
   whisperAllowed(run: RunState, seatId: string): boolean;
   whisperAudience(run: RunState, seatId: string, targetSeatId: string): readonly string[];
   whispersPerCamp(run: RunState, seatId: string): number;
+  /** How many of the crew's first whispers each attempt wash away: spent,
+   * with nobody seeing the card. */
+  washedWhispers(run: RunState): number;
   failureCost(run: RunState): number;
   itemSlots(run: RunState, seatId: string): number;
   /** Percent chance of fair weather on a route, given the location's own. */
@@ -52,8 +55,8 @@ export type RunHooks = {
   /** Whether route option `option` (0-based) leads to a different boss at
    * the next animal or disaster boss camp. */
   swapsBoss(run: RunState, option: number): boolean;
-  /** The offer a seat is dealt after a cleared camp. */
-  draftShape(run: RunState, seatId: string): DraftShape;
+  /** The offers a seat is dealt after a cleared camp, picked in order. */
+  draftShapes(run: RunState, seatId: string): readonly DraftShape[];
   /** What `seatId` pays at the shop for something listed at `price`. */
   shopPrice(run: RunState, seatId: string, price: number): number;
   /** Whether a camp modifier's effect aimed at `seatId` reaches it. Camp
@@ -94,6 +97,7 @@ const HOOK_NAME_SET: Record<HookName, true> = {
   whisperAllowed: true,
   whisperAudience: true,
   whispersPerCamp: true,
+  washedWhispers: true,
   failureCost: true,
   itemSlots: true,
   voidsTrick: true,
@@ -101,7 +105,7 @@ const HOOK_NAME_SET: Record<HookName, true> = {
   normalWeatherChance: true,
   routeOptionCount: true,
   swapsBoss: true,
-  draftShape: true,
+  draftShapes: true,
   shopPrice: true,
   affectsSeat: true,
   freeUse: true,
@@ -124,6 +128,9 @@ export const baseRunHooks: RunHooks = {
     const upgraded = run.seats.some((seat) => seat.seatId === seatId && seat.upgradeId !== null);
     return WHISPERS_PER_CAMP + (upgraded ? WHISPERS_PER_UPGRADE : 0);
   },
+  washedWhispers(_run) {
+    return 0;
+  },
   failureCost(_run) {
     return FAILURE_COST;
   },
@@ -139,8 +146,8 @@ export const baseRunHooks: RunHooks = {
   swapsBoss(_run, _option) {
     return false;
   },
-  draftShape(_run, _seatId) {
-    return BASE_DRAFT_SHAPE;
+  draftShapes(_run, _seatId) {
+    return [BASE_DRAFT_SHAPE];
   },
   shopPrice(_run, _seatId, price) {
     return price;

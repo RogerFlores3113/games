@@ -21,7 +21,7 @@ export const magma = defineMod({
   kind: "location",
   name: "Magma pool",
   weight: 1,
-  text: "The heat burns away every 2 and 3 and some 4s, so the camp is shorter.",
+  text: "The heat burns off every 2, every 3 and a few 4s, so the camp runs shorter.",
   full: {
     rules: () => ({ deckFor: () => (playerCount) => heatDeck(playerCount) }),
   },

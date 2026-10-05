@@ -53,8 +53,9 @@ export function drawItem(seed: string, stream: (part: ItemDrawPart) => string, p
 
 /** Draws an offer of `shape` for a seat of `characterId`. `stream` names
  * item `item` of bundle `bundle`; the exclusive items number on after the
- * open ones. Bundles may repeat across options and may hold items the seat
- * already owns. */
+ * open ones. Bundles of several items may repeat across options; one-item
+ * bundles never do, so a pick of one is a pick between different items.
+ * Bundles may hold items the seat already owns. */
 export function drawOffer(
   seed: string,
   stream: (bundle: number, item: number, part: ItemDrawPart) => string,
@@ -65,11 +66,15 @@ export function drawOffer(
 ): DraftOffer {
   const open = openPool(catalog);
   const exclusive = exclusivePool(catalog, characterId);
+  const single = shape.bundleSize + shape.exclusive === 1;
+  const offered = new Set<string>();
   const bundles = Array.from({ length: shape.options }, (_, bundle) => {
     const taken = new Set<string>();
     const pick = (pool: ItemPool, item: number): void => {
-      const id = drawItem(seed, (part) => stream(bundle, item, part), pool, taken, shape.rareChance);
-      if (id !== null) taken.add(id);
+      const id = drawItem(seed, (part) => stream(bundle, item, part), pool, single ? offered : taken, shape.rareChance);
+      if (id === null) return;
+      taken.add(id);
+      offered.add(id);
     };
     for (let item = 0; item < shape.bundleSize; item++) pick(open, item);
     for (let item = 0; item < shape.exclusive; item++) pick(exclusive, shape.bundleSize + item);
@@ -78,8 +83,8 @@ export function drawOffer(
   return { kind, bundles };
 }
 
-/** The standard offer after a cleared camp, seeded per (cleared camp, seat,
- * ordinal). */
+/** An offer after a cleared camp, seeded per (cleared camp, seat, ordinal):
+ * the ordinal counts the seat's offers from that clear. */
 export function draftOfferFor(seed: string, cleared: CampIndex, seat: SeatRun, ordinal: number, catalog: Catalog, shape: DraftShape = BASE_DRAFT_SHAPE): DraftOffer {
   return drawOffer(seed, (bundle, item, part) => STREAMS.draftItem(cleared, seat.seatId, ordinal, bundle, item, part), seat.characterId, catalog, shape, "standard");
 }

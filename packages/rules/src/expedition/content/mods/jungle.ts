@@ -5,6 +5,6 @@ export const jungle = defineMod({
   kind: "location",
   name: "Jungle",
   weight: 1,
-  text: "The jungle camp, where nothing changes the rules.",
+  text: "Home ground under the canopy: nothing changes here.",
   full: {},
 });

@@ -21,8 +21,12 @@
 //
 // whispersUsedBy is DERIVED from the attempt's log (no counter field is ever
 // stored — matches types.ts's own "derive, don't cache" discipline): it is
-// the count of "whisper" log entries whose actorSeatId is the seat in
-// question.
+// the count of "whisper" and "whisper-washed" log entries whose actorSeatId
+// is the seat in question.
+//
+// WASHED WHISPERS: while fewer than rules.washedWhispers crew whispers have
+// been sent this attempt (Rain, Downpour), a whisper is spent with no
+// Reveal at all; its public "whisper-washed" log entry tells the table.
 //
 // Sources that change whisper legality, audience or count act
 // ONLY through the composed RunHooks (whisperAllowed/whisperAudience/
@@ -36,13 +40,18 @@ import { react } from "./react";
 import type { Catalog, LogEntry, Reveal, RunAt, RunError, RunState } from "./types";
 import type { AdapterResult } from "../../adapter";
 
-/** COMM-01/COMM-02: the count of this attempt's "whisper" log entries whose
- * actorSeatId is `seatId`. Returns 0 with no attempt in progress — there is
- * nothing to derive from. */
+const isWhisper = (entry: LogEntry): boolean => entry.event === "whisper" || entry.event === "whisper-washed";
+
+/** COMM-01/COMM-02: the count of this attempt's whispers, heard or washed
+ * away, whose actorSeatId is `seatId`. Returns 0 with no attempt in
+ * progress — there is nothing to derive from. */
 export function whispersUsedBy(run: RunState, seatId: string): number {
-  const attempt = attemptOf(run);
-  if (attempt === null) return 0;
-  return attempt.log.filter((entry) => entry.event === "whisper" && entry.actorSeatId === seatId).length;
+  return (attemptOf(run)?.log ?? []).filter((entry) => isWhisper(entry) && entry.actorSeatId === seatId).length;
+}
+
+/** Every whisper the crew has sent this attempt, heard or washed away. */
+export function crewWhispers(run: RunState): number {
+  return (attemptOf(run)?.log ?? []).filter(isWhisper).length;
 }
 
 /** Guard order (COMM-01): wrong_phase (no attempt) -> wrong_window (must be between tricks, D-13: no grace period)
@@ -81,7 +90,8 @@ export function whisperLegality(
 
 /** Applies a legal Whisper: computes the audience BEFORE appending anything,
  * then appends the Reveal and the public LogEntry immutably, and lets the
- * camp's modifiers react to it. Never mutates `run`. */
+ * camp's modifiers react to it. A washed whisper appends only its log
+ * entry. Never mutates `run`. */
 export function applyWhisper(
   run: RunState,
   actorSeatId: string,
@@ -94,12 +104,19 @@ export function applyWhisper(
   }
 
   const rules = rulesFor(run, catalog);
+  const attempt = attemptOf(run)!; // legality already proved there is one
+  const ordinal = crewWhispers(run);
+  const sent = { type: "whisper-sent", ordinal, fromSeatId: actorSeatId, toSeatId: action.targetSeatId } as const;
+
+  if (ordinal < rules.washedWhispers(run)) {
+    const washed: LogEntry = { event: "whisper-washed", actorSeatId, subjectSeatIds: [action.targetSeatId], sourceId: null, audience: "public" };
+    return { ok: true, state: react(withAttempt(run, { ...attempt, log: [...attempt.log, washed] }) as RunAt<"camp">, [sent], catalog) };
+  }
+
   const audience = rules.whisperAudience(run, actorSeatId, action.targetSeatId);
   if (audience.length === 0 || audience.some((seatId) => !run.seatIds.includes(seatId))) {
     throw new Error("whisper: whisperAudience returned an empty or invalid audience");
   }
-
-  const attempt = attemptOf(run)!; // legality already proved there is one
 
   const reveal: Reveal = {
     cardId: action.cardId,
@@ -116,7 +133,6 @@ export function applyWhisper(
     audience: "public",
   };
 
-  const ordinal = attempt.log.filter((entry) => entry.event === "whisper").length;
   const whispered = withAttempt(run, { ...attempt, reveals: [...attempt.reveals, reveal], log: [...attempt.log, logEntry] }) as RunAt<"camp">;
-  return { ok: true, state: react(whispered, [{ type: "whisper-sent", ordinal, fromSeatId: actorSeatId, toSeatId: action.targetSeatId }], catalog) };
+  return { ok: true, state: react(whispered, [sent], catalog) };
 }

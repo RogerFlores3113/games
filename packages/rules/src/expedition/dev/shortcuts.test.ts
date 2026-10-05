@@ -166,7 +166,7 @@ describe("dev shortcuts", () => {
       name: "location",
       options: [{ value: "clifftop" }, { value: "clearing" }, { value: "jungle" }, { value: "desert" }, { value: "cave" }, { value: "magma" }],
     });
-    expect(weather).toMatchObject({ name: "weather", options: [{ value: "rain" }, { value: "fair" }, { value: "fog" }, { value: "thunderstorm" }, { value: "night" }] });
+    expect(weather).toMatchObject({ name: "weather", options: [{ value: "rain" }, { value: "fair" }, { value: "downpour" }, { value: "fog" }, { value: "thunderstorm" }, { value: "night" }] });
     expect(() => run("set-spec", dealt, { location: "cave", weather: "night" })).toThrow("cave never has night");
     expect(() => run("set-spec", fresh(), { location: "jungle", weather: "rain" })).toThrow("set-spec works in a loadout or a camp");
     expect(() => run("set-spec", dealt, { location: "rain", weather: "rain" })).toThrow(/location must be one of/);

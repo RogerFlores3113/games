@@ -5,7 +5,7 @@ export const desert = defineMod({
   kind: "location",
   name: "Desert",
   weight: 1,
-  text: "A mirage hides one objective from everyone until the first trick is won.",
+  text: "The heat plays tricks: a mirage hides one objective until the first trick is won.",
   full: {
     on: {
       // The mirage is fixed by id at the deal, so an objective dropped or

@@ -86,7 +86,7 @@ describe("modTooltip", () => {
   it("gives the modifier's sentence, its kind, and what its reading means", () => {
     expect(modTooltip(campView("thunderstorm", [STORM]), "thunderstorm")).toEqual({
       title: "Thunderstorm",
-      text: "Lightning may strike before a trick, and then the lowest card wins it.",
+      text: "Watch the sky: lightning may strike before a trick, and then the lowest card wins it.",
       badges: ["Weather", "30% next trick", "2 strikes left"],
       reason: null,
     });

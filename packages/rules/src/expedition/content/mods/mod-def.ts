@@ -26,6 +26,8 @@ export type ModCtx = {
   readonly strength: Strength;
   /** null in the loadout, before the deal. */
   readonly camp: CampState | null;
+  /** Whether the camp's location is exposed: bad weather is harsher there. */
+  readonly exposed: boolean;
   /** Seeded 0..n-1 on expedition-mod:{id}:{strength}:camp{k}:attempt{a}:rule:{label}.
    * The same label gives the same value within an attempt. */
   roll(label: string, n: number): number;
@@ -52,6 +54,7 @@ export type StatusPart =
   | { readonly kind: "chance"; readonly percent: number; readonly strikesLeft: number } // Thunderstorm: the next trick's chance
   | { readonly kind: "strike" } // a strike sits on this trick
   | { readonly kind: "meter"; readonly left: number; readonly of: number } // Flooding: tricks left before the river floods
+  | { readonly kind: "washes"; readonly left: number; readonly of: number } // Rain, Downpour: whispers still to wash away this camp, of how many
   | { readonly kind: "facing"; readonly seatId: string } // Crocodile: the seat it watches this trick
   | { readonly kind: "dam"; readonly suit: Suit } // Beaver: the suit dammed this trick
   | { readonly kind: "streak"; readonly seatId: string; readonly count: number } // Tiger: the last winner's run of tricks
@@ -89,6 +92,8 @@ type DefBase<K extends ModKind> = {
 export type LocationDef = DefBase<"location"> & {
   /** Percent chance of fair weather here; NORMAL_WEATHER_CHANCE when absent. */
   readonly normalWeatherChance?: number;
+  /** Bad weather is harsher here (Clifftop); each weather says how. */
+  readonly exposed?: true;
 };
 export type BossDef = DefBase<"animal" | "disaster"> & { readonly half: ModBody };
 export type ModDef = LocationDef | DefBase<"weather"> | DefBase<"pairing"> | BossDef | DefBase<"temple">;

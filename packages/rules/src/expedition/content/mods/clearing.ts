@@ -5,6 +5,6 @@ export const clearing = defineMod({
   kind: "location",
   name: "Clearing",
   weight: 1,
-  text: "An open clearing where nothing gets in the way.",
+  text: "A quiet clearing where nothing gets in the way.",
   full: {},
 });

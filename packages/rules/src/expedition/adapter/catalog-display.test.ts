@@ -130,7 +130,7 @@ describe("CHARACTER_DISPLAY", () => {
 describe("MOD_DISPLAY", () => {
   it("names every camp modifier with its kind and one sentence, and round-trips through JSON", () => {
     expect(Object.keys(MOD_DISPLAY).sort()).toEqual(Object.keys(CATALOG.mods).sort());
-    expect(MOD_DISPLAY.thunderstorm).toEqual({ id: "thunderstorm", name: "Thunderstorm", kind: "weather", text: "Lightning may strike before a trick, and then the lowest card wins it." });
+    expect(MOD_DISPLAY.thunderstorm).toEqual({ id: "thunderstorm", name: "Thunderstorm", kind: "weather", text: "Watch the sky: lightning may strike before a trick, and then the lowest card wins it." });
     expect(JSON.parse(JSON.stringify(MOD_DISPLAY))).toEqual(MOD_DISPLAY);
   });
 });

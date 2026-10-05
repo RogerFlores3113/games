@@ -1,19 +1,24 @@
+import { DRAFT } from "../../run/balance";
+import type { DraftShape } from "../../run/draft";
 import { currentStamp } from "../../run/usage";
 import { ability, defineCharacter, defineUpgrade } from "../source-def";
 
 /** Item instance uids are minted as it<n> (run/items.ts). */
 const ITEM_UID = /^it\d+$/;
 
+/** After the usual draft, a pick of one of three Pack Rat items. */
+const PACK_RAT_PICK: DraftShape = { options: 3, bundleSize: 0, exclusive: 1, rareChance: DRAFT.rareChance };
+
 export const packRat = defineCharacter({
   id: "pack-rat",
   name: "The Pack Rat",
   theme: "Carries more",
   power: "Big Pack",
-  text: "Carry three items, and draft bundles add two Pack Rat items.",
+  text: "Carry three items, and after each draft pick one of three Pack Rat items.",
   passive: {
     modifier: (owner) => ({
       itemSlots: (prev) => (run, seatId) => prev(run, seatId) + (seatId === owner.seatId ? 1 : 0),
-      draftShape: (prev) => (run, seatId) => (seatId === owner.seatId ? { ...prev(run, seatId), exclusive: 2 } : prev(run, seatId)),
+      draftShapes: (prev) => (run, seatId) => (seatId === owner.seatId ? [...prev(run, seatId), PACK_RAT_PICK] : prev(run, seatId)),
     }),
   },
   upgrades: [

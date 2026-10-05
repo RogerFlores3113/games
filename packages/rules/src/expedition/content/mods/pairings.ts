@@ -10,8 +10,8 @@ export type PairingRule = {
 };
 
 export const PAIRINGS: readonly PairingRule[] = [
-  { location: "magma", weathers: ["rain", "thunderstorm"], result: { cancels: ["magma"], adds: "steam" } },
-  { location: "cave", weathers: ["rain"], result: { cancels: [], adds: "flooding" } },
+  { location: "magma", weathers: ["rain", "downpour", "thunderstorm"], result: { cancels: ["magma"], adds: "steam" } },
+  { location: "cave", weathers: ["rain", "downpour"], result: { cancels: [], adds: "flooding" } },
   { location: "cave", weathers: ["night"], result: "never" },
-  { location: "desert", weathers: ["rain"], result: "never" },
+  { location: "desert", weathers: ["rain", "downpour"], result: "never" },
 ];

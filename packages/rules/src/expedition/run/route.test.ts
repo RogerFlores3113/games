@@ -42,7 +42,7 @@ describe("routeOptions", () => {
   it("draws every weighted location and weather, and fair about 80% of the time away from the clifftop", () => {
     const places = Array.from({ length: 400 }, (_, n) => routeOptions(draftAfter(`place-${n}`, "standard", 1), CATALOG)).flat().map((o) => o.next);
     expect(new Set(places.map((p) => p.location))).toEqual(new Set(["clearing", "jungle", "clifftop", "desert", "cave", "magma"]));
-    expect(new Set(places.map((p) => p.weather))).toEqual(new Set(["fair", "rain", "thunderstorm", "fog", "night"]));
+    expect(new Set(places.map((p) => p.weather))).toEqual(new Set(["fair", "rain", "downpour", "thunderstorm", "fog", "night"]));
     const fairShare = (location: string) => {
       const here = places.filter((p) => p.location === location);
       return here.filter((p) => p.weather === "fair").length / here.length;

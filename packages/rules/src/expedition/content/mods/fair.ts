@@ -6,6 +6,6 @@ export const fair = defineMod({
   kind: "weather",
   name: "Fair",
   weight: 0,
-  text: "Clear skies, so nothing changes.",
+  text: "Clear skies and a gentle breeze: nothing changes.",
   full: {},
 });
