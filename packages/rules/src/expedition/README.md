@@ -134,6 +134,18 @@ abstains from votes, takes the head offer's first bundle, readies with the
 gear it has and passes a gated window. Bot seats have no disconnect time,
 so it never acts for them.
 
+The pass cannot play a card for a seat, so the connected players can also
+vote a disconnected seat out (the room's kick vote, through the adapter's
+`seats` hooks; no kick takes the crew below three). `run/stages/kick.ts`'s
+`kickSeat` moves its `SeatRun` from `seatIds`/`seats` into
+`RunState.kicked` whole, so every per-player rule reads the crew in play:
+its ballot or ready mark goes, its unpicked offers go, and a dealt camp is
+abandoned (a `restarted` history entry, no supplies) and its loadout
+reopens for a fresh deal. `seatPresence` marks a kicked seat `back` while
+it is connected; `openLoadout` puts every back seat in again at its old
+place (at once while the muster or a loadout is open), with its character,
+items, upgrade and ledger. A kicked seat's character stays taken.
+
 **Layering order** (`run/compose.ts`): **base, then each camp-stack
 layer's `rules` (location, weather, pairing, the boss or the temple, then
 the temple's helpers at half strength), then per seat (seat
