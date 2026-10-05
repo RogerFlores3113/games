@@ -437,6 +437,22 @@ describe("view-leak-check: concealment canaries", () => {
     expect(found).toContain(`typed:identity-count-exceeded:${key(real.target)}`);
   });
 
+  it("Canary K4: a surveyed camp's mirage shown with its card is flagged", () => {
+    const loadout = setupRun({ seatIds: SEAT_IDS, seed: SEED, catalog: CATALOG, camp: 2, characters: { p0: "cartographer" }, upgrades: { p0: "cartographer.survey" } });
+    if (loadout.stage.tag !== "loadout") throw new Error("expected a loadout");
+    const state: RunState = { ...loadout, stage: { ...loadout.stage, camp: { ...loadout.stage.camp, location: "desert", weather: "fair" } } };
+    const clean = toExpeditionPlayerView(state, "p0", CATALOG);
+    expect(leaks(state, "p0", clean)).toEqual([]);
+    if (clean.stage.tag !== "loadout") throw new Error("expected a loadout view");
+    const at = clean.stage.camp.survey!.findIndex((o) => o.kind === "hidden");
+    const real = attemptOf(advanceTo(state, "objective-pick", CATALOG))!.camp.objectives[at]!;
+    if (real.kind !== "win-card") throw new Error(`expected a win-card objective under the mirage, got ${real.kind}`);
+    const tampered = structuredClone(clean);
+    if (tampered.stage.tag !== "loadout") throw new Error("expected a loadout view");
+    tampered.stage.camp.survey![at] = { kind: "win-card", target: real.target };
+    expect(leaks(state, "p0", tampered)).toEqual([`typed:identity-count-exceeded:${key(real.target)}`]);
+  });
+
   /** Rescue under `weather`: p1 carries a Rope Ladder and the first trick fails a no-tricks objective. */
   function rescueIn(weather: string): RunState {
     const between = advanceTo(loadoutAt("jungle", weather, { p1: ["rope-ladder"] }), "between-tricks", CATALOG);

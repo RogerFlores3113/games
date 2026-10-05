@@ -270,7 +270,9 @@ export type ExpeditionSurveyedObjectiveView =
   | { kind: "win-card"; target: ExpeditionCardIdentityView }
   | { kind: "ordered"; target: ExpeditionCardIdentityView; order: number | "last" }
   | { kind: "no-tricks" }
-  | { kind: "exactly-n"; n: number };
+  | { kind: "exactly-n"; n: number }
+  /** Kept from the viewer at the deal too (a Desert's mirage). */
+  | { kind: "hidden" };
 
 export type ExpeditionStockView = {
   stockId: string;

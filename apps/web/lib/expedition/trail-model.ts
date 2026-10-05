@@ -325,6 +325,8 @@ function surveyLabel(objective: NonNullable<ExpeditionCampPreviewView["survey"]>
       return "No tricks";
     case "exactly-n":
       return `Exactly ${objective.n}`;
+    case "hidden":
+      return "Hidden";
   }
 }
 

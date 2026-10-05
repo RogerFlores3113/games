@@ -324,6 +324,7 @@ const SurveyedObjectiveViewSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("ordered"), target: CardIdentityViewSchema, order: z.union([z.number().int().min(1), z.literal("last")]) }),
   z.strictObject({ kind: z.literal("no-tricks") }),
   z.strictObject({ kind: z.literal("exactly-n"), n: z.number().int().min(0) }),
+  z.strictObject({ kind: z.literal("hidden") }),
 ]);
 
 const CampPreviewViewSchema = z.strictObject({

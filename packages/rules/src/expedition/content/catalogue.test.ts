@@ -437,6 +437,18 @@ describe("Cartographer", () => {
     expect(after.objectiveDeck).toEqual(before.objectiveDeck.slice(1));
   });
 
+  it("Survey keeps the card a Desert's mirage will hide face down", () => {
+    const loadout = crew({ character: "cartographer", kit: ["cartographer.survey"], camp: 2 });
+    if (loadout.stage.tag !== "loadout") throw new Error("expected a loadout");
+    const desert: RunState = { ...loadout, stage: { ...loadout.stage, camp: { ...loadout.stage.camp, location: "desert", weather: "fair" } } };
+    const view = toExpeditionPlayerView(desert, "p0", CATALOG);
+    if (view.stage.tag !== "loadout") throw new Error("expected a loadout view");
+    const survey = [{ kind: "win-card", target: ident("clubs", 6) }, { kind: "win-card", target: ident("diamonds", 12) }, { kind: "hidden" }];
+    expect(view.stage.camp.survey).toEqual(survey);
+    const dealt = attemptViewOf(toExpeditionPlayerView(advanceTo(desert, "objective-pick", CATALOG), "p0", CATALOG)).camp.objectives;
+    expect(dealt.map((o) => ("target" in o ? { kind: o.kind, target: o.target } : { kind: o.kind }))).toEqual(survey);
+  });
+
   it("Survey shows the Cartographer alone each route's coming objectives", () => {
     const route = toRoute(playOut(clearableTable({ character: "cartographer", kit: ["cartographer.survey"] })));
     const surveys = (seatId: string) => {

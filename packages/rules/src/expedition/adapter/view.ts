@@ -34,7 +34,7 @@ import { runStatus } from "../run/lifecycle";
 import { SUPPLIES_MAX } from "../run/balance";
 import { bossAt, campCount, visibleBossId } from "../run/plan";
 import { slotKindsFor, type CampSpec, type RouteOption } from "../run/route";
-import { surveyObjectives, surveyedCamps } from "../run/survey";
+import { surveyDeal, surveyedCamps } from "../run/survey";
 import { campStack, modCtx, pairingOf, specOf, type StackLayer } from "../run/stack";
 import type { StatusPart } from "../content/mods/mod-def";
 import { whispersUsedBy } from "../run/whisper";
@@ -350,7 +350,14 @@ function toSurveyedObjectiveView(objective: Objective): ExpeditionSurveyedObject
 function surveysFor(state: RunState, seatId: string, rules: RunRules, catalog: Catalog): ReadonlyMap<CampSpec, ExpeditionSurveyedObjectiveView[]> {
   const surveyed = new Map<CampSpec, ExpeditionSurveyedObjectiveView[]>();
   if (!state.seatIds.includes(seatId) || !rules.surveys(state, seatId)) return surveyed;
-  for (const camp of surveyedCamps(state)) surveyed.set(camp.spec, surveyObjectives(camp, catalog).map(toSurveyedObjectiveView));
+  for (const camp of surveyedCamps(state)) {
+    const dealt = surveyDeal(camp, catalog);
+    const dealtRules = rulesFor(dealt, catalog);
+    const views = dealt.stage.attempt.camp.objectives.map((objective): ExpeditionSurveyedObjectiveView =>
+      dealtRules.hides(dealt, seatId, { kind: "objective", objectiveId: objective.id }) ? { kind: "hidden" } : toSurveyedObjectiveView(objective),
+    );
+    surveyed.set(camp.spec, views);
+  }
   return surveyed;
 }
 

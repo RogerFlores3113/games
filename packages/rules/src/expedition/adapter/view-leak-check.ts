@@ -25,7 +25,7 @@ import { CATALOG } from "../run/catalog";
 import { attemptOf } from "../run/attempt";
 import { rulesFor } from "../run/compose";
 import { horizon } from "../run/plan";
-import { surveyObjectives, surveyedCamps } from "../run/survey";
+import { surveyDeal, surveyedCamps } from "../run/survey";
 import type { AttemptState, Catalog, RunState } from "../run/types";
 import type { CardIdentity } from "../state";
 
@@ -88,6 +88,13 @@ function findCardIdentity(camp: AttemptState["camp"], cardId: string): CardIdent
   const currentPlay = camp.currentTrick.plays.find((p) => p.card.id === cardId);
   if (currentPlay !== undefined) return currentPlay.card.identity;
   return camp.discards.find((d) => d.card.id === cardId)?.card.identity ?? null;
+}
+
+/** The Desert's mirage, read from the effect its deal stored rather than
+ * through `hides`, so a hook that hides the wrong objective is caught. */
+function mirageObjectiveIds(attempt: AttemptState): ReadonlySet<string> {
+  if (attempt.camp.completedTricks.length > 0) return new Set();
+  return new Set(attempt.effects.flatMap((effect) => (effect.origin.kind === "mod" && effect.origin.modId === "desert" && typeof effect.params.objectiveId === "string" ? [effect.params.objectiveId] : [])));
 }
 
 /** Derives the secrets a given seat's view must never leak, INDEPENDENTLY of
@@ -179,13 +186,7 @@ export function secretsForExpeditionSeat(
 
     for (const identity of camp.removedCards) bump(identity);
 
-    // The Desert's mirage is read from the effect its deal stored, not
-    // through `hides`, so a hook that hides the wrong objective is caught.
-    const mirages = new Set(
-      camp.completedTricks.length > 0
-        ? []
-        : attempt!.effects.flatMap((effect) => (effect.origin.kind === "mod" && effect.origin.modId === "desert" && typeof effect.params.objectiveId === "string" ? [effect.params.objectiveId] : [])),
-    );
+    const mirages = mirageObjectiveIds(attempt!);
     for (const objective of camp.objectives) {
       if (mirages.has(objective.id) || rules.hides(state, seatId, { kind: "objective", objectiveId: objective.id })) continue;
       if (objective.kind === "win-card" || objective.kind === "ordered") bump(objective.target);
@@ -219,7 +220,11 @@ export function secretsForExpeditionSeat(
   const surveys = seated && rules.surveys(state, seatId);
   if (surveys) {
     for (const surveyed of surveyedCamps(state)) {
-      for (const objective of surveyObjectives(surveyed, catalog)) {
+      const dealt = surveyDeal(surveyed, catalog);
+      const dealtRules = rulesFor(dealt, catalog);
+      const mirages = mirageObjectiveIds(dealt.stage.attempt);
+      for (const objective of dealt.stage.attempt.camp.objectives) {
+        if (mirages.has(objective.id) || dealtRules.hides(dealt, seatId, { kind: "objective", objectiveId: objective.id })) continue;
         if (objective.kind === "win-card" || objective.kind === "ordered") bump(objective.target);
       }
     }

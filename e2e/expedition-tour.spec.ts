@@ -57,7 +57,7 @@ const WANTED = [
 /** Phases play rarely reaches; each is also captured from a rewritten view. */
 const RARE = [
   "run-end-won", "between-camps-draft", "vote-tie-length", "vote-tie-route", "shop", "camp-storm-strike", "camp-rain", "route-weather",
-  "camp-cave", "camp-night", "camp-desert", "camp-fog", "camp-magma", "camp-flood", "loadout-fog", "rescue-fog",
+  "camp-cave", "camp-night", "camp-desert", "camp-fog", "camp-magma", "camp-flood", "loadout-fog", "rescue-fog", "route-survey",
   "camp-tiger", "camp-rats", "camp-snake", "camp-crocodile", "camp-capybara", "camp-beaver", "route-boss",
   "camp-tornado", "camp-earthquake", "camp-wildfire", "camp-meteor", "camp-blood-moon", "camp-locusts", "camp-monsoon", "long-camp-6",
   "temple-short", "temple-standard", "temple-long", "temple-rescue",
@@ -594,6 +594,25 @@ function routeWeatherView(game: Game): Game {
   };
 }
 
+/** A Cartographer's surveyed route vote: one option into a Desert, whose
+ * mirage keeps one card hidden in the survey. */
+function routeSurveyView(game: Game): Game {
+  const base = routeWeatherView(game);
+  const card = (suit: string, rank: number) => ({ kind: "win-card", target: { kind: "standard", suit, rank } });
+  const surveys = [
+    [card("clubs", 6), card("diamonds", 12), { kind: "hidden" }],
+    [card("spades", 9), { kind: "exactly-n", n: 2 }, card("hearts", 11)],
+    [card("hearts", 5), card("spades", 13), { kind: "no-tricks" }],
+  ];
+  const stage = base.stage as { options: { next: Record<string, unknown> }[] };
+  stage.options.forEach((option, i) => {
+    option.next = { ...option.next, survey: surveys[i] };
+  });
+  stage.options[0]!.next.location = "desert";
+  stage.options[0]!.next.weather = "fair";
+  return base;
+}
+
 /** Mid-trick under a boss with `status`, its marks on the crew; `edit`
  * changes the attempt in place. */
 function bossView(
@@ -743,6 +762,7 @@ async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<v
   }
   await capture(shopView, "trail", "shop");
   await capture(routeWeatherView, "trail", "route-weather");
+  await capture(routeSurveyView, "trail", "route-survey");
   await capture(routeBossView as (g: Game) => Game, "trail", "route-boss");
   await capture(fogLoadoutView, "trail", "loadout-fog");
   await capture(lengthTieView as (g: Game) => Game, "trail", "vote-tie-length", 2_000);

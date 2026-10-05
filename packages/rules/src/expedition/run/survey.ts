@@ -2,7 +2,6 @@
 // `surveys` hook names (the Cartographer's Survey). Derived, never stored:
 // the deal is the same pure function of the run the loadout will deal from.
 
-import type { Objective } from "../state";
 import { dealCamp } from "./lifecycle";
 import { planAfter, type CampSpec } from "./route";
 import type { Catalog, RunAt, RunState } from "./types";
@@ -27,8 +26,9 @@ export function surveyedCamps(run: RunState): readonly SurveyedCamp[] {
   }
 }
 
-/** The objectives the camp's next attempt deals, exactly as dealCamp will. */
-export function surveyObjectives(camp: SurveyedCamp, catalog: Catalog): readonly Objective[] {
+/** The camp's next attempt, dealt exactly as dealCamp will deal it: its
+ * objectives, and what its rules will hide (a Desert's mirage). */
+export function surveyDeal(camp: SurveyedCamp, catalog: Catalog): RunAt<"camp"> {
   const atLoadout: RunAt<"loadout"> = { ...camp.run, stage: { tag: "loadout", camp: camp.spec, stock: null, ready: {} } };
-  return dealCamp(atLoadout, catalog).stage.attempt.camp.objectives;
+  return dealCamp(atLoadout, catalog);
 }

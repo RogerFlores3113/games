@@ -783,10 +783,10 @@ describe("powers between camps", () => {
   });
 
   it("names a surveyed camp's objective cards", () => {
-    const surveyed = preview(3, { survey: [{ kind: "win-card", target: { kind: "standard", suit: "spades", rank: 7 } }, { kind: "ordered", target: { kind: "standard", suit: "hearts", rank: 12 }, order: 1 }, { kind: "exactly-n", n: 2 }, { kind: "no-tricks" }] });
+    const surveyed = preview(3, { survey: [{ kind: "win-card", target: { kind: "standard", suit: "spades", rank: 7 } }, { kind: "ordered", target: { kind: "standard", suit: "hearts", rank: 12 }, order: 1 }, { kind: "exactly-n", n: 2 }, { kind: "no-tricks" }, { kind: "hidden" }] });
     const panel = model(at({ tag: "route", options: [{ id: "a", next: surveyed, swapsBoss: false }], ballots: [] })).panel;
     if (panel.kind !== "route") throw new Error("expected the route vote");
-    expect(panel.options[0]!.next.survey).toEqual(["7♠", "#1 Q♥", "Exactly 2", "No tricks"]);
+    expect(panel.options[0]!.next.survey).toEqual(["7♠", "#1 Q♥", "Exactly 2", "No tricks", "Hidden"]);
   });
 
   it("makes a teammate's crew row a pick while a gift is aimed at teammates", () => {

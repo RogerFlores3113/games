@@ -2036,3 +2036,10 @@ How each of the nine fits (for unit 13):
   `swarm` part while a seat is concealed (`structural:fogged-swarm`). The
   public `ate-item` log still tells the table what the swarm ate, as
   before: an eaten item is gone.
+- Survey keeps a coming Desert's mirage hidden. `run/survey.ts`'s
+  `surveyDeal` returns the dealt attempt itself, so the view asks that
+  run's composed `hides` (the mirage effect its `camp-dealt` stored) and
+  shows the objective as `{ kind: "hidden" }`, a new surveyed-objective
+  variant mirrored in the schema; the web lists it as "Hidden". The leak
+  check reads the dealt attempt's mirage effect too and does not count that
+  card. The tour gains `route-survey`.
