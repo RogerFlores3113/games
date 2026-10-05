@@ -116,12 +116,15 @@ export type LoadedDice = {
   readonly objectives: Readonly<Record<string, "done" | "failed">>;
 };
 
-/** One per ended attempt. `coins` is the payout of a clear, 0 otherwise. A
+/** One per ended attempt, with the location and weather it was played at.
+ * `coins` is the payout of a clear, 0 otherwise. A
  * `restarted` attempt was abandoned when the crew kicked a seat: it costs
  * nothing and the camp's loadout reopens. */
 export type CampResult = {
   readonly camp: CampIndex;
   readonly attempt: number;
+  readonly location: ModId;
+  readonly weather: ModId;
   readonly status: "cleared" | "failed" | "restarted";
   readonly suppliesSpent: number;
   readonly coins: number;

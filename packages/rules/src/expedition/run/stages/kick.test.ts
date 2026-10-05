@@ -102,7 +102,7 @@ describe("a kick at each stage", () => {
     expect(kicked.stage.tag === "loadout" ? kicked.stage.camp : null).toEqual(playing.stage.tag === "camp" ? playing.stage.camp : null);
     expect(kicked.supplies).toBe(2);
     expect(kicked.purse).toBe(7);
-    expect(kicked.history).toEqual([{ camp: 1, attempt: 1, status: "restarted", suppliesSpent: 0, coins: 0 }]);
+    expect(kicked.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "restarted", suppliesSpent: 0, coins: 0 }]);
     const redealt = readyAll(kicked);
     expect(attemptOf(redealt)!.attemptNumber).toBe(2);
     expect(attemptOf(redealt)!.camp.seatIds).toEqual(["p0", "p1", "p3"]);
@@ -127,7 +127,7 @@ describe("a kick at each stage", () => {
     const kicked = kickSeat(paused, "p3", ropeCatalog);
     expect(kicked.stage.tag).toBe("loadout");
     expect(kicked.supplies).toBe(3);
-    expect(kicked.history).toEqual([{ camp: 1, attempt: 1, status: "restarted", suppliesSpent: 0, coins: 0 }]);
+    expect(kicked.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "restarted", suppliesSpent: 0, coins: 0 }]);
     expect(kicked.seats[0]!.items).toEqual([{ uid: "it0", itemId: "test-rope" }]);
   });
 

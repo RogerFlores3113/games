@@ -126,7 +126,7 @@ describe("the temple's skip", () => {
     const used = applyRunAction(after, "p1", { type: "use-ability", sourceKey: "temple", targets: ["objective:o2"] }, catalog);
     if (!used.ok) throw new Error(used.error);
     // The last open objective dropped and every plate pressed: the camp clears.
-    expect(used.state.history).toEqual([{ camp: 2, attempt: 1, status: "cleared", suppliesSpent: 0, coins: 8 }]);
+    expect(used.state.history).toEqual([{ camp: 2, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 8 }]);
   });
 
   it("shows every seat the crew's token in its usage: not earned, then 1 left, then used", () => {

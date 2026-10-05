@@ -325,6 +325,6 @@ describe("Monsoon", () => {
       run = result.state;
     }
     expect(run.stage.tag).toBe("draft");
-    expect(run.history.at(-1)).toEqual({ camp: 2, attempt: 1, status: "cleared", suppliesSpent: 0, coins: 6 });
+    expect(run.history.at(-1)).toEqual({ camp: 2, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 6 });
   });
 });

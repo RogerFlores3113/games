@@ -101,7 +101,7 @@ describe("fail-then-replay resets every camp-scoped resource (RUN-06)", () => {
     expect(run.seats.every((seat) => seat.offers.length === 0)).toBe(true); // D-01: no draft on a failure
     expect(run.seats.map((s) => s.items)).toEqual([[{ uid: poncho, itemId: "rain-poncho" }], [], []]); // single-use items are spent
     expect(run.seats.map((s) => s.ledger.map((e) => (e.kind === "used" ? e.sourceKey : e.kind)))).toEqual([[poncho, "explorer"], [camouflage], [sabotage]]);
-    expect(run.history).toEqual([{ camp: 3, attempt: 1, status: "failed", suppliesSpent: 1, coins: 0 }]);
+    expect(run.history).toEqual([{ camp: 3, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 0 }]);
     expect(nextAttemptNumber(run, campIndex(3))).toBe(2);
 
     // Replay: ready every seat again.

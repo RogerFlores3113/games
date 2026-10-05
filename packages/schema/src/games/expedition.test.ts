@@ -92,7 +92,7 @@ const draftView = {
   ],
   kicked: [{ seatId: "seat-3", characterId: "hermit", upgradeId: null, back: true }],
   yourAbilities: [{ sourceKey: "leader.delegate", usableNow: false, reason: "Usable between tricks", steps: [] }],
-  history: [{ camp: 1, attempt: 1, status: "restarted", coins: 0 }, { camp: 1, attempt: 2, status: "cleared", coins: 8 }],
+  history: [{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "restarted", coins: 0 }, { camp: 1, attempt: 2, location: "jungle", weather: "fair", status: "cleared", coins: 8 }],
   stage: {
     tag: "draft",
     cleared: 1,
@@ -117,7 +117,7 @@ const midCampFields = {
       steps: [{ kind: "player", prompt: "Pick a teammate", choices: ["seat:seat-2", "seat:seat-3"] }],
     },
   ],
-  history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }],
+  history: [{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", coins: 8 }],
 };
 
 const midAttempt = {

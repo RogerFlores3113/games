@@ -142,7 +142,7 @@ describe("cuesFor", () => {
   });
 
   it("plays supply-lost when supplies drop and the camp is cleared in the same step", () => {
-    const next = game({ supplies: { count: 4, max: 5 }, stage: draft, history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }] });
+    const next = game({ supplies: { count: 4, max: 5 }, stage: draft, history: [{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", coins: 8 }] });
     expect(cuesFor(game(), next)).toEqual(["sfx-supply-lost", "sfx-camp-cleared"]);
   });
 

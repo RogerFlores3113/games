@@ -61,7 +61,7 @@ describe("dev shortcuts", () => {
   it("force-camp failed spends a supply, records the failure and reopens the loadout", () => {
     const failed = run("force-camp", fresh(), { outcome: "failed" });
     expect(failed.supplies).toBe(2);
-    expect(failed.history).toEqual([{ camp: 1, attempt: 1, status: "failed", suppliesSpent: 1, coins: 0 }]);
+    expect(failed.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 0 }]);
     expect(failed.stage.tag).toBe("loadout");
   });
 
@@ -80,7 +80,7 @@ describe("dev shortcuts", () => {
     expect(cleared.seats.every((s) => s.offers.length === 1)).toBe(true);
     // The crew seats the Businessman, whose two empty slots paid 5 at the deal.
     expect(cleared.purse).toBe(cleared.history[0]!.coins + 5);
-    expect(cleared.history[0]).toMatchObject({ camp: 1, attempt: 1, status: "cleared", suppliesSpent: 0 });
+    expect(cleared.history[0]).toMatchObject({ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0 });
   });
 
   it("force-camp refuses once the run is over", () => {

@@ -82,7 +82,7 @@ function settleFailure(run: RunAt<"camp">, catalog: Catalog): RunState {
   const cost = rulesFor(run, catalog).failureCost(run);
   if (!Number.isInteger(cost) || cost < 1) throw new Error(`settleCamp: failureCost must be an integer >= 1, got ${cost}`);
   const spec = run.stage.camp;
-  const result: CampResult = { camp: spec.index, attempt: run.stage.attempt.attemptNumber, status: "failed", suppliesSpent: cost, coins: 0 };
+  const result: CampResult = { camp: spec.index, attempt: run.stage.attempt.attemptNumber, location: spec.location, weather: spec.weather, status: "failed", suppliesSpent: cost, coins: 0 };
   const supplies = Math.max(0, run.supplies - cost);
   const settled: RunState = { ...run, supplies, history: [...run.history, result] };
   return supplies === 0 ? { ...settled, stage: { tag: "ended", result: "lost" } } : openLoadout(settled, spec, catalog);
@@ -93,7 +93,7 @@ function settleFailure(run: RunAt<"camp">, catalog: Catalog): RunState {
 function settleClear(run: RunAt<"camp">, catalog: Catalog): RunState {
   const spec = run.stage.camp;
   const coins = payoutFor(run.stage.attempt.camp);
-  const result: CampResult = { camp: spec.index, attempt: run.stage.attempt.attemptNumber, status: "cleared", suppliesSpent: 0, coins };
+  const result: CampResult = { camp: spec.index, attempt: run.stage.attempt.attemptNumber, location: spec.location, weather: spec.weather, status: "cleared", suppliesSpent: 0, coins };
   const settled: RunState = { ...run, purse: run.purse + coins, history: [...run.history, result] };
   if (isFinalCamp(planOf(run), spec.index)) return { ...settled, stage: { tag: "ended", result: "won" } };
   const rules = rulesFor(run, catalog);

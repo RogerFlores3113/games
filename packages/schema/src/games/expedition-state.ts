@@ -186,6 +186,8 @@ export const ExpeditionRunStateSchema = z.strictObject({
     z.strictObject({
       camp: CampIndexSchema,
       attempt: z.number().int().min(1),
+      location: z.string().min(1),
+      weather: z.string().min(1),
       status: z.enum(["cleared", "failed", "restarted"]),
       suppliesSpent: z.number().int().min(0),
       coins: z.number().int().min(0),

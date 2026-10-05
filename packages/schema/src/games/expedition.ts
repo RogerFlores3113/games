@@ -312,6 +312,8 @@ const CampIndexSchema = z.number().int().min(1);
 const CampResultViewSchema = z.strictObject({
   camp: CampIndexSchema,
   attempt: z.number().int().min(1),
+  location: z.string().min(1),
+  weather: z.string().min(1),
   status: z.enum(["cleared", "failed", "restarted"]),
   coins: z.number().int().min(0),
 });

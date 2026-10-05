@@ -6,7 +6,7 @@ import { buildRunEndModel } from "./run-end-model";
 type Result = ExpeditionView["history"][number];
 
 function result(camp: number, attempt: number, status: Result["status"]): Result {
-  return { camp, attempt, status, coins: status === "cleared" ? 8 : 0 };
+  return { camp, attempt, location: "jungle", weather: "fair", status, coins: status === "cleared" ? 8 : 0 };
 }
 
 function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {

@@ -46,8 +46,9 @@
  * 13 for the character seams (hallucinated tricks, free uses, route rerolls
  * and boss swaps, special draft offers); 14 for the nine characters, whose
  * ledgers lost the pool's cost and regain entries; 15 for kicked seats and
- * restarted attempts in the run, and kick votes in the room. */
-export const ROOM_SCHEMA_VERSION = 15;
+ * restarted attempts in the run, and kick votes in the room; 16 for the
+ * location and weather each history entry was played at. */
+export const ROOM_SCHEMA_VERSION = 16;
 
 /** D-01: 32 uppercase-safe characters — no `I`, `O`, `0`, `1` — because the
  * room code is read aloud over a voice call. Do not add lowercase. */

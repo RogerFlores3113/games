@@ -22,7 +22,7 @@ const STANDARD_PLAN: ExpeditionView["plan"] = [
   { at: 6, tier: "temple", bossId: null },
 ];
 
-const CLEARED_1 = { camp: 1, attempt: 1, status: "cleared" as const, coins: 8 };
+const CLEARED_1 = { camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared" as const, coins: 8 };
 
 /** Old-style kit ids as a seat's upgrade and equipped items; an item's uid
  * here is its item id, so ability keys in these fixtures read by name. */
@@ -108,8 +108,8 @@ describe("trail", () => {
       {
         history: [
           CLEARED_1,
-          { camp: 2, attempt: 1, status: "failed", coins: 0 },
-          { camp: 2, attempt: 2, status: "cleared", coins: 8 },
+          { camp: 2, attempt: 1, location: "jungle", weather: "fair", status: "failed", coins: 0 },
+          { camp: 2, attempt: 2, location: "jungle", weather: "fair", status: "cleared", coins: 8 },
         ],
       },
     );
@@ -124,7 +124,7 @@ describe("trail", () => {
   });
 
   it("keeps a failed camp as the stop you are at and counts the retry", () => {
-    const view = at({ tag: "loadout", camp: preview(2), mods: [], yourSlots: 2, shop: null, readySeatIds: [] }, { history: [CLEARED_1, { camp: 2, attempt: 1, status: "failed", coins: 0 }] });
+    const view = at({ tag: "loadout", camp: preview(2), mods: [], yourSlots: 2, shop: null, readySeatIds: [] }, { history: [CLEARED_1, { camp: 2, attempt: 1, location: "jungle", weather: "fair", status: "failed", coins: 0 }] });
     expect(model(view).trail![1]).toEqual({ index: 2, state: "here", kind: "camp", caption: "try 2" });
   });
 

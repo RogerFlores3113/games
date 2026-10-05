@@ -287,7 +287,7 @@ describe("applyRunAction: camp delegation", () => {
 
   it("settles a decided camp in the same call: history gains one entry, the draft opens", () => {
     const state = ok(applyRunAction(campRun({ p0: ["item-a"] }), "p0", { type: "play-card", cardId: "c-p0" }, catalog));
-    expect(state.history).toEqual([{ camp: 1, attempt: 1, status: "cleared", suppliesSpent: 0, coins: 5 }]);
+    expect(state.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 5 }]);
     expect(state.stage).toEqual({ tag: "draft", cleared: 1, payout: 5 });
     expect(attemptOf(state)).toBeNull();
   });

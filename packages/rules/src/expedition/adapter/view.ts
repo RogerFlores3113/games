@@ -330,7 +330,7 @@ function toShopView(state: RunState, stock: readonly StockEntry[] | null, ownSea
 }
 
 function toCampResultView(result: RunState["history"][number]): ExpeditionCampResultView {
-  return { camp: result.camp, attempt: result.attempt, status: result.status, coins: result.coins };
+  return { camp: result.camp, attempt: result.attempt, location: result.location, weather: result.weather, status: result.status, coins: result.coins };
 }
 
 function toSurveyedObjectiveView(objective: Objective): ExpeditionSurveyedObjectiveView {

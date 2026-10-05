@@ -35,7 +35,7 @@ function stageWithout(stage: Stage, seatId: string): Stage {
 function restartCamp(run: RunState, catalog: Catalog): RunState {
   if (run.stage.tag !== "camp") return run;
   const { camp: spec, attempt } = (run as RunAt<"camp">).stage;
-  const result: CampResult = { camp: spec.index, attempt: attempt.attemptNumber, status: "restarted", suppliesSpent: 0, coins: 0 };
+  const result: CampResult = { camp: spec.index, attempt: attempt.attemptNumber, location: spec.location, weather: spec.weather, status: "restarted", suppliesSpent: 0, coins: 0 };
   return openLoadout({ ...run, history: [...run.history, result] }, spec, catalog);
 }
 

@@ -1742,7 +1742,7 @@ describe("kick votes on the live wire (Expedition)", () => {
       expect(kicked.game?.seats.map((s) => s.seatId)).toEqual([ana.seatId, ben.seatId, cy.seatId]);
       expect(kicked.game?.kicked).toEqual([{ seatId: dee.seatId, characterId: "hermit", upgradeId: null, back: false }]);
       expect(kicked.game?.stage.tag).toBe("loadout");
-      expect(kicked.game?.history).toEqual([{ camp: 1, attempt: 1, status: "restarted", coins: 0 }]);
+      expect(kicked.game?.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "restarted", coins: 0 }]);
       expect(kicked.kickVotes).toEqual([]);
 
       const beforeReturn = mark(ana);

@@ -242,7 +242,7 @@ export type ExpeditionAbilityStepView = { kind: TargetKind; prompt: string; choi
 /** The viewer's own abilities, by source key. `steps` is [] unless usableNow. */
 export type ExpeditionAbilityView = { sourceKey: string; usableNow: boolean; reason: string | null; steps: ExpeditionAbilityStepView[] };
 
-export type ExpeditionCampResultView = { camp: number; attempt: number; status: "cleared" | "failed" | "restarted"; coins: number };
+export type ExpeditionCampResultView = { camp: number; attempt: number; location: string; weather: string; status: "cleared" | "failed" | "restarted"; coins: number };
 
 /** A seat the crew voted out while it was away. `back` while it is
  * connected again, waiting to rejoin at the next loadout. */

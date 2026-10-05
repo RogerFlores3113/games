@@ -394,7 +394,7 @@ describe("buildTrailPrompt", () => {
   const withCharacter = (characterId: string | null): Partial<ExpeditionView> => ({
     seats: SEATS.map((s) => ({ seatId: s.seatId, characterId: s.seatId === "me" ? characterId : "explorer", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] })),
   });
-  const failedCamp3 = [{ camp: 3, attempt: 1, status: "failed" as const, coins: 0 }];
+  const failedCamp3 = [{ camp: 3, attempt: 1, location: "jungle", weather: "fair", status: "failed" as const, coins: 0 }];
 
   it("at muster asks for an explorer and a length vote when both are owed", () => {
     const v = trail({ tag: "muster", ballots: [] }, withCharacter(null));
@@ -457,12 +457,12 @@ describe("buildTrailPrompt", () => {
   });
 
   it("at the loadout tells you to set out by your character", () => {
-    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 2 }, mods: [], yourSlots: 2, shop: null, readySeatIds: [] }, { history: [{ camp: 1, attempt: 1, status: "cleared", coins: 8 }] });
+    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 2 }, mods: [], yourSlots: 2, shop: null, readySeatIds: [] }, { history: [{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", coins: 8 }] });
     expect(at(v)).toEqual({ text: "The Explorer, set out for camp 2 when ready", tone: "your-move" });
   });
 
   it("at the loadout after a kick says the camp restarts without them", () => {
-    const restarted = [{ camp: 3, attempt: 1, status: "restarted" as const, coins: 0 }];
+    const restarted = [{ camp: 3, attempt: 1, location: "jungle", weather: "fair", status: "restarted" as const, coins: 0 }];
     const kicked = [{ seatId: "dee", characterId: "hermit", upgradeId: null, back: false }];
     const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 3 }, mods: [], yourSlots: 2, shop: null, readySeatIds: [] }, { history: restarted, kicked });
     expect(at(v, [...SEATS, { seatId: "dee", displayLabel: "Dee" }])).toEqual({ text: "Camp 3 restarts without Dee. Set out", tone: "alert" });

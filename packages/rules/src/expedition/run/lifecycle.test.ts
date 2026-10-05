@@ -177,7 +177,7 @@ describe("settling a failure", () => {
 
     expect(failed.supplies).toBe(2);
     expect(failed.purse).toBe(0);
-    expect(failed.history).toEqual([{ camp: 3, attempt: 1, status: "failed", suppliesSpent: 1, coins: 0 }]);
+    expect(failed.history).toEqual([{ camp: 3, attempt: 1, location: "cave", weather: "fair", status: "failed", suppliesSpent: 1, coins: 0 }]);
     expect(failed.stage).toEqual({ ...before.stage, ready: {} });
     expect(failed.seats.map((s) => s.offers)).toEqual([[], [], []]);
     expect(failed.seats.map((s) => s.items)).toEqual([[{ uid: "it0", itemId: "item-a" }], [], [{ uid: "it1", itemId: "always-fails" }]]);
@@ -255,7 +255,7 @@ describe("settling a clear", () => {
       withAttempt(fresh, { ...fresh.stage.attempt, camp: { ...fresh.stage.attempt.camp, totalTricks: n } }) as RunAt<"camp">;
     const settled = settleCamp({ ...withUnplayed(1), purse: 4 }, "cleared", catalog);
     expect(settled.purse).toBe(10);
-    expect(settled.history).toEqual([{ camp: 1, attempt: 1, status: "cleared", suppliesSpent: 0, coins: 6 }]);
+    expect(settled.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 6 }]);
     expect(settleCamp(withUnplayed(0), "cleared", catalog).purse).toBe(5);
   });
 
@@ -263,7 +263,7 @@ describe("settling a clear", () => {
     const run = setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog, items: { p0: ["item-a"] } });
     const settled = settleCamp(clearedCamp(run, catalog), "cleared", catalog);
     expect(settled.stage).toEqual({ tag: "draft", cleared: 1, payout: 8 });
-    expect(settled.history).toEqual([{ camp: 1, attempt: 1, status: "cleared", suppliesSpent: 0, coins: 8 }]);
+    expect(settled.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 8 }]);
     for (const seat of settled.seats) {
       expect(seat.offers).toHaveLength(1);
       expect(seat.offers[0]!.bundles).toHaveLength(3);
@@ -428,7 +428,7 @@ describe("the rescue window", () => {
     const passed = use(paused, "p0", { type: "skip-window" });
     expect(passed.stage.tag).toBe("loadout");
     expect(passed.supplies).toBe(2);
-    expect(passed.history).toEqual([{ camp: 1, attempt: 1, status: "failed", suppliesSpent: 1, coins: 0 }]);
+    expect(passed.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 0 }]);
     expect(passed.seats[0]!.ledger).toEqual([{ kind: "passed", sourceKey: "it0", at: { camp: 1, attempt: 1, trick: 1 }, failedObjectiveIds: [`duck-${winner}`] }]);
   });
 
@@ -450,7 +450,7 @@ describe("the rescue window", () => {
     const failed = playTrick(everyoneDucks({}));
     expect(failed.stage.tag).toBe("loadout");
     expect(failed.supplies).toBe(2);
-    expect(failed.history).toEqual([{ camp: 1, attempt: 1, status: "failed", suppliesSpent: 1, coins: 0 }]);
+    expect(failed.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 0 }]);
   });
 
   it("a pass is stamped with its trick, so a later failure at another trick reopens rescue for that seat", () => {
