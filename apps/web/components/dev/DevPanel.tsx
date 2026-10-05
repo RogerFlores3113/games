@@ -1,16 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DevAutoplayScopeSchema } from "@games/schema";
 import type { ClientMessage, DevAutoplayScope, DevCommand, DevShortcutWire, RoomView } from "@games/schema";
-import { useDevStore } from "../../lib/dev/dev-store";
+import { useDevStore, type DevSent } from "../../lib/dev/dev-store";
 import {
   listSnapshots,
   removeSnapshot,
   saveSnapshot,
   type DevSnapshot,
 } from "../../lib/dev/dev-snapshots";
+import { readBotsPlay, takeSoloStart, writeBotsPlay } from "../../lib/dev/dev-solo";
 import { withSeatLabels } from "../../lib/dev/seat-labels";
+import {
+  DevShortcutControls,
+  devButtonClass as buttonClass,
+  devControlClass as controlClass,
+  fieldInitial,
+  shortcutParams,
+  type DevField as Field,
+} from "./DevShortcutControls";
+import { DevToolbar } from "./DevToolbar";
+import { DevPickMenu } from "./DevPickMenu";
 
 export interface DevPanelProps {
   view: RoomView;
@@ -18,19 +29,7 @@ export interface DevPanelProps {
   disabled: boolean;
 }
 
-type Field = DevShortcutWire["fields"][number];
-
 const AUTOPLAY_DEFAULT_STEPS = 500;
-
-const controlClass =
-  "rounded border border-[var(--color-border)] bg-[var(--color-bg)] px-1.5 py-1 text-xs text-[var(--color-text)] disabled:opacity-50";
-const buttonClass =
-  "cursor-pointer rounded border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-xs font-semibold text-[var(--color-text)] hover:bg-[var(--color-surface)] disabled:cursor-not-allowed disabled:opacity-50";
-
-function fieldInitial(field: Field): string {
-  if (field.kind === "choice") return field.options[0]?.value ?? "";
-  return String(field.initial);
-}
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -48,16 +47,19 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+/** The dev tools on a room page: the always-visible toolbar, the full
+ * panel (DEV or backtick), and the menu a right-click on the table opens. */
 export function DevPanel({ view, send, disabled }: DevPanelProps) {
   const [open, setOpen] = useState(false);
   const devState = useDevStore((s) => s.state);
   const devResult = useDevStore((s) => s.result);
-  const busy = useDevStore((s) => s.pending.length > 0);
+  const picked = useDevStore((s) => s.picked);
+  const busy = useDevStore((s) => s.pending.some((kind) => kind !== "quiet" && kind !== "bots"));
 
   const [scope, setScope] = useState<DevAutoplayScope>("bots");
   const [stopAtMilestone, setStopAtMilestone] = useState(false);
   const [steps, setSteps] = useState(String(AUTOPLAY_DEFAULT_STEPS));
-  const [botsAuto, setBotsAuto] = useState(false);
+  const [botsAuto, setBotsAutoState] = useState(() => readBotsPlay(view.code));
   const [reveal, setReveal] = useState(false);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [json, setJson] = useState("");
@@ -66,10 +68,23 @@ export function DevPanel({ view, send, disabled }: DevPanelProps) {
   const [snapshotName, setSnapshotName] = useState("");
   const [snapshots, setSnapshots] = useState<DevSnapshot[]>([]);
   const lastAutoGame = useRef<string | null>(null);
+  const lastSnapshotGame = useRef<string | null>(null);
 
-  function sendDev(command: DevCommand) {
-    useDevStore.getState().sent(command.kind);
+  function sendDev(command: DevCommand, as: DevSent = command.kind) {
+    // A reconnecting room drops what is sent; an answer never comes.
+    if (disabled) return;
+    useDevStore.getState().sent(as);
     send({ type: "dev", command });
+  }
+
+  function setBotsAuto(on: boolean) {
+    writeBotsPlay(view.code, on);
+    setBotsAutoState(on);
+  }
+
+  function fillAndStart() {
+    for (let seats = view.seats.length; seats < view.limits.min; seats++) sendDev({ kind: "add-bot" });
+    send({ type: "start_game" });
   }
 
   useEffect(() => {
@@ -89,18 +104,30 @@ export function DevPanel({ view, send, disabled }: DevPanelProps) {
   }, [disabled]);
 
   useEffect(() => {
-    if (!open || disabled) return;
-    sendDev({ kind: "snapshot" });
-    // `send` is re-created every render; the trigger is the open flag and a fresh view.
+    if (disabled) {
+      lastSnapshotGame.current = null;
+      return;
+    }
+    const fingerprint = `${view.status}:${JSON.stringify(view.game)}`;
+    if (fingerprint === lastSnapshotGame.current) return;
+    lastSnapshotGame.current = fingerprint;
+    sendDev({ kind: "snapshot" }, "quiet");
+    // `send` is re-created every render; the trigger is a fresh game view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, view, disabled]);
+  }, [view, disabled]);
+
+  useEffect(() => {
+    if (disabled || view.status !== "lobby" || view.youSeatId !== view.hostSeatId) return;
+    if (takeSoloStart(view.code)) fillAndStart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, disabled]);
 
   useEffect(() => {
     if (!botsAuto || disabled || view.status !== "in_progress") return;
     const fingerprint = JSON.stringify(view.game);
     if (fingerprint === lastAutoGame.current) return;
     lastAutoGame.current = fingerprint;
-    sendDev({ kind: "autoplay", scope: "bots", maxSteps: AUTOPLAY_DEFAULT_STEPS, stopAtMilestone: false });
+    sendDev({ kind: "autoplay", scope: "bots", maxSteps: AUTOPLAY_DEFAULT_STEPS, stopAtMilestone: false }, "bots");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botsAuto, view, disabled]);
 
@@ -128,17 +155,23 @@ export function DevPanel({ view, send, disabled }: DevPanelProps) {
   }, [devState?.shortcuts]);
 
   function fieldValue(shortcutId: string, field: Field): string {
-    return fieldValues[`${shortcutId}:${field.name}`] ?? fieldInitial(field);
+    const stored = fieldValues[`${shortcutId}:${field.name}`];
+    // A choice the state no longer offers falls back to the first one.
+    if (stored === undefined || (field.kind === "choice" && !field.options.some((o) => o.value === stored))) return fieldInitial(field);
+    return stored;
   }
 
-  function runShortcut(shortcut: DevShortcutWire) {
-    const params: Record<string, string | number> = {};
-    for (const field of shortcut.fields) {
-      const value = fieldValue(shortcut.id, field);
-      params[field.name] = field.kind === "number" ? Number(value) : value;
-    }
+  function setFieldValue(shortcutId: string, field: Field, value: string) {
+    setFieldValues((current) => ({ ...current, [`${shortcutId}:${field.name}`]: value }));
+  }
+
+  function runShortcut(shortcut: DevShortcutWire, target?: { field: string; id: string }) {
+    const params = shortcutParams(shortcut, (field) => fieldValue(shortcut.id, field));
+    if (target !== undefined) params[target.field] = target.id;
     sendDev({ kind: "shortcut", id: shortcut.id, params });
   }
+
+  const closePick = useCallback(() => useDevStore.getState().pick(null), []);
 
   function applyJson() {
     let state: unknown;
@@ -165,15 +198,35 @@ export function DevPanel({ view, send, disabled }: DevPanelProps) {
 
   return (
     <>
-      <button
-        type="button"
-        data-testid="dev-toggle"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-        className="fixed bottom-2 left-2 z-[1000] cursor-pointer rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] font-bold tracking-wider text-[var(--color-text-muted)] opacity-70 hover:opacity-100"
-      >
-        DEV
-      </button>
+      <DevToolbar
+        view={view}
+        shortcuts={devState?.shortcuts ?? []}
+        valueOf={(shortcut, field) => fieldValue(shortcut.id, field)}
+        onChange={(shortcut, field, value) => setFieldValue(shortcut.id, field, value)}
+        onRun={(shortcut) => runShortcut(shortcut)}
+        onFillAndStart={fillAndStart}
+        open={open}
+        onToggleOpen={() => setOpen((current) => !current)}
+        botsPlay={botsAuto}
+        onBotsPlay={setBotsAuto}
+        result={devResult}
+        inControl={inControl}
+      />
+      {picked !== null && (
+        <DevPickMenu
+          picked={picked}
+          shortcuts={devState?.shortcuts ?? []}
+          seats={view.seats}
+          valueOf={(shortcut, field) => fieldValue(shortcut.id, field)}
+          onChange={(shortcut, field, value) => setFieldValue(shortcut.id, field, value)}
+          onRun={(shortcut, target) => {
+            runShortcut(shortcut, target);
+            closePick();
+          }}
+          onClose={closePick}
+          inControl={inControl}
+        />
+      )}
       {open && (
         <aside
           data-testid="dev-panel"
@@ -271,52 +324,16 @@ export function DevPanel({ view, send, disabled }: DevPanelProps) {
                 <h4 className="font-semibold">{group}</h4>
                 {shortcuts.map((shortcut) => (
                   <div key={shortcut.id} className="flex flex-wrap items-center gap-1.5">
-                    {shortcut.fields.map((field) => {
-                      const testId = `dev-field-${shortcut.id}-${field.name}`;
-                      const set = (value: string) =>
-                        setFieldValues((current) => ({
-                          ...current,
-                          [`${shortcut.id}:${field.name}`]: value,
-                        }));
-                      return (
-                        <label key={field.name} className="flex items-center gap-1">
-                          <span className="text-[var(--color-text-muted)]">{field.label}</span>
-                          {field.kind === "choice" ? (
-                            <select
-                              data-testid={testId}
-                              className={controlClass}
-                              value={fieldValue(shortcut.id, field)}
-                              onChange={(e) => set(e.target.value)}
-                            >
-                              {field.options.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {withSeatLabels(option.label, view.seats)}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input
-                              data-testid={testId}
-                              type={field.kind === "number" ? "number" : "text"}
-                              min={field.kind === "number" ? field.min : undefined}
-                              max={field.kind === "number" ? field.max : undefined}
-                              className={`${controlClass} ${field.kind === "number" ? "w-16" : "w-28"}`}
-                              value={fieldValue(shortcut.id, field)}
-                              onChange={(e) => set(e.target.value)}
-                            />
-                          )}
-                        </label>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      data-testid={`dev-shortcut-${shortcut.id}`}
-                      className={buttonClass}
+                    <DevShortcutControls
+                      fields={shortcut.fields}
+                      valueOf={(field) => fieldValue(shortcut.id, field)}
+                      onChange={(field, value) => setFieldValue(shortcut.id, field, value)}
+                      onRun={() => runShortcut(shortcut)}
                       disabled={inControl}
-                      onClick={() => runShortcut(shortcut)}
-                    >
-                      {shortcut.label}
-                    </button>
+                      seats={view.seats}
+                      buttonLabel={shortcut.label}
+                      testIds={{ button: `dev-shortcut-${shortcut.id}`, field: (name) => `dev-field-${shortcut.id}-${name}` }}
+                    />
                   </div>
                 ))}
               </div>

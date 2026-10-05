@@ -644,60 +644,94 @@ automatically by `card-packs.contract.test.ts`.
 
 ## Dev mode
 
-A sandbox for debugging: skip to any camp, edit any state, play a 3-5 seat
-table alone.
+A sandbox for debugging: one person in one tab plays a whole run with bots,
+skips to the part worth testing, and sets things off on the table.
 
 **Enable.** Both halves must be on. The worker needs `DEV_MODE`: `npm run
 dev` in `apps/worker` runs `wrangler dev --port 8787 --var DEV_MODE:1`, and
 Playwright's worker command passes the same var. `wrangler.jsonc` never sets
 it, so a deploy refuses every `dev` message with a `dev_result` saying how
-to turn it on. The web app shows the panel when `NODE_ENV` is `development`
-(`next dev`) or `NEXT_PUBLIC_DEV_MODE=1`.
+to turn it on. The web app shows the dev tools when `NODE_ENV` is
+`development` (`next dev`) or `NEXT_PUBLIC_DEV_MODE=1`; every entry point is
+a dynamic import behind `DEV_PANEL_ENABLED` (`dev-gate.test.ts` holds that).
 
-**Use.** On a room page press backtick or click the small DEV button
-(bottom left).
+**Play solo.** "Play solo (dev)" on the home page creates an Expedition room
+(named from the name field, else "Solo"), fills it with bots, starts it, and
+turns on "Bots play": bots take their own turns after every change, so you
+only act for your seat. Bots abstain from votes, so your ballot decides. A
+room made the usual way gets the same from the toolbar's "Fill with bots and
+start" in the lobby.
+
+**Toolbar.** Always on the bottom edge (‹ folds it to its DEV button):
+- Go: jump to camp N of a run length, arriving at the table, the loadout,
+  the shop (the loadout before a boss camp) or the route vote that leads
+  there (the draft before it skipped).
+- Skip camp: settle the camp cleared or failed through the real settle.
+- Next stage: every seat makes autoplay's move until the stage moves on; a
+  camp is played out.
+- +10 coins, +1 supply, and the camp's location and weather (Set).
+- Bots play, and the last answer from the worker.
+
+**Right-click on the table.** An objective (on the table or in a seat's
+objectives) offers "Mark an objective" (done, failed, or as played again)
+and its owner. A boss sprite or a modifier chip offers its trigger, where it
+has one: the Tornado's gust, the Earthquake, the Locusts, a lightning strike,
+a Snake bite on a chosen seat, whom the Crocodile watches, which suit the
+Beaver dams. A trigger runs the modifier's own code (`dev/triggers.ts`): a
+reaction fires on the first event it answers and its ops go through the
+toolkit as the modifier's; a rule rolls with loaded dice
+(`AttemptState.loaded.rolls`, read by `modCtx`'s `roll`), refused when the
+new roll would lose the camp on a trick already played. A marked objective
+is a last rule layer over `objectiveStatus` (`loaded.objectives`), so the
+table, the outcome, rescue and the settle all follow it. Loaded dice last
+one attempt; play never writes them.
+
+**Panel.** DEV or backtick opens the full panel:
 - Lobby: "Add bot" seats a bot (a seat nobody connects to). Two bots plus you
   is a legal Expedition table.
 - Autoplay: pick who it plays for (bots, everyone but me, everyone) and when
   it stops (your decision, or the next camp to settle), with a step cap.
-  Bots abstain from votes, so your ballot decides.
-  "Bots act automatically" re-runs bot autoplay after every change.
-- Shortcuts: jump to a camp of a chosen run length (arriving at its loadout
-  or dealt), jump to the final camp, end the run won or lost, force the camp
-  to clear or fail (through the real settle), set supplies, set the purse,
-  set a boss camp's boss (`set-plan-boss`, kept by a later jump in the same
-  length, re-dealing that camp if it is in play), set a seat's character,
-  give a seat an item (`give-item`: a new instance, equipped while a slot is
-  free), set a seat's upgrade (`set-upgrade`, its own character's or none),
-  set the camp's location and weather (`set-spec`, dealing a dealt camp
-  again), move a card between hands, make the last trick a hallucination
-  (`void-last-trick`), reroll a route option (`reroll-route`), set a route's
-  boss swap (`set-route-swap`), queue a special draft offer
-  (`queue-offer`), set an objective's owner.
-- Reveal all hands: a plain-text dump of every hand, objective and trick,
-  naming the seats each concealed thing is hidden from.
+- Shortcuts: every entry in `DEV_SHORTCUTS`, the toolbar's and the
+  right-click menu's included, plus jump to the final camp, end the run won
+  or lost, set supplies, set the purse, set a boss camp's boss
+  (`set-plan-boss`, kept by a later jump in the same length, re-dealing that
+  camp if it is in play), set a seat's character, give a seat an item
+  (`give-item`: a new instance, equipped while a slot is free), set a seat's
+  upgrade (`set-upgrade`, its own character's or none), move a card between
+  hands, make the last trick a hallucination (`void-last-trick`), reroll a
+  route option (`reroll-route`), set a route's boss swap
+  (`set-route-swap`), queue a special draft offer (`queue-offer`).
+- Reveal all hands: a plain-text dump of every hand, objective, trick and
+  loaded die, naming the seats each concealed thing is hidden from.
 - State: the whole `RunState` as JSON. Edit and Apply; the worker parses it
   with `ExpeditionRunStateSchema` and then `dev/check.ts` (card conservation,
   known ids, seat alignment, item instances below `itemSerial`, equipped
   sets within the slots, draft offers of known items, upgrades of the seat's
   own character, route rerolls and boss swaps, hallucinations naming this
-  camp's cards), and answers with a readable error if either fails.
+  camp's cards, loaded dice naming this camp's objectives and known
+  modifiers), and answers with a readable error if either fails.
 - Snapshots: named copies of the state in this browser's localStorage. One
   saved in another room loads into any room with the same seat count; its
   seat ids are renamed to the room's.
 
 **Where it lives.** The room plumbing is game-agnostic: `GameAdapter.dev`
-(`packages/rules/src/adapter.ts`), `apps/worker/src/dev-room.ts`, the `dev`
-messages in `packages/schema/src/dev.ts`, and `apps/web/components/dev/
-DevPanel.tsx`, which renders whatever shortcuts the game describes. The
-Expedition layer is `dev/`: `shortcuts.ts` (the `DEV_SHORTCUTS` registry,
-one small pure function over `RunState` each), `check.ts`, `autoplay.ts`
-(`botMove`, the first priority move `applyRunAction` accepts, never a
-whisper, an ability, an equip or a buy; it takes a draft's first bundle),
-`inspect.ts` and `hooks.ts`. When `RunState`
-changes, update `ExpeditionRunStateSchema` (the worker's compile-time
-assertion in `game-registration.ts` fails until you do), then `check.ts` and
-whichever shortcuts touch the changed fields.
+(`packages/rules/src/adapter.ts`; a `DevShortcut` may carry a `toolbar`
+label and a `target`, the kind of table thing it acts on and the field that
+takes its id), `apps/worker/src/dev-room.ts`, the `dev` messages in
+`packages/schema/src/dev.ts`, and `apps/web/components/dev/` (`DevPanel.tsx`
+owns the toolbar, the panel and the right-click menu, and renders whatever
+shortcuts the game describes). The board names what a right-click lands on:
+`apps/web/components/expedition/phaser/dev-picks.ts` with
+`lib/expedition/dev-entity.ts`. The Expedition layer is `dev/`:
+`shortcuts.ts` (the `DEV_SHORTCUTS` registry, one small pure function over
+`RunState` each), `triggers.ts` (one trigger per modifier with a moment or a
+turning choice), `check.ts`, `autoplay.ts` (`botMove`, the first priority
+move `applyRunAction` accepts, never a whisper, an ability, an equip or a
+buy; it takes a draft's first bundle), `inspect.ts` and `hooks.ts`. When
+`RunState` changes, update `ExpeditionRunStateSchema` (the worker's
+compile-time assertion in `game-registration.ts` fails until you do), then
+`check.ts` and whichever shortcuts touch the changed fields. A new modifier
+with a moment gets a `TRIGGERS` entry and a test in `triggers.test.ts`.
 
 ## Invariants
 

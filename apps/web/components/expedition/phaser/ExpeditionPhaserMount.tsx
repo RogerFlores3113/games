@@ -25,6 +25,7 @@ import { createAudioDirector } from "./audio-director";
 import { confineInputToCanvas } from "./confine-input";
 import { computeZoom, isBelowComfortSize, STAGE_HEIGHT, STAGE_WIDTH } from "../../../lib/expedition/compute-zoom";
 import type { ExpeditionSceneStore } from "../../../lib/expedition/expedition-scene-store";
+import { DEV_PANEL_ENABLED } from "../../../lib/dev/dev-gate";
 
 export interface ExpeditionPhaserMountProps {
   store: ExpeditionSceneStore;
@@ -53,6 +54,7 @@ export default function ExpeditionPhaserMount({ store }: ExpeditionPhaserMountPr
     if (gameRef.current || !containerRef.current) return;
     let destroyed = false;
     let uninstallBridge: (() => void) | null = null;
+    let uninstallDevPicks: (() => void) | null = null;
 
     const index = new ObjectIndex();
     const initialZoom = computeZoom(window.innerWidth, window.innerHeight);
@@ -92,6 +94,13 @@ export default function ExpeditionPhaserMount({ store }: ExpeditionPhaserMountPr
       });
     }
 
+    if (DEV_PANEL_ENABLED) {
+      void import("./dev-picks").then(({ installDevPicks }) => {
+        if (destroyed) return;
+        uninstallDevPicks = installDevPicks(game, index, store);
+      });
+    }
+
     function handleResize() {
       const nextZoom = computeZoom(window.innerWidth, window.innerHeight);
       game.scale.setZoom(nextZoom);
@@ -107,6 +116,7 @@ export default function ExpeditionPhaserMount({ store }: ExpeditionPhaserMountPr
       releaseInput();
       audio.destroy();
       uninstallBridge?.();
+      uninstallDevPicks?.();
       game.destroy(true);
       gameRef.current = null;
     };

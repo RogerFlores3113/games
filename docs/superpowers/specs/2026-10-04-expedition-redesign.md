@@ -2179,3 +2179,29 @@ How each of the nine fits (for unit 13):
   does not yet validate `kicked` (unique characters across crew and kicked,
   item uids), and loading a saved state does not rename kicked seat ids;
   the dev sandbox was being rebuilt concurrently, so it was left alone.
+
+### Implementation notes (batch 4, dev mode v2)
+
+- `AttemptState.loaded?` (the dev sandbox's loaded dice: pinned mod rule rolls and decided
+  objective statuses) is the one `RunState` change. Play never writes it; `modCtx`'s `roll`
+  reads a pinned roll, and `ruleLayersFor` folds decided objectives as the very last layer.
+  `ROOM_SCHEMA_VERSION` stays as it is: the field is optional, so every persisted state
+  parses unchanged.
+- Triggers run each modifier's own code. Tornado, Earthquake and Locusts fire their
+  `trick-completed` reaction on the first trick index it answers; the Thunderstorm's
+  `trick-started` reaction runs with its draws loaded to 0; the Snake's `whisper-sent`
+  reaction runs as if the chosen seat whispered. Crocodile and Beaver pin their `start` roll
+  to the first value whose own `status` shows the chosen seat or suit on this trick, and
+  refuse a value that would lose the camp on a trick already played (the roll derives every
+  trick, so it would rewrite them).
+- No trigger yet for the Tiger, Blood Moon, Wildfire, Meteor, Monsoon and Flooding, Desert,
+  Rats or Capybara: each acts by a rule on every trick (or at the deal), with no moment to
+  set off. "Flood now" would need a loaded river line; left for the owner to ask for.
+- `DevShortcut` gains `toolbar` (a short label; the shortcut also sits on the toolbar) and
+  `target` (the kind of table thing it acts on, and the field that takes its id). The board
+  maps a right-click to `{ kind, id }` (`dev-entity.ts`); the dev tools stay game-agnostic.
+- The room view has no bot flag, so "Bots play" shows in every in-progress dev room. It is on
+  by default only in a room "Play solo (dev)" made; the choice is kept per room in this
+  browser.
+- The canvas fills a 1280x720 or 1920x1080 window, so the toolbar overlays the bottom 28 px
+  (at muster, the length cards' "No votes yet" line). Its ‹ button folds it to DEV.

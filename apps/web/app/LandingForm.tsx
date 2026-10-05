@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Button } from "../components/Button";
 import { PhotoCredit } from "../components/PhotoCredit";
@@ -10,6 +11,12 @@ import { writeDisplayName } from "../lib/seat-token";
 import { writePendingConfig, writePendingGame } from "../lib/pending-room";
 import { LANDING_GAME_OPTIONS, LANDING_SETTINGS } from "../components/game-ui";
 import { configFieldName, readCreateRoomForm } from "../lib/create-room-form";
+import { DEV_PANEL_ENABLED } from "../lib/dev/dev-gate";
+
+// Behind the inlined constant, like the room page's dev panel.
+const PlaySoloButton = DEV_PANEL_ENABLED
+  ? dynamic(() => import("../components/dev/PlaySoloButton").then((m) => m.PlaySoloButton), { ssr: false })
+  : null;
 
 const CHECK_NAME_ERROR = "Couldn't create a room — check your name and try again.";
 const CHECK_CONNECTION_ERROR = "Couldn't create a room — check your connection and try again.";
@@ -179,6 +186,7 @@ export default function LandingForm({ initialError }: LandingFormProps) {
         <Button type="submit" variant="primary" disabled={submitting}>
           {submitting ? "Creating..." : "Create room"}
         </Button>
+        {PlaySoloButton && <PlaySoloButton />}
       </form>
       <PhotoCredit credit={LANDING_IMAGE_CREDIT} theme="light" />
     </main>
