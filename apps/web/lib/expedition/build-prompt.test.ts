@@ -461,6 +461,13 @@ describe("buildTrailPrompt", () => {
     expect(at(v)).toEqual({ text: "The Explorer, set out for camp 2 when ready", tone: "your-move" });
   });
 
+  it("at the loadout after a kick says the camp restarts without them", () => {
+    const restarted = [{ camp: 3, attempt: 1, status: "restarted" as const, coins: 0 }];
+    const kicked = [{ seatId: "dee", characterId: "hermit", upgradeId: null, back: false }];
+    const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 3 }, mods: [], yourSlots: 2, shop: null, readySeatIds: [] }, { history: restarted, kicked });
+    expect(at(v, [...SEATS, { seatId: "dee", displayLabel: "Dee" }])).toEqual({ text: "Camp 3 restarts without Dee. Set out", tone: "alert" });
+  });
+
   it("at the loadout after a failure tells you to try the camp again", () => {
     const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 3 }, mods: [], yourSlots: 2, shop: null, readySeatIds: [] }, { history: failedCamp3 });
     expect(at(v)).toEqual({ text: "Camp 3 failed. Set out to try again", tone: "alert" });

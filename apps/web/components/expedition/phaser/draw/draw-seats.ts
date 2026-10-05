@@ -217,7 +217,7 @@ function drawPlate(ctx: Ctx, layer: Layer, seat: SeatModel, box: Rect): void {
   const x0 = box.x + 2;
   const iw = box.w - 4;
 
-  const badge = !seat.connected ? { value: "away", color: PALETTE.statusDisconnected } : seat.mayAct ? { value: "turn", color: PALETTE.turn } : null;
+  const badge = !seat.connected ? { value: "offline", color: PALETTE.statusDisconnected } : seat.mayAct ? { value: "turn", color: PALETTE.turn } : null;
   nameRow(ctx, group, seat, { x: x0, y: box.y + 2, w: iw, h: ROW_H }, badge);
 
   const countsY = box.y + 15;

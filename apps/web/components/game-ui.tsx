@@ -19,6 +19,8 @@ export interface BoardProps {
   reconnecting: boolean;
   onDeleteRoom?: () => void;
   onRestartLobby?: () => void;
+  /** Votes to kick a disconnected seat out of play (`kick: false` takes it back). */
+  onKickVote?: (targetSeatId: string, kick: boolean) => void;
 }
 
 // `Record<GameId, …>` (not `Partial`) makes a future GameId with no

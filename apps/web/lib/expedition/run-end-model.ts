@@ -54,7 +54,7 @@ export function buildRunEndModel(server: SceneServerInput): RunEndModel {
   const campCount = view.campCount ?? Math.max(0, ...view.history.map((h) => h.camp));
   const history = Array.from({ length: campCount }, (_, i): RunEndCamp => {
     const index = i + 1;
-    const results = view.history.filter((h) => h.camp === index);
+    const results = view.history.filter((h) => h.camp === index && h.status !== "restarted");
     return {
       index,
       attempts: results.length,

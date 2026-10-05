@@ -2175,10 +2175,22 @@ How each of the nine fits (for unit 13):
   picks. `pick-character` and the absent-seat pass treat a kicked seat's
   character as taken.
 - Known edge: a J.D. kicked during the muster misses Lucky Start, which
-  reacts to `run-started` for the seats in the crew. Dev: `dev/check.ts`
-  does not yet validate `kicked` (unique characters across crew and kicked,
-  item uids), and loading a saved state does not rename kicked seat ids;
-  the dev sandbox was being rebuilt concurrently, so it was left alone.
+  reacts to `run-started` for the seats in the crew. The dev sandbox's
+  handling of `kicked` landed with dev mode v2 (below).
+- Web: the vote sits in a strip under the corner buttons, which no scene
+  draws in at 1280x720 or wider (the trail map starts 88 px down, so a
+  pill is 32 px tall, under the 44 px touch minimum). One pill per seat the
+  crew can kick: "Kick Dee? 0/2", "Undo kick Dee 1/2" once you voted, the
+  tally alone for a viewer who cannot vote. Its "?" (or hover, or focus)
+  opens what a kick does, by stage ("Kicking restarts camp 2 without them,
+  at no cost. If they come back, they rejoin at the next loadout."). The
+  seat plate and crew row say "offline" (was "away"). A kicked player who
+  is back sees "You're out of the crew for now" over the empty hand row,
+  with their character and where they rejoin ("at the next loadout, once
+  camp 2 ends", "at the loadout before camp 3"); the crew sees "Dee is
+  back and rejoins at the next loadout." in the strip. A restarted camp's
+  loadout prompt reads "Camp 2 restarts without Dee. Set out", and the
+  trail and run end do not count a restart as a try.
 
 ### Implementation notes (batch 4, dev mode v2)
 

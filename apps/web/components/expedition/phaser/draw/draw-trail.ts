@@ -214,7 +214,7 @@ function drawMusterCrew(ctx: Ctx, crew: MusterCrewRow[], votes: string): void {
   layer.add(text(scene, zone.x + zone.w - 4 - labelWidth(votes), zone.y + 3, votes, PALETTE.textDim));
   crew.forEach((row, i) => {
     const y = zone.y + 13 + i * CREW_ROW_H;
-    const status = row.connected ? MUSTER_STATUS[row.status] : { label: "away", color: PALETTE.statusDisconnected };
+    const status = row.connected ? MUSTER_STATUS[row.status] : { label: "offline", color: PALETTE.statusDisconnected };
     const statusX = zone.x + zone.w - 4 - labelWidth(status.label);
     const chars = Math.floor((statusX - zone.x - 8) / LABEL_CELL.w);
     layer.add(text(scene, zone.x + 4, y, fitLabel(row.isYou ? `${row.name} (you)` : row.name, chars), row.isYou ? PALETTE.turn : PALETTE.text));
@@ -678,7 +678,7 @@ const STATUS: Readonly<Record<CrewRow["status"], { label: string; color: string 
 /** Name and status, then the character and kit as icons. */
 function drawCrewRow(ctx: Ctx, row: CrewRow, x: number, y: number, w: number): void {
   const { scene, layer } = ctx;
-  const status = row.connected ? STATUS[row.status] : { label: "away", color: PALETTE.statusDisconnected };
+  const status = row.connected ? STATUS[row.status] : { label: "offline", color: PALETTE.statusDisconnected };
   const statusX = x + w - labelWidth(status.label);
   const nameChars = Math.floor((statusX - x - 4) / LABEL_CELL.w);
   layer.add(text(scene, x, y, fitLabel(row.isYou ? `${row.displayLabel} (you)` : row.displayLabel, nameChars), row.isYou ? PALETTE.turn : PALETTE.text));

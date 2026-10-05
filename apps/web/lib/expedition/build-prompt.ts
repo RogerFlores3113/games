@@ -316,6 +316,10 @@ export function buildTrailPrompt(view: ExpeditionView, seats: readonly PromptSea
       const last = view.history.at(-1);
       if (you !== undefined && !stage.readySeatIds.includes(you.seatId)) {
         if (last?.camp === stage.camp.index && last.status === "failed") return { text: `Camp ${last.camp} failed. Set out to try again`, tone: "alert" };
+        if (last?.camp === stage.camp.index && last.status === "restarted") {
+          const text = `Camp ${last.camp} restarts without ${nameList(view.kicked.map((k) => nameOf(k.seatId)))}. Set out`;
+          return { text: text.length <= PROMPT_MAX_CHARS ? text : `Camp ${last.camp} restarts with a smaller crew. Set out`, tone: "alert" };
+        }
         if (stage.shop !== null) return { text: `The shop is open. Set out for camp ${stage.camp.index} when ready`, tone: "your-move" };
         const name = you.characterId === null ? "Crew" : (CHARACTER_DISPLAY[you.characterId]?.name ?? you.characterId);
         return { text: `${name}, set out for camp ${stage.camp.index} when ready`, tone: "your-move" };

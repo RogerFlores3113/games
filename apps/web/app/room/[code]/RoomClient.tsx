@@ -300,6 +300,7 @@ function ConnectedRoom({
         // `Seat.lastAppliedRoomActionId` (a separate field, room-state.ts).
         onDeleteRoom={() => send({ type: "delete_room", actionId: nanoid() })}
         onRestartLobby={() => send({ type: "restart_lobby", actionId: nanoid() })}
+        onKickVote={(targetSeatId, kick) => send({ type: "kick_vote", targetSeatId, kick })}
       />
       {devPanel}
     </>

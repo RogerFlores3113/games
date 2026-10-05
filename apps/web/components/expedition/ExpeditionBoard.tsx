@@ -27,6 +27,8 @@ import { toggleMute } from "../../lib/expedition/audio/audio-prefs";
 import { ReconnectingBanner } from "../ReconnectingBanner";
 import { ExpeditionRulesModal } from "./ExpeditionRulesModal";
 import { ExpeditionSettingsModal } from "./ExpeditionSettingsModal";
+import { KickPanel } from "./KickPanel";
+import { buildKickPanel } from "../../lib/expedition/kick-model";
 
 const ExpeditionPhaserMount = dynamic(() => import("./phaser/ExpeditionPhaserMount"), { ssr: false });
 
@@ -36,6 +38,7 @@ export interface ExpeditionBoardProps {
   reconnecting?: boolean;
   onDeleteRoom?: () => void;
   onRestartLobby?: () => void;
+  onKickVote?: (targetSeatId: string, kick: boolean) => void;
 }
 
 export function ExpeditionBoard({
@@ -44,6 +47,7 @@ export function ExpeditionBoard({
   reconnecting = false,
   onDeleteRoom,
   onRestartLobby,
+  onKickVote,
 }: ExpeditionBoardProps) {
   const isHost = view.youSeatId !== null && view.youSeatId === view.hostSeatId;
 
@@ -112,6 +116,7 @@ export function ExpeditionBoard({
   }, [store, reconnecting]);
 
   const canRestart = isHost && game !== null && game.runStatus !== "in_progress";
+  const kickPanel = game === null ? null : buildKickPanel(view, game);
 
   return (
     <>
@@ -168,6 +173,16 @@ export function ExpeditionBoard({
       </span>
 
       <ExpeditionPhaserMount store={store} />
+
+      {kickPanel !== null && !reconnecting && (
+        <KickPanel
+          model={kickPanel}
+          onKickVote={(seatId, kick) => {
+            playCue("sfx-ui-click");
+            onKickVote?.(seatId, kick);
+          }}
+        />
+      )}
 
       <ExpeditionRulesModal open={rulesOpen} onClose={() => setRulesOpen(false)} game={game} />
 

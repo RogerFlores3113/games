@@ -57,6 +57,11 @@ describe("buildRunEndModel", () => {
     });
   });
 
+  it("does not count a camp restarted by a kick as a try", () => {
+    const model = buildRunEndModel(server(makeView({ history: [result(1, 1, "restarted"), result(1, 2, "failed"), result(1, 3, "failed")] })));
+    expect(model.history[0]).toEqual({ index: 1, attempts: 2, cleared: false, boss: null, caption: "2 tries" });
+  });
+
   it("celebrates a won run with the supplies left", () => {
     const history = [1, 2, 3, 4, 5, 6].map((n) => result(n, 1, "cleared"));
     const model = buildRunEndModel(server(makeView({ runStatus: "won", purse: 3, supplies: { count: 1, max: 5 }, history, stage: { tag: "ended", result: "won" } })));

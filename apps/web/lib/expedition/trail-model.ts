@@ -272,7 +272,7 @@ function buildTrail(view: View): TrailStop[] | null {
   const here = focusCampIndex(view);
   return Array.from({ length: view.campCount }, (_, i): TrailStop => {
     const index = i + 1;
-    const results = view.history.filter((h) => h.camp === index);
+    const results = view.history.filter((h) => h.camp === index && h.status !== "restarted");
     const cleared = results.some((h) => h.status === "cleared");
     const state = cleared ? "cleared" : index === here ? "here" : "ahead";
     const kind = stopKind(view, index);
