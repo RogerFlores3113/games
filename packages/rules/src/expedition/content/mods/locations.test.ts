@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ExpeditionCampView, ExpeditionView } from "../../adapter/view-types";
 import { toExpeditionPlayerView } from "../../adapter/view";
-import { campGoals, currentActorSeatId } from "../../camp";
+import { checkCampOutcome, currentActorSeatId } from "../../camp";
 import { attemptOf } from "../../run/attempt";
 import { CATALOG } from "../../run/catalog";
 import { rulesFor } from "../../run/compose";
@@ -146,10 +146,20 @@ describe("Flooding", () => {
     expect(campStack(run, CATALOG).map((layer) => layer.def.id)).toEqual(["cave", "rain", "flooding"]);
   });
 
-  it("fails the camp once 14 of 18 tricks are played with an objective still open", () => {
-    expect(campGoals(after(13, [pending]), rules)).toEqual([{ id: "flooding", status: "done" }]);
-    expect(campGoals(after(14, [pending]), rules)).toEqual([{ id: "flooding", status: "failed" }]);
-    expect(campGoals(after(14, []), rules)).toEqual([{ id: "flooding", status: "done" }]);
+  it("ends the camp once 14 of 18 tricks are played, failing a card objective still open", () => {
+    expect(checkCampOutcome(after(13, [pending]), rules)).toEqual({ status: "in_progress" });
+    expect(checkCampOutcome(after(14, [pending]), rules)).toEqual({ status: "failed", failedObjectiveIds: ["open"], failedGoalIds: [] });
+  });
+
+  it("judges trick-count objectives on the tricks won when the river rises", () => {
+    const counts: Objective[] = [
+      { id: "none", kind: "no-tricks", ownerSeatId: "p1" },
+      { id: "all", kind: "exactly-n", n: 14, ownerSeatId: "p0" },
+    ];
+    expect(checkCampOutcome(after(13, counts), rules)).toEqual({ status: "in_progress" });
+    expect(checkCampOutcome(after(14, counts), rules)).toEqual({ status: "succeeded" });
+    const short: Objective[] = [{ id: "three", kind: "exactly-n", n: 3, ownerSeatId: "p1" }];
+    expect(checkCampOutcome(after(14, short), rules)).toEqual({ status: "failed", failedObjectiveIds: ["three"], failedGoalIds: [] });
   });
 
   it("shows the tricks left before the river floods", () => {

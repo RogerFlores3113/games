@@ -301,7 +301,23 @@ describe("Monsoon", () => {
     expect(checkCampOutcome(campOf(rising), rulesFor(rising, CATALOG)).status).toBe("in_progress");
 
     const flooded = { ...rising, stage: { ...rising.stage, attempt: { ...rising.stage.attempt, camp: { ...campOf(rising), completedTricks: [0, 1, 2, 3, 4].map(filler), currentTrick: { index: 5, leaderSeatId: "p0", plays: [] } } } } };
-    expect(checkCampOutcome(campOf(flooded), rulesFor(flooded, CATALOG))).toEqual({ status: "failed", failedObjectiveIds: [], failedGoalIds: ["monsoon"] });
+    expect(checkCampOutcome(campOf(flooded), rulesFor(flooded, CATALOG))).toEqual({ status: "failed", failedObjectiveIds: ["waiting"], failedGoalIds: [] });
     expect(checkCampOutcome(campOf(flooded), rulesFor(flooded, halfCatalog("monsoon"))).status).toBe("in_progress");
+  });
+
+  it("ends the camp at the river, so a trick-count objective met by then clears it", () => {
+    const objectives: Objective[] = [
+      { id: "none", kind: "no-tricks", ownerSeatId: "p1" },
+      { id: "five", kind: "exactly-n", n: 5, ownerSeatId: "p0" },
+    ];
+    const rising = table("monsoon", { hands: suitedHands(2), done: 4, objectives });
+    let run: RunState = rising;
+    for (const seatId of SEATS) {
+      const result = applyRunAction(run, seatId, { type: "play-card", cardId: handOf(run, seatId)[0]! }, CATALOG);
+      if (!result.ok) throw new Error(result.error);
+      run = result.state;
+    }
+    expect(run.stage.tag).toBe("draft");
+    expect(run.history.at(-1)).toEqual({ camp: 2, attempt: 1, status: "cleared", suppliesSpent: 0, coins: 6 });
   });
 });

@@ -1980,3 +1980,17 @@ How each of the nine fits (for unit 13):
   this camp" rather than "Used". Turncoat's suits come up in the pick tray.
 - `sources.contract.test.ts` loses its list of target kinds awaiting the
   nine: the catalogue uses every kind.
+
+### Implementation notes (review fixes)
+
+- The river ends the camp (lead decision). Monsoon and Flooding no longer
+  carry a `goals` guard: their shared `riverBody(late)` in
+  `content/mods/flooding.ts` layers `objectiveStatus` so that, once
+  `river(total) + late` tricks are complete, every objective is judged on a
+  camp whose `totalTricks` is the tricks played. A no-tricks or exactly-n
+  objective resolves on the tricks won so far and an unwon card objective
+  fails, so the camp is decided at the flood. Before, a trick-count
+  objective was only ever done at the last trick, so a Monsoon or Flooding
+  camp with one could not be won. A flood that fails an objective now opens
+  rescue like any failed objective (a failed goal never did). A camp cleared
+  at the flood is paid for its unplayed tricks like any early clear.

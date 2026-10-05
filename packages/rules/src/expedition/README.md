@@ -153,7 +153,7 @@ objective's kind and target, or a seat's unused items from a viewer (Cave,
 Night, Desert, Heavy fog); the view and the leak check both read it, so a
 new concealment needs no change to either. A boss uses whichever channel
 its mechanic is: a question is a rule (Crocodile's guard, Wildfire's and
-Meteor's `burns`, Blood Moon's `identityOf`, Monsoon's river guard), a
+Meteor's `burns`, Blood Moon's `identityOf`, the river that ends a Monsoon camp), a
 moment is a reaction (Snake's bite on `whisper-sent`; Tornado, Earthquake
 and Locusts on `trick-completed`, moving cards with `move-card` and
 `reveal`, owners with `reassign-objective`, items with `break-item` and
