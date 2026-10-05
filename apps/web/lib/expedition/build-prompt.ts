@@ -159,7 +159,8 @@ function gatePrompt(view: ExpeditionView, nameOf: (seatId: string | null) => str
     const name = ability === undefined ? "an ability" : sourceName(yourSourceId(view, ability.sourceKey));
     return { text: `An objective failed: rescue it with ${name}, or pass`, tone: "your-move" };
   }
-  if (pending.length === 0) return null;
+  // Under Heavy fog the server names nobody whose items are hidden.
+  if (pending.length === 0) return { text: "An objective failed: waiting on the crew", tone: "waiting" };
   return { text: `An objective failed: waiting for ${nameOf(pending[0]!)}`, tone: "waiting" };
 }
 

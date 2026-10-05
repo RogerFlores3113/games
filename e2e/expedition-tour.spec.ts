@@ -57,7 +57,7 @@ const WANTED = [
 /** Phases play rarely reaches; each is also captured from a rewritten view. */
 const RARE = [
   "run-end-won", "between-camps-draft", "vote-tie-length", "vote-tie-route", "shop", "camp-storm-strike", "camp-rain", "route-weather",
-  "camp-cave", "camp-night", "camp-desert", "camp-fog", "camp-magma", "camp-flood", "loadout-fog",
+  "camp-cave", "camp-night", "camp-desert", "camp-fog", "camp-magma", "camp-flood", "loadout-fog", "rescue-fog",
   "camp-tiger", "camp-rats", "camp-snake", "camp-crocodile", "camp-capybara", "camp-beaver", "route-boss",
   "camp-tornado", "camp-earthquake", "camp-wildfire", "camp-meteor", "camp-blood-moon", "camp-locusts", "camp-monsoon", "long-camp-6",
   "temple-short", "temple-standard", "temple-long", "temple-rescue",
@@ -546,6 +546,13 @@ function fogView(game: Game): Game {
   return fogged(campIn(game, "jungle", "fog", [mod("jungle", "location"), mod("fog", "weather")]));
 }
 
+/** A rescue under fog: the teammate holding the rescue item is not named. */
+function fogRescueView(game: Game): Game {
+  const next = fogView(rescue(game, { youPending: false }));
+  ((next.stage as CampStage).attempt as unknown as { pendingSeatIds: string[] }).pendingSeatIds = [];
+  return next;
+}
+
 const HEAT_REMOVED = ["spades", "hearts", "diamonds", "clubs"].flatMap((suit) => [2, 3].map((rank) => ({ kind: "standard", suit, rank }))).concat([{ kind: "standard", suit: "clubs", rank: 4 }]);
 
 /** The magma pool, its chip naming the cards the heat burned. */
@@ -701,6 +708,8 @@ async function capturePickers(host: Page, tour: Tour, rewrite: Rewriter): Promis
   }
   await reloadTo((g) => rescue(g, { youPending: false }));
   await tour.shot("rescue-waiting");
+  await reloadTo(fogRescueView);
+  await tour.shot("rescue-fog");
   await reloadTo(stormView);
   await host.waitForTimeout(1_000);
   await tour.shot("camp-storm-strike");

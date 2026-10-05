@@ -908,6 +908,16 @@ describe("banner", () => {
     });
   });
 
+  it("rescue under fog: names nobody when the teammates who can rescue are hidden", () => {
+    const view = gated([], [], [failedKd("s3")]);
+    expect(buildSceneModel(server(view), ui(), "big-index").banner).toEqual({
+      title: "Objective failed: K♦ (Cara's)",
+      detail: "Waiting on the crew to rescue it or pass",
+      youPending: false,
+      uses: [],
+    });
+  });
+
   it("is null while no gated window is open, and while you are targeting", () => {
     expect(buildSceneModel(server(makeView()), ui(), "big-index").banner).toBeNull();
     const between = makeView({ attempt: { ...makeAttempt(), window: "between-tricks" } });

@@ -2025,3 +2025,14 @@ How each of the nine fits (for unit 13):
   Smelling Salts' `canUse` also refuses while a trick is in progress
   ("A trick is in progress"), so its `void-trick` can never throw on client
   input.
+- Heavy fog keeps who carries items from the table in two more places.
+  The rescue view's `pendingSeatIds` leaves out every seat whose loadout
+  the viewer cannot see, so a teammate waited on for a Rope Ladder is not
+  named (the viewer still sees itself); the web then reads "waiting on the
+  crew". Every `swarm` status part is dropped from a fogged viewer's mods,
+  since naming the next meal, or none, says who still has equipped items;
+  the Locusts' chip reads its plain "Swarming". The leak check flags a
+  concealed seat in `pendingSeatIds` (`structural:fogged-pending`) and any
+  `swarm` part while a seat is concealed (`structural:fogged-swarm`). The
+  public `ate-item` log still tells the table what the swarm ate, as
+  before: an eaten item is gone.

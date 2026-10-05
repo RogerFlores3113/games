@@ -403,9 +403,21 @@ function toModView(state: RunState, spec: CampSpec, layer: StackLayer, catalog: 
   return { id: layer.def.id, kind: layer.def.kind, strength: layer.strength, status: status.map(toStatusPartView) };
 }
 
-function toModViews(state: RunState, catalog: Catalog): ExpeditionModView[] {
+/** Seats whose loadout is kept from this viewer (Heavy fog). */
+function foggedSeatIds(state: RunState, seatId: string, rules: RunRules): readonly string[] {
+  return state.seatIds.filter((other) => rules.hides(state, seatId, { kind: "loadout", seatId: other }));
+}
+
+/** Under fog the swarm's next meal would say who still carries items, so it
+ * is left out. */
+function toModViews(state: RunState, seatId: string, rules: RunRules, catalog: Catalog): ExpeditionModView[] {
   const spec = specOf(state);
-  return spec === null ? [] : campStack(state, catalog).map((layer) => toModView(state, spec, layer, catalog));
+  if (spec === null) return [];
+  const fogged = foggedSeatIds(state, seatId, rules).length > 0;
+  return campStack(state, catalog).map((layer) => {
+    const view = toModView(state, spec, layer, catalog);
+    return fogged ? { ...view, status: view.status.filter((part) => part.kind !== "swarm") } : view;
+  });
 }
 
 function toBallotViews(state: RunState, ballots: PerSeat<string | null>): ExpeditionBallotView[] {
@@ -475,7 +487,8 @@ function toAttemptView(state: RunState, rawAttempt: AttemptState, seatId: string
   return {
     attemptNumber: rawAttempt.attemptNumber,
     window,
-    pendingSeatIds: Array.from(gatedPendingSeatIds(state, catalog)),
+    // Under fog, a teammate waited on in rescue would be one holding a rescue item.
+    pendingSeatIds: gatedPendingSeatIds(state, catalog).filter((pending) => !foggedSeatIds(state, seatId, rules).includes(pending)),
     rescue,
     effects: rawAttempt.effects.map((effect) => toEffectView(effect, yourSeatId, faceDownIds)),
     reveals,
@@ -501,7 +514,7 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
       return {
         tag: "loadout",
         camp: toPreviewView(state, stage.camp, catalog, surveyOf(stage.camp)),
-        mods: toModViews(state, catalog),
+        mods: toModViews(state, seatId, rules, catalog),
         yourSlots: ownSeat === undefined ? 0 : rules.itemSlots(state, seatId),
         shop: toShopView(state, stage.stock, ownSeat, catalog),
         readySeatIds: readySeatIds(state, stage.ready),
@@ -510,7 +523,7 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
       return {
         tag: "camp",
         camp: toPreviewView(state, stage.camp, catalog, null),
-        mods: toModViews(state, catalog),
+        mods: toModViews(state, seatId, rules, catalog),
         attempt: toAttemptView(state, stage.attempt, seatId, ownSeat !== undefined, rules, catalog),
       };
     case "draft":

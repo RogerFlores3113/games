@@ -269,6 +269,13 @@ describe("Locusts", () => {
     expect(statusOf(second, "locusts")).toEqual([{ kind: "swarm", seatId: null }]);
   });
 
+  it("under Heavy fog name no seat as the next meal, since that would say who still carries items", () => {
+    const start = table("locusts", { hands: suitedHands(4) }, { items });
+    const fogged = { ...start, stage: { ...start.stage, camp: { ...start.stage.camp, weather: "fog" } } };
+    expect(statusOf(fogged, "locusts")).toEqual([]);
+    expect(statusOf(fogged, "locusts", halfCatalog("locusts"))).toEqual([{ kind: "alternating", activeNow: false }]);
+  });
+
   it("with no items left eat a random card from every hand, shortening the camp by one trick", () => {
     const before = table("locusts", { hands: suitedHands(4) });
     const after = playTrick(before);

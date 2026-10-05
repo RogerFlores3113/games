@@ -736,8 +736,12 @@ function buildBanner(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalU
   const title = failed.length === 1 ? `Objective failed: ${failed[0]}` : failed.length > 1 ? `Objectives failed: ${failed.join(", ")}` : "An objective failed";
   const detail = youPending
     ? `You can rescue it with ${useNames}${others.length === 0 ? "" : `. ${listed(others)} can too`}`
-    : `${others.join(" or ")} can rescue it. Waiting on them`;
-  return { title, detail: youPending || others.length !== 1 ? detail : `Waiting on ${others[0]} to rescue it or pass`, youPending, uses };
+    : others.length === 0
+      ? "Waiting on the crew to rescue it or pass"
+      : others.length === 1
+        ? `Waiting on ${others[0]} to rescue it or pass`
+        : `${others.join(" or ")} can rescue it. Waiting on them`;
+  return { title, detail, youPending, uses };
 }
 
 /** "Bob", "Bob and Cara", "Bob, Cara and Dan". */

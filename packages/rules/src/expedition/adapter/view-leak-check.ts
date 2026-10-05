@@ -342,6 +342,17 @@ export function checkExpeditionViewForLeaks(input: {
     }
   }
 
+  // Under fog, naming who can rescue or who the swarm eats next says who
+  // still carries items.
+  if (input.secrets.concealedSeatIds.length > 0 && stage !== null && typeof stage === "object") {
+    const fields = stage as Record<string, unknown>;
+    const attempt = fields.attempt as Record<string, unknown> | null | undefined;
+    const pending = attempt !== null && typeof attempt === "object" && Array.isArray(attempt.pendingSeatIds) ? (attempt.pendingSeatIds as unknown[]) : [];
+    if (pending.some((id) => input.secrets.concealedSeatIds.includes(String(id)))) reasons.add("structural:fogged-pending");
+    const mods = Array.isArray(fields.mods) ? (fields.mods as Record<string, unknown>[]) : [];
+    if (mods.some((mod) => Array.isArray(mod.status) && (mod.status as Record<string, unknown>[]).some((part) => part.kind === "swarm"))) reasons.add("structural:fogged-swarm");
+  }
+
   const seats = input.view !== null && typeof input.view === "object" ? (input.view as Record<string, unknown>).seats : undefined;
   if (Array.isArray(seats)) {
     for (const seat of seats as Record<string, unknown>[]) {

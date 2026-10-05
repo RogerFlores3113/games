@@ -123,6 +123,7 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
   ["reconnecting beats everything", view(camp()), ui(), { reconnecting: true, whisperAvailable: true }, { text: "Reconnecting…", tone: "alert" }],
   ["rescue, you are pending", rescue(["me"]), ui(), playing, { text: "An objective failed: rescue it with Free Spirit, or pass", tone: "your-move" }],
   ["rescue, waiting on a teammate", rescue(["bo"]), ui(), playing, { text: "An objective failed: waiting for Bo", tone: "waiting" }],
+  ["rescue under fog, no teammate named", rescue([]), ui(), playing, { text: "An objective failed: waiting on the crew", tone: "waiting" }],
   [
     "objective pick, your pick",
     view(camp({ campPhase: "objective-pick" })),

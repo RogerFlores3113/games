@@ -437,6 +437,45 @@ describe("view-leak-check: concealment canaries", () => {
     expect(found).toContain(`typed:identity-count-exceeded:${key(real.target)}`);
   });
 
+  /** Rescue under `weather`: p1 carries a Rope Ladder and the first trick fails a no-tricks objective. */
+  function rescueIn(weather: string): RunState {
+    const between = advanceTo(loadoutAt("jungle", weather, { p1: ["rope-ladder"] }), "between-tricks", CATALOG);
+    const camp = attemptOf(between)!.camp;
+    let run: RunState = { ...between, stage: { ...between.stage, attempt: { ...attemptOf(between)!, camp: { ...camp, objectives: SEAT_IDS.map((seatId) => ({ id: `duck-${seatId}`, kind: "no-tricks" as const, ownerSeatId: seatId })) } } } } as RunState;
+    for (let i = 0; i < SEAT_IDS.length; i++) {
+      const rules = rulesFor(run, CATALOG);
+      const actor = currentActorSeatId(attemptOf(run)!.camp, rules)!;
+      const result = applyRunAction(run, actor, { type: "play-card", cardId: rules.legalPlays(attemptOf(run)!.camp, actor)[0]!.id }, CATALOG);
+      if (!result.ok) throw new Error(result.error);
+      run = result.state;
+    }
+    return run;
+  }
+
+  it("Canary N: under fog a teammate named as able to rescue is flagged", () => {
+    expect(attemptViewOf(toExpeditionPlayerView(rescueIn("fair"), "p0", CATALOG)).pendingSeatIds).toEqual(["p1"]);
+    const state = rescueIn("fog");
+    const clean = toExpeditionPlayerView(state, "p0", CATALOG);
+    expect(attemptViewOf(clean).window).toBe("rescue");
+    expect(attemptViewOf(clean).pendingSeatIds).toEqual([]);
+    expect(attemptViewOf(toExpeditionPlayerView(state, "p1", CATALOG)).pendingSeatIds).toEqual(["p1"]);
+    expect(leaks(state, "p0", clean)).toEqual([]);
+    const tampered = structuredClone(clean);
+    attemptViewOf(tampered).pendingSeatIds = ["p1"];
+    expect(leaks(state, "p0", tampered)).toEqual(["structural:fogged-pending"]);
+  });
+
+  it("Canary O: under fog the Locusts' next meal shown on any seat is flagged", () => {
+    const run = advanceTo(loadoutAt("jungle", "fog", { p2: ["bait"] }), "between-tricks", CATALOG);
+    const state: RunState = { ...run, plan: { ...run.plan!, bosses: [{ at: campIndex(2), tier: "disaster", modId: "locusts" }] } };
+    const clean = toExpeditionPlayerView(state, "p0", CATALOG);
+    expect(leaks(state, "p0", clean)).toEqual([]);
+    const tampered = structuredClone(clean);
+    if (tampered.stage.tag !== "camp") throw new Error("expected a camp");
+    tampered.stage.mods.find((m) => m.id === "locusts")!.status.push({ kind: "swarm", seatId: "p2" });
+    expect(leaks(state, "p0", tampered)).toEqual(["structural:fogged-swarm"]);
+  });
+
   it("Canary L: under fog another seat's backpack or unused item is flagged", () => {
     const state = loadoutAt("jungle", "fog", { p0: ["bait", "parrot", "whetstone"] });
     const clean = toExpeditionPlayerView(state, "p1", CATALOG);
