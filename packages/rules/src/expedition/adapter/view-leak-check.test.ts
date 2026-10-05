@@ -18,7 +18,7 @@ import { defineItem } from "../content/source-def";
 import { rulesFor } from "../run/compose";
 import { toExpeditionPlayerView } from "./view";
 import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "./view-leak-check";
-import type { RunState } from "../run/types";
+import type { Catalog, RunState } from "../run/types";
 import type { CardIdentity } from "../state";
 import type { ExpeditionAttemptView, ExpeditionView } from "./view-types";
 
@@ -396,6 +396,45 @@ describe("view-leak-check: concealment canaries", () => {
     const tampered = structuredClone(clean);
     attemptViewOf(tampered).camp.objectives[at] = { id: real.id, kind: "win-card", target: real.target, ownerSeatId: null, status: "pending" };
     expect(leaks(state, "p1", tampered)).toEqual([`typed:identity-count-exceeded:${key(real.target)}`]);
+  });
+
+  it("Canary K2: the mirage's objective shown after another objective is dropped is flagged", () => {
+    const loadout = setupRun({ seatIds: SEAT_IDS, seed: "mir5", catalog: CATALOG, camp: 2, characters: { p0: "hermit", p1: "jd", p2: "explorer" } });
+    if (loadout.stage.tag !== "loadout") throw new Error("expected a loadout");
+    const between = advanceTo({ ...loadout, stage: { ...loadout.stage, camp: { ...loadout.stage.camp, location: "desert", weather: "fair" } } }, "between-tricks", CATALOG);
+    const mirage = attemptViewOf(toExpeditionPlayerView(between, "p1", CATALOG)).camp.objectives.find((o) => o.kind === "hidden")!.id;
+    const camp = attemptOf(between)!.camp;
+    const dropped = camp.objectives.find((o) => o.ownerSeatId === "p0" && o.id !== mirage)!;
+    const result = applyRunAction(between, "p0", { type: "use-ability", sourceKey: "hermit", targets: [`objective:${dropped.id}`] }, CATALOG);
+    if (!result.ok) throw new Error(result.error);
+    const state = result.state;
+
+    const real = camp.objectives.find((o) => o.id === mirage)!;
+    if (real.kind !== "win-card") throw new Error(`expected a win-card objective under the mirage, got ${real.kind}`);
+    const tampered = structuredClone(toExpeditionPlayerView(state, "p1", CATALOG));
+    const objectives = attemptViewOf(tampered).camp.objectives;
+    objectives[objectives.findIndex((o) => o.id === mirage)] = { id: real.id, kind: "win-card", target: real.target, ownerSeatId: real.ownerSeatId, status: "pending" };
+    expect(leaks(state, "p1", tampered)).toEqual([`typed:identity-count-exceeded:${key(real.target)}`]);
+  });
+
+  it("Canary K3: a mirage hook that hides the wrong objective is caught on the real view", () => {
+    const state = advanceTo(loadoutAt("desert", "fair"), "objective-pick", CATALOG);
+    const camp = attemptOf(state)!.camp;
+    const mirage = attemptOf(state)!.effects.find((e) => e.origin.kind === "mod" && e.origin.modId === "desert")!.params.objectiveId;
+    const wrong = camp.objectives.find((o) => o.id !== mirage)!;
+    const real = camp.objectives.find((o) => o.id === mirage)!;
+    if (real.kind !== "win-card") throw new Error(`expected a win-card objective under the mirage, got ${real.kind}`);
+    const desert = CATALOG.mods.desert!;
+    const misplaced: Catalog = {
+      ...CATALOG,
+      mods: {
+        ...CATALOG.mods,
+        desert: { ...desert, full: { ...desert.full, effect: () => ({ hides: (prev) => (run, viewer, subject) => prev(run, viewer, subject) || (subject.kind === "objective" && subject.objectiveId === wrong.id) }) } },
+      },
+    };
+    const view = toExpeditionPlayerView(state, "p1", misplaced);
+    const found = checkExpeditionViewForLeaks({ view, serialized: JSON.stringify(view), secrets: secretsForExpeditionSeat(state, "p1", misplaced, SEED) });
+    expect(found).toContain(`typed:identity-count-exceeded:${key(real.target)}`);
   });
 
   it("Canary L: under fog another seat's backpack or unused item is flagged", () => {

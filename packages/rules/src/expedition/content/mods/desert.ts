@@ -1,11 +1,4 @@
-import type { CampState } from "../../state";
-import { defineMod, type ModCtx } from "./mod-def";
-
-/** The objective the mirage hides, until the first trick completes. */
-function mirageObjectiveId(ctx: ModCtx, camp: CampState | null): string | null {
-  if (camp === null || camp.completedTricks.length > 0 || camp.objectives.length === 0) return null;
-  return camp.objectives[ctx.roll("mirage", camp.objectives.length)]!.id;
-}
+import { defineMod } from "./mod-def";
 
 export const desert = defineMod({
   id: "desert",
@@ -14,9 +7,19 @@ export const desert = defineMod({
   weight: 1,
   text: "A mirage hides one objective from everyone until the first trick is won.",
   full: {
-    rules: (ctx) => ({
+    on: {
+      // The mirage is fixed by id at the deal, so an objective dropped or
+      // added before the first trick never moves it onto another one.
+      "camp-dealt": (ctx) => {
+        const objectives = ctx.camp.objectives;
+        if (objectives.length === 0) return [];
+        return [{ op: "add-modifier", lasts: "attempt", audience: "public", params: { objectiveId: objectives[ctx.roll("mirage", objectives.length)]!.id } }];
+      },
+    },
+    effect: (effect, ctx) => ({
       hides: (prev) => (run, viewerSeatId, subject) =>
-        prev(run, viewerSeatId, subject) || (subject.kind === "objective" && subject.objectiveId === mirageObjectiveId(ctx, ctx.camp)),
+        prev(run, viewerSeatId, subject) ||
+        (subject.kind === "objective" && subject.objectiveId === effect.params.objectiveId && ctx.camp !== null && ctx.camp.completedTricks.length === 0),
     }),
   },
 });

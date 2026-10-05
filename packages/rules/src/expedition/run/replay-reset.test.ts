@@ -54,7 +54,7 @@ describe("fail-then-replay resets every camp-scoped resource (RUN-06)", () => {
     const [explorerSeat, camoSeat, sabotageSeat] = ["s0", "s1", "s2"] as const;
     const whispersOf = (state: RunState, seatId: string) => rulesFor(state, catalog).whispersPerCamp(state, seatId);
 
-    let run = setupRun({
+    const loadout = setupRun({
       seatIds: [explorerSeat, camoSeat, sabotageSeat],
       seed: SEED,
       catalog,
@@ -62,6 +62,9 @@ describe("fail-then-replay resets every camp-scoped resource (RUN-06)", () => {
       characters: { [explorerSeat]: "explorer", [camoSeat]: "jd", [sabotageSeat]: "leader" },
       items: { [explorerSeat]: ["rain-poncho"], [camoSeat]: ["camouflage"], [sabotageSeat]: ["test-sabotage"] },
     });
+    if (loadout.stage.tag !== "loadout") throw new Error("expected a loadout");
+    // A plain camp: the seed's own spec is a Desert, whose mirage is an effect too.
+    let run: RunState = { ...loadout, stage: { ...loadout.stage, camp: { ...loadout.stage.camp, location: "jungle", weather: "fair" } } };
     const [poncho, camouflage, sabotage] = ["it0", "it1", "it2"];
 
     run = advanceTo(run, "between-tricks", catalog);

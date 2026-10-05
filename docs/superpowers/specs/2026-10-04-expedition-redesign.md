@@ -2005,3 +2005,11 @@ How each of the nine fits (for unit 13):
   seat; the room reschedules while the seat is still awaited, so a muster
   takes two alarms (character, then ballot). This answers the open question
   on auto-readying.
+- The Desert's mirage is fixed by objective id at the deal. Its
+  `camp-dealt` reaction stores a public attempt effect `{ objectiveId }`
+  (`roll("mirage")` over the dealt objectives, as before), and its
+  `effect` hides that id until a trick completes. Hiding by list position
+  let a Hermit drop or Camouflage before the first trick slide the mirage
+  onto another objective and show the first one's card. The leak check
+  reads the stored effect itself beside `hides`, so a hook that hides the
+  wrong objective is flagged (canary K3 swaps in such a hook).

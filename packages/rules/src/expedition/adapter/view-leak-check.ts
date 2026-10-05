@@ -179,8 +179,15 @@ export function secretsForExpeditionSeat(
 
     for (const identity of camp.removedCards) bump(identity);
 
+    // The Desert's mirage is read from the effect its deal stored, not
+    // through `hides`, so a hook that hides the wrong objective is caught.
+    const mirages = new Set(
+      camp.completedTricks.length > 0
+        ? []
+        : attempt!.effects.flatMap((effect) => (effect.origin.kind === "mod" && effect.origin.modId === "desert" && typeof effect.params.objectiveId === "string" ? [effect.params.objectiveId] : [])),
+    );
     for (const objective of camp.objectives) {
-      if (rules.hides(state, seatId, { kind: "objective", objectiveId: objective.id })) continue;
+      if (mirages.has(objective.id) || rules.hides(state, seatId, { kind: "objective", objectiveId: objective.id })) continue;
       if (objective.kind === "win-card" || objective.kind === "ordered") bump(objective.target);
     }
   }

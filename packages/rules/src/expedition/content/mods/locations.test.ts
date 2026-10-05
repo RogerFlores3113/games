@@ -81,6 +81,19 @@ describe("Desert", () => {
     for (let i = 0; i < SEATS.length; i++) run = playFirst(run).run;
     for (const seatId of SEATS) expect(hiddenIn(run, seatId)).toEqual([]);
   });
+
+  it("keeps the same objective hidden when another one is dropped before the first trick", () => {
+    const loadout = setupRun({ seatIds: SEATS, seed: "mir5", catalog: CATALOG, camp: 2, characters: { p0: "hermit", p1: "jd", p2: "explorer" } }) as RunAt<"loadout">;
+    const run = advanceTo({ ...loadout, stage: { ...loadout.stage, camp: { ...loadout.stage.camp, location: "desert", weather: "fair" } } }, "between-tricks", CATALOG);
+    const hiddenIn = (state: RunState) => campOf(toExpeditionPlayerView(state, "p1", CATALOG)).objectives.filter((o) => o.kind === "hidden").map((o) => o.id);
+    const [mirage] = hiddenIn(run);
+    const dropped = attemptOf(run)!.camp.objectives.find((o) => o.ownerSeatId === "p0" && o.id !== mirage)!;
+    expect(attemptOf(run)!.camp.objectives.indexOf(dropped)).toBeLessThan(attemptOf(run)!.camp.objectives.findIndex((o) => o.id === mirage));
+
+    const result = STAGES.camp.on["use-ability"]!(run as RunAt<"camp">, "p0", { type: "use-ability", sourceKey: "hermit", targets: [`objective:${dropped.id}`] }, CATALOG);
+    if (!result.ok) throw new Error(result.error);
+    expect(hiddenIn(result.state)).toEqual([mirage]);
+  });
 });
 
 describe("Magma pool", () => {

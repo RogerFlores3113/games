@@ -155,7 +155,10 @@ earlier planned boss at half strength (its `half` body), in the order faced.
 The run hook `hides(run, viewer, subject)` keeps a current-trick play, an
 objective's kind and target, or a seat's unused items from a viewer (Cave,
 Night, Desert, Heavy fog); the view and the leak check both read it, so a
-new concealment needs no change to either. A boss uses whichever channel
+new concealment needs no change to either. The Desert fixes its mirage by
+objective id at `camp-dealt` (an attempt effect), and the leak check reads
+that effect itself as well, so a `hides` that hides the wrong objective is
+caught. A boss uses whichever channel
 its mechanic is: a question is a rule (Crocodile's guard, Wildfire's and
 Meteor's `burns`, Blood Moon's `identityOf`, the river that ends a Monsoon camp), a
 moment is a reaction (Snake's bite on `whisper-sent`; Tornado, Earthquake
