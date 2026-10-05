@@ -279,6 +279,23 @@ describe("Explorer", () => {
     expect(objectiveOf(run, "o1")).toEqual(winCard("o1", ident("spades", 8), "p0"));
     expect([refusal(run, "p0", "explorer", ["value:a:10"]), refusal(run, "p0", "explorer.reshape", ["objective-value:o1:9"])]).toEqual(["ability_spent", "ability_spent"]);
   });
+
+  it("Reshape never shifts an objective onto a card already won or on the table", () => {
+    const start = table({
+      character: "explorer",
+      kit: ["explorer.reshape"],
+      mates: ["jd", "leader"],
+      hands: { p0: [std("a", "spades", 9)], p1: [std("b", "spades", 6)], p2: [std("c", "hearts", 5)] },
+      objectives: [winCard("o1", ident("spades", 13), "p0"), winCard("o2", ident("hearts", 6), "p2")],
+      tricks: [WON_BY_P1],
+      leader: "p2",
+    });
+    const midTrick = play(start, "p2", "c");
+    const status = abilityStatus(midTrick, "p0", "explorer.reshape", CATALOG);
+    if (status === null || !status.usable) throw new Error("expected Reshape to be usable on p0's turn");
+    expect(status.steps[0]!.choices).toEqual(["objective-value:o1:14", "objective-value:o2:7"]);
+    expect(refusal(midTrick, "p0", "explorer.reshape", ["objective-value:o1:12"])).toBe("invalid_target");
+  });
 });
 
 /** Every seat takes its first bundle until the route vote opens. */
@@ -518,6 +535,13 @@ describe("Perfumist", () => {
     const saved = rescue(failed, "p0", "perfumist.smelling-salts", []);
     expect([camp(saved).completedTricks, camp(saved).voidedTricks.length, rules(saved).objectiveStatus(camp(saved), objectiveOf(saved, "o1"))]).toEqual([[], 1, "pending"]);
     expect(remaining(saved, "p0", "perfumist.smelling-salts", CATALOG)).toEqual({ kind: "uses", left: 0, of: 1 });
+  });
+
+  it("an objective failed with a trick on the table opens no rescue, so Smelling Salts is refused", () => {
+    const start = table({ character: "perfumist", kit: ["perfumist.smelling-salts"], hands: { p0: [std("a", "spades", 9)], p1: [std("b", "spades", 6)], p2: [std("c", "hearts", 5)] }, objectives: [winCard("o1", ident("spades", 14), "p1")], tricks: [WON_BY_P0], leader: "p0" });
+    const midTrick = withAttempt(start, { ...attemptOf(start)!, camp: { ...camp(start), hands: camp(start).hands.map((h) => (h.seatId === "p0" ? { ...h, cards: [] } : h)), currentTrick: { ...camp(start).currentTrick, plays: [{ seatId: "p0", card: std("a", "spades", 9) }] } } });
+    expect(currentWindow(midTrick, rules(midTrick))).toBeNull();
+    expect(refusal(midTrick, "p0", "perfumist.smelling-salts", [])).toBe("wrong_window");
   });
 });
 

@@ -2013,3 +2013,15 @@ How each of the nine fits (for unit 13):
   onto another objective and show the first one's card. The leak check
   reads the stored effect itself beside `hides`, so a hook that hides the
   wrong objective is flagged (canary K3 swaps in such a hook).
+- Reshape (`objective-value`) never offers a rank whose card was already
+  won, burned, counted as, eaten or removed, or sits face up on the table
+  (printed or counted-as). A face-down play the seat cannot see stays on
+  offer, since leaving it out would name the card; an objective moved onto
+  it settles when the trick completes, as any target does. Reshape mid-trick
+  onto a card another seat had won failed the camp with a trick on the
+  table, and Smelling Salts then threw from `void-trick`.
+- Rescue opens only with no trick on the table (`WINDOWS.rescue.isOpen`):
+  a failure with plays down settles at once, whatever ability caused it.
+  Smelling Salts' `canUse` also refuses while a trick is in progress
+  ("A trick is in progress"), so its `void-trick` can never throw on client
+  input.

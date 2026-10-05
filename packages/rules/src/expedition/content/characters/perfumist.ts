@@ -74,7 +74,10 @@ export const perfumist = defineCharacter({
         window: "rescue",
         limit: { kind: "per-run", times: 1 },
         targets: [],
-        canUse: (ctx) => (ctx.camp!.completedTricks.length > 0 ? true : "No trick to undo"),
+        canUse: (ctx) => {
+          if (ctx.camp!.currentTrick.plays.length > 0) return "A trick is in progress";
+          return ctx.camp!.completedTricks.length > 0 ? true : "No trick to undo";
+        },
         apply: (ctx) => [{ op: "void-trick", trickIndex: ctx.camp!.completedTricks.at(-1)!.index }],
       }),
     }),

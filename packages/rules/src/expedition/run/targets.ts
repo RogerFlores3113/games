@@ -305,6 +305,17 @@ export const TARGET_KINDS: { readonly [K in TargetKind]: TargetKindDef<K> } = {
     describe: () => "Pick an objective's card to shift",
     choices: ({ run, seatId, camp, rules }, spec) => {
       if (camp === null) return [];
+      // A card already won, eaten or on the table would settle the objective
+      // at once; a face-down play is left in, since leaving it out would
+      // name the card.
+      const played = [
+        ...camp.removedCards,
+        ...camp.completedTricks.flatMap((trick) => trick.plays.flatMap((play) => [play.card.identity, ...(play.countsAs === null ? [] : [play.countsAs])])),
+        ...camp.discards.map((discard) => discard.card.identity),
+        ...camp.currentTrick.plays.flatMap((play, position) =>
+          rules.hides(run, seatId, { kind: "play", trickIndex: camp.currentTrick.index, position, seatId: play.seatId }) ? [] : [play.card.identity, rules.identityOf(play.card)],
+        ),
+      ];
       return camp.objectives.flatMap((objective) => {
         if (objective.kind !== "win-card" && objective.kind !== "ordered") return [];
         const target = objective.target;
@@ -312,7 +323,7 @@ export const TARGET_KINDS: { readonly [K in TargetKind]: TargetKindDef<K> } = {
         if (rules.hides(run, seatId, { kind: "objective", objectiveId: objective.id })) return [];
         return ranksAround(target.rank, spec.spread)
           .map((rank): StandardIdentity => ({ kind: "standard", suit: target.suit, rank }))
-          .filter((shifted) => !camp.removedCards.some((removed) => identitiesEqual(removed, shifted)))
+          .filter((shifted) => !played.some((identity) => identitiesEqual(identity, shifted)))
           .map((shifted) => ({ id: `objective-value:${objective.id}:${shifted.rank}`, target: { kind: "objective-value" as const, objective, target: shifted } }));
       });
     },

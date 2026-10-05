@@ -59,10 +59,12 @@ export const WINDOWS: { readonly [W in ActiveWindow]: WindowDef } = {
     id: "rescue",
     phrase: "When an objective fails",
     gated: true,
-    // Only failed objectives open it; a failed goal never does.
+    // Only failed objectives open it; a failed goal never does. A failure
+    // with a trick on the table settles at once: a rescue there could not
+    // void or replay a trick half played.
     isOpen: (run, rules) => {
       const camp = attemptOf(run)?.camp;
-      if (camp === undefined) return false;
+      if (camp === undefined || camp.currentTrick.plays.length > 0) return false;
       const outcome = checkCampOutcome(camp, rules);
       return outcome.status === "failed" && outcome.failedObjectiveIds.length > 0 && outcome.failedGoalIds.length === 0;
     },
