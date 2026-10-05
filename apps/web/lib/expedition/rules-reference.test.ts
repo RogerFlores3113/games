@@ -123,6 +123,10 @@ describe("buildRulesReference", () => {
     expect(groups[1]!.entries.map((e) => e.id).sort()).toEqual(["flooding", "steam"]);
     expect(groups.flatMap((g) => g.entries).every((e) => e.imageUrl === null)).toBe(true);
     expect(groups[0]!.entries.map((e) => e.id)).toContain("thunderstorm");
+    expect(groups[0]!.entries.find((e) => e.id === "downpour")!.icon[4]).toBe("b.b.b.b.b");
+    expect(groups[0]!.note).toBe(
+      "Most camps have fair weather (80% of routes, fewer on the Clifftop). Other weather is drawn for the route. On the Clifftop bad weather hits harder: Rain washes away 2 more whispers, a Downpour 3 more, and lightning can strike 3 times.",
+    );
     expect(groups[0]!.entries.find((e) => e.id === "fair")!.icon).toEqual(["....o....", ".o.....o.", "...ooo...", "..ooooo..", "o.ooooo.o", "..ooooo..", "...ooo...", ".o.....o.", "....o...."]);
   });
 

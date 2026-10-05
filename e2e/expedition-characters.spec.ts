@@ -245,7 +245,7 @@ test.describe("the nine characters", () => {
     await capture(page, "businessman-popup-bought");
   });
 
-  test("the Pack Rat carries three items and drafts Pack Rat items in every bundle", async ({ page }) => {
+  test("the Pack Rat carries three items, drafts the usual bundle, then picks one of three Pack Rat items", async ({ page }) => {
     test.setTimeout(180_000);
     const panel = await soloTable(page, 2);
     await crewAs(page, panel, "pack-rat", null);
@@ -258,9 +258,20 @@ test.describe("the nine characters", () => {
     await waitForScene(page, "camp");
     const draft = await toDraft(page, panel);
     await closePanel(page);
-    const bundles = (draft.panel as { draft: { bundles: { items: { exclusive: boolean }[] }[] } }).draft.bundles;
-    for (const bundle of bundles) expect(bundle.items.map((i) => i.exclusive)).toEqual([false, false, true, true]);
+    type Offer = { kind: string; ownPick?: string | null; bundles?: { objectId: string; items: { name: string; exclusive: boolean }[] }[]; items?: { name: string }[] };
+    const offer = (m: Trail) => (m.panel as { draft: Offer }).draft;
+    const first = offer(draft);
+    expect(first.ownPick).toBeNull();
+    for (const bundle of first.bundles!) expect(bundle.items.map((i) => i.exclusive)).toEqual([false, false]);
     await capture(page, "pack-rat-draft");
+    const own = await clickUntilChanged<Trail>(page, first.bundles![0]!.objectId, (m) => offer(m).ownPick === "pack-rat");
+    expect(offer(own).bundles!.map((b) => b.items.map((i) => i.exclusive))).toEqual([[true], [true], [true]]);
+    expect(new Set(offer(own).bundles!.map((b) => b.items[0]!.name)).size).toBe(3);
+    expect((await getModel<{ prompt: { text: string } }>(page)).prompt.text).toBe("The Pack Rat's own pick: take one item");
+    await capture(page, "pack-rat-pick");
+    const taken = await clickUntilChanged<Trail>(page, offer(own).bundles![1]!.objectId, (m) => offer(m).kind === "taken");
+    expect(offer(taken).items!.map((i) => i.name)).toEqual([...first.bundles![0]!.items.map((i) => i.name), offer(own).bundles![1]!.items[0]!.name]);
+    await capture(page, "pack-rat-taken");
   });
 
   test("Quartermaster hands one of the Pack Rat's items to a teammate", async ({ page }) => {

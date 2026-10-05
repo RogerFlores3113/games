@@ -19,9 +19,18 @@ export function ledSuit(camp: ExpeditionCampView): "spades" | "hearts" | "diamon
   return lead.card.identity.kind === "standard" ? lead.card.identity.suit : null;
 }
 
-/** The attempt's whispers in order; a whisper always has a sender. */
+/** The attempt's heard whispers in order; a whisper always has a sender.
+ * Their ordinals match the whisper reveals'. */
 export function whisperLog(view: ExpeditionView): (ExpeditionLogEntryView & { actorSeatId: string })[] {
   return (attemptOf(view)?.log ?? []).filter((l): l is ExpeditionLogEntryView & { actorSeatId: string } => l.event === "whisper" && l.actorSeatId !== null);
+}
+
+/** Every whisper sent this attempt in order, heard or washed away by the
+ * weather, with its place in the log. */
+export function whispersSent(view: ExpeditionView): (ExpeditionLogEntryView & { actorSeatId: string; washed: boolean; logIndex: number })[] {
+  return (attemptOf(view)?.log ?? []).flatMap((l, logIndex) =>
+    (l.event === "whisper" || l.event === "whisper-washed") && l.actorSeatId !== null ? [{ ...l, actorSeatId: l.actorSeatId, washed: l.event === "whisper-washed", logIndex }] : [],
+  );
 }
 
 /** The camp the crew is at, or the next one it heads to; null at muster and

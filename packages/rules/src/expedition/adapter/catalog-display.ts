@@ -11,7 +11,7 @@ import { CATALOG } from "../run/catalog";
 import { salePrice } from "../content/characters/businessman";
 import type { TargetKind } from "../run/targets";
 import { WINDOWS, type ActiveWindow } from "../run/windows";
-import { DRAFT, FAILURE_COST, ITEM_SLOTS, PAYOUT, RUN_LENGTHS, SHOP, SUPPLIES_MAX, SUPPLIES_START, SUPPLY_PRICE, WHISPERS_PER_UPGRADE } from "../run/balance";
+import { DRAFT, FAILURE_COST, ITEM_SLOTS, NORMAL_WEATHER_CHANCE, PAYOUT, RUN_LENGTHS, SHOP, SUPPLIES_MAX, SUPPLIES_START, SUPPLY_PRICE, THUNDERSTORM, WASHES, WHISPERS_PER_UPGRADE } from "../run/balance";
 import type { BossTier } from "../run/plan";
 import type { RunLength } from "../run/types";
 import { EVENTS } from "../content/events/registry";
@@ -235,4 +235,7 @@ export const BALANCE_DISPLAY = {
   itemSlots: ITEM_SLOTS,
   upgradePrice: SHOP.upgradePrice,
   whispersPerUpgrade: WHISPERS_PER_UPGRADE,
+  fairWeatherChance: NORMAL_WEATHER_CHANCE,
+  washes: { rain: { ...WASHES.rain }, downpour: { ...WASHES.downpour } },
+  strikes: { max: THUNDERSTORM.maxStrikes, exposed: THUNDERSTORM.exposedStrikes },
 } as const;

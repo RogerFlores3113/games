@@ -486,7 +486,8 @@ function drawBundleCard(ctx: Ctx, bundle: DraftBundle, x: number, y: number, w: 
     itemY += bundleItem(ctx, card, item, itemY, w, bundle.items.length > 2) + 1;
   });
   layer.add(card);
-  const take = button(scene, x + w / 2, y + h - 3 - BUNDLE_TAKE_H / 2, w - 8, BUNDLE_TAKE_H, "Take bundle", { onClick: () => handlers.onBundle(bundle.bundle), outline: true });
+  const label = bundle.items.length === 1 ? "Take it" : "Take bundle";
+  const take = button(scene, x + w / 2, y + h - 3 - BUNDLE_TAKE_H / 2, w - 8, BUNDLE_TAKE_H, label, { onClick: () => handlers.onBundle(bundle.bundle), outline: true });
   layer.add(take);
   index.register("trail", bundle.objectId, take);
 }

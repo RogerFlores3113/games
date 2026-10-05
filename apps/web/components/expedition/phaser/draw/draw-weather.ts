@@ -1,8 +1,9 @@
 /**
  * The camp's modifiers on screen: the chip strip on the top bar, the small
  * pixel icons that name a location or weather at a glance, and the weather
- * overlay (rain, a storm's darker sky, and the flash when lightning
- * strikes). Every value drawn comes from the scene model.
+ * overlay (rain, a downpour's heavier rain, a storm's darker sky, and the
+ * flash when lightning strikes). Every value drawn comes from the scene
+ * model.
  */
 import type Phaser from "phaser";
 import { PALETTE, toPhaserColor } from "../palette";
@@ -166,8 +167,14 @@ export function drawModStrip(scene: Phaser.Scene, layer: Layer, chips: ModChip[]
 // The weather overlay
 // ---------------------------------------------------------------------------
 
-const DROP_KEY = "weather:drop";
-const SKY_DIM: Readonly<Record<Precipitation, number>> = { none: 0, rain: 0.18, storm: 0.34 };
+const SKY_DIM: Readonly<Record<Precipitation, number>> = { none: 0, rain: 0.18, downpour: 0.3, storm: 0.34 };
+/** Falling drops per weather: a downpour is denser, faster and longer than
+ * rain, and falls nearly straight; a storm's rain slants in the wind. */
+const DROPS: Readonly<Record<Exclude<Precipitation, "none">, { speedY: [number, number]; speedX: [number, number]; rotate: number; quantity: number; texture: string }>> = {
+  rain: { speedY: [300, 360], speedX: [-40, -20], rotate: 6, quantity: 4, texture: "weather:drop" },
+  downpour: { speedY: [460, 560], speedX: [-24, -8], rotate: 3, quantity: 11, texture: "weather:drop-heavy" },
+  storm: { speedY: [380, 460], speedX: [-90, -60], rotate: 12, quantity: 6, texture: "weather:drop" },
+};
 const NIGHT_DIM = 0.38;
 const FOG_KEY = "weather:fog-band";
 /** Mist above the seat plates, around the stump and low on the ground, so
@@ -186,14 +193,16 @@ const FLASH_MS = 520;
 const BLOOD_MOON_ALPHA = 0.24;
 const MOON_MS = 600;
 
-function ensureDropTexture(scene: Phaser.Scene): void {
-  if (scene.textures.exists(DROP_KEY)) return;
+/** A drop: 8 px long, or 13 for a downpour's heavier streaks. */
+function ensureDropTexture(scene: Phaser.Scene, key: string): void {
+  if (scene.textures.exists(key)) return;
+  const length = key === "weather:drop-heavy" ? 13 : 8;
   const g = scene.make.graphics({}, false);
   g.fillStyle(toPhaserColor(PALETTE.rain), 1);
-  g.fillRect(0, 0, 1, 8);
+  g.fillRect(0, 0, 1, length);
   g.fillStyle(toPhaserColor(PALETTE.moon), 1);
-  g.fillRect(0, 6, 1, 2);
-  g.generateTexture(DROP_KEY, 1, 8);
+  g.fillRect(0, length - 2, 1, 2);
+  g.generateTexture(key, 1, length);
   g.destroy();
 }
 
@@ -297,17 +306,17 @@ export class WeatherOverlay {
     this.objects = [];
     if (precipitation === "none") return;
     const dim = this.scene.add.rectangle(0, 0, STAGE.w, STAGE.h, toPhaserColor(PALETTE.letterbox), SKY_DIM[precipitation]).setOrigin(0, 0);
-    ensureDropTexture(this.scene);
-    const storm = precipitation === "storm";
-    const rain = this.scene.add.particles(0, 0, DROP_KEY, {
+    const drops = DROPS[precipitation];
+    ensureDropTexture(this.scene, drops.texture);
+    const rain = this.scene.add.particles(0, 0, drops.texture, {
       x: { min: -40, max: STAGE.w + 40 },
-      y: -8,
+      y: -14,
       lifespan: 1100,
-      speedY: { min: storm ? 380 : 300, max: storm ? 460 : 360 },
-      speedX: { min: storm ? -90 : -40, max: storm ? -60 : -20 },
-      rotate: storm ? 12 : 6,
+      speedY: { min: drops.speedY[0], max: drops.speedY[1] },
+      speedX: { min: drops.speedX[0], max: drops.speedX[1] },
+      rotate: drops.rotate,
       alpha: { start: 0.85, end: 0.35 },
-      quantity: storm ? 6 : 4,
+      quantity: drops.quantity,
       frequency: 20,
     });
     this.sky.add([dim, rain]);

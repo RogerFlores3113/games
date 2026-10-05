@@ -1,8 +1,9 @@
 import type { ExpeditionModView, ExpeditionView, ModDisplay } from "@games/rules";
 import { MOD_DISPLAY } from "@games/rules";
 import { cardLabel, modObjectId, rankLabel } from "./expedition-ids";
+import type { BossHappening, SeatNamer } from "./boss-model";
 import type { Tooltip } from "./build-scene-model";
-import { modName } from "./view-access";
+import { modName, whispersSent } from "./view-access";
 
 /**
  * The camp's modifiers as the table shows them: a strip of chips naming
@@ -30,7 +31,7 @@ export interface ModChip {
   alert: boolean;
 }
 
-export type Precipitation = "none" | "rain" | "storm";
+export type Precipitation = "none" | "rain" | "downpour" | "storm";
 /** What hangs over the backdrop besides rain. */
 export type Haze = "none" | "night" | "fog";
 
@@ -57,6 +58,7 @@ export const STRIKE_NOTICE = "Lightning struck: the lowest card wins this trick"
 
 const PRECIPITATION: Readonly<Record<string, Precipitation>> = {
   rain: "rain",
+  downpour: "downpour",
   thunderstorm: "storm",
 };
 
@@ -74,14 +76,34 @@ const KIND_LABEL: Readonly<Record<ModDisplay["kind"], string>> = {
   temple: "Temple",
 };
 
-/** Camp modifiers that stop whispers, for the Whisper button's reason. */
-const WHISPER_BLOCKERS: readonly string[] = ["rain"];
+/** The weather washing whispers away this camp (Rain, Downpour): its id,
+ * the washes still to come and how many it washes in all; null without one. */
+export function washing(view: ExpeditionView): { modId: string; left: number; of: number } | null {
+  for (const mod of modsOf(view)) {
+    const washes = mod.status.find((part) => part.kind === "washes");
+    if (washes !== undefined) return { modId: mod.id, left: washes.left, of: washes.of };
+  }
+  return null;
+}
 
-/** "Blocked by Rain" when a camp modifier is why, short enough for the
- * caption under the Whisper button; null otherwise. */
-export function whisperBlocker(view: ExpeditionView): string | null {
-  const blocker = modsOf(view).find((mod) => WHISPER_BLOCKERS.includes(mod.id));
-  return blocker === undefined ? null : `Blocked by ${modDisplayName(blocker.id)}`;
+/** The chip tooltip's reading: "1 of 2 whispers will wash away". */
+function washingReading(left: number, of: number): string {
+  return left === 0 ? "No more whispers wash away" : `${left} of ${of} ${of === 1 ? "whisper" : "whispers"} will wash away`;
+}
+
+/** A toast for each whisper the weather washed away this attempt. Keys
+ * follow the log, like the disasters' happenings. */
+export function washedHappenings(view: ExpeditionView, seats: SeatNamer): BossHappening[] {
+  const weather = washing(view);
+  if (view.stage.tag !== "camp" || weather === null) return [];
+  const base = `${view.stage.camp.index}:${view.stage.attempt.attemptNumber}`;
+  const where = `in the ${modDisplayName(weather.modId).toLowerCase()}`;
+  return whispersSent(view).flatMap((entry) => {
+    if (!entry.washed) return [];
+    const to = entry.subjectSeatIds[0] ?? "";
+    const from = seats.isYou(entry.actorSeatId) ? "Your" : `${seats.name(entry.actorSeatId)}'s`;
+    return [{ key: `${base}:${entry.logIndex}`, kind: "washed", text: `${from} whisper to ${seats.isYou(to) ? "you" : seats.name(to)} washed away ${where}`, cards: [] }];
+  });
 }
 
 export function modDisplayName(id: string): string {
@@ -115,15 +137,18 @@ function chipFor(mod: ExpeditionModView, view: ExpeditionView): ModChip {
   const strike = mod.status.some((part) => part.kind === "strike");
   const chance = mod.status.find((part) => part.kind === "chance");
   const meter = mod.status.find((part) => part.kind === "meter");
+  const washes = mod.status.find((part) => part.kind === "washes");
   const badge = strike
     ? "Lowest wins"
     : chance !== undefined && chance.percent > 0
       ? `${chance.percent}%`
       : meter !== undefined
         ? meter.left === 0 ? "Flooded" : `${meter.left} left`
-        : mod.id === HEAT_ID
-          ? heatNote(view)
-          : null;
+        : washes !== undefined
+          ? washes.left === 0 ? "Heard now" : `${washes.left} of ${washes.of} wash away`
+          : mod.id === HEAT_ID
+            ? heatNote(view)
+            : null;
   return {
     id: mod.id,
     objectId: modObjectId(mod.id),
@@ -176,6 +201,8 @@ export function modTooltip(view: ExpeditionView, modId: string): Tooltip | null 
   const badges = mod.strength === "half" ? [KIND_LABEL[mod.kind], "Half strength at the temple"] : [KIND_LABEL[mod.kind]];
   if (chance !== undefined) badges.push(chance.percent > 0 ? `${chance.percent}% next trick` : "No more strikes", `${chance.strikesLeft} ${chance.strikesLeft === 1 ? "strike" : "strikes"} left`);
   if (meter !== undefined) badges.push(meter.left === 0 ? "The river has flooded" : `Floods after ${meter.left} more ${meter.left === 1 ? "trick" : "tricks"}`);
+  const washes = mod.status.find((part) => part.kind === "washes");
+  if (washes !== undefined) badges.push(washingReading(washes.left, washes.of));
   if (modId === HEAT_ID && chip.badge !== null) badges.push(chip.badge.replace(/^No /, "Burned: "));
   return { title: chip.name, text: MOD_DISPLAY[modId]?.text ?? "", badges, reason: null };
 }

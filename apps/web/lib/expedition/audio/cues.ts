@@ -57,6 +57,9 @@ function newDeal(prev: Game, next: Game): boolean {
   return attemptOf(prev)?.camp == null || attemptKey(prev) !== attemptKey(next);
 }
 
+/** Every whisper sent, heard or washed away. */
+const isWhisper = (event: string): boolean => event === "whisper" || event === "whisper-washed";
+
 const RULES: ReadonlyArray<{ cue: SfxId; when: (prev: Game, next: Game) => boolean }> = [
   { cue: "sfx-card-deal", when: newDeal },
   { cue: "sfx-card-play", when: (p, n) => sameAttempt(p, n) && totalPlays(n) > totalPlays(p) },
@@ -70,7 +73,7 @@ const RULES: ReadonlyArray<{ cue: SfxId; when: (prev: Game, next: Game) => boole
   },
   { cue: "sfx-objective-done", when: (p, n) => statusChanged(p, n, "done") },
   { cue: "sfx-objective-failed", when: (p, n) => statusChanged(p, n, "failed") },
-  { cue: "sfx-whisper", when: (p, n) => sameAttempt(p, n) && logCount(n, (e) => e === "whisper") > logCount(p, (e) => e === "whisper") },
+  { cue: "sfx-whisper", when: (p, n) => sameAttempt(p, n) && logCount(n, isWhisper) > logCount(p, isWhisper) },
   { cue: "sfx-power", when: (p, n) => sameAttempt(p, n) && logCount(n, (e) => e === "use-ability") > logCount(p, (e) => e === "use-ability") },
   { cue: "sfx-supply-lost", when: (p, n) => n.supplies.count < p.supplies.count },
   {

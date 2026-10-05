@@ -293,7 +293,18 @@ describe("draft", () => {
           ],
         },
       ],
+      ownPick: null,
     });
+  });
+
+  it("offers the Pack Rat's own pick as one-item cards, and says whose pick it is", () => {
+    const own = at(draftStage({ yourOffer: { kind: "standard", bundles: [["pocket-glass"], ["signal-flare"], ["first-aid-kit"]] } }));
+    const p = panel(own).draft;
+    expect(p.kind === "offer" && [p.ownPick, p.bundles.map((b) => b.items.map((i) => [i.name, i.exclusive]))]).toEqual([
+      "pack-rat",
+      [[["Pocket Glass", true]], [["Signal Flare", true]], [["First Aid Kit", true]]],
+    ]);
+    expect(model(own).prompt).toEqual({ text: "The Pack Rat's own pick: take one item", tone: "your-move" });
   });
 
   it("names the bundle you just took", () => {

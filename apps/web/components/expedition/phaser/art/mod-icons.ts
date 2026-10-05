@@ -25,6 +25,7 @@ export const MOD_ICON_INK: Readonly<Record<string, string>> = {
 const ICONS: Readonly<Record<string, readonly string[]>> = {
   fair: ["....o....", ".o.....o.", "...ooo...", "..ooooo..", "o.ooooo.o", "..ooooo..", "...ooo...", ".o.....o.", "....o...."],
   rain: ["...www...", ".wwwwwww.", "wwwwwwwww", ".wwwwwww.", ".........", ".b..b..b.", "b..b..b..", ".........", ".b..b..b."],
+  downpour: ["..ggggg..", ".ggggggg.", "ggggggggg", ".ggggggg.", "b.b.b.b.b", "b.b.b.b.b", ".b.b.b.b.", "b.b.b.b.b", ".b.b.b.b."],
   thunderstorm: ["...ggg...", ".ggggggg.", "ggggggggg", ".gggyggg.", "....yy...", "...yy....", "..yyyyy..", "....yy...", "...y....."],
   jungle: ["...ttt...", "..ttttt..", ".ttttttt.", "ttttttttt", ".ttttttt.", "...kkk...", "....k....", "....k....", "mmmmmmmmm"],
   clearing: [".........", ".........", "....o....", "...ooo...", ".........", "t..t...t.", "tt.tt.ttt", "mmmmmmmmm", "mmmmmmmmm"],

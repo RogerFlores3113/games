@@ -56,7 +56,7 @@ const WANTED = [
 ];
 /** Phases play rarely reaches; each is also captured from a rewritten view. */
 const RARE = [
-  "run-end-won", "between-camps-draft", "vote-tie-length", "vote-tie-route", "shop", "camp-storm-strike", "camp-rain", "route-weather",
+  "run-end-won", "between-camps-draft", "draft-pack-rat", "vote-tie-length", "vote-tie-route", "shop", "camp-storm-strike", "camp-rain", "camp-rain-washed", "camp-downpour", "route-weather",
   "camp-cave", "camp-night", "camp-desert", "camp-fog", "camp-magma", "camp-flood", "loadout-fog", "rescue-fog", "route-survey",
   "camp-tiger", "camp-rats", "camp-snake", "camp-crocodile", "camp-capybara", "camp-beaver", "route-boss",
   "camp-tornado", "camp-earthquake", "camp-wildfire", "camp-meteor", "camp-blood-moon", "camp-locusts", "camp-monsoon", "long-camp-6",
@@ -486,11 +486,30 @@ function stormView(game: Game): Game {
   };
 }
 
-/** The camp in play in the rain, with the Whisper button stopped. */
+/** The camp in play in the rain, the next whisper set to wash away. */
 function rainView(game: Game): Game {
   const stage = game.stage as Game["stage"] & { camp: Record<string, unknown> };
-  const attempt = { ...stage.attempt!, yourWhisper: { allowed: false, left: 1 } };
-  return { ...game, stage: { ...stage, camp: { ...stage.camp, weather: "rain" }, mods: [mod("jungle", "location"), mod("rain", "weather")], attempt } };
+  const attempt = { ...stage.attempt!, yourWhisper: { allowed: true, left: 1 } };
+  return { ...game, stage: { ...stage, camp: { ...stage.camp, weather: "rain" }, mods: [mod("jungle", "location"), mod("rain", "weather", [{ kind: "washes", left: 1, of: 2 }])], attempt } };
+}
+
+/** After the rain washed away your whisper and a teammate's: the ticker says
+ * so and your Whisper button reads "Washed away". */
+function rainWashedView(game: Game): Game {
+  const next = rainView(game);
+  const stage = next.stage as CampStage;
+  const mate = game.seats.find((s) => s.seatId !== game.yourSeatId)!.seatId;
+  const washed = (from: string, to: string) => ({ event: "whisper-washed", actorSeatId: from, subjectSeatIds: [to], sourceId: null, private: false });
+  (stage as Record<string, unknown>).mods = [mod("jungle", "location"), mod("rain", "weather", [{ kind: "washes", left: 0, of: 2 }])];
+  stage.attempt = { ...stage.attempt, yourWhisper: { allowed: true, left: 0 }, log: [washed(mate, game.yourSeatId), washed(game.yourSeatId, mate)] } as typeof stage.attempt;
+  return next;
+}
+
+/** A downpour on the exposed Clifftop: five whispers to wash away. */
+function downpourView(game: Game): Game {
+  const next = campIn(game, "clifftop", "downpour", [mod("clifftop", "location"), mod("downpour", "weather", [{ kind: "washes", left: 5, of: 5 }])]);
+  (next.stage as CampStage).attempt = { ...(next.stage as CampStage).attempt, yourWhisper: { allowed: true, left: 1 } } as CampStage["attempt"];
+  return next;
 }
 
 type CampStage = Game["stage"] & { camp: Record<string, unknown>; attempt: NonNullable<Game["stage"]["attempt"]> };
@@ -517,11 +536,11 @@ function caveView(game: Game): Game {
   });
 }
 
-/** Mid-trick at night: only the leader's card face down. */
+/** Mid-trick at night: every teammate's card face down. */
 function nightView(game: Game): Game {
   return campIn(playing(game, { plays: 2, window: "in-trick" }), "jungle", "night", [mod("jungle", "location"), mod("night", "weather")], (camp) => {
     const trick = camp.currentTrick as { plays: Plays };
-    trick.plays = trick.plays.map((play, i) => (i === 0 ? faceDown(play) : play));
+    trick.plays = trick.plays.map((play) => (play.seatId === game.yourSeatId ? play : faceDown(play)));
   });
 }
 
@@ -734,6 +753,10 @@ async function capturePickers(host: Page, tour: Tour, rewrite: Rewriter): Promis
   await tour.shot("camp-storm-strike");
   await reloadTo(rainView);
   await tour.shot("camp-rain");
+  await reloadTo(rainWashedView);
+  await tour.shot("camp-rain-washed");
+  await reloadTo(downpourView);
+  await tour.shot("camp-downpour");
   for (const [name, view] of [["camp-cave", caveView], ["camp-night", nightView], ["camp-desert", desertView], ["camp-fog", fogView], ["camp-magma", magmaView], ["camp-flood", floodView], ...BOSS_VIEWS] as const) {
     await reloadTo(view);
     await tour.shot(name);
@@ -760,6 +783,15 @@ async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<v
       "between-camps-draft-rewritten",
     );
   }
+  await capture(
+    (g) => ({
+      ...g,
+      history: [h(1, 1, "cleared")],
+      stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: { kind: "standard", bundles: [["pocket-glass"], ["signal-flare"], ["first-aid-kit"]] }, pendingSeatIds: [g.yourSeatId] },
+    }),
+    "trail",
+    "draft-pack-rat",
+  );
   await capture(shopView, "trail", "shop");
   await capture(routeWeatherView, "trail", "route-weather");
   await capture(routeSurveyView, "trail", "route-survey");

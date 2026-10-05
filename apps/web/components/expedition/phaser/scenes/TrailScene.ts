@@ -99,8 +99,10 @@ export class TrailScene extends Phaser.Scene {
       onBundle(bundle) {
         const model = trailModel(store);
         if (model?.panel.kind !== "draft" || model.panel.draft.kind !== "offer") return;
-        const itemIds = model.panel.draft.bundles.find((b) => b.bundle === bundle)?.itemIds ?? [];
-        store.getState().updateLocalUi((ui) => ({ ...ui, takenBundle: itemIds }));
+        const draft = model.panel.draft;
+        const itemIds = draft.bundles.find((b) => b.bundle === bundle)?.itemIds ?? [];
+        // The Pack Rat's pick follows the bundle just taken: say both.
+        store.getState().updateLocalUi((ui) => ({ ...ui, takenBundle: draft.ownPick === null ? itemIds : [...(ui.takenBundle ?? []), ...itemIds] }));
         store.getState().dispatch({ type: "pick-bundle", bundle });
       },
       onVote(choice) {

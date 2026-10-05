@@ -232,11 +232,12 @@ export function bossBlockReason(view: ExpeditionView, card: { kind: string; suit
   return null;
 }
 
-/** Something a disaster did between tricks, said once in a toast: a gust,
- * a quake, a locust meal. `key` is unique per attempt and log entry. */
+/** Something that happened, said once in a toast: a disaster's gust, quake
+ * or locust meal, or a whisper the weather washed away. `key` is unique per
+ * attempt and log entry. */
 export interface BossHappening {
   key: string;
-  kind: "gust" | "quake" | "ate-item" | "ate-cards";
+  kind: "gust" | "quake" | "ate-item" | "ate-cards" | "washed";
   text: string;
   /** Cards it moved or ate, as labels: your sent cards, the eaten ones. */
   cards: string[];

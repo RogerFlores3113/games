@@ -130,11 +130,11 @@ function drawActions(scene: Phaser.Scene, layer: Layer, model: SceneModel, index
 
 function drawWhisperCaption(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
   if (!model.whisper.shown || model.targeting !== null) return;
-  const { visible, reason, left, state } = model.whisper;
-  const caption = visible ? (left > 1 ? `Share a card (${left})` : "Share a card") : (reason ?? "");
+  const { visible, reason, left, state, washes } = model.whisper;
+  const caption = visible ? (washes ? "Will wash away" : left > 1 ? `Share a card (${left})` : "Share a card") : (reason ?? "");
   if (caption === "") return;
   const zone = ZONES.actions;
-  const color = visible ? PALETTE.turn : state === "blocked" ? PALETTE.destructive : PALETTE.textDim;
+  const color = visible ? (washes ? PALETTE.rain : PALETTE.turn) : state === "blocked" ? PALETTE.destructive : state === "washed" ? PALETTE.rain : PALETTE.textDim;
   const shown = fitLabel(caption, Math.floor((zone.w - 4) / LABEL_CELL.w));
   layer.add(text(scene, zone.x + Math.floor((zone.w - labelWidth(shown)) / 2), zone.y + 2 + WHISPER_H + 3, shown, color));
 }

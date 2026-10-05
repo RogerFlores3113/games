@@ -781,7 +781,7 @@ function whisperView(opts: {
   window?: "between-tricks" | null;
   yourWhisper?: { allowed: boolean; left: number };
   reveals?: ExpeditionAttemptView["reveals"];
-  log?: { actor: string; to: string }[];
+  log?: { actor: string; to: string; washed?: true }[];
 }): ExpeditionView {
   return makeView({
     yourSeatId: "s2",
@@ -792,7 +792,7 @@ function whisperView(opts: {
       rescue: null,
       effects: [],
       reveals: opts.reveals ?? [],
-      log: (opts.log ?? []).map((l) => ({ event: "whisper", actorSeatId: l.actor, subjectSeatIds: [l.to], sourceId: null, private: false })),
+      log: (opts.log ?? []).map((l) => ({ event: l.washed ? "whisper-washed" : "whisper", actorSeatId: l.actor, subjectSeatIds: [l.to], sourceId: null, private: false })),
       yourWhisper: opts.yourWhisper ?? { allowed: true, left: 1 },
       camp: makeCamp(),
     },
@@ -802,7 +802,7 @@ function whisperView(opts: {
 describe("whisper status", () => {
   it("ready: seated, playing, between tricks, a Whisper left", () => {
     const model = buildSceneModel(server(whisperView({})), ui(), "big-index");
-    expect(model.whisper).toEqual({ shown: true, visible: true, used: false, active: false, state: "ready", reason: null, left: 1 });
+    expect(model.whisper).toEqual({ shown: true, visible: true, used: false, active: false, state: "ready", reason: null, left: 1, washes: false });
   });
 
   it("not shown at all outside the playing phase", () => {
@@ -832,11 +832,15 @@ describe("whisper status", () => {
     expect(buildSceneModel(server(view), ui(), "big-index").whisper).toMatchObject({ visible: false, state: "blocked", reason: "Blocked right now" });
   });
 
-  it("blocked under rain: says the rain blocks it", () => {
-    const view = whisperView({ yourWhisper: { allowed: false, left: 1 } });
-    if (view.stage.tag !== "camp") throw new Error("camp fixture");
-    const rainy: ExpeditionView = { ...view, stage: { ...view.stage, mods: [{ id: "rain", kind: "weather", strength: "full", status: [] }] } };
-    expect(buildSceneModel(server(rainy), ui(), "big-index").whisper).toMatchObject({ state: "blocked", reason: "Blocked by Rain" });
+  it("under rain: warns that your whisper will wash away, and says so once it has", () => {
+    const rainy = (view: ExpeditionView, left: number): ExpeditionView =>
+      view.stage.tag === "camp" ? { ...view, stage: { ...view.stage, mods: [{ id: "rain", kind: "weather", strength: "full", status: [{ kind: "washes", left, of: 1 }] }] } } : view;
+    const before = buildSceneModel(server(rainy(whisperView({}), 1)), ui(), "big-index");
+    expect(before.whisper).toMatchObject({ visible: true, state: "ready", washes: true });
+    const after = buildSceneModel(server(rainy(whisperView({ yourWhisper: { allowed: true, left: 0 }, log: [{ actor: "s2", to: "s3", washed: true }] }), 0)), ui(), "big-index");
+    expect(after.whisper).toMatchObject({ visible: false, used: true, state: "washed", reason: "Washed away", washes: false });
+    expect(after.whisperLog).toEqual(["Your whisper to Cara washed away"]);
+    expect(after.happenings).toEqual([{ key: "2:1:0", kind: "washed", text: "Your whisper to Cara washed away in the rain", cards: [] }]);
   });
 
   it("active reflects ui.targeting.mode === whisper", () => {
@@ -861,6 +865,11 @@ describe("whispers on the table", () => {
     expect(model.sentWhispers).toEqual([{ toSeatId: "s3", toName: "Cara", card: "A♠", objectId: "reveal:A♠" }]);
     expect(model.receivedWhispers).toEqual([]);
     expect(model.whisperLog).toEqual(["You whispered A♠ to Cara"]);
+  });
+
+  it("a washed whisper takes no card from the sender's heard ones", () => {
+    const view = whisperView({ reveals: [fromYou], log: [{ actor: "s2", to: "s1", washed: true }, { actor: "s1", to: "s2", washed: true }, { actor: "s2", to: "s3" }] });
+    expect(buildSceneModel(server(view), ui(), "big-index").whisperLog).toEqual(["Your whisper to Alice washed away", "Alice's whisper to you washed away", "You whispered A♠ to Cara"]);
   });
 
   it("a third seat sees only the names: no card anywhere", () => {

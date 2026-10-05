@@ -147,6 +147,9 @@ describe("BALANCE_DISPLAY", () => {
       itemSlots: 2,
       upgradePrice: 8,
       whispersPerUpgrade: 1,
+      fairWeatherChance: 80,
+      washes: { rain: { spared: 2, exposed: 2 }, downpour: { spared: 1, exposed: 3 } },
+      strikes: { max: 2, exposed: 1 },
     });
   });
 });

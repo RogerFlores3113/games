@@ -134,6 +134,7 @@ describe("cuesFor", () => {
   it("plays whisper and power for new log entries of those events", () => {
     const entry = (event: string, sourceId: string | null = null) => ({ event, actorSeatId: "a", subjectSeatIds: ["b"], sourceId, private: false });
     expect(cuesFor(game(), game({}, {}, [entry("whisper")]))).toEqual(["sfx-whisper"]);
+    expect(cuesFor(game(), game({}, {}, [entry("whisper-washed")]))).toEqual(["sfx-whisper"]);
     expect(cuesFor(game(), game({}, {}, [entry("use-ability", "explorer")]))).toEqual(["sfx-power"]);
     const had = game({}, {}, [entry("whisper")]);
     expect(cuesFor(had, game({}, {}, [entry("whisper")]))).toEqual([]);

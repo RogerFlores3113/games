@@ -1668,11 +1668,12 @@ and a bare identifier lives in `run/balance.ts`. A def's `text` repeats some of 
 | Fair weather chance | 80% | `NORMAL_WEATHER_CHANCE` |
 | Clifftop's fair weather chance | 50% | `content/mods/clifftop.ts` `normalWeatherChance` |
 | Location weights | clearing, jungle, clifftop, desert, cave, magma: 1 each | each def's `weight` in `content/mods/<id>.ts` |
-| Weather weights | rain, fog, thunderstorm, night: 1 each; fair 0 (drawn by chance) | each def's `weight` |
+| Weather weights | rain, fog, thunderstorm, night: 3 each; downpour 1 (a third of Rain); fair 0 (drawn by chance) | each def's `weight` |
+| Rain, Downpour washes | first whispers each camp, crew-wide: Rain players - 2, Downpour players - 1; on an exposed location (Clifftop) 2 and 3 more | `WASHES` |
 | Pairing and temple weights | steam, flooding, temple: 0 (never drawn) | each def's `weight` |
 | Boss pool | uniform over a tier's defs with weight above 0; every boss weight 1 | `run/plan.ts` `bossPool`, each def's `weight` |
 | Thunderstorm strike chance | 20% before trick 0, +10% per trick, capped at 100% | `THUNDERSTORM.firstChance`, `THUNDERSTORM.perTrick` |
-| Thunderstorm strikes per camp | at most 2 | `THUNDERSTORM.maxStrikes` |
+| Thunderstorm strikes per camp | at most 2, one more on an exposed location (Clifftop) | `THUNDERSTORM.maxStrikes`, `THUNDERSTORM.exposedStrikes` |
 | River (Flooding, Monsoon) | every objective done by trick `ceil(total * 3 / 4)` | `RIVER_SHARE`; `river` in `content/mods/flooding.ts` |
 | Heat (Magma) | no 2s or 3s, then 4s (clubs, diamonds, hearts, spades) until the deck divides by the seat count | `content/mods/magma.ts` `heatDeck`, `FOURS_ORDER` |
 | Tiger | pounces on a leader with 2 or more wins in a row; full every trick, half even trick indices | `content/mods/tiger.ts` `pounceOn`, `body(1)`, `body(2)` |
@@ -2060,3 +2061,65 @@ How each of the nine fits (for unit 13):
   for the replayed trick, as the Core's own hallucination does, so that
   trick gets its own storm roll. The dev shortcut `void-last-trick` still
   edits the state without reacting.
+
+### Implementation notes (batch 4: weather and the Pack Rat)
+
+- Rain no longer blocks whispers. The run hook `washedWhispers(run)` (base
+  0) says how many of the crew's first whispers each attempt wash away;
+  `applyWhisper` counts every whisper sent this attempt (`crewWhispers`)
+  and, below that number, spends the whisper with no `Reveal` and a public
+  log entry `{ event: "whisper-washed", actorSeatId, subjectSeatIds:
+  [target], sourceId: null }`. `whispersUsedBy` counts it, so it is spent.
+  A washed whisper still emits `whisper-sent`, so the Snake bites it: the
+  seat did whisper. Rain and Downpour share `washingBody` in
+  `content/mods/rain.ts`, with their numbers in `balance.ts`'s `WASHES`
+  (players less `spared`, plus `exposed` at an exposed location). Status
+  part `washes { left, of }`, mirrored in the schema.
+- Downpour pairs exactly as Rain (steam at magma, flooding in a cave,
+  never in the desert); `weather.test.ts` checks that relation for every
+  location. "A third as likely" is integer weights: Rain, Heavy fog,
+  Thunderstorm and Night go from 1 to 3 and Downpour is 1, so the four
+  older weathers keep their odds against each other. A seed's drawn routes
+  change.
+- Exposure is a location flag, `LocationDef.exposed` (Clifftop), read as
+  `ModCtx.exposed`; each weather says how it is harsher there rather than
+  the Clifftop naming weather ids. The Clifftop keeps its 50% fair chance.
+- Night hides every current-trick play from all but its player, as the
+  Cave does; Cave with Night stays "never".
+- Mosquito Net is untouched, per the brief: no weather blocks whispers now,
+  so its passive (`whisperAllowed`) does nothing and its text ("Rain can't
+  stop your whispers.") is stale until the item set is replaced. The
+  README's layering example that named it is dropped.
+- `draftShape` became `draftShapes(run, seatId)`: a clear deals one offer
+  per shape, in order, behind any queued special offers, seeded by its
+  ordinal. The Pack Rat's Big Pack appends a pick of three one-item bundles
+  of Pack Rat items (`PACK_RAT_PICK` in its file); its standard bundles no
+  longer carry Pack Rat items. Deviation: a one-item bundle never repeats
+  another option's item (`drawOffer`), so the pick is between three
+  different items; Treasure Map's one-item options are distinct too now.
+  Both offers are kind "standard"; the web tells the Pack Rat's pick by
+  every offered item being exclusive to one character (`ownPickOf`).
+- `RunState` is unchanged in shape, so `ROOM_SCHEMA_VERSION` stays 14.
+- Location and weather texts are rewritten as one warm line each (Clifftop:
+  "Exposed to the elements up here: weather hits harder."). Each is still
+  the rules sentence the chip tooltip and the rules modal show.
+- Web: the weather chip reads "1 of 2 wash away" while washes are left,
+  then "Heard now"; its tooltip says "1 of 2 whispers will wash away". Your
+  Whisper button's caption warns "Will wash away" while one is left, and
+  after your whisper washed away it reads "Washed away" in the rain's
+  colour (whisper state `washed`). Every seat gets a toast ("Bianca's
+  whisper to you washed away in the rain", a `washed` happening beside the
+  disasters') and a ticker line ("Your whisper to Bob washed away"). The
+  sound plays for a washed whisper too. Downpour has its own 9x9 icon and
+  overlay: denser, faster, longer streaks on a darker sky. The rules
+  modal's Weather page notes the fair chance and what the Clifftop does,
+  and the Whisper rules say how washing works. The Pack Rat's pick reuses
+  the draft cards with "Take it" for a one-item bundle and the prompt
+  "The Pack Rat's own pick: take one item"; the taken panel lists the
+  bundle and the pick together.
+- e2e: `expedition-camp.spec.ts` gains a forced Rain (a whisper washes
+  away, the button, ticker, toast and chip say so);
+  `expedition-characters.spec.ts`'s Pack Rat test drafts the bundle, then
+  the pick. The tour gains `camp-rain-washed`, `camp-downpour` and
+  `draft-pack-rat`; `camp-rain` shows a whisper about to wash away and
+  `camp-night` every teammate's card face down.

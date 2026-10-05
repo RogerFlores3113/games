@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { draftOffer, kitIds, pickDraftOffer, trailToCamp, walkTrail, type TrailView, type SceneName } from "./expedition-driver";
+import { autoplay, shortcut, soloTable } from "./expedition-dev-panel";
 import { clickObject, createExpeditionRoom, getModel, getScene, hoverObject, startExpeditionGame, waitForBridge } from "./expedition-helpers";
 
 /**
@@ -785,7 +786,7 @@ test("a forced Thunderstorm: its chance on the top bar, a strike's alert, and th
   await panel.getByTestId("dev-shortcut-set-spec").click();
   await expect.poll(async () => (await model()).mods.map((m) => m.id)).toEqual(["clifftop", "thunderstorm"]);
   let m = await model();
-  expect(m.mods[1]).toMatchObject({ name: "Thunderstorm", badge: "20%", pips: 2, alert: false });
+  expect(m.mods[1], "the exposed Clifftop gives the storm a third strike").toMatchObject({ name: "Thunderstorm", badge: "20%", pips: 3, alert: false });
   expect(m.sky).toMatchObject({ location: "clifftop", precipitation: "storm" });
 
   // One objective nobody can finish or fail this trick, and a strike on the
@@ -799,7 +800,7 @@ test("a forced Thunderstorm: its chance on the top bar, a strike's alert, and th
   await expect.poll(async () => (await model()).sky.strike).not.toBeNull();
   m = await model();
   const struck = m.sky.strike;
-  expect(m.mods[1]).toMatchObject({ badge: "Lowest wins", pips: 1, alert: true });
+  expect(m.mods[1]).toMatchObject({ badge: "Lowest wins", pips: 2, alert: true });
   expect(m.sky.notice).toBe("Lightning struck: the lowest card wins this trick");
 
   await panel.getByTestId("dev-autoplay-scope").selectOption("everyone");
@@ -886,4 +887,56 @@ test("a forced Cave: teammates' cards lie face down showing only their suit, and
   const last = (await model()).lastTrick!.plays;
   expect(last).toHaveLength(3);
   expect(last.find((p) => p.seatId === hidden.seatId)!.card!.label).toMatch(/^([2-9]|10|[JQKA])[♠♥♦♣]$|^(Sun|Moon)$/);
+});
+
+// ---------------------------------------------------------------------------
+// A forced Rain (needs the worker in dev mode, see dev-mode.spec.ts)
+// ---------------------------------------------------------------------------
+
+interface RainModel {
+  sceneKey: SceneName;
+  youSeatId: string;
+  mods: { id: string; name: string; badge: string | null }[];
+  sky: { precipitation: string };
+  faceUpObjectives: unknown[];
+  hand: { objectId: string; targetable: boolean }[];
+  seats: { seatId: string; objectId: string; isYou: boolean; targetable: boolean }[];
+  whisper: { visible: boolean; active: boolean; state: string; reason: string | null; washes: boolean };
+  whisperLog: string[];
+  happenings: { kind: string; text: string }[];
+  receivedWhispers: unknown[];
+  sentWhispers: unknown[];
+  targeting: { canConfirm: boolean } | null;
+}
+
+test("a forced Rain: the crew's first whisper washes away, the sender's button and every seat's ticker say so, and the chip counts it", async ({ page }) => {
+  test.setTimeout(120_000);
+  const panel = await soloTable(page, 2);
+  const model = () => getModel<RainModel>(page);
+  await shortcut(panel, "jump-to-camp", { length: "short", camp: "2", stage: "camp" });
+  await expect.poll(async () => (await model()).sceneKey).toBe("camp");
+  await shortcut(panel, "set-spec", { location: "jungle", weather: "rain" });
+  await expect.poll(async () => (await model()).mods.map((m) => m.id)).toEqual(["jungle", "rain"]);
+  await autoplay(panel, "everyone", (await model()).faceUpObjectives.length);
+  await expect.poll(async () => (await model()).whisper.visible).toBe(true);
+
+  let m = await model();
+  expect(m.mods[1]).toMatchObject({ name: "Rain", badge: "1 of 1 wash away" });
+  expect(m.sky.precipitation).toBe("rain");
+  expect(m.whisper.washes).toBe(true);
+
+  await page.getByTestId("dev-toggle").click();
+  m = await clickUntilChanged<RainModel>(page, WHISPER_ID, (x) => x.whisper.active);
+  m = await clickHandCard<RainModel>(page, m.hand.find((c) => c.targetable)!.objectId, (x) => x.seats.some((s) => s.targetable));
+  const mate = m.seats.find((s) => s.targetable)!;
+  await clickUntilChanged<RainModel>(page, mate.objectId, (x) => x.targeting?.canConfirm === true);
+  await clickUntilChanged<RainModel>(page, CONFIRM_ID, (x) => x.targeting === null);
+
+  await expect.poll(async () => (await model()).whisper.state).toBe("washed");
+  m = await model();
+  expect(m.whisper).toMatchObject({ visible: false, reason: "Washed away", washes: false });
+  expect(m.sentWhispers).toEqual([]);
+  expect(m.whisperLog).toEqual([expect.stringMatching(/^Your whisper to Bot \d washed away$/)]);
+  expect(m.happenings).toEqual([{ key: expect.any(String), kind: "washed", text: expect.stringMatching(/^Your whisper to Bot \d washed away in the rain$/), cards: [] }]);
+  expect(m.mods[1]).toMatchObject({ badge: "Heard now" });
 });

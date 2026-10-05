@@ -4,7 +4,7 @@ import type { Prompt } from "./build-prompt";
 import { buildTrailPrompt, PROMPT_MAX_CHARS } from "./build-prompt";
 import type { SceneServerInput, Tooltip, TopBar } from "./build-scene-model";
 import { buildTopBar } from "./build-scene-model";
-import { characterName, usesLabel, type UsesLabel, liveSourceKeys, sourceBadges, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, yourSourceId, type SourceKind } from "./source-text";
+import { characterName, ownPickOf, usesLabel, type UsesLabel, liveSourceKeys, sourceBadges, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, yourSourceId, type SourceKind } from "./source-text";
 import { bundleItemObjectId, bundleObjectId, crewObjectId, draftObjectId, kitObjectId, lengthObjectId, powerObjectId, READY_ID, rerollObjectId, routeObjectId } from "./expedition-ids";
 import { buildGear, buildShop, type Gear, type ShopPanel } from "./loadout-model";
 import { choiceFor, currentStep, isPicked, type LocalUiState, type PickEntity } from "./local-ui";
@@ -183,7 +183,9 @@ export interface VoteResult {
 }
 
 export type DraftPanel =
-  | { kind: "offer"; bundles: DraftBundle[] }
+  /** `ownPick`: the character whose own items these are (the Pack Rat's
+   * pick after the draft), else null. */
+  | { kind: "offer"; bundles: DraftBundle[]; ownPick: string | null }
   /** What you took, as the bundle's items; after a refresh, the newest item. */
   | { kind: "taken"; items: { sourceId: string; name: string }[] }
   | { kind: "none"; text: string };
@@ -412,7 +414,7 @@ function bundleFor(itemIds: readonly string[], bundle: number): DraftBundle {
 function buildDraft(view: View, yourOffer: { bundles: string[][] } | null, taken: readonly string[] | null): DraftPanel {
   const you = view.seats.find((s) => s.seatId === view.yourSeatId);
   if (you === undefined) return { kind: "none", text: "The crew is choosing" };
-  if (yourOffer !== null) return { kind: "offer", bundles: yourOffer.bundles.map(bundleFor) };
+  if (yourOffer !== null) return { kind: "offer", bundles: yourOffer.bundles.map(bundleFor), ownPick: ownPickOf(yourOffer.bundles) };
   if (taken !== null && taken.length > 0) return { kind: "taken", items: taken.map((sourceId) => ({ sourceId, name: sourceName(sourceId) })) };
   // Instances mint in order, so the newest is the last one taken.
   const newest = [...you.items.equipped, ...(you.items.backpack ?? [])].sort((a, b) => Number(a.uid.slice(2)) - Number(b.uid.slice(2))).at(-1);

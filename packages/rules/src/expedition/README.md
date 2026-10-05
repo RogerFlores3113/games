@@ -116,10 +116,13 @@ until the tag stops changing.
 4. **Settle.** A failure costs supplies and reopens the loadout for the same
    camp spec with a fresh deal; 0 supplies ends the run. A clear pays
    `5 + min(3, unplayed tricks)` into the shared purse and deals every seat
-   a private draft offer, or wins the run at the final camp.
+   its private draft offers (one per shape its composed `draftShapes` names:
+   the usual bundles, and for the Pack Rat a pick of one of three Pack Rat
+   items after them), or wins the run at the final camp.
 5. **Draft.** Each seat with an offer sends `pick-bundle { bundle }`: one
    instance per item of that bundle of its head offer, equipped while a slot
-   is free, else into the backpack.
+   is free, else into the backpack. The next offer in its queue is then its
+   head; the draft ends once no seat has one.
 6. **Route.** Each seat votes over 2 or 3 options to the next camp.
 7. **Event.** A stub with no effect yet. Each seat sends `ready`, then the
    next camp's loadout opens.
@@ -138,7 +141,7 @@ order) each live source's passive in `[character, ...powers, upgrade,
 ...equipped]` order, then each live effect's layer in `attempt.effects` order, then the
 passives marked `foldsLast`.** A boss
 folds after the weather so it can refine it; passives fold after both, so an
-item can lift a camp rule for its owner (Mosquito Net under Rain). A
+item can lift a camp rule for its owner. A
 `foldsLast` passive has the last word over items and effects (Momentum's
 whisper count). A backpack item is not live: no passive, no ability.
 
@@ -158,7 +161,14 @@ Night, Desert, Heavy fog); the view and the leak check both read it, so a
 new concealment needs no change to either. The Desert fixes its mirage by
 objective id at `camp-dealt` (an attempt effect), and the leak check reads
 that effect itself as well, so a `hides` that hides the wrong objective is
-caught. A boss uses whichever channel
+caught. The run hook `washedWhispers(run)` says how many of the crew's first
+whispers each attempt wash away (Rain, Downpour): `run/whisper.ts` spends
+such a whisper with no reveal at all and a public `whisper-washed` log
+entry, and the weather's `washes` status part counts what is left. A
+location marked `exposed` (Clifftop) sets `ctx.exposed` for the camp's
+other layers, and each weather says how it is harsher there (Rain and
+Downpour wash more whispers, the Thunderstorm strikes once more).
+A boss uses whichever channel
 its mechanic is: a question is a rule (Crocodile's guard, Wildfire's and
 Meteor's `burns`, Blood Moon's `identityOf`, the river that ends a Monsoon camp), a
 moment is a reaction (Snake's bite on `whisper-sent`; Tornado, Earthquake
@@ -332,9 +342,10 @@ as the engine did before them.
   `routeOptionCount(run, count)` (1 to 3); `swapsBoss(run, option)` gives
   that option a `swapBoss`, another boss of the next animal or disaster
   boss camp's tier, written into the plan when the route is chosen and
-  hidden while beyond the horizon; `draftShape(run, seatId)` is a cleared
-  camp's offer (`DraftShape`: options, bundle size, items exclusive to the
-  character, rare chance); `shopPrice(run, seatId, price)`, which the shop
+  hidden while beyond the horizon; `draftShapes(run, seatId)` lists a
+  cleared camp's offers, picked in order (`DraftShape`: options, bundle
+  size, items exclusive to the character, rare chance; a one-item bundle
+  never repeats another option's item); `shopPrice(run, seatId, price)`, which the shop
   view shows per viewer; `affectsSeat(run, seatId, origin)`, which the
   animal bosses ask through `ctx.affects` before singling a seat out (it
   folds the seat layers only); `freeUse(run, seatId, key)`; and
@@ -403,6 +414,8 @@ Locations, weathers, pairings, bosses and the temple are all `ModDef`s
      non-fair weather is drawn for a route by weight. A boss of weight
      above 0 joins its tier's pool, and `drawPlan` draws uniformly from the
      pool. Pairings, `fair` and the temple have weight 0.
+   - A location may set `exposed: true` (Clifftop): bad weather is harsher
+     there. A weather reads `ctx.exposed` and decides how.
    - A location may set `normalWeatherChance`, the percent chance of fair
      weather there (Clifftop: 50). Without it the route uses
      `NORMAL_WEATHER_CHANCE`.

@@ -37,6 +37,13 @@ export function characterName(characterId: string): string {
   return CHARACTER_DISPLAY[characterId]?.name ?? characterId;
 }
 
+/** The character whose own items fill every bundle of an offer (the Pack
+ * Rat's pick after a draft); null for an offer anyone could draft. */
+export function ownPickOf(bundles: readonly (readonly string[])[]): string | null {
+  const owners = new Set(bundles.flat().map((id) => SOURCE_DISPLAY[id]?.item?.exclusiveTo ?? null));
+  return owners.size === 1 ? ([...owners][0] ?? null) : null;
+}
+
 export function sourceKind(sourceId: string): SourceKind {
   return SOURCE_DISPLAY[sourceId]?.kind ?? "item";
 }

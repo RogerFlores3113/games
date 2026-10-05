@@ -86,6 +86,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       heading: "The Whisper",
       paragraphs: [
         "Once per camp, between tricks, show one card from your hand to one teammate. Everyone sees that you whispered, but only they see the card.",
+        "In Rain or a Downpour the crew's first whispers each camp wash away: they are spent, everyone sees them wash away, and nobody sees the card.",
       ],
       items: [],
     },
@@ -176,7 +177,10 @@ export function buildModPages(): ModPage[] {
         {
           id: "weather",
           heading: "Weather",
-          note: "Most camps have fair weather. Other weather is drawn for the route.",
+          note:
+            `Most camps have fair weather (${B.fairWeatherChance}% of routes, fewer on the Clifftop). Other weather is drawn for the route. ` +
+            `On the Clifftop bad weather hits harder: Rain washes away ${B.washes.rain.exposed} more whispers, a Downpour ${B.washes.downpour.exposed} more, ` +
+            `and lightning can strike ${B.strikes.max + B.strikes.exposed} times.`,
           entries: entriesOf("weather", () => null),
         },
         {

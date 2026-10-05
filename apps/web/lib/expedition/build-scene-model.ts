@@ -1,5 +1,5 @@
 import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionObjectiveView, ExpeditionTargetKind, ExpeditionView } from "@games/rules";
-import { attemptOf, campHeadline, focusCampIndex, ledSuit, whisperLog } from "./view-access";
+import { attemptOf, campHeadline, focusCampIndex, ledSuit, whisperLog, whispersSent } from "./view-access";
 import { SOURCE_DISPLAY } from "@games/rules";
 import type { CardPackId } from "./card-pack-ids";
 import {
@@ -24,7 +24,7 @@ import type { Prompt } from "./build-prompt";
 import { buildPrompt, describeOption } from "./build-prompt";
 import type { ObjectiveHolder } from "./objective-tooltip";
 import { objectiveTooltip } from "./objective-tooltip";
-import { buildModChips, buildSky, modTooltip, whisperBlocker, type ModChip, type Sky } from "./weather-model";
+import { buildModChips, buildSky, modTooltip, washedHappenings, washing, type ModChip, type Sky } from "./weather-model";
 import { bossBlockReason, bossHappenings, buildBoss, buildHelpers, latestGust, seatMarks, type BossHappening, type BossModel, type Gust, type SeatBossMark, type SeatNamer } from "./boss-model";
 import { buildTemplePath, type TemplePath } from "./temple-model";
 import { buildPopupShop, POPUP_SHOP, type PopupShopModel } from "./popup-shop-model";
@@ -154,7 +154,8 @@ export interface MiniCard {
   sourceName: string;
 }
 
-export type WhisperState = "ready" | "wait-between-tricks" | "used" | "blocked";
+/** "washed": spent, and the weather washed your last whisper away. */
+export type WhisperState = "ready" | "wait-between-tricks" | "used" | "washed" | "blocked";
 
 export interface ReceivedWhisper {
   fromSeatId: string;
@@ -234,8 +235,8 @@ export interface ShownPlayModel {
   countsAs: ExpeditionCardIdentityView | null;
 }
 
-/** A card on the stump played face down (a Cave, the Night's lead): only
- * the suit it follows as shows. */
+/** A card on the stump played face down (a Cave, the Night): only the suit
+ * it follows as shows. */
 export interface FaceDownPlayModel {
   seatId: string;
   hidden: true;
@@ -287,7 +288,8 @@ export interface SceneModel {
    * phrase for the unavailable states. `visible`: it can be started now.
    * `used`: you have spent every Whisper this camp. `left`: Whispers you may
    * still send this camp. */
-  whisper: { shown: boolean; visible: boolean; used: boolean; active: boolean; state: WhisperState; reason: string | null; left: number };
+  /** `washes`: the weather will wash your next whisper away. */
+  whisper: { shown: boolean; visible: boolean; used: boolean; active: boolean; state: WhisperState; reason: string | null; left: number; washes: boolean };
   /** Cards teammates named to you, kept face up for the attempt. */
   receivedWhispers: ReceivedWhisper[];
   /** Cards an ability showed you, and who held each. */
@@ -298,10 +300,11 @@ export interface SceneModel {
   gustSent: SentWhisper[];
   /** The latest gust, for its card flight; null before the first. */
   gust: Gust | null;
-  /** What the disasters did this attempt, oldest first, for their toasts. */
+  /** What the disasters did this attempt, and each whisper the weather
+   * washed away, oldest first, for their toasts. */
   happenings: BossHappening[];
-  /** One line per Whisper this attempt, oldest first. Public: names only,
-   * plus the card for a Whisper you sent. */
+  /** One line per Whisper this attempt, oldest first, a washed one saying
+   * so. Public: names only, plus the card for a Whisper you sent. */
   whisperLog: string[];
   banner: Banner | null;
   /** The current trick as a whole, for a board pick. */
@@ -589,16 +592,17 @@ function whisperStatus(view: ExpeditionView, active: boolean): SceneModel["whisp
   let reason: string | null = null;
   if (!mine.allowed) {
     state = "blocked";
-    reason = whisperBlocker(view) ?? "Blocked right now";
+    reason = "Blocked right now";
   } else if (mine.left === 0) {
-    state = "used";
-    const sent = whisperLog(view).some((entry) => entry.actorSeatId === view.yourSeatId);
-    reason = sent ? "Used this camp" : "No whispers this camp";
+    const last = whispersSent(view).filter((entry) => entry.actorSeatId === view.yourSeatId).at(-1);
+    state = last?.washed === true ? "washed" : "used";
+    reason = last === undefined ? "No whispers this camp" : last.washed ? "Washed away" : "Used this camp";
   } else if (attemptOf(view)?.window !== "between-tricks") {
     state = "wait-between-tricks";
     reason = "Between tricks";
   }
-  return { shown, visible: shown && state === "ready", used: state === "used", active, state, reason, left: mine.left };
+  const washes = (washing(view)?.left ?? 0) > 0;
+  return { shown, visible: shown && state === "ready", used: state === "used" || state === "washed", active, state, reason, left: mine.left, washes };
 }
 
 function buildWhispers(
@@ -618,8 +622,9 @@ function buildWhispers(
   );
 
   let sentSoFar = 0;
-  const whisperLines = whisperLog(view).map((l) => {
+  const whisperLines = whispersSent(view).map((l) => {
     const to = l.subjectSeatIds[0] ?? "";
+    if (l.washed) return `${l.actorSeatId === you ? "Your" : `${nameOf(l.actorSeatId)}'s`} whisper to ${to === you ? "you" : nameOf(to)} washed away`;
     if (l.actorSeatId === you) {
       const card = mineSent[sentSoFar++];
       return card === undefined ? `You whispered to ${nameOf(to)}` : `You whispered ${cardLabel(card.identity)} to ${nameOf(to)}`;
@@ -874,7 +879,7 @@ export function buildSceneModel(
     whisper,
     ...buildWhispers(view, roomSeats),
     gust: latestGust(view),
-    happenings: bossHappenings(view, namer),
+    happenings: [...bossHappenings(view, namer), ...washedHappenings(view, namer)],
     banner: ui.targeting === null ? buildBanner(view, roomSeats, ui) : null,
     boardPick: pickOrNull(ui, view, "board"),
     tray: buildTray(view, roomSeats, ui),

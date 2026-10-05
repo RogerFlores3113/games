@@ -4,7 +4,7 @@ import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } f
 import { cardLabel, rankLabel, SUIT_GLYPH } from "./expedition-ids";
 import type { LocalUiState } from "./local-ui";
 import { currentStep } from "./local-ui";
-import { sourceName, yourSourceId } from "./source-text";
+import { characterName, ownPickOf, sourceName, yourSourceId } from "./source-text";
 
 /**
  * The one line that always says what to do next. Reads only fields the view
@@ -298,7 +298,11 @@ export function buildTrailPrompt(view: ExpeditionView, seats: readonly PromptSea
       return waitingFor(view.seats.filter((s) => s.characterId === null || !voted(stage.ballots, s.seatId)).map((s) => s.seatId), "Setting out…");
     }
     case "draft":
-      if (stage.yourOffer !== null) return { text: `Camp ${stage.cleared} cleared! +${stage.payout} coins. Take a bundle`, tone: "your-move" };
+      if (stage.yourOffer !== null) {
+        const own = ownPickOf(stage.yourOffer.bundles);
+        if (own !== null) return { text: `${characterName(own)}'s own pick: take one item`, tone: "your-move" };
+        return { text: `Camp ${stage.cleared} cleared! +${stage.payout} coins. Take a bundle`, tone: "your-move" };
+      }
       return waitingFor(stage.pendingSeatIds, "Choosing the route…");
     case "route": {
       const next = stage.options[0]?.next.index ?? 0;

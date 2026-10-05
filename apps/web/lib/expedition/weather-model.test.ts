@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { ExpeditionCardIdentityView, ExpeditionModView, ExpeditionView } from "@games/rules";
-import { buildModChips, buildSky, modTooltip, whisperBlocker } from "./weather-model";
+import type { ExpeditionCardIdentityView, ExpeditionLogEntryView, ExpeditionModView, ExpeditionView } from "@games/rules";
+import { buildModChips, buildSky, modTooltip, washedHappenings } from "./weather-model";
 
 const STORM: ExpeditionModView = { id: "thunderstorm", kind: "weather", strength: "full", status: [{ kind: "chance", percent: 30, strikesLeft: 2 }] };
 const STRUCK: ExpeditionModView = { ...STORM, status: [{ kind: "chance", percent: 40, strikesLeft: 1 }, { kind: "strike" }] };
 const CLIFFTOP: ExpeditionModView = { id: "clifftop", kind: "location", strength: "full", status: [] };
-const RAIN: ExpeditionModView = { id: "rain", kind: "weather", strength: "full", status: [] };
+const RAIN: ExpeditionModView = { id: "rain", kind: "weather", strength: "full", status: [{ kind: "washes", left: 1, of: 2 }] };
+const DOWNPOUR: ExpeditionModView = { id: "downpour", kind: "weather", strength: "full", status: [{ kind: "washes", left: 0, of: 3 }] };
 
 /** A camp view with only what the sky and the chips read: the spec, the
  * mods, and the attempt's current trick. */
-function campView(weather: string, mods: ExpeditionModView[], trick = 0, removedCards: ExpeditionCardIdentityView[] = []): ExpeditionView {
+function campView(weather: string, mods: ExpeditionModView[], trick = 0, removedCards: ExpeditionCardIdentityView[] = [], log: ExpeditionLogEntryView[] = []): ExpeditionView {
   return {
     yourSeatId: "s1",
     runStatus: "in_progress",
@@ -26,7 +27,7 @@ function campView(weather: string, mods: ExpeditionModView[], trick = 0, removed
       tag: "camp",
       camp: { index: 2, location: "clifftop", weather, pairing: null, event: null, slotKinds: [], bossId: null, shop: false, survey: null },
       mods,
-      attempt: { attemptNumber: 1, camp: { currentTrick: { index: trick }, removedCards } } as never,
+      attempt: { attemptNumber: 1, log, camp: { currentTrick: { index: trick }, removedCards } } as never,
     },
   } as ExpeditionView;
 }
@@ -50,9 +51,10 @@ describe("buildModChips", () => {
 });
 
 describe("buildSky", () => {
-  it("rains under rain, storms under a thunderstorm, and is dry in fair weather", () => {
+  it("rains under rain, pours under a downpour, storms under a thunderstorm, and is dry in fair weather", () => {
     expect(buildSky(campView("rain", [RAIN]))).toEqual({ location: "clifftop", backdrop: "clifftop", precipitation: "rain", haze: "none", flood: null, strike: null, notice: null, bloodMoon: false });
     expect(buildSky(campView("thunderstorm", [STORM]))?.precipitation).toBe("storm");
+    expect(buildSky(campView("downpour", [DOWNPOUR]))?.precipitation).toBe("downpour");
     expect(buildSky(campView("fair", []))?.precipitation).toBe("none");
   });
 
@@ -94,10 +96,24 @@ describe("modTooltip", () => {
   });
 });
 
-describe("whisperBlocker", () => {
-  it("names the rain when it is in the camp", () => {
-    expect(whisperBlocker(campView("rain", [CLIFFTOP, RAIN]))).toBe("Blocked by Rain");
-    expect(whisperBlocker(campView("thunderstorm", [STORM]))).toBeNull();
+const whispered = (event: "whisper" | "whisper-washed", actorSeatId: string, toSeatId: string): ExpeditionLogEntryView => ({ event, actorSeatId, subjectSeatIds: [toSeatId], sourceId: null, private: false });
+const NAMES: Record<string, string> = { s1: "Ana", s2: "Bo", s3: "Cy" };
+const namer = { name: (seatId: string) => NAMES[seatId] ?? seatId, isYou: (seatId: string) => seatId === "s1" };
+
+describe("washing whispers", () => {
+  it("reads the washes left on the chip, and says it in full on hover", () => {
+    expect(buildModChips(campView("rain", [CLIFFTOP, RAIN]))[1]).toMatchObject({ name: "Rain", badge: "1 of 2 wash away" });
+    expect(modTooltip(campView("rain", [CLIFFTOP, RAIN]), "rain")?.badges).toEqual(["Weather", "1 of 2 whispers will wash away"]);
+    expect(buildModChips(campView("downpour", [DOWNPOUR]))[0]).toMatchObject({ name: "Downpour", badge: "Heard now" });
+    expect(modTooltip(campView("downpour", [DOWNPOUR]), "downpour")?.badges).toEqual(["Weather", "No more whispers wash away"]);
+  });
+
+  it("toasts each washed whisper, naming you, and none for one that was heard", () => {
+    const log = [whispered("whisper-washed", "s2", "s1"), whispered("whisper-washed", "s1", "s3"), whispered("whisper", "s3", "s2")];
+    expect(washedHappenings(campView("downpour", [DOWNPOUR], 0, [], log), namer)).toEqual([
+      { key: "2:1:0", kind: "washed", text: "Bo's whisper to you washed away in the downpour", cards: [] },
+      { key: "2:1:1", kind: "washed", text: "Your whisper to Cy washed away in the downpour", cards: [] },
+    ]);
   });
 });
 
