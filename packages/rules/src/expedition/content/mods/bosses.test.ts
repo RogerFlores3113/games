@@ -183,7 +183,7 @@ describe("Capybara", () => {
 });
 
 describe("Beaver", () => {
-  it("dams one suit each trick, moving on a suit per trick, unless it is all a player can follow with", () => {
+  it("dams one suit each trick, moving on a suit per trick, unless it is the only suit in a player's hand", () => {
     const fresh = campWith("beaver", camp({}));
     const [dam] = statusOf(fresh, "p0", "beaver");
     if (dam?.kind !== "dam") throw new Error("expected a dam status");
@@ -198,7 +198,10 @@ describe("Beaver", () => {
     };
     expect(legalFor([dammedCard, otherCard, sun])).toEqual(["other", "sun"]);
     expect(legalFor([dammedCard, sun])).toEqual(["dammed", "sun"]);
-    expect(legalFor([dammedCard, otherCard], [{ seatId: "p0", card: card("lead", std(dam.suit, 3)) }])).toEqual(["dammed"]);
+    const damLed = [{ seatId: "p0", card: card("lead", std(dam.suit, 3)) }];
+    expect(legalFor([dammedCard, otherCard], damLed)).toEqual(["other"]);
+    expect(legalFor([dammedCard, otherCard, sun], damLed)).toEqual(["other", "sun"]);
+    expect(legalFor([dammedCard, sun], damLed)).toEqual(["dammed"]);
 
     const later = campWith("beaver", camp({ completedTricks: [trick(0, "p0", filler(0))], currentTrick: { index: 1, leaderSeatId: "p0", plays: [] } }));
     expect(statusOf(later, "p0", "beaver")).toEqual([{ kind: "dam", suit: SUITS[(SUITS.indexOf(dam.suit) + 1) % 4] }]);

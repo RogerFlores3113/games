@@ -2043,3 +2043,10 @@ How each of the nine fits (for unit 13):
   variant mirrored in the schema; the web lists it as "Hidden". The leak
   check reads the dealt attempt's mirage effect too and does not count that
   card. The tour gains `route-survey`.
+- The Beaver follows the owner's literal rule: the dammed suit can't be
+  played unless it is the only suit in the hand, even when it is led. The
+  layer hands the previous `legalPlays` the seat's hand without its dammed
+  cards whenever another standard suit is in it, so a led dammed suit
+  plays as a void (any other suit or a joker). A hand of the dammed suit
+  and jokers plays as usual, so the dam never forces the Sun or Moon out.
+  Before, following suit won over the dam. The rules text says so.
