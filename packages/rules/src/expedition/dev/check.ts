@@ -27,7 +27,12 @@ function checkCrew(run: RunState, catalog: Catalog, problems: string[]): void {
   if (seats.length !== seatIds.length || seats.some((seat, i) => seat.seatId !== seatIds[i])) {
     problems.push("seats do not line up with seatIds in order");
   }
-  for (const seat of seats) {
+  // A kicked seat keeps its character and items, so it counts for uniqueness.
+  const kicked = run.kicked.map((k) => k.seat);
+  for (const seat of kicked) if (seatIds.includes(seat.seatId)) problems.push(`kicked seat ${seat.seatId} is still in the crew`);
+  for (const id of duplicates(kicked.map((seat) => seat.seatId))) problems.push(`seat ${id} is kicked more than once`);
+  const everyone = [...seats, ...kicked];
+  for (const seat of everyone) {
     if (seat.characterId !== null && !Object.hasOwn(catalog.characters, seat.characterId)) {
       problems.push(`${seat.seatId}: unknown character ${seat.characterId}`);
     }
@@ -42,9 +47,9 @@ function checkCrew(run: RunState, catalog: Catalog, problems: string[]): void {
       }
     }
   }
-  const characterIds = seats.flatMap((seat) => (seat.characterId === null ? [] : [seat.characterId]));
+  const characterIds = everyone.flatMap((seat) => (seat.characterId === null ? [] : [seat.characterId]));
   for (const id of duplicates(characterIds)) problems.push(`character ${id} is held by more than one seat`);
-  for (const uid of duplicates(seats.flatMap((seat) => seat.items.map((item) => item.uid)))) problems.push(`item uid ${uid} is owned more than once`);
+  for (const uid of duplicates(everyone.flatMap((seat) => seat.items.map((item) => item.uid)))) problems.push(`item uid ${uid} is owned more than once`);
   // The slots come from the composed rules, which only known ids can compose.
   if (problems.length > 0) return;
   const rules = rulesFor(run, catalog);

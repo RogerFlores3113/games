@@ -17,6 +17,21 @@ function dealt(): RunState {
 
 
 describe("checkRunState", () => {
+  it("counts a kicked seat's character and items, and flags a kicked seat still in the crew", () => {
+    const run = dealt();
+    const a = run.seats[0]!;
+    const twin = { ...run, kicked: [{ seat: { ...a, seatId: "d" }, position: 3, back: false }] };
+    expect(checkRunState(twin, CATALOG)).toContain(`character ${a.characterId} is held by more than one seat`);
+    expect(checkRunState({ ...run, kicked: [{ seat: { ...a, characterId: null }, position: 0, back: false }] }, CATALOG)).toContain("kicked seat a is still in the crew");
+  });
+
+  it("flags loaded dice that name an objective or a modifier this camp lacks", () => {
+    const run = dealt();
+    const attempt = attemptOf(run)!;
+    const loaded = withAttempt(run, { ...attempt, loaded: { rolls: { "dragon:full:start": 1 }, objectives: { nope: "done" } } });
+    expect(checkRunState(loaded, CATALOG)).toEqual(["loaded dice decide objective nope, which is not in this camp", "loaded dice pin dragon:full:start, a roll of no known camp modifier"]);
+  });
+
   it("passes a fresh run and a freshly dealt run", () => {
     expect(checkRunState(createRun({ seatIds: SEATS, seed: "check" }), CATALOG)).toEqual([]);
     expect(checkRunState(dealt(), CATALOG)).toEqual([]);

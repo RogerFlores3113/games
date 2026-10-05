@@ -14,6 +14,13 @@ describe("expeditionDevHooks", () => {
     expect(hooks.seatIds(fresh())).toEqual(["a", "b", "c"]);
   });
 
+  it("reports a kicked seat at its place, since the room keeps its seat", () => {
+    const run = createRun({ seatIds: ["a", "b", "c", "d"], seed: "hooks" });
+    const b = run.seats[1]!;
+    const benched = { ...run, seatIds: ["a", "c", "d"], seats: run.seats.filter((s) => s.seatId !== "b"), kicked: [{ seat: b, position: 1, back: false }] };
+    expect(hooks.seatIds(benched)).toEqual(["a", "b", "c", "d"]);
+  });
+
   it("offers every shortcut id with its group", () => {
     expect(hooks.shortcuts(fresh()).map((s) => [s.id, s.group])).toEqual([
       ["jump-to-camp", "Run"],

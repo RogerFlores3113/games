@@ -8,7 +8,12 @@ import { inspectRun } from "./inspect";
 import { DEV_SHORTCUTS, type ShortcutDef } from "./shortcuts";
 
 export const expeditionDevHooks: GameDevHooks<RunState> = {
-  seatIds: (run) => run.seatIds,
+  // The room keeps a kicked player's seat, so a saved state's seats are the
+  // crew with each kicked seat back at its place, as rejoining puts it.
+  seatIds: (run) =>
+    [...run.kicked]
+      .sort((a, b) => a.position - b.position)
+      .reduce<string[]>((ids, k) => [...ids.slice(0, k.position), k.seat.seatId, ...ids.slice(k.position)], [...run.seatIds]),
 
   check: (run) => checkRunState(run, CATALOG),
 

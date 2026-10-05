@@ -2205,3 +2205,7 @@ How each of the nine fits (for unit 13):
   browser.
 - The canvas fills a 1280x720 or 1920x1080 window, so the toolbar overlays the bottom 28 px
   (at muster, the length cards' "No votes yet" line). Its ‹ button folds it to DEV.
+- `dev/check.ts` now counts kicked seats: a kicked seat must be out of the crew and kicked once,
+  and its character and item uids count toward uniqueness. The dev `seatIds` hook lists a kicked
+  seat back at its place (the room keeps its seat), so a saved state with a kicked seat loads
+  into a room of the same size with every seat id renamed.
