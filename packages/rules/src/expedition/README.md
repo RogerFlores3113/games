@@ -124,8 +124,12 @@ until the tag stops changing.
 7. **Event.** A stub with no effect yet. Each seat sends `ready`, then the
    next camp's loadout opens.
 
-A disconnected seat's ballot is cast as an abstention by the worker's
-auto-pass after the existing grace.
+A seat disconnected past the worker's auto-pass grace never holds the
+table: `run/absent.ts`'s `absentSeatAction` (the adapter's
+`autoPassRequest`) picks the first free character in registry order,
+abstains from votes, takes the head offer's first bundle, readies with the
+gear it has and passes a gated window. Bot seats have no disconnect time,
+so it never acts for them.
 
 **Layering order** (`run/compose.ts`): **base, then each camp-stack
 layer's `rules` (location, weather, pairing, the boss or the temple, then

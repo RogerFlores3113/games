@@ -187,8 +187,13 @@ describe("expeditionGame: autoPassRequest", () => {
     expect(expeditionGame.autoPassRequest!(betweenTricks!, "p0")).toBeNull();
   });
 
-  it("names an abstention for a seat that has not voted at muster, and null once it has", () => {
-    const fresh = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
+  it("names an abstention for a seat with a character that has not voted at muster, and null once it has", () => {
+    let fresh = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
+    for (const [seatId, characterId] of [["p0", "hermit"], ["p1", "leader"]] as const) {
+      const picked = expeditionGame.applyAction(fresh, seatId, { type: "pick-character", characterId });
+      if (!picked.ok) throw new Error(picked.error);
+      fresh = picked.state;
+    }
     const voted = expeditionGame.applyAction(fresh, "p1", { type: "vote", choice: "long" });
     if (!voted.ok) throw new Error(voted.error);
     expect(expeditionGame.autoPassRequest!(voted.state, "p0")).toEqual({ type: "vote", choice: null });
@@ -209,7 +214,59 @@ describe("expeditionGame: autoPassRequest", () => {
     if (!passed.ok) throw new Error(passed.error);
     expect(passed.state.stage.tag).toBe("loadout");
     expect(passed.state.history).toEqual([{ camp: 3, attempt: 1, status: "failed", suppliesSpent: 1, coins: 0 }]);
-    expect(expeditionGame.autoPassRequest!(passed.state, "p0")).toBeNull();
+    expect(expeditionGame.autoPassRequest!(passed.state, "p0")).toEqual({ type: "ready" });
+  });
+
+  it("picks the first free character for an absent seat at muster, J.D. first", () => {
+    const fresh = fixtures().fresh!;
+    expect(expeditionGame.autoPassRequest!(fresh, "p2")).toEqual({ type: "pick-character", characterId: "jd" });
+    const picked = expeditionGame.applyAction(fresh, "p0", { type: "pick-character", characterId: "jd" });
+    if (!picked.ok) throw new Error(picked.error);
+    expect(expeditionGame.autoPassRequest!(picked.state, "p2")).toEqual({ type: "pick-character", characterId: "businessman" });
+    expect(expeditionGame.autoPassRequest!(picked.state, "p0")).toEqual({ type: "vote", choice: null });
+  });
+
+  it("carries a muster with two absent seats to camp 1's loadout", () => {
+    let run = fixtures().fresh!;
+    for (const action of [{ type: "pick-character", characterId: "leader" }, { type: "vote", choice: "short" }] as const) {
+      const acted = expeditionGame.applyAction(run, "p0", action);
+      if (!acted.ok) throw new Error(acted.error);
+      run = acted.state;
+    }
+    for (let step = 0; step < 4; step++) {
+      for (const seatId of ["p1", "p2"]) {
+        const request = expeditionGame.autoPassRequest!(run, seatId);
+        if (request === null) continue;
+        const passed = expeditionGame.applyAction(run, seatId, request);
+        if (!passed.ok) throw new Error(passed.error);
+        run = passed.state;
+      }
+    }
+    expect(run.stage.tag).toBe("loadout");
+    expect(run.seats.map((seat) => seat.characterId)).toEqual(["leader", "jd", "businessman"]);
+  });
+
+  it("readies an absent seat in the loadout and at an event with the gear it has", () => {
+    const loadout = setupRun({ seatIds: ["p0", "p1", "p2"], seed: SEED, catalog: CATALOG, camp: 2, items: { p1: ["bait"] } });
+    expect(expeditionGame.autoPassRequest!(loadout, "p1")).toEqual({ type: "ready" });
+    const readied = expeditionGame.applyAction(loadout, "p1", { type: "ready" });
+    if (!readied.ok) throw new Error(readied.error);
+    expect(expeditionGame.autoPassRequest!(readied.state, "p1")).toBeNull();
+    expect(readied.state.seats[1]!.equipped).toEqual(loadout.seats[1]!.equipped);
+
+    const spec = loadout.stage.tag === "loadout" ? loadout.stage.camp : null;
+    const event: RunState = { ...loadout, stage: { tag: "event", route: { id: "a", next: spec!, reroll: 0, swapBoss: null }, ready: { p0: true } } };
+    expect(expeditionGame.autoPassRequest!(event, "p2")).toEqual({ type: "ready" });
+    expect(expeditionGame.autoPassRequest!(event, "p0")).toBeNull();
+  });
+
+  it("takes the first bundle offered to an absent seat in the draft", () => {
+    const draft = fixtures().draft!;
+    expect(expeditionGame.autoPassRequest!(draft, "p1")).toEqual({ type: "pick-bundle", bundle: 0 });
+    const taken = expeditionGame.applyAction(draft, "p1", { type: "pick-bundle", bundle: 0 });
+    if (!taken.ok) throw new Error(taken.error);
+    expect(taken.state.seats[1]!.items.map((item) => item.itemId)).toEqual(["bait", "parrot"]);
+    expect(expeditionGame.autoPassRequest!(taken.state, "p1")).toBeNull();
   });
 });
 

@@ -6,7 +6,9 @@
 import { describe, expect, it } from "vitest";
 import type { RoomCode, RoomState, SeatToken } from "@games/schema";
 import { ABSENT_SEAT_PASS_GRACE_MS } from "@games/schema";
-import { autoPassAbsentSeats, awaitedSeatIds, createEmptyRoom, joinRoom, markConnected, seatsToAutoPass, startGame, toSeatView } from "./room-state";
+import type { RunState } from "@games/rules";
+import { EXPEDITION_GAME_ID } from "@games/schema/games/expedition";
+import { applyGameAction, autoPassAbsentSeats, awaitedSeatIds, createEmptyRoom, joinRoom, markConnected, seatsToAutoPass, startGame, toSeatView } from "./room-state";
 import { computeRoomTimers } from "./scheduler";
 import { TEST_GAME_REGISTRY, TOY_GAME_ID } from "../test/toy-game";
 
@@ -90,5 +92,70 @@ describe("computeRoomTimers: auto_pass", () => {
     const timers = computeRoomTimers(idle, LEFT_AT, { awaitedSeatIds: ["s1"] });
     expect(timers.filter((t) => t.type === "auto_pass")).toEqual([]);
     expect(timers.filter((t) => t.type === "zombie_sweep")).toHaveLength(1);
+  });
+});
+
+describe("autoPassAbsentSeats: Expedition", () => {
+  const DUE = LEFT_AT + ABSENT_SEAT_PASS_GRACE_MS;
+
+  function expeditionRoom(): RoomState {
+    let state = createEmptyRoom(ROOM_CODE, 0);
+    for (let i = 0; i < 3; i++) {
+      const joined = joinRoom(state, {
+        displayName: `Player ${i}`,
+        now: i + 1,
+        mintSeatId: () => `e${i}`,
+        mintSeatToken: () => `et${i}` as unknown as SeatToken,
+        ...(i === 0 ? { gameId: EXPEDITION_GAME_ID } : {}),
+      });
+      if (!joined.ok) throw new Error(`join ${i}: ${joined.reason}`);
+      state = joined.state;
+    }
+    const started = startGame(state, "e0", 10, "seed-expedition");
+    if (!started.ok) throw new Error(`start: ${started.reason}`);
+    return started.state;
+  }
+
+  function act(state: RoomState, seatId: string, request: unknown, now: number): RoomState {
+    const result = applyGameAction(state, seatId, `${seatId}:${now}`, request, now);
+    if (!result.ok) throw new Error(`${seatId}: ${result.reason}`);
+    return result.state;
+  }
+
+  /** The room's auto-pass alarm firing, a moment apart, until nobody absent is due. */
+  function alarms(state: RoomState): RoomState {
+    let current = state;
+    for (let i = 0; i < 10; i++) {
+      const next = autoPassAbsentSeats(current, DUE + i);
+      if (next === current) return current;
+      current = next;
+    }
+    return current;
+  }
+
+  const run = (state: RoomState) => state.game as RunState;
+
+  it("picks a character and abstains for a seat that dropped at the muster, then readies it into camp 1", () => {
+    let state = markConnected(expeditionRoom(), "e2", false, LEFT_AT);
+    state = act(state, "e0", { type: "pick-character", characterId: "leader" }, 20);
+    state = act(state, "e1", { type: "pick-character", characterId: "hermit" }, 21);
+    state = act(state, "e0", { type: "vote", choice: "short" }, 22);
+    state = act(state, "e1", { type: "vote", choice: "short" }, 23);
+    expect(run(state).stage.tag).toBe("muster");
+
+    state = alarms(state);
+    expect(run(state).stage.tag).toBe("loadout");
+    expect(run(state).seats.map((seat) => seat.characterId)).toEqual(["leader", "hermit", "jd"]);
+
+    state = act(state, "e0", { type: "ready" }, 24);
+    state = act(state, "e1", { type: "ready" }, 25);
+    state = alarms(state);
+    expect(run(state).stage.tag).toBe("camp");
+  });
+
+  it("never acts for a bot seat, which has no disconnect time", () => {
+    const room = expeditionRoom();
+    const botted: RoomState = { ...room, seats: room.seats.map((seat) => (seat.seatId === "e2" ? { ...seat, connected: false, disconnectedAt: null, bot: true } : seat)) };
+    expect(autoPassAbsentSeats(botted, DUE)).toBe(botted);
   });
 });

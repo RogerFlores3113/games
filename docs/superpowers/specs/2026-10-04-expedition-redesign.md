@@ -1994,3 +1994,14 @@ How each of the nine fits (for unit 13):
   camp with one could not be won. A flood that fails an objective now opens
   rescue like any failed objective (a failed goal never did). A camp cleared
   at the flood is paid for its unplayed tricks like any early clear.
+- A disconnected seat no longer freezes the table (lead decision).
+  `run/absent.ts`'s `absentSeatAction`, which the adapter's
+  `autoPassRequest` returns after the existing grace, picks the first free
+  character in registry order at the muster (J.D. first), abstains from a
+  vote, takes the head offer's first bundle in the draft (a special offer
+  too; it never uses Cash Out), readies in the loadout and at an event with
+  the gear it has, and passes a gated window. Bots have no disconnect time,
+  so the worker never auto-passes them. Each alarm submits one action per
+  seat; the room reschedules while the seat is still awaited, so a muster
+  takes two alarms (character, then ballot). This answers the open question
+  on auto-readying.

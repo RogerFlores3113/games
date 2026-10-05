@@ -13,9 +13,8 @@
 import type { AdapterResult, GameAdapter } from "../../adapter";
 import { createRun, runStatus } from "../run/lifecycle";
 import { applyRunAction } from "../run/stages/registry";
-import { attemptOf } from "../run/attempt";
 import { CATALOG } from "../run/catalog";
-import { gatedPendingSeatIds } from "../run/windows";
+import { absentSeatAction } from "../run/absent";
 import { expeditionDevHooks } from "../dev/hooks";
 import { toExpeditionPlayerView } from "./view";
 import { parseRunAction } from "./request-guards";
@@ -57,12 +56,8 @@ export const expeditionGame: GameAdapter<RunState, RunAction, ExpeditionConfig, 
     return { outcome: status, campReached: state.history.at(-1)?.camp ?? 0, suppliesLeft: state.supplies };
   },
 
-  /** A seat with no ballot abstains; a seat a gated window waits on passes. */
   autoPassRequest(state, seatId) {
-    const stage = state.stage;
-    if ((stage.tag === "muster" || stage.tag === "route") && !Object.hasOwn(stage.ballots, seatId)) return { type: "vote", choice: null };
-    if (attemptOf(state) === null) return null;
-    return gatedPendingSeatIds(state, CATALOG).includes(seatId) ? { type: "skip-window" } : null;
+    return absentSeatAction(state, seatId, CATALOG);
   },
 
   dev: expeditionDevHooks,
