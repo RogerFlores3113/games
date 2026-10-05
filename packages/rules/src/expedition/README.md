@@ -555,7 +555,7 @@ yet." })`, exported as `blankEvent` and registered as `event: blankEvent`.
 2. A gated window needs a hold in `run/stages/camp.ts`'s `settleIfDecided`
    (rescue holds the settle) and is passed with `skip-window`.
    `gatedPendingSeatIds` already counts any gated window.
-3. The web client shows a gated window as the banner on the stump
+3. The web client shows a gated window as the banner on the table
    (`buildBanner` in `apps/web/lib/expedition/build-scene-model.ts`); an open
    window needs nothing more, since `yourAbilities` already says what is
    usable now.
@@ -626,10 +626,10 @@ yet." })`, exported as `blankEvent` and registered as `event: blankEvent`.
 
 ## Add an interactable
 
-Interactables are clickable world objects, for fun only (spec §5.4): a
-campfire's spark burst, scattering fireflies, a swinging lantern, the camp
-mascot's click bubble. **They never change game state and never reach the
-server** — the registry lives entirely in `apps/web`, not in this package:
+Interactables are clickable world objects, for fun only (spec §5.4):
+scattering fireflies and the camp mascot's click bubble. **They never change
+game state and never reach the server** — the registry lives entirely in
+`apps/web`, not in this package:
 `apps/web/components/expedition/phaser/interactables/registry.ts`'s
 `INTERACTABLE_REGISTRY`, built in Phase 12. The fixed contract: an
 `InteractableDef` is one new file under `interactables/<id>.ts` plus one
@@ -674,7 +674,10 @@ only act for your seat. Bots abstain from votes, so your ballot decides. A
 room made the usual way gets the same from the toolbar's "Fill with bots and
 start" in the lobby.
 
-**Toolbar.** Always on the bottom edge (‹ folds it to its DEV button):
+**Toolbar.** Always on the bottom edge (‹ folds it to its DEV button). The
+stage keeps a strip free for it when it can do so at the same zoom; where
+the stage fills the window (exactly 1280x720 or 1920x1080) the toolbar
+starts folded so it covers nothing, and › unfolds it over the stage:
 - Go: jump to camp N of a run length, arriving at the table, the loadout,
   the shop (the loadout before a boss camp) or the route vote that leads
   there (the draft before it skipped).

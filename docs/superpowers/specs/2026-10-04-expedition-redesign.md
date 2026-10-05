@@ -2221,3 +2221,73 @@ How each of the nine fits (for unit 13):
   and its character and item uids count toward uniqueness. The dev `seatIds` hook lists a kicked
   seat back at its place (the room keeps its seat), so a saved state with a kicked seat loads
   into a room of the same size with every seat id renamed.
+
+### Implementation notes (batch 4: look and feel)
+
+- Tables. Each location sets out its own table (`tables/table-<id>.png`,
+  416x224, PixelLab 208x112 at 2x): the Jungle's stump, the Clifftop's
+  granite slab, the Magma pool's basalt pillar, the Clearing's patch of
+  bare dirt, the Desert's sandstone block, the Cave's boulder, and the
+  temple's carved altar wherever the temple stands (`tableOf(backdrop)`).
+  The old 384x176 stump, its placement constant and the floating look are
+  gone. `layout.ts`'s `TABLE_ROWS` records, per art, where its flat top
+  begins and where its foot ends; every table is lifted so its top starts
+  at `ZONES.table.y` (148), and its foot runs down behind the board, which
+  stands on the stage's bottom edge, so the table reads as one surface
+  rising from the bottom of the screen (`layout.test.ts`: every table's foot
+  reaches behind its board). The zone `stump` is now `table` (h 80), and the
+  ticker moved up to 228 to clear the tooltip.
+- The tables' tops are shallower than the old stump's (about 54 px), so the
+  trick moved: the back seats' cards sit at the far rim (y 148), the side
+  seats' at 154, yours at the front (318, 164), and the seat straight
+  behind you plays left of centre (286) so no two cards overlap. Deviation
+  from "keep the trick where it was": the spots changed, the zone did not.
+- Boards. Your hand stands on a board of the table's material
+  (`tables/board-<id>.png`, 424x72): the fan moved up 16 px (`HAND_CARD_Y`
+  300; the hand zone 288..356, the temple's plate path to 272, the tooltip
+  to 248) so the board's front shows under the cards, and its ends past a
+  short fan. The board casts a dark band on the table along its rim and has
+  a lit lip where the cards stand, so table and board never read as one.
+  The dark tray behind the fan is deleted.
+- Camp furniture. The campfire and lantern interactables, their art and
+  prompt specs are deleted; the fireflies (centred in the world column) and
+  the mascot remain. The trail and run-end backdrops keep their own fires.
+- HUD. Supplies are crates only, "Supplies 3 of 4" hanging under the bar on
+  hover; the purse is the new 16x16 coin (`ui/coin.png`) and its count,
+  "12 coins" on hover. Hover labels hang left of the prompt plate so they
+  never cover it, and follow the pointer itself rather than an object's
+  hover events, so a redraw (a teammate's move) under a still pointer keeps
+  them up.
+- Progress map. The camp label is a chip (`MAP_ID`) that opens "Map of the
+  run", an HTML dialog like the rules modal (Esc, the close button or a
+  click outside closes it). `buildProgressMap(view)` lists every camp: where
+  it was played (or the camp the crew is at or heads to), its boss once a
+  route preview revealed it (else its tier), "Cleared on try 2", "You are
+  here, try 3", "Next" between camps, "Lost here". To show where past camps
+  were, `CampResult` (and its view) gained `location` and `weather`;
+  `ROOM_SCHEMA_VERSION` is 16. A dev jump to a later camp writes no history
+  for the camps it skips, so those read "Not chosen yet".
+- Cursors. A pixel glove (`cursors/<kind>.png`, 16x16 at 2x, hotspots in
+  `cursors.ts`): the plain glove on the canvas and the board's HTML, pointing
+  over anything clickable (every `useHandCursor` became `cursor:
+  CURSOR.pointer` or `pointerIf`), open over a hand card you can play or a
+  loadout item you can drag, closed while dragging either, blocked over a
+  card the rules refuse on your turn and over a disabled HTML control.
+  `pointerIf(false)` is `undefined`: Phaser reads an empty config object as
+  a hit area and throws on hover.
+- Art pipeline. All new art went through `fetch-art.mjs` from the PixelLab
+  job downloads (tables and boards at scale 2, the coin at 1, the cursors at
+  2), is listed in `art-files.generated.ts`, `CREDITS.md` and
+  `make-prompts.mjs` (TABLES, BOARDS and UI_ICONS with every prompt and job
+  or object id; four tables are img2img from the stump at strength 80).
+- Fixes. A no-tricks objective reads "No tricks" ("=0" in a crowded row),
+  never "0 tricks", which the plate's count above it already reads. The dev
+  toolbar no longer covers the stage: the stage keeps a 28 px strip for it
+  when that costs no zoom (`toolbarReserve`), and where the stage fills the
+  window (exactly 1280x720 or 1920x1080) the toolbar starts folded to its
+  DEV button in the bottom-left corner, which covers only panel padding;
+  unfolding it there lasts until the window changes. The kick vote sits in
+  `KICK_POCKET` (546, 26, 90x17), the stage pocket under the corner buttons
+  that no scene draws in, positioned from the canvas at any zoom, one pill
+  high; two or more dropped or returning teammates fold into one pill that
+  opens the list.
