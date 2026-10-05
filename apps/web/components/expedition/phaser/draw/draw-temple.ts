@@ -1,5 +1,5 @@
 /**
- * The temple's plate path along the foot of the stump: "Plates 2/9", one
+ * The temple's plate path along the foot of the table: "Plates 2/9", one
  * tile per plate with its suit's pip (the Sun last), and what to lead next.
  * A pressed plate is lit, the next one outlined with a pulsing ring,
  * those ahead dark. Hovering the row shows the temple's rules.

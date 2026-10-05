@@ -1,0 +1,17 @@
+{
+  "id": "table-clifftop",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "a wide flat grey granite stone slab card table on a clifftop, seen from slightly above, wide weathered flat top with cracks and lichen, thick rough rock body running straight down off the bottom edge of the image, isolated object on plain background",
+    "init_image_url": "https://api.pixellab.ai/mcp/images/0fad0915-6d5e-4bb4-8ed4-981f2088ef60/download",
+    "init_image_strength": 80,
+    "view": "high top-down",
+    "outline": "single color black outline",
+    "shading": "detailed shading",
+    "no_background": true,
+    "seed": 5
+  },
+  "job": "1ae665ad-6254-43fb-bd81-c36f8f876706",
+  "scale": 2,
+  "note": "208x112 like its init image; natively transparent"
+}

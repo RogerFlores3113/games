@@ -4,6 +4,7 @@
  * value comes from the trail model; a tap, drag or buy only calls a handler.
  */
 import type Phaser from "phaser";
+import { CURSOR, pointerIf } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
 import { PACK_COLS, PACK_ROWS, TRAIL_ZONES, gearLayout, type Rect } from "../layout";
@@ -72,7 +73,7 @@ export function gearTile(scene: Phaser.Scene, item: GearItem, w: number, h: numb
 function placeGearTile(ctx: LoadoutCtx, item: GearItem, rect: Rect, locked: boolean): void {
   const tile = gearTile(ctx.scene, item, rect.w, rect.h).setPosition(rect.x, rect.y);
   const bg = tile.list[0] as Phaser.GameObjects.Rectangle;
-  bg.setInteractive({ useHandCursor: !locked || item.targetable });
+  bg.setInteractive(locked ? pointerIf(item.targetable) : { cursor: CURSOR.grab });
   if (!locked || item.targetable) bg.on("pointerdown", () => ctx.handlers.onGearPress(item.uid));
   hoverable(bg, ctx, item.uid, item.objectId);
   ctx.layer.add(tile);

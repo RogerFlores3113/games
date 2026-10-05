@@ -44,6 +44,14 @@ async function chipStatus(page: Page, objectId: string): Promise<string | null> 
   }, objectId);
 }
 
+/** The stage fills a 1280x720 window, so the toolbar starts folded to its
+ * DEV button there, covering nothing; this unfolds it. */
+async function unfoldToolbar(page: Page): Promise<void> {
+  await expect(page.getByTestId("dev-toolbar-jump-to-camp")).toBeHidden();
+  await page.getByTestId("dev-toolbar-collapse").click();
+  await expect(page.getByTestId("dev-toolbar-jump-to-camp")).toBeVisible();
+}
+
 async function toolbar(page: Page, id: string, fields: Record<string, string> = {}, answer = /: done\.$/): Promise<void> {
   for (const [name, value] of Object.entries(fields)) {
     const field = page.getByTestId(`dev-toolbar-field-${id}-${name}`);
@@ -64,6 +72,7 @@ test("one tab: play solo, skip to a Long run's disaster, mark an objective, set 
   await waitForBridge(page);
   await expect.poll(() => getScene(page)).toBe("trail");
   await expect(page.getByTestId("dev-toolbar")).toBeVisible();
+  await unfoldToolbar(page);
   await expect(page.getByTestId("dev-toolbar-bots")).toBeChecked();
   await shot(page, "1-muster-1280");
 
@@ -118,11 +127,12 @@ test("one tab: play solo, skip to a Long run's disaster, mark an objective, set 
   await shot(page, "5-run-end-1920");
 });
 
-test("the toolbar folds away to its DEV button, and a right-click on bare table offers nothing", async ({ page }) => {
+test("the toolbar starts folded where the stage fills the window and folds away to its DEV button, and a right-click on bare table offers nothing", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/");
   await page.getByTestId("play-solo-dev").click();
   await waitForBridge(page);
+  await unfoldToolbar(page);
   await toolbar(page, "jump-to-camp", { length: "standard", camp: "2", stage: "camp" }, /^Jump to camp: done\.$/);
   await expect.poll(() => getScene(page)).toBe("camp");
 
@@ -137,4 +147,37 @@ test("the toolbar folds away to its DEV button, and a right-click on bare table 
   await expect(page.getByTestId("dev-toggle")).toBeVisible();
   await page.getByTestId("dev-toolbar-collapse").click();
   await expect(page.getByTestId("dev-toolbar-jump-to-camp")).toBeVisible();
+});
+
+test("the HUD names the supplies and the purse on hover, and the camp label opens the map of the run", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/");
+  await page.getByTestId("play-solo-dev").click();
+  await waitForBridge(page);
+  await unfoldToolbar(page);
+  await toolbar(page, "jump-to-camp", { length: "standard", camp: "2", stage: "camp" }, /^Jump to camp: done\.$/);
+  await expect.poll(() => getScene(page)).toBe("camp");
+  await toolbar(page, "set-spec", { location: "cave", weather: "rain" }, /^Set the camp's location and weather: done\.$/);
+
+  const texts = () => page.evaluate(() => window.__expeditionTest!.layout().filter((e) => e.kind === "text").map((e) => e.label));
+  const stage = (x: number, y: number) => page.evaluate(([px, py]) => window.__expeditionTest!.pagePoint({ x: px!, y: py! })!, [x, y]);
+  const crate = await stage(14, 11);
+  await page.mouse.move(crate.x, crate.y);
+  await expect.poll(texts).toContain("Supplies 3 of 4");
+  const { topBar } = await page.evaluate(() => window.__expeditionTest!.model as { topBar: { purse: number } });
+  const coin = await stage(88, 11);
+  await page.mouse.move(coin.x, coin.y);
+  await expect.poll(texts).toContain(`${topBar.purse} coins`);
+
+  const map = (await page.evaluate(() => window.__expeditionTest!.positionOf("map")))!;
+  await page.mouse.click(map.x, map.y);
+  const modal = page.getByTestId("expedition-map-modal");
+  await expect(modal).toBeVisible();
+  await expect(page.getByTestId("expedition-map-heading")).toHaveText("Standard run, camp 2 of 6");
+  await expect(page.getByTestId("expedition-map-stop-2")).toContainText("Cave");
+  await expect(page.getByTestId("expedition-map-stop-2")).toContainText("Rain");
+  await expect(page.getByTestId("expedition-map-stop-2")).toContainText("You are here");
+  await expect(page.getByTestId("expedition-map-stop-6")).toContainText("The Temple");
+  await page.keyboard.press("Escape");
+  await expect(modal).toBeHidden();
 });

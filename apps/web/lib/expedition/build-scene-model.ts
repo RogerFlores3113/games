@@ -72,6 +72,8 @@ export interface TopBar {
   /** The crew's shared coins. */
   purse: number;
   camp: string;
+  /** The camp label opens the map of the run once the run's length is set. */
+  map: boolean;
   /** The supply crates as an ability target (First Aid Kit); null outside
    * targeting. */
   suppliesPick: PickState | null;
@@ -205,7 +207,7 @@ export interface SeatModel {
   bossMark: SeatBossMark | null;
 }
 
-/** One option of the pick tray on the stump: a whisper, a won trick, or a
+/** One option of the pick tray on the table: a whisper, a won trick, or a
  * rank for the held card. */
 export interface TrayOption {
   choiceId: string;
@@ -235,7 +237,7 @@ export interface ShownPlayModel {
   countsAs: ExpeditionCardIdentityView | null;
 }
 
-/** A card on the stump played face down (a Cave, the Night): only the suit
+/** A card on the table played face down (a Cave, the Night): only the suit
  * it follows as shows. */
 export interface FaceDownPlayModel {
   seatId: string;
@@ -318,7 +320,7 @@ export interface SceneModel {
   /** The Perfumist's pink mist hangs over this trick: it is a hallucination. */
   mist: boolean;
   trayPage: number;
-  /** The card being dragged onto the table; `legal` says whether the stump
+  /** The card being dragged onto the table; `legal` says whether the table
    * accepts it. Null when no card is held. */
   drag: { cardId: string; legal: boolean } | null;
   targeting: { mode: "ability" | "whisper"; sourceObjectId: string; nextKind: ExpeditionTargetKind | null; canConfirm: boolean } | null;
@@ -403,7 +405,7 @@ function objectiveLabel(o: ExpeditionObjectiveView): { label: string; orderBadge
     return { label: cardLabel(o.target), orderBadge: o.order === "last" ? "L" : String(o.order) };
   }
   if (o.kind === "no-tricks") {
-    return { label: "0 tricks", orderBadge: null };
+    return { label: "No tricks", orderBadge: null };
   }
   if (o.kind === "hidden") {
     return { label: "?", orderBadge: null };
@@ -668,7 +670,7 @@ function buildLastTrick(camp: ExpeditionCampView | null, view: ExpeditionView, u
 
 /** Supplies of their cap, the purse, and which camp of how many. */
 export function buildTopBar(view: ExpeditionView, suppliesPick: PickState | null = null): TopBar {
-  return { supplies: view.supplies.count, suppliesMax: view.supplies.max, purse: view.purse, camp: campLabel(view), suppliesPick };
+  return { supplies: view.supplies.count, suppliesMax: view.supplies.max, purse: view.purse, camp: campLabel(view), map: view.campCount !== null, suppliesPick };
 }
 
 /** In a boss camp or the temple the strip's chip names it, so the label

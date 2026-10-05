@@ -38,7 +38,6 @@ const ICONS = [
   ["leader-sun", "small golden sun emblem"],
   ["icon-whisper", "green leaf with a curling speech swirl"],
   ["icon-tricks", "small stack of playing cards"],
-  ["lantern", "hanging brass oil lantern glowing warm"],
 ];
 
 /** The second icon batch: one per character base power, upgrade and item,
@@ -254,6 +253,76 @@ const LOCATIONS = {
   ), job: "82638f20-7863-4ed8-b98a-6312500ccbaa" },
 };
 
+/** Each location's card table, rising from the foot of the camp scene, and
+ * the board your hand rests on in the same material: [location, job,
+ * description] for the table, then the board. The Jungle's stump is the
+ * style source; four tables are img2img from it at strength 80. Fetched at
+ * scale 2 to tables/table-<id>.png and tables/board-<id>.png. */
+const STUMP_JOB = "0fad0915-6d5e-4bb4-8ed4-981f2088ef60";
+const TABLES = [
+  ["jungle", STUMP_JOB, "giant ancient jungle tree stump used as a card table, seen from slightly above, a wide flat sawn top with growth rings at the top of the image, thick gnarled bark trunk widening downward and running straight off the bottom edge of the image, moss and small glowing orange mushrooms on the bark, isolated object on plain background"],
+  ["clifftop", "1ae665ad-6254-43fb-bd81-c36f8f876706", "a wide flat grey granite stone slab card table on a clifftop, seen from slightly above, wide weathered flat top with cracks and lichen, thick rough rock body running straight down off the bottom edge of the image, isolated object on plain background", true],
+  ["magma", "f296d351-6b7d-47e8-9139-68c655c414ce", "a wide black basalt pillar card table beside lava, seen from slightly above, wide flat dark hexagonal stone top with faint glowing orange cracks, columnar basalt body running straight down off the bottom edge of the image, isolated object on plain background", true],
+  ["clearing", "fc425eca-f3f2-4300-8654-e0d2ffc1f62d", "a wide oval patch of bare packed brown dirt on grassy ground used as a card table, seen from above, flat smooth dirt in the middle with a few pebbles and twigs, short grass tufts ringing the edges, the patch continuing off the bottom edge of the image, isolated on plain background", false, { outline: "lineless" }],
+  ["desert", "d9e28a67-d009-46a1-b31d-8815c33c4226", "a wide flat-topped orange sandstone rock card table in the desert, seen from slightly above, wide smooth wind-worn flat top, layered striped sandstone body running straight down off the bottom edge of the image, a little sand drifted at its base, isolated object on plain background", true],
+  ["cave", "01744ed0-7587-48c1-99aa-557d34785f71", "a huge flat dark blue-grey boulder card table inside a cave, seen from slightly above, wide flat damp top with a few tiny glowing blue crystals, rounded rough rock body running straight down off the bottom edge of the image, isolated object on plain background", true],
+  ["temple", "b689e96c-271a-47e0-bec9-865679ef1692", "ancient carved stone temple altar used as a card table, seen from slightly above, a wide flat grey stone top with a carved golden sun emblem border at the top of the image, carved glyph panels and vines on the sides widening downward and running straight off the bottom edge of the image, isolated object on plain background"],
+];
+const tableSpec = ([, job, description, fromStump = false, extra = {}]) => ({
+  tool: "create_image_pixflux",
+  params: {
+    description,
+    ...(fromStump ? { init_image_url: `https://api.pixellab.ai/mcp/images/${STUMP_JOB}/download`, init_image_strength: 80 } : { width: 208, height: 112 }),
+    view: "high top-down",
+    outline: "single color black outline",
+    shading: "detailed shading",
+    ...extra,
+    no_background: true,
+    seed: 5,
+  },
+  job,
+  scale: 2,
+  note: fromStump ? "208x112 like its init image; natively transparent" : "natively transparent",
+});
+const BOARDS = [
+  ["jungle", "246d56b7-abf5-4bee-bd61-2a1882d49d3c", "a long dark brown polished wooden plank board seen from above, a tray for holding playing cards, darker carved wooden rim around the edges, wood grain, isolated object on plain background"],
+  ["clifftop", "dc87d81a-ec3e-4f1a-8b5e-454f5f00b726", "a long flat dark grey slate stone tablet seen from above, a tray for holding playing cards, chiselled raised rim around the edges, smooth worn surface, isolated object on plain background"],
+  ["magma", "b17032cc-96bc-4e10-85f8-04b2b0b2394b", "a long flat black obsidian slab seen from above, a tray for holding playing cards, glossy glassy surface with a thin glowing orange edge, isolated object on plain background"],
+  ["clearing", "ac2a32fc-93b1-474b-acbd-f4e66991aeff", "a long woven reed mat seen from above, a tray for holding playing cards, light tan straw weave with a darker bound edge, isolated object on plain background"],
+  ["desert", "fe0633ab-25e6-4ee3-99fb-5e0d681d1ff3", "a long flat pale cream sandstone tablet seen from above, a tray for holding playing cards, darker reddish carved rim, fine sand texture, isolated object on plain background"],
+  ["cave", "eee09b6f-c95f-46ca-a5a8-d3f1221628e9", "a long flat wet dark blue stone ledge seen from above, a tray for holding playing cards, rough chipped rim with a few tiny glowing blue crystals, isolated object on plain background"],
+  ["temple", "8f2ba951-ebed-425f-aa69-cd77060a2f19", "a long carved grey temple stone tablet seen from above, a tray for holding playing cards, a thin inlaid gold border and small carved glyphs along the rim, isolated object on plain background"],
+];
+const boardSpec = ([, job, description]) => ({
+  tool: "create_image_pixflux",
+  params: { description, width: 212, height: 36, view: "high top-down", outline: "single color black outline", shading: "medium shading", no_background: true, seed: 3 },
+  job,
+  scale: 2,
+  note: "natively transparent",
+});
+
+/** The HUD coin and the glove cursors: one 1-direction object with seven
+ * item descriptions; `batch_index` is the frame used. Cursors are fetched
+ * at scale 2 (32x32), the coin at scale 1. */
+const UI_BATCH = {
+  tool: "create_1_direction_object",
+  params: {
+    name: "hud coin and glove cursors",
+    description: "jungle expedition UI icon, warm palette, single-pixel dark outline, simple shading, transparent background",
+    view: "sidescroller",
+    size: 16,
+  },
+  object_id: "3c480778-3727-4448-ab5d-4a84ba869bc8",
+};
+const UI_ICONS = [
+  ["coin", "shiny round gold coin seen face on, a raised rim and a bold vertical line stamped down the middle, bright highlights", 0, 1],
+  ["cursor-pointer", "tan leather explorer glove with the index finger pointing up and to the left, mouse cursor", 2, 2],
+  ["cursor-grab", "tan leather explorer glove open palm facing the viewer, fingers spread, mouse cursor", 3, 2],
+  ["cursor-grabbing", "tan leather explorer glove clenched into a grabbing fist, mouse cursor", 5, 2],
+  ["cursor-not-allowed", "tan leather explorer glove with a small red no-entry circle beside it, mouse cursor", 6, 2],
+  ["cursor-default", "tan leather explorer glove pointing up and to the left, plain arrow-like silhouette, mouse cursor", 7, 2],
+];
+
 const specs = {
   "bg-jungle-night": backdrop(
     "side view backdrop of a dense jungle clearing at night: canopy silhouettes and hanging vines framing the left, right and top edges, a few stars and a thin moon in a blue-black sky, calm dark mossy ground filling the centre and bottom with no objects. Night jungle, deep greens, blue-black sky, moss browns, no people, no text",
@@ -267,23 +336,6 @@ const specs = {
   "bg-trail-dusk": backdrop(
     "an abandoned jungle campsite at dusk, a cold empty fire pit and a fallen tent, the trail fading into dark trees, purple and deep blue dusk sky, wistful mood, no people, no text",
   ),
-  "stump-table": {
-    tool: "create_image_pixflux",
-    params: {
-      description:
-        "giant ancient jungle tree stump used as a card table, very wide flat oval sawn top taking most of the image with dark concentric growth rings, short thick gnarled dark bark rim, twisting roots at the base, moss patches and tiny glowing orange mushrooms on the roots, isolated object on plain background",
-      width: 384,
-      height: 176,
-      view: "high top-down",
-      outline: "single color black outline",
-      shading: "detailed shading",
-      detail: "highly detailed",
-      no_background: true,
-    },
-    job: "a030638f-1d4e-4aaf-b2d2-8c4cf2d4bcde",
-    scale: 1,
-    note: "keyed offline with `fetch-art.mjs ... --matte`; the flat top spans x 78..322, y 12..85",
-  },
   "trail-map": {
     tool: "create_image_pixflux",
     params: {
@@ -313,19 +365,6 @@ const specs = {
     },
     scale: 1,
   },
-  campfire: {
-    tool: "create_1_direction_object",
-    params: {
-      name: "campfire",
-      description:
-        "small crackling campfire on a ring of grey stones with crossed logs, bright orange and gold flames, warm night palette, single-pixel dark outline, transparent background",
-      size: 32,
-      view: "sidescroller",
-    },
-    frames_used: [56, 57, 59, 60],
-    note: "four candidates from the one set, played as a flicker strip",
-    scale: 1,
-  },
   "mascot-panda": mascotStrip("idle", "idle: gentle breathing, tail swishing slowly, a slow blink"),
   "mascot-cheer": mascotStrip("cheer", "cheer: hops up happily with both paws raised in the air, then lands"),
   "mascot-flop": mascotStrip("flop", "flop: sighs and flops over sadly onto its back, paws up"),
@@ -336,6 +375,9 @@ const specs = {
   ...Object.fromEntries(NINE_ICONS.map(([id, item, frame]) => [`source-${id}`, { ...NINE_BATCH, item_description: item, batch_index: frame, scale: 1 }])),
   "source-magician": MAGICIAN_ICON,
   ...LOCATIONS,
+  ...Object.fromEntries(TABLES.map((table) => [`table-${table[0]}`, tableSpec(table)])),
+  ...Object.fromEntries(BOARDS.map((board) => [`board-${board[0]}`, boardSpec(board)])),
+  ...Object.fromEntries(UI_ICONS.map(([id, item, frame, scale]) => [id, { ...UI_BATCH, item_description: item, batch_index: frame, scale }])),
   ...Object.fromEntries(BOSSES.map((boss) => [`boss-${boss[0]}`, bossSpec(boss)])),
   ...Object.fromEntries(CREW.map(([id, description, seed, job]) => [`crew-${id}`, crewSpec(description, seed, job, "alpha thresholded and grey halos stripped locally; drawn bottom-centred on a 64x80 canvas")])),
   ...Object.fromEntries(NINE_CREW.map(([id, description, seed, job]) => [`crew-${id}`, crewSpec(description, seed, job, "natively transparent; used as downloaded")])),

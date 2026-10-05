@@ -2,19 +2,19 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { MOD_DISPLAY } from "@games/rules";
-import { ART, backdropArtId, fittedFallbackLabel, crewArtId, resolveArt, sourceArtId, type ArtId } from "./art-registry";
+import { ART, backdropArtId, fittedFallbackLabel, crewArtId, resolveArt, sourceArtId, tableOf, type ArtId } from "./art-registry";
 import { ART_FILES } from "./art-files.generated";
 
 const SPRITES_DIR = fileURLToPath(new URL("../../../../public/expedition/sprites/", import.meta.url));
 
 describe("resolveArt", () => {
   it("draws the PNG when its file is on disk, otherwise the labelled fallback", () => {
-    expect(resolveArt("campfire", new Set(["camp/campfire.png"]))).toMatchObject({
+    expect(resolveArt("crate", new Set(["camp/crate.png"]))).toMatchObject({
       kind: "file",
-      key: "art:campfire",
-      url: "/expedition/sprites/camp/campfire.png",
+      key: "art:crate",
+      url: "/expedition/sprites/camp/crate.png",
     });
-    expect(resolveArt("campfire", new Set())).toMatchObject({ kind: "fallback", key: "art-fallback:campfire" });
+    expect(resolveArt("crate", new Set())).toMatchObject({ kind: "fallback", key: "art-fallback:crate" });
   });
 });
 
@@ -64,6 +64,12 @@ describe("ART and ART_FILES", () => {
     const locations = Object.values(MOD_DISPLAY).filter((mod) => mod.kind === "location").map((mod) => mod.id);
     expect(locations.map((id) => [id, backdropArtId(id)])).toEqual(locations.map((id) => [id, id === "jungle" ? "bg-jungle-night" : `bg-${id}`]));
     expect(backdropArtId("nowhere")).toBe("bg-jungle-night");
+  });
+
+  it("every location and the temple set out their own table and board; anywhere else the Jungle's stump", () => {
+    const locations = Object.values(MOD_DISPLAY).filter((mod) => mod.kind === "location").map((mod) => mod.id);
+    expect([...locations, "temple"].map(tableOf)).toEqual([...locations, "temple"]);
+    expect(tableOf("nowhere")).toBe("jungle");
   });
 
   it("no two entries share a file", () => {

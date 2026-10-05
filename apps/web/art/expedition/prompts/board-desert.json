@@ -1,0 +1,17 @@
+{
+  "id": "board-desert",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "a long flat pale cream sandstone tablet seen from above, a tray for holding playing cards, darker reddish carved rim, fine sand texture, isolated object on plain background",
+    "width": 212,
+    "height": 36,
+    "view": "high top-down",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "seed": 3
+  },
+  "job": "fe0633ab-25e6-4ee3-99fb-5e0d681d1ff3",
+  "scale": 2,
+  "note": "natively transparent"
+}

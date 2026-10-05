@@ -1,13 +1,14 @@
 /**
- * The face-up objective pool on the stump, and the `actions` zone: the
+ * The face-up objective pool on the table, and the `actions` zone: the
  * Whisper button, Confirm / Cancel, and rescue Use / Pass. Every flag
  * drawn (`pickable`, `targetable`, `canConfirm`, `whisper.*`) is already a
  * server-derived fact on the model.
  */
 import type Phaser from "phaser";
+import { CURSOR, pointerIf } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
-import { MINI_H, MINI_W, OBJECTIVE_POOL_STEP, ZONES, stumpRowXs } from "../layout";
+import { MINI_H, MINI_W, OBJECTIVE_POOL_STEP, ZONES, tableRowXs } from "../layout";
 import { CANCEL_ID, CONFIRM_ID, GATE_SKIP_ID, TRAY_MORE_ID, WHISPER_ID, gateUseObjectId } from "../../../../lib/expedition/expedition-ids";
 import type { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
@@ -36,12 +37,12 @@ function tileCaption(chip: ObjectiveChip): { body: string | null; caption: strin
 function drawObjectivePool(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   const pool = model.faceUpObjectives;
   if (pool.length === 0) return;
-  const zone = ZONES.stump;
+  const zone = ZONES.table;
   const title = "Objectives";
   layer.add(platedText(scene, zone.x + Math.floor((zone.w - labelWidth(title)) / 2), zone.y + 12, title));
 
   const bodyY = zone.y + 28;
-  stumpRowXs(pool.length, OBJECTIVE_POOL_STEP).forEach((cx, i) => {
+  tableRowXs(pool.length, OBJECTIVE_POOL_STEP).forEach((cx, i) => {
     const chip = pool[i]!;
     const tileX = cx - TILE_W / 2;
     const container = scene.add.container(Math.round(tileX), bodyY);
@@ -64,7 +65,7 @@ function drawObjectivePool(scene: Phaser.Scene, layer: Layer, model: SceneModel,
     }
     const hit = scene.add.zone(0, 0, TILE_W, MINI_H + 3 + LABEL_CELL.h).setOrigin(0, 0);
     container.add(hit);
-    hit.setInteractive({ useHandCursor: highlighted });
+    hit.setInteractive(pointerIf(highlighted));
     hit.on("pointerover", () => handlers.onObjectiveHover(chip.objectiveId));
     hit.on("pointerout", () => handlers.onObjectiveHover(null));
     if (highlighted) hit.on("pointerdown", () => handlers.onObjective(chip.objectiveId));
@@ -141,12 +142,12 @@ function drawWhisperCaption(scene: Phaser.Scene, layer: Layer, model: SceneModel
 
 const BANNER_PAD = 6;
 
-/** The rescue window on the stump: what failed, who it waits on, and your
+/** The rescue window on the table: what failed, who it waits on, and your
  * Use and Pass buttons when it waits on you. */
 function drawBanner(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   const banner = model.banner;
   if (banner === null) return;
-  const zone = ZONES.stump;
+  const zone = ZONES.table;
   const x = zone.x + 4;
   const w = zone.w - 8;
   const chars = Math.floor((w - BANNER_PAD * 2) / LABEL_CELL.w);
@@ -188,12 +189,12 @@ const TRAY_CARDS_H = MINI_H + 2;
 const TRAY_MINI_STEP = 9;
 
 /** Choices with no single place on the table (whispers, your won tricks,
- * the ranks for a held card), as buttons on the stump. Pages when they do
+ * the ranks for a held card), as buttons on the table. Pages when they do
  * not all fit. */
 function drawTray(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   const tray = model.tray;
   if (tray === null) return;
-  const zone = ZONES.stump;
+  const zone = ZONES.table;
   layer.add(plate(scene, zone.x, zone.y, zone.w, zone.h).setAlpha(0.92).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
   const title = fitLabel(tray.title, Math.floor((zone.w - 8) / LABEL_CELL.w));
   layer.add(text(scene, zone.x + Math.floor((zone.w - labelWidth(title)) / 2), zone.y + 3, title, PALETTE.textDim));
@@ -231,7 +232,7 @@ function drawTray(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: O
     option.cards.forEach((label, j) => container.add(miniCard(scene, cx0 + j * TRAY_MINI_STEP, TRAY_OPTION_H_TEXT, label, model.cardPackId)));
     container.setSize(optionW, optionH);
     const hit = scene.add.zone(0, 0, optionW, optionH).setOrigin(0, 0);
-    hit.setInteractive({ useHandCursor: true });
+    hit.setInteractive({ cursor: CURSOR.pointer });
     hit.on("pointerdown", () => handlers.onTrayPick(option.choiceId));
     container.add(hit);
     layer.add(container);
@@ -248,12 +249,12 @@ function drawTray(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: O
 const POPUP_ROW_H = 17;
 const POPUP_BUY_H = 13;
 
-/** The Pop-up Shop over the stump: a row per item in stock (icon, name,
+/** The Pop-up Shop over the table: a row per item in stock (icon, name,
  * price, then a button for each player it can go to) and the refresh. */
 function drawPopupShop(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   const shop = model.popupShop;
   if (shop === null) return;
-  const zone = ZONES.stump;
+  const zone = ZONES.table;
   layer.add(plate(scene, zone.x, zone.y, zone.w, zone.h).setAlpha(0.95).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
   layer.add(text(scene, zone.x + 4, zone.y + 3, shop.title, PALETTE.sun));
   const purse = `Crew: ${shop.purse} coins`;
@@ -301,7 +302,7 @@ function drawFanPicker(scene: Phaser.Scene, layer: Layer, model: SceneModel, ind
   const fan = model.fan;
   if (fan === null) return;
   const h = 14 + fan.rows.length * FAN_ROW_H + 2;
-  const zone = { x: ZONES.stump.x - 32, y: ZONES.stump.y + ZONES.stump.h - h, w: ZONES.stump.w + 64, h };
+  const zone = { x: ZONES.table.x - 32, y: ZONES.table.y + ZONES.table.h - h, w: ZONES.table.w + 64, h };
   layer.add(plate(scene, zone.x, zone.y, zone.w, zone.h).setAlpha(0.95).setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
   layer.add(text(scene, zone.x + 4, zone.y + 3, fitLabel(fan.title, Math.floor((zone.w - 8) / LABEL_CELL.w)), PALETTE.textDim));
   fan.rows.forEach((row, r) => {
@@ -315,7 +316,7 @@ function drawFanPicker(scene: Phaser.Scene, layer: Layer, model: SceneModel, ind
       if (!place.targetable && !place.selected) container.setAlpha(0.45);
       const hit = scene.add.zone(x, y, hitW, MINI_H).setOrigin(0, 0);
       if (place.targetable) {
-        hit.setInteractive({ useHandCursor: true });
+        hit.setInteractive({ cursor: CURSOR.pointer });
         hit.on("pointerdown", () => handlers.onTrayPick(place.choiceId));
       }
       container.add(hit);
@@ -343,7 +344,7 @@ function drawFanPicker(scene: Phaser.Scene, layer: Layer, model: SceneModel, ind
 /** The Perfumist's pink mist over a hallucinated trick. */
 function drawMist(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
   if (!model.mist) return;
-  const zone = ZONES.stump;
+  const zone = ZONES.table;
   layer.add(scene.add.ellipse(zone.x + zone.w / 2, zone.y + zone.h / 2, zone.w + 40, zone.h + 24, toPhaserColor(PALETTE.mist), 0.3));
   const label = "Pink mist: every card goes back";
   layer.add(platedText(scene, zone.x + Math.floor((zone.w - labelWidth(label)) / 2), zone.y + 2, label, PALETTE.mist));
@@ -355,8 +356,8 @@ export function drawControls(scene: Phaser.Scene, layer: Layer, model: SceneMode
   drawWhisperCaption(scene, layer, model);
 }
 
-/** Overlays on the stump: drawn last so they cover the trick. */
-export function drawStumpOverlays(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
+/** Overlays on the table: drawn last so they cover the trick. */
+export function drawTableOverlays(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   drawMist(scene, layer, model);
   drawBanner(scene, layer, model, index, handlers);
   drawFanPicker(scene, layer, model, index, handlers);

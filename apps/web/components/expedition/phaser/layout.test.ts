@@ -3,6 +3,7 @@ import { CHARACTER_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
 import { buildTrailModel, musterLines } from "../../../lib/expedition/trail-model";
 import { initialLocalUi } from "../../../lib/expedition/local-ui";
 import { wrapWords } from "./draw/text-fit";
+import { TABLE_IDS } from "./art/art-registry";
 import {
   BUNDLE_TAKE_H,
   BUNDLE_TEXT_LINES,
@@ -21,6 +22,7 @@ import {
   HAND_MARKER_H,
   HOVER_LIFT,
   INTERACTABLE_ANCHORS,
+  KICK_POCKET,
   SCENE_ZONES,
   SETTINGS_SAFE_ZONE,
   STAGE,
@@ -37,7 +39,10 @@ import {
   rectContains,
   rectsIntersect,
   rowBoxes,
-  stumpRowXs,
+  tableArtAt,
+  tableRowXs,
+  tableSpan,
+  boardArtAt,
   trailStopXs,
   type Rect,
   type SeatSpot,
@@ -116,7 +121,7 @@ describe("rect helpers", () => {
   });
 });
 
-describe("seats around the stump", () => {
+describe("seats around the table", () => {
   const silhouette = (spot: SeatSpot): Rect => ({ x: spot.x - SILHOUETTE_W / 2, y: spot.bottom - SILHOUETTE_H, w: SILHOUETTE_W, h: SILHOUETTE_H });
   const card = (at: { x: number; y: number }): Rect => ({ x: at.x, y: at.y, w: CARD_W, h: CARD_H });
 
@@ -150,10 +155,36 @@ describe("seats around the stump", () => {
 
   it.each([2, 3, 4, 5])("count=%i: every played card lands on the stump, clear of the others and of yours", (count) => {
     const cards = [...seatSpots(count).map((s) => card(s.card)), card(YOUR_CARD_AT)];
-    for (const c of cards) expect(rectContains(ZONES.stump, c)).toBe(true);
+    for (const c of cards) expect(rectContains(ZONES.table, c)).toBe(true);
     for (let i = 0; i < cards.length; i++) {
       for (let j = i + 1; j < cards.length; j++) expect(rectsIntersect(cards[i]!, cards[j]!)).toBe(false);
     }
+  });
+});
+
+describe("KICK_POCKET", () => {
+  it("is clear of every zone of the scenes a run under way draws, and of the corner buttons at 2x and up", () => {
+    for (const scene of ["camp", "trail", "route", "draft", "muster"]) {
+      for (const [id, zone] of Object.entries(SCENE_ZONES[scene]!)) expect(rectsIntersect(KICK_POCKET, zone), `${scene}.${id}`).toBe(false);
+    }
+    const buttonsAt2x = { x: 584, y: 0, w: 56, h: 26 };
+    expect(rectsIntersect(KICK_POCKET, buttonsAt2x)).toBe(false);
+    expect(rectContains(STAGE, KICK_POCKET)).toBe(true);
+  });
+});
+
+describe("tables and boards", () => {
+  it.each(TABLE_IDS)("%s: the table rises from behind the board to its flat top where the cards land, and the board stands on the bottom edge", (id) => {
+    const span = tableSpan(id);
+    expect(span.top).toBe(ZONES.table.y);
+    expect(span.foot).toBeGreaterThanOrEqual(span.boardTop + 2);
+    expect(boardArtAt(id).y + 72).toBeGreaterThanOrEqual(STAGE.h);
+    expect(tableArtAt(id).x).toBe(112);
+  });
+
+  it.each(TABLE_IDS)("%s: your resting hand stands on the board, its front showing below the cards", (id) => {
+    expect(HAND_CARD_Y + CARD_H).toBeGreaterThanOrEqual(tableSpan(id).boardTop + 18);
+    expect(HAND_CARD_Y + CARD_H).toBeLessThanOrEqual(STAGE.h - 16);
   });
 });
 
@@ -177,30 +208,27 @@ describe("handFanXs", () => {
   });
 });
 
-describe("stumpRowXs", () => {
+describe("tableRowXs", () => {
   it("centres items on the stump", () => {
-    expect(stumpRowXs(3, 48)).toEqual([272, 320, 368]);
+    expect(tableRowXs(3, 48)).toEqual([272, 320, 368]);
   });
 });
 
 describe("INTERACTABLE_ANCHORS", () => {
-  it("places the campfire, fireflies and lantern in the world zone, clear of the boss, and the mascot in the actions zone", () => {
+  it("places the fireflies in the world zone, scattering inside it, and the mascot in the actions zone", () => {
     const at = (p: { x: number; y: number }): Rect => ({ x: p.x, y: p.y, w: 1, h: 1 });
-    expect(rectContains(ZONES.world, at(INTERACTABLE_ANCHORS.campfire))).toBe(true);
-    expect(rectContains(ZONES.world, at(INTERACTABLE_ANCHORS.fireflies))).toBe(true);
-    expect(rectContains(ZONES.world, at(INTERACTABLE_ANCHORS.lantern))).toBe(true);
+    const scatter = { x: INTERACTABLE_ANCHORS.fireflies.x - 21, y: INTERACTABLE_ANCHORS.fireflies.y - 21, w: 43, h: 43 };
+    expect(rectContains(ZONES.world, scatter)).toBe(true);
     expect(rectContains(ZONES.actions, at(INTERACTABLE_ANCHORS.mascot))).toBe(true);
-    const lanternWithRope = { x: INTERACTABLE_ANCHORS.lantern.x - 8, y: INTERACTABLE_ANCHORS.lantern.y - 20, w: 16, h: 28 };
-    expect(rectContains(ZONES.world, lanternWithRope)).toBe(true);
   });
 });
 
 describe("pointInRect (the drop test)", () => {
   it("accepts any point inside the stump and rejects the hand and the stump's far edge", () => {
-    expect(pointInRect(ZONES.stump, { x: 320, y: 180 })).toBe(true);
-    expect(pointInRect(ZONES.stump, { x: 192, y: 148 })).toBe(true);
-    expect(pointInRect(ZONES.stump, { x: 448, y: 180 })).toBe(false);
-    expect(pointInRect(ZONES.stump, { x: 320, y: 300 })).toBe(false);
+    expect(pointInRect(ZONES.table, { x: 320, y: 180 })).toBe(true);
+    expect(pointInRect(ZONES.table, { x: 192, y: 148 })).toBe(true);
+    expect(pointInRect(ZONES.table, { x: 448, y: 180 })).toBe(false);
+    expect(pointInRect(ZONES.table, { x: 320, y: 300 })).toBe(false);
   });
 });
 
@@ -261,13 +289,13 @@ describe("the temple", () => {
       for (let i = 0; i < pieces.length; i++) for (let j = i + 1; j < pieces.length; j++) expect(rectsIntersect(pieces[i]!, pieces[j]!)).toBe(false);
       expect(rectContains(ZONES.path, geo.row)).toBe(true);
     }
-    expect(pathLayout(9, longest.count, longest.hint, 8)).toMatchObject({ countX: 165, hintX: 361, tileY: 278, textY: 280 });
+    expect(pathLayout(9, longest.count, longest.hint, 8)).toMatchObject({ countX: 165, hintX: 361, tileY: 274, textY: 276 });
   });
 
-  it.each([2, 3, 4])("count=%i teammates: the path is clear of every seat, the stump, the hand, the kit, the world column and the top bar", (count) => {
+  it.each([2, 3, 4])("count=%i teammates: the path is clear of every seat, the table, the hand, the kit, the world column and the top bar", (count) => {
     const spots = seatSpots(count);
     const seats = spots.flatMap((s, i) => [plateRect(spots, i), { x: s.x - SILHOUETTE_W / 2, y: s.bottom - SILHOUETTE_H, w: SILHOUETTE_W, h: SILHOUETTE_H }]);
-    for (const r of [...seats, ZONES.stump, ZONES.hand, ZONES.kit, ZONES.world, ZONES.topBar, ZONES.you]) expect(rectsIntersect(ZONES.path, r)).toBe(false);
+    for (const r of [...seats, ZONES.table, ZONES.hand, ZONES.kit, ZONES.world, ZONES.topBar, ZONES.you]) expect(rectsIntersect(ZONES.path, r)).toBe(false);
     const lifted = handFanXs(18).map((x) => ({ x, y: HAND_CARD_Y - HOVER_LIFT - HAND_MARKER_H - 1, w: CARD_W, h: CARD_H }));
     for (const card of lifted) expect(rectsIntersect(ZONES.path, card)).toBe(false);
   });
@@ -326,8 +354,8 @@ describe("a crowded objective row", () => {
   it("shortens a trick-count tag to its number, so a card and the tag fit a teammate plate beside two kit icons", async () => {
     const { objectiveItemWidth } = await import("./draw/ui-kit");
     const chip = (kind: "ordered" | "no-tricks", label: string) => ({ objectiveId: label, objectId: label, kind, label, orderBadge: null, status: "pending" as const, ownerSeatId: "s1", pickable: false, targetable: false, selected: false });
-    const tag = chip("no-tricks", "0 tricks");
-    expect([objectiveItemWidth(tag), objectiveItemWidth(tag, true)]).toEqual([58, 16]);
+    const tag = chip("no-tricks", "No tricks");
+    expect([objectiveItemWidth(tag), objectiveItemWidth(tag, true)]).toEqual([64, 22]);
     const room = 108 - 2 * 17 - 4;
     expect(objectiveItemWidth(chip("ordered", "10♠"), true) + 2 + objectiveItemWidth(tag, true)).toBeLessThanOrEqual(room);
   });

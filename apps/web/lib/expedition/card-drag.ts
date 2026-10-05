@@ -6,7 +6,7 @@ export interface Point {
 /**
  * The life of one hand-card gesture, as a state machine. A press becomes a
  * drag only once the pointer travels `DRAG_THRESHOLD` stage px, so a plain
- * click stays a click. A card dropped over the stump plays it when legal;
+ * click stays a click. A card dropped over the table plays it when legal;
  * every other release sends it back to its slot, with the reason when the
  * card was illegal. Pure: the scene feeds pointer events in and runs the
  * returned effect.
@@ -26,7 +26,7 @@ export type DragState =
 export type DragEvent =
   | { type: "press"; cardId: string; at: Point; legal: boolean; reason: string | null }
   | { type: "move"; at: Point }
-  /** `overTable`: the pointer is over the stump zone (layout.ts decides). */
+  /** `overTable`: the pointer is over the table zone (layout.ts decides). */
   | { type: "release"; overTable: boolean }
   | { type: "settle" }
   | { type: "cancel" };

@@ -4,16 +4,17 @@
  * scene model.
  */
 import type Phaser from "phaser";
-import { STAGE, ZONES, type Rect } from "../layout";
+import { STAGE, ZONES, pointInRect, type Rect } from "../layout";
 import type { ObjectIndex } from "../object-index";
-import { SUPPLIES_ID } from "../../../../lib/expedition/expedition-ids";
+import { MAP_ID, SUPPLIES_ID } from "../../../../lib/expedition/expedition-ids";
+import { CURSOR } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL, SIGN_CELL, WORLD_SIGN_FONT } from "../font/font-keys";
 import { placeArt } from "../art/place-art";
 import { ART, backdropArtId, type ArtId } from "../art/art-registry";
 import type { Tooltip, TopBar } from "../../../../lib/expedition/build-scene-model";
 import type { Prompt, PromptTone } from "../../../../lib/expedition/build-prompt";
-import { PANEL_ALPHA, coin, labelWidth, plate, text, type Layer } from "./ui-kit";
+import { PANEL_ALPHA, labelWidth, plate, platedText, text, type Layer } from "./ui-kit";
 import { wrapWords } from "./text-fit";
 
 const MAX_CRATES = 8;
@@ -34,7 +35,7 @@ const BACKDROP_SHADE: Readonly<Partial<Record<ArtId, { dim: number; vignette: nu
 const DEFAULT_SHADE = { dim: 0.3, vignette: 0.5 };
 const VIGNETTE_KEY = "backdrop-vignette";
 
-/** Transparent around the stump, the letterbox colour at the edges. */
+/** Transparent around the table, the letterbox colour at the edges. */
 function ensureVignette(scene: Phaser.Scene): void {
   if (scene.textures.exists(VIGNETTE_KEY)) return;
   const texture = scene.textures.createCanvas(VIGNETTE_KEY, STAGE.w, STAGE.h);
@@ -50,7 +51,7 @@ function ensureVignette(scene: Phaser.Scene): void {
   texture.refresh();
 }
 
-/** The location's backdrop with its shade. The stump is drawn with the
+/** The location's backdrop with its shade. The table is drawn with the
  * seats, over their silhouettes. */
 export function drawBackdrop(scene: Phaser.Scene, location: string): Phaser.GameObjects.GameObject[] {
   const id = backdropArtId(location);
@@ -64,47 +65,100 @@ export function drawBackdrop(scene: Phaser.Scene, location: string): Phaser.Game
   return objects;
 }
 
-/** Supplies as crates of their cap, the purse as a coin, and the camp on
- * the right. `onSupplies` makes the crates a target while an ability picks
+/** What the top bar's controls do in a scene: the crates as an ability's
+ * target, and the camp label opening the map of the run. */
+export interface TopBarHandlers {
+  index: ObjectIndex;
+  sceneKey: "camp" | "trail";
+  onMap: () => void;
+  onSupplies?: () => void;
+}
+
+const HOVER_Y = ZONES.topBar.y + ZONES.topBar.h + 2;
+/** Hover labels hang under the bar, left of the prompt plate. */
+const HOVER_RIGHT = ZONES.prompt.x - 2;
+
+/** Hangs `label` under the bar, from `x`, while the pointer is over
+ * `rect`. It follows the pointer itself rather than the hover events of an
+ * object, so a redraw under a still pointer keeps it up; it lives as long
+ * as `owner`, the bar's plate. */
+function hoverLabel(scene: Phaser.Scene, layer: Layer, owner: Phaser.GameObjects.GameObject, rect: Rect, label: string, x: number): void {
+  let shown: Phaser.GameObjects.GameObject[] = [];
+  const sync = () => {
+    const pointer = scene.input.activePointer;
+    const over = pointInRect(rect, { x: pointer.x, y: pointer.y });
+    if (over && shown.length === 0) {
+      shown = platedText(scene, Math.min(x, HOVER_RIGHT - labelWidth(label)), HOVER_Y, label);
+      layer.add(shown);
+    } else if (!over && shown.length > 0) {
+      for (const piece of shown) piece.destroy();
+      shown = [];
+    }
+  };
+  scene.input.on("pointermove", sync);
+  owner.once("destroy", () => scene.input.off("pointermove", sync));
+  sync();
+}
+
+/** Supplies as crates of their cap ("Supplies 3 of 4" on hover), the purse
+ * as a coin and its count ("12 coins"), and the camp on the right, which
+ * opens the map of the run. The crates are a target while an ability picks
  * the supplies. Returns the span left free between them. */
-export function drawTopBar(scene: Phaser.Scene, layer: Layer, bar: TopBar, index?: ObjectIndex, onSupplies?: () => void): { left: number; right: number } {
+export function drawTopBar(scene: Phaser.Scene, layer: Layer, bar: TopBar, handlers?: TopBarHandlers): { left: number; right: number } {
   const zone = ZONES.topBar;
-  layer.add(plate(scene, zone.x, zone.y, zone.w, zone.h).setAlpha(PANEL_ALPHA));
+  const bg = plate(scene, zone.x, zone.y, zone.w, zone.h).setAlpha(PANEL_ALPHA);
+  layer.add(bg);
   const textY = zone.y + Math.floor((zone.h - LABEL_CELL.h) / 2);
-  const crate = ART.crate;
+  const icon = ART.crate;
+  const cy = zone.y + zone.h / 2;
   let x = zone.x + 6;
   for (let i = 0; i < Math.min(bar.suppliesMax, MAX_CRATES); i++) {
-    const art = placeArt(scene, "crate", x + crate.w / 2, zone.y + zone.h / 2);
+    const art = placeArt(scene, "crate", x + icon.w / 2, cy);
     if (i >= bar.supplies) art.setAlpha(EMPTY_CRATE_ALPHA);
     layer.add(art);
-    x += crate.w + 2;
+    x += icon.w + 2;
   }
-  const suppliesLabel = `Supplies ${bar.supplies}/${bar.suppliesMax}`;
+  const crates = { x: zone.x + 2, y: zone.y + 1, w: x - zone.x, h: zone.h - 2 };
+  hoverLabel(scene, layer, bg, crates, `Supplies ${bar.supplies} of ${bar.suppliesMax}`, crates.x);
   const pick = bar.suppliesPick;
-  if (pick !== null && index !== undefined) {
-    const w = x + 4 + labelWidth(suppliesLabel) - zone.x - 2;
-    const target = scene.add.container(zone.x + 2, zone.y + 1);
-    target.add(scene.add.rectangle(0, 0, w, zone.h - 2, 0, 0).setOrigin(0, 0).setStrokeStyle(2, toPhaserColor(PALETTE.turn)));
-    target.setSize(w, zone.h - 2);
-    if (pick.targetable && onSupplies !== undefined) {
-      const hit = scene.add.zone(0, 0, w, zone.h - 2).setOrigin(0, 0);
-      hit.setInteractive({ useHandCursor: true });
-      hit.on("pointerdown", onSupplies);
+  if (pick !== null && handlers !== undefined) {
+    const target = scene.add.container(crates.x, crates.y);
+    target.add(scene.add.rectangle(0, 0, crates.w, crates.h, 0, 0).setOrigin(0, 0).setStrokeStyle(2, toPhaserColor(PALETTE.turn)));
+    target.setSize(crates.w, crates.h);
+    if (pick.targetable && handlers.onSupplies !== undefined) {
+      const hit = scene.add.zone(0, 0, crates.w, crates.h).setOrigin(0, 0).setInteractive({ cursor: CURSOR.pointer });
+      hit.on("pointerdown", handlers.onSupplies);
       target.add(hit);
     }
     layer.add(target);
-    index.register("camp", SUPPLIES_ID, target);
+    handlers.index.register(handlers.sceneKey, SUPPLIES_ID, target);
   }
-  layer.add(text(scene, x + 2, textY, suppliesLabel, pick?.targetable ? PALETTE.turn : PALETTE.text));
 
-  const coinX = x + 2 + labelWidth(suppliesLabel) + 16;
-  layer.add(coin(scene, coinX, zone.y + zone.h / 2, 6));
-  const coinsLabel = `Coins ${bar.purse}`;
-  layer.add(text(scene, coinX + 10, textY, coinsLabel));
+  const coinX = x + 8;
+  layer.add(placeArt(scene, "coin", coinX + ART.coin.w / 2, cy));
+  const purse = String(bar.purse);
+  layer.add(text(scene, coinX + ART.coin.w + 3, textY, purse));
+  const coinsW = ART.coin.w + 3 + labelWidth(purse) + 2;
+  hoverLabel(scene, layer, bg, { x: coinX - 1, y: zone.y + 1, w: coinsW + 1, h: zone.h - 2 }, bar.purse === 1 ? "1 coin" : `${bar.purse} coins`, coinX);
 
-  const campX = zone.x + zone.w - 6 - labelWidth(bar.camp);
-  layer.add(text(scene, campX, textY, bar.camp));
-  return { left: coinX + 10 + labelWidth(coinsLabel) + 10, right: campX - 10 };
+  const campW = labelWidth(bar.camp) + 8;
+  const campX = zone.x + zone.w - 3 - campW;
+  if (bar.map && handlers !== undefined) {
+    const chip = scene.add.container(campX, zone.y + 2);
+    const bg = plate(scene, 0, 0, campW, zone.h - 4, PALETTE.plate).setStrokeStyle(1, toPhaserColor(PALETTE.plateEdge));
+    chip.add([bg, text(scene, 4, textY - zone.y - 2, bar.camp)]);
+    const hit = scene.add.zone(0, 0, campW, zone.h - 4).setOrigin(0, 0).setInteractive({ cursor: CURSOR.pointer });
+    hit.on("pointerover", () => bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
+    hit.on("pointerout", () => bg.setStrokeStyle(1, toPhaserColor(PALETTE.plateEdge)));
+    hit.on("pointerdown", handlers.onMap);
+    chip.add(hit);
+    chip.setSize(campW, zone.h - 4);
+    layer.add(chip);
+    handlers.index.register(handlers.sceneKey, MAP_ID, chip);
+  } else {
+    layer.add(text(scene, campX + 4, textY, bar.camp));
+  }
+  return { left: coinX + coinsW + 8, right: campX - 8 };
 }
 
 const TONE_COLOR: Readonly<Record<PromptTone, string>> = {

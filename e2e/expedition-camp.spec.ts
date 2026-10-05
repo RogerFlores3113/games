@@ -9,7 +9,7 @@ import { clickObject, createExpeditionRoom, getModel, getScene, hoverObject, sta
  * §8). Drives an entire camp — muster, ready, play, an ability use, a Whisper,
  * the last-trick glance — through `window.__expeditionTest` plus real mouse
  * input, then proves refresh-and-resume, per-browser card packs, and that
- * the four interactables never touch game state. Every id used below
+ * the interactables never touch game state. Every id used below
  * mirrors `apps/web/lib/expedition/expedition-ids.ts`'s literal scheme
  * (`draft:<id>`, `source:<id>`, `seat:<seatId>`, "gate-skip",
  * `objective:<label>`, `hand:<label>`, "ready", "whisper", "confirm",
@@ -735,7 +735,7 @@ test.describe("Expedition full camp (SCENE-02/03/04/08/09/11, criterion 5)", () 
       const countBeforeClicks = gameActionFrames;
       const snapshot = JSON.stringify(await getModel<CampModel>(page));
 
-      for (const id of ["campfire", "fireflies", "lantern", "mascot"]) {
+      for (const id of ["fireflies", "mascot"]) {
         await clickObject(page, `interactable:${id}`);
         await clickObject(page, `interactable:${id}`);
       }

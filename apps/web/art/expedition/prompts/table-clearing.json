@@ -1,0 +1,17 @@
+{
+  "id": "table-clearing",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "a wide oval patch of bare packed brown dirt on grassy ground used as a card table, seen from above, flat smooth dirt in the middle with a few pebbles and twigs, short grass tufts ringing the edges, the patch continuing off the bottom edge of the image, isolated on plain background",
+    "width": 208,
+    "height": 112,
+    "view": "high top-down",
+    "outline": "lineless",
+    "shading": "detailed shading",
+    "no_background": true,
+    "seed": 5
+  },
+  "job": "fc425eca-f3f2-4300-8654-e0d2ffc1f62d",
+  "scale": 2,
+  "note": "natively transparent"
+}

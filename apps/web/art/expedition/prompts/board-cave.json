@@ -1,0 +1,17 @@
+{
+  "id": "board-cave",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "a long flat wet dark blue stone ledge seen from above, a tray for holding playing cards, rough chipped rim with a few tiny glowing blue crystals, isolated object on plain background",
+    "width": 212,
+    "height": 36,
+    "view": "high top-down",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "seed": 3
+  },
+  "job": "eee09b6f-c95f-46ca-a5a8-d3f1221628e9",
+  "scale": 2,
+  "note": "natively transparent"
+}

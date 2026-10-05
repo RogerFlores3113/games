@@ -383,7 +383,7 @@ async function newExpedition(pages: Page[]): Promise<void> {
   for (const p of pages) await waitForScene(p, "trail", 60_000);
 }
 
-const h = (camp: number, attempt: number, status: "cleared" | "failed") => ({ camp, attempt, status, coins: status === "cleared" ? 7 : 0 });
+const h = (camp: number, attempt: number, status: "cleared" | "failed") => ({ camp, attempt, location: "jungle", weather: "fair", status, coins: status === "cleared" ? 7 : 0 });
 
 const PREVIEW = { index: 2, location: "jungle", weather: "fair", pairing: null, event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: null, shop: false, survey: null };
 

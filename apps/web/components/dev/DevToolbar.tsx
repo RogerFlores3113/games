@@ -5,6 +5,7 @@ import type { DevShortcutWire, RoomView } from "@games/schema";
 import { safeGetItem, safeSetItem } from "../../lib/safe-storage";
 import type { DevResultFrame } from "../../lib/dev/dev-store";
 import { DevShortcutControls, devButtonClass, type DevField } from "./DevShortcutControls";
+import { useToolbarRoom } from "../../lib/dev/toolbar-room";
 
 export interface DevToolbarProps {
   view: RoomView;
@@ -25,7 +26,9 @@ const PICK_HINT = "Right-click a boss, a weather chip or an objective for more."
 const COLLAPSED_KEY = "games:dev-toolbar-collapsed";
 
 /** The always-visible strip along the bottom edge: the shortcuts a solo
- * playtest reaches for, bots on or off, and the last answer. */
+ * playtest reaches for, bots on or off, and the last answer. Folding it
+ * away is remembered; where the game's stage fills the window it starts
+ * folded, and unfolding it there lasts until the window changes. */
 export function DevToolbar({
   view,
   shortcuts,
@@ -40,7 +43,15 @@ export function DevToolbar({
   result,
   inControl,
 }: DevToolbarProps) {
-  const [collapsed, setCollapsed] = useState(() => safeGetItem(COLLAPSED_KEY) === "1");
+  const [folded, setFolded] = useState(() => safeGetItem(COLLAPSED_KEY) === "1");
+  const fits = useToolbarRoom((room) => room.fits);
+  const [unfoldedHere, setUnfoldedHere] = useState(false);
+  const [fitsBefore, setFitsBefore] = useState(fits);
+  if (fits !== fitsBefore) {
+    setFitsBefore(fits);
+    setUnfoldedHere(false);
+  }
+  const collapsed = fits ? folded : !unfoldedHere;
   const onToolbar = view.status === "lobby" ? [] : shortcuts.filter((s) => s.toolbar !== undefined);
   const picks = shortcuts.some((s) => s.target !== undefined);
   const compact = "px-1 py-0.5 text-[11px]";
@@ -65,8 +76,12 @@ export function DevToolbar({
         aria-label={collapsed ? "Show the dev toolbar" : "Hide the dev toolbar"}
         title={collapsed ? "Show the dev toolbar" : "Hide the dev toolbar"}
         onClick={() => {
+          if (!fits) {
+            setUnfoldedHere(collapsed);
+            return;
+          }
           safeSetItem(COLLAPSED_KEY, collapsed ? "0" : "1");
-          setCollapsed(!collapsed);
+          setFolded(!collapsed);
         }}
         className={`${devButtonClass} ${compact}`}
       >

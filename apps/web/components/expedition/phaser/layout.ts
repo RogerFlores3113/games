@@ -6,6 +6,7 @@
  */
 
 import { LABEL_CELL } from "./font/font-keys";
+import type { TableId } from "./art/art-registry";
 
 export interface Rect {
   x: number;
@@ -24,23 +25,30 @@ export const STAGE: Rect = { x: 0, y: 0, w: 640, h: 360 };
 /** Reserved for the HTML settings button drawn over the canvas. */
 export const SETTINGS_SAFE_ZONE: Rect = { x: 584, y: 0, w: 56, h: 56 };
 
+/** The pocket under the corner buttons, right of the prompt and above the
+ * whispers and the trail map, that no scene draws in while a run is under
+ * way: the HTML kick vote sits here, one pill high, at any zoom. */
+export const KICK_POCKET: Rect = { x: 546, y: 26, w: 90, h: 17 };
+
 export const ZONES = {
   topBar: { x: 0, y: 0, w: 576, h: 22 },
   prompt: { x: 96, y: 24, w: 448, h: 16 },
-  /** The left column above the kit: the campfire, or in a boss camp the
-   * boss in its place. */
+  /** The left column above the kit: the fireflies, or in a boss camp the
+   * boss in their place. */
   world: { x: 6, y: 42, w: 96, h: 100 },
   crowd: { x: 104, y: 42, w: 432, h: 104 },
   whispers: { x: 540, y: 58, w: 92, h: 112 },
   kit: { x: 8, y: 146, w: 92, h: 126 },
-  stump: { x: 192, y: 148, w: 256, h: 82 },
+  /** The table's flat top, where cards land, and the drop target. */
+  table: { x: 192, y: 148, w: 256, h: 80 },
   lastTrick: { x: 540, y: 174, w: 92, h: 58 },
-  ticker: { x: 136, y: 232, w: 368, h: 18 },
-  tooltip: { x: 104, y: 252, w: 432, h: 24 },
+  ticker: { x: 136, y: 228, w: 368, h: 18 },
+  tooltip: { x: 104, y: 248, w: 432, h: 24 },
   you: { x: 8, y: 276, w: 108, h: 80 },
-  /** The temple's plate path, along the foot of the stump above your hand. */
-  path: { x: 120, y: 276, w: 400, h: 16 },
-  hand: { x: 120, y: 292, w: 400, h: 64 },
+  /** The temple's plate path, along the foot of the altar above your hand. */
+  path: { x: 120, y: 272, w: 400, h: 16 },
+  /** Your hand, standing on its board: the board's front shows below it. */
+  hand: { x: 120, y: 288, w: 400, h: 68 },
   actions: { x: 524, y: 276, w: 108, h: 80 },
 } as const satisfies Record<string, Rect>;
 
@@ -195,44 +203,77 @@ export function centreOf(r: Rect): Point {
 }
 
 // ---------------------------------------------------------------------------
-// Seats around the stump
+// The table, its board and the seats around it
 // ---------------------------------------------------------------------------
 
-/** The stump sprite's top-left; its flat top spans x 206..450, y 150..223. */
-export const STUMP_ART_AT: Point = { x: 128, y: 138 };
+/** Where every table's flat top begins: each location's art is lifted so its
+ * top starts here, and its foot runs down behind your board to the stage's
+ * bottom edge. */
+export const TABLE_TOP_Y = ZONES.table.y;
+const TABLE_ART_W = 416;
+const BOARD_ART_W = 424;
+
+/** Rows measured in each 2x art (stage px from its top): where the table's
+ * flat top begins at its centre and where its foot ends, and where the
+ * board's rim begins at its centre and where it ends. */
+const TABLE_ROWS: Readonly<Record<TableId, { top: number; foot: number; boardTop: number; boardFoot: number }>> = {
+  jungle: { top: 8, foot: 220, boardTop: 14, boardFoot: 60 },
+  clifftop: { top: 6, foot: 216, boardTop: 12, boardFoot: 64 },
+  magma: { top: 10, foot: 216, boardTop: 12, boardFoot: 64 },
+  clearing: { top: 28, foot: 208, boardTop: 16, boardFoot: 56 },
+  desert: { top: 14, foot: 208, boardTop: 14, boardFoot: 60 },
+  cave: { top: 8, foot: 216, boardTop: 12, boardFoot: 62 },
+  temple: { top: 24, foot: 200, boardTop: 18, boardFoot: 56 },
+};
+
+/** The top-left of a table's art, centred on the stage. */
+export function tableArtAt(id: TableId): Point {
+  return { x: (STAGE.w - TABLE_ART_W) / 2, y: TABLE_TOP_Y - TABLE_ROWS[id].top };
+}
+
+/** The top-left of a board's art: centred, its foot on the stage's bottom
+ * edge, in front of the table's foot. */
+export function boardArtAt(id: TableId): Point {
+  return { x: (STAGE.w - BOARD_ART_W) / 2, y: STAGE.h - TABLE_ROWS[id].boardFoot };
+}
+
+/** The stage rows a table's art covers, and where its board's rim begins. */
+export function tableSpan(id: TableId): { top: number; foot: number; boardTop: number } {
+  const rows = TABLE_ROWS[id];
+  return { top: TABLE_TOP_Y, foot: tableArtAt(id).y + rows.foot, boardTop: boardArtAt(id).y + rows.boardTop };
+}
+
 export const SILHOUETTE_W = 64;
 export const SILHOUETTE_H = 80;
 export const PLATE_H = 48;
 const PLATE_GAP = 2;
 
 /** Where a teammate sits: the silhouette's bottom-centre (its legs hidden
- * behind the stump's rim), and the top-left of the card they play, on the
- * stump in front of them. */
+ * behind the table's far rim), and the top-left of the card they play, on
+ * the table in front of them. */
 export interface SeatSpot {
   x: number;
   bottom: number;
   card: Point;
 }
 
-const SIDE_LEFT: SeatSpot = { x: 160, bottom: 222, card: { x: 226, y: 170 } };
-const BACK_LEFT: SeatSpot = { x: 262, bottom: 174, card: { x: 268, y: 151 } };
-const BACK: SeatSpot = { x: 320, bottom: 172, card: { x: 306, y: 150 } };
-const BACK_RIGHT: SeatSpot = { x: 378, bottom: 174, card: { x: 344, y: 151 } };
-const SIDE_RIGHT: SeatSpot = { x: 480, bottom: 222, card: { x: 386, y: 170 } };
-const BACK_LEFT_5: SeatSpot = { x: 248, bottom: 174, card: { x: 262, y: 151 } };
-const BACK_RIGHT_5: SeatSpot = { x: 392, bottom: 174, card: { x: 350, y: 151 } };
+// The tables' tops are shallow: the back row of cards sits at the far rim,
+// the side seats' a little nearer and as far in as the seats allow, and the
+// card of the seat straight behind you lands left of centre, clear of yours
+// at the front.
+const seat = (x: number, bottom: number, cardX: number, cardY: number): SeatSpot => ({ x, bottom, card: { x: cardX, y: cardY } });
 
-/** Your own card, at the front of the stump. */
-export const YOUR_CARD_AT: Point = { x: 306, y: 190 };
+/** Your own card, at the front of the table. */
+export const YOUR_CARD_AT: Point = { x: 318, y: 164 };
 
-/** Teammates left to right in turn order: with two they flank the stump,
+/** Teammates left to right in turn order: with two they flank the table,
  * with three one sits behind it. Five is a spectator's view. */
 const SPOTS: Readonly<Record<number, readonly SeatSpot[]>> = {
-  1: [BACK],
-  2: [SIDE_LEFT, SIDE_RIGHT],
-  3: [SIDE_LEFT, BACK, SIDE_RIGHT],
-  4: [SIDE_LEFT, BACK_LEFT, BACK_RIGHT, SIDE_RIGHT],
-  5: [SIDE_LEFT, BACK_LEFT_5, BACK, BACK_RIGHT_5, SIDE_RIGHT],
+  1: [seat(320, 172, 286, 148)],
+  2: [seat(160, 222, 244, 156), seat(480, 222, 372, 156)],
+  3: [seat(160, 222, 236, 156), seat(320, 172, 286, 148), seat(480, 222, 372, 156)],
+  4: [seat(160, 222, 226, 154), seat(262, 174, 258, 148), seat(378, 174, 352, 148), seat(480, 222, 384, 154)],
+  5: [seat(160, 222, 226, 154), seat(248, 174, 258, 148), seat(320, 172, 286, 148), seat(392, 174, 352, 148), seat(480, 222, 384, 154)],
 };
 
 export function seatSpots(count: number): readonly SeatSpot[] {
@@ -256,10 +297,10 @@ export function plateRect(spots: readonly SeatSpot[], i: number): Rect {
 // ---------------------------------------------------------------------------
 
 export const HOVER_LIFT = 8;
-/** Resting top edge of a hand card: low enough that the lifted card's top
- * (`HAND_CARD_Y - HOVER_LIFT`) and the targeting marker above it stay in
- * the hand zone. */
-export const HAND_CARD_Y = ZONES.hand.y + ZONES.hand.h - CARD_H - 12;
+/** Resting top edge of a hand card, on its board: low enough that the
+ * lifted card's top (`HAND_CARD_Y - HOVER_LIFT`) and the targeting marker
+ * above it stay in the hand zone. */
+export const HAND_CARD_Y = ZONES.hand.y + ZONES.hand.h - CARD_H - 16;
 export const HAND_MARKER_H = 2;
 
 /** Left x of each card in a `count`-card fan centred in the hand zone. The
@@ -276,16 +317,16 @@ export function handFanXs(count: number): number[] {
 }
 
 // ---------------------------------------------------------------------------
-// Stump: trick row and the face-up objective pool
+// Table: trick row and the face-up objective pool
 // ---------------------------------------------------------------------------
 
-export const STUMP_CENTRE: Point = centreOf(ZONES.stump);
+export const TABLE_CENTRE: Point = centreOf(ZONES.table);
 export const OBJECTIVE_POOL_STEP = 50;
 
 /** Centre x of each of `count` items spaced `step` apart, centred on the
- * stump. */
-export function stumpRowXs(count: number, step: number): number[] {
-  const firstX = STUMP_CENTRE.x - ((count - 1) * step) / 2;
+ * table. */
+export function tableRowXs(count: number, step: number): number[] {
+  const firstX = TABLE_CENTRE.x - ((count - 1) * step) / 2;
   return Array.from({ length: count }, (_, i) => Math.round(firstX + i * step));
 }
 
@@ -360,14 +401,10 @@ export function helperRows(count: number): HelperRow[] {
 // ---------------------------------------------------------------------------
 
 export const INTERACTABLE_ANCHORS: {
-  campfire: Point;
   fireflies: Point;
-  lantern: Point;
   mascot: Point;
 } = {
-  campfire: { x: 50, y: 120 },
-  fireflies: { x: 30, y: 64 },
-  lantern: { x: 84, y: 70 },
+  fireflies: { x: 52, y: 88 },
   mascot: { x: 612, y: 338 },
 };
 

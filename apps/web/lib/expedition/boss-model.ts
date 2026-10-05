@@ -6,7 +6,7 @@ import { modName } from "./view-access";
 
 /**
  * The boss on the table: what its sprite's caption says, the one-line rule
- * under the stump, who it looks at and the marks it leaves on seats. A pure
+ * under the table, who it looks at and the marks it leaves on seats. A pure
  * display transform of the boss's status parts; never decides a rule.
  */
 
@@ -22,7 +22,7 @@ export interface BossModel {
   name: string;
   /** Under the sprite: a few words. */
   caption: string;
-  /** Under the stump: what the boss does right now, as one sentence. */
+  /** Under the table: what the boss does right now, as one sentence. */
   rule: string;
   /** The seat the boss faces this trick (the Crocodile), for its gaze arrow. */
   facingSeatId: string | null;
@@ -40,7 +40,7 @@ export interface SeatNamer {
 const NAME_CHARS = 10;
 /** Captions stay within 15 characters, the boss zone's caption line. */
 export const CAPTION_MAX_CHARS = 15;
-/** Rules stay within one line of the ticker under the stump. */
+/** Rules stay within one line of the ticker under the table. */
 export const RULE_MAX_CHARS = 60;
 const CAPTION_NAME_CHARS = 6;
 
@@ -201,7 +201,7 @@ const HELPER_SHORT_NAME: Readonly<Record<string, string>> = {
 /** The bosses planned earlier in the run, back at the temple at half
  * strength, in the order the run met them. `name` is their caption's
  * first line ("Tiger (half)"); a helper has no gaze arrow and no rule under
- * the stump: its caption and the marks it leaves on seats say what it does. */
+ * the table: its caption and the marks it leaves on seats say what it does. */
 export function buildHelpers(view: ExpeditionView, seats: SeatNamer): BossModel[] {
   return bossMods(view)
     .filter((m) => m.strength === "half")

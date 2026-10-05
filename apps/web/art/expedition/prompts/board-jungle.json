@@ -1,0 +1,17 @@
+{
+  "id": "board-jungle",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "a long dark brown polished wooden plank board seen from above, a tray for holding playing cards, darker carved wooden rim around the edges, wood grain, isolated object on plain background",
+    "width": 212,
+    "height": 36,
+    "view": "high top-down",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "seed": 3
+  },
+  "job": "246d56b7-abf5-4bee-bd61-2a1882d49d3c",
+  "scale": 2,
+  "note": "natively transparent"
+}

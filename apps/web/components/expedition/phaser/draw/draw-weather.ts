@@ -8,7 +8,7 @@
 import type Phaser from "phaser";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
-import { STAGE, STUMP_CENTRE, ZONES } from "../layout";
+import { STAGE, TABLE_CENTRE, ZONES } from "../layout";
 import type { ObjectIndex } from "../object-index";
 import type { Haze, ModChip, Precipitation, Sky } from "../../../../lib/expedition/weather-model";
 import { labelWidth, plate, text, type Layer } from "./ui-kit";
@@ -177,7 +177,7 @@ const DROPS: Readonly<Record<Exclude<Precipitation, "none">, { speedY: [number, 
 };
 const NIGHT_DIM = 0.38;
 const FOG_KEY = "weather:fog-band";
-/** Mist above the seat plates, around the stump and low on the ground, so
+/** Mist above the seat plates, around the table and low on the ground, so
  * the plates' text never sits on a bright band. */
 const FOG_BANDS = [
   { y: 46, alpha: 0.3, drift: 60, ms: 9000 },
@@ -185,7 +185,7 @@ const FOG_BANDS = [
   { y: 248, alpha: 0.3, drift: 70, ms: 10000 },
 ] as const;
 /** The water line: just under the hand panels when the river is low, the
- * stump's foot when it floods. */
+ * table's foot when it floods. */
 const RIVER_LOW_Y = 300;
 const RIVER_HIGH_Y = 232;
 const RIVER_MS = 700;
@@ -323,19 +323,19 @@ export class WeatherOverlay {
     this.objects = [dim, rain];
   }
 
-  /** Lights the sky once per strike key, with a bolt down onto the stump. */
+  /** Lights the sky once per strike key, with a bolt down onto the table. */
   flash(strike: string | null): void {
     if (strike === null || this.flashed.has(strike)) return;
     this.flashed.add(strike);
     const glare = this.scene.add.rectangle(0, 0, STAGE.w, STAGE.h, toPhaserColor(PALETTE.text), 0.85).setOrigin(0, 0);
     const bolt = this.scene.add.graphics();
     const points = [
-      [STUMP_CENTRE.x + 70, 0],
-      [STUMP_CENTRE.x + 40, 40],
-      [STUMP_CENTRE.x + 58, 46],
-      [STUMP_CENTRE.x + 18, 96],
-      [STUMP_CENTRE.x + 34, 100],
-      [STUMP_CENTRE.x, ZONES.stump.y + 6],
+      [TABLE_CENTRE.x + 70, 0],
+      [TABLE_CENTRE.x + 40, 40],
+      [TABLE_CENTRE.x + 58, 46],
+      [TABLE_CENTRE.x + 18, 96],
+      [TABLE_CENTRE.x + 34, 100],
+      [TABLE_CENTRE.x, ZONES.table.y + 6],
     ] as const;
     for (const [width, color] of [[5, PALETTE.coin], [2, PALETTE.text]] as const) {
       bolt.lineStyle(width, toPhaserColor(color), 1);

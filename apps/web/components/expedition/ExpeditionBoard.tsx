@@ -26,9 +26,11 @@ import { playCue } from "../../lib/expedition/audio/cue-bus";
 import { toggleMute } from "../../lib/expedition/audio/audio-prefs";
 import { ReconnectingBanner } from "../ReconnectingBanner";
 import { ExpeditionRulesModal } from "./ExpeditionRulesModal";
+import { ExpeditionMapModal } from "./ExpeditionMapModal";
 import { ExpeditionSettingsModal } from "./ExpeditionSettingsModal";
 import { KickPanel } from "./KickPanel";
 import { buildKickPanel } from "../../lib/expedition/kick-model";
+import { CURSOR } from "./phaser/cursors";
 
 const ExpeditionPhaserMount = dynamic(() => import("./phaser/ExpeditionPhaserMount"), { ssr: false });
 
@@ -53,6 +55,7 @@ export function ExpeditionBoard({
 
   const onActionRef = useRef(onAction);
   const onRestartLobbyRef = useRef(onRestartLobby);
+  const [mapOpen, setMapOpen] = useState(false);
   useEffect(() => {
     onActionRef.current = onAction;
     onRestartLobbyRef.current = onRestartLobby;
@@ -73,6 +76,10 @@ export function ExpeditionBoard({
     createExpeditionSceneStore({
       onAction: (request) => onActionRef.current(request),
       onRestartLobby: () => onRestartLobbyRef.current?.(),
+      onOpenMap: () => {
+        playCue("sfx-ui-click");
+        setMapOpen(true);
+      },
       cardPackId: readCardPackPref(),
     }),
   );
@@ -99,6 +106,17 @@ export function ExpeditionBoard({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, game, view.seats, view.hostSeatId]);
+
+  // The glove cursors over the board's HTML too (globals.css reads them).
+  useEffect(() => {
+    const body = document.body;
+    body.classList.add("expedition-gloves");
+    for (const [kind, value] of Object.entries(CURSOR)) body.style.setProperty(`--glove-${kind}`, value);
+    return () => {
+      body.classList.remove("expedition-gloves");
+      for (const kind of Object.keys(CURSOR)) body.style.removeProperty(`--glove-${kind}`);
+    };
+  }, []);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -185,6 +203,8 @@ export function ExpeditionBoard({
       )}
 
       <ExpeditionRulesModal open={rulesOpen} onClose={() => setRulesOpen(false)} game={game} />
+
+      <ExpeditionMapModal open={mapOpen} onClose={() => setMapOpen(false)} game={game} />
 
       <ExpeditionSettingsModal
         open={settingsOpen}

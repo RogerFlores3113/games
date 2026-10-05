@@ -4,6 +4,7 @@
  * that control's own label, fully inside it.
  */
 import type Phaser from "phaser";
+import { CURSOR, pointerIf } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL, SIGN_CELL, WORLD_LABEL_FONT, WORLD_SIGN_FONT } from "../font/font-keys";
 import { MINI_H, MINI_W } from "../layout";
@@ -97,7 +98,7 @@ export function button(
   container.add(t);
   container.setSize(w, h);
   if (opts.onClick) {
-    container.setInteractive({ useHandCursor: true });
+    container.setInteractive({ cursor: CURSOR.pointer });
     container.on("pointerdown", opts.onClick);
   }
   return container;
@@ -142,9 +143,12 @@ export function showsCard(chip: ObjectiveChip): boolean {
   return chip.kind === "win-card" || chip.kind === "sun" || chip.kind === "ordered" || chip.kind === "hidden";
 }
 
-/** A trick-count tag's text: "0 tricks", or in a crowded row just "0". */
+/** A trick-count tag's text: "No tricks" or "=2 tricks", or in a crowded
+ * row just "=0" or "=2". Never "0 tricks", which a plate's trick count
+ * already reads. */
 function tagLabel(chip: ObjectiveChip, tight: boolean): string {
-  return tight ? chip.label.split(" ")[0]! : chip.label;
+  if (!tight) return chip.label;
+  return chip.kind === "no-tricks" ? "=0" : chip.label.split(" ")[0]!;
 }
 
 /** Width of one compact objective item: a mini card plus a badge column, or
@@ -191,7 +195,7 @@ export function objectiveItem(
   }
   const hit = scene.add.zone(0, 0, w, MINI_H).setOrigin(0, 0);
   container.add(hit);
-  hit.setInteractive({ useHandCursor: chip.targetable });
+  hit.setInteractive(pointerIf(chip.targetable));
   hit.on("pointerover", () => opts.onHover(true));
   hit.on("pointerout", () => opts.onHover(false));
   if (chip.targetable) hit.on("pointerdown", opts.onClick);

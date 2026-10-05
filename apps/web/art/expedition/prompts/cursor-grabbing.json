@@ -1,0 +1,14 @@
+{
+  "id": "cursor-grabbing",
+  "tool": "create_1_direction_object",
+  "params": {
+    "name": "hud coin and glove cursors",
+    "description": "jungle expedition UI icon, warm palette, single-pixel dark outline, simple shading, transparent background",
+    "view": "sidescroller",
+    "size": 16
+  },
+  "object_id": "3c480778-3727-4448-ab5d-4a84ba869bc8",
+  "item_description": "tan leather explorer glove clenched into a grabbing fist, mouse cursor",
+  "batch_index": 5,
+  "scale": 2
+}

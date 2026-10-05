@@ -249,7 +249,7 @@ describe("objectives", () => {
   it("no-tricks and exactly-n labels", () => {
     const model = buildSceneModel(server(viewWithObjectives([noTricks, exactlyN])), ui(), "big-index");
     const nt = model.faceUpObjectives.find((o) => o.objectiveId === "o3")!;
-    expect(nt.label).toBe("0 tricks");
+    expect(nt.label).toBe("No tricks");
     const en = model.faceUpObjectives.find((o) => o.objectiveId === "o4")!;
     expect(en.label).toBe("=2 tricks");
   });
@@ -529,13 +529,14 @@ describe("trick and lastTrick", () => {
 });
 
 describe("HUD: top bar", () => {
-  it("shows supplies against their cap, the purse, and the camp label", () => {
+  it("shows supplies against their cap, the purse, and the camp label that opens the map", () => {
     const view = makeView({ campIndex: 2, supplies: { count: 2, max: 5 }, purse: 11 });
     expect(buildSceneModel(server(view), ui(), "big-index").topBar).toEqual({
       supplies: 2,
       suppliesMax: 5,
       purse: 11,
       camp: "Camp 2 of 6",
+      map: true,
       suppliesPick: null,
     });
   });

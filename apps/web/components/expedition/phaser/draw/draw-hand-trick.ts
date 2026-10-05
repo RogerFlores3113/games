@@ -1,10 +1,11 @@
 /**
- * Your hand (the `hand` zone), the current trick on the stump, and the
+ * Your hand (the `hand` zone), the current trick on the table, and the
  * last-trick pile with its hover fan (the `lastTrick` zone). Card facts
  * (`playable`, `dimmed`, `targetable`, `selected`, `lifted`, `isLed`) are
  * read off the model; nothing here recomputes legality.
  */
 import type Phaser from "phaser";
+import { CURSOR } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
 import {
@@ -35,7 +36,6 @@ import { DIM_ALPHA, PANEL_ALPHA, labelWidth, miniCard, plate, platedText, text, 
 
 const DEAL_TWEEN_MS = 150;
 const FAN_STEP = 15;
-const TRAY_PAD = 3;
 
 /** Where a seat's played card flies in from: its plate, or your hand. */
 function seatOrigin(model: SceneModel, seatId: string, dropOrigin: Point | null): Point {
@@ -46,7 +46,7 @@ function seatOrigin(model: SceneModel, seatId: string, dropOrigin: Point | null)
   return centreOf(plateRect(seatSpots(mates.length), i));
 }
 
-/** The top-left of the card a seat plays: on the stump in front of them. */
+/** The top-left of the card a seat plays: on the table in front of them. */
 export function cardSpot(model: SceneModel, seatId: string): Point {
   if (seatId === model.youSeatId) return YOUR_CARD_AT;
   const mates = others(model);
@@ -58,18 +58,9 @@ function nameOf(model: SceneModel, seatId: string): string {
   return model.seats.find((s) => s.seatId === seatId)?.displayLabel ?? "?";
 }
 
-/** A dark tray under the fan, so dimmed cards dim against it, not the art. */
-function drawHandTray(scene: Phaser.Scene, layer: Layer, xs: number[]): void {
-  if (xs.length === 0) return;
-  const zone = ZONES.hand;
-  const x = xs[0]! - TRAY_PAD;
-  const y = HAND_CARD_Y - HOVER_LIFT - HAND_MARKER_H - 2;
-  layer.add(plate(scene, x, y, xs.at(-1)! + CARD_W + TRAY_PAD - x, zone.y + zone.h - y).setAlpha(PANEL_ALPHA));
-}
-
+/** Your hand, fanned on the board `draw-seats.ts` lays in front of the table. */
 export function drawHand(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   const xs = handFanXs(model.hand.length);
-  drawHandTray(scene, layer, xs);
   const order = model.hand.map((card, i) => ({ card, i })).sort((a, b) => Number(a.card.lifted) - Number(b.card.lifted));
 
   for (const { card, i } of order) {
@@ -78,6 +69,14 @@ export function drawHand(scene: Phaser.Scene, layer: Layer, model: SceneModel, i
     const strip = next === undefined || card.lifted ? CARD_W : next - x;
     drawHandCard(scene, layer, model, index, handlers, card, x, strip);
   }
+}
+
+/** A pick points; a card you can play opens the glove to grab it; on your
+ * turn, a card the rules refuse is blocked. */
+function handCursor(card: CardModel): string {
+  if (card.targetable) return CURSOR.pointer;
+  if (card.playable) return CURSOR.grab;
+  return card.dimmed ? CURSOR["not-allowed"] : CURSOR.default;
 }
 
 function drawHandCard(
@@ -108,7 +107,7 @@ function drawHandCard(
   }
 
   const hit = scene.add.zone(x, y, strip, CARD_H).setOrigin(0, 0);
-  hit.setInteractive({ useHandCursor: card.playable || card.targetable });
+  hit.setInteractive({ cursor: handCursor(card) });
   hit.on("pointerdown", () => handlers.onCardPress(card.id));
   hit.on("pointerover", () => handlers.onCardHover(card.id));
   hit.on("pointerout", () => handlers.onCardHover(null));
@@ -116,10 +115,10 @@ function drawHandCard(
   index.register("camp", card.objectId, hit);
 }
 
-/** The stump's drop outline while a legal card is held. */
+/** The table's drop outline while a legal card is held. */
 export function drawDropTarget(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
   if (model.drag === null || !model.drag.legal) return;
-  const zone = ZONES.stump;
+  const zone = ZONES.table;
   layer.add(
     scene.add
       .rectangle(zone.x + 2, zone.y + 2, zone.w - 4, zone.h - 4, 0, 0)
@@ -160,7 +159,7 @@ export function drawTrick(
     container.setSize(CARD_W, CARD_H);
     if (pick !== null && pick.targetable) {
       const hit = scene.add.zone(0, 0, CARD_W, CARD_H).setOrigin(0, 0);
-      hit.setInteractive({ useHandCursor: true });
+      hit.setInteractive({ cursor: CURSOR.pointer });
       hit.on("pointerdown", () => handlers.onPick("card", pick.id));
       container.add(hit);
     }
@@ -221,12 +220,12 @@ function faceDownCard(scene: Phaser.Scene, model: SceneModel, suit: FaceDownPlay
   ];
 }
 
-/** The whole trick as one target (a board pick): the stump outlined, with a
+/** The whole trick as one target (a board pick): the table outlined, with a
  * label, clickable anywhere. */
 export function drawBoardPick(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   const pick = model.boardPick;
   if (pick === null) return;
-  const zone = ZONES.stump;
+  const zone = ZONES.table;
   const container = scene.add.container(zone.x, zone.y);
   container.add(scene.add.rectangle(1, 1, zone.w - 2, zone.h - 2, 0, 0).setOrigin(0, 0).setStrokeStyle(2, toPhaserColor(PALETTE.turn)));
   const label = pick.selected ? "This trick (picked)" : "Click to pick this trick";
@@ -234,7 +233,7 @@ export function drawBoardPick(scene: Phaser.Scene, layer: Layer, model: SceneMod
   container.setSize(zone.w, zone.h);
   if (pick.targetable) {
     const hit = scene.add.zone(0, 0, zone.w, zone.h).setOrigin(0, 0);
-    hit.setInteractive({ useHandCursor: true });
+    hit.setInteractive({ cursor: CURSOR.pointer });
     hit.on("pointerdown", () => handlers.onPick("board", ""));
     container.add(hit);
   }

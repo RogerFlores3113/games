@@ -86,7 +86,7 @@ const draftStage = (over: Partial<Extract<ExpeditionStageView, { tag: "draft" }>
 
 describe("topBar", () => {
   it("shows supplies against their cap, the purse, and the camp the crew heads to", () => {
-    expect(model(makeView()).topBar).toEqual({ supplies: 3, suppliesMax: 5, purse: 12, camp: "Camp 2 of 6", suppliesPick: null });
+    expect(model(makeView()).topBar).toEqual({ supplies: 3, suppliesMax: 5, purse: 12, camp: "Camp 2 of 6", map: true, suppliesPick: null });
   });
 
   it("labels a boss camp and the temple by their tier", () => {
@@ -98,6 +98,7 @@ describe("topBar", () => {
   it("reads Choosing the run at muster", () => {
     const view = at({ tag: "muster", ballots: [] }, { length: null, campCount: null, plan: [], history: [] });
     expect(model(view).topBar.camp).toBe("Choosing the run");
+    expect(model(view).topBar.map).toBe(false);
   });
 });
 

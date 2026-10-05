@@ -466,3 +466,20 @@ body {
   background-position: center;
   background-attachment: fixed;
 }
+
+/* The Expedition board's glove cursors over its HTML (the board sets the
+ * --glove-* variables from cursors.ts, and the canvas sets its own): the
+ * plain glove everywhere, pointing over what can be clicked, blocked over a
+ * disabled control, and the text caret in a text field. */
+body.expedition-gloves {
+  cursor: var(--glove-default);
+}
+body.expedition-gloves :is(a[href], button, select, summary, label, [role="button"], [role="tab"], input[type="checkbox"], input[type="radio"]):not(:disabled) {
+  cursor: var(--glove-pointer);
+}
+body.expedition-gloves :is(button, select, input):disabled {
+  cursor: var(--glove-not-allowed);
+}
+body.expedition-gloves :is(input:not([type="checkbox"]):not([type="radio"]), textarea):not(:disabled) {
+  cursor: text;
+}

@@ -1,0 +1,17 @@
+{
+  "id": "board-magma",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "a long flat black obsidian slab seen from above, a tray for holding playing cards, glossy glassy surface with a thin glowing orange edge, isolated object on plain background",
+    "width": 212,
+    "height": 36,
+    "view": "high top-down",
+    "outline": "single color black outline",
+    "shading": "medium shading",
+    "no_background": true,
+    "seed": 3
+  },
+  "job": "b17032cc-96bc-4e10-85f8-04b2b0b2394b",
+  "scale": 2,
+  "note": "natively transparent"
+}

@@ -2,7 +2,7 @@
  * What has been whispered this camp. The `whispers` zone keeps the cards
  * teammates named to you (face up, labelled "from <Name>") and the cards you
  * named (labelled "to <Name>"), and the cards the latest Tornado gust took
- * from your hand. A ticker along the foot of the stump says,
+ * from your hand. A ticker along the foot of the table says,
  * to every seat, who whispered to whom.
  */
 import type Phaser from "phaser";
@@ -59,9 +59,9 @@ function drawCards(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: 
   });
 }
 
-/** The newest whispers under the stump. The boss's rule and a lightning
+/** The newest whispers under the table. The boss's rule and a lightning
  * strike on the trick in play are pinned to the bottom lines, each on a
- * solid plate edged in its colour, since the stump's roots behind them are
+ * solid plate edged in its colour, since the table behind them is
  * as dark and busy as the text is bright. */
 function drawTicker(scene: Phaser.Scene, layer: Layer, model: SceneModel): void {
   const pinned = [

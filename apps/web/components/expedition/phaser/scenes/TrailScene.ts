@@ -12,6 +12,7 @@ import { drawBackdrop, drawPrompt, drawTooltip, drawTopBar } from "../draw/draw-
 import { drawTrailScene, type FlipClock, type TrailHandlers } from "../draw/draw-trail";
 import { gearTile } from "../draw/draw-loadout";
 import { PALETTE, toPhaserColor } from "../palette";
+import { CURSOR } from "../cursors";
 import type { TrailModel } from "../../../../lib/expedition/trail-model";
 import { equipAfter, tapMove, type Gear, type GearMove } from "../../../../lib/expedition/loadout-model";
 import { DRAG_THRESHOLD } from "../../../../lib/expedition/card-drag";
@@ -187,7 +188,7 @@ export class TrailScene extends Phaser.Scene {
     this.layer.removeAll(true);
     this.index.clearScene("trail");
     this.renderBackdrop(model);
-    drawTopBar(this, this.layer, model.topBar);
+    drawTopBar(this, this.layer, model.topBar, { index: this.index, sceneKey: "trail", onMap: () => this.sceneStore.getState().openMap() });
     drawPrompt(this, this.layer, model.prompt);
     drawTrailScene(this, this.layer, model, this.index, this.handlers, this.flips);
     if (model.panel.kind !== "muster") drawTooltip(this, this.layer, model.tooltip, TRAIL_ZONES.tooltip);
@@ -235,6 +236,7 @@ export class TrailScene extends Phaser.Scene {
       this.handlers.onSourceHover(null);
     }
     gesture.ghost.setPosition(at.x, at.y);
+    this.input.manager.canvas.style.cursor = CURSOR.grabbing;
     const move = dropMove(gear, gesture.uid, at);
     const geo = gearLayout(gear.slots.length);
     const rect = move === null ? null : move.to.kind === "slot" ? geo.slots[move.to.index]! : geo.packArea;
@@ -249,6 +251,7 @@ export class TrailScene extends Phaser.Scene {
     const gear = gearOf(this.sceneStore);
     const dragged = gesture.ghost !== null;
     this.dropGesture();
+    if (dragged) this.input.manager.canvas.style.cursor = CURSOR.default;
     if (gear === null) return;
     equip(this.sceneStore, gear, dragged ? dropMove(gear, gesture.uid, this.pointerAt()) : tapMove(gear, gesture.uid));
   }

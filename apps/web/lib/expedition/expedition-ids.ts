@@ -46,7 +46,7 @@ export function trickObjectId(identity: ExpeditionCardIdentityView): string {
   return `trick:${cardLabel(identity)}`;
 }
 
-/** A face-down card on the stump, named by the seat that played it. */
+/** A face-down card on the table, named by the seat that played it. */
 export function faceDownTrickObjectId(seatId: string): string {
   return `trick:face-down:${seatId}`;
 }
@@ -183,6 +183,8 @@ export const PACK_NEXT_ID = "pack-page:next";
 export const BOARD_ID = "board";
 export const TRAY_MORE_ID = "pick:more";
 export const SUPPLIES_ID = "supplies";
+/** The top bar's camp label, which opens the map of the run. */
+export const MAP_ID = "map";
 export const WHISPER_ID = "whisper";
 export const CONFIRM_ID = "confirm";
 export const CANCEL_ID = "cancel";

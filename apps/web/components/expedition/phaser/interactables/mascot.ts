@@ -8,6 +8,7 @@
  * never touches game state or the server (SCENE-09).
  */
 import type Phaser from "phaser";
+import { CURSOR } from "../cursors";
 import { WORLD_LABEL_FONT } from "../font/font-keys";
 import { PALETTE, toPhaserColor } from "../palette";
 import { PANEL_ALPHA } from "../draw/ui-kit";
@@ -20,7 +21,7 @@ const LINES: readonly string[] = [
   "Psst - the Sun always wins.",
   "I once ate a whole supply crate.",
   "Fireflies make good snacks.",
-  "The stump has seen things.",
+  "The table has seen things.",
 ];
 
 const BUBBLE_LIFETIME_MS = 3000;
@@ -47,7 +48,7 @@ function place(scene: Phaser.Scene, anchor: { x: number; y: number }): Phaser.Ga
   container.add(panda);
   PANDA.set(container, panda);
   container.setSize(art.w, art.h);
-  container.setInteractive({ useHandCursor: true });
+  container.setInteractive({ cursor: CURSOR.pointer });
   return container;
 }
 

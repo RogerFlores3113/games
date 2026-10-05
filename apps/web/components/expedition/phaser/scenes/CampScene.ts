@@ -1,5 +1,5 @@
 /**
- * The camp scene: draws the world and the four interactables once, then
+ * The camp scene: draws the world and its interactables once, then
  * redraws every zone (top bar, prompt, seats, hand, trick, last trick,
  * tooltip, actions) from the store's `model` whenever it changes. Click
  * handlers only call `store.dispatch`/`store.confirmTargeting`/
@@ -11,11 +11,11 @@ import { ensurePixelFonts } from "../font/pixel-font";
 import { ensureCardTextures } from "../card-packs/card-textures";
 import { drawBackdrop, drawPrompt, drawTooltip, drawTopBar } from "../draw/draw-table";
 import { WeatherOverlay, drawModStrip } from "../draw/draw-weather";
-import { drawCrowdAndStump, drawPlates, drawYouAndKit } from "../draw/draw-seats";
+import { drawCrowdAndTable, drawPlates, drawYouAndKit } from "../draw/draw-seats";
 import type { CampHandlers } from "../draw/camp-handlers";
 import { preloadArt } from "../art/place-art";
 import { drawBoardPick, drawDropTarget, drawHand, drawLastTrick, drawTrick } from "../draw/draw-hand-trick";
-import { drawControls, drawStumpOverlays } from "../draw/draw-controls";
+import { drawControls, drawTableOverlays } from "../draw/draw-controls";
 import { drawWhispers } from "../draw/draw-whispers";
 import { drawBossCaption, placeBosses, worldKey } from "../draw/draw-boss";
 import { drawTemplePath } from "../draw/draw-temple";
@@ -25,6 +25,7 @@ import { bossObjectId } from "../../../../lib/expedition/boss-model";
 import { INTERACTABLE_REGISTRY } from "../interactables/registry";
 import { CARD_H, CARD_W, HAND_CARD_Y, INTERACTABLE_ANCHORS, ZONES, handFanXs, pointInRect, type Point } from "../layout";
 import { PALETTE, toPhaserColor } from "../palette";
+import { CURSOR } from "../cursors";
 import { cardTextureKey } from "../card-packs/card-pack-def";
 import { reduceDrag, type DragEffect, type DragEvent } from "../../../../lib/expedition/card-drag";
 import { interactableObjectId, LAST_TRICK_ID, mateSourceObjectId, modObjectId, sourceObjectId } from "../../../../lib/expedition/expedition-ids";
@@ -222,6 +223,7 @@ export class CampScene extends Phaser.Scene {
   private dropOrigin: Point | null = null;
   private returnTween: Phaser.Tweens.Tween | null = null;
   private settleTimer: Phaser.Time.TimerEvent | null = null;
+  private cursorHeld = false;
 
   constructor(deps: SceneDeps) {
     super("camp");
@@ -259,8 +261,8 @@ export class CampScene extends Phaser.Scene {
     this.fx = new BossFx(this, this.add.container(0, 0), this.index);
     this.dragLayer = this.add.container(0, 0);
     this.weather = new WeatherOverlay(this, skyLayer, this.add.container(0, 0));
-    const stump = ZONES.stump;
-    this.tableGlow = this.add.rectangle(stump.x, stump.y, stump.w, stump.h, toPhaserColor(PALETTE.turn), 0.22).setOrigin(0, 0).setVisible(false);
+    const table = ZONES.table;
+    this.tableGlow = this.add.rectangle(table.x, table.y, table.w, table.h, toPhaserColor(PALETTE.turn), 0.22).setOrigin(0, 0).setVisible(false);
     this.dragLayer.add(this.tableGlow);
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       this.lastDown = this.pointerAt();
@@ -336,8 +338,13 @@ export class CampScene extends Phaser.Scene {
     this.renderBoss(model);
     const chipsBefore = this.fx?.chipSpots(this.previousModel) ?? new Map();
     this.dynamicLayer.removeAll(true);
-    drawCrowdAndStump(this, this.dynamicLayer, model, this.index, this.handlers);
-    const span = drawTopBar(this, this.dynamicLayer, model.topBar, this.index, () => this.handlers.onPick("supplies", ""));
+    drawCrowdAndTable(this, this.dynamicLayer, model, this.index, this.handlers);
+    const span = drawTopBar(this, this.dynamicLayer, model.topBar, {
+      index: this.index,
+      sceneKey: "camp",
+      onMap: () => this.sceneStore.getState().openMap(),
+      onSupplies: () => this.handlers.onPick("supplies", ""),
+    });
     drawModStrip(this, this.dynamicLayer, model.mods, span, this.index, this.handlers);
     drawPrompt(this, this.dynamicLayer, model.prompt);
     this.renderTable(model);
@@ -364,7 +371,7 @@ export class CampScene extends Phaser.Scene {
     drawTemplePath(this, layer, model, this.index, this.handlers, pressedNow);
     drawControls(this, layer, model, this.index, this.handlers);
     drawBoardPick(this, layer, model, this.index, this.handlers);
-    drawStumpOverlays(this, layer, model, this.index, this.handlers);
+    drawTableOverlays(this, layer, model, this.index, this.handlers);
   }
 
   private pointerAt(): Point {
@@ -390,7 +397,7 @@ export class CampScene extends Phaser.Scene {
     const phase = this.sceneStore.getState().localUi.drag.phase;
     if (phase !== "pressed" && phase !== "dragging") return;
     const at = this.pointerAt();
-    const effect = this.drive({ type: "release", overTable: pointInRect(ZONES.stump, at) });
+    const effect = this.drive({ type: "release", overTable: pointInRect(ZONES.table, at) });
     if (effect.kind === "click") this.handlers.onCard(effect.cardId);
     if (effect.kind === "play") {
       this.dropOrigin = this.ghost === null ? { x: at.x, y: at.y - CARD_H / 2 } : { x: this.ghost.x, y: this.ghost.y - CARD_H / 2 };
@@ -438,6 +445,7 @@ export class CampScene extends Phaser.Scene {
    * it is in the model: the pointer is not state. */
   private syncDrag(): void {
     const drag = this.sceneStore.getState().localUi.drag;
+    this.holdCursor(drag.phase === "dragging");
     const model = campModel(this.sceneStore);
     if (model === null || drag.phase === "idle") {
       this.dropGhost();
@@ -460,7 +468,7 @@ export class CampScene extends Phaser.Scene {
       const grabX = slotX + CARD_W / 2 - this.lastDown.x;
       const grabY = HAND_CARD_Y + CARD_H / 2 - this.lastDown.y;
       this.ghost?.setPosition(Math.round(at.x + grabX), Math.round(at.y + grabY));
-      this.tableGlow?.setVisible(drag.legal && pointInRect(ZONES.stump, at));
+      this.tableGlow?.setVisible(drag.legal && pointInRect(ZONES.table, at));
       return;
     }
     this.tableGlow?.setVisible(false);
@@ -482,6 +490,14 @@ export class CampScene extends Phaser.Scene {
       });
     }
     this.settleAfter(drag.reason === null && this.ghost !== null ? RETURN_MS : REASON_HOLD_MS);
+  }
+
+  /** The closed glove while a card is dragged, over whatever it passes;
+   * the plain glove when it lets go, until the pointer finds something. */
+  private holdCursor(dragging: boolean): void {
+    if (dragging) this.input.manager.canvas.style.cursor = CURSOR.grabbing;
+    else if (this.cursorHeld) this.input.manager.canvas.style.cursor = CURSOR.default;
+    this.cursorHeld = dragging;
   }
 
   /** Hover state is checked against the pointer every frame because a

@@ -136,10 +136,8 @@ const FORBIDDEN_IMPORT_RE = /room-socket|room-store|expedition-scene-store|game-
 const FORBIDDEN_TOKEN_RE = /\bonAction\b|\bdispatch\s*\(|\.send\s*\(|\bfetch\s*\(|__expeditionTest|WebSocket/;
 
 describe("INTERACTABLE_REGISTRY (SCENE-09, ENG-01)", () => {
-  it("has exactly the ids campfire, fireflies, lantern, mascot, each key equal to its def's own id", () => {
-    expect(Object.keys(INTERACTABLE_REGISTRY).sort()).toEqual(
-      ["campfire", "fireflies", "lantern", "mascot"].sort(),
-    );
+  it("has exactly the ids fireflies and mascot, each key equal to its def's own id", () => {
+    expect(Object.keys(INTERACTABLE_REGISTRY).sort()).toEqual(["fireflies", "mascot"]);
     for (const [id, def] of Object.entries(INTERACTABLE_REGISTRY)) {
       expect(def.id).toBe(id);
     }

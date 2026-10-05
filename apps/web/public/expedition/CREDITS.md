@@ -18,14 +18,11 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | leader-sun | sprites/camp/leader-sun.png | PixelLab generation, spec `prompts/leader-sun.json` | PixelLab ToS | 2026-10-02 |
 | icon-whisper | sprites/camp/icon-whisper.png | PixelLab generation, spec `prompts/icon-whisper.json` | PixelLab ToS | 2026-10-02 |
 | icon-tricks | sprites/camp/icon-tricks.png | Hand-drawn in code (`apps/web/art/expedition/draw-icon-tricks.mjs`) | Project original | 2026-10-02 |
-| lantern | sprites/camp/lantern.png | PixelLab generation, spec `prompts/lantern.json` | PixelLab ToS | 2026-10-02 |
 | backpack-open | sprites/fireside/backpack-open.png | PixelLab generation, spec `prompts/backpack-open.json` | PixelLab ToS | 2026-10-02 |
-| campfire | sprites/camp/campfire.png | PixelLab generation (frames 56,57,59,60 of one candidate set), spec `prompts/campfire.json` | PixelLab ToS | 2026-10-02 |
 | mascot-panda | sprites/camp/mascot-panda.png | PixelLab generation (red panda object, v3 animation), spec `prompts/mascot-panda.json` | PixelLab ToS | 2026-10-02 |
 | mascot-cheer | sprites/camp/mascot-cheer.png | PixelLab generation (red panda object, v3 animation), spec `prompts/mascot-cheer.json` | PixelLab ToS | 2026-10-02 |
 | mascot-flop | sprites/camp/mascot-flop.png | PixelLab generation (red panda object, v3 animation), spec `prompts/mascot-flop.json` | PixelLab ToS | 2026-10-02 |
 | trail-map | sprites/fireside/trail-map.png | PixelLab generation, spec `prompts/trail-map.json` | PixelLab ToS | 2026-10-02 |
-| stump-table | sprites/camp/stump-table.png | PixelLab generation, spec `prompts/stump-table.json`; backdrop keyed out offline | PixelLab ToS | 2026-10-03 |
 | source-cartographer | sprites/sources/cartographer.png | PixelLab generation, spec `prompts/source-cartographer.json` | PixelLab ToS | 2026-10-03 |
 | source-trained-monkey | sprites/sources/trained-monkey.png | PixelLab generation, spec `prompts/source-trained-monkey.json` | PixelLab ToS | 2026-10-03 |
 | source-pack-mule | sprites/sources/pack-mule.png | PixelLab generation, spec `prompts/source-pack-mule.json` | PixelLab ToS | 2026-10-03 |
@@ -108,6 +105,26 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | source-hermit.burden | sprites/sources/hermit.burden.png | PixelLab generation, spec `prompts/source-hermit.burden.json` | PixelLab ToS | 2026-10-04 |
 | source-hermit.first-pick | sprites/sources/hermit.first-pick.png | PixelLab generation, spec `prompts/source-hermit.first-pick.json` | PixelLab ToS | 2026-10-04 |
 | source-hermit.alms | sprites/sources/hermit.alms.png | PixelLab generation, spec `prompts/source-hermit.alms.json` | PixelLab ToS | 2026-10-04 |
+| table-jungle | sprites/tables/table-jungle.png | PixelLab generation, spec `prompts/table-jungle.json` | PixelLab ToS | 2026-10-04 |
+| table-clifftop | sprites/tables/table-clifftop.png | PixelLab generation, spec `prompts/table-clifftop.json` | PixelLab ToS | 2026-10-04 |
+| table-magma | sprites/tables/table-magma.png | PixelLab generation, spec `prompts/table-magma.json` | PixelLab ToS | 2026-10-04 |
+| table-clearing | sprites/tables/table-clearing.png | PixelLab generation, spec `prompts/table-clearing.json` | PixelLab ToS | 2026-10-04 |
+| table-desert | sprites/tables/table-desert.png | PixelLab generation, spec `prompts/table-desert.json` | PixelLab ToS | 2026-10-04 |
+| table-cave | sprites/tables/table-cave.png | PixelLab generation, spec `prompts/table-cave.json` | PixelLab ToS | 2026-10-04 |
+| table-temple | sprites/tables/table-temple.png | PixelLab generation, spec `prompts/table-temple.json` | PixelLab ToS | 2026-10-04 |
+| board-jungle | sprites/tables/board-jungle.png | PixelLab generation, spec `prompts/board-jungle.json` | PixelLab ToS | 2026-10-04 |
+| board-clifftop | sprites/tables/board-clifftop.png | PixelLab generation, spec `prompts/board-clifftop.json` | PixelLab ToS | 2026-10-04 |
+| board-magma | sprites/tables/board-magma.png | PixelLab generation, spec `prompts/board-magma.json` | PixelLab ToS | 2026-10-04 |
+| board-clearing | sprites/tables/board-clearing.png | PixelLab generation, spec `prompts/board-clearing.json` | PixelLab ToS | 2026-10-04 |
+| board-desert | sprites/tables/board-desert.png | PixelLab generation, spec `prompts/board-desert.json` | PixelLab ToS | 2026-10-04 |
+| board-cave | sprites/tables/board-cave.png | PixelLab generation, spec `prompts/board-cave.json` | PixelLab ToS | 2026-10-04 |
+| board-temple | sprites/tables/board-temple.png | PixelLab generation, spec `prompts/board-temple.json` | PixelLab ToS | 2026-10-04 |
+| coin | sprites/ui/coin.png | PixelLab generation, spec `prompts/coin.json` | PixelLab ToS | 2026-10-04 |
+| cursor-default | sprites/cursors/default.png | PixelLab generation, spec `prompts/cursor-default.json` | PixelLab ToS | 2026-10-04 |
+| cursor-pointer | sprites/cursors/pointer.png | PixelLab generation, spec `prompts/cursor-pointer.json` | PixelLab ToS | 2026-10-04 |
+| cursor-grab | sprites/cursors/grab.png | PixelLab generation, spec `prompts/cursor-grab.json` | PixelLab ToS | 2026-10-04 |
+| cursor-grabbing | sprites/cursors/grabbing.png | PixelLab generation, spec `prompts/cursor-grabbing.json` | PixelLab ToS | 2026-10-04 |
+| cursor-not-allowed | sprites/cursors/not-allowed.png | PixelLab generation, spec `prompts/cursor-not-allowed.json` | PixelLab ToS | 2026-10-04 |
 
 ## Audio
 

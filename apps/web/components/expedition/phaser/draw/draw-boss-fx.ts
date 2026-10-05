@@ -11,7 +11,7 @@
 import type Phaser from "phaser";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
-import { CARD_H, CARD_W, HAND_CARD_Y, MINI_H, MINI_W, STUMP_CENTRE, ZONES, centreOf, handFanXs, type Point } from "../layout";
+import { CARD_H, CARD_W, HAND_CARD_Y, MINI_H, MINI_W, TABLE_CENTRE, ZONES, centreOf, handFanXs, type Point } from "../layout";
 import { cardTextureKey } from "../card-packs/card-pack-def";
 import type { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
@@ -241,7 +241,7 @@ export class BossFx {
     this.afterDraw();
   }
 
-  /** A plated line over the stump, with the cards it is about, that fades
+  /** A plated line over the table, with the cards it is about, that fades
    * after a few seconds. Toasts that arrive together stack. */
   private toast(line: string, cards: string[], model: SceneModel): void {
     const chars = Math.floor((TOAST_MAX_W - 2 * TOAST_PAD) / LABEL_CELL.w);
@@ -250,8 +250,8 @@ export class BossFx {
     const w = Math.max(labelWidth(shown), cardsW) + 2 * TOAST_PAD;
     const h = LABEL_CELL.h + 2 * TOAST_PAD + (cards.length === 0 ? 0 : MINI_H + TOAST_GAP);
     const slot = this.toastsShown++ % 3;
-    const x = Math.round(STUMP_CENTRE.x - w / 2);
-    const y = ZONES.stump.y + 2 + slot * (LABEL_CELL.h + 2 * TOAST_PAD + TOAST_GAP);
+    const x = Math.round(TABLE_CENTRE.x - w / 2);
+    const y = ZONES.table.y + 2 + slot * (LABEL_CELL.h + 2 * TOAST_PAD + TOAST_GAP);
     const toast = this.scene.add.container(x, y);
     toast.add(plate(this.scene, 0, 0, w, h, PALETTE.plate).setAlpha(PANEL_ALPHA + 0.1).setStrokeStyle(1, toPhaserColor(PALETTE.destructive)));
     toast.add(text(this.scene, Math.round((w - labelWidth(shown)) / 2), TOAST_PAD, shown, PALETTE.sun));

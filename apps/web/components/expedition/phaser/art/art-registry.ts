@@ -1,5 +1,5 @@
 /**
- * Every sprite the Expedition scenes draw. Scenes place art only through
+ * Every sprite the Expedition draws, and its glove cursors. Scenes place art only through
  * `placeArt(scene, id, x, y)`, so a PNG can land one file at a time: an id
  * whose file is not listed in `ART_FILES` draws its labelled fallback.
  * No `phaser` import.
@@ -65,6 +65,31 @@ const LOCATION_ART = {
   "bg-temple": { file: "locations/bg-temple.png", w: 640, h: 360, fallback: { color: c(PALETTE.moss), label: "temple" } },
 } as const satisfies Readonly<Record<string, ArtDef>>;
 
+/** The locations with a card table and a hand board of their own under
+ * tables/: the table rising from the foot of the camp scene (416x224) and
+ * the board your hand rests on, in the same material (424x72). The temple
+ * camp sets its altar at whatever location it stands in. */
+export const TABLE_IDS = ["jungle", "clifftop", "magma", "clearing", "desert", "cave", "temple"] as const;
+export type TableId = (typeof TABLE_IDS)[number];
+
+type TableArtId = `table-${TableId}` | `board-${TableId}`;
+
+const TABLE_ART = Object.fromEntries(
+  TABLE_IDS.flatMap((id) => [
+    [`table-${id}`, { file: `tables/table-${id}.png`, w: 416, h: 224, fallback: { color: c(PALETTE.stump), label: "" } }],
+    [`board-${id}`, { file: `tables/board-${id}.png`, w: 424, h: 72, fallback: { color: c(PALETTE.bark), label: "" } }],
+  ]),
+) as Record<TableArtId, ArtDef>;
+
+/** The glove cursors, 32x32 under cursors/: CSS cursors, not drawn by a
+ * scene (`cursors.ts` names their hotspots). */
+export const CURSOR_KINDS = ["default", "pointer", "grab", "grabbing", "not-allowed"] as const;
+export type CursorKind = (typeof CURSOR_KINDS)[number];
+
+const CURSOR_ART = Object.fromEntries(
+  CURSOR_KINDS.map((kind) => [`cursor-${kind}`, { file: `cursors/${kind}.png`, w: 32, h: 32, fallback: { color: c(PALETTE.sun), label: "" } }]),
+) as Record<`cursor-${CursorKind}`, ArtDef>;
+
 /** Every animal and disaster boss, each a sprite under bosses/<id>.png. */
 const BOSS_SIZES = {
   tiger: [112, 96], rats: [112, 80], snake: [96, 96], crocodile: [160, 64], capybara: [96, 80], beaver: [96, 96],
@@ -80,13 +105,11 @@ const BOSS_ART = Object.fromEntries(
 
 export const ART = {
   "bg-jungle-night": { file: "camp/bg-jungle-night.png", w: 640, h: 360, fallback: { color: c(PALETTE.jungle), label: "" } },
-  "stump-table": { file: "camp/stump-table.png", w: 384, h: 176, fallback: { color: c(PALETTE.stump), label: "" } },
-  campfire: { file: "camp/campfire.png", w: 32, h: 32, frames: 4, fps: 6, fallback: { color: c(PALETTE.sun), label: "fire" } },
-  lantern: { file: "camp/lantern.png", w: 16, h: 16, fallback: { color: c(PALETTE.sun), label: "" } },
   "mascot-panda": { file: "camp/mascot-panda.png", w: 32, h: 32, frames: 4, fps: 4, fallback: { color: c(PALETTE.sun), label: "panda" } },
   "mascot-cheer": { file: "camp/mascot-cheer.png", w: 32, h: 32, frames: 4, fps: 6, fallback: { color: c(PALETTE.sun), label: "yay" } },
   "mascot-flop": { file: "camp/mascot-flop.png", w: 32, h: 32, frames: 4, fps: 4, fallback: { color: c(PALETTE.sun), label: "oof" } },
   crate: { file: "camp/crate.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
+  coin: { file: "ui/coin.png", w: 16, h: 16, fallback: { color: c(PALETTE.coin), label: "" } },
   "seat-pack": { file: "camp/seat-pack.png", w: 16, h: 16, fallback: { color: c(PALETTE.moss), label: "bag" } },
   "leader-sun": { file: "camp/leader-sun.png", w: 16, h: 16, fallback: { color: c(PALETTE.sun), label: "*" } },
   "icon-whisper": { file: "camp/icon-whisper.png", w: 16, h: 16, fallback: { color: c(PALETTE.turn), label: "W" } },
@@ -102,6 +125,8 @@ export const ART = {
   "bg-temple-dawn": { file: "run-end/bg-temple-dawn.png", w: 640, h: 360, fallback: { color: c(PALETTE.jungle), label: "" } },
   "bg-trail-dusk": { file: "run-end/bg-trail-dusk.png", w: 640, h: 360, fallback: { color: c(PALETTE.letterbox), label: "" } },
   ...LOCATION_ART,
+  ...TABLE_ART,
+  ...CURSOR_ART,
   ...BOSS_ART,
   ...SOURCE_ART,
   ...CREW_ART,
@@ -131,6 +156,12 @@ export function modArtId(mod: { readonly id: string; readonly kind: string }): A
 /** A location's backdrop: its own, or the Jungle's. */
 export function backdropArtId(location: string): ArtId {
   return modArtId({ id: location, kind: "location" }) ?? "bg-jungle-night";
+}
+
+/** The table and hand board a camp's backdrop (a location, or the temple)
+ * sets out: its own, or the Jungle's stump. */
+export function tableOf(backdrop: string): TableId {
+  return (TABLE_IDS as readonly string[]).includes(backdrop) ? (backdrop as TableId) : "jungle";
 }
 
 /** The seated silhouette for a character, or null when it has none. */

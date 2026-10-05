@@ -6,6 +6,7 @@
  * never touches game state or the server (SCENE-09).
  */
 import type Phaser from "phaser";
+import { CURSOR } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
 import type { InteractableDef } from "./interactable-def";
 
@@ -65,7 +66,7 @@ function place(scene: Phaser.Scene, anchor: { x: number; y: number }): Phaser.Ga
 
   const span = (DRIFT_RADIUS + DRIFT_WOBBLE) * 2;
   container.setSize(span, span);
-  container.setInteractive({ useHandCursor: true });
+  container.setInteractive({ cursor: CURSOR.pointer });
   return container;
 }
 

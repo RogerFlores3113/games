@@ -1,15 +1,17 @@
 /**
- * The crew around the stump: each teammate as their character's seated
+ * The crew around the table: each teammate as their character's seated
  * silhouette behind it, with a name plate above their head (the `crowd`
- * zone). Your own seat panel (`you`) and your kit (`kit`) sit at the left.
+ * zone), and the board your hand rests on in front of it. Your own seat
+ * panel (`you`) and your kit (`kit`) sit at the left.
  * Every value comes from `SceneModel`.
  */
 import type Phaser from "phaser";
+import { CURSOR, pointerIf } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
-import { MINI_H, PLATE_H, SILHOUETTE_H, STUMP_ART_AT, ZONES, plateRect, seatSpots, type Rect } from "../layout";
+import { CARD_H, HAND_CARD_Y, MINI_H, PLATE_H, SILHOUETTE_H, ZONES, boardArtAt, plateRect, seatSpots, tableArtAt, tableSpan, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
-import { ART, crewArtId, sourceArtId } from "../art/art-registry";
+import { ART, crewArtId, sourceArtId, tableOf, type TableId } from "../art/art-registry";
 import { mateSourceObjectId, seatFogObjectId, seatMarkObjectId, seatObjectId, sourceObjectId } from "../../../../lib/expedition/expedition-ids";
 import { fogTile } from "./draw-weather";
 import type { ObjectIndex } from "../object-index";
@@ -69,7 +71,7 @@ function nameRow(ctx: Ctx, group: Layer, seat: SeatModel, row: Rect, badge: { va
   if (seat.targetable) {
     const hit = scene.add.zone(0, 0, row.w, row.h).setOrigin(0, 0);
     container.add(hit);
-    hit.setInteractive({ useHandCursor: true });
+    hit.setInteractive({ cursor: CURSOR.pointer });
     hit.on("pointerdown", () => handlers.onPick("seat", seat.seatId));
   }
   group.add(container);
@@ -79,7 +81,7 @@ function nameRow(ctx: Ctx, group: Layer, seat: SeatModel, row: Rect, badge: { va
 function objectivesRow(ctx: Ctx, group: Layer, chips: ObjectiveChip[], x: number, y: number, maxW: number): void {
   const targeting = ctx.model.targeting !== null;
   const rowWidth = (ws: number[]) => ws.reduce((sum, w) => sum + w, 0) + OBJECTIVE_GAP * Math.max(0, chips.length - 1);
-  // A crowded row shortens "0 tricks" to "0" before squeezing items together; the tooltip says the rest.
+  // A crowded row shortens "No tricks" to "=0" before squeezing items together; the tooltip says the rest.
   const tight = rowWidth(chips.map((c) => objectiveItemWidth(c))) > maxW;
   const widths = chips.map((c) => objectiveItemWidth(c, tight));
   const natural = rowWidth(widths);
@@ -156,7 +158,7 @@ function handCount(ctx: Ctx, group: Layer, seat: SeatModel, x: number, y: number
   container.setSize(w, LABEL_CELL.h + 2);
   if (seat.handPick.targetable) {
     const hit = scene.add.zone(0, 0, w, LABEL_CELL.h + 2).setOrigin(0, 0);
-    hit.setInteractive({ useHandCursor: true });
+    hit.setInteractive({ cursor: CURSOR.pointer });
     hit.on("pointerdown", () => handlers.onPick("hand", seat.seatId));
     container.add(hit);
   }
@@ -164,7 +166,7 @@ function handCount(ctx: Ctx, group: Layer, seat: SeatModel, x: number, y: number
   index.register("camp", seat.handObjectId, container);
 }
 
-/** A teammate behind the stump: the silhouette, drawn before the stump so
+/** A teammate behind the table: the silhouette, drawn before the table so
  * its rim hides their legs. Clickable while the seat is a target. */
 function drawSilhouette(ctx: Ctx, layer: Layer, seat: SeatModel, spot: { x: number; bottom: number }): void {
   const { scene, model, handlers } = ctx;
@@ -181,7 +183,7 @@ function drawSilhouette(ctx: Ctx, layer: Layer, seat: SeatModel, spot: { x: numb
   if (!seat.connected) sprite.setAlpha(DISCONNECTED_ALPHA);
   else if (model.targeting !== null && !inPlay(seat)) sprite.setAlpha(0.7);
   if (seat.targetable) {
-    sprite.setInteractive({ useHandCursor: true, pixelPerfect: true });
+    sprite.setInteractive({ cursor: CURSOR.pointer, pixelPerfect: true });
     sprite.on("pointerdown", () => handlers.onPick("seat", seat.seatId));
   }
   layer.add(sprite);
@@ -239,14 +241,37 @@ function inPlay(seat: SeatModel): boolean {
   return seat.targetable || seat.selected || seat.handPick.targetable || seat.handPick.selected || seat.objectives.some((o) => o.targetable || o.selected);
 }
 
-/** The silhouettes, then the stump over their legs. */
-export function drawCrowdAndStump(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
+const BOARD_SHADOW_H = 4;
+const BOARD_SHADOW_ALPHA = 0.55;
+const BOARD_LIP_ALPHA = 0.45;
+/** The board art's transparent margin either side. */
+const BOARD_INSET = 10;
+
+/** The board your hand stands on, in front of the table's foot: the shadow
+ * it casts on the table along its rim, and a lit lip where your cards stand,
+ * so the two never read as one surface. */
+function drawBoard(scene: Phaser.Scene, layer: Layer, id: TableId): void {
+  const at = boardArtAt(id);
+  const board = ART[`board-${id}`];
+  const rim = tableSpan(id).boardTop;
+  const w = board.w - 2 * BOARD_INSET;
+  layer.add(plate(scene, at.x + BOARD_INSET, rim - BOARD_SHADOW_H, w, BOARD_SHADOW_H, PALETTE.letterbox).setAlpha(BOARD_SHADOW_ALPHA));
+  layer.add(placeArt(scene, `board-${id}`, at.x + board.w / 2, at.y + board.h / 2));
+  layer.add(plate(scene, at.x + BOARD_INSET, HAND_CARD_Y + CARD_H, w, 1, PALETTE.cardFace).setAlpha(BOARD_LIP_ALPHA));
+}
+
+/** The silhouettes, then the location's table over their legs, then your
+ * board over the table's foot. */
+export function drawCrowdAndTable(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   const ctx: Ctx = { scene, model, index, handlers };
   const mates = others(model);
   const spots = seatSpots(mates.length);
   mates.forEach((seat, i) => drawSilhouette(ctx, layer, seat, spots[i]!));
-  const stump = ART["stump-table"];
-  layer.add(placeArt(scene, "stump-table", STUMP_ART_AT.x + stump.w / 2, STUMP_ART_AT.y + stump.h / 2));
+  const id = tableOf(model.sky.backdrop);
+  const at = tableArtAt(id);
+  const table = ART[`table-${id}`];
+  layer.add(placeArt(scene, `table-${id}`, at.x + table.w / 2, at.y + table.h / 2));
+  drawBoard(scene, layer, id);
 }
 
 /** Plates for every teammate, drawn over the world. */
@@ -319,7 +344,7 @@ function kitRow(ctx: Ctx, layer: Layer, chip: SourceChip, x: number, y: number, 
   container.setSize(w, KIT_ROW_H);
   container.setAlpha(chip.spent ? DIM_ALPHA + 0.2 : 1);
   const hit = scene.add.zone(0, 0, w, KIT_ROW_H).setOrigin(0, 0);
-  hit.setInteractive({ useHandCursor: chip.usable });
+  hit.setInteractive(pointerIf(chip.usable));
   hit.on("pointerdown", () => handlers.onSource(chip.sourceKey));
   hit.on("pointerover", () => handlers.onSourceHover(chip.sourceKey));
   hit.on("pointerout", () => handlers.onSourceHover(null));

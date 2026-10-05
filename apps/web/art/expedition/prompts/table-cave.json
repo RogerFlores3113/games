@@ -1,0 +1,17 @@
+{
+  "id": "table-cave",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "a huge flat dark blue-grey boulder card table inside a cave, seen from slightly above, wide flat damp top with a few tiny glowing blue crystals, rounded rough rock body running straight down off the bottom edge of the image, isolated object on plain background",
+    "init_image_url": "https://api.pixellab.ai/mcp/images/0fad0915-6d5e-4bb4-8ed4-981f2088ef60/download",
+    "init_image_strength": 80,
+    "view": "high top-down",
+    "outline": "single color black outline",
+    "shading": "detailed shading",
+    "no_background": true,
+    "seed": 5
+  },
+  "job": "01744ed0-7587-48c1-99aa-557d34785f71",
+  "scale": 2,
+  "note": "208x112 like its init image; natively transparent"
+}

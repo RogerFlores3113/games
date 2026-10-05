@@ -48,7 +48,7 @@ export interface Sky {
   /** Unique per strike, so its flash plays once however often the scene
    * redraws; null when no strike sits on the trick in play. */
   strike: string | null;
-  /** Said under the stump while a strike sits on the trick. */
+  /** Said under the table while a strike sits on the trick. */
   notice: string | null;
   /** The Blood Moon is up this trick: the sky turns red. */
   bloodMoon: boolean;

@@ -1,6 +1,6 @@
 /**
  * The boss on the table, in the `world` column above your kit where the
- * campfire stands in a plain camp: its sprite scaled to fill the column,
+ * fireflies drift in a plain camp: its sprite scaled to fill the column,
  * breathing; under it a caption with what it is doing; for the Crocodile,
  * an arrow pointing at the seat it watches. At the temple the column holds
  * the helpers instead, one row each at half a boss's size, captioned with
@@ -68,7 +68,7 @@ function placeSprite(scene: Phaser.Scene, layer: Layer, boss: BossModel, stage: 
 }
 
 /** What stands in the world column, as a key that changes only when the
- * bosses there do: null for the campfire. */
+ * bosses there do: null for the fireflies. */
 export function worldKey(model: SceneModel): string | null {
   if (model.boss !== null) return model.boss.id;
   return model.helpers.length === 0 ? null : model.helpers.map((h) => h.id).join("+");

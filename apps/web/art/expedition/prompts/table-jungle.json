@@ -1,0 +1,17 @@
+{
+  "id": "table-jungle",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "giant ancient jungle tree stump used as a card table, seen from slightly above, a wide flat sawn top with growth rings at the top of the image, thick gnarled bark trunk widening downward and running straight off the bottom edge of the image, moss and small glowing orange mushrooms on the bark, isolated object on plain background",
+    "width": 208,
+    "height": 112,
+    "view": "high top-down",
+    "outline": "single color black outline",
+    "shading": "detailed shading",
+    "no_background": true,
+    "seed": 5
+  },
+  "job": "0fad0915-6d5e-4bb4-8ed4-981f2088ef60",
+  "scale": 2,
+  "note": "natively transparent"
+}

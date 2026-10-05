@@ -19,6 +19,7 @@
 import { useEffect, useRef, useState } from "react";
 import Phaser from "phaser";
 import { PALETTE, toPhaserColor } from "./palette";
+import { CURSOR } from "./cursors";
 import { SCENE_FACTORIES } from "./scenes/scene-registry";
 import { ObjectIndex } from "./object-index";
 import { createAudioDirector } from "./audio-director";
@@ -26,6 +27,15 @@ import { confineInputToCanvas } from "./confine-input";
 import { computeZoom, isBelowComfortSize, STAGE_HEIGHT, STAGE_WIDTH } from "../../../lib/expedition/compute-zoom";
 import type { ExpeditionSceneStore } from "../../../lib/expedition/expedition-scene-store";
 import { DEV_PANEL_ENABLED } from "../../../lib/dev/dev-gate";
+import { toolbarReserve, useToolbarRoom } from "../../../lib/dev/toolbar-room";
+
+/** The strip kept free under the stage for the dev toolbar, when there is one. */
+function devReserve(width: number, height: number): number {
+  if (!DEV_PANEL_ENABLED) return 0;
+  const reserve = toolbarReserve(width, height);
+  useToolbarRoom.getState().setFits(reserve > 0);
+  return reserve;
+}
 
 export interface ExpeditionPhaserMountProps {
   store: ExpeditionSceneStore;
@@ -49,6 +59,7 @@ export default function ExpeditionPhaserMount({ store }: ExpeditionPhaserMountPr
   const gameRef = useRef<Phaser.Game | null>(null);
   const [zoom, setZoom] = useState(1);
   const [belowComfort, setBelowComfort] = useState(false);
+  const [reserve, setReserve] = useState(0);
 
   useEffect(() => {
     if (gameRef.current || !containerRef.current) return;
@@ -60,6 +71,7 @@ export default function ExpeditionPhaserMount({ store }: ExpeditionPhaserMountPr
     const initialZoom = computeZoom(window.innerWidth, window.innerHeight);
     setZoom(initialZoom);
     setBelowComfort(isBelowComfortSize(window.innerWidth, window.innerHeight));
+    setReserve(devReserve(window.innerWidth, window.innerHeight));
 
     const game = new Phaser.Game({
       type: Phaser.AUTO,
@@ -75,6 +87,7 @@ export default function ExpeditionPhaserMount({ store }: ExpeditionPhaserMountPr
     });
     gameRef.current = game;
     game.canvas.style.imageRendering = "pixelated";
+    game.input.setDefaultCursor(CURSOR.default);
     const releaseInput = confineInputToCanvas(game);
 
     for (const [key, factory] of Object.entries(SCENE_FACTORIES)) {
@@ -106,6 +119,7 @@ export default function ExpeditionPhaserMount({ store }: ExpeditionPhaserMountPr
       game.scale.setZoom(nextZoom);
       setZoom(nextZoom);
       setBelowComfort(isBelowComfortSize(window.innerWidth, window.innerHeight));
+      setReserve(devReserve(window.innerWidth, window.innerHeight));
     }
     window.addEventListener("resize", handleResize);
 
@@ -127,7 +141,7 @@ export default function ExpeditionPhaserMount({ store }: ExpeditionPhaserMountPr
       style={{
         display: "flex",
         width: "100dvw",
-        height: "100dvh",
+        height: `calc(100dvh - ${reserve}px)`,
         alignItems: "center",
         justifyContent: "center",
         flexDirection: "column",

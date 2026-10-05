@@ -5,6 +5,7 @@
  * handlers.
  */
 import type Phaser from "phaser";
+import { CURSOR, pointerIf } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL, SIGN_CELL, WORLD_SIGN_FONT } from "../font/font-keys";
 import { BUNDLE_ITEM_TEXT_Y, BUNDLE_TAKE_H, DRAFT_ZONES, MUSTER_LINE, MUSTER_PORTRAIT_W, MUSTER_TEXT_LINES, MUSTER_ZONES, bundleItemH, musterBoxes, musterTextChars, ROUTE_ZONES, TRAIL_ZONES, bundleBoxes, bundleTextChars, rowBoxes, trailStopXs, type Rect } from "../layout";
@@ -184,7 +185,7 @@ function drawCharacterCard(ctx: Ctx, card: CharacterCard, x: number, y: number, 
 
   container.setSize(w, h);
   const hit = scene.add.zone(0, 0, w, h).setOrigin(0, 0);
-  hit.setInteractive({ useHandCursor: card.pickable });
+  hit.setInteractive(pointerIf(card.pickable));
   if (card.pickable) hit.on("pointerdown", () => handlers.onDraft(card.characterId));
   container.add(hit);
   if (card.pickable) {
@@ -249,7 +250,7 @@ function drawLengthOption(ctx: Ctx, option: LengthOption, x: number, y: number, 
   container.add(centredText(scene, Math.floor(w / 2), 47, fitLabel(voters, chars), option.voters.length === 0 ? PALETTE.textDim : PALETTE.turn));
   container.setSize(w, h);
   const hit = scene.add.zone(0, 0, w, h).setOrigin(0, 0);
-  hit.setInteractive({ useHandCursor: option.votable });
+  hit.setInteractive(pointerIf(option.votable));
   if (option.votable) hit.on("pointerdown", () => handlers.onVote(option.id));
   container.add(hit);
   layer.add(container);
@@ -585,7 +586,7 @@ function drawRouteCard(ctx: Ctx, card: RouteCard, x: number, y: number, w: numbe
     container.add([bg, body]);
     container.setSize(w, h);
     const hit = scene.add.zone(0, 0, w, h).setOrigin(0, 0);
-    hit.setInteractive({ useHandCursor: card.votable });
+    hit.setInteractive(pointerIf(card.votable));
     if (card.votable) hit.on("pointerdown", () => handlers.onVote(card.id));
     container.add(hit);
     layer.add(container);
@@ -715,7 +716,7 @@ function drawCrew(ctx: Ctx): void {
     layer.add(group);
     if (row.targetable) {
       const pick = scene.add.rectangle(zone.x + 2, y - 2, zone.w - 4, rowH - 1, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.turn));
-      pick.setInteractive({ useHandCursor: true });
+      pick.setInteractive({ cursor: CURSOR.pointer });
       pick.on("pointerdown", () => ctx.handlers.onPickSeat(row.seatId));
       layer.add(pick);
       ctx.index.register("trail", row.objectId, pick);

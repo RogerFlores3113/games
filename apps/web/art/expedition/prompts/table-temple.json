@@ -1,0 +1,17 @@
+{
+  "id": "table-temple",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "ancient carved stone temple altar used as a card table, seen from slightly above, a wide flat grey stone top with a carved golden sun emblem border at the top of the image, carved glyph panels and vines on the sides widening downward and running straight off the bottom edge of the image, isolated object on plain background",
+    "width": 208,
+    "height": 112,
+    "view": "high top-down",
+    "outline": "single color black outline",
+    "shading": "detailed shading",
+    "no_background": true,
+    "seed": 5
+  },
+  "job": "b689e96c-271a-47e0-bec9-865679ef1692",
+  "scale": 2,
+  "note": "natively transparent"
+}
