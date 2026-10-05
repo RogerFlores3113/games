@@ -2,17 +2,13 @@
   "id": "source-magician",
   "tool": "create_1_direction_object",
   "params": {
-    "description": "jungle expedition item icon, warm night palette, single-pixel dark outline, simple shading, transparent background",
-    "size": 16,
+    "description": "bright purple magician top hat with a white band and a white-tipped wand, sparkles, light colours that read on a dark background",
     "view": "sidescroller",
     "style_images": [
-      "sources/scout.png",
-      "sources/parrot.png",
-      "sources/whetstone.png"
+      "sources/parrot.png"
     ]
   },
-  "object_id": "b28dd46a-a2bf-4964-af7a-f55e90287cdf",
-  "item_description": "dark top hat with a red band",
-  "batch_index": 2,
+  "object_id": "9b89e75e-6f87-4516-a5ce-284ca42e24a7",
+  "batch_index": 0,
   "scale": 1
 }

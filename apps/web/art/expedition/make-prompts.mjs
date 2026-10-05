@@ -75,6 +75,20 @@ const NINE_BATCH = {
   object_id: "b28dd46a-a2bf-4964-af7a-f55e90287cdf",
 };
 
+/** The first Magician hat read dark on dark in the kit chip, so it was redrawn
+ * in its own batch with a brighter description. */
+const MAGICIAN_ICON = {
+  ...NINE_BATCH,
+  params: {
+    description: "bright purple magician top hat with a white band and a white-tipped wand, sparkles, light colours that read on a dark background",
+    view: "sidescroller",
+    style_images: ["sources/parrot.png"],
+  },
+  object_id: "9b89e75e-6f87-4516-a5ce-284ca42e24a7",
+  batch_index: 0,
+  scale: 1,
+};
+
 const NINE_ICONS = [
   ["jd", "tourist's baseball cap", 0],
   ["jd.blend-in", "eyes peering out of a leafy bush", 8],
@@ -104,7 +118,6 @@ const NINE_ICONS = [
   ["message-bottle", "corked bottle with a note", 61],
   ["first-aid-kit", "red first aid kit", 50],
   ["signal-flare", "red signal flare", 62],
-  ["magician", "dark top hat with a red band", 2],
   ["magician.double-act", "two theatre masks", 14],
   ["magician.misdirection", "white glove pointing", 15],
   ["magician.switcheroo", "card with two swapping arrows", 16],
@@ -321,6 +334,7 @@ const specs = {
   ),
   ...Object.fromEntries(SOURCE_ICONS.map(([id, item, frame]) => [`source-${id}`, { ...SOURCE_BATCH, item_description: item, batch_index: frame, scale: 1 }])),
   ...Object.fromEntries(NINE_ICONS.map(([id, item, frame]) => [`source-${id}`, { ...NINE_BATCH, item_description: item, batch_index: frame, scale: 1 }])),
+  "source-magician": MAGICIAN_ICON,
   ...LOCATIONS,
   ...Object.fromEntries(BOSSES.map((boss) => [`boss-${boss[0]}`, bossSpec(boss)])),
   ...Object.fromEntries(CREW.map(([id, description, seed, job]) => [`crew-${id}`, crewSpec(description, seed, job, "alpha thresholded and grey halos stripped locally; drawn bottom-centred on a 64x80 canvas")])),
