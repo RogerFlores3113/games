@@ -7,10 +7,12 @@
 import type { AdapterResult } from "../../adapter";
 import { shuffleWithSeed } from "../../shuffle";
 import { checkCampOutcome } from "../camp";
+import type { CampEvent, CampState } from "../state";
 import { resolveTuned, windowsOf, type AbilityContext, type ItemAbility } from "../content/source-def";
 import { attemptOf, withAttempt } from "./attempt";
 import { rulesFor } from "./compose";
 import { drawOffer } from "./draft";
+import { react } from "./react";
 import { STREAMS, seededIndex } from "./rng";
 import type { RunRules } from "./run-rules";
 import { resolveTargets, stepsFor, type AbilityStep, type SeatScope, type Target, type TargetSpec } from "./targets";
@@ -185,7 +187,21 @@ export function useAbility(
   const attempt = attemptOf(applied);
   if (attempt === null) return { ok: true, state: { ...applied, seats } };
   const logEntry: LogEntry = { event: "use-ability", actorSeatId: seatId, subjectSeatIds: subjectSeatIds(resolved.targets), sourceId, audience: "public" };
-  return { ok: true, state: withAttempt({ ...applied, seats }, { ...attempt, log: [...attempt.log, logEntry] }) };
+  const logged = withAttempt({ ...applied, seats }, { ...attempt, log: [...attempt.log, logEntry] });
+  return { ok: true, state: react(logged, replayEvents(ops, attempt.camp), catalog) };
+}
+
+/** A voided trick is played again: the table reacts to it as to one Pink
+ * Mist voids, so the replayed trick gets its own Thunderstorm roll. */
+function replayEvents(ops: readonly ToolkitOp[], camp: CampState): readonly CampEvent[] {
+  return ops.flatMap((op): CampEvent[] => {
+    if (op.op !== "void-trick") return [];
+    const leaderSeatId = camp.currentTrick.leaderSeatId;
+    return [
+      { type: "trick-voided", trickIndex: op.trickIndex, leaderSeatId },
+      { type: "trick-started", trickIndex: camp.currentTrick.index, leaderSeatId },
+    ];
+  });
 }
 
 /** skip-window: in the open gated window, appends `passed` for each of the

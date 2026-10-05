@@ -35,7 +35,8 @@ function deferFatalEffects(before: RunAt<"camp">, seatId: string, action: CampAc
   const completed = played.run.stage.attempt.camp.completedTricks.length > attempt.camp.completedTricks.length;
   const deferrable = attempt.effects.filter((e) => e.deferIfFatal && e.lasts === "trick" && e.atTrick === t);
   if (!completed || deferrable.length === 0 || !failed(played.run, catalog)) return played;
-  const last = t + 1 >= attempt.camp.totalTricks;
+  // The trick index runs ahead of the tricks played after a hallucination.
+  const last = attempt.camp.completedTricks.length + 1 >= attempt.camp.totalTricks;
   const effects = attempt.effects.flatMap((e) => (!deferrable.includes(e) ? [e] : last ? [] : [{ ...e, atTrick: t + 1 }]));
   const retried = play(withAttempt(before, { ...attempt, effects }) as RunAt<"camp">, seatId, action, catalog);
   return retried.ok && !failed(retried.run, catalog) ? retried : played;

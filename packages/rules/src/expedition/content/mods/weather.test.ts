@@ -87,6 +87,40 @@ describe("Thunderstorm", () => {
     expect(after.stage.attempt.effects).toEqual([]);
   });
 
+  /** stormCamp after a hallucination: trick 0 was voided, so the trick in play is index 1 and the first to count. */
+  function afterHallucination(objectives: readonly Objective[], totalTricks: number, strikes: readonly ActiveEffect[]): RunAt<"camp"> {
+    const run = stormCamp(objectives, totalTricks, strikes);
+    const camp = run.stage.attempt.camp;
+    const voided = { index: 0, leaderSeatId: "p1", plays: camp.hands.map((h) => ({ seatId: h.seatId, card: h.cards.at(-1)! })) };
+    return { ...run, stage: { ...run.stage, attempt: { ...run.stage.attempt, camp: { ...camp, voidedTricks: [voided], currentTrick: { ...camp.currentTrick, index: 1 } } } } };
+  }
+
+  it("after a hallucination a fatal strike still waits, since a trick is left to play", () => {
+    const after = playAce(afterHallucination([owned("ace-goal", SPADE(14), "p0"), owned("king-goal", HEART_K, "p1")], 2, [{ ...STRIKE, atTrick: 1 }]));
+    expect(after.stage.attempt.camp.completedTricks[0]!.winnerSeatId).toBe("p0");
+    expect(after.stage.attempt.effects).toEqual([{ ...STRIKE, atTrick: 2 }]);
+  });
+
+  it("after a hallucination the chance shows for the next trick while one is left", () => {
+    const run = afterHallucination([owned("king-goal", HEART_K, "p1")], 2, []);
+    const layer = campStack(run, CATALOG).find((l) => l.def.id === "thunderstorm")!;
+    expect(layer.body.status!(modCtx(run, run.stage.camp, layer, CATALOG))).toEqual([{ kind: "chance", percent: 40, strikesLeft: 2 }]);
+  });
+
+  it("the trick Smelling Salts replays gets its own roll", () => {
+    const loadout = setupRun({ seatIds: SEATS, seed: "weather", catalog: CATALOG, camp: 2, characters: { p0: "perfumist" }, upgrades: { p0: "perfumist.smelling-salts" } }) as RunAt<"loadout">;
+    const struck = stormCamp([owned("three-goal", SPADE(3), "p2")], 12, []);
+    const filler = (index: number) => ({ index, leaderSeatId: "p1", winnerSeatId: "p1", plays: SEATS.map((seatId, s) => ({ seatId, card: card(`f${index}-${s}`, { kind: "standard", suit: "hearts", rank: 4 + s } as CardIdentity), countsAs: null, burned: false })) });
+    const camp = { ...struck.stage.attempt.camp, completedTricks: Array.from({ length: 8 }, (_, i) => filler(i)), currentTrick: { ...struck.stage.attempt.camp.currentTrick, index: 8 } };
+    const run: RunAt<"camp"> = { ...loadout, stage: { tag: "camp", camp: { ...loadout.stage.camp, weather: "thunderstorm" }, attempt: { ...struck.stage.attempt, camp } } };
+    const failed = playAce(run);
+    expect(failed.stage.attempt.effects).toEqual([]);
+    const saved = applyRunAction(failed, "p0", { type: "use-ability", sourceKey: "perfumist.smelling-salts", targets: [] }, CATALOG);
+    if (!saved.ok) throw new Error(saved.error);
+    expect(attemptOf(saved.state)!.camp.currentTrick.index).toBe(9);
+    expect(attemptOf(saved.state)!.effects).toEqual([{ ...STRIKE, atTrick: 9 }]);
+  });
+
   it("a harmless strike lands: the lowest card wins the trick", () => {
     const after = playAce(stormCamp([owned("king-goal", HEART_K, "p1")], 2, [STRIKE]));
     expect(after.stage.attempt.camp.completedTricks[0]!.winnerSeatId).toBe("p1");

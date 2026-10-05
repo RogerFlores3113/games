@@ -15,19 +15,21 @@ function chanceAt(trick: number): number {
   return Math.min(100, THUNDERSTORM.firstChance + THUNDERSTORM.perTrick * trick);
 }
 
-/** The trick the next roll is for: trick 0 until every objective is
- * picked, else the one after the trick in play. */
-function nextRoll(camp: CampState | null): number {
-  if (camp === null || camp.objectives.some((o) => o.ownerSeatId === null)) return 0;
-  return camp.currentTrick.index + 1;
+/** The trick the next roll is for, and whether that trick will be played:
+ * trick 0 until every objective is picked, else the one after the trick in
+ * play. A hallucination moves the index on without playing a trick, so what
+ * is left is counted from the tricks played. */
+function nextRoll(camp: CampState | null): { readonly trick: number; readonly played: boolean } {
+  if (camp === null || camp.objectives.some((o) => o.ownerSeatId === null)) return { trick: 0, played: true };
+  return { trick: camp.currentTrick.index + 1, played: camp.completedTricks.length + 1 < camp.totalTricks };
 }
 
 function status(run: RunState, camp: CampState | null): readonly StatusPart[] {
   const strikes = strikesOf(run);
   const strikesLeft = Math.max(0, THUNDERSTORM.maxStrikes - strikes.length);
   const next = nextRoll(camp);
-  const rolls = strikesLeft > 0 && (camp === null || next < camp.totalTricks);
-  const parts: StatusPart[] = [{ kind: "chance", percent: rolls ? chanceAt(next) : 0, strikesLeft }];
+  const rolls = strikesLeft > 0 && next.played;
+  const parts: StatusPart[] = [{ kind: "chance", percent: rolls ? chanceAt(next.trick) : 0, strikesLeft }];
   if (camp !== null && strikes.some((s) => s.atTrick === camp.currentTrick.index)) parts.push({ kind: "strike" });
   return parts;
 }

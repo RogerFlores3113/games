@@ -2050,3 +2050,13 @@ How each of the nine fits (for unit 13):
   plays as a void (any other suit or a joker). A hand of the dammed suit
   and jokers plays as usual, so the dam never forces the Sun or Moon out.
   Before, following suit won over the dam. The rules text says so.
+- After a hallucination `currentTrick.index` runs ahead of the tricks
+  played, so the Thunderstorm counts what is left from
+  `completedTricks.length`: the deferral drops a fatal strike only when no
+  trick follows the one just completed, and the status shows a chance
+  while another trick will be played. The roll's chance still reads the
+  trick index, as the roll at `trick-started` does. A `void-trick` from an
+  ability (Smelling Salts) now reacts to `trick-voided` and `trick-started`
+  for the replayed trick, as the Core's own hallucination does, so that
+  trick gets its own storm roll. The dev shortcut `void-last-trick` still
+  edits the state without reacting.
