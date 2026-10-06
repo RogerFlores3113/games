@@ -2617,3 +2617,119 @@ How each of the nine fits (for unit 13):
   for camp 1. Take an item", three single items), the shop before camp 3,
   the bundles of two after the animal camp, the event before camp 2, the
   route vote and the loadout of camp 2.
+
+### Implementation notes (batch 6 unit E)
+
+- Objective icons (decision 8). `CampPreview.objectives` is a list of
+  `ObjectiveIcon { glyph, key, objectId }`, drawn as mini cards (14x20,
+  parchment face, ink glyph) after an "Objectives" key on the loadout's and
+  the shop replay's preview and on every route card. Cards to win come
+  first (`?`), then the ordered ones numbered in turn (`1`, `2`, ...), then
+  trick counts: an unresolved trick-count slot and an exact count read `#`,
+  no tricks `0`. `objectiveWords(key)` holds each glyph's plain words, shown
+  in the tooltip strip on hover (`LocalUiState.tooltipPreviewObjective`);
+  `L` (ordered "last"), `A`-`E` (key `track-b:n`) and `>` / `<` (keys
+  `more-tricks`, `fewer-tricks`) are in the table for kinds the catalogue
+  does not deal yet. A preview only knows slot kinds, so the mirage's `~`
+  has no preview icon (a survey still lists its objectives as text). The
+  icons take no input, so a click on one still votes for its route card:
+  `TrailScene.update` finds the icon under the pointer
+  (`previewObjectiveIcons`) and sets the tooltip, as the layout audit
+  allows a label over one control only.
+- Trail map (9): the captions are "cleared", "next" and "try n" only; the
+  crew token has no "Crew" label.
+- Vote box (10): the title ("Run length" or "Route") and the winner in sign
+  lettering, 38 px tall; a tie adds the coin and "Tie, settled by a coin".
+  `VoteResult.tally` is gone. It stands top right of the loadout's panel.
+- Item bar (11). The bar zone (`TRAIL_ZONES.backpack`) is on every stage
+  between camps: "Item slots" with "1 of 2", a tile per slot (icon, name,
+  uses; a click opens the backpack, hover shows the rules), the backpack
+  button (`backpack-icon`, "Backpack", "2 of 6", sun-coloured when full,
+  object id `backpack`), and "Explorer": the character's powers and the
+  upgrade as tiles, two to a row, with "No upgrade yet" while there is none
+  (the explorer's power moved here from the deleted "Your explorer"
+  section). `itemBarLayout` replaces `gearLayout`; the backpack pages, their
+  ids and `LocalUiState.packPage` are deleted, as are the big
+  `backpack-open` art, its prompt spec and credit.
+- The inventory window. `lib/expedition/inventory-model.ts` builds
+  `Inventory` from the view (`buildInventory`): the slots (`slot:i`), the
+  backpack's items (`pack:<uid>`) then its empty patches (`pack-cell:i`),
+  at least six and more when a Rats cut overfilled it, `locked` once you
+  are ready or outside the stages between camps, `aiming` (the step's
+  prompt while a power is aimed at an item), and the item waiting for its
+  discard confirm. `equipAfter` and `clickMove` (moved here from
+  `loadout-model.ts`) refuse to send an item to a full backpack, and
+  `roomFor` counts free slots plus room in the backpack. It is drawn by
+  `phaser/draw/inventory-window.ts`, a class any scene can own
+  (`new InventoryWindow(scene, index, sceneKey, handlers, rect?)`, then
+  `draw(layer, inventory)` on every render, `destroy()` on shutdown): the
+  `leather-panel` art at 1x (256x192) under a veil from the trail map down,
+  the six patches in two rows of three with stitched seams, the slots below
+  with brass edges, the hovered item's name, uses, rarity and rules in a
+  column on the right, a discard patch (a pixel bin) under it, and a footer
+  line. Icons are the items' 16 px art at 2x. The veil and the leather
+  take no input (a press on the veil outside the window closes it through
+  the scene's own pointerdown), for the same audit rule. A click moves an item between
+  backpack and slots; a drag swaps slots, drops into the backpack, or onto
+  the discard patch, which asks "Discard Bait for good?" with Discard and
+  Keep (`LocalUiState.discardUid`). A refused click says why in the footer
+  ("Your backpack is full. Discard an item to make room."). While a power is
+  aimed at an item (the sale, Quartermaster) the window opens by itself,
+  dims what is not a choice, tags a sale's price ("+1"), shows the step's
+  prompt with Cancel, and a click picks; picking closes it, so the
+  teammate step shows the crew. The window closes when the stage moves on:
+  `LocalUiState.inventoryOpen` holds the stage key it was opened in
+  (`inventoryStageKey`) and the reconcile drops it on another. Esc, the x,
+  or a click on the veil closes it. While it is open the trail scene draws
+  only the top bar, prompt, trail map and the window, so nothing sits under
+  it. Ids: `backpack`, `inventory:close`, `inventory:discard`,
+  `inventory:discard-confirm`, `inventory:discard-keep`, `inventory:cancel`.
+- A full backpack (decision 7's "point the player there"). The web never
+  shows action errors, so the model predicts the refusal: a draft offer
+  that does not fit (`fits`, room below the bundle's size) relabels every
+  Take "Backpack full: make room", which opens the backpack, and the prompt
+  reads "Your backpack is full. Discard an item to take one" (alert); a
+  shop item with no room shows "Pack full" (`ShopBuy` kind `full`), which
+  opens the backpack too. Supplies and upgrades are unaffected.
+- Screens. The shop is its own panel kind (`shop`): "Shop" and the purse
+  over the full panel, or beside the camp's preview on a replay. The event
+  panel is the event's name, its text and "Next: the route vote for camp 2
+  of 6". The loadout is the camp preview (plus the vote box after a vote);
+  the draft draws a single item as a card with its icon at 2x, its name,
+  rules and chips, and keeps bundles of two as stacked items. Prompts:
+  "Prepare for camp 2" at the loadout, "Event | Quiet trail" at the event,
+  "Shop | Before camp 3" at the shop; Ready's caption reads "When you are
+  ready".
+- Deviation: the stub event is named "Quiet trail" (was "Event"), so the
+  event prompt does not read "Event | Event". Display copy only; its id
+  stays `event`.
+- The rules reference's "Between camps" now describes the draft before
+  every camp (pairs after a boss camp), events after every other camp, and
+  the six-item backpack opened from the item bar.
+- Art: `ui/backpack-icon.png` (32x32, job bece17b3-...) and
+  `ui/leather-panel.png` (256x192, job 0144adcc-..., its off-white backdrop
+  keyed out with `fetch-art --matte`) went through `fetch-art.mjs`, with
+  prompt specs in `make-prompts.mjs` and rows in `CREDITS.md`. Palette:
+  `leatherPatch`, `leatherStitch`, `leatherSlot`.
+- e2e: the driver's `gearOf` reads the inventory model; `tapGear` and
+  `dragGear` open the window first; `buyStock` closes it; `shopEntry`
+  reads the `shop` panel; `trailStep` makes room when an offer does not fit
+  (`discardLast`: drag the last backpack item onto the discard patch,
+  confirm, close). The characters spec reads the sale's and the gift's
+  targets from the inventory. The tour's rewritten views use the batch 6
+  stage shapes (the shop stage, no `event` in previews, no `yourSlots`),
+  the route tie shows on the loadout, a live shop stage is its own phase
+  (`shop`), and the tour opens the backpack once at a loadout to capture
+  `inventory`. The five-seat step plays on one autoplay step at a time
+  until the route vote (the shop and the draft come before it now).
+- Proved: `TOUR_STRICT=1` with both sizes passes with no layout
+  violation (the first strict run flagged the window's veil and leather
+  and the route cards' icons as second controls under their labels, now
+  input-free). The run did not hit unit D's A♣ click this time. Its
+  `loadout` phase is no longer reached: since unit D a loadout after a
+  route vote shows the vote and reads as `loadout-first`. Screenshots at
+  1280x720 and 1920x1080 in `tmp/units/E/` (draft before camp 1, single
+  items, bundles after the boss, the Pack Rat's pick, shop, event, route
+  vote and an objective's hover, both loadouts, the inventory empty, with
+  items and hover, full, the discard confirm, a full backpack at the draft
+  and the shop, the Pack Rat's three slots, a sale aimed into the window).
