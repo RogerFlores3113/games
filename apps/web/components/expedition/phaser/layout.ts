@@ -23,6 +23,20 @@ export interface Point {
 export const STAGE: Rect = { x: 0, y: 0, w: 640, h: 360 };
 
 /** Reserved for the HTML settings button drawn over the canvas. */
+/** The transition signboard, drawn at `scale` over every scene: its art's
+ * top rests `top` stage px below the stage's top edge; `face` is the plank
+ * inside the carved border and `chain` one link pair at each corner, in the
+ * art's own px. The chains repeat that pair up past the stage's top. */
+export const SIGNBOARD = {
+  scale: 2,
+  top: 30,
+  face: { x: 22, y: 40, w: 148, h: 68 },
+  facePad: 8,
+  /** The plank's four boards between their seams, inclusive rows: one line of lettering each. */
+  boards: [[42, 56], [58, 72], [74, 87], [89, 104]],
+  chain: { y: 11, h: 10, w: 10, xs: [27, 155] },
+} as const;
+
 export const SETTINGS_SAFE_ZONE: Rect = { x: 584, y: 0, w: 56, h: 56 };
 
 /** The pocket under the corner buttons, right of the prompt and above the

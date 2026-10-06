@@ -29,6 +29,8 @@ export interface ExpeditionTestBridge {
   /** The store's scene, once its Phaser scene is running. */
   readonly scene: SceneKey | null;
   readonly model: ActiveModel | null;
+  /** The signboard between scenes while one plays: what it says and whether it still hangs. */
+  readonly transition: { caseId: string; phase: "sign" | "fade-in"; title: string; sub: string | null } | null;
   /** Every registered object's page-CSS-px CENTRE + scaled size, keyed by
    * its test-bridge id. */
   objects(): Record<string, { x: number; y: number; width: number; height: number }>;
@@ -116,6 +118,10 @@ function ensureBridge(): ExpeditionTestBridge {
     },
     get model() {
       return current()?.store.getState().model ?? null;
+    },
+    get transition() {
+      const transition = current()?.store.getState().transition ?? null;
+      return transition === null ? null : { caseId: transition.caseId, phase: transition.phase, ...transition.copy };
     },
     objects() {
       const install = current();

@@ -21,6 +21,7 @@ import Phaser from "phaser";
 import { PALETTE, toPhaserColor } from "./palette";
 import { CURSOR } from "./cursors";
 import { SCENE_FACTORIES } from "./scenes/scene-registry";
+import { TRANSITION_SCENE_KEY, TransitionScene } from "./scenes/TransitionScene";
 import { ObjectIndex } from "./object-index";
 import { createAudioDirector } from "./audio-director";
 import { confineInputToCanvas } from "./confine-input";
@@ -93,6 +94,8 @@ export default function ExpeditionPhaserMount({ store }: ExpeditionPhaserMountPr
     for (const [key, factory] of Object.entries(SCENE_FACTORIES)) {
       game.scene.add(key, factory({ store, index }), false);
     }
+    // Added last, so it draws over whichever scene runs.
+    game.scene.add(TRANSITION_SCENE_KEY, new TransitionScene({ store }), true);
 
     const unsubscribeScene = store.subscribe((next, prev) => {
       if (next.sceneKey !== prev.sceneKey) syncActiveScene(game, store);

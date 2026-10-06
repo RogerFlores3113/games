@@ -353,6 +353,19 @@ const specs = {
     gallery: "d64fe364-5449-5ec3-bdd8-eef4c31dce69",
     file: "title/bg-basecamp.png",
   },
+  // The scene-transition sign. A raw-image job; `job` fetches it again.
+  signboard: {
+    tool: "create_image_pixflux",
+    params: {
+      description:
+        "blank rectangular wooden signboard made of horizontal weathered planks with a dark carved border and iron corner brackets, two iron chains rising straight up from the top left and top right corners to the top edge of the image, front view, empty plank face with no text, isolated sprite on plain background",
+      width: 192,
+      height: 128,
+    },
+    job: "47469044-62b1-4704-90c8-2ec737aa770e",
+    scale: 1,
+    note: "natively transparent; used as downloaded",
+  },
   "trail-map": {
     tool: "create_image_pixflux",
     params: {

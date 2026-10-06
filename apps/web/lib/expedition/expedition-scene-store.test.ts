@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExpeditionAbilityView, ExpeditionCampView, ExpeditionStageView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
 import type { RoomSeatInfo, SceneModel, SceneServerInput } from "./build-scene-model";
 import { beginAbilityTargeting, selectTarget, setTooltipSource } from "./local-ui";
@@ -245,5 +245,79 @@ describe("createExpeditionSceneStore", () => {
     store.getState().setReconnecting(true);
     expect(listener).toHaveBeenCalledTimes(2);
     unsubscribe();
+  });
+});
+
+describe("scene transitions", () => {
+  function transitionStore(speed: "full" | "skip" = "full") {
+    vi.useFakeTimers();
+    const onAction = vi.fn();
+    const store = createExpeditionSceneStore({ onAction, cardPackId: "big-index", transitions: { speed: () => speed, now: () => Date.now() } });
+    return { store, onAction };
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("the first view shows at once: a refresh or a late join plays no sign for what already happened", () => {
+    const { store } = transitionStore();
+    store.getState().setServer(server(onTrail(draftOffer)));
+    expect(store.getState().sceneKey).toBe("trail");
+    expect(store.getState().transition).toBeNull();
+  });
+
+  it("a cleared camp hangs the sign over the camp, blocks input, then swaps the draft in at black and fades it in", () => {
+    const { store, onAction } = transitionStore();
+    store.getState().setServer(server(makeView()));
+    store.getState().setServer(server(onTrail(draftOffer)));
+
+    expect(store.getState().sceneKey).toBe("camp");
+    expect(store.getState().transition).toMatchObject({ caseId: "camp-won", phase: "sign", copy: { title: "Camp won!", sub: "+8 coins" } });
+    store.getState().dispatch({ type: "play-card", cardId: "c-as" });
+    expect(onAction).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(650 + 2500 + 450 + 150 - 1);
+    expect(store.getState().sceneKey).toBe("camp");
+    vi.advanceTimersByTime(1);
+    expect(store.getState().sceneKey).toBe("trail");
+    expect(store.getState().transition).toMatchObject({ caseId: "camp-won", phase: "fade-in" });
+    store.getState().dispatch({ type: "pick-bundle", bundle: 0 });
+    expect(onAction).toHaveBeenCalledWith({ type: "pick-bundle", bundle: 0 });
+
+    vi.advanceTimersByTime(450);
+    expect(store.getState().transition).toBeNull();
+  });
+
+  it("swaps in the newest view that arrived while the sign hung", () => {
+    const { store } = transitionStore();
+    store.getState().setServer(server(makeView()));
+    store.getState().setServer(server(onTrail(draftOffer)));
+    store.getState().setServer(server(onTrail({ ...draftOffer, yourOffer: null, pendingSeatIds: ["s1"] })));
+    vi.advanceTimersByTime(5000);
+    expect(store.getState().model).toMatchObject({ sceneKey: "trail", prompt: { text: "Waiting for Alice" } });
+    expect(store.getState().server?.game.stage).toMatchObject({ tag: "draft", pendingSeatIds: ["s1"] });
+  });
+
+  it("a dev jump shows the next view at once", () => {
+    const { store } = transitionStore("skip");
+    store.getState().setServer(server(makeView()));
+    store.getState().setServer(server(onTrail(draftOffer)));
+    expect(store.getState().transition).toBeNull();
+    expect(store.getState().sceneKey).toBe("trail");
+  });
+
+  it("a move with no case, or a store made without transitions, shows the next view at once", () => {
+    const { store } = transitionStore();
+    store.getState().setServer(server(onTrail(draftOffer)));
+    store.getState().setServer(server(onTrail({ tag: "route", options: [], ballots: [] })));
+    expect(store.getState().transition).toBeNull();
+    expect(store.getState().server?.game.stage.tag).toBe("route");
+
+    const plain = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
+    plain.getState().setServer(server(makeView()));
+    plain.getState().setServer(server(onTrail(draftOffer)));
+    expect(plain.getState().sceneKey).toBe("trail");
+    expect(plain.getState().transition).toBeNull();
   });
 });

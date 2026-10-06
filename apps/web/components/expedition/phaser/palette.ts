@@ -65,6 +65,10 @@ export const PALETTE = {
   coinEdge: "#7A4E16",
   coinShine: "#F6E3A6",
   mist: "#F28DC0", // the Perfumist's pink mist
+  // The transition signboard's lettering, cut into its #C7A280 planks: the
+  // ink by the sign's tone, and the lit lower edge of each cut.
+  signInk: { neutral: "#2E1E14", good: "#1E4A28", bad: "#7E1C14", boss: "#5C1F0C" },
+  signCut: "#E1C8A1",
 } as const;
 
 /** Parses a "#rrggbb" string into Phaser's `0xrrggbb` integer form. */

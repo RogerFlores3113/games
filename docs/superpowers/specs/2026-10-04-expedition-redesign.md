@@ -2363,3 +2363,64 @@ How each of the nine fits (for unit 13):
   `icon-tricks`), on the length cards, the trail map and the map of the run; a disaster keeps
   the storm cloud. So Standard reads camp, camp, paw, camp, camp, temple, and Long has the paw
   at camp 3 and the storm at camp 6.
+
+### Implementation notes (batch 5 transitions)
+
+- One table, `apps/web/lib/expedition/scene-transitions.ts`: `TRANSITION_TIMING`
+  (milliseconds per beat for each speed: `enter`, `hold`, `fadeOut`, `black`,
+  `fadeIn`, plus the landing's `bouncePx` and `swingDeg`) and `TRANSITIONS`, the
+  cases in priority order, each `when(shown, next)` over two consecutive views,
+  a `tone` (the ink) and its `copy` (title, smaller sub line, "\n" breaks it), with
+  an optional per-case `hold`. Deleting a case makes that move instant again.
+- Cases: run won, run lost (camp to ended), camp won (camp to draft, "+8 coins"),
+  camp lost (camp to loadout after a failure, "-1 supply. 3 left"), camp restarts
+  (a kick's restart), run start (muster to loadout: "Standard run", "6 camps", "A
+  coin flip decided it" on a tie), route decided (route to event: "Heading to the
+  Clifftop", the weather and pairing, the flip), the shop (event to a loadout with a
+  shop: "Stock up before the Tiger"), the next camp (event to loadout: "Camp 2 of
+  6", "Pack for the Desert"), and setting out (loadout to camp): the temple, a boss
+  camp ("Boss: the Tiger") or a plain table ("Camp 2", "Cave, Rain, Flooding"),
+  with "try 2" on a replay. The draft to the route vote has no sign: same scene,
+  next panel. Routine moves (next camp, plain table) hang 2 s; the rest 2.5 s, the
+  run's end 3 s.
+- The transition is purely presentational and lives in the scene store: when a
+  view arrives that matches a case, the store keeps the view on screen, records the
+  transition (`phase: "sign"`) and holds the newest view; at black it swaps the
+  newest view in (`phase: "fade-in"`), and the transition clears after the fade in.
+  `dispatch` refuses while the sign hangs. The first view a store sees never plays
+  one, so a refresh, a late join or a reconnecting page shows no sign for history.
+  A store made without the `transitions` option shows every view at once (the
+  existing store tests).
+- The sign is a Phaser scene (`TransitionScene`) added last, so it draws over every
+  scene and takes the pointer while the sign hangs (`globalTopOnly`). Poses are a
+  pure function of time since the start (`signPose`): an accelerating fall, then a
+  damped bounce on the chains and a damped swing about the chains' top. The art's
+  chains are short, so the scene crops its top bar and repeats its 10 px link pair
+  up past the stage's top. The plank is drawn at 2x; the lettering is the 5x7 font,
+  the title at 3x (2x when two lines are not enough), the sub line at 2x (1x when
+  needed), each with a light cut line under the ink, two-line titles balanced.
+  Deviation: the plank is lettered in capitals. The 5x7 font has no descenders, so
+  at 3x a lower-case "g" read as "9" and "p" as "P"; the table's copy stays in
+  sentence case. After the swap the screen stays black until the next scene is
+  running (its art loaded), then fades in.
+- Speeds (`transition-speed.ts`): `full`; `reduced` under prefers-reduced-motion
+  (the sign fades in where it hangs, no drop or swing, 200 ms fades, 2 s hold);
+  `fast`, the whole sequence in about 300 ms, set by
+  `localStorage["expedition-transitions"] = "fast"`; and `skip` for a view a dev
+  command caused within 1.5 s of sending or answering it (`useDevStore.jumpedAt`:
+  shortcuts, loaded states and autoplay you ran, not the bots' own moves), which
+  shows at once. A first version faded dev jumps through black in 300 ms, but a
+  spec that reads the model straight after a dev command then read the view
+  before it (the temple spec's Skip test failed once), so jumps skip. "always" in
+  the same key keeps the full sign after dev jumps, to preview the signs from the
+  toolbar.
+- e2e: `playwright.config.ts` gives every context `expedition-transitions=fast`
+  through `use.storageState`, so specs keep their assertions and run the real
+  sequence compressed. `expedition-transitions.spec.ts` clears it and checks the
+  full sequence: the muster stays on screen under "STANDARD RUN" for over 2.5 s,
+  then the loadout; Set out hangs "Camp 1" over the trail; a dev Skip camp plays
+  no transition at all; with "always" it hangs "CAMP WON!" over the table; a reload
+  plays nothing. The test bridge gained `transition` (case, phase and copy).
+- Art: `ui/signboard.png` is registered as `signboard` (192x128) with its prompt
+  spec. The PixelLab job (47469044-…) is a raw-image job; its tool is recorded as
+  `create_image_pixflux`, which the job listing does not confirm.

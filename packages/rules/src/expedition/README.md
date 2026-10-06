@@ -705,6 +705,14 @@ is a last rule layer over `objectiveStatus` (`loaded.objectives`), so the
 table, the outcome, rescue and the settle all follow it. Loaded dice last
 one attempt; play never writes them.
 
+**Scene transitions.** A view a dev command causes (a shortcut, a loaded
+state, autoplay you ran) shows at once, with no signboard between
+scenes; the bots' own moves keep it. To preview the signs
+from the toolbar, set `localStorage["expedition-transitions"] = "always"`.
+The e2e suite sets it to `"fast"` (the whole sequence in about 300 ms).
+The cases, copy and timings are one table in
+`apps/web/lib/expedition/scene-transitions.ts`.
+
 **Panel.** DEV or backtick opens the full panel:
 - Lobby: "Add bot" seats a bot (a seat nobody connects to). Two bots plus you
   is a legal Expedition table.

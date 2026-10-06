@@ -110,6 +110,9 @@ export const ART = {
   "mascot-flop": { file: "camp/mascot-flop.png", w: 32, h: 32, frames: 4, fps: 4, fallback: { color: c(PALETTE.sun), label: "oof" } },
   crate: { file: "camp/crate.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
   coin: { file: "ui/coin.png", w: 16, h: 16, fallback: { color: c(PALETTE.coin), label: "" } },
+  /** The plank the scene transitions hang; its chains are one 10 px link
+   * pair (`SIGN_CHAIN`) that the scene repeats up to the stage's top. */
+  signboard: { file: "ui/signboard.png", w: 192, h: 128, fallback: { color: c(PALETTE.bark), label: "" } },
   "seat-pack": { file: "camp/seat-pack.png", w: 16, h: 16, fallback: { color: c(PALETTE.moss), label: "bag" } },
   "leader-sun": { file: "camp/leader-sun.png", w: 16, h: 16, fallback: { color: c(PALETTE.sun), label: "*" } },
   "icon-whisper": { file: "camp/icon-whisper.png", w: 16, h: 16, fallback: { color: c(PALETTE.turn), label: "W" } },

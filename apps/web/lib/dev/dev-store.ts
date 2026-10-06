@@ -22,9 +22,21 @@ export interface DevStoreState {
    * in order, so each `dev_result` matches the head. */
   pending: DevSent[];
   picked: DevPick | null;
+  /** When a command that moves the game itself (a shortcut, a loaded
+   * state, a user's autoplay) was last sent or answered, by `Date.now()`:
+   * the board skips the signboard for the views it causes. */
+  jumpedAt: number | null;
   sent: (kind: DevSent) => void;
   receive: (message: DevStateFrame | DevResultFrame) => void;
   pick: (pick: DevPick | null) => void;
+}
+
+const JUMPS: ReadonlySet<DevSent> = new Set<DevSent>(["shortcut", "load-state", "autoplay"]);
+
+/** Whether a dev command moved the game within the last `ms`. */
+export function devJumpedWithin(ms: number, now = Date.now()): boolean {
+  const at = useDevStore.getState().jumpedAt;
+  return at !== null && now - at <= ms;
 }
 
 export const useDevStore = create<DevStoreState>((set, get) => ({
@@ -32,13 +44,15 @@ export const useDevStore = create<DevStoreState>((set, get) => ({
   result: null,
   pending: [],
   picked: null,
-  sent: (kind) => set({ pending: [...get().pending, kind] }),
+  jumpedAt: null,
+  sent: (kind) => set({ pending: [...get().pending, kind], ...(JUMPS.has(kind) ? { jumpedAt: Date.now() } : {}) }),
   receive: (message) => {
     if (message.type === "dev_state") {
       set({ state: message });
       return;
     }
     const [kind, ...pending] = get().pending;
+    if (kind !== undefined && JUMPS.has(kind)) set({ jumpedAt: Date.now() });
     if (kind === "quiet" || ((kind === "snapshot" || kind === "bots") && message.ok)) {
       set({ pending });
       return;

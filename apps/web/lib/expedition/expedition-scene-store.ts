@@ -9,6 +9,7 @@ import type { RunEndModel } from "./run-end-model";
 import { buildRunEndModel } from "./run-end-model";
 import type { LocalUiState } from "./local-ui";
 import { confirmTargeting as confirmTargetingUi, initialLocalUi, reconcileLocalUi } from "./local-ui";
+import { TRANSITION_TIMING, swapAt, transitionFor, type SceneTransition, type TransitionSpeed, type TransitionTiming } from "./scene-transitions";
 
 /**
  * The single dispatch chokepoint for the Phaser scenes (spec §7.1): every
@@ -26,13 +27,26 @@ import { confirmTargeting as confirmTargetingUi, initialLocalUi, reconcileLocalU
 /** What the active scene draws, tagged by its scene key. */
 export type ActiveModel = SceneModel | TrailModel | RunEndModel;
 
+/** The signboard between two views (`scene-transitions.ts`). While
+ * `phase` is "sign" the view before it stays on screen and input is held;
+ * at black the newest view swaps in and `phase` becomes "fade-in". */
+export type ActiveTransition = SceneTransition & {
+  serial: number;
+  timing: TransitionTiming;
+  /** On the `transitions.now` clock. */
+  startedAt: number;
+  phase: "sign" | "fade-in";
+};
+
 export interface ExpeditionSceneState {
+  /** The view on screen, which trails the newest one while a sign hangs. */
   server: SceneServerInput | null;
   localUi: LocalUiState;
   cardPackId: CardPackId;
   reconnecting: boolean;
   sceneKey: SceneKey | null;
   model: ActiveModel | null;
+  transition: ActiveTransition | null;
 }
 
 export interface ExpeditionSceneActions {
@@ -46,7 +60,7 @@ export interface ExpeditionSceneActions {
    * (`expedition-card-pack-pref.ts`), never this store's. */
   setCardPack(id: CardPackId): void;
   /** Forwards `request` to `onAction` exactly once. A no-op while
-   * `reconnecting` or before any server view has arrived. */
+   * `reconnecting`, while a sign hangs, or before any server view has arrived. */
   dispatch(request: RunAction): void;
   /** Host only (the worker refuses anyone else): back to the lobby with
    * seats kept. A no-op while `reconnecting`. */
@@ -81,8 +95,39 @@ export function createExpeditionSceneStore(opts: {
   onRestartLobby?: () => void;
   onOpenMap?: () => void;
   cardPackId: CardPackId;
+  /** Without it every view shows at once. `speed` is asked as each sign
+   * starts; `now` is the clock the scene animates `startedAt` against. */
+  transitions?: { speed: () => TransitionSpeed; now: () => number };
 }): ExpeditionSceneStore {
   return createStore<ExpeditionSceneState & ExpeditionSceneActions>((set, get) => {
+    let serial = 0;
+    /** The newest view, held back while a sign hangs. */
+    let held: SceneServerInput | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    function show(server: SceneServerInput): void {
+      const reconciled = reconcileLocalUi(get().localUi, server.game);
+      set({ server, localUi: reconciled, ...rebuild(server, reconciled, get().cardPackId, get().reconnecting) });
+    }
+
+    function startTransition(found: SceneTransition, server: SceneServerInput, timing: TransitionTiming, now: () => number): void {
+      if (timer !== null) clearTimeout(timer);
+      const own = ++serial;
+      held = server;
+      set({ transition: { ...found, serial: own, timing, startedAt: now(), phase: "sign" } });
+      timer = setTimeout(() => {
+        const next = held;
+        held = null;
+        if (next !== null) show(next);
+        const current = get().transition;
+        if (current?.serial === own) set({ transition: { ...current, phase: "fade-in" } });
+        timer = setTimeout(() => {
+          timer = null;
+          if (get().transition?.serial === own) set({ transition: null });
+        }, timing.fadeIn);
+      }, swapAt(timing, found));
+    }
+
     function applyLocalUi(nextUi: LocalUiState): void {
       const { server, cardPackId, reconnecting, localUi } = get();
       // An unchanged UI must not rebuild the model: the scenes redraw on
@@ -102,10 +147,19 @@ export function createExpeditionSceneStore(opts: {
       reconnecting: false,
       sceneKey: null,
       model: null,
+      transition: null,
 
       setServer(server) {
-        const reconciled = reconcileLocalUi(get().localUi, server.game);
-        set({ server, localUi: reconciled, ...rebuild(server, reconciled, get().cardPackId, get().reconnecting) });
+        if (get().transition?.phase === "sign") {
+          held = server;
+          return;
+        }
+        const shown = get().server;
+        const transitions = opts.transitions;
+        const found = shown === null || transitions === undefined ? null : transitionFor(shown.game, server.game);
+        const speed = found === null ? "skip" : transitions!.speed();
+        if (found === null || speed === "skip") show(server);
+        else startTransition(found, server, TRANSITION_TIMING[speed], transitions!.now);
       },
 
       setReconnecting(reconnecting) {
@@ -133,8 +187,8 @@ export function createExpeditionSceneStore(opts: {
       },
 
       dispatch(request) {
-        const { server, reconnecting } = get();
-        if (server === null || reconnecting) return;
+        const { server, reconnecting, transition } = get();
+        if (server === null || reconnecting || transition?.phase === "sign") return;
         opts.onAction(request);
       },
 

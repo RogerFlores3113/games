@@ -21,6 +21,7 @@ import { ExpeditionViewSchema } from "@games/schema/games/expedition";
 import type { ExpeditionView } from "@games/rules";
 import { createExpeditionSceneStore } from "../../lib/expedition/expedition-scene-store";
 import { readCardPackPref, writeCardPackPref } from "../../lib/expedition/expedition-card-pack-pref";
+import { transitionSpeed } from "../../lib/expedition/transition-speed";
 import type { CardPackId } from "../../lib/expedition/card-pack-ids";
 import { playCue } from "../../lib/expedition/audio/cue-bus";
 import { toggleMute } from "../../lib/expedition/audio/audio-prefs";
@@ -81,6 +82,7 @@ export function ExpeditionBoard({
         setMapOpen(true);
       },
       cardPackId: readCardPackPref(),
+      transitions: { speed: transitionSpeed, now: () => performance.now() },
     }),
   );
 

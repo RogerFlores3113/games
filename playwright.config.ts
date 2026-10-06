@@ -38,6 +38,16 @@ const E2E_HEARTBEAT_PONG_TIMEOUT_MS = "1000";
 const E2E_SOCKET_STALE_MS = 5000;
 const E2E_ZOMBIE_SWEEP_INTERVAL_MS = 1000;
 
+const BASE_URL = REMOTE_BASE_URL ?? `http://localhost:${WEB_PORT}`;
+
+// Expedition's scene transitions hang a signboard for about four seconds
+// between scenes. Every spec runs them compressed (the same sequence, a
+// third of a second); expedition-transitions.spec.ts plays them in full.
+const E2E_STORAGE = {
+  cookies: [],
+  origins: [{ origin: new URL(BASE_URL).origin, localStorage: [{ name: "expedition-transitions", value: "fast" }] }],
+};
+
 export default defineConfig({
   testDir: "./e2e",
   reporter: "list",
@@ -50,7 +60,8 @@ export default defineConfig({
     timeout: 10_000,
   },
   use: {
-    baseURL: REMOTE_BASE_URL ?? `http://localhost:${WEB_PORT}`,
+    baseURL: BASE_URL,
+    storageState: E2E_STORAGE,
   },
   projects: [
     {

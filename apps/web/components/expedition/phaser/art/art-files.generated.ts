@@ -125,4 +125,5 @@ export const ART_FILES: readonly string[] = [
   "tables/table-magma.png",
   "tables/table-temple.png",
   "ui/coin.png",
+  "ui/signboard.png",
 ];
