@@ -36,12 +36,14 @@ describe("botMove", () => {
     expect(runStatus(playOut(["a", "b", "c", "d", "e"]))).not.toBe("in_progress");
   });
 
-  it("at muster, picks a free character first and then abstains from the length vote", () => {
+  it("at muster, picks a free character first, abstains from the length vote, then locks in", () => {
     const muster = createRun({ seatIds: ["a", "b", "c"], seed: "autoplay" });
     expect(botMove(muster, ["a"], CATALOG)).toEqual({ seatId: "a", request: { type: "pick-character", characterId: Object.keys(CATALOG.characters)[0]! } });
     expect(botMove(crewed(), ["b"], CATALOG)).toEqual({ seatId: "b", request: { type: "vote", choice: null } });
-    const voted: RunState = { ...crewed(), stage: { tag: "muster", ballots: { a: "long", b: null } } };
-    expect(botMove(voted, ["a", "b"], CATALOG)).toBeNull();
+    const voted: RunState = { ...crewed(), stage: { tag: "muster", ballots: { a: "long", b: null }, locked: { a: true } } };
+    expect(botMove(voted, ["a", "b"], CATALOG)).toEqual({ seatId: "b", request: { type: "lock-in" } });
+    const locked: RunState = { ...voted, stage: { tag: "muster", ballots: { a: "long", b: null }, locked: { a: true, b: true } } };
+    expect(botMove(locked, ["a", "b"], CATALOG)).toBeNull();
   });
 
   it("on a route, abstains until the seat has a ballot", () => {

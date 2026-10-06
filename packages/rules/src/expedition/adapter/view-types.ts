@@ -325,7 +325,8 @@ export type ExpeditionStatusPartView =
 export type ExpeditionModView = { id: string; kind: ModKind; strength: Strength; status: ExpeditionStatusPartView[] };
 
 export type ExpeditionStageView =
-  | { tag: "muster"; ballots: ExpeditionBallotView[] }
+  /** `lockedSeatIds`: the seats whose character and ballot are final. */
+  | { tag: "muster"; ballots: ExpeditionBallotView[]; lockedSeatIds: string[] }
   | { tag: "loadout"; camp: ExpeditionCampPreviewView; mods: ExpeditionModView[]; yourSlots: number; shop: ExpeditionShopView | null; readySeatIds: string[] }
   | { tag: "camp"; camp: ExpeditionCampPreviewView; mods: ExpeditionModView[]; attempt: ExpeditionAttemptView }
   | { tag: "draft"; cleared: number; payout: number; yourOffer: { kind: "standard" | "special"; bundles: string[][] } | null; pendingSeatIds: string[] }

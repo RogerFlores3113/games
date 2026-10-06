@@ -74,7 +74,7 @@ describe("dev-room: autoplay", () => {
   it("bots play until the run waits on the human's own decision", () => {
     const room = startedWithBots(2);
     const outcome = applyDevCommand(room, "host", { kind: "autoplay", scope: "bots", maxSteps: 50, stopAtMilestone: false }, devInput());
-    expect(outcome.reply).toEqual({ ok: true, message: "Autoplay: 4 steps, stopped because waiting on a seat autoplay does not control." });
+    expect(outcome.reply).toEqual({ ok: true, message: "Autoplay: 6 steps, stopped because waiting on a seat autoplay does not control." });
     expect(outcome.state.status).toBe("in_progress");
   });
 

@@ -38,7 +38,7 @@ export function createRun(input: { seatIds: readonly string[]; seed: string }): 
     history: [],
     lastVote: null,
     itemSerial: 0,
-    stage: { tag: "muster", ballots: {} },
+    stage: { tag: "muster", ballots: {}, locked: {} },
   };
 }
 

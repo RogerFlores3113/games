@@ -100,6 +100,12 @@ describe("checkRunState", () => {
     expect(checkRunState({ ...loadout, supplies: 5 }, CATALOG)).toEqual(["supplies must be a whole number from 0 to 4, got 5"]);
   });
 
+  it("flags a muster lock-in without a character and a ballot, or for an unknown seat", () => {
+    const muster = createRun({ seatIds: SEATS, seed: "check" });
+    const run: RunState = { ...muster, stage: { tag: "muster", ballots: {}, locked: { [SEATS[0]!]: true, zed: true } } };
+    expect(checkRunState(run, CATALOG)).toEqual(["the lock-in list holds unknown seat zed", `${SEATS[0]} is locked in without a character and a ballot`]);
+  });
+
   it("flags a run past muster that has no plan", () => {
     const loadout = DEV_SHORTCUTS["jump-to-camp"].apply(createRun({ seatIds: SEATS, seed: "check" }), { length: "standard", camp: 1, stage: "loadout" }, CATALOG);
     expect(checkRunState({ ...loadout, plan: null }, CATALOG)).toEqual([

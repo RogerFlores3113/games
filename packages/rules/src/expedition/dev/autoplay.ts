@@ -1,6 +1,7 @@
 // The dev sandbox's stand-in for a player: the first move the engine accepts
 // for the seats it controls. Never whispers, uses abilities, equips or buys;
-// takes the first bundle; abstains from votes so the human's ballot decides.
+// takes the first bundle; abstains from votes so the human's ballot decides,
+// and locks in at the muster once it has picked and abstained.
 
 import { currentActorSeatId } from "../camp";
 import { platePath, pressedCount } from "../content/mods/temple";
@@ -40,7 +41,9 @@ function candidates(run: RunState, seatIds: readonly string[], catalog: Catalog)
       const taken = run.seats.flatMap((seat) => (seat.characterId === null ? [] : [seat.characterId]));
       const free = Object.keys(catalog.characters).filter((id) => !taken.includes(id));
       const picks = mine.filter((seat) => seat.characterId === null).flatMap((seat, i): Candidate[] => (free[i] === undefined ? [] : [{ seatId: seat.seatId, request: { type: "pick-character", characterId: free[i]! } }]));
-      return [...picks, ...mine.filter((seat) => !Object.hasOwn(stage.ballots, seat.seatId)).map((seat): Candidate => ({ seatId: seat.seatId, request: { type: "vote", choice: null } }))];
+      const votes = mine.filter((seat) => !Object.hasOwn(stage.ballots, seat.seatId)).map((seat): Candidate => ({ seatId: seat.seatId, request: { type: "vote", choice: null } }));
+      const locks = mine.filter((seat) => !Object.hasOwn(stage.locked, seat.seatId)).map((seat): Candidate => ({ seatId: seat.seatId, request: { type: "lock-in" } }));
+      return [...picks, ...votes, ...locks];
     }
     case "route":
       return mine.filter((seat) => !Object.hasOwn(stage.ballots, seat.seatId)).map((seat) => ({ seatId: seat.seatId, request: { type: "vote", choice: null } }));

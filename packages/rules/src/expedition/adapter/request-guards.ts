@@ -38,6 +38,11 @@ function parseVote(record: Record<string, unknown>): RunAction | null {
   return { type: "vote", choice: record.choice };
 }
 
+function parseLockIn(record: Record<string, unknown>): RunAction | null {
+  if (!hasExactKeys(record, ["type"])) return null;
+  return { type: "lock-in" };
+}
+
 function parseEquip(record: Record<string, unknown>): RunAction | null {
   if (!hasExactKeys(record, ["type", "itemUids"])) return null;
   if (!isBoundedStringArray(record.itemUids)) return null;
@@ -106,6 +111,8 @@ export function parseRunAction(request: unknown): RunAction | null {
       return parsePickCharacter(request);
     case "vote":
       return parseVote(request);
+    case "lock-in":
+      return parseLockIn(request);
     case "equip":
       return parseEquip(request);
     case "buy":

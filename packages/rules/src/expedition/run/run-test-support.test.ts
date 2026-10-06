@@ -126,9 +126,16 @@ describe("enumerateLegalRunActions", () => {
     );
   });
 
+  it("at muster, offers no pick to a seat that has a character, and a lock-in once it also has a ballot", () => {
+    const base = createRun({ seatIds: SEAT_IDS, seed: "enum-lock" });
+    const run: RunState = { ...base, seats: base.seats.map((s) => (s.seatId === "p1" ? { ...s, characterId: "plain-2" } : s)), stage: { tag: "muster", ballots: { p1: "long" }, locked: {} } };
+    const p1 = enumerateLegalRunActions(run, catalog).filter((c) => c.seatId === "p1");
+    expect(p1.map((c) => c.action)).toEqual([{ type: "lock-in" }]);
+  });
+
   it("at muster, offers each seat without a ballot a vote per length and an abstention", () => {
     const base = createRun({ seatIds: SEAT_IDS, seed: "enum-votes" });
-    const run = { ...base, stage: { tag: "muster" as const, ballots: { p1: "long" as const } } };
+    const run = { ...base, stage: { tag: "muster" as const, ballots: { p1: "long" as const }, locked: {} } };
     const votes = enumerateLegalRunActions(run, catalog).filter((c) => c.action.type === "vote");
     expect(votes.filter((c) => c.seatId === "p1")).toEqual([]);
     expect(votes.filter((c) => c.seatId === "p0").map((c) => c.action)).toEqual([

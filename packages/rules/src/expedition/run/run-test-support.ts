@@ -223,9 +223,9 @@ function loadoutCandidates(run: RunState, catalog: Catalog): Array<{ seatId: str
 
 /** Every candidate action for every seat at `run`'s current stage, kept
  * only if `applyRunAction` itself accepts it (T-03-24 discipline: legality
- * is decided ONLY by the real transition, never re-derived here). Votes are
- * offered only to seats without a ballot, so a random driver cannot change
- * its mind forever. */
+ * is decided ONLY by the real transition, never re-derived here). Votes and
+ * characters are offered only to seats without one, so a random driver
+ * cannot change its mind forever. */
 export function enumerateLegalRunActions(
   run: RunState,
   catalog: Catalog,
@@ -241,11 +241,13 @@ export function enumerateLegalRunActions(
 
   if (stage.tag === "muster") {
     for (const seat of run.seats) {
+      if (seat.characterId !== null) continue;
       for (const characterId of Object.keys(catalog.characters)) {
         candidates.push({ seatId: seat.seatId, action: { type: "pick-character", characterId } });
       }
     }
     votes(stage.ballots, Object.keys(RUN_LENGTHS));
+    for (const seat of run.seats) candidates.push({ seatId: seat.seatId, action: { type: "lock-in" } });
   } else if (stage.tag === "route") {
     votes(stage.ballots, stage.options.map((o) => o.id));
   } else if (stage.tag === "draft") {

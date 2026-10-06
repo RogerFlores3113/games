@@ -518,7 +518,7 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
   const surveyOf = (spec: CampSpec): ExpeditionSurveyedObjectiveView[] | null => surveys.get(spec) ?? null;
   switch (stage.tag) {
     case "muster":
-      return { tag: "muster", ballots: toBallotViews(state, stage.ballots) };
+      return { tag: "muster", ballots: toBallotViews(state, stage.ballots), lockedSeatIds: readySeatIds(state, stage.locked) };
     case "loadout":
       return {
         tag: "loadout",

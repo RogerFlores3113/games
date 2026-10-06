@@ -28,6 +28,8 @@ export const ExpeditionErrorCodeSchema = z.enum([
   "not_a_choice",
   "unknown_character",
   "character_taken",
+  "incomplete_choices",
+  "locked",
   "not_owned_item",
   "too_many_items",
   "sold_out",

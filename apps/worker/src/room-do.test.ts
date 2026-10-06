@@ -1724,6 +1724,7 @@ describe("kick votes on the live wire (Expedition)", () => {
       const characters = ["explorer", "leader", "magician", "hermit"];
       crew.forEach((p, i) => act(p, { type: "pick-character", characterId: characters[i] }));
       crew.forEach((p) => act(p, { type: "vote", choice: "short" }));
+      crew.forEach((p) => act(p, { type: "lock-in" }));
       await viewWhere(ana, (v) => v.game?.stage.tag === "loadout");
       crew.forEach((p) => act(p, { type: "ready" }));
       await viewWhere(ana, (v) => v.game?.stage.tag === "camp");

@@ -47,7 +47,7 @@ function clearedCamp(run: RunState, catalog: Catalog): RunAt<"camp"> {
 describe("createRun", () => {
   it("starts in muster with 3 supplies, an empty purse and no plan: no characters, no items, no offers, no ledger", () => {
     const run = createRun({ seatIds: SEAT_IDS, seed: "s" });
-    expect(run.stage).toEqual({ tag: "muster", ballots: {} });
+    expect(run.stage).toEqual({ tag: "muster", ballots: {}, locked: {} });
     expect(run.supplies).toBe(3);
     expect(run.purse).toBe(0);
     expect(run.plan).toBeNull();
@@ -79,13 +79,15 @@ describe("muster and the length vote", () => {
   const catalog = testCatalog();
   const crewed = (run: RunState): RunState =>
     act(act(act(run, "p0", { type: "pick-character", characterId: "plain-1" }, catalog), "p1", { type: "pick-character", characterId: "plain-2" }, catalog), "p2", { type: "pick-character", characterId: "plain-3" }, catalog);
+  const lockAll = (run: RunState): RunState => run.seatIds.reduce((next, seatId) => act(next, seatId, { type: "lock-in" }, catalog), run);
 
-  it("waits until every seat has a character and a ballot, then opens camp 1's loadout in the Jungle", () => {
+  it("waits until every seat has locked in a character and a ballot, then opens camp 1's loadout in the Jungle", () => {
     let run = crewed(createRun({ seatIds: SEAT_IDS, seed: "s" }));
     run = act(run, "p0", { type: "vote", choice: "long" }, catalog);
     run = act(run, "p1", { type: "vote", choice: "long" }, catalog);
-    expect(run.stage.tag).toBe("muster");
     run = act(run, "p2", { type: "vote", choice: "short" }, catalog);
+    expect(run.stage.tag).toBe("muster");
+    run = lockAll(run);
     expect(run.plan).toEqual({ length: "long", bosses: [{ at: 3, tier: "animal", modId: "beaver" }, { at: 6, tier: "disaster", modId: "locusts" }, { at: 8, tier: "temple", modId: "temple" }] });
     expect(run.lastVote).toEqual({ topic: "length", result: { tally: [{ choice: "short", votes: 1 }, { choice: "standard", votes: 0 }, { choice: "long", votes: 2 }], tied: null, winner: "long" } });
     expect(run.stage).toEqual({
@@ -96,17 +98,18 @@ describe("muster and the length vote", () => {
     });
   });
 
-  it("a ballot changes until the vote resolves", () => {
+  it("a ballot changes until the seat locks in", () => {
     let run = act(createRun({ seatIds: SEAT_IDS, seed: "s" }), "p0", { type: "vote", choice: "long" }, catalog);
     run = act(run, "p0", { type: "vote", choice: "short" }, catalog);
-    expect(run.stage).toEqual({ tag: "muster", ballots: { p0: "short" } });
+    expect(run.stage).toEqual({ tag: "muster", ballots: { p0: "short" }, locked: {} });
   });
 
-  it("the last character pick resolves a vote every seat already cast", () => {
+  it("the last lock-in resolves the vote, whatever order the seats chose in", () => {
     let run = createRun({ seatIds: SEAT_IDS, seed: "s" });
     for (const seatId of SEAT_IDS) run = act(run, seatId, { type: "vote", choice: "short" }, catalog);
+    run = crewed(run);
     expect(run.stage.tag).toBe("muster");
-    expect(crewed(run).plan?.length).toBe("short");
+    expect(lockAll(run).plan?.length).toBe("short");
   });
 
   it("refuses a length that does not exist as not_a_choice, and ready as wrong_stage", () => {
@@ -121,7 +124,7 @@ describe("muster and the length vote", () => {
       let run = crewed(createRun({ seatIds: SEAT_IDS, seed: `tie-${n}` }));
       run = act(run, "p0", { type: "vote", choice: "short" }, catalog);
       run = act(run, "p1", { type: "vote", choice: "long" }, catalog);
-      run = act(run, "p2", { type: "vote", choice: null }, catalog);
+      run = lockAll(act(run, "p2", { type: "vote", choice: null }, catalog));
       expect(run.lastVote?.result.tied).toEqual(["short", "long"]);
       winners.add(run.plan!.length);
     }
@@ -132,7 +135,7 @@ describe("muster and the length vote", () => {
     let run = crewed(createRun({ seatIds: SEAT_IDS, seed: "s" }));
     run = act(run, "p0", { type: "vote", choice: null }, catalog);
     run = act(run, "p1", { type: "vote", choice: null }, catalog);
-    run = act(run, "p2", { type: "vote", choice: "standard" }, catalog);
+    run = lockAll(act(run, "p2", { type: "vote", choice: "standard" }, catalog));
     expect(run.plan?.length).toBe("standard");
     expect(run.lastVote?.result.tied).toBeNull();
   });

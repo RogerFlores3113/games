@@ -142,6 +142,7 @@ describe("applyRunAction: each stage accepts only its own actions", () => {
   const every: RunAction[] = [
     { type: "pick-character", characterId: "plain-5" },
     { type: "vote", choice: null },
+    { type: "lock-in" },
     { type: "equip", itemUids: [] },
     { type: "buy", stockId: "supplies" },
     { type: "pick-bundle", bundle: 0 },
@@ -158,8 +159,8 @@ describe("applyRunAction: each stage accepts only its own actions", () => {
       return result.ok || result.error !== "wrong_stage";
     }).map((action) => action.type);
 
-  it("muster: pick-character and vote", () => {
-    expect(accepted(musterRun())).toEqual(["pick-character", "vote"]);
+  it("muster: pick-character, vote and lock-in", () => {
+    expect(accepted(musterRun())).toEqual(["pick-character", "vote", "lock-in"]);
   });
 
   it("loadout: equip, buy, ready and abilities", () => {
@@ -201,12 +202,17 @@ describe("applyRunAction: pick-character (muster)", () => {
     });
   });
 
-  it("rejects a second pick by the same seat as wrong_phase", () => {
+  it("switches the seat's character until it locks in, freeing the old one", () => {
     const first = ok(applyRunAction(musterRun(), "p0", { type: "pick-character", characterId: "plain-1" }, catalog));
-    expect(applyRunAction(first, "p0", { type: "pick-character", characterId: "plain-2" }, catalog)).toEqual({
-      ok: false,
-      error: "wrong_phase",
-    });
+    const switched = ok(applyRunAction(first, "p0", { type: "pick-character", characterId: "plain-2" }, catalog));
+    expect(switched.seats.map((s) => s.characterId)).toEqual(["plain-2", null, null]);
+    const taken = ok(applyRunAction(switched, "p1", { type: "pick-character", characterId: "plain-1" }, catalog));
+    expect(taken.seats.map((s) => s.characterId)).toEqual(["plain-2", "plain-1", null]);
+  });
+
+  it("picking the character the seat already holds changes nothing", () => {
+    const first = ok(applyRunAction(musterRun(), "p0", { type: "pick-character", characterId: "plain-1" }, catalog));
+    expect(ok(applyRunAction(first, "p0", { type: "pick-character", characterId: "plain-1" }, catalog))).toEqual(first);
   });
 
   it("stays in muster after the last pick until every seat has voted", () => {
@@ -214,7 +220,53 @@ describe("applyRunAction: pick-character (muster)", () => {
     SEAT_IDS.forEach((seatId, i) => {
       run = ok(applyRunAction(run, seatId, { type: "pick-character", characterId: `plain-${i + 1}` }, catalog));
     });
-    expect(run.stage).toEqual({ tag: "muster", ballots: {} });
+    expect(run.stage).toEqual({ tag: "muster", ballots: {}, locked: {} });
+  });
+});
+
+describe("applyRunAction: lock-in (muster)", () => {
+  const chosen = (seatId: string, characterId: string, run = musterRun()): RunState =>
+    ok(applyRunAction(ok(applyRunAction(run, seatId, { type: "pick-character", characterId }, catalog)), seatId, { type: "vote", choice: "long" }, catalog));
+
+  it("refuses a seat with no character or no ballot as incomplete_choices", () => {
+    const run = musterRun();
+    expect(applyRunAction(run, "p0", { type: "lock-in" }, catalog)).toEqual({ ok: false, error: "incomplete_choices" });
+    const picked = ok(applyRunAction(run, "p0", { type: "pick-character", characterId: "plain-1" }, catalog));
+    expect(applyRunAction(picked, "p0", { type: "lock-in" }, catalog)).toEqual({ ok: false, error: "incomplete_choices" });
+    const voted = ok(applyRunAction(run, "p0", { type: "vote", choice: "short" }, catalog));
+    expect(applyRunAction(voted, "p0", { type: "lock-in" }, catalog)).toEqual({ ok: false, error: "incomplete_choices" });
+  });
+
+  it("locks the seat's character and ballot, and others see it locked", () => {
+    const locked = ok(applyRunAction(chosen("p0", "plain-1"), "p0", { type: "lock-in" }, catalog));
+    expect(locked.stage).toEqual({ tag: "muster", ballots: { p0: "long" }, locked: { p0: true } });
+  });
+
+  it("an abstention is a ballot a seat may lock in", () => {
+    const picked = ok(applyRunAction(musterRun(), "p0", { type: "pick-character", characterId: "plain-1" }, catalog));
+    const abstained = ok(applyRunAction(picked, "p0", { type: "vote", choice: null }, catalog));
+    expect(ok(applyRunAction(abstained, "p0", { type: "lock-in" }, catalog)).stage).toEqual({ tag: "muster", ballots: { p0: null }, locked: { p0: true } });
+  });
+
+  it("refuses a locked seat's pick, vote and second lock-in as locked", () => {
+    const locked = ok(applyRunAction(chosen("p0", "plain-1"), "p0", { type: "lock-in" }, catalog));
+    expect(applyRunAction(locked, "p0", { type: "pick-character", characterId: "plain-2" }, catalog)).toEqual({ ok: false, error: "locked" });
+    expect(applyRunAction(locked, "p0", { type: "vote", choice: "short" }, catalog)).toEqual({ ok: false, error: "locked" });
+    expect(applyRunAction(locked, "p0", { type: "lock-in" }, catalog)).toEqual({ ok: false, error: "locked" });
+  });
+
+  it("advances only once every seat has locked in", () => {
+    let run = musterRun();
+    SEAT_IDS.forEach((seatId, i) => {
+      run = chosen(seatId, `plain-${i + 1}`, run);
+    });
+    expect(run.stage.tag).toBe("muster");
+    run = ok(applyRunAction(run, "p0", { type: "lock-in" }, catalog));
+    run = ok(applyRunAction(run, "p1", { type: "lock-in" }, catalog));
+    expect(run.stage.tag).toBe("muster");
+    run = ok(applyRunAction(run, "p2", { type: "lock-in" }, catalog));
+    expect(run.stage.tag).toBe("loadout");
+    expect(run.plan?.length).toBe("long");
   });
 });
 

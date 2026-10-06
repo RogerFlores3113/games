@@ -63,7 +63,9 @@ describe("a kick at each stage", () => {
     for (const [seatId, characterId] of [["p0", "plain-2"], ["p1", "plain-3"], ["p2", "plain-4"]] as const) {
       run = act(run, seatId, { type: "pick-character", characterId });
       run = act(run, seatId, { type: "vote", choice: "short" });
+      run = act(run, seatId, { type: "lock-in" });
     }
+    run = act(run, "p3", { type: "vote", choice: "long" });
     expect(run.stage.tag).toBe("muster");
     const kicked = kickSeat(run, "p3", catalog);
     expect(kicked.stage.tag).toBe("loadout");
@@ -77,9 +79,20 @@ describe("a kick at each stage", () => {
     for (const [seatId, characterId] of [["p0", "plain-2"], ["p1", "plain-3"], ["p2", "plain-4"]] as const) {
       run = act(run, seatId, { type: "pick-character", characterId });
       run = act(run, seatId, { type: "vote", choice: "standard" });
+      run = act(run, seatId, { type: "lock-in" });
     }
     expect(run.stage.tag).toBe("muster");
     expect(kickSeat(run, "p3", catalog).stage.tag).toBe("loadout");
+  });
+
+  it("muster: a kicked seat's lock-in goes with it, and back in the muster it locks in again", () => {
+    let run = createRun({ seatIds: FOUR, seed: "muster-kick" });
+    run = act(act(act(run, "p3", { type: "pick-character", characterId: "plain-1" }), "p3", { type: "vote", choice: "long" }), "p3", { type: "lock-in" });
+    const kicked = kickSeat(run, "p3", catalog);
+    expect(kicked.stage).toEqual({ tag: "muster", ballots: {}, locked: {} });
+    const back = seatPresence(kicked, "p3", true, catalog);
+    expect(back.seats[3]!.characterId).toBe("plain-1");
+    expect(act(act(back, "p3", { type: "vote", choice: "short" }), "p3", { type: "lock-in" }).stage).toEqual({ tag: "muster", ballots: { p3: "short" }, locked: { p3: true } });
   });
 
   it("loadout: the ready mark goes, and the last ready seat's deal is for the crew left", () => {
@@ -188,6 +201,17 @@ describe("every per-player rule reads the crew in play", () => {
     run = kickSeat(run, "p4", catalog);
     expect(absentSeatAction(run, "p0", catalog)).toEqual({ type: "pick-character", characterId: "plain-2" });
   });
+
+  it("the absent-seat pass at the muster picks, abstains, then locks in, and leaves a locked seat be", () => {
+    let run = createRun({ seatIds: FOUR, seed: "absent" });
+    const steps: RunAction[] = [];
+    for (let action = absentSeatAction(run, "p1", catalog); action !== null; action = absentSeatAction(run, "p1", catalog)) {
+      steps.push(action);
+      run = act(run, "p1", action);
+    }
+    expect(steps).toEqual([{ type: "pick-character", characterId: "plain-1" }, { type: "vote", choice: null }, { type: "lock-in" }]);
+    expect(run.stage).toEqual({ tag: "muster", ballots: { p1: null }, locked: { p1: true } });
+  });
 });
 
 describe("a kicked seat coming back", () => {
@@ -232,6 +256,7 @@ describe("a kicked seat coming back", () => {
     for (const [seatId, characterId] of [["p0", "plain-1"], ["p1", "plain-3"], ["p2", "plain-4"]] as const) {
       run = act(run, seatId, { type: "pick-character", characterId });
       run = act(run, seatId, { type: "vote", choice: "short" });
+      run = act(run, seatId, { type: "lock-in" });
     }
     const atCamp = readyAll(kickSeat(run, "p3", catalog));
     expect(atCamp.stage.tag).toBe("camp");
@@ -247,7 +272,7 @@ describe("a kicked seat coming back", () => {
   it("rejoins the muster at once, with no ballot", () => {
     const run = act(createRun({ seatIds: FOUR, seed: "m" }), "p0", { type: "vote", choice: "short" });
     const back = seatPresence(kickSeat(run, "p3", catalog), "p3", true, catalog);
-    expect(back.stage).toEqual({ tag: "muster", ballots: { p0: "short" } });
+    expect(back.stage).toEqual({ tag: "muster", ballots: { p0: "short" }, locked: {} });
     expect(back.seatIds).toEqual(FOUR);
   });
 

@@ -175,7 +175,7 @@ describe("J.D.", () => {
   it("Lucky Start gives J.D. one random item when the length vote opens camp 1", () => {
     let run = createRun({ seatIds: SEATS, seed: "beginner" });
     for (const [seatId, characterId] of [["p0", "jd"], ["p1", "leader"], ["p2", "explorer"]] as const) run = act(run, seatId, { type: "pick-character", characterId });
-    for (const seatId of SEATS) run = act(run, seatId, { type: "vote", choice: "short" });
+    for (const seatId of SEATS) run = act(act(run, seatId, { type: "vote", choice: "short" }), seatId, { type: "lock-in" });
     expect(run.stage.tag).toBe("loadout");
     expect(run.seats.map((s) => [s.items, s.equipped])).toEqual([[[{ uid: "it0", itemId: "parrot" }], ["it0"]], [[], []], [[], []]]);
   });

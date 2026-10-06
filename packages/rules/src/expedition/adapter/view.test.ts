@@ -36,7 +36,7 @@ describe("toExpeditionPlayerView", () => {
 
     const view = toExpeditionPlayerView(run, "p0", CATALOG);
 
-    expect(view.stage).toEqual({ tag: "muster", ballots: [] });
+    expect(view.stage).toEqual({ tag: "muster", ballots: [], lockedSeatIds: [] });
     expect(view.runStatus).toBe("in_progress");
     expect([view.length, view.campCount, view.plan, view.lastVote]).toEqual([null, null, [], null]);
     expect(view.seats).toEqual(
@@ -130,6 +130,9 @@ describe("toExpeditionPlayerView", () => {
       ["p2", { type: "pick-character", characterId: "jd" }],
       ["p0", { type: "vote", choice: "long" }],
       ["p1", { type: "vote", choice: null }],
+      ["p0", { type: "lock-in" }],
+      ["p1", { type: "lock-in" }],
+      ["p2", { type: "vote", choice: "long" }],
     ] as const;
     for (const [seatId, action] of steps) {
       const result = applyRunAction(run, seatId, action, CATALOG);
@@ -138,10 +141,11 @@ describe("toExpeditionPlayerView", () => {
     }
     expect(toExpeditionPlayerView(run, "p2", CATALOG).stage).toEqual({
       tag: "muster",
-      ballots: [{ seatId: "p0", choice: "long" }, { seatId: "p1", choice: null }],
+      ballots: [{ seatId: "p0", choice: "long" }, { seatId: "p1", choice: null }, { seatId: "p2", choice: "long" }],
+      lockedSeatIds: ["p0", "p1"],
     });
 
-    const last = applyRunAction(run, "p2", { type: "vote", choice: "long" }, CATALOG);
+    const last = applyRunAction(run, "p2", { type: "lock-in" }, CATALOG);
     if (!last.ok) throw new Error(last.error);
     const view = toExpeditionPlayerView(last.state, "p2", CATALOG);
 

@@ -143,7 +143,7 @@ const StockEntrySchema = z.strictObject({
 });
 
 const StageSchema = z.discriminatedUnion("tag", [
-  z.strictObject({ tag: z.literal("muster"), ballots: PerSeatSchema(RunLengthSchema.nullable()) }),
+  z.strictObject({ tag: z.literal("muster"), ballots: PerSeatSchema(RunLengthSchema.nullable()), locked: ReadySchema }),
   z.strictObject({ tag: z.literal("loadout"), camp: CampSpecSchema, stock: z.array(StockEntrySchema).nullable(), ready: ReadySchema }),
   z.strictObject({ tag: z.literal("camp"), camp: CampSpecSchema, attempt: AttemptSchema }),
   z.strictObject({ tag: z.literal("draft"), cleared: CampIndexSchema, payout: z.number().int().min(0) }),

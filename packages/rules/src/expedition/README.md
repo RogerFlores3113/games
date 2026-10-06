@@ -95,11 +95,14 @@ transition: it refuses an action type the stage does not accept
 until the tag stops changing.
 
 1. **Muster.** Each seat sends `pick-character` and `vote { choice }`
-   ("short", "standard", "long", or null to abstain). A ballot may change
-   until the vote resolves. The last missing input resolves it (majority,
-   else a seeded coin flip recorded in `lastVote`), draws the plan (each
-   boss camp's boss from its tier's pool, ids sorted, one seeded index) and
-   opens the loadout for camp 1 (the Jungle, fair weather). A planned boss
+   ("short", "standard", "long", or null to abstain), then `lock-in`
+   (refused `incomplete_choices` without both). Until it locks in, a seat
+   may switch its character (the old one is free again) and change its
+   ballot; after, both are refused `locked`. Every seat sees who has locked
+   in. The last lock-in resolves the vote (majority, else a seeded coin
+   flip recorded in `lastVote`), draws the plan (each boss camp's boss
+   from its tier's pool, ids sorted, one seeded index) and opens the
+   loadout for camp 1 (the Jungle, fair weather). A planned boss
    stays out of every view until a route preview leads to its camp
    (`run/plan.ts`'s `horizon`); the leak check flags it before then.
 2. **Loadout.** Each seat sends `equip { itemUids }` (replaces its equipped
@@ -130,7 +133,7 @@ until the tag stops changing.
 A seat disconnected past the worker's auto-pass grace never holds the
 table: `run/absent.ts`'s `absentSeatAction` (the adapter's
 `autoPassRequest`) picks the first free character in registry order,
-abstains from votes, takes the head offer's first bundle, readies with the
+abstains from votes, locks in at the muster, takes the head offer's first bundle, readies with the
 gear it has and passes a gated window. Bot seats have no disconnect time,
 so it never acts for them.
 
@@ -139,8 +142,8 @@ vote a disconnected seat out (the room's kick vote, through the adapter's
 `seats` hooks; no kick takes the crew below three). `run/stages/kick.ts`'s
 `kickSeat` moves its `SeatRun` from `seatIds`/`seats` into
 `RunState.kicked` whole, so every per-player rule reads the crew in play:
-its ballot or ready mark goes, its unpicked offers go, and a dealt camp is
-abandoned (a `restarted` history entry, no supplies) and its loadout
+its ballot, lock-in or ready mark goes, its unpicked offers go, and a dealt
+camp is abandoned (a `restarted` history entry, no supplies) and its loadout
 reopens for a fresh deal. `seatPresence` marks a kicked seat `back` while
 it is connected; `openLoadout` puts every back seat in again at its old
 place (at once while the muster or a loadout is open), with its character,
@@ -667,12 +670,13 @@ to turn it on. The web app shows the dev tools when `NODE_ENV` is
 `development` (`next dev`) or `NEXT_PUBLIC_DEV_MODE=1`; every entry point is
 a dynamic import behind `DEV_PANEL_ENABLED` (`dev-gate.test.ts` holds that).
 
-**Play solo.** "Play solo (dev)" on the home page creates an Expedition room
-(named from the name field, else "Solo"), fills it with bots, starts it, and
-turns on "Bots play": bots take their own turns after every change, so you
-only act for your seat. Bots abstain from votes, so your ballot decides. A
-room made the usual way gets the same from the toolbar's "Fill with bots and
-start" in the lobby.
+**Play solo.** "Play solo (dev)" on `/expedition/start` creates an
+Expedition room (named from the name field, else "Solo"), fills it with
+bots, starts it, and turns on "Bots play": bots take their own turns after
+every change, so you only act for your seat. Bots abstain from votes and
+lock in at the muster, so your ballot decides once you lock in. A room made
+the usual way gets the same from the toolbar's "Fill with bots and start"
+in the lobby.
 
 **Toolbar.** Always on the bottom edge (‹ folds it to its DEV button). The
 stage keeps a strip free for it when it can do so at the same zoom; where

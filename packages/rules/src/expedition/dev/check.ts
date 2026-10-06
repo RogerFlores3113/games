@@ -135,6 +135,13 @@ function checkRunFields(run: RunState, problems: string[]): void {
   if (run.plan !== null) for (const entry of run.history) checkSpecIndex(run, "a history entry", entry.camp, problems);
   switch (stage.tag) {
     case "muster":
+      checkPerSeat(run, "the ballots", Object.keys(stage.ballots), problems);
+      checkPerSeat(run, "the lock-in list", Object.keys(stage.locked), problems);
+      for (const seatId of Object.keys(stage.locked)) {
+        const seat = run.seats.find((s) => s.seatId === seatId);
+        if (seat !== undefined && (seat.characterId === null || !Object.hasOwn(stage.ballots, seatId))) problems.push(`${seatId} is locked in without a character and a ballot`);
+      }
+      break;
     case "route":
       checkPerSeat(run, "the ballots", Object.keys(stage.ballots), problems);
       break;

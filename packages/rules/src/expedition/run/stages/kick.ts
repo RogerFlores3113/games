@@ -18,8 +18,9 @@ function without<V>(perSeat: PerSeat<V>, seatId: string): PerSeat<V> {
 function stageWithout(stage: Stage, seatId: string): Stage {
   switch (stage.tag) {
     case "muster":
+      return { ...stage, ballots: without(stage.ballots, seatId), locked: without(stage.locked, seatId) };
     case "route":
-      return { ...stage, ballots: without(stage.ballots, seatId) } as Stage;
+      return { ...stage, ballots: without(stage.ballots, seatId) };
     case "loadout":
     case "event":
       return { ...stage, ready: without(stage.ready, seatId) };
@@ -39,7 +40,7 @@ function restartCamp(run: RunState, catalog: Catalog): RunState {
   return openLoadout({ ...run, history: [...run.history, result] }, spec, catalog);
 }
 
-/** Takes seatId out of the crew. Its ballot or ready mark goes with it, a
+/** Takes seatId out of the crew. Its ballot, lock-in or ready mark goes with it, a
  * dealt camp restarts without it, and the run advances: the seat may have
  * been the last one the stage waited on. Throws unless canKick. */
 export function kickSeat(run: RunState, seatId: string, catalog: Catalog): RunState {

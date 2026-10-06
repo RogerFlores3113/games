@@ -11,26 +11,34 @@ import { err, everySeat, ok, type StageDef } from "./stage-def";
 
 const LENGTHS = Object.keys(RUN_LENGTHS) as RunLength[];
 
-/** Every seat picks a character (public, final, unique) and votes a length
- * (changeable until the vote resolves). The last missing input resolves the
- * vote, draws the plan, opens camp 1's loadout and lets the seats' sources
- * react to run-started. */
+/** Every seat picks a character (public, unique) and votes a length, both
+ * changeable until the seat locks in. The last lock-in resolves the vote,
+ * draws the plan, opens camp 1's loadout and lets the seats' sources react to
+ * run-started. */
 export const muster: StageDef<"muster"> = {
   on: {
     "pick-character": (run, seatId, action, catalog) => {
+      if (Object.hasOwn(run.stage.locked, seatId)) return err("locked");
       const seat = run.seats.find((s) => s.seatId === seatId)!;
-      if (seat.characterId !== null) return err("wrong_phase");
       if (!Object.hasOwn(catalog.characters, action.characterId)) return err("unknown_character");
+      if (seat.characterId === action.characterId) return ok(run);
       if (takenCharacters(run).has(action.characterId)) return err("character_taken");
       return ok({ ...run, seats: run.seats.map((s) => (s.seatId === seatId ? { ...s, characterId: action.characterId } : s)) });
     },
     vote: (run, seatId, action) => {
+      if (Object.hasOwn(run.stage.locked, seatId)) return err("locked");
       if (action.choice !== null && !(LENGTHS as readonly string[]).includes(action.choice)) return err("not_a_choice");
       return ok({ ...run, stage: { ...run.stage, ballots: { ...run.stage.ballots, [seatId]: action.choice as RunLength | null } } });
     },
+    "lock-in": (run, seatId) => {
+      if (Object.hasOwn(run.stage.locked, seatId)) return err("locked");
+      const seat = run.seats.find((s) => s.seatId === seatId)!;
+      if (seat.characterId === null || !Object.hasOwn(run.stage.ballots, seatId)) return err("incomplete_choices");
+      return ok({ ...run, stage: { ...run.stage, locked: { ...run.stage.locked, [seatId]: true } } });
+    },
   },
   advance(run, catalog) {
-    if (run.seats.some((seat) => seat.characterId === null) || !everySeat(run, run.stage.ballots)) return run;
+    if (!everySeat(run, run.stage.locked)) return run;
     const result = tally(run.seed, STREAMS.lengthVote(), LENGTHS, run.seatIds, run.stage.ballots)!;
     const opened = openLoadout({ ...run, plan: drawPlan(run.seed, result.winner, catalog), lastVote: { topic: "length", result } }, firstCampSpec(result.winner), catalog);
     return react(opened, [{ type: "run-started" }], catalog);

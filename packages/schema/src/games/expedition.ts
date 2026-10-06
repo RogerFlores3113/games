@@ -400,7 +400,7 @@ const ModViewSchema = z.strictObject({
 });
 
 const StageViewSchema = z.discriminatedUnion("tag", [
-  z.strictObject({ tag: z.literal("muster"), ballots: z.array(BallotViewSchema) }),
+  z.strictObject({ tag: z.literal("muster"), ballots: z.array(BallotViewSchema), lockedSeatIds: z.array(z.string().min(1)) }),
   z.strictObject({
     tag: z.literal("loadout"),
     camp: CampPreviewViewSchema,

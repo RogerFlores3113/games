@@ -4,7 +4,7 @@ import type { GameRegistry, GameRegistryEntry } from "./game-registration";
 import { GameErrorDetailSchema } from "@games/schema";
 import type { RunError } from "@games/rules";
 
-/** All 29 `RunError` members (7 `CampError` + 22 more), in the same order as
+/** All 31 `RunError` members (7 `CampError` + 24 more), in the same order as
  * `packages/schema/src/games/expedition-errors.ts`'s `ExpeditionErrorCodeSchema`. */
 const ALL_RUN_ERRORS: readonly RunError[] = [
   "not_your_turn",
@@ -20,6 +20,8 @@ const ALL_RUN_ERRORS: readonly RunError[] = [
   "not_a_choice",
   "unknown_character",
   "character_taken",
+  "incomplete_choices",
+  "locked",
   "not_owned_item",
   "too_many_items",
   "sold_out",
@@ -67,7 +69,7 @@ describe("D-08/D-09: GAME_REGISTRY / resolveGame", () => {
     expect(entry?.mapError("no_whispers_left")).toEqual({ gameId: "expedition", code: "no_whispers_left" });
   });
 
-  it("mapError maps every one of the 29 RunError names to a wire-parseable GameErrorDetail", () => {
+  it("mapError maps every one of the 31 RunError names to a wire-parseable GameErrorDetail", () => {
     const entry = resolveGame("expedition");
     expect(entry).toBeDefined();
     for (const name of ALL_RUN_ERRORS) {

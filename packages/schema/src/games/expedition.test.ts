@@ -6,7 +6,7 @@ import {
   ExpeditionViewSchema,
 } from "./expedition";
 
-// The 29 RunError names: CampError's 7 members, then RunError's 22
+// The 31 RunError names: CampError's 7 members, then RunError's 24
 // additional members.
 const EXPEDITION_ERROR_CODES = [
   "not_your_turn",
@@ -22,6 +22,8 @@ const EXPEDITION_ERROR_CODES = [
   "not_a_choice",
   "unknown_character",
   "character_taken",
+  "incomplete_choices",
+  "locked",
   "not_owned_item",
   "too_many_items",
   "sold_out",
@@ -265,7 +267,7 @@ describe("ExpeditionViewSchema", () => {
       plan: [],
       lastVote: null,
       seats: [{ ...draftView.seats[0], characterId: null, upgradeId: null, usage: [] }],
-      stage: { tag: "muster", ballots: [{ seatId: "seat-1", choice: "long" }, { seatId: "seat-2", choice: null }] },
+      stage: { tag: "muster", ballots: [{ seatId: "seat-1", choice: "long" }, { seatId: "seat-2", choice: null }], lockedSeatIds: ["seat-1"] },
     };
     expect(ExpeditionViewSchema.safeParse(muster).success).toBe(true);
     const rescue = campWith({ ...midAttempt, window: "rescue", pendingSeatIds: ["seat-2"], rescue: { failedObjectiveIds: ["o4"] } } );
@@ -470,8 +472,8 @@ describe("ExpeditionErrorCodeSchema", () => {
     expect(ExpeditionErrorCodeSchema.safeParse(code).success).toBe(false);
   });
 
-  it("has exactly 29 members", () => {
-    expect(ExpeditionErrorCodeSchema.options.length).toBe(29);
+  it("has exactly 31 members", () => {
+    expect(ExpeditionErrorCodeSchema.options.length).toBe(31);
   });
 });
 

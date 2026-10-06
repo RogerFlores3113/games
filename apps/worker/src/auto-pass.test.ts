@@ -135,20 +135,22 @@ describe("autoPassAbsentSeats: Expedition", () => {
 
   const run = (state: RoomState) => state.game as RunState;
 
-  it("picks a character and abstains for a seat that dropped at the muster, then readies it into camp 1", () => {
+  it("picks a character, abstains and locks in for a seat that dropped at the muster, then readies it into camp 1", () => {
     let state = markConnected(expeditionRoom(), "e2", false, LEFT_AT);
     state = act(state, "e0", { type: "pick-character", characterId: "leader" }, 20);
     state = act(state, "e1", { type: "pick-character", characterId: "hermit" }, 21);
     state = act(state, "e0", { type: "vote", choice: "short" }, 22);
     state = act(state, "e1", { type: "vote", choice: "short" }, 23);
+    state = act(state, "e0", { type: "lock-in" }, 24);
+    state = act(state, "e1", { type: "lock-in" }, 25);
     expect(run(state).stage.tag).toBe("muster");
 
     state = alarms(state);
     expect(run(state).stage.tag).toBe("loadout");
     expect(run(state).seats.map((seat) => seat.characterId)).toEqual(["leader", "hermit", "jd"]);
 
-    state = act(state, "e0", { type: "ready" }, 24);
-    state = act(state, "e1", { type: "ready" }, 25);
+    state = act(state, "e0", { type: "ready" }, 26);
+    state = act(state, "e1", { type: "ready" }, 27);
     state = alarms(state);
     expect(run(state).stage.tag).toBe("camp");
   });

@@ -29,6 +29,7 @@ export const STAGES: { readonly [T in StageTag]: StageDef<T> } = {
 const ACTION_TYPES: Readonly<Record<RunAction["type"], true>> = {
   "pick-character": true,
   vote: true,
+  "lock-in": true,
   equip: true,
   buy: true,
   "pick-bundle": true,

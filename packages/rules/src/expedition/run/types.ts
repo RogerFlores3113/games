@@ -137,7 +137,7 @@ export type CampResult = {
 export type KickedSeat = { readonly seat: SeatRun; readonly position: number; readonly back: boolean };
 
 export type Stage =
-  | { readonly tag: "muster"; readonly ballots: PerSeat<RunLength | null> } // null abstains
+  | { readonly tag: "muster"; readonly ballots: PerSeat<RunLength | null>; readonly locked: PerSeat<true> } // null abstains; a locked seat's pick and ballot are final
   | { readonly tag: "loadout"; readonly camp: CampSpec; readonly stock: readonly StockEntry[] | null; readonly ready: PerSeat<true> } // stock: the shop before a boss camp
   | { readonly tag: "camp"; readonly camp: CampSpec; readonly attempt: AttemptState }
   | { readonly tag: "draft"; readonly cleared: CampIndex; readonly payout: number }
@@ -168,6 +168,7 @@ export type RunStatus = "in_progress" | "won" | "lost";
 export type RunAction =
   | { readonly type: "pick-character"; readonly characterId: string } // muster
   | { readonly type: "vote"; readonly choice: string | null } // muster, route; null abstains
+  | { readonly type: "lock-in" } // muster; needs a character and a ballot
   | { readonly type: "equip"; readonly itemUids: readonly string[] } // loadout; replaces the equipped set
   | { readonly type: "buy"; readonly stockId: string } // loadout before a boss camp
   | { readonly type: "pick-bundle"; readonly bundle: number } // draft
@@ -186,6 +187,8 @@ export type RunError =
   | "not_a_choice"
   | "unknown_character"
   | "character_taken"
+  | "incomplete_choices"
+  | "locked"
   | "not_owned_item"
   | "too_many_items"
   | "sold_out"

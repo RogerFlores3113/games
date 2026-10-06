@@ -91,7 +91,7 @@ function stageLines(run: RunState, catalog: Catalog): string[] {
   const stage = run.stage;
   switch (stage.tag) {
     case "muster":
-      return [`length ballots: ${perSeat(run, stage.ballots)}`];
+      return [`length ballots: ${perSeat(run, stage.ballots)}`, `locked in: ${perSeat(run, stage.locked)}`];
     case "loadout":
       return [
         specLabel(stage.camp, catalog),

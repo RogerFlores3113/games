@@ -112,9 +112,9 @@ describe("expeditionGame: identity and createInitialState", () => {
 });
 
 describe("expeditionGame: applyAction accepts valid actions and never mutates state", () => {
-  it("picking characters and voting a length from every seat is accepted and opens the first camp's loadout", () => {
+  it("picking characters, voting a length and locking in from every seat is accepted and opens the first camp's loadout", () => {
     let state = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
-    expect(state.stage).toEqual({ tag: "muster", ballots: {} });
+    expect(state.stage).toEqual({ tag: "muster", ballots: {}, locked: {} });
     const characterIds = Object.keys(CATALOG.characters);
     state.seatIds.forEach((seatId, i) => {
       const result = expeditionGame.applyAction(state, seatId, { type: "pick-character", characterId: characterIds[i] });
@@ -123,11 +123,13 @@ describe("expeditionGame: applyAction accepts valid actions and never mutates st
     });
     expect(state.seats.map((s) => s.characterId)).toEqual(characterIds.slice(0, 3));
     for (const seatId of state.seatIds) {
-      const snapshotBefore = structuredClone(state);
-      const result = expeditionGame.applyAction(state, seatId, { type: "vote", choice: "short" });
-      expect(result.ok).toBe(true);
-      expect(state).toEqual(snapshotBefore);
-      if (result.ok) state = result.state;
+      for (const action of [{ type: "vote", choice: "short" }, { type: "lock-in" }]) {
+        const snapshotBefore = structuredClone(state);
+        const result = expeditionGame.applyAction(state, seatId, action);
+        expect(result.ok).toBe(true);
+        expect(state).toEqual(snapshotBefore);
+        if (result.ok) state = result.state;
+      }
     }
     expect(state.stage.tag).toBe("loadout");
     expect(state.plan?.length).toBe("short");
@@ -187,7 +189,7 @@ describe("expeditionGame: autoPassRequest", () => {
     expect(expeditionGame.autoPassRequest!(betweenTricks!, "p0")).toBeNull();
   });
 
-  it("names an abstention for a seat with a character that has not voted at muster, and null once it has", () => {
+  it("names an abstention for a seat with a character that has not voted at muster, a lock-in once it has, and null once locked", () => {
     let fresh = createRun({ seatIds: ["p0", "p1", "p2"], seed: SEED });
     for (const [seatId, characterId] of [["p0", "hermit"], ["p1", "leader"]] as const) {
       const picked = expeditionGame.applyAction(fresh, seatId, { type: "pick-character", characterId });
@@ -197,7 +199,10 @@ describe("expeditionGame: autoPassRequest", () => {
     const voted = expeditionGame.applyAction(fresh, "p1", { type: "vote", choice: "long" });
     if (!voted.ok) throw new Error(voted.error);
     expect(expeditionGame.autoPassRequest!(voted.state, "p0")).toEqual({ type: "vote", choice: null });
-    expect(expeditionGame.autoPassRequest!(voted.state, "p1")).toBeNull();
+    expect(expeditionGame.autoPassRequest!(voted.state, "p1")).toEqual({ type: "lock-in" });
+    const locked = expeditionGame.applyAction(voted.state, "p1", { type: "lock-in" });
+    if (!locked.ok) throw new Error(locked.error);
+    expect(expeditionGame.autoPassRequest!(locked.state, "p1")).toBeNull();
   });
 
   it("names an abstention for a seat that has not voted on a route", () => {
@@ -228,12 +233,12 @@ describe("expeditionGame: autoPassRequest", () => {
 
   it("carries a muster with two absent seats to camp 1's loadout", () => {
     let run = fixtures().fresh!;
-    for (const action of [{ type: "pick-character", characterId: "leader" }, { type: "vote", choice: "short" }] as const) {
+    for (const action of [{ type: "pick-character", characterId: "leader" }, { type: "vote", choice: "short" }, { type: "lock-in" }] as const) {
       const acted = expeditionGame.applyAction(run, "p0", action);
       if (!acted.ok) throw new Error(acted.error);
       run = acted.state;
     }
-    for (let step = 0; step < 4; step++) {
+    for (let step = 0; step < 6; step++) {
       for (const seatId of ["p1", "p2"]) {
         const request = expeditionGame.autoPassRequest!(run, seatId);
         if (request === null) continue;

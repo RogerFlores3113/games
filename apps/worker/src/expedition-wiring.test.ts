@@ -71,7 +71,7 @@ function targetCombos(steps: readonly { choices: readonly string[] }[]): string[
 /** Every candidate action for `seatId`, built ONLY from `view` (the seat's
  * own projected view — bots never read room.game to decide) and the public
  * character list. Priority order: pick-character, pick-bundle, a vote
- * (a short run at muster, route a between camps), ready,
+ * (a short run at muster, route a between camps), lock-in, ready,
  * use-ability (targets from the server's own step choices), whisper,
  * skip-window, pick-objective, play-card. `applyGameAction` (called by the
  * caller) is the sole arbiter of legality — a candidate here is a GUESS,
@@ -80,15 +80,17 @@ function buildCandidates(view: ExpeditionViewWire, seatId: string): RunAction[] 
   const candidates: RunAction[] = [];
 
   const taken = new Set(view.seats.map((seat) => seat.characterId));
+  const picked = view.seats.find((seat) => seat.seatId === seatId)?.characterId != null;
   for (const characterId of Object.keys(CHARACTER_DISPLAY)) {
-    if (!taken.has(characterId)) candidates.push({ type: "pick-character", characterId });
+    if (!picked && !taken.has(characterId)) candidates.push({ type: "pick-character", characterId });
   }
 
   const stage = view.stage;
   if (stage.tag === "draft") {
     (stage.yourOffer?.bundles ?? []).forEach((_, bundle) => candidates.push({ type: "pick-bundle", bundle }));
   }
-  if (stage.tag === "muster") candidates.push({ type: "vote", choice: "short" });
+  if (stage.tag === "muster" && !stage.ballots.some((b) => b.seatId === seatId)) candidates.push({ type: "vote", choice: "short" });
+  if (stage.tag === "muster") candidates.push({ type: "lock-in" });
   if (stage.tag === "route") candidates.push({ type: "vote", choice: stage.options[0]!.id });
 
   candidates.push({ type: "ready" });

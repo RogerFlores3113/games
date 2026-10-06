@@ -65,7 +65,7 @@ function mapError(error: AdapterError): GameErrorDetail {
   }
 }
 
-/** Expedition's own error mapper — an exhaustive switch over all 29
+/** Expedition's own error mapper — an exhaustive switch over all 31
  * `RunError` members with a `never`-typed default, mirroring Hanabi's
  * `mapError` above exactly (D-07, D-08). No `String(error)` fallback. */
 function mapExpeditionError(error: RunError): GameErrorDetail {
@@ -96,6 +96,10 @@ function mapExpeditionError(error: RunError): GameErrorDetail {
       return { gameId: EXPEDITION_GAME_ID, code: "unknown_character" };
     case "character_taken":
       return { gameId: EXPEDITION_GAME_ID, code: "character_taken" };
+    case "incomplete_choices":
+      return { gameId: EXPEDITION_GAME_ID, code: "incomplete_choices" };
+    case "locked":
+      return { gameId: EXPEDITION_GAME_ID, code: "locked" };
     case "not_owned_item":
       return { gameId: EXPEDITION_GAME_ID, code: "not_owned_item" };
     case "too_many_items":

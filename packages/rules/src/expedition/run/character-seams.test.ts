@@ -608,7 +608,7 @@ describe("source reactions", () => {
     run = act(run, "p0", { type: "pick-character", characterId: "lucky" }, catalog);
     run = act(run, "p1", { type: "pick-character", characterId: "plain-1" }, catalog);
     run = act(run, "p2", { type: "pick-character", characterId: "plain-2" }, catalog);
-    for (const seatId of SEATS) run = act(run, seatId, { type: "vote", choice: "short" }, catalog);
+    for (const seatId of SEATS) run = act(act(run, seatId, { type: "vote", choice: "short" }, catalog), seatId, { type: "lock-in" }, catalog);
     expect(run.stage.tag).toBe("loadout");
     expect(run.seats.map((s) => [s.items, s.equipped])).toEqual([[[{ uid: "it0", itemId: "item-b" }], ["it0"]], [[], []], [[], []]]);
   });
