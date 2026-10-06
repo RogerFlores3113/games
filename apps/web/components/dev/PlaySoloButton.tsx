@@ -11,8 +11,9 @@ import { writeDisplayName } from "../../lib/seat-token";
 const SOLO_NAME = "Solo";
 
 /** Dev builds only: an Expedition room for one player, filled with bots and
- * started as soon as it opens, its bots taking their own turns. */
-export function PlaySoloButton() {
+ * started as soon as it opens, its bots taking their own turns. `className`
+ * styles the button and its error line to sit on the start page's panel. */
+export function PlaySoloButton({ className, errorClassName }: { className?: string; errorClassName?: string }) {
   const router = useRouter();
   const [starting, setStarting] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -43,14 +44,14 @@ export function PlaySoloButton() {
         type="button"
         variant="ghost"
         data-testid="play-solo-dev"
-        className="border-[var(--color-landing-panel-border)]! text-[var(--color-landing-text)]! hover:bg-black/5!"
+        className={className}
         disabled={starting}
         onClick={playSolo}
       >
         {starting ? "Starting..." : "Play solo (dev)"}
       </Button>
       {failed && (
-        <p className="text-[length:var(--text-label)]" style={{ color: "var(--color-landing-destructive)" }}>
+        <p role="alert" className={errorClassName}>
           Couldn&apos;t create a solo room. Try again.
         </p>
       )}

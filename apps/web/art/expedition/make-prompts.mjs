@@ -336,6 +336,23 @@ const specs = {
   "bg-trail-dusk": backdrop(
     "an abandoned jungle campsite at dusk, a cold empty fire pit and a fallen tent, the trail fading into dark trees, purple and deep blue dusk sky, wistful mood, no people, no text",
   ),
+  // The home page tile, the start page and the room lobby (HTML, outside
+  // the sprite folder). Made in the PixelLab Creator; the description is
+  // the start of each prompt as the gallery listing shows it.
+  "title-trail": {
+    tool: "create_image_pixflux",
+    params: { description: "side view title backdrop of a jungle exp…", width: 320, height: 180 },
+    scale: 2,
+    gallery: "8af56d45-9cbe-58a7-9394-0945aa5643b6",
+    file: "title/bg-title-trail.png",
+  },
+  "title-basecamp": {
+    tool: "create_image_pixflux",
+    params: { description: "side view backdrop of an expedition base…", width: 320, height: 180 },
+    scale: 2,
+    gallery: "d64fe364-5449-5ec3-bdd8-eef4c31dce69",
+    file: "title/bg-basecamp.png",
+  },
   "trail-map": {
     tool: "create_image_pixflux",
     params: {

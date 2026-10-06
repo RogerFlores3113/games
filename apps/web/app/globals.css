@@ -183,6 +183,43 @@
   --color-landing-text: #10233D;
   --color-landing-text-muted: #47566B;
   --color-landing-destructive: #C7362F;
+
+  /*
+   * Home page game picker (owner request, 2026-10-05: "more personality").
+   * `--color-home-dusk` lifts the night sky behind the tiles; the festival
+   * trio is the Hanabi tile's lettering and "Play now" (the gold is the
+   * same value as the CTA accent, declared apart so the accent's own
+   * reserved uses stay countable). `--color-home-ink` is the label on it.
+   */
+  --color-home-dusk: #1C1538;
+  --color-home-ink: #1A1206;
+  --color-festival-gold: #F5B942;
+  --color-festival-pink: #F472B6;
+  --color-festival-sky: #7DD3FC;
+
+  /*
+   * Expedition's HTML screens (start page, room lobby): the canvas's wood,
+   * parchment and campfire colours. Ink on parchment is 13.7:1, muted text
+   * on parchment 6.4:1, the error red on parchment 5.4:1, ink on the ember
+   * button 6.3:1, and cream on the dark wood 11.1:1.
+   */
+  --color-trail-ink: #1B120A;
+  --color-trail-wood: #6B4A2B;
+  --color-trail-wood-light: #94693E;
+  --color-trail-wood-dark: #44301B;
+  --color-trail-brass: #E0B65A;
+  --color-trail-parchment: #EBDDB8;
+  --color-trail-parchment-light: #F8F0DA;
+  --color-trail-parchment-shade: #CDB78A;
+  --color-trail-text: #2A1F14;
+  --color-trail-text-muted: #5C4831;
+  --color-trail-cream: #FFF1D0;
+  --color-trail-ember: #E8792E;
+  --color-trail-ember-light: #F7A55B;
+  --color-trail-ember-dark: #9C4514;
+  --color-trail-stone: #9C8E78;
+  --color-trail-error: #A3271F;
+  --color-trail-moss: #3F8F5C;
 }
 
 body {
@@ -482,4 +519,525 @@ body.expedition-gloves :is(button, select, input):disabled {
 }
 body.expedition-gloves :is(input:not([type="checkbox"]):not([type="radio"]), textarea):not(:disabled) {
   cursor: text;
+}
+
+/*
+ * Home page (`app/page.tsx`): a night sky with a scatter of stars behind
+ * the game tiles. The stars are 1-2px dots tiled every 240px; the dusk
+ * glow sits behind the heading.
+ */
+.home-sky {
+  background-color: var(--color-bg);
+  background-image:
+    radial-gradient(1.5px 1.5px at 22px 38px, rgba(255, 241, 208, 0.85), rgba(255, 241, 208, 0) 100%),
+    radial-gradient(1px 1px at 131px 77px, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 100%),
+    radial-gradient(1px 1px at 201px 19px, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 100%),
+    radial-gradient(1.5px 1.5px at 77px 161px, rgba(125, 211, 252, 0.7), rgba(125, 211, 252, 0) 100%),
+    radial-gradient(1px 1px at 179px 203px, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 100%),
+    radial-gradient(ellipse 80% 55% at 50% -5%, var(--color-home-dusk) 0%, rgba(28, 21, 56, 0) 100%);
+  background-size: 240px 240px, 240px 240px, 240px 240px, 240px 240px, 240px 240px, 100% 100%;
+  background-repeat: repeat, repeat, repeat, repeat, repeat, no-repeat;
+}
+
+.home-kicker {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.home-lede {
+  font-size: 18px;
+  color: var(--color-text-muted);
+}
+
+.home-title {
+  font-family: var(--font-festive), var(--font-sans);
+  font-size: clamp(40px, 6vw, 64px);
+  line-height: 1.05;
+  color: var(--color-text);
+  text-shadow: 0 0 32px rgba(245, 185, 66, 0.25);
+}
+
+.game-grid {
+  display: grid;
+  gap: clamp(16px, 2.5vw, 32px);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+}
+
+/*
+ * One game: its art fills a rounded tile, a scrim darkens the bottom for
+ * the name, tagline and "Play now", and the whole tile is that link's hit
+ * area (`.game-tile-play::after`). The art is pixel art shown at whole
+ * multiples where it can be, never smoothed.
+ */
+.game-tile {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: clamp(340px, 30vw, 580px);
+  border-radius: 28px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+}
+.game-tile:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 32px 70px rgba(0, 0, 0, 0.55);
+}
+.game-tile:has(.game-tile-play:focus-visible) {
+  outline: 3px solid var(--color-text);
+  outline-offset: 4px;
+}
+
+.game-tile-art {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-image: var(--tile-art);
+  background-size: cover;
+  background-position: center top;
+  image-rendering: pixelated;
+  transition: filter 200ms ease-out;
+}
+.game-tile:hover .game-tile-art {
+  filter: brightness(1.12) saturate(1.1);
+}
+.game-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(11, 15, 26, 0) 30%, rgba(11, 15, 26, 0.72) 62%, rgba(11, 15, 26, 0.94) 100%);
+}
+
+.game-tile-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: clamp(20px, 2.6vw, 36px);
+}
+
+.game-tile-players {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--color-text);
+  background: rgba(11, 15, 26, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.game-tile-name {
+  line-height: 1;
+  color: var(--color-text);
+}
+.game-tile[data-tone="festival"] .game-tile-name {
+  font-size: clamp(44px, 5vw, 68px);
+  background: linear-gradient(95deg, var(--color-festival-gold) 0%, var(--color-festival-pink) 55%, var(--color-festival-sky) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(11, 15, 26, 0.9)) drop-shadow(0 0 18px rgba(244, 114, 182, 0.35));
+}
+.game-tile[data-tone="trail"] .game-tile-name {
+  font-size: clamp(56px, 6vw, 80px);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--color-trail-cream);
+  text-shadow: 4px 4px 0 var(--color-trail-ink), 0 0 24px rgba(232, 121, 46, 0.45);
+}
+
+.game-tile-tagline {
+  max-width: 34ch;
+  font-size: 17px;
+  line-height: 1.45;
+  color: rgba(244, 246, 251, 0.88);
+}
+.game-tile[data-tone="trail"] .game-tile-tagline,
+.game-tile[data-tone="trail"] .game-tile-players {
+  font-family: var(--font-pixel), ui-monospace, monospace;
+}
+.game-tile[data-tone="trail"] .game-tile-tagline {
+  max-width: 440px;
+  font-size: 24px;
+  line-height: 1.2;
+  color: var(--color-trail-cream);
+  text-shadow: 2px 2px 0 var(--color-trail-ink);
+}
+.game-tile[data-tone="trail"] .game-tile-players {
+  font-weight: 400;
+  border-radius: 0;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--color-trail-cream);
+  background: rgba(27, 18, 10, 0.7);
+  border-color: rgba(255, 241, 208, 0.3);
+}
+
+.game-tile-play {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 28px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.game-tile-play::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.game-tile-play:focus-visible {
+  outline: none;
+}
+.game-tile[data-tone="festival"] .game-tile-play {
+  border-radius: 999px;
+  color: var(--color-home-ink);
+  background: var(--color-festival-gold);
+  box-shadow: 0 0 0 4px rgba(245, 185, 66, 0.22), 0 10px 30px rgba(245, 185, 66, 0.35);
+}
+.game-tile[data-tone="festival"]:hover .game-tile-play {
+  filter: brightness(1.06);
+}
+.game-tile[data-tone="trail"] .game-tile-play {
+  margin-left: 4px;
+  font-weight: 400;
+  font-size: 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-tile,
+  .game-tile-art {
+    transition: none;
+  }
+  .game-tile:hover {
+    transform: none;
+  }
+}
+
+/*
+ * Expedition's HTML screens. Pixel-art frames are box-shadows: four
+ * offset copies of the box draw a 4px outline whose corners stay open,
+ * the notched corner of a pixel-art panel, and inset bands draw the lit
+ * top edge and the shaded bottom edge.
+ */
+.trail-type {
+  font-family: var(--font-pixel), ui-monospace, monospace;
+  color: var(--color-trail-cream);
+  color-scheme: light;
+}
+
+.trail-backdrop {
+  background-color: var(--color-trail-ink);
+  background-image:
+    linear-gradient(90deg, rgba(27, 18, 10, 0.78) 0%, rgba(27, 18, 10, 0.5) 34%, rgba(27, 18, 10, 0) 62%),
+    url("/expedition/title/bg-title-trail.png");
+  background-size: cover;
+  background-position: center;
+  image-rendering: pixelated;
+}
+@media (max-width: 639px) {
+  .trail-backdrop {
+    background-image:
+      linear-gradient(180deg, rgba(27, 18, 10, 0.35) 0%, rgba(27, 18, 10, 0.75) 45%, rgba(27, 18, 10, 0.85) 100%),
+      url("/expedition/title/bg-title-trail.png");
+  }
+}
+
+.trail-camp-backdrop {
+  background-color: var(--color-trail-ink);
+  background-image:
+    radial-gradient(ellipse 70% 80% at 50% 45%, rgba(27, 18, 10, 0.2) 0%, rgba(27, 18, 10, 0.55) 70%, rgba(27, 18, 10, 0.8) 100%),
+    url("/expedition/title/bg-basecamp.png");
+  background-size: cover;
+  background-position: center bottom;
+  background-attachment: fixed;
+  image-rendering: pixelated;
+}
+
+.trail-back {
+  font-size: 16px;
+  color: var(--color-trail-cream);
+  text-shadow: 2px 2px 0 var(--color-trail-ink);
+}
+.trail-back:hover {
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+.trail-kicker {
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  color: var(--color-trail-ember-light);
+  text-shadow: 2px 2px 0 var(--color-trail-ink);
+}
+
+.trail-title {
+  font-size: clamp(56px, 7vw, 80px);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--color-trail-cream);
+  text-shadow: 4px 4px 0 var(--color-trail-ink), 0 0 32px rgba(232, 121, 46, 0.5);
+}
+
+.trail-lede {
+  font-size: 24px;
+  line-height: 1.2;
+  color: var(--color-trail-cream);
+  text-shadow: 2px 2px 0 var(--color-trail-ink);
+}
+
+.trail-wood {
+  position: relative;
+  margin: 4px;
+  padding: 14px;
+  background-color: var(--color-trail-wood);
+  background-image: repeating-linear-gradient(180deg, rgba(27, 18, 10, 0) 0 18px, rgba(27, 18, 10, 0.3) 18px 20px);
+  box-shadow:
+    inset 0 4px 0 0 var(--color-trail-wood-light),
+    inset 0 -4px 0 0 var(--color-trail-wood-dark),
+    0 -4px 0 0 var(--color-trail-ink),
+    0 4px 0 0 var(--color-trail-ink),
+    -4px 0 0 0 var(--color-trail-ink),
+    4px 0 0 0 var(--color-trail-ink),
+    8px 12px 0 0 rgba(0, 0, 0, 0.35);
+}
+.trail-wood::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--color-trail-brass), var(--color-trail-brass)) left top / 4px 4px no-repeat,
+    linear-gradient(var(--color-trail-brass), var(--color-trail-brass)) right top / 4px 4px no-repeat,
+    linear-gradient(var(--color-trail-brass), var(--color-trail-brass)) left bottom / 4px 4px no-repeat,
+    linear-gradient(var(--color-trail-brass), var(--color-trail-brass)) right bottom / 4px 4px no-repeat;
+}
+
+.trail-parchment {
+  margin: 4px;
+  padding: 20px;
+  color: var(--color-trail-text);
+  background-color: var(--color-trail-parchment);
+  box-shadow:
+    inset 0 -4px 0 0 var(--color-trail-parchment-shade),
+    0 -4px 0 0 var(--color-trail-ink),
+    0 4px 0 0 var(--color-trail-ink),
+    -4px 0 0 0 var(--color-trail-ink),
+    4px 0 0 0 var(--color-trail-ink);
+}
+
+.trail-label {
+  font-size: 16px;
+  color: var(--color-trail-text);
+}
+
+.trail-muted {
+  color: var(--color-trail-text-muted);
+}
+
+.trail-input {
+  margin: 4px;
+  padding: 10px 12px;
+  font-size: 24px;
+  color: var(--color-trail-text);
+  background-color: var(--color-trail-parchment-light);
+  border-radius: 0;
+  box-shadow:
+    inset 0 4px 0 0 var(--color-trail-parchment-shade),
+    0 -4px 0 0 var(--color-trail-ink),
+    0 4px 0 0 var(--color-trail-ink),
+    -4px 0 0 0 var(--color-trail-ink),
+    4px 0 0 0 var(--color-trail-ink);
+}
+.trail-input:focus {
+  outline: none;
+  box-shadow:
+    inset 0 4px 0 0 var(--color-trail-parchment-shade),
+    0 -4px 0 0 var(--color-trail-ember-dark),
+    0 4px 0 0 var(--color-trail-ember-dark),
+    -4px 0 0 0 var(--color-trail-ember-dark),
+    4px 0 0 0 var(--color-trail-ember-dark);
+}
+
+.trail-error {
+  font-size: 16px;
+  color: var(--color-trail-error);
+}
+
+.trail-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 4px;
+  min-height: 52px;
+  padding: 10px 22px 14px;
+  font-family: var(--font-pixel), ui-monospace, monospace;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--color-trail-ink);
+  background-color: var(--color-trail-ember);
+  border: 0;
+  border-radius: 0;
+  box-shadow:
+    inset 0 4px 0 0 var(--color-trail-ember-light),
+    inset 0 -6px 0 0 var(--color-trail-ember-dark),
+    0 -4px 0 0 var(--color-trail-ink),
+    0 4px 0 0 var(--color-trail-ink),
+    -4px 0 0 0 var(--color-trail-ink),
+    4px 0 0 0 var(--color-trail-ink);
+}
+.trail-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.trail-button:active:not(:disabled) {
+  padding: 14px 22px 10px;
+  box-shadow:
+    inset 0 6px 0 0 var(--color-trail-ember-dark),
+    0 -4px 0 0 var(--color-trail-ink),
+    0 4px 0 0 var(--color-trail-ink),
+    -4px 0 0 0 var(--color-trail-ink),
+    4px 0 0 0 var(--color-trail-ink);
+}
+.trail-button:focus-visible {
+  outline: 3px solid var(--color-trail-cream);
+  outline-offset: 7px;
+}
+.trail-button:disabled {
+  color: var(--color-trail-text-muted);
+  background-color: var(--color-trail-stone);
+  box-shadow:
+    inset 0 -6px 0 0 var(--color-trail-wood-dark),
+    0 -4px 0 0 var(--color-trail-ink),
+    0 4px 0 0 var(--color-trail-ink),
+    -4px 0 0 0 var(--color-trail-ink),
+    4px 0 0 0 var(--color-trail-ink);
+}
+.trail-button-quiet {
+  font-size: 16px;
+  min-height: 44px;
+  background-color: var(--color-trail-parchment-light);
+  box-shadow:
+    inset 0 -4px 0 0 var(--color-trail-parchment-shade),
+    0 -4px 0 0 var(--color-trail-ink),
+    0 4px 0 0 var(--color-trail-ink),
+    -4px 0 0 0 var(--color-trail-ink),
+    4px 0 0 0 var(--color-trail-ink);
+}
+
+/* Expedition room lobby (`components/expedition/ExpeditionLobby.tsx`). */
+.trail-title-sm {
+  font-size: clamp(48px, 5vw, 64px);
+}
+
+/* The code is read aloud, so it keeps the room code's mono face. */
+.trail-code {
+  padding: 6px 14px 8px;
+  margin: 4px;
+  font-family: var(--font-mono);
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0.14em;
+  color: var(--color-trail-cream);
+  background-color: var(--color-trail-wood-dark);
+  box-shadow:
+    inset 0 -4px 0 0 var(--color-trail-ink),
+    0 -4px 0 0 var(--color-trail-ink),
+    0 4px 0 0 var(--color-trail-ink),
+    -4px 0 0 0 var(--color-trail-ink),
+    4px 0 0 0 var(--color-trail-ink);
+}
+
+.trail-seat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 12px 8px;
+  font-size: 16px;
+  color: var(--color-trail-text);
+  background-color: var(--color-trail-parchment-light);
+  box-shadow: inset 0 -4px 0 0 var(--color-trail-parchment-shade);
+}
+.trail-seat-self {
+  box-shadow:
+    inset 0 -4px 0 0 var(--color-trail-parchment-shade),
+    inset 0 0 0 4px var(--color-trail-ember);
+}
+.trail-seat-open {
+  justify-content: center;
+  color: var(--color-trail-text-muted);
+  background-color: transparent;
+  box-shadow: none;
+  border: 2px dashed var(--color-trail-parchment-shade);
+}
+
+.trail-seat-hat {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  background: url("/expedition/sprites/fireside/crew-token.png") center / 32px 32px no-repeat;
+  image-rendering: pixelated;
+}
+
+.trail-badge {
+  padding: 2px 8px 4px;
+  font-size: 16px;
+  color: var(--color-trail-cream);
+  background-color: var(--color-trail-wood);
+  box-shadow: inset 0 -2px 0 0 var(--color-trail-wood-dark);
+}
+
+.trail-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  color: var(--color-trail-text-muted);
+}
+.trail-status::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background-color: var(--color-trail-moss);
+}
+.trail-status[data-connected="false"]::before {
+  background-color: var(--color-trail-stone);
+}
+
+/* The red panda from camp, sitting on the lobby panel's top edge. */
+.trail-panda {
+  flex: none;
+  margin-bottom: -6px;
+  width: 96px;
+  height: 96px;
+  background: url("/expedition/sprites/camp/mascot-panda.png") 0 0 / 384px 96px no-repeat;
+  image-rendering: pixelated;
+  animation: trail-panda 1s steps(4) infinite;
+}
+@keyframes trail-panda {
+  to {
+    background-position: -384px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trail-panda {
+    animation: none;
+  }
 }

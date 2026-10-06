@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { CreateRoomRequestSchema } from "@games/schema";
+import { CreateRoomRequestSchema, GameIdSchema } from "@games/schema";
 import { mintRoomCode } from "../../../lib/room-code";
 import { pendingRoomCookieName } from "../../../lib/pending-room-cookie";
 import { readCreateRoomForm } from "../../../lib/create-room-form";
+import { startPath } from "../../../lib/start-path";
 
 // Node runtime, explicit rather than relying on the default — this route
 // only mints a string and never touches Durable Object state (see
@@ -21,7 +22,11 @@ function handleFormPost(request: Request, formData: FormData) {
   const parsed = CreateRoomRequestSchema.safeParse(readCreateRoomForm(formData));
 
   if (!parsed.success) {
-    return NextResponse.redirect(new URL("/?error=create", request.url), 303);
+    // Back to the start page the form was on, which shows the error; a
+    // post naming no known game goes home.
+    const game = GameIdSchema.safeParse(formData.get("gameId"));
+    const back = game.success ? `${startPath(game.data)}?error=create` : "/";
+    return NextResponse.redirect(new URL(back, request.url), 303);
   }
 
   const code = mintRoomCode();
@@ -67,7 +72,7 @@ export async function POST(request: Request) {
     try {
       formData = await request.formData();
     } catch {
-      return NextResponse.redirect(new URL("/?error=create", request.url), 303);
+      return NextResponse.redirect(new URL("/", request.url), 303);
     }
     return handleFormPost(request, formData);
   }

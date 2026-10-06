@@ -2,15 +2,17 @@ import type { ComponentType } from "react";
 import type { GameId, RoomView } from "@games/schema";
 import { HanabiBoard, type HanabiActionRequest } from "./hanabi/HanabiBoard";
 import { HanabiLobbySettings } from "./hanabi/HanabiLobbySettings";
-import { HanabiCreateSettings } from "./hanabi/HanabiCreateSettings";
 import { ExpeditionBoard } from "./expedition/ExpeditionBoard";
+import { ExpeditionLobby } from "./expedition/ExpeditionLobby";
+import type { LobbyProps } from "./Lobby";
 
 /**
  * D-11: the ONLY web module permitted to name a specific game's UI
  * components. `RoomClient.tsx` picks a board from `BOARD_COMPONENTS` and
  * `Lobby.tsx` picks a settings fieldset from `LOBBY_SETTINGS`, both keyed by
  * `gameId` — neither file branches on a game name itself. Phase 11/12 add
- * Expedition's board/settings entries here, and nowhere else.
+ * Expedition's board/settings entries here, and nowhere else. The home page
+ * and the start pages pick theirs from `game-catalog.ts`.
  */
 
 export interface BoardProps {
@@ -46,28 +48,9 @@ export const LOBBY_SETTINGS: Readonly<Partial<Record<GameId, ComponentType<Lobby
   hanabi: HanabiLobbySettings,
 };
 
-// D-12: the landing page's game picker options. Expedition is registered as
-// of Phase 11 (GameIdSchema/GAME_REGISTRY both hold it); Phase 12 enables the
-// option here now that the camp board is playable (SCENE-01). Client-side
-// only — this list (unlike BOARD_COMPONENTS/LOBBY_SETTINGS) is not keyed by
-// GameId and is not required to be exhaustive over it.
-export const LANDING_GAME_OPTIONS: readonly { value: string; label: string; disabled: boolean }[] = [
-  { value: "hanabi", label: "Hanabi", disabled: false },
-  { value: "expedition", label: "Expedition", disabled: false },
-];
-
-/** `name` is the form-field name the game's config controls must use
- * (`configFieldName(gameId)`, namespaced per game). Every panel is submitted
- * even while hidden, so a shared name would let one game's controls leak
- * into another game's request (WR-02). */
-export interface CreateSettingsProps {
-  name: string;
-}
-
-// Partial: a game with no create-time settings (the test-only toy game,
-// Expedition today) renders no fieldset at all, not an empty one.
-export const LANDING_SETTINGS: Readonly<Partial<Record<GameId, ComponentType<CreateSettingsProps>>>> = {
-  hanabi: HanabiCreateSettings,
+// A game with its own lobby look; any other game gets the shared `Lobby`.
+export const LOBBY_COMPONENTS: Readonly<Partial<Record<GameId, ComponentType<LobbyProps>>>> = {
+  expedition: ExpeditionLobby,
 };
 
 export type { HanabiActionRequest };

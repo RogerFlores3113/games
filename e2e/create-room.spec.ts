@@ -53,33 +53,46 @@ test.describe("create room (ROOM-01)", () => {
   });
 });
 
-test.describe("landing page game picker (D-12, D-17)", () => {
-  test("title reads 'Board games', Expedition is enabled, Create room is visible before any game is chosen, and the variant fieldset only shows once Hanabi is chosen", async ({
-    page,
-  }) => {
+test.describe("home page game picker", () => {
+  test("shows a tile per game, each with Play now to that game's start page", async ({ page }) => {
     await page.goto("/");
 
     await expect(page).toHaveTitle("Board games");
-    await expect(page.getByRole("heading", { name: "Board games" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Board games" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2 })).toHaveText(["Hanabi", "Expedition"]);
 
-    const expeditionOption = page.locator('option[value="expedition"]');
-    await expect(expeditionOption).toBeEnabled();
-    await expect(expeditionOption).toHaveText("Expedition");
-    await expect(page.locator('option[value="innovation"]')).toHaveCount(0);
+    const hanabi = page.getByTestId("game-tile-hanabi");
+    const expedition = page.getByTestId("game-tile-expedition");
+    await expect(hanabi.getByRole("link", { name: "Play now" })).toHaveAttribute("href", "/hanabi/start");
+    await expect(expedition.getByRole("link", { name: "Play now" })).toHaveAttribute("href", "/expedition/start");
 
-    // UI-SPEC note 3: "Create room"'s visibility is independent of the
-    // selected game — it is visible and enabled BEFORE any game is picked.
-    const createButton = page.getByRole("button", { name: "Create room" });
-    await expect(createButton).toBeVisible();
-    await expect(createButton).toBeEnabled();
+    await hanabi.getByRole("link", { name: "Play now" }).click();
+    await page.waitForURL(/\/hanabi\/start$/);
+    await expect(page.getByRole("heading", { name: "Hanabi" })).toBeVisible();
+    await expect(page.getByRole("radio", { name: "Base" })).toBeChecked();
+    await expect(page.getByRole("button", { name: "Create room" })).toBeEnabled();
+    await expect(page.getByLabel("Game")).toHaveCount(0);
+  });
 
-    // Only the per-game settings fieldset is gated on the selection.
-    await expect(page.getByRole("radio", { name: "Base" })).toHaveCount(0);
+  test("the tiles stack to one column at phone width with no sideways scroll", async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    await page.goto("/");
+    const hanabi = (await page.getByTestId("game-tile-hanabi").boundingBox())!;
+    const expedition = (await page.getByTestId("game-tile-expedition").boundingBox())!;
+    expect(expedition.y).toBeGreaterThanOrEqual(hanabi.y + hanabi.height);
+    expect(expedition.x).toBe(hanabi.x);
+    const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    await context.close();
+  });
 
-    await page.getByLabel("Game").selectOption("hanabi");
-
-    await expect(page.getByRole("radio", { name: "Base" })).toBeVisible();
-    await expect(createButton).toBeVisible();
+  test("an unknown game's start page is a 404", async ({ page }) => {
+    const response = await page.goto("/innovation/start");
+    expect(response?.status()).toBe(404);
   });
 
   test("a room can be created after choosing Hanabi", async ({ page }) => {
@@ -97,8 +110,7 @@ test.describe("Create room works before hydration (D-17)", () => {
     // works from a pure server-rendered page via its native POST fallback.
     await page.route("**/_next/static/**", (route) => route.abort());
 
-    await page.goto("/");
-    await page.getByLabel("Game").selectOption("hanabi");
+    await page.goto("/hanabi/start");
     await expect(page.getByRole("radio", { name: "Rainbow" })).toBeVisible();
     await page.getByRole("radio", { name: "Rainbow" }).check();
     await page.getByLabel("Your name").fill("Roger");

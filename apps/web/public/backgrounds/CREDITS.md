@@ -127,3 +127,10 @@ photo with people looking at the camera. No readable text, no watermark, no peop
 - Modifications: re-encoded from PNG (800x600) to WebP quality 85
 - Purpose: dark walnut grain tiled across the board surface, replacing the CSS-generated texture the owner rejected and the lighter walnut photo in wood-board.webp
 - Note: if this repository is ever made public, replace this with a file whose license is recorded, or have the owner supply the source and license so this entry can be completed.
+
+## hanabi-fireworks-pixel.png
+
+PixelLab generation (job 67ea7190-520f-4867-98bf-9473e8b37280) used under the PixelLab Terms of
+Service (https://pixellab.ai/termsofservice). Prompt: "night sky over a quiet town with colourful
+fireworks bursting ..." at 320x180, scaled 2x nearest-neighbour. Added 2026-10-05 for the home page
+game picker.

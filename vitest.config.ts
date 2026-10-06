@@ -80,6 +80,10 @@ export default defineConfig({
           root: "apps/web",
           include: ["**/*.test.ts", "**/*.test.tsx"],
           exclude: ["**/node_modules/**", "**/.next/**"],
+          // Font loaders only run inside Next; see apps/web/test/next-font-google-shim.ts.
+          alias: {
+            "next/font/google": alias("./apps/web/test/next-font-google-shim.ts"),
+          },
         },
         // apps/web's tsconfig sets `jsx: "preserve"` for Next; tests that
         // import components (own-hand-render.test.ts) need JSX compiled.

@@ -14,15 +14,10 @@ export interface CreateRoomOptions {
  * `page` ends up seated as host in the lobby.
  */
 export async function createRoom(page: Page, { name, variant = "base" }: CreateRoomOptions): Promise<string> {
-  await page.goto("/");
-  // D-17 (plan 08-09): "Create room" now works before hydration — the form
-  // submits natively to POST /api/room, with a fetch-based JS handler
-  // layered on top once React attaches. `toBeEnabled()` below is now
-  // trivially true (the button is never disabled while a game is picked);
-  // it stays as a smoke check, not a hydration wait. The variant fieldset
-  // is CSS-driven (`:has()`), visible as soon as Hanabi is chosen, with or
-  // without JS.
-  await page.getByLabel("Game").selectOption("hanabi");
+  // D-17: the start page's form posts natively to /api/room before
+  // hydration, with a fetch-based handler layered on once React attaches,
+  // so `toBeEnabled()` is a smoke check, not a hydration wait.
+  await page.goto("/hanabi/start");
   const createButton = page.getByRole("button", { name: "Create room" });
   await expect(createButton).toBeEnabled();
   await page.getByLabel("Your name").fill(name);

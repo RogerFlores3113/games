@@ -7,8 +7,8 @@ import { startTwoPlayerGame } from "./helpers";
 // test and the two pages read from).
 
 test.describe("photo credit (CC BY attribution)", () => {
-  test("landing page shows the Settlers of Catan credit with correct links", async ({ page }) => {
-    await page.goto("/");
+  test("the Hanabi start page shows the Settlers of Catan credit with correct links", async ({ page }) => {
+    await page.goto("/hanabi/start");
 
     const credit = page.getByTestId("photo-credit");
     await expect(credit).toBeVisible();

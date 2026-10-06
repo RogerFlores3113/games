@@ -1,0 +1,12 @@
+{
+  "id": "title-trail",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "side view title backdrop of a jungle exp…",
+    "width": 320,
+    "height": 180
+  },
+  "scale": 2,
+  "gallery": "8af56d45-9cbe-58a7-9394-0945aa5643b6",
+  "file": "title/bg-title-trail.png"
+}

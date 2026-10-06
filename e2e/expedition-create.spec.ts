@@ -63,12 +63,28 @@ test.describe("Expedition room creation (SCENE-01, D-17/WR-06)", () => {
 
     expect(response.status()).toBe(303);
     const location = response.headers()["location"]!;
-    expect(location).toContain("error=create");
+    expect(new URL(location, "http://x").pathname + new URL(location, "http://x").search).toBe("/expedition/start?error=create");
   });
 
-  test("choosing Expedition on the landing page creates a seated Expedition lobby", async ({ page }) => {
+  test("a bounced native post shows the error on the Expedition start page", async ({ page }) => {
+    await page.goto("/expedition/start?error=create");
+    await expect(page.getByText("Couldn't create a room — check your name and try again.")).toBeVisible();
+  });
+
+  test("the Expedition start page's form works before hydration (D-17)", async ({ page }) => {
+    await page.route("**/_next/static/**", (route) => route.abort());
+    await page.goto("/expedition/start");
+    await page.getByLabel("Your name").fill("Roger");
+    await page.getByRole("button", { name: "Create room" }).click();
+    await page.waitForURL(/\/room\/[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/);
+    expect(new URL(page.url()).search).toBe("");
+  });
+
+  test("the Expedition start page creates a seated Expedition lobby", async ({ page }) => {
     await page.goto("/");
-    await page.getByLabel("Game").selectOption("expedition");
+    await page.getByTestId("game-tile-expedition").getByRole("link", { name: "Play now" }).click();
+    await page.waitForURL(/\/expedition\/start$/);
+    await expect(page.getByRole("heading", { name: "Expedition" })).toBeVisible();
 
     const createButton = page.getByRole("button", { name: "Create room" });
     await expect(createButton).toBeEnabled();
@@ -79,18 +95,27 @@ test.describe("Expedition room creation (SCENE-01, D-17/WR-06)", () => {
     const selfRow = page.getByTestId("seat-row").and(page.locator('[data-self="true"]'));
     await expect(selfRow).toBeVisible();
     await expect(selfRow).toContainText("Roger");
+    await expect(selfRow).toContainText("Host");
 
+    // The Expedition lobby, not the shared fireworks one.
+    await expect(page.getByText("Base camp")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Expedition" })).toBeVisible();
+    await expect(page.getByTestId("seat-count")).toHaveText("1 / 5");
+    await expect(page.getByRole("button", { name: "Copy link" })).toBeVisible();
+    await expect(page.getByTestId("start-game")).toBeDisabled();
     await expect(page.getByRole("radio", { name: "Base" })).toHaveCount(0);
   });
 });
 
 test.describe("Phaser bundle isolation (SCENE-01)", () => {
-  test("the landing page never loads the Phaser bundle", async ({ page }) => {
+  test("the home page and the Expedition start page never load the Phaser bundle", async ({ page }) => {
     test.setTimeout(90_000);
     const bodies: string[] = [];
     recordScriptBodies(page, bodies);
 
     await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    await page.goto("/expedition/start");
     await page.waitForLoadState("networkidle");
 
     expect(bodies.some((body) => body.includes(PHASER_SIGNATURE))).toBe(false);

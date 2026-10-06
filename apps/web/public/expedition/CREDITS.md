@@ -18,6 +18,7 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | leader-sun | sprites/camp/leader-sun.png | PixelLab generation, spec `prompts/leader-sun.json` | PixelLab ToS | 2026-10-02 |
 | icon-whisper | sprites/camp/icon-whisper.png | PixelLab generation, spec `prompts/icon-whisper.json` | PixelLab ToS | 2026-10-02 |
 | icon-tricks | sprites/camp/icon-tricks.png | Hand-drawn in code (`apps/web/art/expedition/draw-icon-tricks.mjs`) | Project original | 2026-10-02 |
+| marker-animal | sprites/fireside/marker-animal.png | Hand-drawn in code (`apps/web/art/expedition/draw-marker-animal.mjs`) | Project original | 2026-10-05 |
 | backpack-open | sprites/fireside/backpack-open.png | PixelLab generation, spec `prompts/backpack-open.json` | PixelLab ToS | 2026-10-02 |
 | mascot-panda | sprites/camp/mascot-panda.png | PixelLab generation (red panda object, v3 animation), spec `prompts/mascot-panda.json` | PixelLab ToS | 2026-10-02 |
 | mascot-cheer | sprites/camp/mascot-cheer.png | PixelLab generation (red panda object, v3 animation), spec `prompts/mascot-cheer.json` | PixelLab ToS | 2026-10-02 |
@@ -125,6 +126,9 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | cursor-grab | sprites/cursors/grab.png | PixelLab generation, spec `prompts/cursor-grab.json` | PixelLab ToS | 2026-10-04 |
 | cursor-grabbing | sprites/cursors/grabbing.png | PixelLab generation, spec `prompts/cursor-grabbing.json` | PixelLab ToS | 2026-10-04 |
 | cursor-not-allowed | sprites/cursors/not-allowed.png | PixelLab generation, spec `prompts/cursor-not-allowed.json` | PixelLab ToS | 2026-10-04 |
+| title-trail | title/bg-title-trail.png | PixelLab generation, spec `prompts/title-trail.json` | PixelLab ToS | 2026-10-05 |
+| title-basecamp | title/bg-basecamp.png | PixelLab generation, spec `prompts/title-basecamp.json` | PixelLab ToS | 2026-10-05 |
+| signboard | sprites/ui/signboard.png | PixelLab generation, spec `prompts/signboard.json` | PixelLab ToS | 2026-10-05 |
 
 ## Audio
 

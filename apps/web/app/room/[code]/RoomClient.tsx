@@ -23,7 +23,7 @@ import {
 import { RefusalCard, type RefusalCardReason } from "../../../components/RefusalCard";
 import { JoinForm } from "../../../components/JoinForm";
 import { Lobby } from "../../../components/Lobby";
-import { BOARD_COMPONENTS } from "../../../components/game-ui";
+import { BOARD_COMPONENTS, LOBBY_COMPONENTS } from "../../../components/game-ui";
 import { Button } from "../../../components/Button";
 import { DEV_PANEL_ENABLED } from "../../../lib/dev/dev-gate";
 
@@ -263,9 +263,10 @@ function ConnectedRoom({
   ) : null;
 
   if (view.status === "lobby") {
+    const GameLobby = LOBBY_COMPONENTS[view.gameId] ?? Lobby;
     return (
       <>
-        <Lobby
+        <GameLobby
           view={view}
           onSetConfig={(config: unknown) => send({ type: "set_config", config })}
           onStartGame={() => send({ type: "start_game" })}

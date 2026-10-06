@@ -32,9 +32,9 @@ describe("the dev tools' only entry points", () => {
   const devModule = /["'](?:\.\.?\/)+(?:components\/)?dev\/(?:DevPanel|PlaySoloButton)["']|["']\.\/dev-picks["']/;
   const outsideDevTools = sources.filter((file) => !file.startsWith(join("components", "dev")) && !file.endsWith("dev-picks.ts"));
 
-  it("are the room page, the landing form and the Phaser mount", () => {
+  it("are the room page, the Expedition start page and the Phaser mount", () => {
     const importers = outsideDevTools.filter((file) => devModule.test(readFileSync(join(root, file), "utf-8")));
-    expect(importers.sort()).toEqual([join("app", "LandingForm.tsx"), join("app", "room", "[code]", "RoomClient.tsx"), join("components", "expedition", "phaser", "ExpeditionPhaserMount.tsx")]);
+    expect(importers.sort()).toEqual([join("app", "room", "[code]", "RoomClient.tsx"), join("components", "expedition", "phaser", "ExpeditionPhaserMount.tsx"), join("components", "start", "ExpeditionStart.tsx")]);
   });
 
   it("import the dev tools only dynamically, behind DEV_PANEL_ENABLED", () => {

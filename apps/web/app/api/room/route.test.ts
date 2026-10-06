@@ -104,19 +104,19 @@ describe("POST /api/room — native form path (D-17)", () => {
     expect(decoded).toEqual({ gameId: "hanabi", displayName: "Roger", config: "rainbow" });
   });
 
-  it("303s to /?error=create with no Set-Cookie for a blank display name", async () => {
+  it("303s back to the game's start page with ?error=create and no Set-Cookie for a blank display name", async () => {
     const res = await POST(formRequest({ gameId: "hanabi", displayName: "   ", "config.hanabi": "base" }));
     expect(res.status).toBe(303);
     const location = new URL(res.headers.get("location")!);
-    expect(location.pathname + location.search).toBe("/?error=create");
+    expect(location.pathname + location.search).toBe("/hanabi/start?error=create");
     expect(res.headers.get("set-cookie")).toBeNull();
   });
 
-  it("303s to /?error=create for an unrecognized gameId", async () => {
+  it("303s home for an unrecognized gameId", async () => {
     const res = await POST(formRequest({ gameId: "innovation", displayName: "Roger", "config.innovation": "purple" }));
     expect(res.status).toBe(303);
     const location = new URL(res.headers.get("location")!);
-    expect(location.pathname + location.search).toBe("/?error=create");
+    expect(location.pathname + location.search).toBe("/");
     expect(res.headers.get("set-cookie")).toBeNull();
   });
 
@@ -143,10 +143,10 @@ describe("POST /api/room — native form path (D-17)", () => {
     });
   });
 
-  it("303s to /?error=create when only another game's config field is present (WR-02)", async () => {
+  it("303s back to the start page with ?error=create when only another game's config field is present (WR-02)", async () => {
     const res = await POST(formRequest({ gameId: "hanabi", displayName: "Roger", "config.other": "base" }));
     expect(res.status).toBe(303);
     const location = new URL(res.headers.get("location")!);
-    expect(location.pathname + location.search).toBe("/?error=create");
+    expect(location.pathname + location.search).toBe("/hanabi/start?error=create");
   });
 });

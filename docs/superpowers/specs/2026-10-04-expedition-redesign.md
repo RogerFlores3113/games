@@ -2291,3 +2291,39 @@ How each of the nine fits (for unit 13):
   that no scene draws in, positioned from the canvas at any zoom, one pill
   high; two or more dropped or returning teammates fold into one pill that
   opens the list.
+
+### Implementation notes (batch 5: home page, start pages, Expedition lobby)
+
+- `/` is the game picker. `GAME_CATALOG` (`apps/web/components/game-catalog.ts`, a
+  `Record<GameId, …>`, so a registered game with no tile is a compile error) holds each
+  game's name, tagline, player count, tile art, title font, tone, start screen and
+  create-time settings. The tiles are a CSS grid (`auto-fit`, 420px minimum), two side by
+  side on a laptop and one column on a phone; each tile's "Play now" link stretches over the
+  whole tile. Hanabi's name is Dela Gothic One in a gold-pink-sky gradient over the pixel
+  fireworks; Expedition's is Tiny5 over the trail art.
+- `/<gameId>/start` is one dynamic route (`app/[game]/start/page.tsx`); an unknown segment is
+  a 404. It is a Server Component that renders the catalog's `Start` component with the
+  game's settings fieldset as children, so the form and its settings are in the HTML and
+  post natively (D-17). The form carries `gameId` as a hidden field; the game dropdown and
+  its `:has()` CSS are gone (`LANDING_GAME_OPTIONS`, `LANDING_SETTINGS`, `LandingForm.tsx`
+  deleted). `/api/room` sends a bad native post back to `/<gameId>/start?error=create`, and
+  a post naming no known game to `/`.
+- Hanabi's start page (`ClassicStart`) is the old landing panel and photo, headed "Hanabi",
+  with an "All games" link. Expedition's (`ExpeditionStart`) is the trail-at-sunset art with
+  the title, a line of copy and the form on parchment in a wooden frame; "Play solo (dev)"
+  lives there now, and `PlaySoloButton` takes the classes to sit on it.
+- The pixel face is Tiny5, not Pixelify Sans: Pixelify draws a capital S and a 5 alike,
+  which made "3–5 players" read "3–S". Tiny5 matches the canvas's 5x7 lettering and keeps
+  them apart; its sizes are multiples of 8px so its pixels stay square. The room code keeps
+  the mono face, since it is read aloud.
+- The Expedition lobby (`components/expedition/ExpeditionLobby.tsx`) is picked through
+  `LOBBY_COMPONENTS` in `game-ui.tsx`; any game without an entry gets the shared `Lobby`,
+  which this batch does not touch. It keeps the shared lobby's test contract (`room-code`,
+  `seat-list`, `seat-count`, `start-game`, `seat-row` with `data-self`/`data-connected` on
+  real seats only, "Copy link"/"Copied!", Host, Connected/Disconnected), over the base camp
+  art, with the crew hat on each seat and the camp's red panda sitting on the panel.
+- Deviation: the title art lives at `public/expedition/title/`, not
+  `public/expedition/sprites/title/`. Everything under `sprites/` must be a registered Phaser
+  sprite (`art-registry.test.ts`), and these are HTML backdrops the canvas never loads.
+  Their prompt specs (`title-trail`, `title-basecamp` in `make-prompts.mjs`) record the
+  PixelLab gallery ids and the start of each prompt, as far as the gallery listing shows it.

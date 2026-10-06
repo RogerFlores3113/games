@@ -5,9 +5,8 @@ const VARIANTS: { value: string; label: string }[] = [
 ];
 
 /**
- * D-12/D-17: Hanabi's create-room variant fieldset, moved byte-for-byte out
- * of the landing form into a per-game lookup entry (`LANDING_SETTINGS` in
- * `game-ui.tsx`). Uncontrolled radios named by the `name` prop (the
+ * D-12/D-17: Hanabi's create-room variant fieldset, shown on its start page
+ * (`CreateSettings` in `game-catalog.ts`). Uncontrolled radios named by the `name` prop (the
  * per-game `config.hanabi` field, see `configFieldName`) — so the JS
  * enhancement reads its value via `FormData`, and the native form POST
  * (pre-hydration) carries it exactly the same way.

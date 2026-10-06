@@ -93,12 +93,17 @@ function stripComments(source: string): string {
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const SCAN_DIRS = ["app/room", "components", "lib"];
-// D-12/D-17 (plan 08-09): the landing page's two files, scanned for the same
-// gameId-branching/isHanabi bans as the room-page files above, plus a
-// landing-specific ban on `useHydrated` (the D-17 hydration gate this plan
-// removes) and a quoted "hanabi" literal (the per-game lookup must never
-// hardcode which game it's rendering).
-const LANDING_FILES = ["app/page.tsx", "app/LandingForm.tsx"];
+// The home page and the start pages, scanned for the same gameId-branching
+// bans as the room page, plus a ban on `useHydrated` (the D-17 hydration
+// gate) and a quoted "hanabi" literal: they render whatever
+// `GAME_CATALOG` lists, never a game they name themselves.
+const LANDING_FILES = [
+  "app/page.tsx",
+  "app/[game]/start/page.tsx",
+  "components/start/ClassicStart.tsx",
+  "components/start/ExpeditionStart.tsx",
+  "components/start/use-create-room.ts",
+];
 
 function listFiles(dir: string): string[] {
   const entries = readdirSync(dir);
@@ -143,7 +148,7 @@ describe("game-agnostic-source (D-11)", () => {
     expect(code).not.toContain("variant-picker");
   });
 
-  it("the landing page (page.tsx, LandingForm.tsx) has no isHanabi, gameId branching, useHydrated, or quoted \"hanabi\" literal", () => {
+  it("the home and start pages have no isHanabi, gameId branching, useHydrated, or quoted \"hanabi\" literal", () => {
     for (const file of LANDING_FILES) {
       const full = path.join(ROOT, file);
       const code = stripComments(readFileSync(full, "utf-8"));

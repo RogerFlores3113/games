@@ -65,7 +65,7 @@ async function toolbar(page: Page, id: string, fields: Record<string, string> = 
 test("one tab: play solo, skip to a Long run's disaster, mark an objective, set the boss off, and skip to the run's end", async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto("/");
+  await page.goto("/expedition/start");
   await page.getByLabel("Your name").fill("Roger");
   await page.getByTestId("play-solo-dev").click();
 
@@ -129,7 +129,7 @@ test("one tab: play solo, skip to a Long run's disaster, mark an objective, set 
 
 test("the toolbar starts folded where the stage fills the window and folds away to its DEV button, and a right-click on bare table offers nothing", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto("/");
+  await page.goto("/expedition/start");
   await page.getByTestId("play-solo-dev").click();
   await waitForBridge(page);
   await unfoldToolbar(page);
@@ -151,7 +151,7 @@ test("the toolbar starts folded where the stage fills the window and folds away 
 
 test("the HUD names the supplies and the purse on hover, and the camp label opens the map of the run", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto("/");
+  await page.goto("/expedition/start");
   await page.getByTestId("play-solo-dev").click();
   await waitForBridge(page);
   await unfoldToolbar(page);
