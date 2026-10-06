@@ -940,7 +940,8 @@ async function fiveSeats(browser: Browser, tour: Tour, size: { width: number; he
     await shortcut(panel, "jump-to-camp", { length: "long", camp: "2", stage: "camp" });
     await shortcut(panel, "set-plan-boss", { camp: "3", boss: "crocodile" });
     await shortcut(panel, "force-camp", { outcome: "cleared" });
-    await autoplay(panel, "everyone", 5);
+    // The shop and the draft before camp 3 come first; play on to the vote.
+    for (let step = 0; step < 10 && (await getModel<TrailView>(page)).panel?.kind !== "route"; step++) await autoplay(panel, "everyone", 1);
     await expect.poll(async () => (await getModel<TrailView>(page)).panel?.kind).toBe("route");
     await shot("five-route");
     await shortcut(panel, "jump-to-camp", { length: "long", camp: "3", stage: "camp" });
