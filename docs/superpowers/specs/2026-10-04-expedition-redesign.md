@@ -2839,3 +2839,31 @@ How each of the nine fits (for unit 13):
   the full Playwright suite (148 specs, the tour skipped without its flag);
   `TOUR_STRICT=1` tour at 1920x1080 and 1280x720 with 0 layout violations,
   twice. Screenshots in `tmp/units/F/`.
+
+### Review fixes (batch 6)
+
+- A kick under half-strength Rats (`rats.ts`: a slot off `seatIds.slice(0, 2)`)
+  moves the lost slot to whoever is now second, so `kickSeat` cuts every set
+  to its slots (`withinSlots`) when the stage it leaves is a loadout, as
+  `seatPresence` already did. Before, an absent seat over its slots was
+  refused `too_many_items` on every pass (a softlock at three seats), or a
+  readied seat was dealt into camp with an illegal kit.
+- The absent-seat pass at a loadout never asks for a ready the stage would
+  refuse: a set over its slots is first cut to its first items (`equip`),
+  or, when unequipping would push the backpack past its size, its last
+  equipped item is discarded. Tested in `stages/kick.test.ts`.
+- A boss line with no portrait (unrevealed, or no room on a route card)
+  marks the boss by its tier: the paw for an animal, the storm for a
+  disaster, the temple. `CampPreview.bossTier` carries the tier, which the
+  plan already makes public; the marker art lives in `stopArtId`
+  (`art-registry.ts`) beside the trail map's.
+- The first view after the socket drops shows at once, whether it lands
+  before or after `setReconnecting(false)` (the board's effects run the view
+  first), so a reconnect never signs history. The next move signs as usual.
+- The signboard holds the pointer until the next scene has faded all the
+  way in, not only while it hangs. The fade's frame logic is `fadeStep`
+  (`scene-transitions.ts`, tested). The test bridge's `input.held` reports
+  it, and e2e `clickObject` waits it out, since a click in the fade is now
+  swallowed like a player's (the tour's "New expedition" click landed in it).
+- `create-room-form.ts`'s comments name the per-game start pages and
+  `useCreateRoom`, not the removed landing form.
