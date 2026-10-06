@@ -194,8 +194,11 @@ export function interactableObjectId(id: string): string {
 }
 
 export const READY_ID = "ready";
-/** The item bar's backpack, which opens the inventory window. */
+/** The item bar's backpack, which opens the inventory window; in camp, the
+ * Pack Rat's backpack in the kit bar. */
 export const BACKPACK_ID = "backpack";
+/** The kit bar's header, which pops the bar out and back. */
+export const KIT_TOGGLE_ID = "kit-toggle";
 export const INVENTORY_CLOSE_ID = "inventory:close";
 /** The inventory window's discard patch, and the Discard and Keep of its confirm row. */
 export const DISCARD_ID = "inventory:discard";
@@ -206,8 +209,10 @@ export const INVENTORY_CANCEL_ID = "inventory:cancel";
 export const BOARD_ID = "board";
 export const TRAY_MORE_ID = "pick:more";
 export const SUPPLIES_ID = "supplies";
-/** The top bar's camp label, which opens the map of the run. */
+/** The top bar's camp label, which shows and hides the trail map in camp. */
 export const MAP_ID = "map";
+/** The trail map hung over the camp. */
+export const TRAIL_MAP_ID = "trail-map";
 export const WHISPER_ID = "whisper";
 export const CONFIRM_ID = "confirm";
 export const CANCEL_ID = "cancel";

@@ -11,7 +11,10 @@ import { ensurePixelFonts } from "../font/pixel-font";
 import { ensureCardTextures } from "../card-packs/card-textures";
 import { drawBackdrop, drawPrompt, drawTooltip, drawTopBar } from "../draw/draw-table";
 import { WeatherOverlay, drawModStrip } from "../draw/draw-weather";
-import { drawCrowdAndTable, drawPlates, drawYouAndKit } from "../draw/draw-seats";
+import { drawCrowdAndTable, drawPlates, drawYouPanel } from "../draw/draw-seats";
+import { drawKitBar, type KitBarHandlers } from "../draw/draw-kit-bar";
+import { InventoryWindow, type InventoryHandlers } from "../draw/inventory-window";
+import { drawTrailMap } from "../draw/draw-trail";
 import type { CampHandlers } from "../draw/camp-handlers";
 import { preloadArt } from "../art/place-art";
 import { drawBoardPick, drawDropTarget, drawHand, drawLastTrick, drawTrick } from "../draw/draw-hand-trick";
@@ -23,19 +26,22 @@ import { TEMPLE_PATH_ID } from "../../../../lib/expedition/temple-model";
 import { BossFx } from "../draw/draw-boss-fx";
 import { bossObjectId } from "../../../../lib/expedition/boss-model";
 import { INTERACTABLE_REGISTRY } from "../interactables/registry";
-import { CARD_H, CARD_W, HAND_CARD_Y, INTERACTABLE_ANCHORS, ZONES, handFanXs, pointInRect, type Point } from "../layout";
+import { CARD_H, CARD_W, HAND_CARD_Y, INTERACTABLE_ANCHORS, INVENTORY_WINDOW, ZONES, handFanXs, pointInRect, type Point } from "../layout";
 import { PALETTE, toPhaserColor } from "../palette";
 import { CURSOR } from "../cursors";
 import { cardTextureKey } from "../card-packs/card-pack-def";
 import { reduceDrag, type DragEffect, type DragEvent } from "../../../../lib/expedition/card-drag";
-import { interactableObjectId, LAST_TRICK_ID, mateSourceObjectId, modObjectId, sourceObjectId } from "../../../../lib/expedition/expedition-ids";
+import { interactableObjectId, LAST_TRICK_ID, mateSourceObjectId, modObjectId, sourceObjectId, TRAIL_MAP_ID } from "../../../../lib/expedition/expedition-ids";
 import { ObjectIndex } from "../object-index";
+import { playCue } from "../../../../lib/expedition/audio/cue-bus";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
 import {
   beginAbilityTargeting,
   beginWhisper,
   cancelTargeting,
   choiceFor,
+  confirmTargeting as confirmLocal,
+  currentStep,
   nextTrayPage,
   repickLast,
   selectTarget,
@@ -192,6 +198,28 @@ function buildHandlers(store: SceneDeps["store"], pointer: () => Point): CampHan
   return handlers;
 }
 
+/** The inventory window in camp opens only while a power is aimed at your
+ * items (Pack Animal's swap): a click picks, and the last pick uses it. */
+function inventoryHandlers(store: SceneDeps["store"]): InventoryHandlers {
+  const none = () => undefined;
+  return {
+    onEquip: none,
+    onDiscardAsk: none,
+    onDiscardConfirm: none,
+    onDiscardKeep: none,
+    onPick(uid) {
+      const state = store.getState();
+      const view = state.server?.game;
+      if (state.reconnecting || view === undefined || !(currentStep(state.localUi, view)?.choices.includes(`item:${uid}`) ?? false)) return;
+      state.updateLocalUi((ui, v) => selectTarget(ui, v, `item:${uid}`));
+      const after = store.getState();
+      if (confirmLocal(after.localUi, after.server!.game).request !== null) after.confirmTargeting();
+    },
+    onCancelAim: () => store.getState().updateLocalUi((ui) => cancelTargeting(ui)),
+    onClose: () => store.getState().updateLocalUi((ui) => cancelTargeting(ui)),
+  };
+}
+
 const GHOST_SCALE = 1.2;
 const GHOST_SHADOW = 3;
 const RETURN_MS = 140;
@@ -224,6 +252,10 @@ export class CampScene extends Phaser.Scene {
   private returnTween: Phaser.Tweens.Tween | null = null;
   private settleTimer: Phaser.Time.TimerEvent | null = null;
   private cursorHeld = false;
+  private inventory: InventoryWindow | null = null;
+  private kitHandlers!: KitBarHandlers;
+  /** The kit bar entry the tooltip names: its source and the object under the pointer. */
+  private kitHover: { sourceKey: string; objectId: string } | null = null;
 
   constructor(deps: SceneDeps) {
     super("camp");
@@ -241,6 +273,17 @@ export class CampScene extends Phaser.Scene {
     ensureCardTextures(this, state.cardPackId, glyphs);
     this.lastCardPackId = state.cardPackId;
     this.handlers = buildHandlers(this.sceneStore, () => this.pointerAt());
+    this.kitHandlers = {
+      onUse: (sourceKey) => {
+        this.sceneStore.getState().updateLocalUi((ui) => ({ ...ui, kitOpen: false }));
+        this.handlers.onSource(sourceKey);
+      },
+      onHover: (sourceKey, objectId) => {
+        this.kitHover = sourceKey === null || objectId === undefined ? null : { sourceKey, objectId };
+        this.handlers.onSourceHover(sourceKey);
+      },
+      onToggle: () => this.sceneStore.getState().updateLocalUi((ui) => ({ ...ui, kitOpen: !ui.kitOpen })),
+    };
 
     this.backdropLayer = this.add.container(0, 0);
     this.backdropLocation = null;
@@ -269,10 +312,15 @@ export class CampScene extends Phaser.Scene {
       if (pointer.rightButtonDown()) this.handlers.onCancel();
     });
     this.input.mouse?.disableContextMenu();
-    this.input.keyboard?.on("keydown-ESC", () => this.handlers.onCancel());
+    this.input.keyboard?.on("keydown-ESC", () => {
+      if (this.sceneStore.getState().localUi.mapOpen) this.toggleMap();
+      else this.handlers.onCancel();
+    });
     this.input.on("pointermove", () => this.onPointerMove());
     this.input.on("pointerup", () => this.onPointerRelease());
     this.input.on("pointerupoutside", () => this.onPointerRelease());
+
+    this.inventory = new InventoryWindow(this, this.index, "camp", inventoryHandlers(this.sceneStore), INVENTORY_WINDOW, ZONES.prompt.y + ZONES.prompt.h + 2);
 
     this.unsubscribe = this.sceneStore.subscribe((next, prev) => {
       if (next.model !== prev.model || next.cardPackId !== prev.cardPackId) {
@@ -291,6 +339,8 @@ export class CampScene extends Phaser.Scene {
       this.unsubscribe?.();
       this.unsubscribe = null;
       this.previousModel = null;
+      this.inventory?.destroy();
+      this.inventory = null;
       this.index.clearScene("camp");
     };
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, teardown);
@@ -336,19 +386,28 @@ export class CampScene extends Phaser.Scene {
     if (this.dynamicLayer === null || this.unsubscribe === null) return;
     this.renderSky(model);
     this.renderBoss(model);
+    this.bossLayer?.setVisible(model.trailMap === null);
     const chipsBefore = this.fx?.chipSpots(this.previousModel) ?? new Map();
     this.dynamicLayer.removeAll(true);
     drawCrowdAndTable(this, this.dynamicLayer, model, this.index, this.handlers);
     const span = drawTopBar(this, this.dynamicLayer, model.topBar, {
       index: this.index,
       sceneKey: "camp",
-      onMap: () => this.sceneStore.getState().openMap(),
+      onMap: () => this.toggleMap(),
       onSupplies: () => this.handlers.onPick("supplies", ""),
     });
     drawModStrip(this, this.dynamicLayer, model.mods, span, this.index, this.handlers);
     drawPrompt(this, this.dynamicLayer, model.prompt);
-    this.renderTable(model);
-    drawTooltip(this, this.dynamicLayer, model.tooltip, ZONES.tooltip);
+    // The backpack open for a swap stands alone over the table, so nothing
+    // under its veil takes a click.
+    const packOpen = model.inventory?.open ?? false;
+    if (!packOpen) {
+      this.renderTable(model);
+      drawKitBar(this, this.dynamicLayer, model.kitBar, ZONES.kit, 2, this.index, "camp", this.kitHandlers);
+      drawTooltip(this, this.dynamicLayer, model.tooltip, ZONES.tooltip);
+      if (model.trailMap !== null) this.index.register("camp", TRAIL_MAP_ID, drawTrailMap(this, this.dynamicLayer, model.trailMap));
+    }
+    this.inventory?.draw(this.dynamicLayer, model.inventory);
     this.fx?.afterDraw();
     this.fx?.play(model, this.previousModel, chipsBefore);
     this.previousModel = model;
@@ -357,21 +416,30 @@ export class CampScene extends Phaser.Scene {
   renderTable(model: SceneModel): void {
     if (this.dynamicLayer === null) return;
     const layer = this.dynamicLayer;
-    drawPlates(this, layer, model, this.index, this.handlers);
-    drawYouAndKit(this, layer, model, this.index, this.handlers);
+    // The trail map hangs over the plates and the whispers while it is shown.
+    const mapShown = model.trailMap !== null;
+    if (!mapShown) drawPlates(this, layer, model, this.index, this.handlers);
+    drawYouPanel(this, layer, model, this.index, this.handlers);
     drawHand(this, layer, model, this.index, this.handlers);
     drawDropTarget(this, layer, model);
     drawTrick(this, layer, model, this.index, this.handlers, this.previousModel, this.dropOrigin);
     if (this.sceneStore.getState().localUi.drag.phase === "idle") this.dropOrigin = null;
     drawLastTrick(this, layer, model, this.index, this.handlers);
-    drawWhispers(this, layer, model, this.index);
-    drawBossCaption(this, layer, model);
+    if (!mapShown) drawWhispers(this, layer, model, this.index);
+    if (!mapShown) drawBossCaption(this, layer, model);
     const before = this.previousModel?.temple;
     const pressedNow = model.temple !== null && before !== undefined && before !== null && before.key === model.temple.key && model.temple.pressed > before.pressed;
     drawTemplePath(this, layer, model, this.index, this.handlers, pressedNow);
     drawControls(this, layer, model, this.index, this.handlers);
     drawBoardPick(this, layer, model, this.index, this.handlers);
     drawTableOverlays(this, layer, model, this.index, this.handlers);
+  }
+
+  private toggleMap(): void {
+    const state = this.sceneStore.getState();
+    if (state.reconnecting) return;
+    playCue("sfx-ui-click");
+    state.updateLocalUi((ui) => ({ ...ui, mapOpen: !ui.mapOpen }));
   }
 
   private pointerAt(): Point {
@@ -514,7 +582,13 @@ export class CampScene extends Phaser.Scene {
       const card = campModel(this.sceneStore)?.hand.find((c) => c.id === ui.hoveredCardId);
       if (card === undefined || !over(card.objectId)) this.handlers.onCardHover(null);
     }
-    if (ui.tooltipSourceId !== null && !over(sourceObjectId(ui.tooltipSourceId))) this.handlers.onSourceHover(null);
+    if (ui.tooltipSourceId !== null) {
+      const hovered = this.kitHover?.sourceKey === ui.tooltipSourceId ? this.kitHover.objectId : sourceObjectId(ui.tooltipSourceId);
+      if (!over(hovered)) {
+        this.kitHover = null;
+        this.handlers.onSourceHover(null);
+      }
+    }
     if (ui.tooltipObjectiveId !== null) {
       const chip = findObjective(campModel(this.sceneStore), ui.tooltipObjectiveId);
       if (chip === null || !over(chip.objectId)) this.handlers.onObjectiveHover(null);

@@ -253,11 +253,10 @@ const LOCATIONS = {
   ), job: "82638f20-7863-4ed8-b98a-6312500ccbaa" },
 };
 
-/** Each location's card table, rising from the foot of the camp scene, and
- * the board your hand rests on in the same material: [location, job,
- * description] for the table, then the board. The Jungle's stump is the
- * style source; four tables are img2img from it at strength 80. Fetched at
- * scale 2 to tables/table-<id>.png and tables/board-<id>.png. */
+/** Each location's card table, rising from the foot of the camp scene:
+ * [location, job, description]. The Jungle's stump is the style source;
+ * four tables are img2img from it at strength 80. Fetched at scale 2 to
+ * tables/table-<id>.png. */
 const STUMP_JOB = "0fad0915-6d5e-4bb4-8ed4-981f2088ef60";
 const TABLES = [
   ["jungle", STUMP_JOB, "giant ancient jungle tree stump used as a card table, seen from slightly above, a wide flat sawn top with growth rings at the top of the image, thick gnarled bark trunk widening downward and running straight off the bottom edge of the image, moss and small glowing orange mushrooms on the bark, isolated object on plain background"],
@@ -283,22 +282,6 @@ const tableSpec = ([, job, description, fromStump = false, extra = {}]) => ({
   job,
   scale: 2,
   note: fromStump ? "208x112 like its init image; natively transparent" : "natively transparent",
-});
-const BOARDS = [
-  ["jungle", "246d56b7-abf5-4bee-bd61-2a1882d49d3c", "a long dark brown polished wooden plank board seen from above, a tray for holding playing cards, darker carved wooden rim around the edges, wood grain, isolated object on plain background"],
-  ["clifftop", "dc87d81a-ec3e-4f1a-8b5e-454f5f00b726", "a long flat dark grey slate stone tablet seen from above, a tray for holding playing cards, chiselled raised rim around the edges, smooth worn surface, isolated object on plain background"],
-  ["magma", "b17032cc-96bc-4e10-85f8-04b2b0b2394b", "a long flat black obsidian slab seen from above, a tray for holding playing cards, glossy glassy surface with a thin glowing orange edge, isolated object on plain background"],
-  ["clearing", "ac2a32fc-93b1-474b-acbd-f4e66991aeff", "a long woven reed mat seen from above, a tray for holding playing cards, light tan straw weave with a darker bound edge, isolated object on plain background"],
-  ["desert", "fe0633ab-25e6-4ee3-99fb-5e0d681d1ff3", "a long flat pale cream sandstone tablet seen from above, a tray for holding playing cards, darker reddish carved rim, fine sand texture, isolated object on plain background"],
-  ["cave", "eee09b6f-c95f-46ca-a5a8-d3f1221628e9", "a long flat wet dark blue stone ledge seen from above, a tray for holding playing cards, rough chipped rim with a few tiny glowing blue crystals, isolated object on plain background"],
-  ["temple", "8f2ba951-ebed-425f-aa69-cd77060a2f19", "a long carved grey temple stone tablet seen from above, a tray for holding playing cards, a thin inlaid gold border and small carved glyphs along the rim, isolated object on plain background"],
-];
-const boardSpec = ([, job, description]) => ({
-  tool: "create_image_pixflux",
-  params: { description, width: 212, height: 36, view: "high top-down", outline: "single color black outline", shading: "medium shading", no_background: true, seed: 3 },
-  job,
-  scale: 2,
-  note: "natively transparent",
 });
 
 /** The HUD coin and the glove cursors: one 1-direction object with seven
@@ -417,7 +400,6 @@ const specs = {
   "source-magician": MAGICIAN_ICON,
   ...LOCATIONS,
   ...Object.fromEntries(TABLES.map((table) => [`table-${table[0]}`, tableSpec(table)])),
-  ...Object.fromEntries(BOARDS.map((board) => [`board-${board[0]}`, boardSpec(board)])),
   ...Object.fromEntries(UI_ICONS.map(([id, item, frame, scale]) => [id, { ...UI_BATCH, item_description: item, batch_index: frame, scale }])),
   ...Object.fromEntries(BOSSES.map((boss) => [`boss-${boss[0]}`, bossSpec(boss)])),
   ...Object.fromEntries(CREW.map(([id, description, seed, job]) => [`crew-${id}`, crewSpec(description, seed, job, "alpha thresholded and grey halos stripped locally; drawn bottom-centred on a 64x80 canvas")])),

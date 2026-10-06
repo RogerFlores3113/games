@@ -49,9 +49,10 @@ type Drop = { kind: "move"; move: ItemMove } | { kind: "discard" };
 const LINE = LABEL_CELL.h + 1;
 const ICON_SCALE = 2;
 const TITLE = "Backpack";
-/** The veil starts under the trail map, which stays in view. */
-const VEIL_TOP = 110;
+/** Between camps the veil starts under the trail map, which stays in view. */
+const TRAIL_VEIL_TOP = 110;
 const INFO_HINT = "Point at an item to read it. Click one to move it between your backpack and your slots, or drag it.";
+const READ_HINT = "Point at an item to read it.";
 
 export class InventoryWindow {
   private model: Inventory | null = null;
@@ -71,6 +72,7 @@ export class InventoryWindow {
     private readonly sceneKey: SceneKey,
     private readonly handlers: InventoryHandlers,
     private readonly rect: Rect = INVENTORY_WINDOW,
+    private readonly veilTop: number = TRAIL_VEIL_TOP,
   ) {
     this.dragLayer = scene.add.container(0, 0).setDepth(1000);
     scene.input.on("pointermove", this.onPointerMove, this);
@@ -113,13 +115,13 @@ export class InventoryWindow {
     this.geo = geo;
     if (this.hoverUid !== null && this.itemOf(this.hoverUid) === null) this.hoverUid = null;
 
-    layer.add(this.scene.add.rectangle(0, VEIL_TOP, STAGE.w, STAGE.h - VEIL_TOP, toPhaserColor(PALETTE.letterbox), 0.6).setOrigin(0, 0));
+    layer.add(this.scene.add.rectangle(0, this.veilTop, STAGE.w, STAGE.h - this.veilTop, toPhaserColor(PALETTE.letterbox), 0.6).setOrigin(0, 0));
     layer.add(placeArt(this.scene, "leather-panel", this.rect.x + this.rect.w / 2, this.rect.y + this.rect.h / 2));
 
     this.drawHeader(layer, model, geo);
     model.backpack.forEach((cell, i) => this.drawCell(layer, cell, geo.pack[i]!, "pack", model));
     model.slots.forEach((cell, i) => this.drawCell(layer, cell, geo.slots[i]!, "slot", model));
-    this.drawDiscard(layer, model, geo);
+    if (model.discardable) this.drawDiscard(layer, model, geo);
 
     this.info = this.scene.add.container(0, 0);
     layer.add(this.info);
@@ -163,12 +165,17 @@ export class InventoryWindow {
       if (art !== null) box.add(placeArt(scene, art, rect.w / 2, rect.h / 2).setScale(ICON_SCALE));
       if (item.rare) box.add(scene.add.rectangle(2, 2, rect.w - 4, rect.h - 4, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.rain)));
       if (item.targetable) box.add(scene.add.rectangle(1, 1, rect.w - 2, rect.h - 2, 0, 0).setOrigin(0, 0).setStrokeStyle(2, toPhaserColor(PALETTE.turn)));
+      if (item.selected) {
+        box.add(scene.add.rectangle(1, 1, rect.w - 2, rect.h - 2, 0, 0).setOrigin(0, 0).setStrokeStyle(2, toPhaserColor(PALETTE.sun)));
+        box.add(plate(scene, 1, 1, LABEL_CELL.w + 3, LABEL_CELL.h + 2, PALETTE.sun));
+        box.add(text(scene, 3, 2, "✓", PALETTE.letterbox));
+      }
       if (item.tag !== null) {
         const w = labelWidth(item.tag) + 2;
         box.add(plate(scene, rect.w - w - 1, rect.h - LABEL_CELL.h - 2, w, LABEL_CELL.h + 1));
         box.add(text(scene, rect.w - w, rect.h - LABEL_CELL.h - 1, item.tag, PALETTE.coinShine));
       }
-      if (model.aiming !== null && !item.targetable) box.setAlpha(DIM_ALPHA);
+      if (model.aiming !== null && !item.targetable && !item.selected) box.setAlpha(DIM_ALPHA);
       const movable = model.aiming === null && !model.locked;
       const hit = scene.add.zone(0, 0, rect.w, rect.h).setOrigin(0, 0);
       hit.setInteractive(item.targetable ? { cursor: CURSOR.pointer } : movable ? { cursor: CURSOR.grab } : undefined);
@@ -223,7 +230,7 @@ export class InventoryWindow {
     const item = this.hoverUid === null ? null : this.itemOf(this.hoverUid);
     const lines: { text: string; color: string }[] =
       item === null
-        ? wrapWords(INFO_HINT, chars).map((line) => ({ text: line, color: PALETTE.textDim }))
+        ? wrapWords(this.model?.locked || this.model?.aiming != null ? READ_HINT : INFO_HINT, chars).map((line) => ({ text: line, color: PALETTE.textDim }))
         : [
             ...wrapWords(item.name, chars).map((line) => ({ text: line, color: PALETTE.sun })),
             { text: fitLabel(item.uses, chars), color: item.rare ? PALETTE.rain : PALETTE.textDim },
@@ -313,7 +320,7 @@ export class InventoryWindow {
     const slot = geo.slots.findIndex((rect) => pointInRect(rect, at));
     if (slot !== -1) return { drop: { kind: "move", move: { uid, to: { kind: "slot", index: slot } } }, rect: geo.slots[slot]! };
     if (pointInRect(geo.packArea, at)) return { drop: { kind: "move", move: { uid, to: { kind: "backpack" } } }, rect: geo.packArea };
-    if (pointInRect(geo.discard, at)) return { drop: { kind: "discard" }, rect: geo.discard };
+    if (this.model?.discardable && pointInRect(geo.discard, at)) return { drop: { kind: "discard" }, rect: geo.discard };
     return null;
   }
 
@@ -383,7 +390,7 @@ export class InventoryWindow {
   private onPointerDown(pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]): void {
     if (!this.isOpen || over.length > 0 || this.gesture !== null) return;
     const at = { x: Math.round(pointer.x), y: Math.round(pointer.y) };
-    if (at.y >= VEIL_TOP && !pointInRect(this.rect, at)) this.handlers.onClose();
+    if (at.y >= this.veilTop && !pointInRect(this.rect, at)) this.handlers.onClose();
   }
 
   private onEscape(): void {

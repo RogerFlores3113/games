@@ -530,7 +530,7 @@ describe("trick and lastTrick", () => {
 });
 
 describe("HUD: top bar", () => {
-  it("shows supplies against their cap, the purse, and the camp label that opens the map", () => {
+  it("shows supplies against their cap, the purse, and the camp label that shows the trail map", () => {
     const view = makeView({ campIndex: 2, supplies: { count: 2, max: 5 }, purse: 11 });
     expect(buildSceneModel(server(view), ui(), "big-index").topBar).toEqual({
       stores: true,
@@ -539,8 +539,24 @@ describe("HUD: top bar", () => {
       purse: 11,
       camp: "Camp 2 of 6",
       map: true,
+      mapOpen: false,
       suppliesPick: null,
     });
+  });
+
+  it("hangs the trail map over the camp while the camp label has it open, the camp being played marked here", () => {
+    const view = makeView({ campIndex: 2 });
+    expect(buildSceneModel(server(view), ui(), "big-index").trailMap).toBeNull();
+    const open = buildSceneModel(server(view), ui({ mapOpen: true }), "big-index");
+    expect(open.topBar.mapOpen).toBe(true);
+    expect(open.trailMap?.map((stop) => [stop.index, stop.state, stop.caption])).toEqual([
+      [1, "ahead", ""],
+      [2, "here", "here"],
+      [3, "ahead", ""],
+      [4, "ahead", ""],
+      [5, "ahead", ""],
+      [6, "ahead", ""],
+    ]);
   });
 
   it("names the focus camp as the model's campIndex", () => {
@@ -1278,7 +1294,7 @@ describe("the temple", () => {
     const skipOf = (m: typeof locked, seatId: string) => m.seats.find((s) => s.seatId === seatId)?.sources.find((c) => c.sourceKey === "temple");
     expect(skipOf(locked, "s2")).toMatchObject({ sourceId: "temple", objectId: "source:temple", name: "Skip", kind: "grant", charge: { full: "Not earned", short: "Not earned" }, usable: false, reason: "Win the Sun to earn it" });
     expect(skipOf(locked, "s1")).toMatchObject({ name: "Skip", charge: { full: "Not earned", short: "Not earned" }, usable: false });
-    expect(locked.tooltip).toEqual({ title: "Skip", text: "Drop one open objective.", badges: ["Between tricks or when an objective fails", "Crew token"], reason: "Win the Sun to earn it" });
+    expect(locked.tooltip).toEqual({ title: "Skip", text: "Drop one open objective.", badges: ["Between tricks or when an objective fails", "Not earned"], reason: "Win the Sun to earn it" });
 
     const earned = templeView({ token: [1, 1], abilities: [ability("temple", { kind: "objective", choices: ["objective:o2"] })] });
     const m = buildSceneModel(server(earned), ui(), "big-index");

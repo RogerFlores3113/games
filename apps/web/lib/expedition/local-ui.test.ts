@@ -165,6 +165,8 @@ describe("initialLocalUi", () => {
       inventoryOpen: null,
       discardUid: null,
       tooltipPreviewObjective: null,
+      kitOpen: false,
+      mapOpen: false,
     });
   });
 });

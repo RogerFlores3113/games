@@ -65,20 +65,16 @@ const LOCATION_ART = {
   "bg-temple": { file: "locations/bg-temple.png", w: 640, h: 360, fallback: { color: c(PALETTE.moss), label: "temple" } },
 } as const satisfies Readonly<Record<string, ArtDef>>;
 
-/** The locations with a card table and a hand board of their own under
- * tables/: the table rising from the foot of the camp scene (416x224) and
- * the board your hand rests on, in the same material (424x72). The temple
- * camp sets its altar at whatever location it stands in. */
+/** The locations with a card table of their own under tables/, rising
+ * from the foot of the camp scene (416x224). The temple camp sets its altar
+ * at whatever location it stands in. */
 export const TABLE_IDS = ["jungle", "clifftop", "magma", "clearing", "desert", "cave", "temple"] as const;
 export type TableId = (typeof TABLE_IDS)[number];
 
-type TableArtId = `table-${TableId}` | `board-${TableId}`;
+type TableArtId = `table-${TableId}`;
 
 const TABLE_ART = Object.fromEntries(
-  TABLE_IDS.flatMap((id) => [
-    [`table-${id}`, { file: `tables/table-${id}.png`, w: 416, h: 224, fallback: { color: c(PALETTE.stump), label: "" } }],
-    [`board-${id}`, { file: `tables/board-${id}.png`, w: 424, h: 72, fallback: { color: c(PALETTE.bark), label: "" } }],
-  ]),
+  TABLE_IDS.map((id) => [`table-${id}`, { file: `tables/table-${id}.png`, w: 416, h: 224, fallback: { color: c(PALETTE.stump), label: "" } }]),
 ) as Record<TableArtId, ArtDef>;
 
 /** The glove cursors, 32x32 under cursors/: CSS cursors, not drawn by a

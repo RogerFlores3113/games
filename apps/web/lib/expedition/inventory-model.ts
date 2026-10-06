@@ -1,7 +1,7 @@
 import type { ExpeditionItemView, ExpeditionView } from "@games/rules";
 import { BALANCE_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
 import { packCellObjectId, packObjectId, slotObjectId } from "./expedition-ids";
-import { choiceFor, currentStep, type LocalUiState } from "./local-ui";
+import { choiceFor, currentStep, isPicked, type LocalUiState } from "./local-ui";
 import { sourceName, usesLabel, yourSourceId } from "./source-text";
 
 /**
@@ -23,6 +23,8 @@ export interface InventoryItem {
   rare: boolean;
   /** A choice of the power you are aiming (a sale, a gift). */
   targetable: boolean;
+  /** Already picked by the power you are aiming (Pack Animal's item out). */
+  selected: boolean;
   /** What picking it gives you ("+2" for a sale). */
   tag: string | null;
 }
@@ -47,6 +49,8 @@ export interface Inventory {
   stored: number;
   /** Ready, or not between camps: nothing moves. */
   locked: boolean;
+  /** Between camps, where items can be discarded; in camp nothing is. */
+  discardable: boolean;
   /** What to pick while a power is aimed at one of your items; null otherwise. */
   aiming: string | null;
   /** The item waiting for "Discard for good?". */
@@ -75,6 +79,7 @@ function itemOf(view: ExpeditionView, ui: LocalUiState, item: ExpeditionItemView
     uses: usesLabel(item.itemId, item.remaining).full,
     rare: display?.item?.rarity === "rare",
     targetable,
+    selected: isPicked(ui, "item", item.uid),
     tag: targetable && selling && sellsFor !== undefined ? `+${sellsFor}` : null,
   };
 }
@@ -105,6 +110,7 @@ export function buildInventory(view: ExpeditionView, ui: LocalUiState): Inventor
     capacity,
     stored: stored.length,
     locked: !BETWEEN_CAMPS.has(view.stage.tag) || readied(view),
+    discardable: BETWEEN_CAMPS.has(view.stage.tag),
     aiming,
     discard: discarded === undefined ? null : { uid: discarded.uid, name: sourceName(discarded.itemId) },
   };

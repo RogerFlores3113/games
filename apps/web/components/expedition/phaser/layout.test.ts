@@ -48,7 +48,10 @@ import {
   tableArtAt,
   tableRowXs,
   tableSpan,
-  boardArtAt,
+  kitBarLayout,
+  SIGNBOARD,
+  signChars,
+  KIT_SLOT,
   trailStopXs,
   type Rect,
   type SeatSpot,
@@ -179,17 +182,25 @@ describe("KICK_POCKET", () => {
   });
 });
 
-describe("tables and boards", () => {
-  it.each(TABLE_IDS)("%s: the table rises from behind the board to its flat top where the cards land, and the board stands on the bottom edge", (id) => {
+describe("the signboard's lettering", () => {
+  it("keeps a full line clear of the plank's carved border by 16 px a side at every scale", () => {
+    for (const scale of [1, 2, 3]) {
+      expect(signChars(scale) * LABEL_CELL.w * scale + 2 * 16).toBeLessThanOrEqual(SIGNBOARD.face.w * SIGNBOARD.scale);
+    }
+    expect(signChars(3)).toBe(14);
+  });
+});
+
+describe("tables", () => {
+  it.each(TABLE_IDS)("%s: the table rises from behind your hand to its flat top where the cards land", (id) => {
     const span = tableSpan(id);
     expect(span.top).toBe(ZONES.table.y);
-    expect(span.foot).toBeGreaterThanOrEqual(span.boardTop + 2);
-    expect(boardArtAt(id).y + 72).toBeGreaterThanOrEqual(STAGE.h);
+    expect(span.foot).toBeGreaterThan(HAND_CARD_Y + CARD_H / 2);
     expect(tableArtAt(id).x).toBe(112);
   });
 
-  it.each(TABLE_IDS)("%s: your resting hand stands on the board, its front showing below the cards", (id) => {
-    expect(HAND_CARD_Y + CARD_H).toBeGreaterThanOrEqual(tableSpan(id).boardTop + 18);
+  it("rests your hand in its zone, clear of the stage's bottom edge", () => {
+    expect(HAND_CARD_Y - HOVER_LIFT - HAND_MARKER_H - 1).toBeGreaterThanOrEqual(ZONES.hand.y);
     expect(HAND_CARD_Y + CARD_H).toBeLessThanOrEqual(STAGE.h - 16);
   });
 });
@@ -239,14 +250,44 @@ describe("pointInRect (the drop test)", () => {
 });
 
 describe("itemBarLayout", () => {
-  it("keeps every slot, the backpack and the explorer's tiles inside the bar zone, none overlapping, for 1 to 3 slots", () => {
+  it("keeps every slot and the backpack inside the bar's plate and zone, none overlapping, for 1 to 3 slots", () => {
     for (const slots of [1, 2, 3]) {
       const bar = itemBarLayout(slots);
-      const parts = [...bar.slots, bar.backpack, ...bar.explorerTiles];
-      expect(parts.every((part) => rectContains(TRAIL_ZONES.backpack, part))).toBe(true);
+      const parts = [...bar.slots, bar.backpack];
+      expect(rectContains(TRAIL_ZONES.backpack, bar.plate)).toBe(true);
+      expect(parts.every((part) => rectContains(bar.plate, part))).toBe(true);
       for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) expect(rectsIntersect(parts[i]!, parts[j]!)).toBe(false);
       expect(bar.slots.map((s) => s.h)).toEqual(Array(slots).fill(slots === 3 ? 17 : 22));
     }
+  });
+});
+
+describe("kitBarLayout", () => {
+  const rows = (geo: ReturnType<typeof kitBarLayout>) => [...geo.items, ...geo.powers];
+  const disjoint = (rects: Rect[]) => rects.every((a, i) => rects.slice(i + 1).every((b) => !rectsIntersect(a, b)));
+
+  it("puts the camp's items and powers side by side inside the kit zone, the Pack Rat's backpack and four powers too", () => {
+    const geo = kitBarLayout(ZONES.kit, 2, 4, 4, false);
+    expect([geo.header, geo.leather, geo.stone!].every((r) => rectContains(ZONES.kit, r))).toBe(true);
+    expect(rows(geo).every((r) => r.w === KIT_SLOT && r.h === KIT_SLOT)).toBe(true);
+    expect(disjoint(rows(geo))).toBe(true);
+    expect(geo.items.every((r) => rectContains(geo.leather, r))).toBe(true);
+    expect(geo.powers.every((r) => rectContains(geo.stone!, r))).toBe(true);
+    expect(geo.stone!.x).toBeGreaterThan(geo.leather.x + geo.leather.w);
+  });
+
+  it("stacks the powers under the items between camps, inside the trail's kit zone, for the most a kit holds", () => {
+    const geo = kitBarLayout(TRAIL_ZONES.kit, 1, 3, 4, false);
+    expect([geo.header, geo.leather, geo.stone!].every((r) => rectContains(TRAIL_ZONES.kit, r))).toBe(true);
+    expect(geo.stone!.y).toBeGreaterThan(geo.leather.y + geo.leather.h);
+    expect(disjoint(rows(geo))).toBe(true);
+  });
+
+  it("widens each row to hold a name and what is left when popped out, keeping the rows apart", () => {
+    const geo = kitBarLayout(ZONES.kit, 2, 3, 3, true);
+    expect(rows(geo).every((r) => r.w > 10 * LABEL_CELL.w + KIT_SLOT)).toBe(true);
+    expect(disjoint(rows(geo))).toBe(true);
+    expect(geo.stone!.x + geo.stone!.w).toBeLessThanOrEqual(ZONES.table.x + 8);
   });
 });
 

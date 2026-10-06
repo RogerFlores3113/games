@@ -301,6 +301,33 @@ test.describe("the nine characters", () => {
     await clickUntilChanged<Trail>(page, mate.objectId, (m) => m.inventory!.equipped.length === 0);
   });
 
+  test("Pack Animal opens the Pack Rat's backpack once in camp, between tricks, to swap an item", async ({ page }) => {
+    test.setTimeout(180_000);
+    type Packed = CampModel & {
+      kitBar: { backpack: { usable: boolean } | null; items: ({ sourceKey: string } | null)[] } | null;
+      inventory: { open: boolean; aiming: string | null; slots: { item: { uid: string; objectId: string; selected: boolean; targetable: boolean } | null }[]; backpack: { objectId: string; item: { uid: string; targetable: boolean } | null }[] } | null;
+    };
+    const panel = await soloTable(page, 2);
+    const dealt = await crewAs(page, panel, "pack-rat", "pack-rat.pack-animal");
+    for (const item of ["bait", "parrot", "whetstone", "rope-ladder"]) await shortcut(panel, "give-item", { seat: dealt.youSeatId, item });
+    await autoplay(panel, "everyone", (await camp(page)).faceUpObjectives.length);
+    await closePanel(page);
+    await expect.poll(async () => (await getModel<Packed>(page)).kitBar?.backpack?.usable, { timeout: 15_000 }).toBe(true);
+
+    const aimed = await clickUntilChanged<Packed>(page, "backpack", (m) => m.inventory?.open === true);
+    expect(aimed.inventory!.slots.every((slot) => slot.item?.targetable)).toBe(true);
+    const out = aimed.inventory!.slots[0]!.item!;
+    const second = await clickUntilChanged<Packed>(page, out.objectId, (m) => m.inventory?.slots[0]?.item?.selected === true);
+    await capture(page, "pack-rat-pack-animal");
+    const into = second.inventory!.backpack.find((cell) => cell.item?.targetable)!;
+    // The last pick uses Pack Animal at once: the window shuts, and the swap arrives with the next view.
+    await clickUntilChanged<Packed>(page, into.objectId, (m) => m.inventory?.open === false);
+    await expect.poll(async () => (await getModel<Packed>(page)).kitBar!.items.map((entry) => entry?.sourceKey)).toContain(into.item!.uid);
+    const swapped = await getModel<Packed>(page);
+    expect(swapped.kitBar!.items.map((entry) => entry?.sourceKey)).not.toContain(out.uid);
+    expect(swapped.kitBar!.backpack!.usable).toBe(false);
+  });
+
   test("the Cartographer sees three routes, the third to another boss, and rerolls one for a supply", async ({ page }) => {
     test.setTimeout(180_000);
     const panel = await soloTable(page, 2);

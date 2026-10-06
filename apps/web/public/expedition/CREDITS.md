@@ -112,13 +112,6 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | table-desert | sprites/tables/table-desert.png | PixelLab generation, spec `prompts/table-desert.json` | PixelLab ToS | 2026-10-04 |
 | table-cave | sprites/tables/table-cave.png | PixelLab generation, spec `prompts/table-cave.json` | PixelLab ToS | 2026-10-04 |
 | table-temple | sprites/tables/table-temple.png | PixelLab generation, spec `prompts/table-temple.json` | PixelLab ToS | 2026-10-04 |
-| board-jungle | sprites/tables/board-jungle.png | PixelLab generation, spec `prompts/board-jungle.json` | PixelLab ToS | 2026-10-04 |
-| board-clifftop | sprites/tables/board-clifftop.png | PixelLab generation, spec `prompts/board-clifftop.json` | PixelLab ToS | 2026-10-04 |
-| board-magma | sprites/tables/board-magma.png | PixelLab generation, spec `prompts/board-magma.json` | PixelLab ToS | 2026-10-04 |
-| board-clearing | sprites/tables/board-clearing.png | PixelLab generation, spec `prompts/board-clearing.json` | PixelLab ToS | 2026-10-04 |
-| board-desert | sprites/tables/board-desert.png | PixelLab generation, spec `prompts/board-desert.json` | PixelLab ToS | 2026-10-04 |
-| board-cave | sprites/tables/board-cave.png | PixelLab generation, spec `prompts/board-cave.json` | PixelLab ToS | 2026-10-04 |
-| board-temple | sprites/tables/board-temple.png | PixelLab generation, spec `prompts/board-temple.json` | PixelLab ToS | 2026-10-04 |
 | coin | sprites/ui/coin.png | PixelLab generation, spec `prompts/coin.json` | PixelLab ToS | 2026-10-04 |
 | cursor-default | sprites/cursors/default.png | PixelLab generation, spec `prompts/cursor-default.json` | PixelLab ToS | 2026-10-04 |
 | cursor-pointer | sprites/cursors/pointer.png | PixelLab generation, spec `prompts/cursor-pointer.json` | PixelLab ToS | 2026-10-04 |

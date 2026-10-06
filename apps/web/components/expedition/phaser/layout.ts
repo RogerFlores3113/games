@@ -31,11 +31,18 @@ export const SIGNBOARD = {
   scale: 2,
   top: 30,
   face: { x: 22, y: 40, w: 148, h: 68 },
-  facePad: 8,
+  /** Stage px kept clear inside the face on each side: the carved border
+   * and the swing would crowd a line that ran to the face's edge. */
+  facePad: 16,
   /** The plank's four boards between their seams, inclusive rows: one line of lettering each. */
   boards: [[42, 56], [58, 72], [74, 87], [89, 104]],
   chain: { y: 11, h: 10, w: 10, xs: [27, 155] },
 } as const;
+
+/** Characters of the 5x7 font at `scale` that fit across the plank. */
+export function signChars(scale: number): number {
+  return Math.floor((SIGNBOARD.face.w * SIGNBOARD.scale - SIGNBOARD.facePad * 2) / (LABEL_CELL.w * scale));
+}
 
 export const SETTINGS_SAFE_ZONE: Rect = { x: 584, y: 0, w: 56, h: 56 };
 
@@ -61,7 +68,7 @@ export const ZONES = {
   you: { x: 8, y: 276, w: 108, h: 80 },
   /** The temple's plate path, along the foot of the altar above your hand. */
   path: { x: 120, y: 272, w: 400, h: 16 },
-  /** Your hand, standing on its board: the board's front shows below it. */
+  /** Your hand, in front of the table. */
   hand: { x: 120, y: 288, w: 400, h: 68 },
   actions: { x: 524, y: 276, w: 108, h: 80 },
 } as const satisfies Record<string, Rect>;
@@ -69,15 +76,17 @@ export const ZONES = {
 export type ZoneId = keyof typeof ZONES;
 
 /** The trail between camps: the draft, the event and the loadout. The trail
- * map stops short of the settings safe zone in the top-right corner. */
+ * map stops short of the settings safe zone in the top-right corner; your
+ * kit stands at the left edge under it. */
 export const TRAIL_ZONES = {
   topBar: { x: 0, y: 0, w: 576, h: 22 },
   prompt: { x: 96, y: 24, w: 448, h: 16 },
   trail: { x: 16, y: 44, w: 568, h: 64 },
-  panel: { x: 16, y: 112, w: 400, h: 144 },
+  kit: { x: 2, y: 112, w: 22, h: 244 },
+  panel: { x: 24, y: 112, w: 392, h: 144 },
   crew: { x: 424, y: 112, w: 200, h: 144 },
-  tooltip: { x: 16, y: 258, w: 608, h: 24 },
-  backpack: { x: 16, y: 284, w: 448, h: 72 },
+  tooltip: { x: 24, y: 258, w: 600, h: 24 },
+  backpack: { x: 24, y: 284, w: 440, h: 72 },
   ready: { x: 472, y: 284, w: 152, h: 72 },
 } as const satisfies Record<string, Rect>;
 
@@ -86,7 +95,8 @@ export const ROUTE_ZONES = {
   topBar: TRAIL_ZONES.topBar,
   prompt: TRAIL_ZONES.prompt,
   trail: TRAIL_ZONES.trail,
-  routes: { x: 16, y: 112, w: 608, h: 144 },
+  kit: TRAIL_ZONES.kit,
+  routes: { x: 24, y: 112, w: 600, h: 144 },
   tooltip: TRAIL_ZONES.tooltip,
   backpack: TRAIL_ZONES.backpack,
   ready: TRAIL_ZONES.ready,
@@ -98,6 +108,7 @@ export const DRAFT_ZONES = {
   topBar: TRAIL_ZONES.topBar,
   prompt: TRAIL_ZONES.prompt,
   trail: TRAIL_ZONES.trail,
+  kit: TRAIL_ZONES.kit,
   offer: ROUTE_ZONES.routes,
   tooltip: TRAIL_ZONES.tooltip,
   backpack: TRAIL_ZONES.backpack,
@@ -231,27 +242,24 @@ export function centreOf(r: Rect): Point {
 }
 
 // ---------------------------------------------------------------------------
-// The table, its board and the seats around it
+// The table and the seats around it
 // ---------------------------------------------------------------------------
 
 /** Where every table's flat top begins: each location's art is lifted so its
- * top starts here, and its foot runs down behind your board to the stage's
- * bottom edge. */
+ * top starts here, and its foot runs down behind your hand. */
 export const TABLE_TOP_Y = ZONES.table.y;
 const TABLE_ART_W = 416;
-const BOARD_ART_W = 424;
 
 /** Rows measured in each 2x art (stage px from its top): where the table's
- * flat top begins at its centre and where its foot ends, and where the
- * board's rim begins at its centre and where it ends. */
-const TABLE_ROWS: Readonly<Record<TableId, { top: number; foot: number; boardTop: number; boardFoot: number }>> = {
-  jungle: { top: 8, foot: 220, boardTop: 14, boardFoot: 60 },
-  clifftop: { top: 6, foot: 216, boardTop: 12, boardFoot: 64 },
-  magma: { top: 10, foot: 216, boardTop: 12, boardFoot: 64 },
-  clearing: { top: 28, foot: 208, boardTop: 16, boardFoot: 56 },
-  desert: { top: 14, foot: 208, boardTop: 14, boardFoot: 60 },
-  cave: { top: 8, foot: 216, boardTop: 12, boardFoot: 62 },
-  temple: { top: 24, foot: 200, boardTop: 18, boardFoot: 56 },
+ * flat top begins at its centre and where its foot ends. */
+const TABLE_ROWS: Readonly<Record<TableId, { top: number; foot: number }>> = {
+  jungle: { top: 8, foot: 220 },
+  clifftop: { top: 6, foot: 216 },
+  magma: { top: 10, foot: 216 },
+  clearing: { top: 28, foot: 208 },
+  desert: { top: 14, foot: 208 },
+  cave: { top: 8, foot: 216 },
+  temple: { top: 24, foot: 200 },
 };
 
 /** The top-left of a table's art, centred on the stage. */
@@ -259,16 +267,9 @@ export function tableArtAt(id: TableId): Point {
   return { x: (STAGE.w - TABLE_ART_W) / 2, y: TABLE_TOP_Y - TABLE_ROWS[id].top };
 }
 
-/** The top-left of a board's art: centred, its foot on the stage's bottom
- * edge, in front of the table's foot. */
-export function boardArtAt(id: TableId): Point {
-  return { x: (STAGE.w - BOARD_ART_W) / 2, y: STAGE.h - TABLE_ROWS[id].boardFoot };
-}
-
-/** The stage rows a table's art covers, and where its board's rim begins. */
-export function tableSpan(id: TableId): { top: number; foot: number; boardTop: number } {
-  const rows = TABLE_ROWS[id];
-  return { top: TABLE_TOP_Y, foot: tableArtAt(id).y + rows.foot, boardTop: boardArtAt(id).y + rows.boardTop };
+/** The stage rows a table's art covers. */
+export function tableSpan(id: TableId): { top: number; foot: number } {
+  return { top: TABLE_TOP_Y, foot: tableArtAt(id).y + TABLE_ROWS[id].foot };
 }
 
 export const SILHOUETTE_W = 64;
@@ -325,9 +326,9 @@ export function plateRect(spots: readonly SeatSpot[], i: number): Rect {
 // ---------------------------------------------------------------------------
 
 export const HOVER_LIFT = 8;
-/** Resting top edge of a hand card, on its board: low enough that the
- * lifted card's top (`HAND_CARD_Y - HOVER_LIFT`) and the targeting marker
- * above it stay in the hand zone. */
+/** Resting top edge of a hand card: low enough that the lifted card's top
+ * (`HAND_CARD_Y - HOVER_LIFT`) and the targeting marker above it stay in the
+ * hand zone. */
 export const HAND_CARD_Y = ZONES.hand.y + ZONES.hand.h - CARD_H - 16;
 export const HAND_MARKER_H = 2;
 
@@ -449,28 +450,24 @@ export function trailStopXs(count: number): number[] {
 }
 
 // ---------------------------------------------------------------------------
-// The item bar under the trail: your slots, the backpack, your explorer
+// The item bar under the trail: your slots and the backpack
 // ---------------------------------------------------------------------------
 
 const ITEM_BAR_HEADER_H = 13;
 const BAR_SLOT_W = 136;
 const BAR_SLOT_MAX_H = 22;
 const BAR_PACK_W = 56;
-const BAR_EXPLORER_COLS = 2;
-export const BAR_TILE_H = 20;
-const BAR_GAP = 3;
 
 export interface ItemBarLayout {
   slots: Rect[];
   /** The backpack button: its icon above its two lines of label. */
   backpack: Rect;
-  explorer: Rect;
-  /** Room for two rows of explorer tiles, two to a row. */
-  explorerTiles: Rect[];
+  /** The bar's plate, around the slots and the backpack. */
+  plate: Rect;
 }
 
-/** Where the item bar puts your slots, the backpack and the explorer's
- * tiles, in the trail's bar zone. */
+/** Where the item bar puts your slots and the backpack, in the trail's bar
+ * zone. */
 export function itemBarLayout(slotCount: number): ItemBarLayout {
   const zone = TRAIL_ZONES.backpack;
   const top = zone.y + ITEM_BAR_HEADER_H;
@@ -479,16 +476,56 @@ export function itemBarLayout(slotCount: number): ItemBarLayout {
   const slotH = Math.min(BAR_SLOT_MAX_H, Math.floor((h - (n - 1) * 2) / n));
   const slots = Array.from({ length: slotCount }, (_, i) => ({ x: zone.x + 4, y: top + i * (slotH + 2), w: BAR_SLOT_W, h: slotH }));
   const backpack = { x: zone.x + 4 + BAR_SLOT_W + 6, y: zone.y + 3, w: BAR_PACK_W, h: zone.h - 6 };
-  const ex = backpack.x + backpack.w + 6;
-  const explorer = { x: ex, y: zone.y + 3, w: zone.x + zone.w - 4 - ex, h: zone.h - 6 };
-  const tileW = Math.floor((explorer.w - BAR_GAP * (BAR_EXPLORER_COLS - 1)) / BAR_EXPLORER_COLS);
-  const explorerTiles = Array.from({ length: 2 * BAR_EXPLORER_COLS }, (_, i) => ({
-    x: ex + (i % BAR_EXPLORER_COLS) * (tileW + BAR_GAP),
-    y: top + Math.floor(i / BAR_EXPLORER_COLS) * (BAR_TILE_H + BAR_GAP),
-    w: tileW,
-    h: BAR_TILE_H,
-  }));
-  return { slots, backpack, explorer, explorerTiles };
+  return { slots, backpack, plate: { x: zone.x, y: zone.y, w: backpack.x + backpack.w + 4 - zone.x, h: zone.h } };
+}
+
+// ---------------------------------------------------------------------------
+// The kit bar: your item slots on leather, your powers on stone, at the left
+// ---------------------------------------------------------------------------
+
+/** An item slot or a power tile: a 16 px icon inside a 1 px rim. */
+export const KIT_SLOT = 18;
+const KIT_STEP = KIT_SLOT + 1;
+const KIT_PAD = 2;
+export const KIT_HEADER_H = 11;
+/** A popped-out entry: its slot, then its name and what is left. */
+export const KIT_OPEN_W = 90;
+const KIT_COLUMN_GAP = 2;
+const KIT_DIVIDER = 4;
+
+export interface KitBarLayout {
+  /** The "Kit" toggle above the strips. */
+  header: Rect;
+  /** The leather strip behind the items, and the stone one behind the powers. */
+  leather: Rect;
+  stone: Rect | null;
+  /** One row per item slot, then the backpack's; one per power. A row is the
+   * slot alone, or the slot and its words when popped out. */
+  items: Rect[];
+  powers: Rect[];
+}
+
+/** The bar in `zone` for `items` item rows (slots and the backpack) and
+ * `powers` powers: the items and powers side by side in two columns, or the
+ * powers under the items in one. */
+export function kitBarLayout(zone: Rect, columns: 1 | 2, items: number, powers: number, open: boolean): KitBarLayout {
+  const rowW = open ? KIT_OPEN_W : KIT_SLOT;
+  const stripW = rowW + 2 * KIT_PAD;
+  const top = zone.y + KIT_HEADER_H + 1;
+  const rows = (x: number, y: number, n: number): Rect[] => Array.from({ length: n }, (_, i) => ({ x: x + KIT_PAD, y: y + KIT_PAD + i * KIT_STEP, w: rowW, h: KIT_SLOT }));
+  const stripH = (n: number) => 2 * KIT_PAD + Math.max(1, n) * KIT_STEP - 1;
+  const leather = { x: zone.x, y: top, w: stripW, h: stripH(items) };
+  const stoneX = columns === 2 ? zone.x + stripW + KIT_COLUMN_GAP : zone.x;
+  const stoneY = columns === 2 ? top : leather.y + leather.h + KIT_DIVIDER;
+  const stone = powers === 0 ? null : { x: stoneX, y: stoneY, w: stripW, h: stripH(powers) };
+  const width = columns === 2 && stone !== null ? stone.x + stone.w - zone.x : stripW;
+  return {
+    header: { x: zone.x, y: zone.y, w: width, h: KIT_HEADER_H },
+    leather,
+    stone,
+    items: rows(leather.x, leather.y, items),
+    powers: stone === null ? [] : rows(stone.x, stone.y, powers),
+  };
 }
 
 // ---------------------------------------------------------------------------

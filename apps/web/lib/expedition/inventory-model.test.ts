@@ -50,7 +50,7 @@ describe("buildInventory", () => {
       ["pack-cell:4", null],
       ["pack-cell:5", null],
     ]);
-    expect(inv).toMatchObject({ equipped: ["it1"], capacity: 6, stored: 2, locked: false, aiming: null, discard: null, open: false });
+    expect(inv).toMatchObject({ equipped: ["it1"], capacity: 6, stored: 2, locked: false, discardable: true, aiming: null, discard: null, open: false });
   });
 
   it("names each item with what it does and what is left of it", () => {
@@ -63,6 +63,7 @@ describe("buildInventory", () => {
       uses: "Single use",
       rare: false,
       targetable: false,
+      selected: false,
       tag: null,
     });
   });
@@ -80,7 +81,7 @@ describe("buildInventory", () => {
   it("locks once you are ready, and outside the stages between camps", () => {
     expect(inventory(view([], [], { stage: { ...LOADOUT, readySeatIds: ["s1"] } })).locked).toBe(true);
     expect(inventory(view([], [], { stage: { tag: "route", options: [], ballots: [] } })).locked).toBe(false);
-    expect(inventory(view([], [], { stage: { tag: "camp", camp: LOADOUT.camp, mods: [], attempt: {} as never } })).locked).toBe(true);
+    expect(inventory(view([], [], { stage: { tag: "camp", camp: LOADOUT.camp, mods: [], attempt: {} as never } }))).toMatchObject({ locked: true, discardable: false });
   });
 
   it("opens on a sale, marking what can be sold and for how much", () => {
@@ -92,6 +93,30 @@ describe("buildInventory", () => {
     expect(inv.aiming).toBe("Pick an item to sell");
     expect(inv.slots[0]!.item).toMatchObject({ targetable: false, tag: null });
     expect(inv.backpack[0]!.item).toMatchObject({ targetable: true, tag: "+1" });
+  });
+
+  it("marks the item a power already picked while it asks for the next", () => {
+    const swap = view(["it1", "it2"], ["it3"], {
+      stage: { tag: "camp", camp: LOADOUT.camp, mods: [], attempt: {} as never },
+      yourAbilities: [
+        {
+          sourceKey: "pack-rat.pack-animal",
+          usableNow: true,
+          reason: null,
+          steps: [
+            { kind: "item", prompt: "Pick an equipped item to put away", choices: ["item:it1", "item:it2"] },
+            { kind: "item", prompt: "Pick a backpack item to take out", choices: ["item:it3"] },
+          ],
+        },
+      ],
+    });
+    const inv = inventory(swap, ui({ targeting: { mode: "ability", sourceKey: "pack-rat.pack-animal", selected: ["item:it1"], heldId: null } }));
+    expect(inv.aiming).toBe("Pick a backpack item to take out");
+    expect(inv.slots.map((c) => [c.item?.uid, c.item?.selected, c.item?.targetable])).toEqual([
+      ["it1", true, false],
+      ["it2", false, false],
+    ]);
+    expect(inv.backpack[0]!.item).toMatchObject({ uid: "it3", selected: false, targetable: true });
   });
 
   it("names the item waiting to be discarded", () => {

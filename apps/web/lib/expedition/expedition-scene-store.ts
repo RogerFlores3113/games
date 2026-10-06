@@ -65,8 +65,6 @@ export interface ExpeditionSceneActions {
   /** Host only (the worker refuses anyone else): back to the lobby with
    * seats kept. A no-op while `reconnecting`. */
   restartLobby(): void;
-  /** Opens the map of the run (the top bar's camp label); the board draws it. */
-  openMap(): void;
   /** Runs `local-ui.ts`'s `confirmTargeting`; dispatches the resulting
    * request (if any) and clears `localUi.targeting`. A no-op if targeting
    * is not yet complete. */
@@ -93,7 +91,6 @@ function rebuild(
 export function createExpeditionSceneStore(opts: {
   onAction: (request: unknown) => void;
   onRestartLobby?: () => void;
-  onOpenMap?: () => void;
   cardPackId: CardPackId;
   /** Without it every view shows at once. `speed` is asked as each sign
    * starts; `now` is the clock the scene animates `startedAt` against. */
@@ -190,10 +187,6 @@ export function createExpeditionSceneStore(opts: {
         const { server, reconnecting, transition } = get();
         if (server === null || reconnecting || transition?.phase === "sign") return;
         opts.onAction(request);
-      },
-
-      openMap() {
-        opts.onOpenMap?.();
       },
 
       restartLobby() {

@@ -1,31 +1,29 @@
 /**
  * The crew around the table: each teammate as their character's seated
  * silhouette behind it, with a name plate above their head (the `crowd`
- * zone), and the board your hand rests on in front of it. Your own seat
- * panel (`you`) and your kit (`kit`) sit at the left.
+ * zone). Your own seat panel (`you`) sits at the bottom left.
  * Every value comes from `SceneModel`.
  */
 import type Phaser from "phaser";
-import { CURSOR, pointerIf } from "../cursors";
+import { CURSOR } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
-import { CARD_H, HAND_CARD_Y, MINI_H, PLATE_H, SILHOUETTE_H, ZONES, boardArtAt, plateRect, seatSpots, tableArtAt, tableSpan, type Rect } from "../layout";
+import { MINI_H, PLATE_H, SILHOUETTE_H, ZONES, plateRect, seatSpots, tableArtAt, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
-import { ART, crewArtId, sourceArtId, tableOf, type TableId } from "../art/art-registry";
-import { mateSourceObjectId, seatFogObjectId, seatMarkObjectId, seatObjectId, sourceObjectId } from "../../../../lib/expedition/expedition-ids";
+import { ART, crewArtId, sourceArtId, tableOf } from "../art/art-registry";
+import { mateSourceObjectId, seatFogObjectId, seatMarkObjectId, seatObjectId } from "../../../../lib/expedition/expedition-ids";
 import { fogTile } from "./draw-weather";
 import type { ObjectIndex } from "../object-index";
-import type { ObjectiveChip, SceneModel, SeatModel, SourceChip } from "../../../../lib/expedition/build-scene-model";
+import type { ObjectiveChip, SceneModel, SeatModel } from "../../../../lib/expedition/build-scene-model";
 import type { SeatBossMark } from "../../../../lib/expedition/boss-model";
 import type { CampHandlers } from "./camp-handlers";
-import { fitLabel, fitUses } from "./text-fit";
+import { fitLabel } from "./text-fit";
 import { DIM_ALPHA, PANEL_ALPHA, labelWidth, objectiveItem, objectiveItemWidth, plate, text, type Layer } from "./ui-kit";
 
 const ROW_H = 12;
 const ICON = 16;
 const OBJECTIVE_GAP = 2;
 const DISCONNECTED_ALPHA = 0.5;
-const PULSE_DURATION_MS = 500;
 
 interface Ctx {
   scene: Phaser.Scene;
@@ -241,27 +239,7 @@ function inPlay(seat: SeatModel): boolean {
   return seat.targetable || seat.selected || seat.handPick.targetable || seat.handPick.selected || seat.objectives.some((o) => o.targetable || o.selected);
 }
 
-const BOARD_SHADOW_H = 4;
-const BOARD_SHADOW_ALPHA = 0.55;
-const BOARD_LIP_ALPHA = 0.45;
-/** The board art's transparent margin either side. */
-const BOARD_INSET = 10;
-
-/** The board your hand stands on, in front of the table's foot: the shadow
- * it casts on the table along its rim, and a lit lip where your cards stand,
- * so the two never read as one surface. */
-function drawBoard(scene: Phaser.Scene, layer: Layer, id: TableId): void {
-  const at = boardArtAt(id);
-  const board = ART[`board-${id}`];
-  const rim = tableSpan(id).boardTop;
-  const w = board.w - 2 * BOARD_INSET;
-  layer.add(plate(scene, at.x + BOARD_INSET, rim - BOARD_SHADOW_H, w, BOARD_SHADOW_H, PALETTE.letterbox).setAlpha(BOARD_SHADOW_ALPHA));
-  layer.add(placeArt(scene, `board-${id}`, at.x + board.w / 2, at.y + board.h / 2));
-  layer.add(plate(scene, at.x + BOARD_INSET, HAND_CARD_Y + CARD_H, w, 1, PALETTE.cardFace).setAlpha(BOARD_LIP_ALPHA));
-}
-
-/** The silhouettes, then the location's table over their legs, then your
- * board over the table's foot. */
+/** The silhouettes, then the location's table over their legs. */
 export function drawCrowdAndTable(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   const ctx: Ctx = { scene, model, index, handlers };
   const mates = others(model);
@@ -271,7 +249,6 @@ export function drawCrowdAndTable(scene: Phaser.Scene, layer: Layer, model: Scen
   const at = tableArtAt(id);
   const table = ART[`table-${id}`];
   layer.add(placeArt(scene, `table-${id}`, at.x + table.w / 2, at.y + table.h / 2));
-  drawBoard(scene, layer, id);
 }
 
 /** Plates for every teammate, drawn over the world. */
@@ -323,52 +300,8 @@ function drawYou(ctx: Ctx, layer: Layer, seat: SeatModel): void {
   }
 }
 
-const KIT_ROW_H = 18;
-/** Items on bark; a camp's gift to the crew (the temple's skip) on moss. */
-const KIT_ROW_FACE: Readonly<Record<SourceChip["kind"], string>> = { character: PALETTE.stump, power: PALETTE.stump, upgrade: PALETTE.stump, item: PALETTE.bark, grant: PALETTE.moss };
-const KIT_ROW_GAP = 1;
-
-function kitRow(ctx: Ctx, layer: Layer, chip: SourceChip, x: number, y: number, w: number): void {
-  const { scene, index, handlers } = ctx;
-  const container = scene.add.container(x, y);
-  const bg = plate(scene, 0, 0, w, KIT_ROW_H, KIT_ROW_FACE[chip.kind]);
-  if (chip.usable) bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn));
-  container.add(bg);
-  const art = sourceArtId(chip.sourceId);
-  if (art !== null) container.add(placeArt(scene, art, 1 + ICON / 2, KIT_ROW_H / 2));
-  const textX = ICON + 3;
-  const chars = Math.floor((w - textX - 1) / LABEL_CELL.w);
-  container.add(text(scene, textX, 1, fitLabel(chip.name, chars)));
-  const chargeColor = chip.usable ? PALETTE.turn : chip.spent ? PALETTE.destructive : PALETTE.textDim;
-  container.add(text(scene, textX, KIT_ROW_H - LABEL_CELL.h - 1, fitUses(chip.charge, chars), chargeColor));
-  container.setSize(w, KIT_ROW_H);
-  container.setAlpha(chip.spent ? DIM_ALPHA + 0.2 : 1);
-  const hit = scene.add.zone(0, 0, w, KIT_ROW_H).setOrigin(0, 0);
-  hit.setInteractive(pointerIf(chip.usable));
-  hit.on("pointerdown", () => handlers.onSource(chip.sourceKey));
-  hit.on("pointerover", () => handlers.onSourceHover(chip.sourceKey));
-  hit.on("pointerout", () => handlers.onSourceHover(null));
-  container.add(hit);
-  if (chip.pulse) scene.tweens.add({ targets: bg, alpha: { from: 1, to: 0.55 }, duration: PULSE_DURATION_MS, yoyo: true, repeat: -1 });
-  layer.add(container);
-  index.register("camp", chip.objectId, container);
-}
-
-/** Your character and kit, one row each: icon, name and what is left. */
-function drawKit(ctx: Ctx, layer: Layer, seat: SeatModel): void {
-  const { scene } = ctx;
-  const z = ZONES.kit;
-  const rows = seat.sources;
-  const h = 11 + rows.length * (KIT_ROW_H + KIT_ROW_GAP);
-  layer.add(plate(scene, z.x, z.y, z.w, Math.min(z.h, h)).setAlpha(PANEL_ALPHA));
-  layer.add(text(scene, z.x + 3, z.y + 2, "Your kit", PALETTE.textDim));
-  rows.forEach((chip, i) => kitRow(ctx, layer, chip, z.x + 1, z.y + 11 + i * (KIT_ROW_H + KIT_ROW_GAP), z.w - 2));
-}
-
-export function drawYouAndKit(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
+export function drawYouPanel(scene: Phaser.Scene, layer: Layer, model: SceneModel, index: ObjectIndex, handlers: CampHandlers): void {
   const you = model.seats.find((s) => s.isYou);
   if (you === undefined) return;
-  const ctx: Ctx = { scene, model, index, handlers };
-  drawYou(ctx, layer, you);
-  drawKit(ctx, layer, you);
+  drawYou({ scene, model, index, handlers }, layer, you);
 }

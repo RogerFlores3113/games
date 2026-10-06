@@ -11,7 +11,7 @@ import { LABEL_CELL, WORLD_LABEL_FONT } from "../font/font-keys";
 import { placeArt } from "../art/place-art";
 import { artTextureKey } from "../art/art-registry";
 import { PALETTE, toPhaserColor } from "../palette";
-import { SIGNBOARD, STAGE } from "../layout";
+import { SIGNBOARD, STAGE, signChars } from "../layout";
 import { boardTops, fadeInBlack, signLines, signPose, type SignLine } from "../../../../lib/expedition/scene-transitions";
 import type { ActiveTransition, ExpeditionSceneStore } from "../../../../lib/expedition/expedition-scene-store";
 
@@ -27,12 +27,6 @@ const BETWEEN_GAP = 8;
 /** The 5x7 glyphs' rows, and the lit cut line under each. */
 const GLYPH_ROWS = 7;
 const CUT = 1;
-
-/** Characters of the 5x7 font at `scale` that fit across the plank. */
-function plankChars(scale: number): number {
-  const width = (SIGNBOARD.face.w * SIGNBOARD.scale) - SIGNBOARD.facePad * 2;
-  return Math.floor(width / (LABEL_CELL.w * scale));
-}
 
 export class TransitionScene extends Phaser.Scene {
   private readonly sceneStore: ExpeditionSceneStore;
@@ -94,7 +88,7 @@ export class TransitionScene extends Phaser.Scene {
     layer.removeAll(true);
     // Capitals: the 5x7 font has no descenders, so a carved "g" reads as "9".
     const { title, sub } = transition.copy;
-    const lines = signLines({ title: title.toUpperCase(), sub: sub?.toUpperCase() ?? null }, plankChars);
+    const lines = signLines({ title: title.toUpperCase(), sub: sub?.toUpperCase() ?? null }, signChars);
     const scale = SIGNBOARD.scale;
     const heights = lines.map((line) => GLYPH_ROWS * line.scale + CUT);
     const boards = SIGNBOARD.boards.map(([top, bottom]) => [SIGNBOARD.top + top * scale, SIGNBOARD.top + (bottom + 1) * scale - 1] as const);

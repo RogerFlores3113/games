@@ -149,7 +149,7 @@ test("the toolbar starts folded where the stage fills the window and folds away 
   await expect(page.getByTestId("dev-toolbar-jump-to-camp")).toBeVisible();
 });
 
-test("the HUD names the supplies and the purse on hover, and the camp label opens the map of the run", async ({ page }) => {
+test("the HUD names the supplies and the purse on hover, and the camp label shows and hides the trail map", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/expedition/start");
   await page.getByTestId("play-solo-dev").click();
@@ -169,15 +169,50 @@ test("the HUD names the supplies and the purse on hover, and the camp label open
   await page.mouse.move(coin.x, coin.y);
   await expect.poll(texts).toContain(`${topBar.purse} coins`);
 
-  const map = (await page.evaluate(() => window.__expeditionTest!.positionOf("map")))!;
-  await page.mouse.click(map.x, map.y);
-  const modal = page.getByTestId("expedition-map-modal");
-  await expect(modal).toBeVisible();
-  await expect(page.getByTestId("expedition-map-heading")).toHaveText("Standard run, camp 2 of 6");
-  await expect(page.getByTestId("expedition-map-stop-2")).toContainText("Cave");
-  await expect(page.getByTestId("expedition-map-stop-2")).toContainText("Rain");
-  await expect(page.getByTestId("expedition-map-stop-2")).toContainText("You are here");
-  await expect(page.getByTestId("expedition-map-stop-6")).toContainText("The Temple");
+  type Mapped = { trailMap: { index: number; state: string; caption: string }[] | null };
+  const trailMap = async () => (await page.evaluate(() => window.__expeditionTest!.model as unknown as Mapped)).trailMap;
+  await clickUntilChanged<Mapped>(page, "map", (m) => m.trailMap !== null);
+  // The jump writes no history for camp 1, so it reads as not yet played.
+  expect((await trailMap())!.map((stop) => [stop.index, stop.state, stop.caption])).toEqual([
+    [1, "ahead", ""],
+    [2, "here", "here"],
+    [3, "ahead", ""],
+    [4, "ahead", ""],
+    [5, "ahead", ""],
+    [6, "ahead", ""],
+  ]);
+  await expect.poll(texts).toContain("Camp 6");
+  expect(await page.evaluate(() => "trail-map" in window.__expeditionTest!.objects())).toBe(true);
   await page.keyboard.press("Escape");
-  await expect(modal).toBeHidden();
+  await expect.poll(trailMap).toBeNull();
+  await clickUntilChanged<Mapped>(page, "map", (m) => m.trailMap !== null);
+  await clickUntilChanged<Mapped>(page, "map", (m) => m.trailMap === null);
+});
+
+test("the kit bar on the left folds to its slots and pops out to name your items and powers, between camps and in camp", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/expedition/start");
+  await page.getByTestId("play-solo-dev").click();
+  await waitForBridge(page);
+  await unfoldToolbar(page);
+  await toolbar(page, "jump-to-camp", { length: "standard", camp: "2", stage: "loadout" }, /^Jump to camp: done\.$/);
+  await expect.poll(() => getScene(page)).toBe("trail");
+
+  type Kit = { kitBar: { open: boolean; powers: { objectId: string; name: string }[] } | null };
+  const texts = () => page.evaluate(() => window.__expeditionTest!.layout().filter((e) => e.kind === "text").map((e) => e.label));
+  const folded = await getModel<Kit>(page);
+  const power = folded.kitBar!.powers[0]!;
+  expect(power.objectId).toMatch(/^kit:/);
+  expect(await texts()).not.toContain(power.name);
+  await clickUntilChanged<Kit>(page, "kit-toggle", (m) => m.kitBar?.open === true);
+  await expect.poll(texts).toContain("Your kit");
+  await expect.poll(texts).toContain(power.name);
+  await clickUntilChanged<Kit>(page, "kit-toggle", (m) => m.kitBar?.open === false);
+  await expect.poll(texts).not.toContain(power.name);
+
+  await toolbar(page, "jump-to-camp", { length: "standard", camp: "2", stage: "camp" }, /^Jump to camp: done\.$/);
+  await expect.poll(() => getScene(page)).toBe("camp");
+  const inCamp = await getModel<Kit>(page);
+  expect(inCamp.kitBar!.powers[0]!.objectId).toMatch(/^source:/);
+  expect(await page.evaluate((id) => id in window.__expeditionTest!.objects(), inCamp.kitBar!.powers[0]!.objectId)).toBe(true);
 });

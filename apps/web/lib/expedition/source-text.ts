@@ -69,6 +69,18 @@ export function sourceRulesText(sourceId: string): SourceRules | null {
   return { title: sourceName(sourceId), text: display.text, badges: sourceBadges(sourceId) };
 }
 
+/** One of a seat's own sources as its kit reads it on hover: the rules,
+ * with what is left of it in place of its limit. */
+export function liveRulesText(seat: ExpeditionSeatView | undefined, key: string): SourceRules | null {
+  const sourceId = sourceIdOfKey(seat, key);
+  const rules = sourceRulesText(sourceId);
+  const remaining = seat?.usage.find((u) => u.sourceKey === key)?.remaining ?? null;
+  if (rules === null || remaining === null) return rules;
+  const uses = usesLabel(sourceId, remaining).full;
+  const active = SOURCE_DISPLAY[sourceId]?.active;
+  return { ...rules, badges: active === null || active === undefined ? [uses] : [active.windowPhrase, uses] };
+}
+
 /** What is left of a source, the one wording every screen uses: `full`
  * where there is room ("Once per camp", "1 of 2 charges", "Always on"),
  * `short` where there is not ("1 per camp", "1/2 charges"). */

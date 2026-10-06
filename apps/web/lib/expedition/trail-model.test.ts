@@ -88,7 +88,7 @@ const draftStage = (over: Partial<Extract<ExpeditionStageView, { tag: "draft" }>
 
 describe("topBar", () => {
   it("shows supplies against their cap, the purse, and the camp the crew heads to", () => {
-    expect(model(makeView()).topBar).toEqual({ stores: true, supplies: 3, suppliesMax: 5, purse: 12, camp: "Camp 2 of 6", map: true, suppliesPick: null });
+    expect(model(makeView()).topBar).toEqual({ stores: true, supplies: 3, suppliesMax: 5, purse: 12, camp: "Camp 2 of 6", map: false, mapOpen: false, suppliesPick: null });
   });
 
   it("labels a boss camp and the temple by their tier", () => {
@@ -488,19 +488,25 @@ describe("objective icons", () => {
 });
 
 describe("item bar and inventory", () => {
-  it("shows your item slots, the backpack's count, and your character's powers", () => {
+  it("shows your item slots and the backpack's count; your powers are in the kit bar", () => {
     expect(model(makeView()).itemBar).toEqual({
       slots: [
         {
           objectId: "bar-slot:0",
-          item: { uid: "trained-monkey", itemId: "trained-monkey", objectId: "slot:0", name: "Trained Monkey", text: "Swap a card in your hand with a random card from a teammate's hand.", uses: "Once per camp", rare: false, targetable: false, tag: null },
+          item: { uid: "trained-monkey", itemId: "trained-monkey", objectId: "slot:0", name: "Trained Monkey", text: "Swap a card in your hand with a random card from a teammate's hand.", uses: "Once per camp", rare: false, targetable: false, selected: false, tag: null },
         },
         { objectId: "bar-slot:1", item: null },
       ],
       count: "1 of 2",
       backpack: { stored: 0, capacity: 6 },
-      explorer: [{ sourceKey: "leader", sourceId: "leader", objectId: "kit:leader", name: "Megaphone", kind: "character", charge: { full: "Always on", short: "Always on" } }],
     });
+    const kit = model(makeView()).kitBar!;
+    expect(kit.items.map((e) => e?.objectId ?? null)).toEqual(["kit:trained-monkey", null]);
+    expect(kit.powers.map((e) => [e.objectId, e.name])).toEqual([["kit:leader", "Megaphone"]]);
+  });
+
+  it("has no kit bar at the muster", () => {
+    expect(model(at({ tag: "muster", ballots: [], lockedSeatIds: [] }, { length: null, campCount: null, plan: [], history: [] })).kitBar).toBeNull();
   });
 
   it("is on every stage between camps, shut until opened", () => {

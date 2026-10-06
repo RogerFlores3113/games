@@ -19,7 +19,6 @@ import type {
   CrewRow,
   DraftBundle,
   ItemBar,
-  KitItem,
   LengthOption,
   ObjectiveIcon,
   MusterCrewRow,
@@ -32,7 +31,7 @@ import type {
   VoteResult,
 } from "../../../../lib/expedition/trail-model";
 import { musterLines } from "../../../../lib/expedition/trail-model";
-import { fitLabel, fitUses, wrapWords } from "./text-fit";
+import { fitLabel, wrapWords } from "./text-fit";
 import { PANEL_ALPHA, button, coin, labelWidth, plate, setCoinFace, text, type Layer } from "./ui-kit";
 import { drawShop, type LoadoutHandlers } from "./draw-loadout";
 import type { InventoryItem } from "../../../../lib/expedition/inventory-model";
@@ -108,10 +107,12 @@ const CAPTION_COLOR: Readonly<Record<TrailStop["state"], string>> = {
   ahead: PALETTE.destructive,
 };
 
-function drawTrail(ctx: Ctx, stops: TrailStop[]): void {
-  const { scene, layer } = ctx;
+/** The parchment trail map in the trail zone: a marker per camp, the crew
+ * token over the camp ahead (or the one being played), the path between. */
+export function drawTrailMap(scene: Phaser.Scene, layer: Layer, stops: TrailStop[]): Phaser.GameObjects.Image {
   const zone = TRAIL_ZONES.trail;
-  layer.add(placeArt(scene, "trail-map", zone.x + zone.w / 2, zone.y + zone.h / 2));
+  const map = placeArt(scene, "trail-map", zone.x + zone.w / 2, zone.y + zone.h / 2);
+  layer.add(map);
 
   const xs = trailStopXs(stops.length);
   const markerY = (i: number): number => zone.y + MARKER_ROW + (i % 2 === 0 ? -2 : 2);
@@ -143,6 +144,7 @@ function drawTrail(ctx: Ctx, stops: TrailStop[]): void {
     layer.add(centredText(scene, x, zone.y + LABEL_ROW, `Camp ${stop.index}`, INK));
     if (stop.caption !== "") layer.add(centredText(scene, x, zone.y + CAPTION_ROW, stop.caption, CAPTION_COLOR[stop.state]));
   });
+  return map;
 }
 
 // ---------------------------------------------------------------------------
@@ -784,25 +786,6 @@ function drawCrew(ctx: Ctx): void {
 // Item bar
 // ---------------------------------------------------------------------------
 
-/** One of your powers or upgrade: icon, name, what is left of it. */
-function drawKitTile(ctx: Ctx, item: KitItem, rect: Rect): void {
-  const { scene, layer, index, handlers } = ctx;
-  const container = scene.add.container(rect.x, rect.y);
-  const bg = scene.add.rectangle(0, 0, rect.w, rect.h, toPhaserColor(item.kind === "upgrade" ? PALETTE.bark : PALETTE.stump)).setOrigin(0, 0);
-  container.add(bg);
-  const art = sourceArtId(item.sourceId);
-  if (art !== null) container.add(placeArt(scene, art, 10, rect.h / 2));
-  const chars = Math.floor((rect.w - 22) / LABEL_CELL.w);
-  container.add(text(scene, 20, 1, fitLabel(item.name, chars)));
-  container.add(text(scene, 20, rect.h - LABEL_CELL.h - 1, fitUses(item.charge, chars), PALETTE.textDim));
-  container.setSize(rect.w, rect.h);
-  bg.setInteractive();
-  bg.on("pointerover", () => handlers.onSourceHover(item.sourceKey, item.objectId));
-  bg.on("pointerout", () => handlers.onSourceHover(null));
-  layer.add(container);
-  index.register("trail", item.objectId, container);
-}
-
 /** An item slot on the bar: the item's icon, name and uses, or an empty
  * slot. A click opens the backpack. */
 function drawBarSlot(ctx: Ctx, slot: ItemBar["slots"][number], rect: Rect): void {
@@ -867,29 +850,23 @@ function drawBackpackButton(ctx: Ctx, backpack: ItemBar["backpack"], rect: Rect)
   index.register("trail", BACKPACK_ID, container);
 }
 
-/** Your item slots, the backpack, and your explorer's powers and upgrade. */
+/** Your item slots and the backpack. */
 function drawItemBar(ctx: Ctx): void {
   const { scene, layer, model } = ctx;
   const zone = TRAIL_ZONES.backpack;
-  panel(ctx, zone);
   const bar = model.itemBar;
   if (bar === null) {
+    panel(ctx, zone);
     layer.add(centredText(scene, zone.x + zone.w / 2, zone.y + zone.h / 2 - 4, "Watching the crew", PALETTE.textDim));
     return;
   }
   const geo = itemBarLayout(bar.slots.length);
+  panel(ctx, geo.plate);
   const slotsRight = geo.slots[0]!.x + geo.slots[0]!.w;
   layer.add(text(scene, zone.x + 4, zone.y + 3, "Item slots"));
   layer.add(text(scene, slotsRight - labelWidth(bar.count), zone.y + 3, bar.count, PALETTE.textDim));
   bar.slots.forEach((slot, i) => drawBarSlot(ctx, slot, geo.slots[i]!));
   drawBackpackButton(ctx, bar.backpack, geo.backpack);
-  layer.add(text(scene, geo.explorer.x, zone.y + 3, "Explorer"));
-  const tiles = bar.explorer.slice(0, geo.explorerTiles.length);
-  tiles.forEach((item, i) => drawKitTile(ctx, item, geo.explorerTiles[i]!));
-  const next = geo.explorerTiles[tiles.length];
-  if (!bar.explorer.some((k) => k.kind === "upgrade") && next !== undefined) {
-    layer.add(text(scene, next.x + 2, next.y + Math.floor((next.h - LABEL_CELL.h) / 2), fitLabel("No upgrade yet", Math.floor(next.w / LABEL_CELL.w)), PALETTE.textDim));
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -956,7 +933,7 @@ export function drawTrailScene(scene: Phaser.Scene, layer: Layer, model: TrailMo
     drawMuster(ctx, shown);
     return;
   }
-  if (model.trail !== null) drawTrail(ctx, model.trail);
+  if (model.trail !== null) drawTrailMap(scene, layer, model.trail);
   if (model.inventory?.open) return;
   switch (shown.kind) {
     case "draft":

@@ -29,7 +29,10 @@ import { bossBlockReason, bossHappenings, buildBoss, buildHelpers, latestGust, s
 import { buildTemplePath, type TemplePath } from "./temple-model";
 import { buildPopupShop, POPUP_SHOP, type PopupShopModel } from "./popup-shop-model";
 import { buildFanPicker, mistOver, vowMarks, type FanPicker } from "./character-marks";
-import { isSpent, liveSourceKeys, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, usesLabel, yourSourceId, type SourceKind, type UsesLabel } from "./source-text";
+import { isSpent, liveRulesText, liveSourceKeys, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, usesLabel, yourSourceId, type SourceKind, type UsesLabel } from "./source-text";
+import { buildKitBar, grantedKeys, type KitBar } from "./kit-bar-model";
+import { buildInventory, type Inventory } from "./inventory-model";
+import { buildTrail, type TrailStop } from "./trail-stops";
 
 const TORNADO_ID = "tornado";
 
@@ -74,8 +77,11 @@ export interface TopBar {
   /** The crew's shared coins. */
   purse: number;
   camp: string;
-  /** The camp label opens the map of the run once the run's length is set. */
+  /** In camp the camp label shows and hides the trail map; between camps
+   * the map is always on screen and the label only reads. */
   map: boolean;
+  /** The trail map hangs over the camp. */
+  mapOpen: boolean;
   /** The supply crates as an ability target (First Aid Kit); null outside
    * targeting. */
   suppliesPick: PickState | null;
@@ -326,6 +332,13 @@ export interface SceneModel {
    * accepts it. Null when no card is held. */
   drag: { cardId: string; legal: boolean } | null;
   targeting: { mode: "ability" | "whisper"; sourceObjectId: string; nextKind: ExpeditionTargetKind | null; canConfirm: boolean } | null;
+  /** Your kit on the left; null for a spectator. */
+  kitBar: KitBar | null;
+  /** Your backpack and slots: the inventory window opens over the table
+   * only while a power is aimed at one of your items (Pack Animal). */
+  inventory: Inventory | null;
+  /** The run's camps on the trail map, while the camp label shows it. */
+  trailMap: TrailStop[] | null;
 }
 
 export function sceneKeyFor(game: ExpeditionView): SceneKey {
@@ -480,13 +493,6 @@ function buildTrickPlayModel(
       countsAs,
     },
   };
-}
-
-/** Abilities the camp grants every seat (the temple's skip), keyed by the
- * granting modifier's id. */
-function grantedKeys(view: ExpeditionView): string[] {
-  const stage = view.stage;
-  return stage.tag === "camp" ? stage.mods.flatMap((m) => (SOURCE_DISPLAY[m.id]?.kind === "grant" ? [m.id] : [])) : [];
 }
 
 function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiState, marks: Readonly<Record<string, SeatBossMark>>): SeatModel {
@@ -671,8 +677,8 @@ function buildLastTrick(camp: ExpeditionCampView | null, view: ExpeditionView, u
 }
 
 /** Supplies of their cap, the purse, and which camp of how many. */
-export function buildTopBar(view: ExpeditionView, suppliesPick: PickState | null = null): TopBar {
-  return { stores: view.stage.tag !== "muster", supplies: view.supplies.count, suppliesMax: view.supplies.max, purse: view.purse, camp: campLabel(view), map: view.campCount !== null, suppliesPick };
+export function buildTopBar(view: ExpeditionView, suppliesPick: PickState | null = null, mapOpen = false): TopBar {
+  return { stores: view.stage.tag !== "muster", supplies: view.supplies.count, suppliesMax: view.supplies.max, purse: view.purse, camp: campLabel(view), map: view.stage.tag === "camp" && view.campCount !== null, mapOpen, suppliesPick };
 }
 
 /** In a boss camp or the temple the strip's chip names it, so the label
@@ -710,7 +716,7 @@ function buildTooltip(server: SceneServerInput, ui: LocalUiState): Tooltip | nul
     return rules === null ? null : { ...rules, reason: null };
   }
   if (ui.tooltipSourceId === null) return null;
-  const rules = sourceRulesText(sourceIdOfKey(view.seats.find((s) => s.seatId === view.yourSeatId), ui.tooltipSourceId));
+  const rules = liveRulesText(view.seats.find((s) => s.seatId === view.yourSeatId), ui.tooltipSourceId);
   if (rules === null) return null;
   const ability = view.yourAbilities.find((a) => a.sourceKey === ui.tooltipSourceId);
   const reason = ability !== undefined && !ability.usableNow ? ability.reason : null;
@@ -801,17 +807,6 @@ function buildTray(view: ExpeditionView, roomSeats: RoomSeatInfo[], ui: LocalUiS
     if (ui.targeting?.mode === "ability" && yourSourceId(view, ui.targeting.sourceKey) === POPUP_SHOP) return null;
     return { title: step.prompt, options: step.choices.map((id) => option(id, describeOption(id.slice("option:".length), (seatId) => (seatId === null ? "nobody" : nameOf(seatId))))) };
   }
-  if (step.kind === "item") {
-    const seat = view.seats.find((s) => s.seatId === view.yourSeatId);
-    const items = [...(seat?.items.equipped ?? []), ...(seat?.items.backpack ?? [])];
-    return {
-      title: step.prompt,
-      options: step.choices.map((id) => {
-        const item = items.find((i) => `item:${i.uid}` === id);
-        return option(id, item === undefined ? "An item" : sourceName(item.itemId));
-      }),
-    };
-  }
   if (step.kind === "card-value" || step.kind === "objective-value") {
     const choices = valueChoices(ui, view);
     if (choices.length === 0) return null;
@@ -866,7 +861,7 @@ export function buildSceneModel(
     cardPackId,
     youSeatId: view.yourSeatId,
     campIndex: focusCampIndex(view) ?? 0,
-    topBar: buildTopBar(view, pickOrNull(ui, view, "supplies")),
+    topBar: buildTopBar(view, pickOrNull(ui, view, "supplies"), ui.mapOpen),
     mods: buildModChips(view),
     boss,
     helpers,
@@ -893,5 +888,8 @@ export function buildSceneModel(
     trayPage: ui.trayPage,
     drag,
     targeting,
+    kitBar: buildKitBar(view, ui),
+    inventory: buildInventory(view, ui),
+    trailMap: ui.mapOpen ? buildTrail(view) : null,
   };
 }

@@ -215,6 +215,15 @@ describe("signLines", () => {
     expect(signLines({ title: "Heading to the Desert", sub: null }, chars).map((l) => l.text)).toEqual(["Heading to", "the Desert"]);
   });
 
+  it("breaks a title after its colon when it must wrap", () => {
+    const narrow = (scale: number) => Math.floor(264 / (6 * scale));
+    expect(signLines({ title: "Boss: the Snake", sub: "Camp 3" }, narrow)).toEqual([
+      { text: "Boss:", scale: 3, kind: "title" },
+      { text: "the Snake", scale: 3, kind: "title" },
+      { text: "Camp 3", scale: 2, kind: "sub" },
+    ]);
+  });
+
   it("drops to a smaller scale when two lines are not enough", () => {
     const lines = signLines({ title: "Boss: the Locust swarm of the long dry season", sub: null }, chars);
     expect(lines.every((l) => l.scale === 2)).toBe(true);

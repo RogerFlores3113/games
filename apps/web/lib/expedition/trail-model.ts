@@ -4,13 +4,17 @@ import type { Prompt } from "./build-prompt";
 import { buildTrailPrompt, PROMPT_MAX_CHARS } from "./build-prompt";
 import type { SceneServerInput, Tooltip, TopBar } from "./build-scene-model";
 import { buildTopBar } from "./build-scene-model";
-import { characterName, ownPickOf, usesLabel, type UsesLabel, liveSourceKeys, sourceBadges, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, yourSourceId, type SourceKind } from "./source-text";
+import { characterName, liveRulesText, ownPickOf, usesLabel, type UsesLabel, liveSourceKeys, sourceBadges, sourceIdOfKey, sourceKind, sourceName, yourSourceId, type SourceKind } from "./source-text";
 import { barSlotObjectId, bundleItemObjectId, bundleObjectId, crewObjectId, draftObjectId, kitObjectId, lengthObjectId, powerObjectId, previewObjectiveObjectId, READY_ID, rerollObjectId, routeObjectId } from "./expedition-ids";
 import { buildShop, type ShopPanel } from "./loadout-model";
 import { buildInventory, roomFor, type Inventory, type InventoryItem } from "./inventory-model";
+import { buildKitBar, type KitBar } from "./kit-bar-model";
 import { choiceFor, currentStep, isPicked, type LocalUiState, type PickEntity } from "./local-ui";
 import { cardLabel } from "./expedition-ids";
-import { bossLabel, focusCampIndex, modName, plannedBossAt } from "./view-access";
+import { bossLabel, focusCampIndex, modName } from "./view-access";
+import { buildTrail, type StopKind, type TrailStop } from "./trail-stops";
+
+export type { StopKind, TrailStop } from "./trail-stops";
 import { campBackdrop, modDisplayName } from "./weather-model";
 import { wrapWords } from "../../components/expedition/phaser/draw/text-fit";
 
@@ -20,18 +24,6 @@ import { wrapWords } from "../../components/expedition/phaser/draw/text-fit";
  * display transform of the view; the worker decides whether a pick or vote
  * is legal.
  */
-
-/** A camp, or a boss camp by its tier. */
-export type StopKind = "camp" | "animal" | "disaster" | "temple";
-
-export interface TrailStop {
-  index: number;
-  state: "cleared" | "here" | "ahead";
-  kind: StopKind;
-  /** Second label line under the marker: "cleared", "next" or "try 2";
-   * empty ahead, where the marker shows a boss camp or the temple. */
-  caption: string;
-}
 
 /** One item of a draft bundle. */
 export interface BundleItem {
@@ -257,15 +249,13 @@ export type TrailPanel =
   /** The loadout: the camp it sets out for. */
   | { kind: "loadout"; next: CampPreview };
 
-/** The bar under the trail: your item slots, the backpack that opens the
- * inventory window, and your character's powers and upgrade. */
+/** The bar under the trail: your item slots and the backpack that opens
+ * the inventory window. */
 export interface ItemBar {
   slots: { objectId: string; item: InventoryItem | null }[];
   /** "1 of 2". */
   count: string;
   backpack: { stored: number; capacity: number };
-  /** Your character's powers, then your upgrade. */
-  explorer: KitItem[];
 }
 
 /** One of your live sources: `sourceKey` is what you act through, and
@@ -307,6 +297,8 @@ export interface TrailModel {
   kit: KitItem[] | null;
   /** Null for a spectator. */
   itemBar: ItemBar | null;
+  /** Your kit on the left; null for a spectator and at the muster. */
+  kitBar: KitBar | null;
   inventory: Inventory | null;
   crew: CrewRow[];
   /** The muster's Lock in, the loadout's Set out or the event's Continue;
@@ -333,26 +325,6 @@ function votersFor(server: SceneServerInput, ballots: readonly { seatId: string;
   const seatIds = ballots.filter((b) => b.choice === choice).map((b) => b.seatId);
   const you = server.game.yourSeatId;
   return [...seatIds.filter((id) => id === you), ...seatIds.filter((id) => id !== you)].map((id) => nameOf(server, id));
-}
-
-function stopKind(view: View, index: number): StopKind {
-  return plannedBossAt(view, index)?.tier ?? "camp";
-}
-
-function buildTrail(view: View): TrailStop[] | null {
-  if (view.campCount === null) return null;
-  const here = focusCampIndex(view);
-  return Array.from({ length: view.campCount }, (_, i): TrailStop => {
-    const index = i + 1;
-    const results = view.history.filter((h) => h.camp === index && h.status !== "restarted");
-    const cleared = results.some((h) => h.status === "cleared");
-    const state = cleared ? "cleared" : index === here ? "here" : "ahead";
-    const kind = stopKind(view, index);
-    const parts: string[] = [];
-    if (state === "cleared") parts.push("cleared");
-    if (state === "here") parts.push(results.length === 0 ? "next" : `try ${results.length + 1}`);
-    return { index, state, kind, caption: parts.join(", ") };
-  });
 }
 
 /** The cards to win, then the ordered ones numbered in turn, then the
@@ -677,13 +649,12 @@ function buildKit(view: View): KitItem[] | null {
   });
 }
 
-function buildItemBar(view: View, inventory: Inventory | null, kit: KitItem[] | null): ItemBar | null {
-  if (inventory === null || kit === null) return null;
+function buildItemBar(inventory: Inventory | null): ItemBar | null {
+  if (inventory === null) return null;
   return {
     slots: inventory.slots.map((slot, i) => ({ objectId: barSlotObjectId(i), item: slot.item })),
     count: `${inventory.equipped.length} of ${inventory.slots.length}`,
     backpack: { stored: inventory.stored, capacity: inventory.capacity },
-    explorer: kit.filter((k) => k.kind !== "item"),
   };
 }
 
@@ -749,8 +720,10 @@ function buildTooltip(view: View, ui: LocalUiState): Tooltip | null {
     return words === null ? null : { title: words.title, text: words.text, badges: [], reason: null };
   }
   if (ui.tooltipSourceId === null) return null;
-  const rules = sourceRulesText(sourceIdOfKey(view.seats.find((s) => s.seatId === view.yourSeatId), ui.tooltipSourceId));
-  return rules === null ? null : { ...rules, reason: null };
+  const rules = liveRulesText(view.seats.find((s) => s.seatId === view.yourSeatId), ui.tooltipSourceId);
+  if (rules === null) return null;
+  const ability = view.yourAbilities.find((a) => a.sourceKey === ui.tooltipSourceId);
+  return { ...rules, reason: ability !== undefined && !ability.usableNow ? ability.reason : null };
 }
 
 /** A draft offer your backpack has no room for asks you to make room first. */
@@ -770,7 +743,8 @@ export function buildTrailModel(server: SceneServerInput, ui: LocalUiState, reco
     trail: buildTrail(view),
     panel,
     kit,
-    itemBar: buildItemBar(view, inventory, kit),
+    itemBar: buildItemBar(inventory),
+    kitBar: view.stage.tag === "muster" ? null : buildKitBar(view, ui),
     inventory,
     crew: buildCrew(server, ui),
     ready: buildReady(view),

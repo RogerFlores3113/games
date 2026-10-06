@@ -66,11 +66,11 @@ export function drawBackdrop(scene: Phaser.Scene, location: string): Phaser.Game
 }
 
 /** What the top bar's controls do in a scene: the crates as an ability's
- * target, and the camp label opening the map of the run. */
+ * target, and the camp label showing and hiding the trail map in camp. */
 export interface TopBarHandlers {
   index: ObjectIndex;
   sceneKey: "camp" | "trail";
-  onMap: () => void;
+  onMap?: () => void;
   onSupplies?: () => void;
 }
 
@@ -101,8 +101,8 @@ function hoverLabel(scene: Phaser.Scene, layer: Layer, owner: Phaser.GameObjects
 }
 
 /** Supplies as crates of their cap ("Supplies 3 of 4" on hover), the purse
- * as a coin and its count ("12 coins"), and the camp on the right, which
- * opens the map of the run. The crates are a target while an ability picks
+ * as a coin and its count ("12 coins"), and the camp on the right, which in
+ * camp shows and hides the trail map. The crates are a target while an ability picks
  * the supplies. No crates or purse at the muster. Returns the span left
  * free between them. */
 export function drawTopBar(scene: Phaser.Scene, layer: Layer, bar: TopBar, handlers?: TopBarHandlers): { left: number; right: number } {
@@ -114,13 +114,14 @@ export function drawTopBar(scene: Phaser.Scene, layer: Layer, bar: TopBar, handl
 
   const campW = labelWidth(bar.camp) + 8;
   const campX = zone.x + zone.w - 3 - campW;
-  if (bar.map && handlers !== undefined) {
+  if (bar.map && handlers?.onMap !== undefined) {
     const chip = scene.add.container(campX, zone.y + 2);
-    const bg = plate(scene, 0, 0, campW, zone.h - 4, PALETTE.plate).setStrokeStyle(1, toPhaserColor(PALETTE.plateEdge));
+    const edge = bar.mapOpen ? PALETTE.sun : PALETTE.plateEdge;
+    const bg = plate(scene, 0, 0, campW, zone.h - 4, bar.mapOpen ? PALETTE.stump : PALETTE.plate).setStrokeStyle(1, toPhaserColor(edge));
     chip.add([bg, text(scene, 4, textY - zone.y - 2, bar.camp)]);
     const hit = scene.add.zone(0, 0, campW, zone.h - 4).setOrigin(0, 0).setInteractive({ cursor: CURSOR.pointer });
     hit.on("pointerover", () => bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
-    hit.on("pointerout", () => bg.setStrokeStyle(1, toPhaserColor(PALETTE.plateEdge)));
+    hit.on("pointerout", () => bg.setStrokeStyle(1, toPhaserColor(edge)));
     hit.on("pointerdown", handlers.onMap);
     chip.add(hit);
     chip.setSize(campW, zone.h - 4);

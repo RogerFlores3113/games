@@ -74,6 +74,16 @@ export const PALETTE = {
   leatherPatch: "#3A2212",
   leatherStitch: "#C99A62",
   leatherSlot: "#211207",
+  // The kit bar: a leather strip with item slots sunk into it (dark above
+  // and left, lit below and right), and a stone one with the powers raised
+  // out of it (lit above and left).
+  kitLeather: "#5C3A1C",
+  slotShadow: "#140A03",
+  slotLight: "#9A6A3C",
+  stone: "#56524B",
+  stoneFace: "#7E796E",
+  stoneLight: "#B0AA9B",
+  stoneShadow: "#3A3732",
 } as const;
 
 /** Parses a "#rrggbb" string into Phaser's `0xrrggbb` integer form. */

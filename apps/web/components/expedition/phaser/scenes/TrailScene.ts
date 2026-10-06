@@ -8,6 +8,7 @@ import Phaser from "phaser";
 import { ensurePixelFonts } from "../font/pixel-font";
 import { preloadArt, placeArt } from "../art/place-art";
 import { STAGE, TRAIL_ZONES } from "../layout";
+import { drawKitBar, type KitBarHandlers } from "../draw/draw-kit-bar";
 import { drawBackdrop, drawPrompt, drawTooltip, drawTopBar } from "../draw/draw-table";
 import { drawTrailScene, type FlipClock, type TrailHandlers } from "../draw/draw-trail";
 import { InventoryWindow, type InventoryHandlers } from "../draw/inventory-window";
@@ -61,6 +62,7 @@ export class TrailScene extends Phaser.Scene {
   private readonly sceneStore: SceneDeps["store"];
   private readonly index: ObjectIndex;
   private readonly handlers: TrailHandlers;
+  private readonly kitHandlers: KitBarHandlers;
   private readonly flips: FlipClock = new Map();
   private unsubscribe: (() => void) | null = null;
   private layer: Phaser.GameObjects.Container | null = null;
@@ -76,6 +78,14 @@ export class TrailScene extends Phaser.Scene {
     this.sceneStore = deps.store;
     this.index = deps.index;
     this.handlers = this.buildHandlers();
+    this.kitHandlers = {
+      onUse: (sourceKey) => {
+        this.sceneStore.getState().updateLocalUi((ui) => ({ ...ui, kitOpen: false }));
+        this.handlers.onPower(sourceKey);
+      },
+      onHover: (sourceKey, objectId) => this.handlers.onSourceHover(sourceKey, objectId),
+      onToggle: () => this.sceneStore.getState().updateLocalUi((ui) => ({ ...ui, kitOpen: !ui.kitOpen })),
+    };
   }
 
   private buildHandlers(): TrailHandlers {
@@ -173,9 +183,10 @@ export class TrailScene extends Phaser.Scene {
     this.layer.removeAll(true);
     this.index.clearScene("trail");
     this.renderBackdrop(model);
-    drawTopBar(this, this.layer, model.topBar, { index: this.index, sceneKey: "trail", onMap: () => this.sceneStore.getState().openMap() });
+    drawTopBar(this, this.layer, model.topBar, { index: this.index, sceneKey: "trail" });
     drawPrompt(this, this.layer, model.prompt);
     drawTrailScene(this, this.layer, model, this.index, this.handlers, this.flips);
+    if (!(model.inventory?.open ?? false)) drawKitBar(this, this.layer, model.kitBar, TRAIL_ZONES.kit, 1, this.index, "trail", this.kitHandlers);
     this.inventory?.draw(this.layer, model.inventory);
     if (model.panel.kind !== "muster" && !(model.inventory?.open ?? false)) drawTooltip(this, this.layer, model.tooltip, TRAIL_ZONES.tooltip);
   }

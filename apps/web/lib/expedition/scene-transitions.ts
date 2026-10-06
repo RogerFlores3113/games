@@ -277,8 +277,9 @@ function fitLines(text: string, scales: readonly number[], chars: (scale: number
   return wrap(text, chars(smallest)).map((l) => ({ text: l.slice(0, chars(smallest)), scale: smallest }));
 }
 
-/** Greedy lines no wider than `width`; two lines are balanced, so a
- * title breaks "Heading to / the Desert" rather than leaving one word. */
+/** Greedy lines no wider than `width`; two lines break after a colon
+ * ("Boss: / the Snake"), else are balanced, so a title breaks "Heading to /
+ * the Desert" rather than leaving one word. */
 function wrap(text: string, width: number): string[] {
   const words = text.split(" ");
   const lines: string[] = [];
@@ -288,6 +289,8 @@ function wrap(text: string, width: number): string[] {
     else lines.push(word);
   }
   if (lines.length !== 2) return lines;
-  const splits = words.slice(1).map((_, i) => [words.slice(0, i + 1).join(" "), words.slice(i + 1).join(" ")]);
-  return splits.filter((pair) => pair.every((l) => l.length <= width)).reduce((best, pair) => (Math.max(...pair.map((l) => l.length)) < Math.max(...best.map((l) => l.length)) ? pair : best), lines);
+  const splits = words.slice(1).map((_, i) => [words.slice(0, i + 1).join(" "), words.slice(i + 1).join(" ")]).filter((pair) => pair.every((l) => l.length <= width));
+  const afterColon = splits.find(([first]) => first!.endsWith(":"));
+  if (afterColon !== undefined) return afterColon;
+  return splits.reduce((best, pair) => (Math.max(...pair.map((l) => l.length)) < Math.max(...best.map((l) => l.length)) ? pair : best), lines);
 }

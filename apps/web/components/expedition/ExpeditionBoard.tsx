@@ -27,7 +27,6 @@ import { playCue } from "../../lib/expedition/audio/cue-bus";
 import { toggleMute } from "../../lib/expedition/audio/audio-prefs";
 import { ReconnectingBanner } from "../ReconnectingBanner";
 import { ExpeditionRulesModal } from "./ExpeditionRulesModal";
-import { ExpeditionMapModal } from "./ExpeditionMapModal";
 import { ExpeditionSettingsModal } from "./ExpeditionSettingsModal";
 import { KickPanel } from "./KickPanel";
 import { buildKickPanel } from "../../lib/expedition/kick-model";
@@ -56,7 +55,6 @@ export function ExpeditionBoard({
 
   const onActionRef = useRef(onAction);
   const onRestartLobbyRef = useRef(onRestartLobby);
-  const [mapOpen, setMapOpen] = useState(false);
   useEffect(() => {
     onActionRef.current = onAction;
     onRestartLobbyRef.current = onRestartLobby;
@@ -77,10 +75,6 @@ export function ExpeditionBoard({
     createExpeditionSceneStore({
       onAction: (request) => onActionRef.current(request),
       onRestartLobby: () => onRestartLobbyRef.current?.(),
-      onOpenMap: () => {
-        playCue("sfx-ui-click");
-        setMapOpen(true);
-      },
       cardPackId: readCardPackPref(),
       transitions: { speed: transitionSpeed, now: () => performance.now() },
     }),
@@ -205,8 +199,6 @@ export function ExpeditionBoard({
       )}
 
       <ExpeditionRulesModal open={rulesOpen} onClose={() => setRulesOpen(false)} game={game} />
-
-      <ExpeditionMapModal open={mapOpen} onClose={() => setMapOpen(false)} game={game} />
 
       <ExpeditionSettingsModal
         open={settingsOpen}

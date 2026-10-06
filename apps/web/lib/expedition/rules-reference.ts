@@ -94,7 +94,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       id: "gear",
       heading: "Explorers and gear",
       paragraphs: [
-        "Each player picks one explorer before camp 1, and each has a base power. Click a power or item in your kit to use it, then pick its targets and confirm.",
+        "Each player picks one explorer before camp 1, and each has a base power. Your kit is the bar at the left: your items on leather, your powers on stone. One that glows can be used now: click it, then pick its targets and confirm. Click Kit to read every name and what is left.",
         "Every power and item says when it works and how often.",
       ],
       items: [

@@ -86,10 +86,14 @@ export interface LocalUiState {
   /** An objective icon of a camp preview, by its glyph's key (`win-card`,
    * `ordered:2`, `no-tricks`), for its plain words. */
   tooltipPreviewObjective: string | null;
+  /** The kit bar is popped out to show names and uses. */
+  kitOpen: boolean;
+  /** The trail map hangs over the camp (the camp label toggles it). */
+  mapOpen: boolean;
 }
 
 export function initialLocalUi(): LocalUiState {
-  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipSourceId: null, tooltipObjectiveId: null, tooltipMateSource: null, tooltipModId: null, drag: IDLE_DRAG, trayPage: 0, takenBundle: null, inventoryOpen: null, discardUid: null, tooltipPreviewObjective: null };
+  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipSourceId: null, tooltipObjectiveId: null, tooltipMateSource: null, tooltipModId: null, drag: IDLE_DRAG, trayPage: 0, takenBundle: null, inventoryOpen: null, discardUid: null, tooltipPreviewObjective: null, kitOpen: false, mapOpen: false };
 }
 
 function currentHandIds(view: ExpeditionView): string[] {
@@ -279,6 +283,9 @@ export function reconcileLocalUi(ui: LocalUiState, view: ExpeditionView): LocalU
 
   if (next.inventoryOpen !== null && next.inventoryOpen !== inventoryStageKey(view)) {
     next = { ...next, inventoryOpen: null, discardUid: null };
+  }
+  if (next.mapOpen && view.stage.tag !== "camp") {
+    next = { ...next, mapOpen: false };
   }
   if (next.discardUid !== null) {
     const you = view.seats.find((s) => s.seatId === view.yourSeatId);
