@@ -10,7 +10,7 @@ import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL, SIGN_CELL, WORLD_SIGN_FONT } from "../font/font-keys";
 import { BUNDLE_ITEM_TEXT_Y, BUNDLE_TAKE_H, DRAFT_ZONES, LENGTH_CARD_GAP, MINI_H, MINI_W, MUSTER_LINE, MUSTER_PORTRAIT_W, MUSTER_TEXT_LINES, MUSTER_ZONES, bundleItemH, itemBarLayout, lengthStopStep, musterBoxes, musterTextChars, ROUTE_ZONES, TRAIL_ZONES, bundleBoxes, bundleTextChars, rowBoxes, trailStopXs, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
-import { ART, crewArtId, modArtId, sourceArtId, type ArtId } from "../art/art-registry";
+import { ART, crewArtId, modArtId, sourceArtId, stopArtId } from "../art/art-registry";
 import type { ObjectIndex } from "../object-index";
 import type {
   BundleItem,
@@ -90,8 +90,6 @@ function wrapped(value: string, chars: number, max: number): string[] {
   return wrapWords(value, chars).slice(0, max);
 }
 
-const STOP_ART: Readonly<Record<StopKind, ArtId>> = { camp: "marker-camp", animal: "marker-animal", disaster: "marker-boss", temple: "temple" };
-
 // ---------------------------------------------------------------------------
 // Trail map
 // ---------------------------------------------------------------------------
@@ -138,7 +136,7 @@ export function drawTrailMap(scene: Phaser.Scene, layer: Layer, stops: TrailStop
       const token = ART["crew-token"];
       layer.add(placeArt(scene, "crew-token", x, zone.y + 2 + token.h / 2));
     }
-    const marker = placeArt(scene, stop.state === "cleared" ? "marker-cleared" : STOP_ART[stop.kind], x, y);
+    const marker = placeArt(scene, stop.state === "cleared" ? "marker-cleared" : stopArtId(stop.kind), x, y);
     if (stop.state === "ahead") marker.setAlpha(0.7);
     layer.add(marker);
     layer.add(centredText(scene, x, zone.y + LABEL_ROW, `Camp ${stop.index}`, INK));
@@ -234,7 +232,7 @@ function drawMusterCrew(ctx: Ctx, crew: MusterCrewRow[], locked: string): void {
 function drawStops(scene: Phaser.Scene, container: Phaser.GameObjects.Container, stops: StopKind[], cx: number, y: number, w: number): void {
   const step = lengthStopStep(stops.length, w);
   const x0 = cx - Math.floor(((stops.length - 1) * step) / 2);
-  stops.forEach((kind, i) => container.add(placeArt(scene, STOP_ART[kind], x0 + i * step, y)));
+  stops.forEach((kind, i) => container.add(placeArt(scene, stopArtId(kind), x0 + i * step, y)));
 }
 
 function voterLine(voters: string[]): string {
@@ -356,7 +354,7 @@ const PORTRAIT_SCALE = 0.5;
 /** The boss line: "No boss", the tier with its marker, or once revealed
  * the boss's portrait beside its name and tier. Returns the height used. */
 function bossLine(scene: Phaser.Scene, container: Phaser.GameObjects.Container, preview: CampPreview, x: number, y: number, room = Infinity): number {
-  if (preview.boss === null) {
+  if (preview.boss === null || preview.bossTier === null) {
     container.add(text(scene, x, y, "No boss", PALETTE.textDim));
     return LINE;
   }
@@ -364,7 +362,7 @@ function bossLine(scene: Phaser.Scene, container: Phaser.GameObjects.Container, 
   const h = art === null ? 0 : Math.round(ART[art].h * PORTRAIT_SCALE);
   if (art === null || preview.bossName === null || h > room) {
     const label = preview.bossName === null ? preview.boss : `${preview.bossName}, ${preview.boss.toLowerCase()}`;
-    container.add(placeArt(scene, preview.boss === "The Temple" ? "temple" : "marker-boss", x + 8, y + 3));
+    container.add(placeArt(scene, stopArtId(preview.bossTier), x + 8, y + 3));
     container.add(text(scene, x + 18, y, label, PALETTE.destructive));
     return LINE;
   }

@@ -385,7 +385,7 @@ describe("route", () => {
             { glyph: "?", key: "win-card", objectId: "preview-objective:a:0" },
             { glyph: "?", key: "win-card", objectId: "preview-objective:a:1" },
             { glyph: "?", key: "win-card", objectId: "preview-objective:a:2" },
-          ], boss: "Animal boss", bossId: "tiger", bossName: "Tiger", survey: null },
+          ], boss: "Animal boss", bossTier: "animal", bossId: "tiger", bossName: "Tiger", survey: null },
           voters: ["You", "Alice"],
           yours: true,
           votable: true,
@@ -401,7 +401,7 @@ describe("route", () => {
             { glyph: "1", key: "ordered:1", objectId: "preview-objective:b:1" },
             { glyph: "2", key: "ordered:2", objectId: "preview-objective:b:2" },
             { glyph: "#", key: "trick-count", objectId: "preview-objective:b:3" },
-          ], boss: "Animal boss", bossId: null, bossName: null, survey: null },
+          ], boss: "Animal boss", bossTier: "animal", bossId: null, bossName: null, survey: null },
           voters: [],
           yours: false,
           votable: true,
@@ -421,7 +421,7 @@ describe("route", () => {
     const plan: ExpeditionView["plan"] = [{ at: 3, tier: "animal", bossId: "tiger" }, { at: 6, tier: "temple", bossId: "temple" }];
     const view = at({ tag: "route", options: [{ id: "t", next: preview(6, { location: "desert", bossId: "temple" }), swapsBoss: false }], ballots: [] }, { plan });
     const p = model(view).panel;
-    expect(p.kind === "route" && p.options[0]!.next).toMatchObject({ location: "Desert", locationId: "desert", backdrop: "temple", boss: "The Temple", bossId: null, bossName: null });
+    expect(p.kind === "route" && p.options[0]!.next).toMatchObject({ location: "Desert", locationId: "desert", backdrop: "temple", boss: "The Temple", bossTier: "temple", bossId: null, bossName: null });
   });
 
   it("labels a plain camp without a boss", () => {
@@ -459,6 +459,7 @@ describe("event and loadout panels", () => {
           { glyph: "?", key: "win-card", objectId: "preview-objective:loadout:1" },
         ],
         boss: null,
+        bossTier: null,
         bossId: null,
         bossName: null,
         survey: null,

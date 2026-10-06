@@ -2,7 +2,7 @@
  * The signboard over every scene (`scene-transitions.ts`): it drops on its
  * chains with the copy the store's transition carries, hangs, fades the
  * stage to black, and once the next scene is running fades it back in.
- * It swallows the pointer while the sign hangs. Poses come from the store's
+ * It swallows the pointer until the fade in is done. Poses come from the store's
  * clock, so a frame skipped never changes where the sign ends up.
  */
 import Phaser from "phaser";
@@ -12,7 +12,7 @@ import { placeArt } from "../art/place-art";
 import { artTextureKey } from "../art/art-registry";
 import { PALETTE, toPhaserColor } from "../palette";
 import { SIGNBOARD, STAGE, signChars } from "../layout";
-import { boardTops, fadeInBlack, signLines, signPose, type SignLine } from "../../../../lib/expedition/scene-transitions";
+import { boardTops, fadeStep, signLines, signPose, type FadeState, type SignLine } from "../../../../lib/expedition/scene-transitions";
 import type { ActiveTransition, ExpeditionSceneStore } from "../../../../lib/expedition/expedition-scene-store";
 
 export const TRANSITION_SCENE_KEY = "transition";
@@ -36,9 +36,7 @@ export class TransitionScene extends Phaser.Scene {
   private blocker: Phaser.GameObjects.Zone | null = null;
   /** The transition the sign is lettered for. */
   private letteredSerial: number | null = null;
-  /** The fade in under way: from when the next scene first ran. */
-  private fade: { serial: number; ms: number; from: number | null } | null = null;
-  private doneSerial: number | null = null;
+  private fade: FadeState = { fade: null, doneSerial: null };
   private blocking = false;
 
   constructor(deps: { store: ExpeditionSceneStore }) {
@@ -107,32 +105,20 @@ export class TransitionScene extends Phaser.Scene {
     const transition = this.sceneStore.getState().transition;
     const now = performance.now();
     if (transition?.phase === "sign") {
-      this.fade = null;
+      this.fade = { ...this.fade, fade: null };
       this.drawSign(transition, now);
       return;
     }
-    this.block(false);
     this.sign?.setVisible(false);
-    if (transition?.phase === "fade-in" && transition.serial !== this.doneSerial && this.fade?.serial !== transition.serial) {
-      this.fade = { serial: transition.serial, ms: transition.timing.fadeIn, from: null };
-    }
-    const fade = this.fade;
-    if (fade === null) {
-      this.black?.setAlpha(0);
-      return;
-    }
     // Black until the next scene has loaded its art and drawn.
     const key = this.sceneStore.getState().sceneKey;
-    if (fade.from === null && key !== null && this.scene.manager.isActive(key)) fade.from = now;
-    const black = fade.from === null ? 1 : fadeInBlack(fade.ms, now - fade.from);
-    this.black?.setAlpha(black);
-    if (black === 0) {
-      this.doneSerial = fade.serial;
-      this.fade = null;
-    }
+    const step = fadeStep(this.fade, transition, key !== null && this.scene.manager.isActive(key), now);
+    this.fade = step.state;
+    this.black?.setAlpha(step.black);
+    this.block(step.blocking);
   }
 
-  /** Swallows the pointer over the whole stage while the sign hangs. */
+  /** Swallows the pointer over the whole stage while the sign hangs and the next scene fades in. */
   private block(on: boolean): void {
     if (on === this.blocking || this.blocker === null) return;
     this.blocking = on;

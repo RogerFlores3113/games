@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ExpeditionCampPreviewView, ExpeditionStageView, ExpeditionView } from "@games/rules";
-import { TRANSITION_TIMING, boardTops, fadeInBlack, signLines, signPose, swapAt, transitionFor, type SceneTransition } from "./scene-transitions";
+import { TRANSITION_TIMING, boardTops, fadeInBlack, fadeStep, signLines, signPose, swapAt, transitionFor, type SceneTransition } from "./scene-transitions";
 
 function preview(overrides: Partial<ExpeditionCampPreviewView> = {}): ExpeditionCampPreviewView {
   return { index: 2, location: "clifftop", weather: "thunderstorm", pairing: null, slotKinds: [], bossId: null, shop: false, survey: null, ...overrides };
@@ -189,6 +189,28 @@ describe("the sequence", () => {
     expect(fadeInBlack(TRANSITION_TIMING.full.fadeIn, 0)).toBe(1);
     expect(fadeInBlack(TRANSITION_TIMING.full.fadeIn, 225)).toBeCloseTo(0.5);
     expect(fadeInBlack(TRANSITION_TIMING.full.fadeIn, 450)).toBe(0);
+  });
+});
+
+describe("fadeStep", () => {
+  const fadeIn = { phase: "fade-in" as const, serial: 4, timing: { fadeIn: 450 } };
+
+  it("holds the pointer from black until the new scene has faded all the way in, even after the store drops the transition", () => {
+    let step = fadeStep({ fade: null, doneSerial: null }, fadeIn, false, 1000);
+    expect([step.black, step.blocking]).toEqual([1, true]);
+    step = fadeStep(step.state, fadeIn, true, 2000);
+    expect([step.black, step.blocking]).toEqual([1, true]);
+    step = fadeStep(step.state, null, true, 2225);
+    expect(step.black).toBeCloseTo(0.5);
+    expect(step.blocking).toBe(true);
+    step = fadeStep(step.state, null, true, 2450);
+    expect([step.black, step.blocking]).toEqual([0, false]);
+    expect(step.state).toEqual({ fade: null, doneSerial: 4 });
+  });
+
+  it("does not fade a transition it already faded in, and is clear with none", () => {
+    expect(fadeStep({ fade: null, doneSerial: 4 }, fadeIn, true, 5000)).toEqual({ state: { fade: null, doneSerial: 4 }, black: 0, blocking: false });
+    expect(fadeStep({ fade: null, doneSerial: null }, null, true, 5000)).toEqual({ state: { fade: null, doneSerial: null }, black: 0, blocking: false });
   });
 });
 

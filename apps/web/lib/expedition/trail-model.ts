@@ -11,7 +11,7 @@ import { buildInventory, roomFor, type Inventory, type InventoryItem } from "./i
 import { buildKitBar, type KitBar } from "./kit-bar-model";
 import { choiceFor, currentStep, isPicked, type LocalUiState, type PickEntity } from "./local-ui";
 import { cardLabel } from "./expedition-ids";
-import { bossLabel, focusCampIndex, modName } from "./view-access";
+import { bossLabel, focusCampIndex, modName, plannedBossAt } from "./view-access";
 import { buildTrail, type StopKind, type TrailStop } from "./trail-stops";
 
 export type { StopKind, TrailStop } from "./trail-stops";
@@ -183,6 +183,8 @@ export interface CampPreview {
   objectives: ObjectiveIcon[];
   /** "Animal boss", "The Temple"; null for a plain camp. */
   boss: string | null;
+  /** The boss's tier, public from the plan before the boss is revealed. */
+  bossTier: Exclude<StopKind, "camp"> | null;
   /** The boss's id and name once a route preview has revealed it; null at
    * the temple, which `boss` already names. */
   bossId: string | null;
@@ -356,6 +358,7 @@ export function campPreview(view: View, camp: ExpeditionCampPreviewView, owner =
     pairing: camp.pairing === null ? null : modDisplayName(camp.pairing),
     objectives: objectiveIcons(camp.slotKinds, owner),
     boss: bossLabel(view, camp.index),
+    bossTier: plannedBossAt(view, camp.index)?.tier ?? null,
     bossId,
     bossName: bossId === null ? null : modDisplayName(bossId),
     survey: camp.survey === null ? null : camp.survey.map(surveyLabel),

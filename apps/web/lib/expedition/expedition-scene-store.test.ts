@@ -301,6 +301,24 @@ describe("scene transitions", () => {
     expect(store.getState().server?.game.stage).toMatchObject({ tag: "draft", pendingSeatIds: ["s1"] });
   });
 
+  it("the first view after a reconnect shows at once, whether it lands before or after the reconnect ends; the next move signs again", () => {
+    for (const viewFirst of [true, false]) {
+      const { store } = transitionStore();
+      store.getState().setServer(server(makeView()));
+      store.getState().setReconnecting(true);
+      if (viewFirst) store.getState().setServer(server(onTrail(draftOffer)));
+      store.getState().setReconnecting(false);
+      if (!viewFirst) store.getState().setServer(server(onTrail(draftOffer)));
+      expect(store.getState().transition).toBeNull();
+      expect(store.getState().sceneKey).toBe("trail");
+      store.getState().setServer(server(makeView()));
+      expect(store.getState().transition).toBeNull();
+      store.getState().setServer(server(onTrail(draftOffer)));
+      expect(store.getState().transition).toMatchObject({ caseId: "camp-won", phase: "sign" });
+      vi.useRealTimers();
+    }
+  });
+
   it("a dev jump shows the next view at once", () => {
     const { store } = transitionStore("skip");
     store.getState().setServer(server(makeView()));

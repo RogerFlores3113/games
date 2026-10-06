@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { MOD_DISPLAY } from "@games/rules";
-import { ART, backdropArtId, fittedFallbackLabel, crewArtId, resolveArt, sourceArtId, tableOf, type ArtId } from "./art-registry";
+import { ART, backdropArtId, fittedFallbackLabel, crewArtId, resolveArt, sourceArtId, stopArtId, tableOf, type ArtId } from "./art-registry";
 import { ART_FILES } from "./art-files.generated";
 
 const SPRITES_DIR = fileURLToPath(new URL("../../../../public/expedition/sprites/", import.meta.url));
@@ -15,6 +15,12 @@ describe("resolveArt", () => {
       url: "/expedition/sprites/camp/crate.png",
     });
     expect(resolveArt("crate", new Set())).toMatchObject({ kind: "fallback", key: "art-fallback:crate" });
+  });
+});
+
+describe("stopArtId", () => {
+  it("marks a camp or boss by its tier: the paw for an animal, the storm for a disaster", () => {
+    expect((["camp", "animal", "disaster", "temple"] as const).map(stopArtId)).toEqual(["marker-camp", "marker-animal", "marker-boss", "temple"]);
   });
 });
 

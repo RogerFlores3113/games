@@ -233,6 +233,29 @@ export function fadeInBlack(fadeIn: number, t: number): number {
   return fadeIn === 0 ? 0 : 1 - clamp01(t / fadeIn);
 }
 
+/** A fade in under way, from when the next scene first ran. */
+export type FadeState = { readonly fade: { readonly serial: number; readonly ms: number; readonly from: number | null } | null; readonly doneSerial: number | null };
+
+/** One frame after the sign: black until the next scene runs, then the fade
+ * in, with the pointer held until the screen is clear. The store may drop
+ * its transition before then, since the fade starts on the scene's clock. */
+export function fadeStep(
+  state: FadeState,
+  transition: { readonly phase: "sign" | "fade-in"; readonly serial: number; readonly timing: { readonly fadeIn: number } } | null,
+  nextRunning: boolean,
+  now: number,
+): { state: FadeState; black: number; blocking: boolean } {
+  let fade = state.fade;
+  if (transition?.phase === "fade-in" && transition.serial !== state.doneSerial && fade?.serial !== transition.serial) {
+    fade = { serial: transition.serial, ms: transition.timing.fadeIn, from: null };
+  }
+  if (fade === null) return { state: { fade: null, doneSerial: state.doneSerial }, black: 0, blocking: false };
+  const from = fade.from === null && nextRunning ? now : fade.from;
+  const black = from === null ? 1 : fadeInBlack(fade.ms, now - from);
+  if (black === 0) return { state: { fade: null, doneSerial: fade.serial }, black: 0, blocking: false };
+  return { state: { fade: { ...fade, from }, doneSerial: state.doneSerial }, black, blocking: true };
+}
+
 function clamp01(x: number): number {
   return Math.min(1, Math.max(0, x));
 }

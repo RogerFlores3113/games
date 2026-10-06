@@ -51,7 +51,8 @@ export interface ExpeditionSceneState {
 
 export interface ExpeditionSceneActions {
   /** Reconciles `localUi` against the fresh view, then rebuilds
-   * `sceneKey`/`model` from it. */
+   * `sceneKey`/`model` from it. The first view, and the first after a
+   * reconnect, show at once. */
   setServer(server: SceneServerInput): void;
   setReconnecting(reconnecting: boolean): void;
   /** No-op when `server` is null — there is no view to derive from yet. */
@@ -101,6 +102,9 @@ export function createExpeditionSceneStore(opts: {
     /** The newest view, held back while a sign hangs. */
     let held: SceneServerInput | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    /** Set when the socket drops: the view that resyncs it may come before
+     * or after reconnecting clears, and is history, never a move to sign. */
+    let resyncing = false;
 
     function show(server: SceneServerInput): void {
       const reconciled = reconcileLocalUi(get().localUi, server.game);
@@ -147,19 +151,22 @@ export function createExpeditionSceneStore(opts: {
       transition: null,
 
       setServer(server) {
+        const resync = resyncing;
+        resyncing = false;
         if (get().transition?.phase === "sign") {
           held = server;
           return;
         }
         const shown = get().server;
         const transitions = opts.transitions;
-        const found = shown === null || transitions === undefined ? null : transitionFor(shown.game, server.game);
+        const found = shown === null || resync || transitions === undefined ? null : transitionFor(shown.game, server.game);
         const speed = found === null ? "skip" : transitions!.speed();
         if (found === null || speed === "skip") show(server);
         else startTransition(found, server, TRANSITION_TIMING[speed], transitions!.now);
       },
 
       setReconnecting(reconnecting) {
+        if (reconnecting) resyncing = true;
         const { server, localUi, cardPackId } = get();
         if (server === null) {
           set({ reconnecting });

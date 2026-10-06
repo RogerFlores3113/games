@@ -4,6 +4,7 @@
  * whose file is not listed in `ART_FILES` draws its labelled fallback.
  * No `phaser` import.
  */
+import type { StopKind } from "../../../../lib/expedition/trail-stops";
 import { PALETTE, toPhaserColor } from "../palette";
 
 export interface ArtDef {
@@ -154,6 +155,13 @@ export function sourceArtId(sourceId: string): ArtId | null {
 export function modArtId(mod: { readonly id: string; readonly kind: string }): ArtId | null {
   const id = mod.kind === "location" ? (mod.id === "jungle" ? "bg-jungle-night" : `bg-${mod.id}`) : mod.kind === "animal" || mod.kind === "disaster" ? `boss-${mod.id}` : null;
   return id !== null && id in ART ? (id as ArtId) : null;
+}
+
+const STOP_ART: Readonly<Record<StopKind, ArtId>> = { camp: "marker-camp", animal: "marker-animal", disaster: "marker-boss", temple: "temple" };
+
+/** A camp's marker on the trail, and an unrevealed boss's beside its tier. */
+export function stopArtId(kind: StopKind): ArtId {
+  return STOP_ART[kind];
 }
 
 /** A location's backdrop: its own, or the Jungle's. */
