@@ -48,7 +48,9 @@ function restartCamp(run: RunState, catalog: Catalog): RunState {
 export function kickSeat(run: RunState, seatId: string, catalog: Catalog): RunState {
   if (!canKick(run, seatId)) throw new Error(`kickSeat: ${seatId} cannot be kicked now`);
   const benched = benchSeat(run, seatId);
-  return advance(restartCamp({ ...benched, stage: stageWithout(benched.stage, seatId) }, catalog), catalog);
+  const restarted = restartCamp({ ...benched, stage: stageWithout(benched.stage, seatId) }, catalog);
+  // A slot rule that reads seat order (half Rats) may now give another seat fewer.
+  return advance(restarted.stage.tag === "loadout" ? withinSlots(restarted as RunAt<"loadout">, catalog) : restarted, catalog);
 }
 
 /** A kicked seat connecting is back: it rejoins at the next loadout, or at

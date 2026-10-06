@@ -5,8 +5,10 @@ import { absentSeatAction } from "../absent";
 import { attemptOf, withAttempt } from "../attempt";
 import { CATALOG } from "../catalog";
 import { rulesFor } from "../compose";
-import { createRun, dealCamp, settleCamp } from "../lifecycle";
+import { createRun, dealCamp, openLoadout, settleCamp } from "../lifecycle";
+import { campIndex } from "../plan";
 import { advanceTo, setupRun, testCatalog } from "../run-test-support";
+import { backpackOf } from "../usage";
 import type { Catalog, RunAction, RunAt, RunState } from "../types";
 import { currentWindow } from "../windows";
 import { canKick, kickSeat, seatPresence } from "./kick";
@@ -298,5 +300,59 @@ describe("a kicked seat coming back", () => {
     const run = loadout();
     expect(seatPresence(run, "p1", true, CATALOG)).toBe(run);
     expect(seatPresence(run, "p1", false, CATALOG)).toBe(run);
+  });
+});
+
+describe("a kick under half-strength Rats, which take a slot from the first two seats", () => {
+  const ratsLoadout = (): RunAt<"loadout"> => {
+    const base = setupRun({ seatIds: FOUR, seed: "rats", catalog: CATALOG, camp: 2, items: { p2: ["bait", "whetstone"], p0: ["bait"] } }) as RunAt<"loadout">;
+    const bosses = [
+      { at: campIndex(1), tier: "animal" as const, modId: "rats" },
+      { at: campIndex(2), tier: "temple" as const, modId: "temple" },
+    ];
+    return openLoadout({ ...base, plan: { ...base.plan!, bosses } }, base.stage.camp, CATALOG);
+  };
+
+  it("moves the slot to the new second seat, whose last equipped item goes back to the backpack", () => {
+    const run = ratsLoadout();
+    expect(run.seatIds.map((seatId) => rulesFor(run, CATALOG).itemSlots(run, seatId))).toEqual([1, 1, 2, 2]);
+    expect(run.seats[2]!.equipped).toEqual(["it1", "it2"]);
+    const kicked = kickSeat(run, "p0", CATALOG);
+    expect(kicked.seatIds.map((seatId) => rulesFor(kicked, CATALOG).itemSlots(kicked, seatId))).toEqual([1, 1, 2]);
+    expect(kicked.seats.find((seat) => seat.seatId === "p2")!.equipped).toEqual(["it1"]);
+    expect(absentSeatAction(kicked, "p2", CATALOG)).toEqual({ type: "ready" });
+    expect(applyRunAction(kicked, "p2", { type: "ready" }, CATALOG).ok).toBe(true);
+  });
+
+  it("the last ready that a kick completes deals no seat more items than its slots", () => {
+    const readied = readyAll(ratsLoadout(), ["p1", "p2", "p3"], CATALOG);
+    const dealt = kickSeat(readied, "p0", CATALOG);
+    expect(dealt.stage.tag).toBe("camp");
+    expect(dealt.seats.find((seat) => seat.seatId === "p2")!.equipped).toEqual(["it1"]);
+  });
+});
+
+describe("the absent-seat pass at a loadout whose set is over its slots", () => {
+  const over = (backpack: number): RunState => {
+    const run = setupRun({ seatIds: FOUR, seed: "over", catalog: CATALOG });
+    const items = Array.from({ length: 3 + backpack }, (_, i) => ({ uid: `it${i}`, itemId: i % 2 === 0 ? "bait" : "whetstone" }));
+    return { ...run, seats: run.seats.map((seat) => (seat.seatId === "p0" ? { ...seat, items, equipped: ["it0", "it1", "it2"] } : seat)) };
+  };
+
+  it("equips the first items that fit, then readies", () => {
+    const run = over(1);
+    expect(applyRunAction(run, "p0", { type: "ready" }, CATALOG)).toEqual({ ok: false, error: "too_many_items" });
+    const action = absentSeatAction(run, "p0", CATALOG);
+    expect(action).toEqual({ type: "equip", itemUids: ["it0", "it1"] });
+    const fitted = act(run, "p0", action!, CATALOG);
+    expect(absentSeatAction(fitted, "p0", CATALOG)).toEqual({ type: "ready" });
+  });
+
+  it("discards its last equipped item when the backpack has no room for it", () => {
+    const run = over(6);
+    expect(backpackOf(run.seats[0]!)).toHaveLength(6);
+    expect(absentSeatAction(run, "p0", CATALOG)).toEqual({ type: "discard-item", itemUid: "it2" });
+    const trimmed = act(run, "p0", { type: "discard-item", itemUid: "it2" }, CATALOG);
+    expect(absentSeatAction(trimmed, "p0", CATALOG)).toEqual({ type: "ready" });
   });
 });
