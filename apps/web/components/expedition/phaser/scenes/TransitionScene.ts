@@ -118,6 +118,11 @@ export class TransitionScene extends Phaser.Scene {
     this.block(step.blocking);
   }
 
+  /** Whether the stage swallows the pointer now. */
+  get holdsInput(): boolean {
+    return this.blocking;
+  }
+
   /** Swallows the pointer over the whole stage while the sign hangs and the next scene fades in. */
   private block(on: boolean): void {
     if (on === this.blocking || this.blocker === null) return;

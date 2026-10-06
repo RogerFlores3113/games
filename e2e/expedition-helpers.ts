@@ -16,6 +16,7 @@ interface ExpeditionTestBridgeShape {
   liveGames: number;
   scene: string | null;
   model: unknown;
+  input: { drag: string; reconnecting: boolean; held: boolean } | null;
   objects(): Record<string, { x: number; y: number; width: number; height: number }>;
   positionOf(id: string): { x: number; y: number } | null;
   pagePoint(stage: { x: number; y: number }): { x: number; y: number } | null;
@@ -124,6 +125,8 @@ export async function getScene(page: Page): Promise<"camp" | "trail" | "run-end"
  * clue which.
  */
 export async function clickObject(page: Page, id: string): Promise<void> {
+  // A real click while the signboard holds the pointer is swallowed, as a player's would be.
+  await page.waitForFunction(() => !(window.__expeditionTest?.input?.held ?? false), undefined, { timeout: 15_000 });
   const position = await page.evaluate((objectId) => window.__expeditionTest?.positionOf(objectId) ?? null, id);
   if (position === null) {
     const known = await page.evaluate(() => Object.keys(window.__expeditionTest?.objects() ?? {}));

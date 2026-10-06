@@ -22,6 +22,7 @@ import type { ObjectIndex } from "./object-index";
 import type { LayoutEntry } from "../../../lib/expedition/layout-audit";
 import { recentCues } from "../../../lib/expedition/audio/cue-bus";
 import { STAGE_WIDTH } from "../../../lib/expedition/compute-zoom";
+import { TRANSITION_SCENE_KEY, type TransitionScene } from "./scenes/TransitionScene";
 
 export interface ExpeditionTestBridge {
   ready: boolean;
@@ -32,8 +33,9 @@ export interface ExpeditionTestBridge {
   /** The signboard between scenes while one plays: what it says and whether it still hangs. */
   readonly transition: { caseId: string; phase: "sign" | "fade-in"; title: string; sub: string | null } | null;
   /** What can swallow a click on the canvas: the hand-card gesture in
-   * flight and whether the socket is reconnecting. */
-  readonly input: { drag: string; reconnecting: boolean } | null;
+   * flight, whether the socket is reconnecting, and whether the signboard
+   * holds the pointer (while it hangs and until the next scene has faded in). */
+  readonly input: { drag: string; reconnecting: boolean; held: boolean } | null;
   /** Every registered object's page-CSS-px CENTRE + scaled size, keyed by
    * its test-bridge id. */
   objects(): Record<string, { x: number; y: number; width: number; height: number }>;
@@ -123,8 +125,11 @@ function ensureBridge(): ExpeditionTestBridge {
       return current()?.store.getState().model ?? null;
     },
     get input() {
-      const state = current()?.store.getState();
-      return state === undefined ? null : { drag: state.localUi.drag.phase, reconnecting: state.reconnecting };
+      const install = current();
+      if (install === null) return null;
+      const state = install.store.getState();
+      const sign = install.game.scene.getScene(TRANSITION_SCENE_KEY) as TransitionScene | null;
+      return { drag: state.localUi.drag.phase, reconnecting: state.reconnecting, held: sign?.holdsInput ?? false };
     },
     get transition() {
       const transition = current()?.store.getState().transition ?? null;
