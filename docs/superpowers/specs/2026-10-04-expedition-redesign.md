@@ -954,6 +954,88 @@ Thunderstorm fatal check under composed rules; the generic `deferIfFatal` retry 
   with one upgrade per player bought at the shop.
 - The 13 items take the new kinds with placeholder price and rarity; Rain Poncho's cancel is deleted.
 
+### Lead decisions (batch 6, 2026-10-05)
+
+Owner feedback after playing batch 5, with the lead's resolution where the
+owner left a choice. Items are still not being reworked (the item set is
+replaced later): existing items keep working.
+
+Run flow (rules, unit D):
+
+1. Before each camp, in order: the shop (only before a boss camp, as
+   before), the item draft, the event (when there is one), the route vote,
+   then the loadout. Lead: the loadout stays as the last step ("Prepare for
+   camp k", equip and set out): the crew sees the chosen camp (location,
+   weather, a Rats slot cut) before the deal, and a failed or restarted
+   camp reopens it. A failed or restarted boss camp goes back through its
+   shop (same stock, unsold) and then its loadout, as the old shop-in-the-
+   loadout did; any other replay reopens only the loadout.
+2. One item draft before camp 1 (after the muster's last lock-in, before
+   camp 1's loadout). Camp 1 is the fixed Jungle, so it has no route vote and
+   no event.
+3. A normal draft offers three single items (three different ones).
+4. The draft after a boss camp (animal or disaster; the temple is final)
+   offers three bundles of two instead.
+5. The Pack Rat's extra pick of one of three Pack Rat items follows every
+   draft, single or bundles, and the draft before camp 1.
+6. Events after camps 1, 3, 5 and 7 while a camp follows: before camps 2, 4,
+   6 and 8. Still stubs. Lead: an event is no longer part of a route option
+   (it comes before the vote); it is drawn on its own stream per camp.
+7. The backpack holds 6 items beside the 2 equipped slots (the Pack Rat 3);
+   only equipped items act in camp, and in camp only the Pack Rat's Pack
+   Animal reaches into the backpack (its text: "Open your backpack once
+   each camp to swap items."). Lead, the full backpack: an item that does
+   not fit is refused (`backpack_full`) at the draft and the shop, and the
+   player discards an item (any, equipped or not, in any stage between
+   camps) to make room. There is no free "skip" of an offer: skipping a
+   draft stays the Businessman's paid Cash Out. A dropped seat discards its
+   last backpack item, then takes the first offer. Equip and discard are open
+   in every stage between camps (shop, draft, event, route, loadout), so the
+   inventory window works on every pre-camp screen. A camp rule that takes a
+   slot (Rats) may push the backpack to 7; the slot and item come back once
+   the camp is over.
+   Lead: the boss ahead stays hidden at the shop, the draft and the event,
+   and is revealed by the route preview as before (lead decision of
+   2026-10-04); the shop names the boss only on a replay.
+
+Pre-camp screens (web, unit E):
+
+8. Objectives preview as small card icons: `?` a win-card objective; `1` to
+   `5` ordered objectives (one icon per ordered card); `A` to `E` a second
+   parallel ordered track; `#` an exact trick count; `>` / `<` more/fewer
+   tricks; hover gives the plain words. Lead, kinds the owner did not name:
+   no tricks reads `0` (it is "win exactly no tricks", not "fewer than n"); a
+   trick-count slot in a preview, which the deal resolves to no tricks or an
+   exact count, reads `#`; an ordered objective marked "last" reads `L`; an
+   objective a Desert's mirage hides reads `~`. `A`-`E`, `>` and `<` are
+   reserved: no catalogue kind produces them yet.
+9. Trail map strip: no "boss" or "temple" labels under camps ("next"
+   stays); no "Crew" label by the crew token.
+10. Run length panel: "Run length", then the value ("Short"); no "vote",
+    "by majority" or the list of lengths.
+11. Item bar: "Item slots" with "X of 2"; no big backpack art or "Your
+    backpack is empty..." section. A small backpack icon opens an inventory
+    window: brown leather interior with 6 darker patches for the backpack
+    slots and the 2 (Pack Rat 3) equipment slots below; click moves an item
+    between backpack and slots, drag reorders or moves; icons only, hover
+    gives name, description and uses.
+12. Event screens: no "Route vote" section.
+13. Pre-camp: no "Your explorer" section; the title reads "Prepare for camp
+    2"; an event reads "Event | <event name>".
+
+Camp screen (web, unit F):
+
+14. "Your kit" becomes a pop-out vertical bar on the left: brown inventory
+    slots, one equipped item each, with the character power and upgrades
+    beside them on a different background; hover gives name, description and
+    uses left. Only the compact bar shows by default.
+15. The hand boards are removed.
+16. "Camp k of N" toggles the parchment trail map (the pre-camp one),
+    replacing the "Map of the run" dialog.
+17. The Pack Rat with Pack Animal may open the backpack icon once per camp,
+    between tricks, to swap through the same inventory window; nobody else
+    can open it in camp.
+
 ## Next implementation step
 
 Unit 1: delete `boss/`, `bossTwists`, `bossCancelled`, `cancel-boss-twist`, `objectiveAssignment`
@@ -2424,3 +2506,114 @@ How each of the nine fits (for unit 13):
 - Art: `ui/signboard.png` is registered as `signboard` (192x128) with its prompt
   spec. The PixelLab job (47469044-…) is a raw-image job; its tool is recorded as
   `create_image_pixflux`, which the job listing does not confirm.
+
+### Implementation notes (batch 6 unit D)
+
+- Stages. `Stage` gains `shop { next, camp, stock, ready }` (`camp` is the
+  spec on a replay, null on the way there); `draft` is `{ next }` (the camp
+  it prepares for; the payout now lives only in history); `event` is
+  `{ next, event, ready }`; `loadout` is `{ camp, ready }` (the stock moved to
+  the shop). `CampSpec.event` and the route field `event` are gone.
+  `run/trail.ts` is the one pure table of the way to a camp: `legsTo(length,
+  next)`, `replayLegs(length, camp)`, `draftsBundles(length, next)`,
+  `isBossCamp`, keyed by the run length alone (a length fixes its boss
+  camps), so the web can import it. `lifecycle.ts`'s `openLeg`,
+  `openLegAfter` and `reopenCamp` open the stages; each stage's `advance`
+  opens the next, and the route vote opens the chosen camp's loadout.
+- Draft. `DRAFT` is `{ options: 3, bundleSize: 1, bossBundleSize: 2,
+  rareChance: 15 }`; `BASE_DRAFT_SHAPE` is single items and
+  `BOSS_DRAFT_SHAPE` bundles of two. Offers are dealt when the draft opens
+  (`openDraft`), not at the clear, and the base `draftShapes` reads the draft
+  stage (`standardDraftShape`). Streams keep `camp{k}` = the cleared camp, so
+  the draft before camp 1 draws on `camp0`. A seeded draft after a plain
+  camp now offers different items (single-item options never repeat).
+- Events draw on `expedition-event:camp{k}` (k = the camp the event comes
+  before), uniformly over `EVENTS`, ids sorted. Routes keep every other
+  stream, so a seed's routes keep their places, weathers and mixes.
+- The backpack. `BACKPACK_SIZE = 6` (`balance.ts`); `roomFor` = free slots +
+  room left in the backpack. `pick-bundle` and a shop item are refused
+  `backpack_full` (new `RunError`, wire code and worker mapping; 32 codes)
+  when they do not fit. New action `discard-item { itemUid }` (request guard,
+  `not_owned_item` for an item the seat does not own). `stages/outfit.ts`
+  gives the shop, draft, event, route and loadout the same `equip` and
+  `discard-item` handlers, refused `already_ready` once the seat readied;
+  `equip` is also refused `backpack_full` when it would leave more in the
+  backpack than `max(6, what it holds now)`. `mintItems` throws when asked
+  for more than fits (POLICY A3); Quartermaster's `canTarget` refuses a
+  teammate with no room ("Their backpack is full") and `give-item` throws
+  without room. A Rats cut can leave 7 in the backpack: `refitSlots` puts the
+  backpack's first items back into the freed slot when the camp is over
+  (`settleCamp`, unless the next stage is the loadout itself, and a replay's
+  shop).
+- Windows and stamps. The `loadout` window is open at the shop too, so
+  Quartermaster and the Businessman's sale work there; the sale's `canUse`
+  is now "at the shop stage". The shop stamps the attempt it leads to (as the
+  loadout did when it held the shop); the draft before camp 1 stamps camp 1's
+  first attempt; the event stamps nothing.
+- `horizon`: shop `camp?.index ?? next - 1`, draft and event `next - 1`. The
+  survey previews the loadout's camp, a replay shop's camp and the route
+  options (the event no longer has a camp to preview).
+- Kicks: a kick at the shop drops the ready mark; a restarted camp reopens
+  through `reopenCamp` (the shop first at a boss camp). A back seat still
+  rejoins only when a loadout opens, so it misses that shop and draft.
+- Absent pass and bots: ready at the shop; in the draft, discard the last
+  backpack item while the first bundle does not fit, then take it
+  (`dev/autoplay.ts` asks `absentSeatAction` for its draft move).
+- Dev sandbox: "Go" arrives at the table, the loadout, the shop, the draft,
+  the event or the route vote (the camp before cleared through the real
+  settle, offers it dealt dropped, then `openLeg` on the chosen stage);
+  asking for a stage the camp lacks says where that stage happens ("camp 5
+  has no shop before it: a long run's shops are before camps 3, 6, 8").
+  Next stage from the muster stops at the first draft. `check.ts` flags a
+  shop, draft or event before a camp that has none, an unknown event, a
+  replay shop holding another camp's spec, and a backpack over its size
+  outside a loadout or camp; `inspect.ts` describes the new stages.
+- View. Stage views: `shop { next, camp, shop, readySeatIds }`; `draft
+  { next, cleared, payout, yourOffer, pendingSeatIds }` (`cleared` is
+  `next - 1`, 0 before camp 1; `payout` is that clear's coins from history,
+  0 before camp 1); `event { event, next, readySeatIds }` (`next` is a camp
+  index now); `loadout` lost `yourSlots` and `shop`. New top-level
+  `yourItemSlots` (the viewer's slots now; 0 unseated) and
+  `BALANCE_DISPLAY.backpackSize`. The camp preview lost `event`. Schema
+  mirrors all of it; `ROOM_SCHEMA_VERSION` is 18.
+- Web, kept minimal for unit E: the shop stage reuses the loadout panel
+  (`title` "Before camp 3" beside the shop's own "Shop" header, `next` null
+  unless a replay, gear from
+  `yourItemSlots`), so gear, stock and Set out/Continue work as before; the
+  event panel reads "Next: Camp 4 of 6"; route cards lost their "On the way"
+  stops; the route vote's result shows on the loadout it chose until that
+  camp is played (it used to show on the event); prompts for the shop, the
+  first draft ("Pack for camp 1. Take an item") and single items ("Take an
+  item"); the Businessman's sale button shows at the shop. Transition cases
+  re-keyed: camp won (camp to draft or shop, coins from history), camp lost
+  and restarted (camp to loadout or shop), run start (muster to the first
+  draft), route decided (route to loadout); the "shop" and "next camp"
+  cases are deleted, since no move reaches them now.
+- Tests, written first: `run/trail.test.ts` (the legs of every camp of
+  every length, a whole run walked through `applyRunAction` for each
+  length, the first draft, the event, the shop stage, the replay through the
+  shop, the horizon, single items against bundles, the Pack Rat's pick) and
+  `run/backpack.test.ts` (capacity, refusal, discard, the Pack Rat's 9, the
+  shop, equip and discard in every stage between camps and never in camp,
+  the absent pass, the Rats overflow, Pack Animal's text). The sources
+  contract's walk gives p0 four items when the source is not an item, so
+  Pack Animal finds a backpack item to swap now that single-item drafts fill
+  slots slowly. e2e: J.D. drafts before camp 1 (Lucky Start's item already
+  carried, two equipped after), the Businessman sells at a "shop" jump, the
+  Pack Rat's usual draft is single items, the Cartographer readies through
+  the event before the route vote, the rescue specs seat the host as the
+  Explorer (J.D.'s item plus the first draft would leave no slot for the
+  Rope Ladder), the tiger and route-portrait specs autoplay six steps
+  through the shop and draft, and the transitions spec picks the first
+  draft before setting out. The e2e trail driver (`pickDraftOffer`) never
+  drafts a Rope Ladder while another option is offered: single-item offers
+  made a second rescuer likely, and the absent-rescuer spec waits on the
+  host alone. Every expedition spec passes (65, the tour skipped). The tour
+  (`EXPEDITION_TOUR=1`) walks the new stages (its event and route-vote shots
+  are taken) but failed in the second run's camp 2 at 1920x1080 when a hand
+  card (A♣) could not be clicked: a camp-scene click, left for unit F, which
+  removes the hand boards.
+- Proved in the browser (`tmp/units/D/`): the draft before camp 1 ("Pack
+  for camp 1. Take an item", three single items), the shop before camp 3,
+  the bundles of two after the animal camp, the event before camp 2, the
+  route vote and the loadout of camp 2.
