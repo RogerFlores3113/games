@@ -25,6 +25,13 @@ function readyAll(run: RunState, seatIds: readonly string[] = run.seatIds, cat: 
   return seatIds.reduce((next, seatId) => act(next, seatId, { type: "ready" }, cat), run);
 }
 
+/** Every seat takes the first item of its offers until the draft ends. */
+function pickAll(run: RunState, cat: Catalog = catalog): RunState {
+  let next = run;
+  while (next.stage.tag === "draft") next = act(next, next.seats.find((s) => s.offers.length > 0)!.seatId, { type: "pick-bundle", bundle: 0 }, cat);
+  return next;
+}
+
 function playCard(run: RunState, cat: Catalog = catalog): RunState {
   const camp = attemptOf(run)!.camp;
   const rules = rulesFor(run, cat);
@@ -68,7 +75,7 @@ describe("a kick at each stage", () => {
     run = act(run, "p3", { type: "vote", choice: "long" });
     expect(run.stage.tag).toBe("muster");
     const kicked = kickSeat(run, "p3", catalog);
-    expect(kicked.stage.tag).toBe("loadout");
+    expect(kicked.stage.tag).toBe("draft");
     expect(kicked.plan?.length).toBe("short");
     expect(kicked.seatIds).toEqual(["p0", "p1", "p2"]);
     expect(kicked.kicked).toEqual([{ seat: { seatId: "p3", characterId: "plain-1", upgradeId: null, items: [], equipped: [], offers: [], ledger: [] }, position: 3, back: false }]);
@@ -82,7 +89,7 @@ describe("a kick at each stage", () => {
       run = act(run, seatId, { type: "lock-in" });
     }
     expect(run.stage.tag).toBe("muster");
-    expect(kickSeat(run, "p3", catalog).stage.tag).toBe("loadout");
+    expect(kickSeat(run, "p3", catalog).stage.tag).toBe("draft");
   });
 
   it("muster: a kicked seat's lock-in goes with it, and back in the muster it locks in again", () => {
@@ -150,23 +157,34 @@ describe("a kick at each stage", () => {
     const picked = ["p0", "p1", "p2"].reduce((next, seatId) => act(next, seatId, { type: "pick-bundle", bundle: 0 }, CATALOG), drafting);
     expect(picked.stage.tag).toBe("draft");
     const kicked = kickSeat(picked, "p3", CATALOG);
-    expect(kicked.stage.tag).toBe("route");
+    expect(kicked.stage.tag).toBe("event");
     expect(kicked.kicked[0]!.seat.offers).toEqual([]);
   });
 
-  it("route and event: the ballot or ready mark goes and the stage resolves without it", () => {
+  it("event and route: the ready mark or ballot goes and the stage resolves without it", () => {
     const five = [...FOUR, "p4"];
     const drafting = clearCamp(setupRun({ seatIds: five, seed: "route-kick", catalog: CATALOG }), CATALOG);
-    const routing = five.reduce((next, seatId) => act(next, seatId, { type: "pick-bundle", bundle: 0 }, CATALOG), drafting);
-    expect(routing.stage.tag).toBe("route");
-    const voted = ["p0", "p1", "p3", "p4"].reduce((next, seatId) => act(next, seatId, { type: "vote", choice: "a" }, CATALOG), routing);
-    const atEvent = kickSeat(voted, "p2", CATALOG);
+    const atEvent = pickAll(drafting, CATALOG);
     expect(atEvent.stage.tag).toBe("event");
-    expect(atEvent.lastVote?.result.tally.find((entry) => entry.choice === "a")?.votes).toBe(4);
-    const ready = ["p0", "p1", "p3"].reduce((next, seatId) => act(next, seatId, { type: "ready" }, CATALOG), atEvent);
-    const loadout = kickSeat(ready, "p4", CATALOG);
+    const ready = ["p0", "p1", "p3", "p4"].reduce((next, seatId) => act(next, seatId, { type: "ready" }, CATALOG), atEvent);
+    const routing = kickSeat(ready, "p2", CATALOG);
+    expect(routing.stage.tag).toBe("route");
+    const voted = ["p0", "p1", "p3"].reduce((next, seatId) => act(next, seatId, { type: "vote", choice: "a" }, CATALOG), routing);
+    const loadout = kickSeat(voted, "p4", CATALOG);
     expect(loadout.stage.tag).toBe("loadout");
+    expect(loadout.lastVote?.result.tally.find((entry) => entry.choice === "a")?.votes).toBe(3);
     expect(loadout.seatIds).toEqual(["p0", "p1", "p3"]);
+  });
+
+  it("shop: the ready mark goes, and a restarted boss camp goes back through its shop", () => {
+    const run = setupRun({ seatIds: FOUR, seed: "shop-kick", catalog, camp: 3 });
+    const playing = advanceTo(run, "objective-pick", catalog);
+    const atShop = kickSeat(playing, "p3", catalog);
+    expect(atShop.stage).toMatchObject({ tag: "shop", next: 3, camp: (playing as RunAt<"camp">).stage.camp, ready: {} });
+    const twoReady = readyAll(atShop, ["p0", "p1"]);
+    expect(seatPresence(twoReady, "p3", true, catalog).seatIds).toEqual(["p0", "p1", "p2"]);
+    const loadout = readyAll(twoReady, ["p2"]);
+    expect(loadout.stage).toMatchObject({ tag: "loadout", camp: { index: 3 } });
   });
 
   it("the ended run takes no kicks", () => {
@@ -258,7 +276,7 @@ describe("a kicked seat coming back", () => {
       run = act(run, seatId, { type: "vote", choice: "short" });
       run = act(run, seatId, { type: "lock-in" });
     }
-    const atCamp = readyAll(kickSeat(run, "p3", catalog));
+    const atCamp = readyAll(pickAll(kickSeat(run, "p3", catalog)));
     expect(atCamp.stage.tag).toBe("camp");
     const back = settleCamp(seatPresence(atCamp, "p3", true, catalog) as RunAt<"camp">, "failed", catalog);
     expect(back.seats.map((seat) => [seat.seatId, seat.characterId])).toEqual([

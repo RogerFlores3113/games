@@ -95,7 +95,7 @@ describe("fail-then-replay resets every camp-scoped resource (RUN-06)", () => {
     // The camp fails and settles inside this same call.
     run = act(run, sabotageSeat, { type: "use-ability", sourceKey: sabotage, targets: [] });
 
-    expect(run.stage.tag).toBe("loadout");
+    expect(run.stage.tag).toBe("shop"); // camp 3 is a boss camp: its replay goes back through the shop
     expect(suppliesBefore).toBe(3);
     expect(run.supplies).toBe(2);
     expect(run.seats.every((seat) => seat.offers.length === 0)).toBe(true); // D-01: no draft on a failure
@@ -104,10 +104,11 @@ describe("fail-then-replay resets every camp-scoped resource (RUN-06)", () => {
     expect(run.history).toEqual([{ camp: 3, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 0 }]);
     expect(nextAttemptNumber(run, campIndex(3))).toBe(2);
 
-    // Replay: ready every seat again.
+    // Replay: ready every seat through the shop, then the loadout.
+    for (const seatId of run.seatIds) run = act(run, seatId, { type: "ready" });
     for (const seatId of run.seatIds) run = act(run, seatId, { type: "ready" });
 
-        expect(attemptOf(run)!.attemptNumber).toBe(2);
+    expect(attemptOf(run)!.attemptNumber).toBe(2);
     expect(attemptOf(run)!.effects).toEqual([]);
     expect(attemptOf(run)!.reveals).toEqual([]);
     expect(attemptOf(run)!.log).toEqual([]);

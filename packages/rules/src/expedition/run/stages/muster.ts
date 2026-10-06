@@ -1,10 +1,9 @@
 import { RUN_LENGTHS } from "../balance";
 import { takenCharacters } from "../crew";
-import { openLoadout } from "../lifecycle";
+import { openLegAfter } from "../lifecycle";
 import { react } from "../react";
-import { drawPlan } from "../plan";
+import { campIndex, drawPlan } from "../plan";
 import { STREAMS } from "../rng";
-import { firstCampSpec } from "../route";
 import type { RunLength } from "../types";
 import { tally } from "../vote";
 import { err, everySeat, ok, type StageDef } from "./stage-def";
@@ -13,8 +12,8 @@ const LENGTHS = Object.keys(RUN_LENGTHS) as RunLength[];
 
 /** Every seat picks a character (public, unique) and votes a length, both
  * changeable until the seat locks in. The last lock-in resolves the vote,
- * draws the plan, opens camp 1's loadout and lets the seats' sources react to
- * run-started. */
+ * draws the plan, opens the draft before camp 1 and lets the seats' sources
+ * react to run-started. */
 export const muster: StageDef<"muster"> = {
   on: {
     "pick-character": (run, seatId, action, catalog) => {
@@ -40,7 +39,7 @@ export const muster: StageDef<"muster"> = {
   advance(run, catalog) {
     if (!everySeat(run, run.stage.locked)) return run;
     const result = tally(run.seed, STREAMS.lengthVote(), LENGTHS, run.seatIds, run.stage.ballots)!;
-    const opened = openLoadout({ ...run, plan: drawPlan(run.seed, result.winner, catalog), lastVote: { topic: "length", result } }, firstCampSpec(result.winner), catalog);
+    const opened = openLegAfter({ ...run, plan: drawPlan(run.seed, result.winner, catalog), lastVote: { topic: "length", result } }, campIndex(1), null, catalog);
     return react(opened, [{ type: "run-started" }], catalog);
   },
 };

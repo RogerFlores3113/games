@@ -302,9 +302,13 @@ export function buildTrailPrompt(view: ExpeditionView, seats: readonly PromptSea
       if (stage.yourOffer !== null) {
         const own = ownPickOf(stage.yourOffer.bundles);
         if (own !== null) return { text: `${characterName(own)}'s own pick: take one item`, tone: "your-move" };
-        return { text: `Camp ${stage.cleared} cleared! +${stage.payout} coins. Take a bundle`, tone: "your-move" };
+        const take = stage.yourOffer.bundles.some((bundle) => bundle.length > 1) ? "Take a bundle" : "Take an item";
+        return { text: stage.cleared === 0 ? `Pack for camp ${stage.next}. ${take}` : `Camp ${stage.cleared} cleared! +${stage.payout} coins. ${take}`, tone: "your-move" };
       }
-      return waitingFor(stage.pendingSeatIds, "Choosing the route…");
+      return waitingFor(stage.pendingSeatIds, "Moving on…");
+    case "shop":
+      if (you !== undefined && !stage.readySeatIds.includes(you.seatId)) return { text: `The shop is open before camp ${stage.next}. Continue when ready`, tone: "your-move" };
+      return waitingFor(view.seats.filter((s) => !stage.readySeatIds.includes(s.seatId)).map((s) => s.seatId), "Moving on…");
     case "route": {
       const next = stage.options[0]?.next.index ?? 0;
       if (you !== undefined && !voted(stage.ballots, you.seatId)) return { text: `Vote on the route to camp ${next}`, tone: "your-move" };
@@ -321,7 +325,6 @@ export function buildTrailPrompt(view: ExpeditionView, seats: readonly PromptSea
           const text = `Camp ${last.camp} restarts without ${nameList(view.kicked.map((k) => nameOf(k.seatId)))}. Set out`;
           return { text: text.length <= PROMPT_MAX_CHARS ? text : `Camp ${last.camp} restarts with a smaller crew. Set out`, tone: "alert" };
         }
-        if (stage.shop !== null) return { text: `The shop is open. Set out for camp ${stage.camp.index} when ready`, tone: "your-move" };
         const name = you.characterId === null ? "Crew" : (CHARACTER_DISPLAY[you.characterId]?.name ?? you.characterId);
         return { text: `${name}, set out for camp ${stage.camp.index} when ready`, tone: "your-move" };
       }

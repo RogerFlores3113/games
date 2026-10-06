@@ -105,9 +105,10 @@ function makeView({ attempt, campIndex = 2, ...overrides }: ViewOverrides = {}):
     ],
     kicked: [],
     yourAbilities: [],
+    yourItemSlots: 2,
     history: [],
     lastVote: null,
-    stage: { tag: "camp", camp: { index: campIndex, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false, survey: null }, mods: [], attempt: attempt ?? makeAttempt() },
+    stage: { tag: "camp", camp: { index: campIndex, location: "jungle", weather: "fair", pairing: null, slotKinds: [], bossId: null, shop: false, survey: null }, mods: [], attempt: attempt ?? makeAttempt() },
     ...overrides,
   };
 }
@@ -121,13 +122,13 @@ function ui(overrides: Partial<LocalUiState> = {}): LocalUiState {
 }
 
 describe("sceneKeyFor", () => {
-  const preview = { index: 1, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false, survey: null };
+  const preview = { index: 1, location: "jungle", weather: "fair", pairing: null, slotKinds: [], bossId: null, shop: false, survey: null };
   const stages: [ExpeditionStageView, string][] = [
     [{ tag: "muster", ballots: [], lockedSeatIds: [] }, "trail"],
-    [{ tag: "loadout", camp: preview, mods: [], yourSlots: 2, shop: null, readySeatIds: [] }, "trail"],
-    [{ tag: "draft", cleared: 1, payout: 8, yourOffer: null, pendingSeatIds: [] }, "trail"],
+    [{ tag: "loadout", camp: preview, mods: [], readySeatIds: [] }, "trail"],
+    [{ tag: "draft", next: 2, cleared: 1, payout: 8, yourOffer: null, pendingSeatIds: [] }, "trail"],
     [{ tag: "route", options: [], ballots: [] }, "trail"],
-    [{ tag: "event", event: "storm", next: preview, readySeatIds: [] }, "trail"],
+    [{ tag: "event", event: "storm", next: 1, readySeatIds: [] }, "trail"],
     [{ tag: "camp", camp: preview, mods: [], attempt: makeAttempt() }, "camp"],
     [{ tag: "ended", result: "won" }, "run-end"],
   ];
@@ -440,7 +441,7 @@ describe("trick and lastTrick", () => {
     expect(model.trick!.plays[1]!.isLed).toBe(false);
     expect(shown(model.trick!.plays[0]!).card.objectId).toBe(trickObjectId(AS));
 
-    const noAttempt = makeView({ stage: { tag: "loadout", camp: { index: 2, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false, survey: null }, mods: [], yourSlots: 2, shop: null, readySeatIds: [] } });
+    const noAttempt = makeView({ stage: { tag: "loadout", camp: { index: 2, location: "jungle", weather: "fair", pairing: null, slotKinds: [], bossId: null, shop: false, survey: null }, mods: [], readySeatIds: [] } });
     const model2 = buildSceneModel(server(noAttempt), ui(), "big-index");
     expect(model2.trick).toBeNull();
   });
@@ -1243,7 +1244,7 @@ describe("the temple", () => {
       yourAbilities: over.abilities ?? [ability("temple", undefined, false, "Win the Sun to earn it")],
       stage: {
         tag: "camp",
-        camp: { index: 6, location: "desert", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: "temple", shop: true, survey: null },
+        camp: { index: 6, location: "desert", weather: "fair", pairing: null, slotKinds: [], bossId: "temple", shop: true, survey: null },
         mods: [
           { id: "desert", kind: "location", strength: "full", status: [] },
           { id: "temple", kind: "temple", strength: "full", status: [PATH] },

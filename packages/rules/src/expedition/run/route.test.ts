@@ -5,16 +5,21 @@ import { createRun } from "./lifecycle";
 import { CATALOG } from "./catalog";
 import { testCatalog } from "./run-test-support";
 import { defineMod } from "../content/mods/mod-def";
-import type { RunAt, RunLength } from "./types";
+import type { Catalog, RunAt, RunLength } from "./types";
 
 function draftAfter(seed: string, length: RunLength, cleared: number): RunAt<"draft"> {
   const run = createRun({ seatIds: ["p0", "p1", "p2"], seed });
-  return { ...run, plan: drawPlan(seed, length, CATALOG), stage: { tag: "draft", cleared: campIndex(cleared), payout: 5 } };
+  return { ...run, plan: drawPlan(seed, length, CATALOG), stage: { tag: "draft", next: campIndex(cleared + 1) } };
+}
+
+/** The route options to the camp after `run`'s draft. */
+function optionsOf(run: RunAt<"draft">, catalog: Catalog): ReturnType<typeof routeOptions> {
+  return routeOptions(run, campIndex(run.stage.next - 1), catalog);
 }
 
 describe("firstCampSpec", () => {
   it("is the Jungle in fair weather with the ramp's first slot count, all win-card", () => {
-    expect(firstCampSpec("long")).toEqual({ index: 1, location: "jungle", weather: "fair", event: null, slots: [{ kind: "win-card" }, { kind: "win-card" }] });
+    expect(firstCampSpec("long")).toEqual({ index: 1, location: "jungle", weather: "fair", slots: [{ kind: "win-card" }, { kind: "win-card" }] });
   });
 });
 
@@ -22,25 +27,25 @@ describe("routeOptions", () => {
   it("offers 2 or 3 options, both counts occurring, lettered from a", () => {
     const counts = new Set<number>();
     for (let n = 0; n < 40; n++) {
-      const options = routeOptions(draftAfter(`seed-${n}`, "standard", 1), CATALOG);
+      const options = optionsOf(draftAfter(`seed-${n}`, "standard", 1), CATALOG);
       counts.add(options.length);
       expect(options.map((o) => o.id)).toEqual(["a", "b", "c"].slice(0, options.length));
     }
     expect([...counts].sort()).toEqual([2, 3]);
   });
 
-  it("before camp 4 every option is all win-card at the ramp's count, with the stub event", () => {
-    for (const option of routeOptions(draftAfter("s", "long", 2), CATALOG)) {
-      expect(option.next).toMatchObject({ index: 3, event: "event", slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }] });
+  it("before camp 4 every option is all win-card at the ramp's count", () => {
+    for (const option of optionsOf(draftAfter("s", "long", 2), CATALOG)) {
+      expect(option.next).toMatchObject({ index: 3, slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }] });
     }
   });
 
   it("is the same for the same seed", () => {
-    expect(routeOptions(draftAfter("same", "short", 3), CATALOG)).toEqual(routeOptions(draftAfter("same", "short", 3), CATALOG));
+    expect(optionsOf(draftAfter("same", "short", 3), CATALOG)).toEqual(optionsOf(draftAfter("same", "short", 3), CATALOG));
   });
 
   it("draws every weighted location and weather, and fair about 80% of the time away from the clifftop", () => {
-    const places = Array.from({ length: 400 }, (_, n) => routeOptions(draftAfter(`place-${n}`, "standard", 1), CATALOG)).flat().map((o) => o.next);
+    const places = Array.from({ length: 400 }, (_, n) => optionsOf(draftAfter(`place-${n}`, "standard", 1), CATALOG)).flat().map((o) => o.next);
     expect(new Set(places.map((p) => p.location))).toEqual(new Set(["clearing", "jungle", "clifftop", "desert", "cave", "magma"]));
     expect(new Set(places.map((p) => p.weather))).toEqual(new Set(["fair", "rain", "downpour", "thunderstorm", "fog", "night"]));
     const fairShare = (location: string) => {
@@ -56,7 +61,7 @@ describe("routeOptions", () => {
   it("never draws a weight-0 def by weight, and falls back to fair when no weather is left", () => {
     const stormy = Object.values(CATALOG.mods).filter((def) => def.kind === "weather" && def.id !== "fair");
     const calm = testCatalog({ mods: Object.fromEntries(stormy.map((def) => [def.id, { ...def, weight: 0 }])) });
-    const weathers = Array.from({ length: 50 }, (_, n) => routeOptions(draftAfter(`calm-${n}`, "standard", 1), calm)).flat().map((o) => o.next.weather);
+    const weathers = Array.from({ length: 50 }, (_, n) => optionsOf(draftAfter(`calm-${n}`, "standard", 1), calm)).flat().map((o) => o.next.weather);
     expect(new Set(weathers)).toEqual(new Set(["fair"]));
   });
 
@@ -72,7 +77,7 @@ describe("routeOptions", () => {
     const seen = new Set<string>();
     for (let n = 0; n < 60; n++) {
       const run = draftAfter(`mix-${n}`, "long", 6);
-      for (const option of routeOptions(run, CATALOG)) {
+      for (const option of optionsOf(run, CATALOG)) {
         expect(option.next.slots).toHaveLength(5);
         seen.add(slotKindsFor(run, option.next, CATALOG).join(","));
       }
@@ -89,6 +94,6 @@ describe("routeOptions", () => {
 describe("campSpecAt", () => {
   it("is camp 1's spec at 1 and route a's spec after", () => {
     expect(campSpecAt("s", "short", campIndex(1), CATALOG)).toEqual(firstCampSpec("short"));
-    expect(campSpecAt("s", "short", campIndex(3), CATALOG)).toEqual(routeOptions(draftAfter("s", "short", 2), CATALOG)[0]!.next);
+    expect(campSpecAt("s", "short", campIndex(3), CATALOG)).toEqual(optionsOf(draftAfter("s", "short", 2), CATALOG)[0]!.next);
   });
 });

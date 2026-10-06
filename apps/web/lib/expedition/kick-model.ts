@@ -47,12 +47,12 @@ function rejoinPoint(game: ExpeditionView): string {
   switch (stage.tag) {
     case "camp":
       return `the next loadout, once camp ${stage.camp.index} ends`;
+    case "shop":
     case "draft":
-      return `the loadout before camp ${stage.cleared + 1}`;
+    case "event":
+      return `the loadout before camp ${stage.next}`;
     case "route":
       return stage.options[0] === undefined ? "the next loadout" : `the loadout before camp ${stage.options[0].next.index}`;
-    case "event":
-      return `the loadout before camp ${stage.next.index}`;
     case "muster":
     case "loadout":
     case "ended":

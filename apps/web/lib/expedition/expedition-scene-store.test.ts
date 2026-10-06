@@ -61,11 +61,12 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     ],
     kicked: [],
     yourAbilities: [EXPLORER],
+    yourItemSlots: 2,
     history: [],
     lastVote: null,
     stage: {
       tag: "camp",
-      camp: { index: 2, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false, survey: null },
+      camp: { index: 2, location: "jungle", weather: "fair", pairing: null, slotKinds: [], bossId: null, shop: false, survey: null },
       mods: [],
       attempt: {
         attemptNumber: 1,
@@ -83,11 +84,12 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
   };
 }
 
+/** A trail stage after camp 1 cleared for 8 coins. */
 function onTrail(stage: ExpeditionStageView, overrides: Partial<ExpeditionView> = {}): ExpeditionView {
-  return makeView({ stage, ...overrides });
+  return makeView({ stage, history: [{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", coins: 8 }], ...overrides });
 }
 
-const draftOffer: ExpeditionStageView = { tag: "draft", cleared: 1, payout: 8, yourOffer: { kind: "standard", bundles: [["trained-monkey"]] }, pendingSeatIds: ["s2"] };
+const draftOffer: ExpeditionStageView = { tag: "draft", next: 2, cleared: 1, payout: 8, yourOffer: { kind: "standard", bundles: [["trained-monkey"]] }, pendingSeatIds: ["s2"] };
 const ended: ExpeditionStageView = { tag: "ended", result: "lost" };
 
 function server(view: ExpeditionView, seats = roomSeats()): SceneServerInput {
@@ -123,7 +125,7 @@ describe("createExpeditionSceneStore", () => {
     store.getState().setServer(server(onTrail(draftOffer)));
     const state = store.getState();
     expect(state.sceneKey).toBe("trail");
-    expect(state.model).toMatchObject({ sceneKey: "trail", prompt: { text: "Camp 1 cleared! +8 coins. Take a bundle", tone: "your-move" } });
+    expect(state.model).toMatchObject({ sceneKey: "trail", prompt: { text: "Camp 1 cleared! +8 coins. Take an item", tone: "your-move" } });
   });
 
   it("setServer with an ended run builds the run-end model", () => {

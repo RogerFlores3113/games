@@ -59,7 +59,8 @@ function crewFor(def: SourceDef, seed: string, camp = 1): RunState {
   const characters: Record<string, string> = { p0: character?.id ?? others.shift()! };
   for (const seat of SEATS.slice(1)) characters[seat] = others.shift()!;
   const spare = ITEM_IDS.filter((id) => id !== def.id);
-  const items: Record<string, string[]> = { p0: def.kind === "item" ? [def.id, spare[0]!] : [spare[0]!] };
+  // Four items, so even the Pack Rat's three slots leave one in the backpack.
+  const items: Record<string, string[]> = { p0: def.kind === "item" ? [def.id, spare[0]!] : spare.slice(0, 4) };
   SEATS.slice(1).forEach((seat, i) => (items[seat] = [spare[i + 1]!, spare[i + 4]!]));
   return setupRun({
     seatIds: SEATS,

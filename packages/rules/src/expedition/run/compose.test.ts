@@ -47,7 +47,7 @@ function makeRun(overrides: Partial<RunState> & { attempt?: AttemptState } = {})
     history: [],
     lastVote: null,
     itemSerial: 0,
-    stage: attempt === undefined ? { tag: "loadout", camp: spec, stock: null, ready: {} } : { tag: "camp", camp: spec, attempt },
+    stage: attempt === undefined ? { tag: "loadout", camp: spec, ready: {} } : { tag: "camp", camp: spec, attempt },
     ...rest,
   };
 }

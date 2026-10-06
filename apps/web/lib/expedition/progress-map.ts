@@ -49,7 +49,7 @@ function placeOf(location: string, weather: string): MapPlace {
 function placeAhead(view: ExpeditionView): MapPlace | null {
   const stage = view.stage;
   if (stage.tag === "loadout" || stage.tag === "camp") return placeOf(stage.camp.location, stage.camp.weather);
-  if (stage.tag === "event") return placeOf(stage.next.location, stage.next.weather);
+  if (stage.tag === "shop" && stage.camp !== null) return placeOf(stage.camp.location, stage.camp.weather);
   return null;
 }
 

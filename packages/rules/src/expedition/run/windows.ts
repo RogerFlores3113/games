@@ -2,7 +2,8 @@
 // derived from the run, never stored. A gated window holds the table until
 // every seat that can act in it has used or passed: rescue holds the settle
 // of a camp failed only by failed objectives. The stage windows (loadout,
-// draft, route) are open for their whole stage, between camps.
+// open at the shop too; draft; route) are open for their whole stage,
+// between camps.
 
 import { campPhase, checkCampOutcome, currentActorSeatId } from "../camp";
 import { pendingSourceKeys } from "./abilities";
@@ -74,9 +75,9 @@ export const WINDOWS: { readonly [W in ActiveWindow]: WindowDef } = {
     id: "loadout",
     phrase: "Before setting out",
     gated: false,
-    isOpen: (run) => run.stage.tag === "loadout",
+    isOpen: (run) => run.stage.tag === "loadout" || run.stage.tag === "shop",
     // After its ready a seat can change nothing.
-    mayAct: (run, _rules, seatId) => run.stage.tag === "loadout" && !Object.hasOwn(run.stage.ready, seatId),
+    mayAct: (run, _rules, seatId) => (run.stage.tag === "loadout" || run.stage.tag === "shop") && !Object.hasOwn(run.stage.ready, seatId),
   },
   draft: {
     id: "draft",

@@ -24,7 +24,7 @@
 
 import type { CoreRules } from "../rules";
 import { FAILURE_COST, ITEM_SLOTS, WHISPERS_PER_CAMP, WHISPERS_PER_UPGRADE } from "./balance";
-import { BASE_DRAFT_SHAPE, type DraftShape } from "./draft";
+import { standardDraftShape, type DraftShape } from "./draft";
 import type { Origin, RunState, SourceKey } from "./types";
 
 /** A thing a camp rule may keep from a viewer. */
@@ -55,7 +55,7 @@ export type RunHooks = {
   /** Whether route option `option` (0-based) leads to a different boss at
    * the next animal or disaster boss camp. */
   swapsBoss(run: RunState, option: number): boolean;
-  /** The offers a seat is dealt after a cleared camp, picked in order. */
+  /** The offers a seat is dealt when a draft opens, picked in order. */
   draftShapes(run: RunState, seatId: string): readonly DraftShape[];
   /** What `seatId` pays at the shop for something listed at `price`. */
   shopPrice(run: RunState, seatId: string, price: number): number;
@@ -146,8 +146,8 @@ export const baseRunHooks: RunHooks = {
   swapsBoss(_run, _option) {
     return false;
   },
-  draftShapes(_run, _seatId) {
-    return [BASE_DRAFT_SHAPE];
+  draftShapes(run, _seatId) {
+    return [standardDraftShape(run)];
   },
   shopPrice(_run, _seatId, price) {
     return price;

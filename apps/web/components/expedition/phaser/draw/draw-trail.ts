@@ -565,8 +565,7 @@ const RIBBON_H = 14;
 const ROUTE_FOOTER_H = 4 + 4 + LINE;
 const REROLL_H = 14;
 
-/** A route as a card: the camp ahead, what waits on the way (the event,
- * and the shop before a boss camp), the boss, then the votes. Draws the
+/** A route as a card: the camp ahead, the boss, then the votes. Draws the
  * body and returns its height and a `finish` that draws the card at the
  * row's common height, its votes pinned to the foot. */
 function drawRouteCard(ctx: Ctx, card: RouteCard, x: number, y: number, w: number): { bodyH: number; finish(h: number): void } {
@@ -579,13 +578,6 @@ function drawRouteCard(ctx: Ctx, card: RouteCard, x: number, y: number, w: numbe
 
   const inner = w - 12;
   let cy = placeRows(scene, body, card.next, 6, RIBBON_H + 4, inner);
-  const stops = [...(card.next.event === null ? [] : [{ label: card.next.event, fill: PALETTE.stump, color: PALETTE.text }]), ...(card.next.shop ? [{ label: "Shop", fill: PALETTE.coinEdge, color: PALETTE.coinShine }] : [])];
-  if (stops.length > 0) {
-    body.add(text(scene, 6, cy + 1, "On the way", PALETTE.textDim));
-    let sx = 6 + labelWidth("On the way") + 6;
-    for (const stop of stops) sx += chip(scene, body, sx, cy + 1, stop.label, stop.fill, stop.color) + 3;
-    cy += LINE + 3;
-  }
   cy = objectiveChips(scene, body, card.next.objectives, 6, cy + 2, inner);
   if (card.next.survey !== null) {
     const chars = Math.floor(inner / LABEL_CELL.w);
@@ -673,11 +665,7 @@ function drawEvent(ctx: Ctx, event: Extract<TrailPanel, { kind: "event" }>): voi
     y += LINE;
   }
   y += 6;
-  layer.add(text(scene, main.x + 8, y, fitLabel(`Next: ${event.next.title}`, chars), PALETTE.textDim));
-  const next = scene.add.container(main.x, y + LINE);
-  const after = placeRows(scene, next, event.next, 8, 0, main.w - 16);
-  layer.add(next);
-  bossLine(scene, next, event.next, 8, after + 2);
+  layer.add(text(scene, main.x + 8, y, fitLabel(`Next: ${event.nextTitle}`, chars), PALETTE.textDim));
   if (ctx.model.vote !== null) drawVoteResult(ctx, ctx.model.vote, vote);
 }
 
@@ -687,7 +675,8 @@ function drawLoadout(ctx: Ctx, loadout: Extract<TrailPanel, { kind: "loadout" }>
   panel(ctx, TRAIL_ZONES.panel);
   const vote = ctx.model.vote;
   const { main, side } = panelSplit(vote !== null ? VOTE_W : SIDE_W);
-  drawPreview(ctx, loadout.next, main, loadout.next.title);
+  if (loadout.next !== null) drawPreview(ctx, loadout.next, main, loadout.title);
+  else ctx.layer.add(signText(ctx.scene, main.x + 8, main.y + 6, loadout.title, PALETTE.sun));
   if (vote !== null) drawVoteResult(ctx, vote, side);
   else if (loadout.shop !== null) drawShop(ctx, loadout.shop, side);
   else if (ctx.model.kit !== null) drawExplorer(ctx, ctx.model.kit, side);

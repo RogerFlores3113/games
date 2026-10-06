@@ -10,7 +10,7 @@ import type { CampState } from "../../state";
 import { attemptOf } from "../attempt";
 import { createRun, runStatus } from "../lifecycle";
 import { campIndex } from "../plan";
-import { advanceTo, plainItem, setupRun, testCatalog } from "../run-test-support";
+import { advanceTo, plainItem, setupRun, setupShop, testCatalog } from "../run-test-support";
 import type { RunAction, RunAt, RunState, SeatRun } from "../types";
 import { applyRunAction } from "./registry";
 
@@ -95,7 +95,7 @@ function draftRun(): RunState {
       p0: { offers: [offer([["item-a", "item-b"], ["item-b"]])] },
       p1: { offers: [offer([["item-a"]]), offer([["item-c"]])] },
     }),
-    stage: { tag: "draft", cleared: campIndex(1), payout: 8 },
+    stage: { tag: "draft", next: campIndex(2) },
   };
 }
 
@@ -144,6 +144,7 @@ describe("applyRunAction: each stage accepts only its own actions", () => {
     { type: "vote", choice: null },
     { type: "lock-in" },
     { type: "equip", itemUids: [] },
+    { type: "discard-item", itemUid: "it0" },
     { type: "buy", stockId: "supplies" },
     { type: "pick-bundle", bundle: 0 },
     { type: "ready" },
@@ -163,16 +164,28 @@ describe("applyRunAction: each stage accepts only its own actions", () => {
     expect(accepted(musterRun())).toEqual(["pick-character", "vote", "lock-in"]);
   });
 
-  it("loadout: equip, buy, ready and abilities", () => {
-    expect(accepted(loadoutRun())).toEqual(["equip", "buy", "ready", "use-ability"]);
+  it("shop: equip, discard, buy, ready and abilities", () => {
+    expect(accepted(setupShop({ seatIds: SEAT_IDS, seed: "fixture", catalog, camp: 3 }))).toEqual(["equip", "discard-item", "buy", "ready", "use-ability"]);
+  });
+
+  it("loadout: equip, discard, ready and abilities", () => {
+    expect(accepted(loadoutRun())).toEqual(["equip", "discard-item", "ready", "use-ability"]);
+  });
+
+  it("event: equip, discard and ready", () => {
+    expect(accepted({ ...loadoutRun(), stage: { tag: "event", next: campIndex(2), event: "event", ready: {} } })).toEqual(["equip", "discard-item", "ready"]);
+  });
+
+  it("route: votes, equip, discard and abilities", () => {
+    expect(accepted({ ...loadoutRun(), stage: { tag: "route", from: campIndex(1), options: [], ballots: {} } })).toEqual(["vote", "equip", "discard-item", "use-ability"]);
   });
 
   it("camp: abilities, window passes, whispers and the two camp actions", () => {
     expect(accepted(campRun())).toEqual(["use-ability", "skip-window", "whisper", "pick-objective", "play-card"]);
   });
 
-  it("draft: pick-bundle and abilities", () => {
-    expect(accepted(draftRun())).toEqual(["pick-bundle", "use-ability"]);
+  it("draft: equip, discard, pick-bundle and abilities", () => {
+    expect(accepted(draftRun())).toEqual(["equip", "discard-item", "pick-bundle", "use-ability"]);
   });
 });
 
@@ -265,7 +278,7 @@ describe("applyRunAction: lock-in (muster)", () => {
     run = ok(applyRunAction(run, "p1", { type: "lock-in" }, catalog));
     expect(run.stage.tag).toBe("muster");
     run = ok(applyRunAction(run, "p2", { type: "lock-in" }, catalog));
-    expect(run.stage.tag).toBe("loadout");
+    expect(run.stage).toEqual({ tag: "draft", next: 1 });
     expect(run.plan?.length).toBe("long");
   });
 });
@@ -295,13 +308,13 @@ describe("applyRunAction: pick-bundle", () => {
     expect(applyRunAction(draftRun(), "p2", { type: "pick-bundle", bundle: 0 }, catalog)).toEqual({ ok: false, error: "not_a_choice" });
   });
 
-  it("opens the route once no seat has an offer", () => {
+  it("opens the next stage, the event before camp 2, once no seat has an offer", () => {
     let run = draftRun();
     for (const seatId of ["p0", "p1", "p1"]) {
       expect(run.stage.tag).toBe("draft");
       run = ok(applyRunAction(run, seatId, { type: "pick-bundle", bundle: 0 }, catalog));
     }
-    expect(run.stage.tag).toBe("route");
+    expect(run.stage.tag).toBe("event");
   });
 });
 
@@ -340,11 +353,11 @@ describe("applyRunAction: camp delegation", () => {
   it("settles a decided camp in the same call: history gains one entry, the draft opens", () => {
     const state = ok(applyRunAction(campRun({ p0: ["item-a"] }), "p0", { type: "play-card", cardId: "c-p0" }, catalog));
     expect(state.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 5 }]);
-    expect(state.stage).toEqual({ tag: "draft", cleared: 1, payout: 5 });
+    expect(state.stage).toEqual({ tag: "draft", next: 2 });
     expect(attemptOf(state)).toBeNull();
   });
 
-  it("deals each seat one private offer of three bundles after a clear and leaves items and characters as they were", () => {
+  it("deals each seat one private offer of three single items after a clear and leaves items and characters as they were", () => {
     const state = ok(applyRunAction(campRun({ p0: ["item-a"] }), "p0", { type: "play-card", cardId: "c-p0" }, catalog));
     expect(state.seats.map((s) => s.items)).toEqual([[{ uid: "it0", itemId: "item-a" }], [], []]);
     expect(state.seats.map((s) => s.characterId)).toEqual(["plain-1", "plain-2", "plain-3"]);

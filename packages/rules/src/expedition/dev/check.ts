@@ -2,12 +2,15 @@
 // answers "could the real engine have produced this?" as readable problems.
 
 import { buildFullDeck, cardLabel } from "../deck";
-import { SUPPLIES_MAX } from "../run/balance";
+import { BACKPACK_SIZE, SUPPLIES_MAX } from "../run/balance";
 import { attemptOf } from "../run/attempt";
 import { rulesFor } from "../run/compose";
 import { campCount } from "../run/plan";
+import { legsTo } from "../run/trail";
+import { EVENTS } from "../content/events/registry";
 import { pairingRuleFor } from "../run/stack";
 import type { CampSpec } from "../run/route";
+import { backpackOf } from "../run/usage";
 import type { Catalog, RunState, SeatRun } from "../run/types";
 
 function duplicates(values: readonly string[]): string[] {
@@ -53,9 +56,14 @@ function checkCrew(run: RunState, catalog: Catalog, problems: string[]): void {
   // The slots come from the composed rules, which only known ids can compose.
   if (problems.length > 0) return;
   const rules = rulesFor(run, catalog);
+  // At a loadout or in camp a camp rule may cut a slot (Rats), sending an
+  // equipped item to a full backpack.
+  const campRules = run.stage.tag === "loadout" || run.stage.tag === "camp";
   for (const seat of seats) {
     const slots = rules.itemSlots(run, seat.seatId);
     if (seat.equipped.length > slots) problems.push(`${seat.seatId}: ${seat.equipped.length} items equipped, ${slots} slots`);
+    const stored = backpackOf(seat).length;
+    if (!campRules && stored > BACKPACK_SIZE) problems.push(`${seat.seatId}: ${stored} items in the backpack, which holds ${BACKPACK_SIZE}`);
   }
 }
 
@@ -94,6 +102,8 @@ function checkSpec(what: string, spec: CampSpec, catalog: Catalog, problems: str
 function checkSpecs(run: RunState, catalog: Catalog, problems: string[]): void {
   const stage = run.stage;
   if (stage.tag === "loadout" || stage.tag === "camp") checkSpec("the loadout or camp", stage.camp, catalog, problems);
+  if (stage.tag === "shop" && stage.camp !== null) checkSpec("the shop's camp", stage.camp, catalog, problems);
+  if (stage.tag === "event" && !Object.hasOwn(EVENTS, stage.event)) problems.push(`the event ${stage.event} is not a known event`);
   if (stage.tag === "route") {
     for (const option of stage.options) {
       checkSpec(`route ${option.id}`, option.next, catalog, problems);
@@ -105,7 +115,6 @@ function checkSpecs(run: RunState, catalog: Catalog, problems: string[]): void {
       else if (!Object.hasOwn(catalog.mods, swap.modId) || catalog.mods[swap.modId]!.kind !== planned.tier) problems.push(`route ${option.id}: swaps in ${swap.modId}, not a${planned.tier === "animal" ? "n animal" : " disaster"} boss`);
     }
   }
-  if (stage.tag === "event") checkSpec("the chosen route", stage.route.next, catalog, problems);
   for (const boss of run.plan?.bosses ?? []) {
     if (boss.modId !== null && !Object.hasOwn(catalog.mods, boss.modId)) problems.push(`the ${boss.tier} boss at camp ${boss.at} is unknown mod ${boss.modId}`);
     else if (boss.modId !== null && catalog.mods[boss.modId]!.kind !== boss.tier) problems.push(`the ${boss.tier} boss at camp ${boss.at} is ${boss.modId}, a ${catalog.mods[boss.modId]!.kind}`);
@@ -145,6 +154,7 @@ function checkRunFields(run: RunState, problems: string[]): void {
     case "route":
       checkPerSeat(run, "the ballots", Object.keys(stage.ballots), problems);
       break;
+    case "shop":
     case "loadout":
     case "event":
       checkPerSeat(run, "the ready list", Object.keys(stage.ready), problems);
@@ -152,8 +162,11 @@ function checkRunFields(run: RunState, problems: string[]): void {
   }
   if (stage.tag === "loadout" || stage.tag === "camp") checkSpecIndex(run, "the loadout or camp", stage.camp.index, problems);
   if (stage.tag === "route") for (const option of stage.options) checkSpecIndex(run, `route ${option.id}`, option.next.index, problems);
-  if (stage.tag === "event") checkSpecIndex(run, "the chosen route", stage.route.next.index, problems);
-  if (stage.tag === "draft" && run.plan !== null && stage.cleared >= campCount(run.plan)) problems.push(`a draft after camp ${stage.cleared} has no camp to lead to`);
+  if (stage.tag === "shop" || stage.tag === "draft" || stage.tag === "event") checkSpecIndex(run, `the ${stage.tag}'s next camp`, stage.next, problems);
+  if (run.plan !== null && (stage.tag === "shop" || stage.tag === "draft" || stage.tag === "event") && !legsTo(run.plan.length, stage.next).includes(stage.tag)) {
+    problems.push(`a ${run.plan.length} run has no ${stage.tag} before camp ${stage.next}`);
+  }
+  if (stage.tag === "shop" && stage.camp !== null && stage.camp.index !== stage.next) problems.push(`the shop before camp ${stage.next} holds camp ${stage.camp.index}'s spec`);
 }
 
 function checkCamp(run: RunState, problems: string[]): void {

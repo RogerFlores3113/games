@@ -12,7 +12,7 @@ export function attemptSeed(seed: string, campIndex: number, attemptNumber: numb
   return `${seed}:camp${campIndex}:attempt${attemptNumber}`;
 }
 
-export type RouteField = "location" | "fair" | "weather" | "event" | "mix" | "boss";
+export type RouteField = "location" | "fair" | "weather" | "mix" | "boss";
 /** An item draw rolls its rarity, then picks an item of that rarity. */
 export type ItemDrawPart = "rarity" | "pick";
 
@@ -34,6 +34,11 @@ export const STREAMS = {
   routeField(nextCamp: number, reroll: number, option: number, field: RouteField): string {
     return `expedition-route:camp${nextCamp}:reroll${reroll}:option${option}:${field}`;
   },
+  /** The event on the trail before camp `nextCamp`. */
+  event(nextCamp: number): string {
+    return `expedition-event:camp${nextCamp}`;
+  },
+  /** `clearedCamp` is 0 for the draft before camp 1. */
   draftItem(clearedCamp: number, seatId: string, offer: number, bundle: number, item: number, part: ItemDrawPart): string {
     return `expedition-draft:camp${clearedCamp}:seat${seatId}:offer${offer}:bundle${bundle}:item${item}:${part}`;
   },

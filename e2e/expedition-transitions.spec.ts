@@ -9,7 +9,12 @@ test.use({ storageState: { cookies: [], origins: [] } });
 type Transition = { caseId: string; phase: "sign" | "fade-in"; title: string; sub: string | null };
 type TrailModel = {
   sceneKey: string;
-  panel: { kind: string; characters?: { objectId: string; pickable: boolean; yours: boolean }[]; lengths?: { id: string; objectId: string; yours: boolean }[] };
+  panel: {
+    kind: string;
+    characters?: { objectId: string; pickable: boolean; yours: boolean }[];
+    lengths?: { id: string; objectId: string; yours: boolean }[];
+    draft?: { kind: string; bundles?: { objectId: string }[] };
+  };
   ready: { state: string } | null;
 };
 
@@ -38,7 +43,7 @@ async function readyToLockIn(page: Page): Promise<void> {
   await clickUntilChanged<TrailModel>(page, standard.objectId, (m) => m.ready?.state === "open");
 }
 
-test("locking in hangs the run's length on a sign over the muster, then fades the loadout in", async ({ page }) => {
+test("locking in hangs the run's length on a sign over the muster, then fades the first draft in", async ({ page }) => {
   test.setTimeout(60_000);
   await readyToLockIn(page);
 
@@ -48,10 +53,15 @@ test("locking in hangs the run's length on a sign over the muster, then fades th
   await expect.poll(() => texts(page)).toContain("STANDARD RUN");
   expect((await getModel<TrailModel>(page)).panel.kind).toBe("muster");
 
-  await expect.poll(async () => (await getModel<TrailModel>(page)).panel.kind, { timeout: 10_000 }).toBe("loadout");
+  await expect.poll(async () => (await getModel<TrailModel>(page)).panel.kind, { timeout: 10_000 }).toBe("draft");
   expect(Date.now() - hung).toBeGreaterThan(2500);
   await expect.poll(() => transition(page)).toBeNull();
   expect(await texts(page)).not.toContain("STANDARD RUN");
+
+  // The draft before camp 1 moves on to its loadout with no sign.
+  const first = (await getModel<TrailModel>(page)).panel.draft!.bundles![0]!;
+  await clickUntilChanged<TrailModel>(page, first.objectId, (m) => m.panel.kind === "loadout");
+  expect(await transition(page)).toBeNull();
 
   // Set out: the table's sign, then the camp.
   await clickObject(page, "ready");
@@ -64,7 +74,7 @@ test("a dev jump shows the next scene at once, unless this browser asks for sign
   test.setTimeout(90_000);
   await readyToLockIn(page);
   await clickObject(page, "ready");
-  await expect.poll(async () => (await getModel<TrailModel>(page)).panel.kind, { timeout: 10_000 }).toBe("loadout");
+  await expect.poll(async () => (await getModel<TrailModel>(page)).panel.kind, { timeout: 10_000 }).toBe("draft");
   await expect.poll(() => transition(page)).toBeNull();
 
   await toolbar(page, "jump-to-camp", { length: "standard", stage: "camp" });

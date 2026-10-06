@@ -1,21 +1,15 @@
 import { equipError } from "../items";
 import { dealCamp } from "../lifecycle";
-import { buy } from "../shop";
 import { useAbility } from "../abilities";
 import { err, everySeat, ok, readied, type StageDef } from "./stage-def";
+import { OUTFIT } from "./outfit";
 
-/** Each seat equips, buys before a boss camp, then readies; the last ready
- * deals the camp. After its ready a seat can change nothing. */
+/** Each seat equips, then readies; the last ready deals the camp. After its
+ * ready a seat can change nothing. */
 export const loadout: StageDef<"loadout"> = {
   on: {
+    ...OUTFIT,
     "use-ability": (run, seatId, action, catalog) => useAbility(run, seatId, action.sourceKey, action.targets, catalog),
-    equip: (run, seatId, action, catalog) => {
-      if (Object.hasOwn(run.stage.ready, seatId)) return err("already_ready");
-      const error = equipError(run, seatId, action.itemUids, catalog);
-      if (error !== null) return err(error);
-      return ok({ ...run, seats: run.seats.map((s) => (s.seatId === seatId ? { ...s, equipped: [...action.itemUids] } : s)) });
-    },
-    buy: (run, seatId, action, catalog) => buy(run, seatId, action.stockId, catalog),
     ready: (run, seatId, _action, catalog) => {
       const ready = readied(run.stage.ready, seatId);
       if (ready === null) return err("already_ready");

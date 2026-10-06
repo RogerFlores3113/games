@@ -63,9 +63,13 @@ export const TORNADO = { every: 3, cards: 3 } as const;
  * the camp's tricks is played. Placeholder. */
 export const RIVER_SHARE = 3 / 4;
 
-/** A draft offer: `options` bundles of `bundleSize` items; each item is rare
- * with `rareChance` percent. */
-export const DRAFT = { options: 3, bundleSize: 2, rareChance: 15 } as const;
+/** A draft offer: `options` single items, or after a boss camp `options`
+ * bundles of `bossBundleSize`; each item is rare with `rareChance` percent. */
+export const DRAFT = { options: 3, bundleSize: 1, bossBundleSize: 2, rareChance: 15 } as const;
+
+/** An event waits on the trail after camp 1 and every `EVENT_EVERY`th camp
+ * after it, while a camp follows. */
+export const EVENT_EVERY = 2;
 
 /** The shop before a boss camp: `items` single copies beside the supplies,
  * and each seat's own character's upgrades. */
@@ -73,6 +77,9 @@ export const SHOP = { items: 3, upgradePrice: 8 } as const;
 
 /** Item slots a seat starts with; camp rules and passives move it. */
 export const ITEM_SLOTS = 2;
+
+/** Items a seat stores beside its slots. Only equipped items act in camp. */
+export const BACKPACK_SIZE = 6;
 
 /** Whispers each seat has per camp, before items add to it. */
 export const WHISPERS_PER_CAMP = 1;

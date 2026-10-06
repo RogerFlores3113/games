@@ -1,10 +1,12 @@
 // The dev sandbox's stand-in for a player: the first move the engine accepts
 // for the seats it controls. Never whispers, uses abilities, equips or buys;
-// takes the first bundle; abstains from votes so the human's ballot decides,
-// and locks in at the muster once it has picked and abstained.
+// takes the first bundle (discarding its last backpack item first while it
+// does not fit); abstains from votes so the human's ballot decides, and
+// locks in at the muster once it has picked and abstained.
 
 import { currentActorSeatId } from "../camp";
 import { platePath, pressedCount } from "../content/mods/temple";
+import { absentSeatAction } from "../run/absent";
 import { rulesFor } from "../run/compose";
 import { campStack, modCtx } from "../run/stack";
 import { applyRunAction } from "../run/stages/registry";
@@ -47,11 +49,15 @@ function candidates(run: RunState, seatIds: readonly string[], catalog: Catalog)
     }
     case "route":
       return mine.filter((seat) => !Object.hasOwn(stage.ballots, seat.seatId)).map((seat) => ({ seatId: seat.seatId, request: { type: "vote", choice: null } }));
+    case "shop":
     case "loadout":
     case "event":
       return each({ type: "ready" });
     case "draft":
-      return mine.filter((seat) => seat.offers.length > 0).map((seat) => ({ seatId: seat.seatId, request: { type: "pick-bundle", bundle: 0 } }));
+      return mine.flatMap((seat): Candidate[] => {
+        const move = absentSeatAction(run, seat.seatId, catalog);
+        return move === null ? [] : [{ seatId: seat.seatId, request: move }];
+      });
     case "camp": {
       const out: Candidate[] = gatedPendingSeatIds(run, catalog)
         .filter((seatId) => seatIds.includes(seatId))

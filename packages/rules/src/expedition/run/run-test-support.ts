@@ -18,21 +18,21 @@ import { currentActorSeatId } from "../camp";
 import { rulesFor } from "./compose";
 import { buildCatalog } from "./catalog";
 import { abilityStatus } from "./abilities";
-import { mintItems } from "./items";
-import { createRun, openLoadout, runStatus } from "./lifecycle";
+import { mintItems, roomFor } from "./items";
+import { createRun, openLeg, openLoadout, runStatus } from "./lifecycle";
 import { campIndex, drawPlan } from "./plan";
 import { campSpecAt } from "./route";
 import { applyRunAction } from "./stages/registry";
 import { attemptOf } from "./attempt";
 import { RUN_LENGTHS } from "./balance";
-import { abilityKeys } from "./usage";
+import { abilityKeys, backpackOf } from "./usage";
 import { upgradeOffers } from "./shop";
 import { currentWindow, WINDOWS } from "./windows";
 import { defineCharacter, defineItem, defineUpgrade, type CharacterDef, type ItemDef, type Rarity } from "../content/source-def";
 import { MODS } from "../content/mods/registry";
 import { PAIRINGS, type PairingRule } from "../content/mods/pairings";
 import type { ModDef } from "../content/mods/mod-def";
-import type { Catalog, RunAction, RunLength, RunState } from "./types";
+import type { Catalog, RunAction, RunAt, RunLength, RunState } from "./types";
 
 function plainCharacter(n: number): CharacterDef {
   return defineCharacter({
@@ -123,6 +123,12 @@ export function setupRun(opts: {
   return openLoadout(crewed, campSpecAt(opts.seed, length, campIndex(opts.camp ?? 1), opts.catalog), opts.catalog);
 }
 
+/** setupRun at boss camp `camp`, then the shop on the way there (the stage
+ * before its draft and route vote). */
+export function setupShop(opts: Parameters<typeof setupRun>[0] & { readonly camp: number }): RunAt<"shop"> {
+  return openLeg(setupRun(opts), campIndex(opts.camp), "shop", opts.catalog) as RunAt<"shop">;
+}
+
 /** Drives `run` forward through applyRunAction ONLY until `target` is
  * reached: from a loadout, readies every seat, which deals the camp; for
  * "between-tricks" the current actor then picks their first unowned
@@ -202,12 +208,12 @@ function abilityCandidates(run: RunState, catalog: Catalog): Array<{ seatId: str
   );
 }
 
-/** Loadout candidates past ready: every buy, and equipping the newest items
- * when that changes the set. Equip moves one way only, so a deterministic
- * driver cannot toggle forever. */
+/** Loadout and shop candidates past ready: every buy at the shop, and
+ * equipping the newest items when that changes the set. Equip moves one way
+ * only, so a deterministic driver cannot toggle forever. */
 function loadoutCandidates(run: RunState, catalog: Catalog): Array<{ seatId: string; action: RunAction }> {
-  if (run.stage.tag !== "loadout") return [];
-  const stock = run.stage.stock;
+  if (run.stage.tag !== "loadout" && run.stage.tag !== "shop") return [];
+  const stock = run.stage.tag === "shop" ? run.stage.stock : null;
   return run.seats.flatMap((seat) => {
     const out: Array<{ seatId: string; action: RunAction }> = [];
     const newest = seat.items.slice(-rulesFor(run, catalog).itemSlots(run, seat.seatId)).map((item) => item.uid);
@@ -253,8 +259,11 @@ export function enumerateLegalRunActions(
   } else if (stage.tag === "draft") {
     for (const seat of run.seats) {
       (seat.offers[0]?.bundles ?? []).forEach((_, bundle) => candidates.push({ seatId: seat.seatId, action: { type: "pick-bundle", bundle } }));
+      // Discards only when nothing fits, so a random driver cannot empty a pack for nothing.
+      const fits = (seat.offers[0]?.bundles ?? []).some((bundle) => bundle.length <= roomFor(run, seat.seatId, catalog));
+      if (seat.offers.length > 0 && !fits) for (const item of backpackOf(seat)) candidates.push({ seatId: seat.seatId, action: { type: "discard-item", itemUid: item.uid } });
     }
-  } else if (stage.tag === "loadout" || stage.tag === "event") {
+  } else if (stage.tag === "shop" || stage.tag === "loadout" || stage.tag === "event") {
     for (const seat of run.seats) candidates.push({ seatId: seat.seatId, action: { type: "ready" } });
     candidates.push(...loadoutCandidates(run, catalog));
   } else if (stage.tag === "camp") {

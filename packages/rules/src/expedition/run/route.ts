@@ -1,9 +1,7 @@
 // Camp specs and the routes between them. A spec is what a camp is
-// (location, weather, the event that led there, its objective slots), fixed
-// when the route is chosen, so a failed camp replays the same spec.
+// (location, weather, its objective slots), fixed when the route is chosen,
+// so a failed camp replays the same spec.
 
-import { EVENTS } from "../content/events/registry";
-import type { EventId } from "../content/events/event-def";
 import type { ModDef, ModId } from "../content/mods/mod-def";
 import type { ObjectiveSlot } from "../state";
 import { BOTH_MIX_MIN_SLOTS, MIX_FROM_CAMP, NORMAL_WEATHER_CHANCE, OBJECTIVE_RAMP, ROUTE_OPTIONS } from "./balance";
@@ -20,14 +18,13 @@ export type CampSpec = {
   readonly index: CampIndex;
   readonly location: ModId;
   readonly weather: ModId;
-  readonly event: EventId | null; // the event on the route that led here; null at camp 1
   readonly slots: readonly SlotTemplate[];
 };
 
 export type RouteChoice = "a" | "b" | "c";
 /** The boss a route puts at a later boss camp in place of the planned one. */
 export type SwappedBoss = { readonly at: CampIndex; readonly modId: ModId };
-/** `reroll` counts how often its location and event were drawn again;
+/** `reroll` counts how often its location and weather were drawn again;
  * `swapBoss`, when set, rewrites the plan once the route is chosen. */
 export type RouteOption = { readonly id: RouteChoice; readonly next: CampSpec; readonly reroll: number; readonly swapBoss: SwappedBoss | null };
 
@@ -54,7 +51,7 @@ export function planOf(run: RunState): NonNullable<RunState["plan"]> {
 /** Camp 1: the Jungle in fair weather, every slot a win-card. */
 export function firstCampSpec(length: RunLength): CampSpec {
   const index = campIndex(1);
-  return { index, location: FIRST_LOCATION, weather: FAIR_WEATHER, event: null, slots: slotsFor(OBJECTIVE_RAMP[length][0]!, "plain") };
+  return { index, location: FIRST_LOCATION, weather: FAIR_WEATHER, slots: slotsFor(OBJECTIVE_RAMP[length][0]!, "plain") };
 }
 
 /** One def by weight: ids sorted, a seeded index into the summed weights.
@@ -67,7 +64,7 @@ function drawWeighted(seed: string, stream: string, defs: readonly ModDef[]): Mo
   return pool.find((def) => (at -= def.weight) < 0)!;
 }
 
-/** What the crew's rules say about the routes a draft deals. */
+/** What the crew's rules say about the routes a vote offers. */
 type RouteRules = {
   readonly fairChance: (locationChance: number) => number;
   readonly count: (seeded: number) => number;
@@ -98,11 +95,6 @@ function drawPlace(seed: string, next: CampIndex, reroll: number, option: number
   return { location: location.id, weather: weather?.id ?? FAIR_WEATHER };
 }
 
-function drawEvent(seed: string, next: CampIndex, reroll: number, option: number): EventId {
-  const events = Object.keys(EVENTS).sort();
-  return events[seededIndex(seed, STREAMS.routeField(next, reroll, option, "event"), events.length)]!;
-}
-
 /** The next animal or disaster boss camp from `next` on, with another boss
  * of its tier in place of the planned one; null when there is none to swap. */
 function drawSwap(seed: string, plan: RunPlan, next: CampIndex, option: number, catalog: Catalog): SwappedBoss | null {
@@ -126,19 +118,19 @@ function optionsAfter(seed: string, plan: RunPlan, cleared: CampIndex, catalog: 
     const place = drawPlace(seed, next, 0, i, catalog, rules.fairChance);
     const mix = mixes[seededIndex(seed, STREAMS.routeField(next, 0, i, "mix"), mixes.length)]!;
     const swapBoss = rules.swapsBoss(i) ? drawSwap(seed, plan, next, i, catalog) : null;
-    return { id, next: { index: next, location: place.location, weather: place.weather, event: drawEvent(seed, next, 0, i), slots: slotsFor(slotCount, mix) }, reroll: 0, swapBoss };
+    return { id, next: { index: next, location: place.location, weather: place.weather, slots: slotsFor(slotCount, mix) }, reroll: 0, swapBoss };
   });
 }
 
-/** 2 or 3 options (seeded count, then the crew's routeOptionCount), each
- * with a location by weight, its weather, a uniform event and, from
+/** 2 or 3 options to the camp after `from` (seeded count, then the crew's
+ * routeOptionCount), each with a location by weight, its weather and, from
  * MIX_FROM_CAMP on, a seeded objective mix; an option the crew's swapsBoss
  * names also leads to a different boss. */
-export function routeOptions(run: RunAt<"draft">, catalog: Catalog): readonly RouteOption[] {
-  return optionsAfter(run.seed, planOf(run), run.stage.cleared, catalog, routeRules(run, catalog));
+export function routeOptions(run: RunState, from: CampIndex, catalog: Catalog): readonly RouteOption[] {
+  return optionsAfter(run.seed, planOf(run), from, catalog, routeRules(run, catalog));
 }
 
-/** The option with its location, weather and event drawn again on the next
+/** The option with its location and weather drawn again on the next
  * reroll's streams; its objective mix and any boss swap stay. */
 export function rerollOption(run: RunAt<"route">, choice: RouteChoice, catalog: Catalog): RunAt<"route"> {
   const i = run.stage.options.findIndex((o) => o.id === choice);
@@ -147,7 +139,7 @@ export function rerollOption(run: RunAt<"route">, choice: RouteChoice, catalog: 
   const reroll = option.reroll + 1;
   const next = option.next.index;
   const place = drawPlace(run.seed, next, reroll, i, catalog, routeRules(run, catalog).fairChance);
-  const rerolled: RouteOption = { ...option, reroll, next: { ...option.next, location: place.location, weather: place.weather, event: drawEvent(run.seed, next, reroll, i) } };
+  const rerolled: RouteOption = { ...option, reroll, next: { ...option.next, location: place.location, weather: place.weather } };
   return { ...run, stage: { ...run.stage, options: run.stage.options.map((o) => (o.id === choice ? rerolled : o)) } };
 }
 

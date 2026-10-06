@@ -76,7 +76,7 @@ describe("dev shortcuts", () => {
   it("force-camp cleared opens the draft with an offer for every seat and pays the purse", () => {
     const cleared = run("force-camp", fresh(), { outcome: "cleared" });
     expect(cleared.stage.tag).toBe("draft");
-    expect(cleared.stage.tag === "draft" && cleared.stage.cleared).toBe(1);
+    expect(cleared.stage.tag === "draft" && cleared.stage.next).toBe(2);
     expect(cleared.seats.every((s) => s.offers.length === 1)).toBe(true);
     // The crew seats the Businessman, whose two empty slots paid 5 at the deal.
     expect(cleared.purse).toBe(cleared.history[0]!.coins + 5);
@@ -211,10 +211,11 @@ describe("dev shortcuts for the character seams", () => {
   const routeVote = (): RunState => {
     let state = run("force-camp", run("jump-to-camp", fresh(), { length: "standard", camp: 1, stage: "camp" }), { outcome: "cleared" });
     while (state.stage.tag === "draft") state = act(state, state.seats.find((s) => s.offers.length > 0)!.seatId, { type: "pick-bundle", bundle: 0 });
+    for (const seatId of SEATS) if (state.stage.tag === "event") state = act(state, seatId, { type: "ready" });
     return state;
   };
 
-  it("reroll-route draws one option's place and event again and counts the reroll", () => {
+  it("reroll-route draws one option's place again and counts the reroll", () => {
     const vote = routeVote();
     const rerolled = run("reroll-route", vote, { option: "a" });
     if (rerolled.stage.tag !== "route" || vote.stage.tag !== "route") throw new Error("expected the route vote");
@@ -246,7 +247,7 @@ describe("dev shortcuts for the character seams", () => {
   });
 
   it("queue-offer queues a special offer behind the seat's own", () => {
-    const queued = run("queue-offer", run("force-camp", run("jump-to-camp", fresh(), camp2), { outcome: "cleared" }), { seat: "b" });
+    const queued = run("queue-offer", run("force-camp", run("jump-to-camp", fresh(), { ...camp2, camp: 1 }), { outcome: "cleared" }), { seat: "b" });
     expect(queued.seats.find((s) => s.seatId === "b")!.offers.map((o) => o.kind)).toEqual(["standard", "special"]);
     expect(checkRunState(queued, CATALOG)).toEqual([]);
   });
@@ -266,12 +267,29 @@ describe("dev shortcuts for a solo playtest", () => {
 
   it("jump-to-camp arrives at the shop before a boss camp, and names the shops when the camp has none", () => {
     const shop = run("jump-to-camp", fresh(), { length: "long", camp: 6, stage: "shop" });
-    expect(shop.stage.tag === "loadout" && [shop.stage.camp.index, shop.stage.stock?.length]).toEqual([6, 4]);
-    expect(() => run("jump-to-camp", fresh(), { length: "long", camp: 5, stage: "shop" })).toThrow("camp 5 has no shop: a long run's shops are before camps 3, 6, 8");
+    expect(shop.stage.tag === "shop" && [shop.stage.next, shop.stage.camp, shop.stage.stock.length]).toEqual([6, null, 4]);
+    expect(shop.history.map((h) => [h.camp, h.status])).toEqual([[5, "cleared"]]);
+    expect(checkRunState(shop, CATALOG)).toEqual([]);
+    expect(() => run("jump-to-camp", fresh(), { length: "long", camp: 5, stage: "shop" })).toThrow("camp 5 has no shop before it: a long run's shops are before camps 3, 6, 8");
   });
 
-  it("next-stage moves every seat on: muster to camp 1's loadout, the loadout to the table, the table to its end", () => {
-    const loadout = run("next-stage", fresh());
+  it("jump-to-camp arrives at the draft or the event before a camp", () => {
+    const first = run("jump-to-camp", fresh(), { length: "standard", camp: 1, stage: "draft" });
+    expect(first.stage).toEqual({ tag: "draft", next: 1 });
+    expect(first.seats.map((s) => s.offers.map((o) => o.bundles.map((b) => b.length)))).toEqual(first.seats.map(() => [[1, 1, 1]]));
+    expect(checkRunState(first, CATALOG)).toEqual([]);
+    const afterBoss = run("jump-to-camp", fresh(), { length: "standard", camp: 4, stage: "draft" });
+    expect(afterBoss.seats[0]!.offers.map((o) => o.bundles.map((b) => b.length))).toEqual([[2, 2, 2]]);
+    const event = run("jump-to-camp", fresh(), { length: "long", camp: 4, stage: "event" });
+    expect(event.stage).toMatchObject({ tag: "event", next: 4 });
+    expect(checkRunState(event, CATALOG)).toEqual([]);
+    expect(() => run("jump-to-camp", fresh(), { length: "long", camp: 3, stage: "event" })).toThrow("camp 3 has no event before it: a long run's events are before camps 2, 4, 6, 8");
+  });
+
+  it("next-stage moves every seat on: muster to the first draft, then camp 1's loadout, the loadout to the table, the table to its end", () => {
+    const draft = run("next-stage", fresh());
+    expect(draft.stage).toEqual({ tag: "draft", next: 1 });
+    const loadout = run("next-stage", draft);
     expect(loadout.stage.tag === "loadout" && loadout.stage.camp.index).toBe(1);
     expect(loadout.seats.every((s) => s.characterId !== null)).toBe(true);
     const table = run("next-stage", loadout);
@@ -302,7 +320,7 @@ describe("dev shortcuts for a solo playtest", () => {
     const dealt = run("jump-to-camp", fresh(), { length: "standard", camp: 2, stage: "camp" });
     const ids = attemptOf(dealt)!.camp.objectives.map((o) => o.id);
     const cleared = ids.reduce((state, objective) => run("set-objective-status", state, { objective, status: "done" }), dealt);
-    expect([cleared.stage.tag, cleared.history.at(-1)?.status]).toEqual(["draft", "cleared"]);
+    expect([cleared.stage.tag, cleared.history.at(-1)?.status]).toEqual(["shop", "cleared"]);
     const failed = run("set-objective-status", dealt, { objective: ids[0]!, status: "failed" });
     expect([failed.stage.tag, failed.history.at(-1)?.status, failed.supplies]).toEqual(["loadout", "failed", 2]);
     expect(() => run("set-objective-status", run("force-camp", dealt, { outcome: "cleared" }), { objective: ids[0]!, status: "done" })).toThrow("there is no dealt camp with objectives");

@@ -38,7 +38,7 @@ function fixtures(supplies?: number): Record<string, RunState> {
   const draft: RunState = {
     ...draftBase,
     seats: draftBase.seats.map((seat) => ({ ...seat, offers: [{ kind: "standard", bundles: [["bait", "parrot"], ["whetstone"]] }] })),
-    stage: { tag: "draft", cleared: campIndex(2), payout: 5 },
+    stage: { tag: "draft", next: campIndex(3) },
   };
   return { fresh, rescue, objectivePick, betweenTricks, shop, draft };
 }
@@ -131,7 +131,7 @@ describe("expeditionGame: applyAction accepts valid actions and never mutates st
         if (result.ok) state = result.state;
       }
     }
-    expect(state.stage.tag).toBe("loadout");
+    expect(state.stage.tag).toBe("draft");
     expect(state.plan?.length).toBe("short");
   });
 
@@ -217,7 +217,7 @@ describe("expeditionGame: autoPassRequest", () => {
     const { rescue } = fixtures();
     const passed = expeditionGame.applyAction(rescue!, "p0", expeditionGame.autoPassRequest!(rescue!, "p0"));
     if (!passed.ok) throw new Error(passed.error);
-    expect(passed.state.stage.tag).toBe("loadout");
+    expect(passed.state.stage.tag).toBe("shop");
     expect(passed.state.history).toEqual([{ camp: 3, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 0 }]);
     expect(expeditionGame.autoPassRequest!(passed.state, "p0")).toEqual({ type: "ready" });
   });
@@ -231,7 +231,7 @@ describe("expeditionGame: autoPassRequest", () => {
     expect(expeditionGame.autoPassRequest!(picked.state, "p0")).toEqual({ type: "vote", choice: null });
   });
 
-  it("carries a muster with two absent seats to camp 1's loadout", () => {
+  it("carries a muster with two absent seats through the first draft to camp 1's loadout", () => {
     let run = fixtures().fresh!;
     for (const action of [{ type: "pick-character", characterId: "leader" }, { type: "vote", choice: "short" }, { type: "lock-in" }] as const) {
       const acted = expeditionGame.applyAction(run, "p0", action);
@@ -239,6 +239,11 @@ describe("expeditionGame: autoPassRequest", () => {
       run = acted.state;
     }
     for (let step = 0; step < 6; step++) {
+      if (run.stage.tag === "draft" && run.seats[0]!.offers.length > 0) {
+        const picked = expeditionGame.applyAction(run, "p0", { type: "pick-bundle", bundle: 0 });
+        if (!picked.ok) throw new Error(picked.error);
+        run = picked.state;
+      }
       for (const seatId of ["p1", "p2"]) {
         const request = expeditionGame.autoPassRequest!(run, seatId);
         if (request === null) continue;
@@ -260,7 +265,7 @@ describe("expeditionGame: autoPassRequest", () => {
     expect(readied.state.seats[1]!.equipped).toEqual(loadout.seats[1]!.equipped);
 
     const spec = loadout.stage.tag === "loadout" ? loadout.stage.camp : null;
-    const event: RunState = { ...loadout, stage: { tag: "event", route: { id: "a", next: spec!, reroll: 0, swapBoss: null }, ready: { p0: true } } };
+    const event: RunState = { ...loadout, stage: { tag: "event", next: spec!.index, event: "event", ready: { p0: true } } };
     expect(expeditionGame.autoPassRequest!(event, "p2")).toEqual({ type: "ready" });
     expect(expeditionGame.autoPassRequest!(event, "p0")).toBeNull();
   });

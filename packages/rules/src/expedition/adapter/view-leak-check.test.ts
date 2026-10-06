@@ -65,7 +65,7 @@ function realDraft(): RunState {
   return {
     ...base,
     seats: base.seats.map((seat) => ({ ...seat, offers: offers(seat) })),
-    stage: { tag: "draft", cleared: campIndex(2), payout: 5 },
+    stage: { tag: "draft", next: campIndex(3) },
   };
 }
 

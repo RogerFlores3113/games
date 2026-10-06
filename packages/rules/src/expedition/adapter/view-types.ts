@@ -261,7 +261,6 @@ export type ExpeditionCampPreviewView = {
   location: string;
   weather: string;
   pairing: string | null;
-  event: string | null;
   slotKinds: ExpeditionSlotKindView[];
   bossId: string | null;
   shop: boolean;
@@ -327,12 +326,19 @@ export type ExpeditionModView = { id: string; kind: ModKind; strength: Strength;
 export type ExpeditionStageView =
   /** `lockedSeatIds`: the seats whose character and ballot are final. */
   | { tag: "muster"; ballots: ExpeditionBallotView[]; lockedSeatIds: string[] }
-  | { tag: "loadout"; camp: ExpeditionCampPreviewView; mods: ExpeditionModView[]; yourSlots: number; shop: ExpeditionShopView | null; readySeatIds: string[] }
-  | { tag: "camp"; camp: ExpeditionCampPreviewView; mods: ExpeditionModView[]; attempt: ExpeditionAttemptView }
-  | { tag: "draft"; cleared: number; payout: number; yourOffer: { kind: "standard" | "special"; bundles: string[][] } | null; pendingSeatIds: string[] }
+  /** Before boss camp `next`. `camp` previews it on a replay; null on the
+   * way there, before its route is voted. */
+  | { tag: "shop"; next: number; camp: ExpeditionCampPreviewView | null; shop: ExpeditionShopView; readySeatIds: string[] }
+  /** The draft before camp `next`. `cleared` is the camp before it (0
+   * before camp 1) and `payout` what clearing it paid. A bundle holds one
+   * item, or two after a boss camp. */
+  | { tag: "draft"; next: number; cleared: number; payout: number; yourOffer: { kind: "standard" | "special"; bundles: string[][] } | null; pendingSeatIds: string[] }
+  /** The event on the trail before camp `next`. */
+  | { tag: "event"; event: string; next: number; readySeatIds: string[] }
   /** `swapsBoss`: the option leads to a different boss at the next boss camp. */
   | { tag: "route"; options: { id: string; next: ExpeditionCampPreviewView; swapsBoss: boolean }[]; ballots: ExpeditionBallotView[] }
-  | { tag: "event"; event: string; next: ExpeditionCampPreviewView; readySeatIds: string[] }
+  | { tag: "loadout"; camp: ExpeditionCampPreviewView; mods: ExpeditionModView[]; readySeatIds: string[] }
+  | { tag: "camp"; camp: ExpeditionCampPreviewView; mods: ExpeditionModView[]; attempt: ExpeditionAttemptView }
   | { tag: "ended"; result: "won" | "lost" };
 
 // Deliberately no `seed` key anywhere in this type: the run's RNG root must
@@ -348,6 +354,10 @@ export type ExpeditionView = {
   seats: ExpeditionSeatView[];
   kicked: ExpeditionKickedSeatView[];
   yourAbilities: ExpeditionAbilityView[];
+  /** The viewer's equipment slots now (the camp's rules apply at the loadout
+   * and in camp); 0 for a viewer with no seat. The backpack beside them
+   * holds BALANCE_DISPLAY.backpackSize. */
+  yourItemSlots: number;
   history: ExpeditionCampResultView[];
   lastVote: ExpeditionVoteView | null;
   stage: ExpeditionStageView;

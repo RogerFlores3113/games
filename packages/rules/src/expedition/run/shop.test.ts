@@ -1,11 +1,11 @@
-// The shop in the loadout before a boss camp: prices spend the shared
-// purse, each refusal, the replay visit, and no shop before a plain camp.
+// The shop before a boss camp: prices spend the shared purse, each
+// refusal, the replay visit, and no shop before a plain camp.
 
 import { describe, expect, it } from "vitest";
 import { attemptOf } from "./attempt";
 import { settleCamp } from "./lifecycle";
 import { campIndex } from "./plan";
-import { plainItem, setupRun, testCatalog } from "./run-test-support";
+import { plainItem, setupRun, setupShop, testCatalog } from "./run-test-support";
 import { stockFor } from "./shop";
 import { applyRunAction } from "./stages/registry";
 import type { RunAt, RunState } from "./types";
@@ -18,9 +18,9 @@ const catalog = testCatalog({
 const SEATS = ["p0", "p1", "p2"];
 const SEED = "shop-seed";
 
-/** The loadout of camp 3 of a standard run, an animal boss camp. */
-function shopRun(opts: { purse?: number; supplies?: number } = {}): RunAt<"loadout"> {
-  return setupRun({ seatIds: SEATS, seed: SEED, catalog, camp: 3, purse: opts.purse ?? 20, supplies: opts.supplies }) as RunAt<"loadout">;
+/** The shop before camp 3 of a standard run, an animal boss camp. */
+function shopRun(opts: { purse?: number; supplies?: number } = {}): RunAt<"shop"> {
+  return setupShop({ seatIds: SEATS, seed: SEED, catalog, camp: 3, purse: opts.purse ?? 20, supplies: opts.supplies });
 }
 
 function act(run: RunState, seatId: string, action: Parameters<typeof applyRunAction>[2]): RunState {
@@ -41,11 +41,10 @@ describe("the shop", () => {
     ]);
   });
 
-  it("is closed before a plain camp: every buy is not_a_choice", () => {
+  it("is not a stage before a plain camp: the loadout refuses every buy as wrong_stage", () => {
     const plain = setupRun({ seatIds: SEATS, seed: SEED, catalog, camp: 2, purse: 20 });
-    expect(plain.stage).toMatchObject({ tag: "loadout", stock: null });
-    expect(refusal(plain, "p0", "supplies")).toEqual({ ok: false, error: "not_a_choice" });
-    expect(refusal(plain, "p0", "upgrade:plain-1.a")).toEqual({ ok: false, error: "not_a_choice" });
+    expect(refusal(plain, "p0", "supplies")).toEqual({ ok: false, error: "wrong_stage" });
+    expect(refusal(plain, "p0", "upgrade:plain-1.a")).toEqual({ ok: false, error: "wrong_stage" });
   });
 
   it("a supply spends its price from the shared purse", () => {
@@ -63,11 +62,11 @@ describe("the shop", () => {
   });
 
   it("mints a bought item to the buyer, marks it sold, and refuses it after as sold_out", () => {
-    const run = act(shopRun(), "p1", { type: "buy", stockId: "item0" }) as RunAt<"loadout">;
+    const run = act(shopRun(), "p1", { type: "buy", stockId: "item0" }) as RunAt<"shop">;
     expect(run.purse).toBe(17);
     expect(run.seats[1]!.items).toEqual([{ uid: "it0", itemId: "c-2" }]);
     expect(run.seats[1]!.equipped).toEqual(["it0"]);
-    expect(run.stage.stock![1]).toEqual({ stockId: "item0", what: { kind: "item", itemId: "c-2" }, price: 3, soldTo: "p1" });
+    expect(run.stage.stock[1]).toEqual({ stockId: "item0", what: { kind: "item", itemId: "c-2" }, price: 3, soldTo: "p1" });
     expect(refusal(run, "p2", "item0")).toEqual({ ok: false, error: "sold_out" });
   });
 
@@ -87,11 +86,13 @@ describe("the shop", () => {
 
   it("a failed boss camp's replay is a new visit with the same stock, unsold", () => {
     const first = shopRun();
-    let run = act(first, "p0", { type: "buy", stockId: "item1" });
-    for (const seatId of SEATS) run = act(run, seatId, { type: "ready" });
-    expect(attemptOf(run)).not.toBeNull();
-    const replay = settleCamp(run as RunAt<"camp">, "failed", catalog);
-    expect(replay.stage).toMatchObject({ tag: "loadout", stock: first.stage.stock });
+    let run: RunState = act(first, "p0", { type: "buy", stockId: "item1" });
+    let loadout = setupRun({ seatIds: SEATS, seed: SEED, catalog, camp: 3 });
+    loadout = { ...loadout, seats: run.seats, purse: run.purse, itemSerial: run.itemSerial };
+    for (const seatId of SEATS) loadout = act(loadout, seatId, { type: "ready" });
+    expect(attemptOf(loadout)).not.toBeNull();
+    run = settleCamp(loadout as RunAt<"camp">, "failed", catalog);
+    expect(run.stage).toMatchObject({ tag: "shop", next: 3, stock: first.stage.stock });
     expect(stockFor(SEED, campIndex(3), catalog)).toEqual(first.stage.stock);
   });
 });

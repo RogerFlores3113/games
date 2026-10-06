@@ -16,7 +16,7 @@ import { rulesFor } from "./compose";
 import { createRun, dealCamp, settleCamp } from "./lifecycle";
 import { campIndex } from "./plan";
 import { routeOptions } from "./route";
-import { advanceTo, plainItem, setupRun, testCatalog } from "./run-test-support";
+import { advanceTo, plainItem, setupRun, setupShop, testCatalog } from "./run-test-support";
 import { choicesFor, stepsFor } from "./targets";
 import { applyRunAction } from "./stages/registry";
 import { applyToolkitOps, campCardIds, type ToolkitOp } from "./toolkit";
@@ -75,13 +75,15 @@ function draftOf(run: RunState, catalog: Catalog): RunAt<"draft"> {
   return settleCamp(cleared, "cleared", catalog) as RunAt<"draft">;
 }
 
-/** Every seat takes its first bundle until the route vote opens. */
+/** Every seat takes its first bundle, then readies through any event,
+ * until the route vote opens. */
 function routeOf(run: RunState, catalog: Catalog): RunAt<"route"> {
   let next = run;
   while (next.stage.tag === "draft") {
     const seat = next.seats.find((s) => s.offers.length > 0)!;
     next = act(next, seat.seatId, { type: "pick-bundle", bundle: 0 }, catalog);
   }
+  for (const seatId of SEATS) if (next.stage.tag === "event") next = act(next, seatId, { type: "ready" }, catalog);
   return next as RunAt<"route">;
 }
 
@@ -126,7 +128,7 @@ describe("stage windows", () => {
     expect(useAbility(camp, "p0", "purser", [], catalog)).toEqual({ ok: false, error: "wrong_window" });
   });
 
-  it("lets a draft-window ability drop the head offer for coins, opening the route once nobody has one", () => {
+  it("lets a draft-window ability drop the head offer for coins, moving on once nobody has one", () => {
     const skipper = seamCharacter("skipper", {
       active: ability({ window: "draft", limit: { kind: "per-run", times: 9 }, targets: [], apply: (ctx) => [{ op: "drop-offer", seatId: ctx.self }, { op: "adjust-coins", delta: 4 }] }),
     });
@@ -137,7 +139,7 @@ describe("stage windows", () => {
     expect(run.seats[0]!.offers).toEqual([]);
     expect(run.purse).toBe(purse + 4);
     run = act(act(run, "p1", { type: "pick-bundle", bundle: 0 }, cat), "p2", { type: "pick-bundle", bundle: 0 }, cat);
-    expect(run.stage.tag).toBe("route");
+    expect(run.stage.tag).toBe("event");
   });
 });
 
@@ -151,18 +153,18 @@ describe("route hooks: normalWeatherChance, routeOptionCount, swapsBoss and rero
     for (let n = 0; n < 12; n++) {
       const sunny = routesWith(seamCharacter("sunny", { passive: passive(() => ({ normalWeatherChance: () => () => 100 })) }), `sun-${n}`);
       const stormy = routesWith(seamCharacter("stormy", { passive: passive(() => ({ normalWeatherChance: () => () => 0 })) }), `sun-${n}`);
-      expect(routeOptions(sunny.draft, sunny.catalog).map((o) => o.next.weather).every((w) => w === "fair")).toBe(true);
-      expect(routeOptions(stormy.draft, stormy.catalog).map((o) => o.next.weather).some((w) => w === "fair")).toBe(false);
+      expect(routeOptions(sunny.draft, campIndex(1), sunny.catalog).map((o) => o.next.weather).every((w) => w === "fair")).toBe(true);
+      expect(routeOptions(stormy.draft, campIndex(1), stormy.catalog).map((o) => o.next.weather).some((w) => w === "fair")).toBe(false);
     }
   });
 
   it("offers the count the crew's rules name", () => {
     for (let n = 0; n < 12; n++) {
       const three = routesWith(seamCharacter("three", { passive: passive(() => ({ routeOptionCount: () => () => 3 })) }), `count-${n}`);
-      expect(routeOptions(three.draft, three.catalog).map((o) => o.id)).toEqual(["a", "b", "c"]);
+      expect(routeOptions(three.draft, campIndex(1), three.catalog).map((o) => o.id)).toEqual(["a", "b", "c"]);
     }
     const broken = routesWith(seamCharacter("four", { passive: passive(() => ({ routeOptionCount: () => () => 4 })) }), "count");
-    expect(() => routeOptions(broken.draft, broken.catalog)).toThrow("route: routeOptionCount gave 4, outside 1 to 3");
+    expect(() => routeOptions(broken.draft, campIndex(1), broken.catalog)).toThrow("route: routeOptionCount gave 4, outside 1 to 3");
   });
 
   const swapper = seamCharacter("swapper", { passive: passive(() => ({ routeOptionCount: () => () => 3, swapsBoss: () => (_run, option) => option === 2 })) });
@@ -170,7 +172,7 @@ describe("route hooks: normalWeatherChance, routeOptionCount, swapsBoss and rero
   it("sends the third route to another boss of the next boss camp's tier, written into the plan when chosen", () => {
     const { catalog, draft } = routesWith(swapper, "seam-seed-swap-route");
     const planned = draft.plan!.bosses.find((b) => b.at === 3)!;
-    const options = routeOptions(draft, catalog);
+    const options = routeOptions(draft, campIndex(1), catalog);
     expect(options.map((o) => o.swapBoss === null)).toEqual([true, true, false]);
     const swap = options[2]!.swapBoss!;
     expect(swap.at).toBe(3);
@@ -178,7 +180,7 @@ describe("route hooks: normalWeatherChance, routeOptionCount, swapsBoss and rero
     expect(swap.modId).not.toBe(planned.modId);
     let route: RunState = routeOf(draft, catalog);
     for (const seatId of SEATS) route = act(route, seatId, { type: "vote", choice: "c" }, catalog);
-    expect(route.stage.tag).toBe("event");
+    expect(route.stage.tag).toBe("loadout");
     expect(route.plan!.bosses.find((b) => b.at === 3)!.modId).toBe(swap.modId);
   });
 
@@ -196,7 +198,7 @@ describe("route hooks: normalWeatherChance, routeOptionCount, swapsBoss and rero
     leakFree(route, catalog);
   });
 
-  it("rerolls an option's location, weather and event on the next reroll's streams for supplies", () => {
+  it("rerolls an option's location and weather on the next reroll's streams for supplies", () => {
     const rerolling = seamCharacter("rerolling", {
       passive: passive(() => ({ routeOptionCount: () => () => 3 })),
       active: ability({
@@ -217,7 +219,7 @@ describe("route hooks: normalWeatherChance, routeOptionCount, swapsBoss and rero
     expect(after.stage.options[1]!.reroll).toBe(1);
     expect(after.stage.options[1]!.next.slots).toEqual(before[1]!.next.slots);
     expect([before[1]!.next.location, after.stage.options[1]!.next.location]).toEqual(["jungle", "cave"]);
-    expect(after.stage.options[1]!.next).toEqual({ ...before[1]!.next, location: "cave", weather: "fair", event: "event" });
+    expect(after.stage.options[1]!.next).toEqual({ ...before[1]!.next, location: "cave", weather: "fair" });
     const twice = use(after, "p0", "rerolling", ["route:b"], catalog);
     if (twice.stage.tag !== "route") throw new Error("expected the route vote");
     expect(twice.stage.options[1]!.reroll).toBe(2);
@@ -231,18 +233,18 @@ describe("draftShapes, shopPrice and the offers ops", () => {
     });
     const catalog = catalogWith(lean);
     const draft = draftOf(setupRun({ seatIds: SEATS, seed: "shape", catalog, characters: { p0: "lean" } }), catalog);
-    expect(draft.seats.map((s) => s.offers.map((offer) => offer.bundles.map((b) => b.length)))).toEqual([[[1], [2, 2]], [[2, 2, 2]], [[2, 2, 2]]]);
+    expect(draft.seats.map((s) => s.offers.map((offer) => offer.bundles.map((b) => b.length)))).toEqual([[[1], [1, 1]], [[1, 1, 1]], [[1, 1, 1]]]);
   });
 
   it("charges a seat the price its shopPrice names", () => {
     const haggler = seamCharacter("haggler", { passive: passive((self) => ({ shopPrice: (prev) => (run, seatId, price) => (seatId === self ? price - 1 : prev(run, seatId, price)) })) });
     const catalog = catalogWith(haggler);
-    const shop = setupRun({ seatIds: SEATS, seed: "haggle", catalog, characters: { p0: "haggler" }, camp: 3, purse: 20 }) as RunAt<"loadout">;
-    const item = shop.stage.stock!.find((e) => e.what.kind === "item")!;
+    const shop = setupShop({ seatIds: SEATS, seed: "haggle", catalog, characters: { p0: "haggler" }, camp: 3, purse: 20 });
+    const item = shop.stage.stock.find((e) => e.what.kind === "item")!;
     expect(act(shop, "p0", { type: "buy", stockId: item.stockId }, catalog).purse).toBe(20 - (item.price - 1));
     expect(act(shop, "p1", { type: "buy", stockId: item.stockId }, catalog).purse).toBe(20 - item.price);
     const view = toExpeditionPlayerView(shop, "p0", catalog);
-    if (view.stage.tag !== "loadout" || view.stage.shop === null) throw new Error("expected the shop");
+    if (view.stage.tag !== "shop") throw new Error("expected the shop");
     expect(view.stage.shop.stock.find((e) => e.stockId === item.stockId)!.price).toBe(item.price - 1);
   });
 
@@ -599,7 +601,7 @@ function playTrickWith(run: RunState, catalog: Catalog): { run: RunState } {
 }
 
 describe("source reactions", () => {
-  it("lets a character take a seeded item when the length vote opens camp 1", () => {
+  it("lets a character take a seeded item when the length vote opens the run", () => {
     const lucky = seamCharacter("lucky", {
       on: { "run-started": (ctx) => [{ op: "grant-item", seatId: ctx.self, itemId: ctx.drawOffer(ctx.self, { options: 1, bundleSize: 1, exclusive: 0, rareChance: 0 }).bundles[0]![0]! }] },
     });
@@ -609,7 +611,7 @@ describe("source reactions", () => {
     run = act(run, "p1", { type: "pick-character", characterId: "plain-1" }, catalog);
     run = act(run, "p2", { type: "pick-character", characterId: "plain-2" }, catalog);
     for (const seatId of SEATS) run = act(act(run, seatId, { type: "vote", choice: "short" }, catalog), seatId, { type: "lock-in" }, catalog);
-    expect(run.stage.tag).toBe("loadout");
+    expect(run.stage.tag).toBe("draft");
     expect(run.seats.map((s) => [s.items, s.equipped])).toEqual([[[{ uid: "it0", itemId: "item-b" }], ["it0"]], [[], []], [[], []]]);
   });
 
@@ -654,7 +656,6 @@ describe("surveys", () => {
     const surveyed = own.stage.options[0]!.next.survey;
     let run: RunState = route;
     for (const seatId of SEATS) run = act(run, seatId, { type: "vote", choice: "a" }, catalog);
-    for (const seatId of SEATS) run = act(run, seatId, { type: "ready" }, catalog);
     for (const seatId of SEATS) run = act(run, seatId, { type: "ready" }, catalog);
     const dealt = attemptOf(run)!.camp.objectives.map((o) => (o.kind === "win-card" ? { kind: o.kind, target: o.target } : o.kind === "ordered" ? { kind: o.kind, target: o.target, order: o.order } : o.kind === "exactly-n" ? { kind: o.kind, n: o.n } : { kind: o.kind }));
     expect(surveyed).toEqual(dealt);

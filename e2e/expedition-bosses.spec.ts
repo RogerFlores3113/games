@@ -135,11 +135,12 @@ test.describe("animal bosses on the table", () => {
     const panel = await soloTable(page);
     let pounce: CampModel | null = null;
     await bossCamp(panel, "tiger");
-    // Each failed camp is replayed with a fresh deal; supplies are topped up so the run goes on.
+    // Each failed camp is replayed with a fresh deal, through the shop and
+    // the loadout; supplies are topped up so the run goes on.
     for (let tries = 0; tries < 25 && pounce === null; tries++) {
       if ((await getScene(page)) !== "camp") {
         await shortcut(panel, "set-supplies", { supplies: "4" });
-        await autoplay(panel, "everyone", 3);
+        await autoplay(panel, "everyone", 6);
         await expect.poll(() => getScene(page)).toBe("camp");
       }
       await pickAll(page, panel);
@@ -218,7 +219,8 @@ test.describe("animal bosses on the table", () => {
     await shortcut(panel, "jump-to-camp", { camp: "2", stage: "camp" });
     await shortcut(panel, "set-plan-boss", { camp: "3", boss: "tiger" });
     await shortcut(panel, "force-camp", { outcome: "cleared" });
-    await autoplay(panel, "everyone", 3);
+    // Every seat readies at the shop, then takes an item in the draft.
+    await autoplay(panel, "everyone", 6);
     await expect.poll(async () => (await getModel<{ panel?: { kind: string } }>(page)).panel?.kind).toBe("route");
     const options = (await getModel<{ panel: { options: { next: { bossId: string | null; bossName: string | null } }[] } }>(page)).panel.options;
     expect(options.map((o) => [o.next.bossId, o.next.bossName])).toEqual(options.map(() => ["tiger", "Tiger"]));

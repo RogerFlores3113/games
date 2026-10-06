@@ -120,7 +120,6 @@ const CampSpecSchema = z.strictObject({
   index: CampIndexSchema,
   location: z.string().min(1),
   weather: z.string().min(1),
-  event: z.string().min(1).nullable(),
   slots: z.array(ObjectiveSlotSchema),
 });
 
@@ -144,11 +143,12 @@ const StockEntrySchema = z.strictObject({
 
 const StageSchema = z.discriminatedUnion("tag", [
   z.strictObject({ tag: z.literal("muster"), ballots: PerSeatSchema(RunLengthSchema.nullable()), locked: ReadySchema }),
-  z.strictObject({ tag: z.literal("loadout"), camp: CampSpecSchema, stock: z.array(StockEntrySchema).nullable(), ready: ReadySchema }),
-  z.strictObject({ tag: z.literal("camp"), camp: CampSpecSchema, attempt: AttemptSchema }),
-  z.strictObject({ tag: z.literal("draft"), cleared: CampIndexSchema, payout: z.number().int().min(0) }),
+  z.strictObject({ tag: z.literal("shop"), next: CampIndexSchema, camp: CampSpecSchema.nullable(), stock: z.array(StockEntrySchema), ready: ReadySchema }),
+  z.strictObject({ tag: z.literal("draft"), next: CampIndexSchema }),
+  z.strictObject({ tag: z.literal("event"), next: CampIndexSchema, event: z.string().min(1), ready: ReadySchema }),
   z.strictObject({ tag: z.literal("route"), from: CampIndexSchema, options: z.array(RouteOptionSchema), ballots: PerSeatSchema(RouteChoiceSchema.nullable()) }),
-  z.strictObject({ tag: z.literal("event"), route: RouteOptionSchema, ready: ReadySchema }),
+  z.strictObject({ tag: z.literal("loadout"), camp: CampSpecSchema, ready: ReadySchema }),
+  z.strictObject({ tag: z.literal("camp"), camp: CampSpecSchema, attempt: AttemptSchema }),
   z.strictObject({ tag: z.literal("ended"), result: z.enum(["won", "lost"]) }),
 ]);
 

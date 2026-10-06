@@ -3,7 +3,7 @@
 // again before they rejoined).
 
 import { benchSeat, markBack, MIN_CREW, rejoinBack } from "../crew";
-import { openLoadout, runStatus, withinSlots } from "../lifecycle";
+import { reopenCamp, runStatus, withinSlots } from "../lifecycle";
 import type { CampResult, Catalog, PerSeat, RunAt, RunState, Stage } from "../types";
 import { advance } from "./registry";
 
@@ -21,6 +21,7 @@ function stageWithout(stage: Stage, seatId: string): Stage {
       return { ...stage, ballots: without(stage.ballots, seatId), locked: without(stage.locked, seatId) };
     case "route":
       return { ...stage, ballots: without(stage.ballots, seatId) };
+    case "shop":
     case "loadout":
     case "event":
       return { ...stage, ready: without(stage.ready, seatId) };
@@ -32,12 +33,13 @@ function stageWithout(stage: Stage, seatId: string): Stage {
 }
 
 /** A dealt camp is abandoned for nothing: a `restarted` attempt, then the
- * same camp's loadout, whose deal is fresh for the crew left. */
+ * same camp again (its shop first before a boss camp), whose deal is fresh
+ * for the crew left. */
 function restartCamp(run: RunState, catalog: Catalog): RunState {
   if (run.stage.tag !== "camp") return run;
   const { camp: spec, attempt } = (run as RunAt<"camp">).stage;
   const result: CampResult = { camp: spec.index, attempt: attempt.attemptNumber, location: spec.location, weather: spec.weather, status: "restarted", suppliesSpent: 0, coins: 0 };
-  return openLoadout({ ...run, history: [...run.history, result] }, spec, catalog);
+  return reopenCamp({ ...run, history: [...run.history, result] }, spec, catalog);
 }
 
 /** Takes seatId out of the crew. Its ballot, lock-in or ready mark goes with it, a

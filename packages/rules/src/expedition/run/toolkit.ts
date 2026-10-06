@@ -18,7 +18,7 @@ import { SUPPLIES_MAX } from "./balance";
 import { attemptOf, withAttempt } from "./attempt";
 import type { EffectParams } from "../content/source-def";
 import type { DraftOffer } from "./draft";
-import { mintItems } from "./items";
+import { mintItems, roomFor } from "./items";
 import { STREAMS, attemptSeed } from "./rng";
 import { rerollOption, type RouteChoice } from "./route";
 import type { RunRules } from "./run-rules";
@@ -146,6 +146,7 @@ function applyRunOp(run: RunState, op: RunOp, rules: RunRules, catalog: Catalog)
       const item = from.items.find((i) => i.uid === op.uid);
       const to = seatNamed(run, op.toSeatId, op.op);
       if (item === undefined || from.seatId === to.seatId) throw new Error(`toolkit: give-item: ${op.uid} is not ${op.fromSeatId}'s to give to ${op.toSeatId}`);
+      if (roomFor(run, to.seatId, catalog) < 1) throw new Error(`toolkit: give-item: ${op.toSeatId} has no room for ${op.uid}`);
       const free = to.equipped.length < rules.itemSlots(run, to.seatId);
       const given = withSeat(run, from.seatId, (seat) => withoutItem(seat, op.uid));
       return withSeat(given, to.seatId, (seat) => ({ ...seat, items: [...seat.items, item], equipped: free ? [...seat.equipped, item.uid] : seat.equipped }));

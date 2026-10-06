@@ -106,23 +106,23 @@ describe("Rats", () => {
     const run = setupRun({ seatIds: SEATS, seed: "rats", catalog: CATALOG, camp: 2, items: { p0: ["bait", "whetstone"] } });
     expect(run.seats[0]!.equipped).toEqual(["it0", "it1"]);
     const next = campSpecAt("rats", "standard", campIndex(3), CATALOG);
-    const atEvent: RunState = {
+    const atRoute: RunState = {
       ...run,
       plan: { ...run.plan!, bosses: [{ at: campIndex(3), tier: "animal", modId: "rats" }] },
-      stage: { tag: "event", route: { id: "a", next, reroll: 0, swapBoss: null }, ready: {} },
+      stage: { tag: "route", from: campIndex(2), options: [{ id: "a", next, reroll: 0, swapBoss: null }], ballots: {} },
     };
     const loadout = SEATS.reduce<RunState>((acc, seatId) => {
-      const result = applyRunAction(acc, seatId, { type: "ready" }, CATALOG);
+      const result = applyRunAction(acc, seatId, { type: "vote", choice: "a" }, CATALOG);
       if (!result.ok) throw new Error(result.error);
       return result.state;
-    }, atEvent);
+    }, atRoute);
 
     expect(loadout.stage.tag).toBe("loadout");
     for (const seatId of SEATS) expect(rulesFor(loadout, CATALOG).itemSlots(loadout, seatId)).toBe(1);
     expect(loadout.seats[0]!.equipped).toEqual(["it0"]);
     expect(backpackOf(loadout.seats[0]!).map((i) => i.uid)).toEqual(["it1"]);
     const view = toExpeditionPlayerView(loadout, "p0", CATALOG);
-    expect(view.stage.tag === "loadout" && view.stage.yourSlots).toBe(1);
+    expect(view.stage.tag === "loadout" && view.yourItemSlots).toBe(1);
   });
 });
 

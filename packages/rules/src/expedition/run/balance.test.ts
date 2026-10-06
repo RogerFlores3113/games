@@ -11,7 +11,7 @@ function seatIds(n: number): string[] {
   return Array.from({ length: n }, (_, i) => `p${i}`);
 }
 
-const trickCountSpec: CampSpec = { index: campIndex(5), location: "jungle", weather: "fair", event: "event", slots: [{ kind: "win-card" }, { kind: "trick-count" }] };
+const trickCountSpec: CampSpec = { index: campIndex(5), location: "jungle", weather: "fair", slots: [{ kind: "win-card" }, { kind: "trick-count" }] };
 
 describe("payoutFor", () => {
   const camp = (totalTricks: number, completed: number): CampState =>

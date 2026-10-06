@@ -14,7 +14,8 @@ import { CATALOG } from "../run/catalog";
 import { rulesFor } from "../run/compose";
 import { attemptOf, withAttempt } from "../run/attempt";
 import { advanceTo, setupRun, testCatalog } from "../run/run-test-support";
-import { createRun } from "../run/lifecycle";
+import { createRun, openLeg } from "../run/lifecycle";
+import { campIndex } from "../run/plan";
 import { applyRunAction } from "../run/stages/registry";
 import { resolvedPlay } from "../test-support";
 import { defineItem } from "./source-def";
@@ -172,11 +173,11 @@ function clearableTable(spec: Spec): RunState {
 const playOut = (run: RunState) => play(play(play(run, "p0", "a"), "p1", "b"), "p2", "c");
 
 describe("J.D.", () => {
-  it("Lucky Start gives J.D. one random item when the length vote opens camp 1", () => {
+  it("Lucky Start gives J.D. one random item when the length vote opens the run", () => {
     let run = createRun({ seatIds: SEATS, seed: "beginner" });
     for (const [seatId, characterId] of [["p0", "jd"], ["p1", "leader"], ["p2", "explorer"]] as const) run = act(run, seatId, { type: "pick-character", characterId });
     for (const seatId of SEATS) run = act(act(run, seatId, { type: "vote", choice: "short" }), seatId, { type: "lock-in" });
-    expect(run.stage.tag).toBe("loadout");
+    expect(run.stage.tag).toBe("draft");
     expect(run.seats.map((s) => [s.items, s.equipped])).toEqual([[[{ uid: "it0", itemId: "parrot" }], ["it0"]], [[], []], [[], []]]);
   });
 
@@ -298,15 +299,20 @@ describe("Explorer", () => {
   });
 });
 
-/** Every seat takes its first bundle until the route vote opens. */
+/** Every seat takes its first bundle, then readies through any event,
+ * until the route vote opens. */
 function toRoute(run: RunState): RunState {
   let next = run;
   for (let i = 0; i < 9 && next.stage.tag === "draft"; i++) {
     const seat = next.seats.find((s) => s.offers.length > 0)!;
     next = act(next, seat.seatId, { type: "pick-bundle", bundle: 0 });
   }
+  for (const seatId of SEATS) if (next.stage.tag === "event") next = act(next, seatId, { type: "ready" });
   return next;
 }
+
+/** The shop before boss camp `camp`, from the crew's loadout there. */
+const shopOf = (run: RunState, camp: number): RunState => openLeg(run, campIndex(camp), "shop", CATALOG);
 
 describe("Businessman", () => {
   it("Bottom Line pays 2 coins for one empty slot taken into camp, 5 for two and none for none", () => {
@@ -314,7 +320,7 @@ describe("Businessman", () => {
   });
 
   it("sells an item at the shop for half its price, at least 1, and only at the shop", () => {
-    const shop = crew({ character: "businessman", kit: ["trail-map", "bait"], camp: 3 });
+    const shop = shopOf(crew({ character: "businessman", kit: ["trail-map", "bait"], camp: 3 }), 3);
     const sold = use(shop, "p0", "businessman", ["item:it0"]);
     expect([sold.seats[0]!.items, sold.purse]).toEqual([[{ uid: "it1", itemId: "bait" }], 2]);
     expect(use(sold, "p0", "businessman", ["item:it1"]).purse).toBe(3);
@@ -367,7 +373,7 @@ describe("Businessman", () => {
   });
 
   it("Haggle takes 1 coin off everything the Businessman buys at the shop", () => {
-    const shop = crew({ character: "businessman", kit: ["businessman.haggle"], camp: 3, purse: 20 });
+    const shop = shopOf(crew({ character: "businessman", kit: ["businessman.haggle"], camp: 3, purse: 20 }), 3);
     expect([rules(shop).shopPrice(shop, "p0", 6), rules(shop).shopPrice(shop, "p1", 6), rules(shop).shopPrice(shop, "p0", 1)]).toEqual([5, 6, 1]);
     expect(act(shop, "p0", { type: "buy", stockId: "supplies" }).purse).toBe(15);
   });
@@ -380,11 +386,11 @@ describe("Pack Rat", () => {
     const draft = playOut(start);
     const exclusive = Object.values(CATALOG.items).filter((item) => item.exclusiveTo === "pack-rat").map((item) => item.id);
     const [standard, packRat] = draft.seats[0]!.offers;
-    expect(draft.seats[0]!.offers.map((offer) => offer.bundles.map((bundle) => bundle.length))).toEqual([[2, 2, 2], [1, 1, 1]]);
+    expect(draft.seats[0]!.offers.map((offer) => offer.bundles.map((bundle) => bundle.length))).toEqual([[1, 1, 1], [1, 1, 1]]);
     expect(standard!.bundles.flat().some((id) => exclusive.includes(id))).toBe(false);
     expect(packRat!.bundles.flat().filter((id) => exclusive.includes(id))).toHaveLength(3);
     expect(new Set(packRat!.bundles.flat()).size).toBe(3);
-    expect(draft.seats[1]!.offers.map((offer) => offer.bundles.map((bundle) => bundle.length))).toEqual([[2, 2, 2]]);
+    expect(draft.seats[1]!.offers.map((offer) => offer.bundles.map((bundle) => bundle.length))).toEqual([[1, 1, 1]]);
     const both = act(act(draft, "p0", { type: "pick-bundle", bundle: 0 }), "p0", { type: "pick-bundle", bundle: 2 });
     expect(both.seats[0]!.items.map((item) => item.itemId)).toEqual([...standard!.bundles[0]!, packRat!.bundles[2]![0]!]);
     expect(both.seats[0]!.offers).toEqual([]);

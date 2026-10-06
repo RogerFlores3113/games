@@ -1,9 +1,10 @@
-// Tests for run/draft.ts: bundle offers after a cleared camp.
+// Tests for run/draft.ts: the offers of a draft, single items by default
+// and bundles of two after a boss camp.
 
 import { describe, expect, it } from "vitest";
 import { defineItem, type Rarity } from "../content/source-def";
 import { CATALOG } from "./catalog";
-import { BASE_DRAFT_SHAPE, draftOfferFor } from "./draft";
+import { BOSS_DRAFT_SHAPE, draftOfferFor } from "./draft";
 import { campIndex } from "./plan";
 import { STREAMS, seededIndex } from "./rng";
 import { testCatalog } from "./run-test-support";
@@ -22,18 +23,27 @@ function seat(seatId: string, characterId: string | null = "plain-1"): SeatRun {
 }
 
 describe("draftOfferFor", () => {
-  it("offers 3 bundles of 2 distinct items, deterministically", () => {
+  it("offers 3 different single items by default, deterministically", () => {
     for (let n = 0; n < 30; n++) {
       const offer = draftOfferFor(`seed-${n}`, CAMP_1, seat("p0"), 0, MIXED);
-      expect(offer.kind).toBe("standard");
-      expect(offer.bundles.map((bundle) => bundle.length)).toEqual([2, 2, 2]);
-      for (const bundle of offer.bundles) expect(new Set(bundle).size).toBe(2);
+      expect(offer.bundles.map((bundle) => bundle.length)).toEqual([1, 1, 1]);
+      expect(new Set(offer.bundles.flat()).size).toBe(3);
       expect(draftOfferFor(`seed-${n}`, CAMP_1, seat("p0"), 0, MIXED)).toEqual(offer);
     }
   });
 
+  it("offers 3 bundles of 2 distinct items in the boss shape, deterministically", () => {
+    for (let n = 0; n < 30; n++) {
+      const offer = draftOfferFor(`seed-${n}`, CAMP_1, seat("p0"), 0, MIXED, BOSS_DRAFT_SHAPE);
+      expect(offer.kind).toBe("standard");
+      expect(offer.bundles.map((bundle) => bundle.length)).toEqual([2, 2, 2]);
+      for (const bundle of offer.bundles) expect(new Set(bundle).size).toBe(2);
+      expect(draftOfferFor(`seed-${n}`, CAMP_1, seat("p0"), 0, MIXED, BOSS_DRAFT_SHAPE)).toEqual(offer);
+    }
+  });
+
   it("pins a production offer, so a stream rename shows up", () => {
-    expect(draftOfferFor("pinned", CAMP_1, seat("p0", "explorer"), 0, CATALOG)).toEqual({
+    expect(draftOfferFor("pinned", CAMP_1, seat("p0", "explorer"), 0, CATALOG, BOSS_DRAFT_SHAPE)).toEqual({
       kind: "standard",
       bundles: [
         ["trained-monkey", "trail-map"],
@@ -63,14 +73,14 @@ describe("draftOfferFor", () => {
     const oneRare = testCatalog({ items: { "c-1": plain("c-1", "common"), "r-1": plain("r-1", "rare") } });
     for (let n = 0; n < 40; n++) {
       for (const bundle of draftOfferFor(`fall-${n}`, CAMP_1, seat("p0"), 0, commonsOnly).bundles) for (const id of bundle) expect(COMMONS).toContain(id);
-      for (const bundle of draftOfferFor(`fall-${n}`, CAMP_1, seat("p0"), 0, oneRare).bundles) expect([...bundle].sort()).toEqual(["c-1", "r-1"]);
+      for (const bundle of draftOfferFor(`fall-${n}`, CAMP_1, seat("p0"), 0, oneRare, BOSS_DRAFT_SHAPE).bundles) expect([...bundle].sort()).toEqual(["c-1", "r-1"]);
     }
   });
 
   it("adds an exclusive item to each bundle only when the shape asks, and only for its character", () => {
     const catalog = testCatalog({ items: { "c-1": plain("c-1", "common"), "c-2": plain("c-2", "common"), mine: plain("mine", "common", "plain-1") } });
-    const packRat = { ...BASE_DRAFT_SHAPE, exclusive: 1 };
-    const offered = (characterId: string, shape = BASE_DRAFT_SHAPE) =>
+    const packRat = { ...BOSS_DRAFT_SHAPE, exclusive: 1 };
+    const offered = (characterId: string, shape = BOSS_DRAFT_SHAPE) =>
       new Set(Array.from({ length: 20 }, (_, n) => draftOfferFor(`ex-${n}`, CAMP_1, seat("p0", characterId), 0, catalog, shape).bundles.flat()).flat());
     expect(offered("plain-1")).toEqual(new Set(["c-1", "c-2"]));
     expect(offered("plain-1", packRat)).toEqual(new Set(["c-1", "c-2", "mine"]));

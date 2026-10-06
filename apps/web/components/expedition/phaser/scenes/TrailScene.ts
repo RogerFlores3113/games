@@ -197,7 +197,7 @@ export class TrailScene extends Phaser.Scene {
   /** The loadout shows the camp it sets out for; the rest of the trail
    * rests at the fireside. */
   private renderBackdrop(model: TrailModel): void {
-    const backdrop = model.panel.kind === "loadout" ? model.panel.next.backdrop : null;
+    const backdrop = model.panel.kind === "loadout" ? (model.panel.next?.backdrop ?? null) : null;
     if (this.backdropLayer === null || backdrop === this.backdrop) return;
     this.backdropLayer.removeAll(true);
     this.backdropLayer.add(backdrop === null ? placeArt(this, "bg-fireside", STAGE.w / 2, STAGE.h / 2) : drawBackdrop(this, backdrop));

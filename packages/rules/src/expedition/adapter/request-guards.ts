@@ -49,6 +49,12 @@ function parseEquip(record: Record<string, unknown>): RunAction | null {
   return { type: "equip", itemUids: Array.from(record.itemUids) };
 }
 
+function parseDiscardItem(record: Record<string, unknown>): RunAction | null {
+  if (!hasExactKeys(record, ["type", "itemUid"])) return null;
+  if (typeof record.itemUid !== "string") return null;
+  return { type: "discard-item", itemUid: record.itemUid };
+}
+
 function parseBuy(record: Record<string, unknown>): RunAction | null {
   if (!hasExactKeys(record, ["type", "stockId"])) return null;
   if (typeof record.stockId !== "string") return null;
@@ -115,6 +121,8 @@ export function parseRunAction(request: unknown): RunAction | null {
       return parseLockIn(request);
     case "equip":
       return parseEquip(request);
+    case "discard-item":
+      return parseDiscardItem(request);
     case "buy":
       return parseBuy(request);
     case "pick-bundle":

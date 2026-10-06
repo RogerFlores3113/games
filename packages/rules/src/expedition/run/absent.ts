@@ -4,13 +4,17 @@
 
 import { attemptOf } from "./attempt";
 import { firstFreeCharacter } from "./crew";
+import { roomFor } from "./items";
+import { backpackOf } from "./usage";
 import type { Catalog, RunAction, RunState } from "./types";
 import { gatedPendingSeatIds } from "./windows";
 
 /** Muster: the first character nobody has, in registry order, then an
- * abstention, then a lock-in. A route vote: an abstention. Loadout and
- * event: ready with the gear it has. Draft: the head offer's first bundle. A
- * gated window: a pass. null when the table is not waiting on the seat. */
+ * abstention, then a lock-in. A route vote: an abstention. Shop, loadout
+ * and event: ready with the gear it has. Draft: the head offer's first
+ * bundle, after discarding its last backpack items while that bundle does
+ * not fit. A gated window: a pass. null when the table is not waiting on the
+ * seat. */
 export function absentSeatAction(run: RunState, seatId: string, catalog: Catalog): RunAction | null {
   const seat = run.seats.find((s) => s.seatId === seatId);
   if (seat === undefined) return null;
@@ -26,11 +30,16 @@ export function absentSeatAction(run: RunState, seatId: string, catalog: Catalog
     }
     case "route":
       return Object.hasOwn(stage.ballots, seatId) ? null : { type: "vote", choice: null };
+    case "shop":
     case "loadout":
     case "event":
       return Object.hasOwn(stage.ready, seatId) ? null : { type: "ready" };
-    case "draft":
-      return (seat.offers[0]?.bundles.length ?? 0) > 0 ? { type: "pick-bundle", bundle: 0 } : null;
+    case "draft": {
+      const first = seat.offers[0]?.bundles[0];
+      if (first === undefined) return null;
+      const last = backpackOf(seat).at(-1);
+      return first.length > roomFor(run, seatId, catalog) && last !== undefined ? { type: "discard-item", itemUid: last.uid } : { type: "pick-bundle", bundle: 0 };
+    }
     case "camp":
       return attemptOf(run) !== null && gatedPendingSeatIds(run, catalog).includes(seatId) ? { type: "skip-window" } : null;
     case "ended":

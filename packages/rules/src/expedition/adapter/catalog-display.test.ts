@@ -145,6 +145,7 @@ describe("BALANCE_DISPLAY", () => {
       payout: { base: 5, perUnplayedTrick: 1, unplayedCap: 3 },
       draftOptions: 3,
       itemSlots: 2,
+      backpackSize: 6,
       upgradePrice: 8,
       whispersPerUpgrade: 1,
       fairWeatherChance: 80,

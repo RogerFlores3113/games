@@ -133,6 +133,33 @@ describe("checkRunState", () => {
   });
 });
 
+describe("checkRunState: the stages between camps", () => {
+  const jump = (stage: string, camp: string) => DEV_SHORTCUTS["jump-to-camp"].apply(createRun({ seatIds: SEATS, seed: "check" }), { length: "standard", camp: Number(camp), stage }, CATALOG);
+
+  it("passes a shop, a draft and an event the camp has", () => {
+    for (const [stage, camp] of [["shop", "3"], ["draft", "1"], ["draft", "4"], ["event", "2"]]) expect(checkRunState(jump(stage!, camp!), CATALOG)).toEqual([]);
+  });
+
+  it("flags a shop, a draft or an event before a camp that has none, and an unknown event", () => {
+    const shop = jump("shop", "3");
+    if (shop.stage.tag !== "shop") throw new Error("expected the shop");
+    expect(checkRunState({ ...shop, stage: { ...shop.stage, next: campIndex(4) } }, CATALOG)).toEqual(["a standard run has no shop before camp 4"]);
+    const event = jump("event", "2");
+    if (event.stage.tag !== "event") throw new Error("expected the event");
+    expect(checkRunState({ ...event, stage: { ...event.stage, next: campIndex(3), event: "volcano" } }, CATALOG)).toEqual(["the event volcano is not a known event", "a standard run has no event before camp 3"]);
+  });
+
+  it("flags a backpack over its size between camps, but not one a camp rule overfilled", () => {
+    const draft = jump("draft", "2");
+    const items = Array.from({ length: 9 }, (_, i) => ({ uid: `it${i}`, itemId: "bait" }));
+    const stuffed: RunState = { ...draft, itemSerial: 9, seats: draft.seats.map((s, i) => (i === 0 ? { ...s, items, equipped: ["it0", "it1"] } : s)) };
+    expect(checkRunState(stuffed, CATALOG)).toEqual(["a: 7 items in the backpack, which holds 6"]);
+    const camp = dealt();
+    const overfull: RunState = { ...camp, itemSerial: 9, seats: camp.seats.map((s, i) => (i === 0 ? { ...s, items, equipped: ["it0", "it1"] } : s)) };
+    expect(checkRunState(overfull, CATALOG).some((p) => p.includes("backpack"))).toBe(false);
+  });
+});
+
 describe("checkRunState: the character seams' fields", () => {
   it("flags a route swap to a boss of another tier, and a negative reroll", () => {
     let run = DEV_SHORTCUTS["force-camp"].apply(dealt(), { outcome: "cleared" }, CATALOG);
@@ -141,6 +168,12 @@ describe("checkRunState: the character seams' fields", () => {
       const picked = applyRunAction(run, seat.seatId, { type: "pick-bundle", bundle: 0 }, CATALOG);
       if (!picked.ok) throw new Error(picked.error);
       run = picked.state;
+    }
+    for (const seatId of run.seatIds) {
+      if (run.stage.tag !== "event") break;
+      const readied = applyRunAction(run, seatId, { type: "ready" }, CATALOG);
+      if (!readied.ok) throw new Error(readied.error);
+      run = readied.state;
     }
     if (run.stage.tag !== "route") throw new Error("expected the route vote");
     const options = run.stage.options.map((o, i) => (i === 0 ? { ...o, reroll: -1, swapBoss: { at: campIndex(o.next.index + 1), modId: "tornado" } } : o));

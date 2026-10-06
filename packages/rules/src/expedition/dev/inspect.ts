@@ -24,7 +24,7 @@ function playLabel(play: ResolvedPlay): string {
 
 function specLabel(spec: CampSpec, catalog: Catalog): string {
   const pairing = pairingOf(spec, catalog);
-  return `camp ${spec.index}: ${spec.location}, ${spec.weather}${pairing === null ? "" : `, pairing ${pairing}`}, event ${spec.event ?? "none"}, slots [${spec.slots.map((s) => s.kind).join(", ")}]`;
+  return `camp ${spec.index}: ${spec.location}, ${spec.weather}${pairing === null ? "" : `, pairing ${pairing}`}, slots [${spec.slots.map((s) => s.kind).join(", ")}]`;
 }
 
 function statusLabel(part: StatusPart): string {
@@ -92,16 +92,18 @@ function stageLines(run: RunState, catalog: Catalog): string[] {
   switch (stage.tag) {
     case "muster":
       return [`length ballots: ${perSeat(run, stage.ballots)}`, `locked in: ${perSeat(run, stage.locked)}`];
-    case "loadout":
+    case "shop":
       return [
-        specLabel(stage.camp, catalog),
-        `shop: ${stage.stock === null ? "closed" : stage.stock.map((e) => `${e.stockId} ${e.what.kind === "item" ? e.what.itemId : "supply"} ${e.price}${e.soldTo === null ? "" : ` sold to ${e.soldTo}`}`).join(", ")}`,
+        stage.camp === null ? `before camp ${stage.next}` : `replay of ${specLabel(stage.camp, catalog)}`,
+        `stock: ${stage.stock.map((e) => `${e.stockId} ${e.what.kind === "item" ? e.what.itemId : "supply"} ${e.price}${e.soldTo === null ? "" : ` sold to ${e.soldTo}`}`).join(", ")}`,
         `ready: ${perSeat(run, stage.ready)}`,
       ];
+    case "loadout":
+      return [specLabel(stage.camp, catalog), `ready: ${perSeat(run, stage.ready)}`];
     case "camp":
       return [specLabel(stage.camp, catalog), `attempt ${stage.attempt.attemptNumber}`];
     case "draft":
-      return [`cleared camp ${stage.cleared}, paid ${stage.payout}`];
+      return [`the draft before camp ${stage.next}`];
     case "route":
       return [
         ...stage.options.map(
@@ -111,7 +113,7 @@ function stageLines(run: RunState, catalog: Catalog): string[] {
         `route ballots: ${perSeat(run, stage.ballots)}`,
       ];
     case "event":
-      return [`event ${stage.route.next.event ?? "none"} on route ${stage.route.id}`, specLabel(stage.route.next, catalog), `ready: ${perSeat(run, stage.ready)}`];
+      return [`event ${stage.event} before camp ${stage.next}`, `ready: ${perSeat(run, stage.ready)}`];
     case "ended":
       return [`run ${stage.result}`];
   }

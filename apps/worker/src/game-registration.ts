@@ -104,6 +104,8 @@ function mapExpeditionError(error: RunError): GameErrorDetail {
       return { gameId: EXPEDITION_GAME_ID, code: "not_owned_item" };
     case "too_many_items":
       return { gameId: EXPEDITION_GAME_ID, code: "too_many_items" };
+    case "backpack_full":
+      return { gameId: EXPEDITION_GAME_ID, code: "backpack_full" };
     case "sold_out":
       return { gameId: EXPEDITION_GAME_ID, code: "sold_out" };
     case "supplies_full":

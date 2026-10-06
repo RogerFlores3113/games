@@ -14,15 +14,17 @@ import { event } from "./event";
 import { loadout } from "./loadout";
 import { muster } from "./muster";
 import { route } from "./route";
+import { shop } from "./shop";
 import { err, ok, type Handler, type StageDef, type StageResult } from "./stage-def";
 
 export const STAGES: { readonly [T in StageTag]: StageDef<T> } = {
   muster,
+  shop,
+  draft,
+  event,
+  route,
   loadout,
   camp,
-  draft,
-  route,
-  event,
   ended: { on: {}, advance: (run) => run },
 };
 
@@ -31,6 +33,7 @@ const ACTION_TYPES: Readonly<Record<RunAction["type"], true>> = {
   vote: true,
   "lock-in": true,
   equip: true,
+  "discard-item": true,
   buy: true,
   "pick-bundle": true,
   ready: true,

@@ -10,10 +10,11 @@
 import { resolveTuned, type CoinCost, type ItemAbility, type ItemUses, type Owner, type SourceDef, type SourceId, type UsageLimit } from "../content/source-def";
 import type { Grant } from "../content/mods/mod-def";
 import { nextAttemptNumber } from "./attempt";
+import { campIndex } from "./plan";
 import { rulesFor } from "./compose";
 import type { RunRules } from "./run-rules";
 import { campStack } from "./stack";
-import type { Catalog, ItemInstance, RunState, SeatRun, SourceKey, Stamp } from "./types";
+import type { CampIndex, Catalog, ItemInstance, RunState, SeatRun, SourceKey, Stamp } from "./types";
 import { whispersUsedBy } from "./whisper";
 
 export type Remaining =
@@ -67,19 +68,29 @@ function lastAttemptAt(run: RunState, camp: number): number {
   return Math.max(1, ...run.history.filter((entry) => entry.camp === camp).map((entry) => entry.attempt));
 }
 
+function comingAttempt(run: RunState, camp: CampIndex): Stamp {
+  return { camp, attempt: nextAttemptNumber(run, camp), trick: 0 };
+}
+
 /** The stamp a ledger entry written now would carry. A stage window stamps
- * the camp it belongs to at trick 0: the loadout the attempt it will deal,
- * the draft and the route the attempt that cleared. null in muster, the
- * event and once the run has ended. */
+ * the camp it belongs to at trick 0: the shop and the loadout the attempt
+ * they lead to, the draft and the route the attempt that cleared (the draft
+ * before camp 1, camp 1's first). null in muster, the event and once the run
+ * has ended. */
 export function currentStamp(run: RunState): Stamp | null {
   const stage = run.stage;
   switch (stage.tag) {
     case "camp":
       return { camp: stage.camp.index, attempt: stage.attempt.attemptNumber, trick: stage.attempt.camp.completedTricks.length };
     case "loadout":
-      return { camp: stage.camp.index, attempt: nextAttemptNumber(run, stage.camp.index), trick: 0 };
-    case "draft":
-      return { camp: stage.cleared, attempt: lastAttemptAt(run, stage.cleared), trick: 0 };
+      return comingAttempt(run, stage.camp.index);
+    case "shop":
+      return comingAttempt(run, stage.next);
+    case "draft": {
+      if (stage.next === 1) return comingAttempt(run, stage.next);
+      const cleared = campIndex(stage.next - 1);
+      return { camp: cleared, attempt: lastAttemptAt(run, cleared), trick: 0 };
+    }
     case "route":
       return { camp: stage.from, attempt: lastAttemptAt(run, stage.from), trick: 0 };
     default:

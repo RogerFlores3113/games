@@ -10,7 +10,7 @@ type Log = Attempt["log"];
 const club3 = { id: "c3", identity: { kind: "standard", suit: "clubs", rank: 3 } } as const;
 const club4 = { id: "c4", identity: { kind: "standard", suit: "clubs", rank: 4 } } as const;
 
-const preview = { index: 1, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false, survey: null };
+const preview = { index: 1, location: "jungle", weather: "fair", pairing: null, slotKinds: [], bossId: null, shop: false, survey: null };
 
 function objective(id: string, status: Obj["status"], ownerSeatId: string | null = null): Obj {
   return { id, kind: "no-tricks", ownerSeatId, status };
@@ -62,6 +62,7 @@ function game(over: Partial<ExpeditionView> = {}, campOver: Partial<Camp> = {}, 
     seats: [seat("a", "explorer")],
     kicked: [],
     yourAbilities: [],
+    yourItemSlots: 2,
     history: [],
     lastVote: null,
     stage: {
@@ -84,8 +85,8 @@ function game(over: Partial<ExpeditionView> = {}, campOver: Partial<Camp> = {}, 
   };
 }
 
-const loadout: ExpeditionView["stage"] = { tag: "loadout", camp: preview, mods: [], yourSlots: 2, shop: null, readySeatIds: [] };
-const draft: ExpeditionView["stage"] = { tag: "draft", cleared: 1, payout: 8, yourOffer: null, pendingSeatIds: [] };
+const loadout: ExpeditionView["stage"] = { tag: "loadout", camp: preview, mods: [], readySeatIds: [] };
+const draft: ExpeditionView["stage"] = { tag: "draft", next: 2, cleared: 1, payout: 8, yourOffer: null, pendingSeatIds: [] };
 
 describe("cuesFor", () => {
   it("is silent on the first snapshot", () => {

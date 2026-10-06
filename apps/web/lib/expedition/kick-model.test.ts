@@ -3,7 +3,7 @@ import type { ExpeditionView } from "@games/rules";
 import type { RoomView } from "@games/schema";
 import { buildKickPanel } from "./kick-model";
 
-const PREVIEW = { index: 2, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false, survey: null };
+const PREVIEW = { index: 2, location: "jungle", weather: "fair", pairing: null, slotKinds: [], bossId: null, shop: false, survey: null };
 const ROOM_SEATS: RoomView["seats"] = [
   { seatId: "ana", displayLabel: "Ana", connected: true, isHost: true },
   { seatId: "ben", displayLabel: "Ben", connected: true, isHost: false },
@@ -12,7 +12,7 @@ const ROOM_SEATS: RoomView["seats"] = [
 ];
 
 function game(stage: ExpeditionView["stage"], kicked: ExpeditionView["kicked"] = [], runStatus: ExpeditionView["runStatus"] = "in_progress"): ExpeditionView {
-  return { yourSeatId: null, runStatus, length: "standard", campCount: 6, purse: 0, supplies: { count: 3, max: 4 }, plan: [], seats: [], kicked, yourAbilities: [], history: [], lastVote: null, stage };
+  return { yourSeatId: null, runStatus, length: "standard", campCount: 6, purse: 0, supplies: { count: 3, max: 4 }, plan: [], seats: [], kicked, yourAbilities: [], yourItemSlots: 2, history: [], lastVote: null, stage };
 }
 
 const campStage = { tag: "camp", camp: PREVIEW, mods: [], attempt: {} } as unknown as ExpeditionView["stage"];
@@ -36,10 +36,10 @@ describe("buildKickPanel", () => {
 
   it("says what a kick does outside a camp", () => {
     const room = { youSeatId: "ana", seats: ROOM_SEATS, kickVotes: [{ targetSeatId: "dee", voterSeatIds: [], needed: 2, youCanVote: true }] };
-    const loadout = { tag: "loadout", camp: PREVIEW, mods: [], yourSlots: 2, shop: null, readySeatIds: [] } as ExpeditionView["stage"];
+    const loadout = { tag: "loadout", camp: PREVIEW, mods: [], readySeatIds: [] } as ExpeditionView["stage"];
     expect(buildKickPanel(room, game(loadout))?.consequence).toBe("Kicking sets out for camp 2 without them. If they come back, they rejoin at the next loadout.");
     expect(buildKickPanel(room, game({ tag: "muster", ballots: [], lockedSeatIds: [] }))?.consequence).toBe("Kicking starts the run without them. If they come back, they rejoin at the next loadout.");
-    expect(buildKickPanel(room, game({ tag: "draft", cleared: 1, payout: 5, yourOffer: null, pendingSeatIds: [] }))?.consequence).toBe(
+    expect(buildKickPanel(room, game({ tag: "draft", next: 2, cleared: 1, payout: 5, yourOffer: null, pendingSeatIds: [] }))?.consequence).toBe(
       "Kicking goes on without them. If they come back, they rejoin at the next loadout.",
     );
   });
@@ -53,7 +53,7 @@ describe("buildKickPanel", () => {
       returning: [],
       yours: { title: "You're out of the crew for now", text: "The crew went on while you were away. You rejoin as The Hermit, with your items and upgrade, at the next loadout, once camp 2 ends." },
     });
-    const event = { tag: "event", event: "event", next: { ...PREVIEW, index: 4 }, readySeatIds: [] } as ExpeditionView["stage"];
+    const event = { tag: "event", event: "event", next: 4, readySeatIds: [] } as ExpeditionView["stage"];
     expect(buildKickPanel(room, game(event, kicked))?.yours?.text).toBe("The crew went on while you were away. You rejoin as The Hermit, with your items and upgrade, at the loadout before camp 4.");
     expect(buildKickPanel(room, game({ tag: "ended", result: "won" }, kicked, "won"))?.yours).toEqual({ title: "The run is over", text: "The crew finished the run without you." });
   });

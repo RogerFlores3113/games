@@ -8,13 +8,14 @@ import { RUN_LENGTHS, SUPPLIES_MAX } from "../run/balance";
 import { attemptOf, withAttempt } from "../run/attempt";
 import { MODS } from "../content/mods/registry";
 import { mintItems } from "../run/items";
-import { dealCamp, openLoadout, runStatus, settleCamp } from "../run/lifecycle";
+import { dealCamp, openLeg, openLoadout, runStatus, settleCamp } from "../run/lifecycle";
 import { rulesFor } from "../run/compose";
 import { draftOfferFor } from "../run/draft";
 import { campIndex, drawPlan } from "../run/plan";
 import { campSpecAt, rerollOption, type CampSpec, type RouteChoice } from "../run/route";
 import { campStack, pairingRuleFor } from "../run/stack";
 import { advance, applyRunAction } from "../run/stages/registry";
+import { legsTo, type Leg } from "../run/trail";
 import { applyToolkitOps } from "../run/toolkit";
 import type { Catalog, RunAt, RunLength, RunState } from "../run/types";
 import { describeObjective } from "../objectives";
@@ -83,18 +84,21 @@ function loadoutAt(run: RunState, length: RunLength, k: number, catalog: Catalog
   return openLoadout({ ...crewed, history: crewed.history.filter((h) => h.camp < k) }, campSpecAt(run.seed, length, campIndex(k), catalog), catalog);
 }
 
+/** Where each of a length's camps has `leg` before it, for a refusal. */
+function campsWith(length: RunLength, leg: Leg): string {
+  const camps = Array.from({ length: RUN_LENGTHS[length].camps }, (_, i) => i + 1).filter((k) => legsTo(length, k).includes(leg));
+  return `a ${length} run's ${leg === "event" ? "events" : `${leg}s`} are before camps ${camps.join(", ")}`;
+}
+
 function jumpToCamp(run: RunState, length: RunLength, k: number, stage: Arrival, catalog: Catalog): RunState {
-  if (stage === "route") {
-    if (k === 1) throw new Error("camp 1 has no route vote before it");
-    const cleared = settleCamp(jumpToCamp(run, length, k - 1, "camp", catalog) as RunAt<"camp">, "cleared", catalog);
-    return advance({ ...cleared, seats: cleared.seats.map((s) => ({ ...s, offers: [] })) }, catalog);
+  if (stage === "camp" || stage === "loadout") {
+    const loadout = loadoutAt(run, length, k, catalog);
+    return stage === "camp" ? dealCamp(loadout, catalog) : loadout;
   }
-  const loadout = loadoutAt(run, length, k, catalog);
-  if (stage === "shop" && loadout.stage.stock === null) {
-    const shops = (loadout.plan?.bosses ?? []).map((b) => b.at).join(", ");
-    throw new Error(`camp ${k} has no shop: a ${length} run's shops are before camps ${shops}`);
-  }
-  return stage === "camp" ? dealCamp(loadout, catalog) : loadout;
+  if (k > RUN_LENGTHS[length].camps) throw new Error(`a ${length} run has ${RUN_LENGTHS[length].camps} camps, not ${k}`);
+  if (!legsTo(length, k).includes(stage)) throw new Error(`camp ${k} has no ${stage === "route" ? "route vote" : stage} before it: ${campsWith(length, stage)}`);
+  const before = k === 1 ? loadoutAt(run, length, 1, catalog) : settleCamp(jumpToCamp(run, length, k - 1, "camp", catalog) as RunAt<"camp">, "cleared", catalog);
+  return openLeg({ ...before, seats: before.seats.map((s) => ({ ...s, offers: [] })) }, campIndex(k), stage, catalog);
 }
 
 /** The camp the run is in, or the one it is heading to, dealt. */
@@ -106,12 +110,13 @@ function toCamp(run: RunState, catalog: Catalog): RunAt<"camp"> {
       return run as RunAt<"camp">;
     case "loadout":
       return dealCamp(run as RunAt<"loadout">, catalog);
-    case "event":
-      return dealCamp(openLoadout(run, stage.route.next, catalog), catalog);
+    case "shop":
+      return dealCamp(stage.camp === null ? loadoutAt(run, lengthOf(run), stage.next, catalog) : openLoadout(run, stage.camp, catalog), catalog);
     case "muster":
       return dealCamp(loadoutAt(run, lengthOf(run), 1, catalog), catalog);
     case "draft":
-      return dealCamp(loadoutAt(run, lengthOf(run), stage.cleared + 1, catalog), catalog);
+    case "event":
+      return dealCamp(loadoutAt(run, lengthOf(run), stage.next, catalog), catalog);
     case "route":
       return dealCamp(loadoutAt(run, lengthOf(run), stage.from + 1, catalog), catalog);
     case "ended":
@@ -143,9 +148,11 @@ const STAGE_OPTIONS: DevOption[] = [
   { value: "camp", label: "the table" },
   { value: "loadout", label: "the loadout" },
   { value: "shop", label: "the shop" },
+  { value: "draft", label: "the draft" },
+  { value: "event", label: "the event" },
   { value: "route", label: "the route vote" },
 ];
-type Arrival = "camp" | "loadout" | "shop" | "route";
+type Arrival = "camp" | Leg;
 const modOptions = (catalog: Catalog, kind: "location" | "weather", current: string | null): DevOption[] => {
   const ids = Object.values(catalog.mods).filter((def) => def.kind === kind).map((def) => def.id);
   return opts(current === null ? ids : [current, ...ids.filter((id) => id !== current)]);

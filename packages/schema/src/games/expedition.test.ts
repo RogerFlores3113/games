@@ -6,7 +6,7 @@ import {
   ExpeditionViewSchema,
 } from "./expedition";
 
-// The 31 RunError names: CampError's 7 members, then RunError's 24
+// The 32 RunError names: CampError's 7 members, then RunError's 25
 // additional members.
 const EXPEDITION_ERROR_CODES = [
   "not_your_turn",
@@ -26,6 +26,7 @@ const EXPEDITION_ERROR_CODES = [
   "locked",
   "not_owned_item",
   "too_many_items",
+  "backpack_full",
   "sold_out",
   "supplies_full",
   "upgrade_owned",
@@ -49,7 +50,7 @@ const CAMP_MODS = [
   { id: "tornado", kind: "disaster", strength: "full", status: [{ kind: "countdown", tricks: 2 }] },
   { id: "locusts", kind: "disaster", strength: "half", status: [{ kind: "alternating", activeNow: true }, { kind: "swarm", seatId: null }] },
 ];
-const preview = { index: 2, location: "jungle", weather: "fair", pairing: null, event: "event", slotKinds: ["win-card", "ordered", "ordered"], bossId: null, shop: false, survey: null };
+const preview = { index: 2, location: "jungle", weather: "fair", pairing: null, slotKinds: ["win-card", "ordered", "ordered"], bossId: null, shop: false, survey: null };
 const noItems = { equipped: [], backpack: [], concealed: false };
 
 const header = {
@@ -94,9 +95,11 @@ const draftView = {
   ],
   kicked: [{ seatId: "seat-3", characterId: "hermit", upgradeId: null, back: true }],
   yourAbilities: [{ sourceKey: "leader.delegate", usableNow: false, reason: "Usable between tricks", steps: [] }],
+  yourItemSlots: 2,
   history: [{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "restarted", coins: 0 }, { camp: 1, attempt: 2, location: "jungle", weather: "fair", status: "cleared", coins: 8 }],
   stage: {
     tag: "draft",
+    next: 2,
     cleared: 1,
     payout: 8,
     yourOffer: { kind: "standard", bundles: [["bait", "parrot"], ["whetstone", "trail-map"], ["bait", "puffball"]] },
@@ -119,6 +122,7 @@ const midCampFields = {
       steps: [{ kind: "player", prompt: "Pick a teammate", choices: ["seat:seat-2", "seat:seat-3"] }],
     },
   ],
+  yourItemSlots: 2,
   history: [{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", coins: 8 }],
 };
 
@@ -224,14 +228,15 @@ describe("ExpeditionViewSchema", () => {
   });
 
   it.each([
-    ["loadout", { tag: "loadout", camp: { ...preview, pairing: "steam" }, mods: CAMP_MODS, yourSlots: 2, shop: null, readySeatIds: ["seat-2"] }],
+    ["loadout", { tag: "loadout", camp: { ...preview, pairing: "steam" }, mods: CAMP_MODS, readySeatIds: ["seat-2"] }],
+    ["shop on a replay", { tag: "shop", next: 3, camp: { ...preview, index: 3, shop: true }, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] }],
+    ["first draft", { tag: "draft", next: 1, cleared: 0, payout: 0, yourOffer: { kind: "standard", bundles: [["bait"], ["parrot"], ["whetstone"]] }, pendingSeatIds: [] }],
     [
-      "loadout with the shop",
+      "shop",
       {
-        tag: "loadout",
-        camp: { ...preview, index: 3, shop: true },
-        mods: [],
-        yourSlots: 2,
+        tag: "shop",
+        next: 3,
+        camp: null,
         shop: {
           stock: [
             { stockId: "supplies", what: { kind: "supplies" }, price: 6, soldTo: null },
@@ -253,7 +258,7 @@ describe("ExpeditionViewSchema", () => {
         ballots: [{ seatId: "seat-1", choice: "b" }],
       },
     ],
-    ["event", { tag: "event", event: "event", next: preview, readySeatIds: [] }],
+    ["event", { tag: "event", event: "event", next: 2, readySeatIds: [] }],
     ["ended", { tag: "ended", result: "won" }],
   ])("accepts a %s stage", (_name, stage) => {
     expect(ExpeditionViewSchema.safeParse({ ...draftView, stage }).success).toBe(true);
@@ -472,8 +477,8 @@ describe("ExpeditionErrorCodeSchema", () => {
     expect(ExpeditionErrorCodeSchema.safeParse(code).success).toBe(false);
   });
 
-  it("has exactly 31 members", () => {
-    expect(ExpeditionErrorCodeSchema.options.length).toBe(31);
+  it("has exactly 32 members", () => {
+    expect(ExpeditionErrorCodeSchema.options.length).toBe(32);
   });
 });
 

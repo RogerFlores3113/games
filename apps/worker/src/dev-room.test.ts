@@ -100,11 +100,12 @@ describe("dev-room: autoplay", () => {
     const input = devInput();
     let current = room;
     let reply = { ok: true, message: "" };
+    // Two players each play for everyone else; whichever call settles the camp says so.
     for (let i = 0; i < 1000 && !reply.message.includes("the camp ended"); i++) {
-      current = applyDevCommand(current, "host", { kind: "autoplay", scope: "others", maxSteps: 2000, stopAtMilestone: true }, input).state;
-      const mine = applyDevCommand(current, "bot-1", { kind: "autoplay", scope: "others", maxSteps: 2000, stopAtMilestone: true }, input);
-      current = mine.state;
-      reply = mine.reply;
+      const actor = i % 2 === 0 ? "host" : "bot-1";
+      const outcome = applyDevCommand(current, actor, { kind: "autoplay", scope: "others", maxSteps: 2000, stopAtMilestone: true }, input);
+      current = outcome.state;
+      reply = outcome.reply;
     }
     expect(reply.message).toMatch(/stopped because the camp ended\.$/);
     expect(devStateFrame(current)!.milestone).not.toBe(devStateFrame(room)!.milestone);

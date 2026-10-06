@@ -62,8 +62,11 @@ card or was discarded, and fails if never played by the final trick.
   its `Stage` union and `RunAt<T>`, `SeatRun` with its `ledger`,
   `RunAction`, `Catalog`), `run/stages/` (`registry.ts`'s `STAGES` and
   `applyRunAction`, the single run-level transition, plus one file per
-  stage: muster, loadout, camp, draft, route, event), `run/lifecycle.ts`
-  (`createRun`, `runStatus`, `dealCamp`, `settleCamp`), `run/plan.ts`
+  stage: muster, shop, draft, event, route, loadout, camp, and
+  `outfit.ts`, the equip and discard every stage between camps accepts),
+  `run/trail.ts` (`legsTo`, the stages before each camp), `run/lifecycle.ts`
+  (`createRun`, `runStatus`, `openLeg`, `reopenCamp`, `dealCamp`,
+  `settleCamp`), `run/plan.ts`
   (`RunPlan`, `campIndex`, `drawPlan`, `helpersFor`, `horizon`),
   `run/route.ts` (`CampSpec`, `firstCampSpec`, `routeOptions`,
   `slotKindsFor`), `run/vote.ts` (`tally`),
@@ -75,7 +78,8 @@ card or was discarded, and fails if never played by the final trick.
   (`TARGET_KINDS`, `resolveTargets`, `stepsFor`), `run/windows.ts`
   (`WINDOWS`, `currentWindow`, `gatedPendingSeatIds`), `run/usage.ts`
   (`remaining`, `shareOf`, `liveSourceKeys`, `abilityKeys`,
-  `backpackOf`, `defIdOf`), `run/items.ts` (`mintItems`, `equipError`),
+  `backpackOf`, `defIdOf`), `run/items.ts` (`mintItems`, `roomFor`,
+  `equipError`, `discardItem`, `refitSlots`),
   `run/compose.ts` (`rulesFor`, the rule layers), `run/run-rules.ts` (`RunHooks`,
   `HOOK_NAMES`), `run/toolkit.ts` (`ToolkitOp`, `applyToolkitOps`, the only
   mutation surface for abilities), `run/draft.ts` (`draftOfferFor`,
@@ -86,7 +90,7 @@ card or was discarded, and fails if never played by the final trick.
   lives in that def), `run/rng.ts` (`STREAMS`,
   `seededIndex`) and `run/catalog.ts`'s `CATALOG` (`{ characters, items,
   mods, pairings }` plus the flattened `sources` index). `content/events/`
-  holds the route events: `event-def.ts` (`EventDef`, `defineEvent`), one
+  holds the trail's events: `event-def.ts` (`EventDef`, `defineEvent`), one
   file per event and its `registry.ts` (`EVENTS`).
 
 **The run loop.** A run is a stored stage, and `applyRunAction` is the one
@@ -102,39 +106,67 @@ until the tag stops changing.
    in. The last lock-in resolves the vote (majority, else a seeded coin
    flip recorded in `lastVote`), draws the plan (each boss camp's boss
    from its tier's pool, ids sorted, one seeded index) and opens the
-   loadout for camp 1 (the Jungle, fair weather). A planned boss
-   stays out of every view until a route preview leads to its camp
-   (`run/plan.ts`'s `horizon`); the leak check flags it before then.
-2. **Loadout.** Each seat sends `equip { itemUids }` (replaces its equipped
-   set, within `rules.itemSlots`), before a boss camp `buy { stockId }` at
-   the shop (supplies, three single items, and the seat's own character's
-   upgrades while it has none), then `ready`, which re-checks the slots.
-   A loadout opens with each equipped set cut to the camp's slots (Rats
-   take one), the last items going back to the backpack.
-   After its `ready` a seat can change nothing. The last `ready` deals the
-   camp.
+   stages before camp 1. A planned boss stays out of every view until a
+   route preview leads to its camp (`run/plan.ts`'s `horizon`); the leak
+   check flags it before then.
+2. **The way to a camp** (`run/trail.ts`'s `legsTo(length, next)`, in
+   order): the **shop** before a boss camp, the item **draft**, the
+   **event** after camp 1 and every other camp after it, the **route**
+   vote, then the **loadout**. Camp 1 is the Jungle in fair weather, so
+   before it there is only the draft and the loadout. Short runs:
+   `[draft, loadout]`, `[draft, event, route, loadout]`, `[draft, route,
+   loadout]`, `[shop, draft, event, route, loadout]`; Standard and Long add
+   shops before their animal and disaster camps. Each stage's `advance`
+   opens the next one (`lifecycle.ts`'s `openLegAfter`); the route vote
+   opens the loadout of the camp it chose.
+   - **Shop** (`buy { stockId }`: supplies, three single items, and the
+     seat's own character's upgrades while it has none; then `ready`). The
+     stock is drawn afresh on every visit from the same streams.
+   - **Draft.** Each seat is dealt the offers its composed `draftShapes`
+     names: three single items, or after a boss camp three bundles of two,
+     then for the Pack Rat a pick of one of three Pack Rat items. Each seat
+     with an offer sends `pick-bundle { bundle }`: one instance per item of
+     its head offer's bundle, equipped while a slot is free, else into the
+     backpack. The draft ends once no seat has an offer.
+   - **Event.** A stub with no effect yet (`stage.event`, drawn from
+     `EVENTS`). Each seat sends `ready`.
+   - **Route.** Each seat votes over 2 or 3 options to the next camp.
+   - **Loadout.** Each seat readies, which re-checks the slots. A loadout
+     opens with each equipped set cut to the camp's slots (Rats take one),
+     the last items going back to the backpack. After its `ready` a seat can
+     change nothing. The last `ready` deals the camp.
+   In every one of these stages a seat may `equip { itemUids }` (replaces
+   its equipped set, within `rules.itemSlots`) and `discard-item {
+   itemUid }`, until it readies where the stage has a ready.
 3. **Camp.** Play as before. The camp's modifiers react to the engine's
    events (the deal, picks, plays, completed and started tricks, whispers)
-   with toolkit ops; a decided camp settles unless a rescue is pending.
-4. **Settle.** A failure costs supplies and reopens the loadout for the same
-   camp spec with a fresh deal; 0 supplies ends the run. A clear pays
-   `5 + min(3, unplayed tricks)` into the shared purse and deals every seat
-   its private draft offers (one per shape its composed `draftShapes` names:
-   the usual bundles, and for the Pack Rat a pick of one of three Pack Rat
-   items after them), or wins the run at the final camp.
-5. **Draft.** Each seat with an offer sends `pick-bundle { bundle }`: one
-   instance per item of that bundle of its head offer, equipped while a slot
-   is free, else into the backpack. The next offer in its queue is then its
-   head; the draft ends once no seat has one.
-6. **Route.** Each seat votes over 2 or 3 options to the next camp.
-7. **Event.** A stub with no effect yet. Each seat sends `ready`, then the
-   next camp's loadout opens.
+   with toolkit ops; a decided camp settles unless a rescue is pending. The
+   backpack is shut in camp: only equipped items act, and only the Pack
+   Rat's Pack Animal swaps one in, once per camp.
+4. **Settle.** A failure costs supplies and goes back to the same camp spec
+   for a fresh deal (`reopenCamp`: through its shop again before a boss
+   camp, then its loadout); 0 supplies ends the run. A clear pays `5 +
+   min(3, unplayed tricks)` into the shared purse and opens the stages
+   before the next camp, or wins the run at the final camp.
+
+**The backpack.** A seat stores `BACKPACK_SIZE` (6) items beside its
+equipped slots (2; the Pack Rat 3). `roomFor` is its free slots plus the
+room left in its backpack. A draft pick or a shop item that does not fit is
+refused `backpack_full`; the seat discards (`discard-item`, any item, in
+any stage between camps) and picks again. A gift (`give-item`) and a grant
+(`grant-item`) must fit too: the content checks `roomFor`, and the toolkit
+throws when it did not (POLICY A3). An `equip` may never push the backpack
+past its size. Only a camp rule that takes a slot (Rats) can: the cut item
+waits in the backpack, and when the camp is over the slot comes back and
+the backpack's first items fill it (`refitSlots`).
 
 A seat disconnected past the worker's auto-pass grace never holds the
 table: `run/absent.ts`'s `absentSeatAction` (the adapter's
 `autoPassRequest`) picks the first free character in registry order,
-abstains from votes, locks in at the muster, takes the head offer's first bundle, readies with the
-gear it has and passes a gated window. Bot seats have no disconnect time,
+abstains from votes, locks in at the muster, takes the head offer's first
+bundle (discarding its last backpack item first while that bundle does not
+fit), readies at the shop, the event and the loadout with the gear it has,
+and passes a gated window. Bot seats have no disconnect time,
 so it never acts for them.
 
 The pass cannot play a card for a seat, so the connected players can also
@@ -143,8 +175,8 @@ vote a disconnected seat out (the room's kick vote, through the adapter's
 `kickSeat` moves its `SeatRun` from `seatIds`/`seats` into
 `RunState.kicked` whole, so every per-player rule reads the crew in play:
 its ballot, lock-in or ready mark goes, its unpicked offers go, and a dealt
-camp is abandoned (a `restarted` history entry, no supplies) and its loadout
-reopens for a fresh deal. `seatPresence` marks a kicked seat `back` while
+camp is abandoned (a `restarted` history entry, no supplies) and the camp
+reopens for a fresh deal (through its shop before a boss camp). `seatPresence` marks a kicked seat `back` while
 it is connected; `openLoadout` puts every back seat in again at its old
 place (at once while the muster or a loadout is open), with its character,
 items, upgrade and ledger. A kicked seat's character stays taken.
@@ -234,8 +266,9 @@ draw derives a fresh, uniquely named stream via `run/rng.ts`'s `STREAMS`:
 | Planned boss | `expedition-plan:{animal\|disaster}` |
 | Route vote tie | `expedition-vote:route:camp{k}` (k = the next camp) |
 | Route option count | `expedition-route:camp{k}:count` |
-| Route option field | `expedition-route:camp{k}:reroll{r}:option{i}:{location\|fair\|weather\|event\|mix}` |
-| Draft item | `expedition-draft:camp{k}:seat{id}:offer{o}:bundle{b}:item{j}:{rarity\|pick}` (k = the cleared camp) |
+| Route option field | `expedition-route:camp{k}:reroll{r}:option{i}:{location\|fair\|weather\|mix\|boss}` |
+| Event | `expedition-event:camp{k}` (k = the camp it comes before) |
+| Draft item | `expedition-draft:camp{k}:seat{id}:offer{o}:bundle{b}:item{j}:{rarity\|pick}` (k = the cleared camp, 0 for the draft before camp 1) |
 | Shop item | `expedition-shop:camp{k}:item{i}:{rarity\|pick}` (a replay of the boss camp draws the same stock) |
 | Attempt deal seed | `{seed}:camp{k}:attempt{A}` |
 | Trick-count kind and N | `expedition-trickcount-{kind\|n}:camp{k}:attempt{A}` |
@@ -254,8 +287,9 @@ A camp modifier never names one either: `ctx.roll` gives the same value for
 the same label within an attempt, and `eventKey` is `dealt`, `pick{n}`,
 `t{i}-start`, `t{i}-p{position}`, `t{i}-done`, `t{i}-void`,
 `whisper{ordinal}`, `settled` or (sources only) `started`. A stage window
-(loadout, draft, route) stamps trick 0 of the camp it belongs to, so `k`
-and `A` there are that camp's.
+stamps trick 0 of the camp it belongs to: the shop and the loadout the
+attempt they lead to, the draft and the route the attempt that cleared (the
+draft before camp 1, camp 1's first), so `k` and `A` there are that camp's.
 
 ## Add an item
 
@@ -348,8 +382,9 @@ that card can't win this one trick.
 The nine characters stand on these. With no source using one, each answers
 as the engine did before them.
 
-- **Stage windows.** `loadout` (until the seat is ready), `draft` (a seat
-  with an offer) and `route`, beside the camp windows. Abilities there get
+- **Stage windows.** `loadout` (the shop and the loadout, until the seat
+  is ready), `draft` (a seat with an offer) and `route`, beside the camp
+  windows. Abilities there get
   `ctx.camp === null`; the loadout stamps the attempt it will deal, so a
   per-camp limit counts loadout uses with that camp's.
 - **Run hooks** (`run/run-rules.ts`): `normalWeatherChance(run, chance)`
@@ -357,8 +392,9 @@ as the engine did before them.
   `routeOptionCount(run, count)` (1 to 3); `swapsBoss(run, option)` gives
   that option a `swapBoss`, another boss of the next animal or disaster
   boss camp's tier, written into the plan when the route is chosen and
-  hidden while beyond the horizon; `draftShapes(run, seatId)` lists a
-  cleared camp's offers, picked in order (`DraftShape`: options, bundle
+  hidden while beyond the horizon; `draftShapes(run, seatId)` lists the
+  offers a draft deals the seat, picked in order (the base: three single
+  items, or three bundles of two after a boss camp) (`DraftShape`: options, bundle
   size, items exclusive to the character, rare chance; a one-item bundle
   never repeats another option's item); `shopPrice(run, seatId, price)`, which the shop
   view shows per viewer; `affectsSeat(run, seatId, origin)`, which the
@@ -383,10 +419,10 @@ as the engine did before them.
   `ctx.drawOffer(seatId, shape)` (a special offer for `add-offer`).
 - **Reactions**: a character or upgrade's `on` reacts like a camp
   modifier's, after the camp's modifiers, to the engine's events plus
-  `run-started` (the length vote opening camp 1) and `camp-settled`
-  (before a decided camp settles). Its ops run under the seat's origin; an
-  `add-modifier` from it resolves its layer through the source's
-  `active.effect`.
+  `run-started` (the length vote opening the run, once its first draft is
+  dealt) and `camp-settled` (before a decided camp settles). Its ops run
+  under the seat's origin; an `add-modifier` from it resolves its layer
+  through the source's `active.effect`.
 - **Passives**: `foldsLast` (above).
 
 ## The channel rule
@@ -507,20 +543,20 @@ when the Sun objective is done. Its key is the def id `temple`, through
 
 ## Add an event
 
-An event waits on every route between two camps. Events have no effect
-yet; the event stage (`run/stages/event.ts`) waits for every seat's
-`ready`.
+An event waits on the trail after camp 1 and every other camp after it
+(`run/trail.ts`, `EVENT_EVERY` in `run/balance.ts`), before the route vote.
+Events have no effect yet; the event stage (`run/stages/event.ts`) waits
+for every seat's `ready`.
 
 1. Create `content/events/<id>.ts` exporting `defineEvent({ id, name, text
    })` (`content/events/event-def.ts`). `text` is one sentence.
 2. Add one line to `content/events/registry.ts`'s `EVENTS`.
 
-Nothing else changes. `run/route.ts`'s `optionsAfter` draws each route's
-event uniformly from `EVENTS`, ids sorted, on the route option's `event`
-stream. Adding an event changes which event a seeded route shows; the other
-route fields draw on their own streams and stay. `adapter/
-catalog-display.ts`'s `EVENT_DISPLAY` projects the name and text, and the
-web shows them on the route card and the event panel
+Nothing else changes. `run/lifecycle.ts`'s `openEvent` draws the event
+uniformly from `EVENTS`, ids sorted, on its own stream
+(`expedition-event:camp{k}`), so adding one changes which event a seeded
+run meets and nothing else. `adapter/catalog-display.ts`'s `EVENT_DISPLAY`
+projects the name and text, and the web shows them on the event panel
 (`apps/web/lib/expedition/trail-model.ts`). No contract test covers events
 yet.
 
@@ -682,9 +718,10 @@ in the lobby.
 stage keeps a strip free for it when it can do so at the same zoom; where
 the stage fills the window (exactly 1280x720 or 1920x1080) the toolbar
 starts folded so it covers nothing, and › unfolds it over the stage:
-- Go: jump to camp N of a run length, arriving at the table, the loadout,
-  the shop (the loadout before a boss camp) or the route vote that leads
-  there (the draft before it skipped).
+- Go: jump to camp N of a run length, arriving at the table, its loadout,
+  or any stage on the way there that the camp has: the shop, the draft, the
+  event or the route vote (the camp before it cleared, and the stages
+  before the one you arrive at skipped).
 - Skip camp: settle the camp cleared or failed through the real settle.
 - Next stage: every seat makes autoplay's move until the stage moves on; a
   camp is played out.
@@ -733,7 +770,9 @@ The cases, copy and timings are one table in
 - State: the whole `RunState` as JSON. Edit and Apply; the worker parses it
   with `ExpeditionRunStateSchema` and then `dev/check.ts` (card conservation,
   known ids, seat alignment, item instances below `itemSerial`, equipped
-  sets within the slots, draft offers of known items, upgrades of the seat's
+  sets within the slots, backpacks within their size outside a loadout or
+  camp, draft offers of known items, a shop, draft or event only before a
+  camp that has one, upgrades of the seat's
   own character, route rerolls and boss swaps, hallucinations naming this
   camp's cards, loaded dice naming this camp's objectives and known
   modifiers), and answers with a readable error if either fails.
@@ -754,7 +793,8 @@ shortcuts the game describes). The board names what a right-click lands on:
 `RunState` each), `triggers.ts` (one trigger per modifier with a moment or a
 turning choice), `check.ts`, `autoplay.ts` (`botMove`, the first priority
 move `applyRunAction` accepts, never a whisper, an ability, an equip or a
-buy; it takes a draft's first bundle), `inspect.ts` and `hooks.ts`. When
+buy; it takes a draft's first bundle, discarding as the absent pass does
+when it does not fit), `inspect.ts` and `hooks.ts`. When
 `RunState` changes, update `ExpeditionRunStateSchema` (the worker's
 compile-time assertion in `game-registration.ts` fails until you do), then
 `check.ts` and whichever shortcuts touch the changed fields. A new modifier

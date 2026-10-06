@@ -81,7 +81,7 @@ describe("muster and the length vote", () => {
     act(act(act(run, "p0", { type: "pick-character", characterId: "plain-1" }, catalog), "p1", { type: "pick-character", characterId: "plain-2" }, catalog), "p2", { type: "pick-character", characterId: "plain-3" }, catalog);
   const lockAll = (run: RunState): RunState => run.seatIds.reduce((next, seatId) => act(next, seatId, { type: "lock-in" }, catalog), run);
 
-  it("waits until every seat has locked in a character and a ballot, then opens camp 1's loadout in the Jungle", () => {
+  it("waits until every seat has locked in a character and a ballot, then opens the draft before camp 1, then its loadout in the Jungle", () => {
     let run = crewed(createRun({ seatIds: SEAT_IDS, seed: "s" }));
     run = act(run, "p0", { type: "vote", choice: "long" }, catalog);
     run = act(run, "p1", { type: "vote", choice: "long" }, catalog);
@@ -90,10 +90,11 @@ describe("muster and the length vote", () => {
     run = lockAll(run);
     expect(run.plan).toEqual({ length: "long", bosses: [{ at: 3, tier: "animal", modId: "beaver" }, { at: 6, tier: "disaster", modId: "locusts" }, { at: 8, tier: "temple", modId: "temple" }] });
     expect(run.lastVote).toEqual({ topic: "length", result: { tally: [{ choice: "short", votes: 1 }, { choice: "standard", votes: 0 }, { choice: "long", votes: 2 }], tied: null, winner: "long" } });
+    expect(run.stage).toEqual({ tag: "draft", next: 1 });
+    run = run.seatIds.reduce((next, seatId) => act(next, seatId, { type: "pick-bundle", bundle: 0 }, catalog), run);
     expect(run.stage).toEqual({
       tag: "loadout",
-      camp: { index: 1, location: "jungle", weather: "fair", event: null, slots: [{ kind: "win-card" }, { kind: "win-card" }] },
-      stock: null,
+      camp: { index: 1, location: "jungle", weather: "fair", slots: [{ kind: "win-card" }, { kind: "win-card" }] },
       ready: {},
     });
   });
@@ -172,16 +173,17 @@ describe("settling a failure", () => {
   const atCamp3 = (opts: { supplies?: number; items?: Record<string, readonly string[]>; cat?: Catalog } = {}): RunState =>
     setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog: opts.cat ?? catalog, camp: 3, supplies: opts.supplies, items: { p2: ["always-fails"], ...opts.items } });
 
-  it("costs a supply, records the failure, deals no draft and reopens the loadout for the same spec", () => {
+  it("costs a supply, records the failure, deals no draft and reopens the same spec, through the shop before a boss camp", () => {
     const items = { p0: ["item-a"], p1: [] };
     const cat = testCatalog({ items: { "always-fails": FORCED_FAILURE, "item-a": plainItem("item-a") } });
-    const before = atCamp3({ items, cat });
+    const before = atCamp3({ items, cat }) as RunAt<"loadout">;
     const failed = readyAll(before, cat);
 
     expect(failed.supplies).toBe(2);
     expect(failed.purse).toBe(0);
     expect(failed.history).toEqual([{ camp: 3, attempt: 1, location: "cave", weather: "fair", status: "failed", suppliesSpent: 1, coins: 0 }]);
-    expect(failed.stage).toEqual({ ...before.stage, ready: {} });
+    expect(failed.stage).toMatchObject({ tag: "shop", next: 3, camp: before.stage.camp, ready: {} });
+    expect(readyAll(failed, cat).stage).toEqual({ ...before.stage, ready: {} });
     expect(failed.seats.map((s) => s.offers)).toEqual([[], [], []]);
     expect(failed.seats.map((s) => s.items)).toEqual([[{ uid: "it0", itemId: "item-a" }], [], [{ uid: "it1", itemId: "always-fails" }]]);
     expect(nextAttemptNumber(failed, campIndex(3))).toBe(2);
@@ -191,7 +193,7 @@ describe("settling a failure", () => {
     const first = readyAll(atCamp3({ items: { p2: [] } }), catalog);
     const firstHands = attemptOf(first)!.camp.hands;
     const failed = settleCamp(first as RunAt<"camp">, "failed", catalog);
-    const replay = readyAll(failed, catalog) as RunAt<"camp">;
+    const replay = readyAll(readyAll(failed, catalog), catalog) as RunAt<"camp">;
     expect(replay.stage.camp).toEqual((first as RunAt<"camp">).stage.camp);
     expect(attemptOf(replay)).toMatchObject({ attemptNumber: 2, effects: [], reveals: [], log: [] });
     expect(attemptOf(replay)!.camp.hands).not.toEqual(firstHands);
@@ -238,7 +240,7 @@ describe("settling a failure", () => {
     const failed = readyAll(atCamp3(), catalog);
     const ledger = [{ kind: "used" as const, sourceKey: "plain-1", at: { camp: campIndex(3), attempt: 1, trick: 0 } }];
     const seats = failed.seats.map((s) => (s.seatId === "p0" ? { ...s, ledger } : s));
-    const second = readyAll({ ...failed, seats }, catalog);
+    const second = readyAll(readyAll({ ...failed, seats }, catalog), catalog);
     expect(second.history.map((h) => h.attempt)).toEqual([1, 2]);
     expect(second.seats).toEqual(seats);
   });
@@ -262,20 +264,15 @@ describe("settling a clear", () => {
     expect(settleCamp(withUnplayed(0), "cleared", catalog).purse).toBe(5);
   });
 
-  it("opens the draft and deals every seat one offer of item bundles, owned items included", () => {
+  it("opens the draft and deals every seat one offer of three single items, owned items included", () => {
     const run = setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog, items: { p0: ["item-a"] } });
     const settled = settleCamp(clearedCamp(run, catalog), "cleared", catalog);
-    expect(settled.stage).toEqual({ tag: "draft", cleared: 1, payout: 8 });
+    expect(settled.stage).toEqual({ tag: "draft", next: 2 });
     expect(settled.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 8 }]);
     for (const seat of settled.seats) {
       expect(seat.offers).toHaveLength(1);
-      expect(seat.offers[0]!.bundles).toHaveLength(3);
-      for (const bundle of seat.offers[0]!.bundles) {
-        expect(new Set(bundle).size).toBe(2);
-        for (const id of bundle) expect(["item-a", "item-b", "item-c"]).toContain(id);
-      }
+      expect([...seat.offers[0]!.bundles.flat()].sort()).toEqual(["item-a", "item-b", "item-c"]);
     }
-    expect(settled.seats[0]!.offers[0]!.bundles.flat()).toContain("item-a");
   });
 
   it("clearing the final camp wins: camp 4 of a short run, camp 8 of a long one", () => {
@@ -287,14 +284,23 @@ describe("settling a clear", () => {
   });
 });
 
-describe("between camps: draft, route vote and event", () => {
+describe("between camps: draft, event and route vote", () => {
   const catalog = testCatalog({
     items: { "item-a": plainItem("item-a"), "item-b": plainItem("item-b") },
   });
   const drafting = (camp = 1, seed = "between") => settleCamp(clearedCamp(setupRun({ seatIds: SEAT_IDS, seed, catalog, camp }), catalog), "cleared", catalog);
-  const drafted = (run: RunState): RunState => run.seats.reduce((next, seat) => act(next, seat.seatId, { type: "pick-bundle", bundle: 0 }, catalog), run);
+  /** Every seat picks, then readies through the event when there is one. */
+  const drafted = (run: RunState): RunState => {
+    const picked = run.seats.reduce((next, seat) => act(next, seat.seatId, { type: "pick-bundle", bundle: 0 }, catalog), run);
+    return picked.stage.tag === "event" ? readyAll(picked, catalog) : picked;
+  };
 
-  it("the last draft pick opens the route vote over 2 or 3 options to the next camp", () => {
+  it("the last draft pick after camp 4 opens the route vote; after camp 1 the event comes first", () => {
+    expect(drafting(1).seats.reduce((next, seat) => act(next, seat.seatId, { type: "pick-bundle", bundle: 0 }, catalog), drafting(1) as RunState).stage).toEqual({ tag: "event", next: 2, event: "event", ready: {} });
+    expect(drafted(drafting(4)).stage).toMatchObject({ tag: "route", from: 4 });
+  });
+
+  it("the route vote after the event offers 2 or 3 options to the next camp", () => {
     const run = drafted(drafting());
     expect(run.stage.tag).toBe("route");
     if (run.stage.tag !== "route") return;
@@ -303,24 +309,22 @@ describe("between camps: draft, route vote and event", () => {
     expect([2, 3]).toContain(run.stage.options.length);
     expect(run.stage.options[0]).toEqual({
       id: "a",
-      next: { index: 2, location: "clifftop", weather: "fair", event: "event", slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }] },
+      next: { index: 2, location: "clifftop", weather: "fair", slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }] },
       reroll: 0,
       swapBoss: null,
     });
   });
 
-  it("the last route ballot opens the chosen route's event, and the last ready opens its loadout", () => {
+  it("the last route ballot opens the chosen camp's loadout", () => {
     let run = drafted(drafting());
     if (run.stage.tag !== "route") throw new Error("expected the route vote");
     const second = run.stage.options[1]!;
     run = act(run, "p0", { type: "vote", choice: "b" }, catalog);
     run = act(run, "p1", { type: "vote", choice: "b" }, catalog);
     run = act(run, "p2", { type: "vote", choice: "a" }, catalog);
-    expect(run.stage).toEqual({ tag: "event", route: second, ready: {} });
+    expect(run.stage).toEqual({ tag: "loadout", camp: second.next, ready: {} });
     expect(run.lastVote).toEqual({ topic: "route", result: { tally: expect.arrayContaining([{ choice: "a", votes: 1 }, { choice: "b", votes: 2 }]), tied: null, winner: "b" } });
     expect(applyRunAction(run, "p0", { type: "vote", choice: "a" }, catalog)).toEqual({ ok: false, error: "wrong_stage" });
-    run = readyAll(run, catalog);
-    expect(run.stage).toEqual({ tag: "loadout", camp: second.next, stock: null, ready: {} });
   });
 
   it("a route vote naming no option is not_a_choice", () => {

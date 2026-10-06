@@ -16,7 +16,7 @@ describe("STREAMS distinctness (A1)", () => {
     const useIndices = [0, 1, 2, 3];
     const draws = [0, 1, 2];
     const options = [0, 1, 2];
-    const fields = ["location", "fair", "weather", "event", "mix", "boss"] as const;
+    const fields = ["location", "fair", "weather", "mix", "boss"] as const;
     const mods = ["rain", "thunderstorm"];
     const strengths = ["full", "half"];
     const labels = ["start", "t1"];
@@ -25,8 +25,11 @@ describe("STREAMS distinctness (A1)", () => {
     const parts = ["rarity", "pick"] as const;
 
     for (const seat of seats) names.push(STREAMS.sourceDraw("jd", seat, "run", "started", 0));
+    for (const seat of seats) {
+      for (const bundle of options) for (const part of parts) names.push(STREAMS.draftItem(0, seat, 0, bundle, 0, part));
+    }
     for (const camp of camps) {
-      names.push(STREAMS.routeVote(camp), STREAMS.routeCount(camp));
+      names.push(STREAMS.routeVote(camp), STREAMS.routeCount(camp), STREAMS.event(camp));
       for (const reroll of [0, 1]) {
         for (const option of options) {
           for (const field of fields) names.push(STREAMS.routeField(camp, reroll, option, field));

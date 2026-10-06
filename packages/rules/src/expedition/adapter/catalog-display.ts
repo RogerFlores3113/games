@@ -11,7 +11,7 @@ import { CATALOG } from "../run/catalog";
 import { salePrice } from "../content/characters/businessman";
 import type { TargetKind } from "../run/targets";
 import { WINDOWS, type ActiveWindow } from "../run/windows";
-import { DRAFT, FAILURE_COST, ITEM_SLOTS, NORMAL_WEATHER_CHANCE, PAYOUT, RUN_LENGTHS, SHOP, SUPPLIES_MAX, SUPPLIES_START, SUPPLY_PRICE, THUNDERSTORM, WASHES, WHISPERS_PER_UPGRADE } from "../run/balance";
+import { BACKPACK_SIZE, DRAFT, FAILURE_COST, ITEM_SLOTS, NORMAL_WEATHER_CHANCE, PAYOUT, RUN_LENGTHS, SHOP, SUPPLIES_MAX, SUPPLIES_START, SUPPLY_PRICE, THUNDERSTORM, WASHES, WHISPERS_PER_UPGRADE } from "../run/balance";
 import type { BossTier } from "../run/plan";
 import type { RunLength } from "../run/types";
 import { EVENTS } from "../content/events/registry";
@@ -233,6 +233,7 @@ export const BALANCE_DISPLAY = {
   payout: { ...PAYOUT },
   draftOptions: DRAFT.options,
   itemSlots: ITEM_SLOTS,
+  backpackSize: BACKPACK_SIZE,
   upgradePrice: SHOP.upgradePrice,
   whispersPerUpgrade: WHISPERS_PER_UPGRADE,
   fairWeatherChance: NORMAL_WEATHER_CHANCE,

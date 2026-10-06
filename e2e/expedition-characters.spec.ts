@@ -136,10 +136,20 @@ test.describe("the nine characters", () => {
     await clickUntilChanged<TrailView>(page, "ready", (m) => m.ready?.state === "done");
     await openPanel(page);
     await autoplay(panel, "others", 6);
+    // Lucky Start's item is already carried at the draft before camp 1.
+    await expect.poll(async () => (await getModel<TrailView>(page)).panel?.kind).toBe("draft");
+    const drafting = await getModel<TrailView>(page);
+    expect(drafting.kit?.map((k) => k.sourceId)[0]).toBe("jd");
+    expect(drafting.kit).toHaveLength(2);
+    await closePanel(page);
+    const item = draftOffer(drafting)![0]!;
+    await clickUntilChanged<TrailView>(page, item.objectId, (m) => draftOffer(m) === null);
+    await openPanel(page);
+    await autoplay(panel, "others", 6);
     await expect.poll(async () => (await getModel<TrailView>(page)).panel?.kind).toBe("loadout");
     const loadout = await getModel<TrailView>(page);
     const gear = loadout.panel?.kind === "loadout" ? loadout.panel.gear : null;
-    expect(gear?.equipped).toHaveLength(1);
+    expect(gear?.equipped).toHaveLength(2);
     expect(loadout.kit?.map((k) => k.sourceId)[0]).toBe("jd");
     await capture(page, "jd-loadout");
   });
@@ -197,7 +207,7 @@ test.describe("the nine characters", () => {
     test.setTimeout(180_000);
     const panel = await soloTable(page, 2);
     await crewAs(page, panel, "businessman", null);
-    await shortcut(panel, "jump-to-camp", { length: "standard", camp: "3", stage: "loadout" });
+    await shortcut(panel, "jump-to-camp", { length: "standard", camp: "3", stage: "shop" });
     await waitForScene(page, "trail");
     await shortcut(panel, "give-item", { seat: (await trail(page)).crew.find((r) => r.isYou)!.seatId, item: "trail-map" });
     await closePanel(page);
@@ -246,7 +256,7 @@ test.describe("the nine characters", () => {
     await capture(page, "businessman-popup-bought");
   });
 
-  test("the Pack Rat carries three items, drafts the usual bundle, then picks one of three Pack Rat items", async ({ page }) => {
+  test("the Pack Rat carries three items, drafts the usual item, then picks one of three Pack Rat items", async ({ page }) => {
     test.setTimeout(180_000);
     const panel = await soloTable(page, 2);
     await crewAs(page, panel, "pack-rat", null);
@@ -263,7 +273,7 @@ test.describe("the nine characters", () => {
     const offer = (m: Trail) => (m.panel as { draft: Offer }).draft;
     const first = offer(draft);
     expect(first.ownPick).toBeNull();
-    for (const bundle of first.bundles!) expect(bundle.items.map((i) => i.exclusive)).toEqual([false, false]);
+    for (const bundle of first.bundles!) expect(bundle.items.map((i) => i.exclusive)).toEqual([false]);
     await capture(page, "pack-rat-draft");
     const own = await clickUntilChanged<Trail>(page, first.bundles![0]!.objectId, (m) => offer(m).ownPick === "pack-rat");
     expect(offer(own).bundles!.map((b) => b.items.map((i) => i.exclusive))).toEqual([[true], [true], [true]]);
@@ -302,6 +312,12 @@ test.describe("the nine characters", () => {
     const take = (draft.panel as { draft: { bundles: { objectId: string }[] } }).draft.bundles[0]!;
     await closePanel(page);
     await clickUntilChanged<Trail>(page, take.objectId, (m) => (m.panel as { draft?: { kind: string } }).draft?.kind !== "offer");
+    await openPanel(page);
+    await autoplay(panel, "others", 4);
+    // The event after camp 1 comes before the route vote.
+    await expect.poll(async () => (await trail(page)).panel.kind).toBe("event");
+    await closePanel(page);
+    await clickUntilChanged<Trail>(page, "ready", (m) => m.panel.kind !== "event" || (m as unknown as { ready: { state: string } | null }).ready?.state === "done");
     await openPanel(page);
     await autoplay(panel, "others", 4);
     await expect.poll(async () => (await trail(page)).panel.kind).toBe("route");

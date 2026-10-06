@@ -10,17 +10,17 @@ import type { Catalog, RunAt, RunState } from "./types";
  * there (a route option's boss swap written into the plan). */
 export type SurveyedCamp = { readonly spec: CampSpec; readonly run: RunState };
 
-/** The camps the stage previews: the loadout's camp, each route option's
- * next camp, or the chosen route's. [] elsewhere. */
+/** The camps the stage previews: the loadout's camp, a replay's shop's
+ * camp, or each route option's next camp. [] elsewhere. */
 export function surveyedCamps(run: RunState): readonly SurveyedCamp[] {
   const stage = run.stage;
   switch (stage.tag) {
     case "loadout":
       return [{ spec: stage.camp, run }];
+    case "shop":
+      return stage.camp === null ? [] : [{ spec: stage.camp, run }];
     case "route":
       return stage.options.map((option) => ({ spec: option.next, run: { ...run, plan: planAfter(run.plan!, option) } }));
-    case "event":
-      return [{ spec: stage.route.next, run }];
     default:
       return [];
   }
@@ -29,6 +29,6 @@ export function surveyedCamps(run: RunState): readonly SurveyedCamp[] {
 /** The camp's next attempt, dealt exactly as dealCamp will deal it: its
  * objectives, and what its rules will hide (a Desert's mirage). */
 export function surveyDeal(camp: SurveyedCamp, catalog: Catalog): RunAt<"camp"> {
-  const atLoadout: RunAt<"loadout"> = { ...camp.run, stage: { tag: "loadout", camp: camp.spec, stock: null, ready: {} } };
+  const atLoadout: RunAt<"loadout"> = { ...camp.run, stage: { tag: "loadout", camp: camp.spec, ready: {} } };
   return dealCamp(atLoadout, catalog);
 }

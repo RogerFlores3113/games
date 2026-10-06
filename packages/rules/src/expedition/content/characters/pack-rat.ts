@@ -1,5 +1,6 @@
 import { DRAFT } from "../../run/balance";
 import type { DraftShape } from "../../run/draft";
+import { roomFor } from "../../run/items";
 import { currentStamp } from "../../run/usage";
 import { ability, defineCharacter, defineUpgrade } from "../source-def";
 
@@ -30,13 +31,14 @@ export const packRat = defineCharacter({
         window: "loadout",
         limit: { kind: "unlimited" },
         targets: [{ kind: "item", where: "any" }, { kind: "player", who: "teammate" }],
+        canTarget: (ctx) => (roomFor(ctx.run, ctx.targets[1].seatId, ctx.catalog) > 0 ? true : "Their backpack is full"),
         apply: (ctx) => [{ op: "give-item", fromSeatId: ctx.self, uid: ctx.targets[0].uid, toSeatId: ctx.targets[1].seatId }],
       }),
     }),
     defineUpgrade({
       id: "pack-rat.pack-animal",
       name: "Pack Animal",
-      text: "Swap a carried item for one in your backpack.",
+      text: "Open your backpack once each camp to swap items.",
       active: ability({
         window: "between-tricks",
         limit: { kind: "per-camp", times: 1 },

@@ -14,7 +14,7 @@ function roomSeats(): RoomSeatInfo[] {
 }
 
 function preview(index: number, over: Partial<ExpeditionCampPreviewView> = {}): ExpeditionCampPreviewView {
-  return { index, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: ["win-card", "win-card"], bossId: null, shop: false, survey: null, ...over };
+  return { index, location: "jungle", weather: "fair", pairing: null, slotKinds: ["win-card", "win-card"], bossId: null, shop: false, survey: null, ...over };
 }
 
 const STANDARD_PLAN: ExpeditionView["plan"] = [
@@ -50,9 +50,10 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     ],
     kicked: [],
     yourAbilities: [],
+    yourItemSlots: 2,
     history: [CLEARED_1],
     lastVote: null,
-    stage: { tag: "loadout", camp: preview(2), mods: [], yourSlots: 2, shop: null, readySeatIds: [] },
+    stage: { tag: "loadout", camp: preview(2), mods: [], readySeatIds: [] },
     ...overrides,
   };
 }
@@ -77,6 +78,7 @@ function seatsWith(you: Partial<ExpeditionView["seats"][number]>): ExpeditionVie
 
 const draftStage = (over: Partial<Extract<ExpeditionStageView, { tag: "draft" }>> = {}): ExpeditionStageView => ({
   tag: "draft",
+  next: 2,
   cleared: 1,
   payout: 8,
   yourOffer: null,
@@ -90,7 +92,7 @@ describe("topBar", () => {
   });
 
   it("labels a boss camp and the temple by their tier", () => {
-    const loadout = (index: number) => at({ tag: "loadout", camp: preview(index), mods: [], yourSlots: 2, shop: null, readySeatIds: [] });
+    const loadout = (index: number) => at({ tag: "loadout", camp: preview(index), mods: [], readySeatIds: [] });
     expect(model(loadout(3)).topBar.camp).toBe("Camp 3 of 6 - Animal boss");
     expect(model(loadout(6)).topBar.camp).toBe("Camp 6 of 6 - The Temple");
   });
@@ -106,7 +108,7 @@ describe("topBar", () => {
 describe("trail", () => {
   it("marks cleared camps, the camp ahead, and the boss and temple stops of a standard run", () => {
     const view = at(
-      { tag: "loadout", camp: preview(3), mods: [], yourSlots: 2, shop: null, readySeatIds: [] },
+      { tag: "loadout", camp: preview(3), mods: [], readySeatIds: [] },
       {
         history: [
           CLEARED_1,
@@ -126,7 +128,7 @@ describe("trail", () => {
   });
 
   it("keeps a failed camp as the stop you are at and counts the retry", () => {
-    const view = at({ tag: "loadout", camp: preview(2), mods: [], yourSlots: 2, shop: null, readySeatIds: [] }, { history: [CLEARED_1, { camp: 2, attempt: 1, location: "jungle", weather: "fair", status: "failed", coins: 0 }] });
+    const view = at({ tag: "loadout", camp: preview(2), mods: [], readySeatIds: [] }, { history: [CLEARED_1, { camp: 2, attempt: 1, location: "jungle", weather: "fair", status: "failed", coins: 0 }] });
     expect(model(view).trail![1]).toEqual({ index: 2, state: "here", kind: "camp", caption: "try 2" });
   });
 
@@ -340,7 +342,7 @@ describe("draft", () => {
 
 describe("route", () => {
   const options: Extract<ExpeditionStageView, { tag: "route" }>["options"] = [
-    { id: "a", next: preview(3, { event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: "tiger", shop: false }), swapsBoss: false },
+    { id: "a", next: preview(3, { slotKinds: ["win-card", "win-card", "win-card"], bossId: "tiger", shop: false }), swapsBoss: false },
     { id: "b", next: preview(3, { location: "river-delta", weather: "storm", slotKinds: ["ordered", "ordered", "win-card", "trick-count"], shop: true }), swapsBoss: false },
   ];
   const routeView = (ballots: { seatId: string; choice: string | null }[], over: Partial<ExpeditionView> = {}): ExpeditionView =>
@@ -363,7 +365,7 @@ describe("route", () => {
           id: "a",
           objectId: "route:a",
           label: "Route A",
-          next: { title: "Camp 3 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", backdrop: "jungle", weatherId: "fair", pairing: null, event: "Event", objectives: ["3 cards to win"], boss: "Animal boss", bossId: "tiger", bossName: "Tiger", survey: null },
+          next: { title: "Camp 3 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", backdrop: "jungle", weatherId: "fair", pairing: null, objectives: ["3 cards to win"], boss: "Animal boss", bossId: "tiger", bossName: "Tiger", survey: null },
           voters: ["You", "Alice"],
           yours: true,
           votable: true,
@@ -374,7 +376,7 @@ describe("route", () => {
           id: "b",
           objectId: "route:b",
           label: "Route B",
-          next: { title: "Camp 3 of 6", shop: true, location: "River Delta", weather: "Storm", locationId: "river-delta", backdrop: "river-delta", weatherId: "storm", pairing: null, event: null, objectives: ["1 card to win", "Win 2 in order", "A trick count"], boss: "Animal boss", bossId: null, bossName: null, survey: null },
+          next: { title: "Camp 3 of 6", shop: true, location: "River Delta", weather: "Storm", locationId: "river-delta", backdrop: "river-delta", weatherId: "storm", pairing: null, objectives: ["1 card to win", "Win 2 in order", "A trick count"], boss: "Animal boss", bossId: null, bossName: null, survey: null },
           voters: [],
           yours: false,
           votable: true,
@@ -406,19 +408,20 @@ describe("route", () => {
 
 describe("event and loadout panels", () => {
   it("shows the event's name and text with the camp it leads to", () => {
-    const view = at({ tag: "event", event: "event", next: preview(4, { event: "event" }), readySeatIds: [] });
+    const view = at({ tag: "event", event: "event", next: 4, readySeatIds: [] });
     expect(model(view).panel).toEqual({
       kind: "event",
       name: "Event",
       text: "Nothing happens here yet.",
-      next: { title: "Camp 4 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", backdrop: "jungle", weatherId: "fair", pairing: null, event: "Event", objectives: ["2 cards to win"], boss: null, bossId: null, bossName: null, survey: null },
+      nextTitle: "Camp 4 of 6",
     });
   });
 
   it("shows the camp the crew is about to start in the loadout, with your gear and no shop", () => {
     expect(model(makeView()).panel).toEqual({
       kind: "loadout",
-      next: { title: "Camp 2 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", backdrop: "jungle", weatherId: "fair", pairing: null, event: null, objectives: ["2 cards to win"], boss: null, bossId: null, bossName: null, survey: null },
+      title: "Camp 2 of 6",
+      next: { title: "Camp 2 of 6", shop: false, location: "Jungle", weather: "Fair", locationId: "jungle", backdrop: "jungle", weatherId: "fair", pairing: null, objectives: ["2 cards to win"], boss: null, bossId: null, bossName: null, survey: null },
       gear: {
         equipped: ["trained-monkey"],
         slots: [
@@ -444,7 +447,7 @@ describe("loadout gear and shop", () => {
     if (p.kind !== "loadout") throw new Error(`expected the loadout panel, got ${p.kind}`);
     return p;
   };
-  const shop: NonNullable<Extract<ExpeditionStageView, { tag: "loadout" }>["shop"]> = {
+  const shop: Extract<ExpeditionStageView, { tag: "shop" }>["shop"] = {
     stock: [
       { stockId: "supplies", what: { kind: "supplies" }, price: 6, soldTo: null },
       { stockId: "item0", what: { kind: "item", itemId: "smoke-signal" }, price: 5, soldTo: "s1" },
@@ -452,7 +455,7 @@ describe("loadout gear and shop", () => {
     yourUpgrades: [{ stockId: "upgrade:leader.delegate", upgradeId: "leader.delegate", price: 8 }],
   };
   const shopView = (over: Partial<ExpeditionView> = {}, readySeatIds: string[] = []) =>
-    at({ tag: "loadout", camp: preview(3, { shop: true, survey: null }), mods: [], yourSlots: 2, shop, readySeatIds }, over);
+    at({ tag: "shop", next: 3, camp: null, shop, readySeatIds }, over);
 
   it("lists the backpack with what is left of each item, and the page asked for", () => {
     const seats = seatsWith({
@@ -534,8 +537,10 @@ describe("vote", () => {
     tied: null,
     winner: "b",
   };
-  const firstLoadout: ExpeditionStageView = { tag: "loadout", camp: preview(1), mods: [], yourSlots: 2, shop: null, readySeatIds: [] };
-  const event: ExpeditionStageView = { tag: "event", event: "event", next: preview(4), readySeatIds: [] };
+  const firstLoadout: ExpeditionStageView = { tag: "loadout", camp: preview(1), mods: [], readySeatIds: [] };
+  const event: ExpeditionStageView = { tag: "event", event: "event", next: 4, readySeatIds: [] };
+  /** The loadout the route vote chose, before its camp is played. */
+  const routeLoadout: ExpeditionStageView = { tag: "loadout", camp: preview(4), mods: [], readySeatIds: [] };
 
   it("shows the length vote on camp 1's first loadout, with the flip that settled a tie", () => {
     expect(model(at(firstLoadout, { lastVote: lengthVote, history: [] })).vote).toEqual({
@@ -557,8 +562,8 @@ describe("vote", () => {
     });
   });
 
-  it("shows a clear route majority on the event with no flip", () => {
-    expect(model(at(event, { lastVote: routeVote })).vote).toEqual({
+  it("shows a clear route majority on the loadout it chose, with no flip", () => {
+    expect(model(at(routeLoadout, { lastVote: routeVote })).vote).toEqual({
       key: "route:4",
       title: "Route",
       winner: "Route B",
@@ -572,7 +577,7 @@ describe("vote", () => {
 
   it("flips between route letters on a tied route vote", () => {
     const tied = { topic: "route" as const, tally: [{ choice: "a", votes: 1 }, { choice: "b", votes: 1 }], tied: ["a", "b"], winner: "a" };
-    expect(model(at(event, { lastVote: tied })).vote!.flip).toEqual({
+    expect(model(at(routeLoadout, { lastVote: tied })).vote!.flip).toEqual({
       faces: [
         { label: "Route A", glyph: "A" },
         { label: "Route B", glyph: "B" },
@@ -586,8 +591,10 @@ describe("vote", () => {
     expect(model(at(event, { lastVote: lengthVote })).vote).toBeNull();
   });
 
-  it("hides the route vote on a loadout and at the draft", () => {
-    expect(model(at(firstLoadout, { lastVote: routeVote, history: [] })).vote).toBeNull();
+  it("hides the route vote once its camp has been played, on the event and at the draft", () => {
+    const failed = { camp: 4, attempt: 1, location: "jungle", weather: "fair", status: "failed" as const, coins: 0 };
+    expect(model(at(routeLoadout, { lastVote: routeVote, history: [failed] })).vote).toBeNull();
+    expect(model(at(event, { lastVote: routeVote })).vote).toBeNull();
     expect(model(at(draftStage(), { lastVote: routeVote })).vote).toBeNull();
   });
 
@@ -599,12 +606,12 @@ describe("vote", () => {
 describe("ready", () => {
   it("is Set out in the loadout: open, then done once you are in readySeatIds", () => {
     expect(model(makeView()).ready).toEqual({ objectId: "ready", label: "Set out", state: "open" });
-    const readied = at({ tag: "loadout", camp: preview(2), mods: [], yourSlots: 2, shop: null, readySeatIds: ["s1", "s2"] });
+    const readied = at({ tag: "loadout", camp: preview(2), mods: [], readySeatIds: ["s1", "s2"] });
     expect(model(readied).ready).toEqual({ objectId: "ready", label: "Set out", state: "done" });
   });
 
   it("is Continue on an event", () => {
-    const event = (readySeatIds: string[]) => at({ tag: "event", event: "event", next: preview(4), readySeatIds });
+    const event = (readySeatIds: string[]) => at({ tag: "event", event: "event", next: 4, readySeatIds });
     expect(model(event(["s1"])).ready).toEqual({ objectId: "ready", label: "Continue", state: "open" });
     expect(model(event(["s2"])).ready).toEqual({ objectId: "ready", label: "Continue", state: "done" });
   });
@@ -639,7 +646,7 @@ describe("status", () => {
 
   it("is null in the loadout and the event", () => {
     expect(model(makeView()).status).toBeNull();
-    expect(model(at({ tag: "event", event: "event", next: preview(4), readySeatIds: [] })).status).toBeNull();
+    expect(model(at({ tag: "event", event: "event", next: 4, readySeatIds: [] })).status).toBeNull();
   });
 });
 
@@ -724,8 +731,8 @@ describe("crew", () => {
 
   it("reads each stage's status in the order you, s3, s1", () => {
     const statuses = (stage: ExpeditionStageView) => model(at(stage)).crew.map((c) => c.status);
-    expect(statuses({ tag: "loadout", camp: preview(2), mods: [], yourSlots: 2, shop: null, readySeatIds: ["s1", "s2"] })).toEqual(["ready", "waiting", "ready"]);
-    expect(statuses({ tag: "event", event: "event", next: preview(4), readySeatIds: ["s3"] })).toEqual(["waiting", "ready", "waiting"]);
+    expect(statuses({ tag: "loadout", camp: preview(2), mods: [], readySeatIds: ["s1", "s2"] })).toEqual(["ready", "waiting", "ready"]);
+    expect(statuses({ tag: "event", event: "event", next: 4, readySeatIds: ["s3"] })).toEqual(["waiting", "ready", "waiting"]);
     expect(statuses(draftStage({ pendingSeatIds: ["s3"] }))).toEqual(["ready", "drafting", "ready"]);
     expect(statuses({ tag: "route", options: [], ballots: [{ seatId: "s1", choice: "a" }] })).toEqual(["voting", "voting", "voted"]);
     expect(statuses({ tag: "muster", ballots: [{ seatId: "s2", choice: "short" }], lockedSeatIds: ["s2"] })).toEqual(["ready", "waiting", "waiting"]);
@@ -756,7 +763,7 @@ describe("tooltip", () => {
 
 describe("prompt", () => {
   it("greets a cleared camp with the draft", () => {
-    expect(model(at(draftStage({ yourOffer: { kind: "standard", bundles: [["trained-monkey"]] } }))).prompt).toEqual({ text: "Camp 1 cleared! +8 coins. Take a bundle", tone: "your-move" });
+    expect(model(at(draftStage({ yourOffer: { kind: "standard", bundles: [["trained-monkey"]] } }))).prompt).toEqual({ text: "Camp 1 cleared! +8 coins. Take an item", tone: "your-move" });
   });
 
   it("says Reconnecting while the socket is down", () => {

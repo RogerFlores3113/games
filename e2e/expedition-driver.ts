@@ -306,12 +306,17 @@ export async function clickHandCard<T>(
 }
 
 /** The first offer holding a preferred character or item, else the first. */
+/** Drafted items that hold a gated window (a rescue), taken only when
+ * nothing else is offered: a second rescuer would change who the table
+ * waits on. */
+const RESCUE_ITEMS = ["rope-ladder"];
+
 export function pickDraftOffer<T extends { sourceId: string; itemIds?: string[] }>(offers: T[], preference: readonly string[] = DRAFT_PREFERENCE): T {
   for (const preferred of preference) {
     const found = offers.find((o) => (o.itemIds ?? [o.sourceId]).includes(preferred));
     if (found) return found;
   }
-  const first = offers[0];
+  const first = offers.find((o) => !(o.itemIds ?? []).some((id) => RESCUE_ITEMS.includes(id))) ?? offers[0];
   if (!first) throw new Error("pickDraftOffer: draftOffer was empty");
   return first;
 }

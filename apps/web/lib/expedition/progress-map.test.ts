@@ -3,7 +3,7 @@ import type { ExpeditionCampPreviewView, ExpeditionView } from "@games/rules";
 import { buildProgressMap } from "./progress-map";
 
 function preview(index: number, over: Partial<ExpeditionCampPreviewView> = {}): ExpeditionCampPreviewView {
-  return { index, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: ["win-card", "win-card"], bossId: null, shop: false, survey: null, ...over };
+  return { index, location: "jungle", weather: "fair", pairing: null, slotKinds: ["win-card", "win-card"], bossId: null, shop: false, survey: null, ...over };
 }
 
 function view(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
@@ -22,6 +22,7 @@ function view(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     seats: [],
     kicked: [],
     yourAbilities: [],
+    yourItemSlots: 2,
     history: [
       { camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", coins: 8 },
       { camp: 2, attempt: 1, location: "clifftop", weather: "rain", status: "failed", coins: 0 },

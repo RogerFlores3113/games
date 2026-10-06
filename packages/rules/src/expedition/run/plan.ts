@@ -53,21 +53,23 @@ export function isFinalCamp(plan: RunPlan, at: CampIndex): boolean {
 }
 
 /** The furthest camp the crew has seen previewed. A planned boss is public
- * once its camp is within it. */
+ * once its camp is within it: the route preview that leads there, or the
+ * shop before its replay. */
 export function horizon(run: RunState): number {
   const stage = run.stage;
   switch (stage.tag) {
     case "muster":
       return 0;
+    case "shop":
+      return stage.camp?.index ?? stage.next - 1;
+    case "draft":
+    case "event":
+      return stage.next - 1;
+    case "route":
+      return stage.from + 1;
     case "loadout":
     case "camp":
       return stage.camp.index;
-    case "draft":
-      return stage.cleared;
-    case "route":
-      return stage.from + 1;
-    case "event":
-      return stage.route.next.index;
     case "ended":
       return Infinity;
   }

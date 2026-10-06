@@ -99,7 +99,7 @@ export const businessman = defineCharacter({
     window: "loadout",
     limit: { kind: "unlimited" },
     targets: [{ kind: "item", where: "any" }],
-    canUse: (ctx) => (ctx.run.stage.tag === "loadout" && ctx.run.stage.stock !== null ? true : "Sell only at the shop"),
+    canUse: (ctx) => (ctx.run.stage.tag === "shop" ? true : "Sell only at the shop"),
     apply: (ctx) => {
       const item = ctx.targets[0];
       return [

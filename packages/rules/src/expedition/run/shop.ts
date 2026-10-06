@@ -1,4 +1,4 @@
-// The shop: a panel of the loadout before a boss camp. The stock is one
+// The shop: the stage before a boss camp (and its replays). The stock is one
 // supply line and SHOP.items single copies, drawn on every visit from the
 // same stream names, so a replay of the boss camp offers the same stock
 // again. Upgrades are not stock: each seat sees its own character's upgrades
@@ -8,7 +8,7 @@
 import { DRAFT, SHOP, SUPPLIES_MAX, SUPPLY_PRICE } from "./balance";
 import { rulesFor } from "./compose";
 import { drawItem, openPool } from "./draft";
-import { mintItems } from "./items";
+import { mintItems, roomFor } from "./items";
 import { STREAMS } from "./rng";
 import type { CampIndex, Catalog, RunAt, RunError, RunState, SeatId, SeatRun } from "./types";
 import { seatOf } from "./usage";
@@ -44,7 +44,7 @@ export function upgradeOffers(seat: SeatRun, catalog: Catalog): readonly Upgrade
   return (character?.upgrades ?? []).map((upgrade) => ({ stockId: `${UPGRADE_PREFIX}${upgrade.id}`, upgradeId: upgrade.id, price: SHOP.upgradePrice }));
 }
 
-type Purchase = { readonly price: number; readonly take: (run: RunAt<"loadout">) => RunState };
+type Purchase = { readonly price: number; readonly take: (run: RunAt<"shop">) => RunState };
 
 function upgradePurchase(seat: SeatRun, upgradeId: string, catalog: Catalog): Purchase | RunError {
   if (seat.upgradeId !== null) return "upgrade_owned";
@@ -53,16 +53,17 @@ function upgradePurchase(seat: SeatRun, upgradeId: string, catalog: Catalog): Pu
   return { price: offer.price, take: (run) => ({ ...run, seats: run.seats.map((s) => (s.seatId === seat.seatId ? { ...s, upgradeId } : s)) }) };
 }
 
-function stockPurchase(run: RunAt<"loadout">, seatId: SeatId, entry: StockEntry, catalog: Catalog): Purchase | RunError {
+function stockPurchase(run: RunAt<"shop">, seatId: SeatId, entry: StockEntry, catalog: Catalog): Purchase | RunError {
   const what = entry.what;
   if (what.kind === "supplies") {
     return run.supplies >= SUPPLIES_MAX ? "supplies_full" : { price: entry.price, take: (r) => ({ ...r, supplies: r.supplies + 1 }) };
   }
   if (entry.soldTo !== null) return "sold_out";
+  if (roomFor(run, seatId, catalog) < 1) return "backpack_full";
   return {
     price: entry.price,
     take: (r) => {
-      const stock = r.stage.stock!.map((e) => (e.stockId === entry.stockId ? { ...e, soldTo: seatId } : e));
+      const stock = r.stage.stock.map((e) => (e.stockId === entry.stockId ? { ...e, soldTo: seatId } : e));
       return mintItems({ ...r, stage: { ...r.stage, stock } }, seatId, [what.itemId], catalog);
     },
   };
@@ -76,12 +77,11 @@ export function priceFor(run: RunState, seatId: SeatId, price: number, catalog: 
   return paid;
 }
 
-/** not_a_choice (no shop, or no such stock), already_ready, then the
- * entry's own refusal (supplies_full, sold_out, upgrade_owned,
+/** not_a_choice (no such stock), already_ready, then the entry's own
+ * refusal (supplies_full, sold_out, backpack_full, upgrade_owned,
  * not_your_upgrade), then cannot_afford at the seat's shopPrice. */
-export function buy(run: RunAt<"loadout">, seatId: SeatId, stockId: string, catalog: Catalog): { readonly ok: true; readonly state: RunState } | { readonly ok: false; readonly error: RunError } {
+export function buy(run: RunAt<"shop">, seatId: SeatId, stockId: string, catalog: Catalog): { readonly ok: true; readonly state: RunState } | { readonly ok: false; readonly error: RunError } {
   const stock = run.stage.stock;
-  if (stock === null) return { ok: false, error: "not_a_choice" };
   if (Object.hasOwn(run.stage.ready, seatId)) return { ok: false, error: "already_ready" };
   const entry = stock.find((e) => e.stockId === stockId);
   const purchase = stockId.startsWith(UPGRADE_PREFIX)

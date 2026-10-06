@@ -1,6 +1,7 @@
 // Draft offers. An offer is PRIVATE to its seat and lives on that seat's
-// SeatRun.offers queue; the head is the one to pick. A cleared camp deals
-// each seat a standard offer; an ability may queue special ones.
+// SeatRun.offers queue; the head is the one to pick. The draft before each
+// camp deals each seat a standard offer, of single items, or of bundles of
+// two after a boss camp; an ability may queue special ones.
 //
 // Each item of a bundle rolls its rarity, then picks uniformly over that
 // rarity's sorted ids, so catalogue order never changes a draw. Upgrades are
@@ -9,7 +10,8 @@
 import type { ItemDef, Rarity } from "../content/source-def";
 import { DRAFT } from "./balance";
 import { STREAMS, seededIndex, type ItemDrawPart } from "./rng";
-import type { CampIndex, Catalog, SeatRun } from "./types";
+import { draftsBundles } from "./trail";
+import type { Catalog, RunState, SeatRun } from "./types";
 
 export type DraftOffer = { readonly kind: "standard" | "special"; readonly bundles: readonly (readonly string[])[] };
 
@@ -19,6 +21,13 @@ export type DraftOffer = { readonly kind: "standard" | "special"; readonly bundl
 export type DraftShape = { readonly options: number; readonly bundleSize: number; readonly exclusive: number; readonly rareChance: number };
 
 export const BASE_DRAFT_SHAPE: DraftShape = { options: DRAFT.options, bundleSize: DRAFT.bundleSize, exclusive: 0, rareChance: DRAFT.rareChance };
+export const BOSS_DRAFT_SHAPE: DraftShape = { ...BASE_DRAFT_SHAPE, bundleSize: DRAFT.bossBundleSize };
+
+/** The standard offer of the draft the run is at: bundles after a boss camp. */
+export function standardDraftShape(run: RunState): DraftShape {
+  const stage = run.stage;
+  return stage.tag === "draft" && run.plan !== null && draftsBundles(run.plan.length, stage.next) ? BOSS_DRAFT_SHAPE : BASE_DRAFT_SHAPE;
+}
 
 /** Item ids by rarity, sorted. */
 export type ItemPool = Readonly<Record<Rarity, readonly string[]>>;
@@ -83,8 +92,9 @@ export function drawOffer(
   return { kind, bundles };
 }
 
-/** An offer after a cleared camp, seeded per (cleared camp, seat, ordinal):
- * the ordinal counts the seat's offers from that clear. */
-export function draftOfferFor(seed: string, cleared: CampIndex, seat: SeatRun, ordinal: number, catalog: Catalog, shape: DraftShape = BASE_DRAFT_SHAPE): DraftOffer {
+/** An offer of the draft after camp `cleared` (0 before camp 1), seeded per
+ * (cleared camp, seat, ordinal): the ordinal counts the seat's offers from
+ * that draft. */
+export function draftOfferFor(seed: string, cleared: number, seat: SeatRun, ordinal: number, catalog: Catalog, shape: DraftShape = BASE_DRAFT_SHAPE): DraftOffer {
   return drawOffer(seed, (bundle, item, part) => STREAMS.draftItem(cleared, seat.seatId, ordinal, bundle, item, part), seat.characterId, catalog, shape, "standard");
 }

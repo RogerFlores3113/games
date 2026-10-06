@@ -25,6 +25,7 @@ import type { ModDef, ModId, Strength } from "../content/mods/mod-def";
 import type { PairingRule } from "../content/mods/pairings";
 import type { DraftOffer } from "./draft";
 import type { RunPlan } from "./plan";
+import type { EventId } from "../content/events/event-def";
 import type { CampSpec, RouteChoice, RouteOption } from "./route";
 import type { StockEntry } from "./shop";
 import type { VoteRecord } from "./vote";
@@ -138,11 +139,13 @@ export type KickedSeat = { readonly seat: SeatRun; readonly position: number; re
 
 export type Stage =
   | { readonly tag: "muster"; readonly ballots: PerSeat<RunLength | null>; readonly locked: PerSeat<true> } // null abstains; a locked seat's pick and ballot are final
-  | { readonly tag: "loadout"; readonly camp: CampSpec; readonly stock: readonly StockEntry[] | null; readonly ready: PerSeat<true> } // stock: the shop before a boss camp
-  | { readonly tag: "camp"; readonly camp: CampSpec; readonly attempt: AttemptState }
-  | { readonly tag: "draft"; readonly cleared: CampIndex; readonly payout: number }
+  /** Before boss camp `next`. `camp` is its spec on a replay, null on the way there. */
+  | { readonly tag: "shop"; readonly next: CampIndex; readonly camp: CampSpec | null; readonly stock: readonly StockEntry[]; readonly ready: PerSeat<true> }
+  | { readonly tag: "draft"; readonly next: CampIndex }
+  | { readonly tag: "event"; readonly next: CampIndex; readonly event: EventId; readonly ready: PerSeat<true> }
   | { readonly tag: "route"; readonly from: CampIndex; readonly options: readonly RouteOption[]; readonly ballots: PerSeat<RouteChoice | null> }
-  | { readonly tag: "event"; readonly route: RouteOption; readonly ready: PerSeat<true> }
+  | { readonly tag: "loadout"; readonly camp: CampSpec; readonly ready: PerSeat<true> }
+  | { readonly tag: "camp"; readonly camp: CampSpec; readonly attempt: AttemptState }
   | { readonly tag: "ended"; readonly result: "won" | "lost" };
 export type StageTag = Stage["tag"];
 
@@ -169,10 +172,11 @@ export type RunAction =
   | { readonly type: "pick-character"; readonly characterId: string } // muster
   | { readonly type: "vote"; readonly choice: string | null } // muster, route; null abstains
   | { readonly type: "lock-in" } // muster; needs a character and a ballot
-  | { readonly type: "equip"; readonly itemUids: readonly string[] } // loadout; replaces the equipped set
-  | { readonly type: "buy"; readonly stockId: string } // loadout before a boss camp
+  | { readonly type: "equip"; readonly itemUids: readonly string[] } // between camps; replaces the equipped set
+  | { readonly type: "discard-item"; readonly itemUid: string } // between camps
+  | { readonly type: "buy"; readonly stockId: string } // shop
   | { readonly type: "pick-bundle"; readonly bundle: number } // draft
-  | { readonly type: "ready" } // loadout, event
+  | { readonly type: "ready" } // shop, event, loadout
   | { readonly type: "use-ability"; readonly sourceKey: SourceKey; readonly targets: readonly string[] }
   | { readonly type: "skip-window" }
   | { readonly type: "whisper"; readonly targetSeatId: string; readonly cardId: string }
@@ -191,6 +195,7 @@ export type RunError =
   | "locked"
   | "not_owned_item"
   | "too_many_items"
+  | "backpack_full"
   | "sold_out"
   | "supplies_full"
   | "upgrade_owned"

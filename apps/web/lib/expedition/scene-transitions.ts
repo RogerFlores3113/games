@@ -76,25 +76,25 @@ export const TRANSITIONS: readonly TransitionCase[] = [
   {
     id: "camp-won",
     tone: "good",
-    when: (shown, next) => shown.stage.tag === "camp" && next.stage.tag === "draft",
-    copy: (_, next) => ({ title: "Camp won!", sub: next.stage.tag === "draft" ? `+${next.stage.payout} coins` : null }),
+    when: (shown, next) => shown.stage.tag === "camp" && (next.stage.tag === "draft" || next.stage.tag === "shop") && next.history.at(-1)?.status === "cleared",
+    copy: (_, next) => ({ title: "Camp won!", sub: `+${next.history.at(-1)?.coins ?? 0} coins` }),
   },
   {
     id: "camp-lost",
     tone: "bad",
-    when: (shown, next) => shown.stage.tag === "camp" && next.stage.tag === "loadout" && next.history.at(-1)?.status === "failed",
+    when: (shown, next) => shown.stage.tag === "camp" && (next.stage.tag === "loadout" || next.stage.tag === "shop") && next.history.at(-1)?.status === "failed",
     copy: (shown, next) => ({ title: "Camp lost", sub: suppliesLost(shown.supplies.count - next.supplies.count, next.supplies.count) }),
   },
   {
     id: "camp-restarted",
     tone: "neutral",
-    when: (shown, next) => shown.stage.tag === "camp" && next.stage.tag === "loadout" && next.history.at(-1)?.status === "restarted",
+    when: (shown, next) => shown.stage.tag === "camp" && (next.stage.tag === "loadout" || next.stage.tag === "shop") && next.history.at(-1)?.status === "restarted",
     copy: () => ({ title: "Camp restarts", sub: "A smaller crew, at no cost" }),
   },
   {
     id: "run-start",
     tone: "neutral",
-    when: (shown, next) => shown.stage.tag === "muster" && next.stage.tag === "loadout",
+    when: (shown, next) => shown.stage.tag === "muster" && next.stage.tag === "draft",
     copy: (_, next) => {
       const length = next.length === null ? null : RUN_LENGTH_DISPLAY[next.length];
       if (length === undefined || length === null) return { title: "Setting out", sub: null };
@@ -105,28 +105,12 @@ export const TRANSITIONS: readonly TransitionCase[] = [
   {
     id: "route-decided",
     tone: "neutral",
-    when: (shown, next) => shown.stage.tag === "route" && next.stage.tag === "event",
+    when: (shown, next) => shown.stage.tag === "route" && next.stage.tag === "loadout",
     copy: (_, next) => {
-      if (next.stage.tag !== "event") return { title: "On the trail", sub: null };
-      const camp = next.stage.next;
+      if (next.stage.tag !== "loadout") return { title: "On the trail", sub: null };
+      const camp = next.stage.camp;
       const flip = next.lastVote?.topic === "route" && next.lastVote.tied !== null;
       return { title: `Heading to ${placeName(camp.location)}`, sub: `${weatherLine(camp.weather, camp.pairing)}${flip ? "\nA coin flip decided it" : ""}` };
-    },
-  },
-  {
-    id: "shop",
-    tone: "neutral",
-    when: (shown, next) => shown.stage.tag === "event" && next.stage.tag === "loadout" && next.stage.shop !== null,
-    copy: (_, next) => ({ title: "The shop is open", sub: `Stock up before ${bossAhead(next)}` }),
-  },
-  {
-    id: "next-camp",
-    tone: "neutral",
-    hold: ROUTINE_HOLD,
-    when: (shown, next) => shown.stage.tag === "event" && next.stage.tag === "loadout",
-    copy: (_, next) => {
-      const camp = campOf(next);
-      return { title: `Camp ${camp?.index ?? "?"}${next.campCount === null ? "" : ` of ${next.campCount}`}`, sub: camp === null ? null : `Pack for ${placeName(camp.location)}` };
     },
   },
   {
@@ -179,21 +163,13 @@ function suppliesLost(lost: number, left: number): string {
 function campOf(view: ExpeditionView): { index: number; location: string; weather: string; pairing: string | null } | null {
   const stage = view.stage;
   if (stage.tag === "loadout" || stage.tag === "camp") return stage.camp;
-  if (stage.tag === "event") return stage.next;
+  if (stage.tag === "shop") return stage.camp;
   return null;
 }
 
 function plannedTier(view: ExpeditionView): string | null {
   const camp = campOf(view);
   return camp === null ? null : (view.plan.find((p) => p.at === camp.index)?.tier ?? null);
-}
-
-/** "the Tiger", "the temple", or "the boss" while it is still hidden. */
-function bossAhead(view: ExpeditionView): string {
-  const camp = campOf(view);
-  const planned = camp === null ? undefined : view.plan.find((p) => p.at === camp.index);
-  if (planned?.tier === "temple") return "the temple";
-  return planned?.bossId != null ? placeName(planned.bossId) : "the boss";
 }
 
 function attemptOf(view: ExpeditionView): number {

@@ -372,7 +372,7 @@ describe("muster cards", () => {
     const narrowest = Math.min(...boxes.map((b) => b.w));
     const cards = buildTrailModel(
       {
-        game: { yourSeatId: null, runStatus: "in_progress", length: null, campCount: null, purse: 0, supplies: { count: 3, max: 4 }, plan: [], seats: [], kicked: [], yourAbilities: [], history: [], lastVote: null, stage: { tag: "muster", ballots: [], lockedSeatIds: [] } },
+        game: { yourSeatId: null, runStatus: "in_progress", length: null, campCount: null, purse: 0, supplies: { count: 3, max: 4 }, plan: [], seats: [], kicked: [], yourAbilities: [], yourItemSlots: 2, history: [], lastVote: null, stage: { tag: "muster", ballots: [], lockedSeatIds: [] } },
         roomSeats: [],
         hostSeatId: null,
       },
@@ -411,7 +411,7 @@ describe("muster run lengths", () => {
   it("fit every length's summary on its card in full", () => {
     const muster = buildTrailModel(
       {
-        game: { yourSeatId: null, runStatus: "in_progress", length: null, campCount: null, purse: 0, supplies: { count: 3, max: 4 }, plan: [], seats: [], kicked: [], yourAbilities: [], history: [], lastVote: null, stage: { tag: "muster", ballots: [], lockedSeatIds: [] } },
+        game: { yourSeatId: null, runStatus: "in_progress", length: null, campCount: null, purse: 0, supplies: { count: 3, max: 4 }, plan: [], seats: [], kicked: [], yourAbilities: [], yourItemSlots: 2, history: [], lastVote: null, stage: { tag: "muster", ballots: [], lockedSeatIds: [] } },
         roomSeats: [],
         hostSeatId: null,
       },

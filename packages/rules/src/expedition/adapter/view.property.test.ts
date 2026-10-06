@@ -138,7 +138,7 @@ describe("property: whole-run per-seat leak checker (COMM-03/ENG-03)", () => {
       const state: RunState = {
         ...base,
         seats: base.seats.map((seat) => ({ ...seat, offers: [draftOfferFor(DETERMINISTIC_SEED, campIndex(2), seat, 0, CATALOG)] })),
-        stage: { tag: "draft", cleared: campIndex(2), payout: 5 },
+        stage: { tag: "draft", next: campIndex(3) },
       };
       expect(state.seats.every((seat) => seat.offers.length === 1)).toBe(true);
       assertNoLeaksAt(state, DETERMINISTIC_SEED);

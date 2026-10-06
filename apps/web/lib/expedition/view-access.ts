@@ -41,12 +41,12 @@ export function focusCampIndex(view: ExpeditionView): number | null {
     case "loadout":
     case "camp":
       return stage.camp.index;
+    case "shop":
     case "draft":
-      return stage.cleared + 1;
+    case "event":
+      return stage.next;
     case "route":
       return stage.options[0]?.next.index ?? null;
-    case "event":
-      return stage.next.index;
     case "muster":
     case "ended":
       return null;

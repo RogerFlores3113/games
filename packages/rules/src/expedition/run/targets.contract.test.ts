@@ -104,8 +104,8 @@ function richState(playerCount: 3 | 4 | 5): RunState {
 function routeState(playerCount: 3 | 4 | 5): RunState {
   const seatIds = Array.from({ length: playerCount }, (_, i) => `p${i}`);
   const base = setupRun({ seatIds, seed: SEED, catalog: CATALOG });
-  const draft = { ...base, stage: { tag: "draft", cleared: campIndex(1), payout: 5 } } as RunAt<"draft">;
-  return { ...base, stage: { tag: "route", from: campIndex(1), options: routeOptions(draft, CATALOG), ballots: {} } };
+  const draft = { ...base, stage: { tag: "draft", next: campIndex(2) } } as RunAt<"draft">;
+  return { ...base, stage: { tag: "route", from: campIndex(1), options: routeOptions(draft, campIndex(1), CATALOG), ballots: {} } };
 }
 
 describe("target-kind registry", () => {

@@ -32,6 +32,7 @@ export const ExpeditionErrorCodeSchema = z.enum([
   "locked",
   "not_owned_item",
   "too_many_items",
+  "backpack_full",
   "sold_out",
   "supplies_full",
   "upgrade_owned",

@@ -320,8 +320,7 @@ function toStockView(entry: StockEntry, price: number): ExpeditionStockView {
 }
 
 /** Prices are what the viewer would pay (the composed shopPrice). */
-function toShopView(state: RunState, stock: readonly StockEntry[] | null, ownSeat: SeatRun | undefined, catalog: Catalog): ExpeditionShopView | null {
-  if (stock === null) return null;
+function toShopView(state: RunState, stock: readonly StockEntry[], ownSeat: SeatRun | undefined, catalog: Catalog): ExpeditionShopView {
   const price = (listed: number): number => (ownSeat === undefined ? listed : priceFor(state, ownSeat.seatId, listed, catalog));
   return {
     stock: stock.map((entry) => toStockView(entry, price(entry.price))),
@@ -370,7 +369,6 @@ function toPreviewView(state: RunState, spec: CampSpec, catalog: Catalog, survey
     location: spec.location,
     weather: spec.weather,
     pairing: pairingOf(spec, catalog),
-    event: spec.event,
     slotKinds: Array.from(slotKindsFor(state, spec, catalog)),
     bossId: boss === null ? null : visibleBossId(state, boss),
     shop: boss !== null,
@@ -519,13 +517,19 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
   switch (stage.tag) {
     case "muster":
       return { tag: "muster", ballots: toBallotViews(state, stage.ballots), lockedSeatIds: readySeatIds(state, stage.locked) };
+    case "shop":
+      return {
+        tag: "shop",
+        next: stage.next,
+        camp: stage.camp === null ? null : toPreviewView(state, stage.camp, catalog, surveyOf(stage.camp)),
+        shop: toShopView(state, stage.stock, ownSeat, catalog),
+        readySeatIds: readySeatIds(state, stage.ready),
+      };
     case "loadout":
       return {
         tag: "loadout",
         camp: toPreviewView(state, stage.camp, catalog, surveyOf(stage.camp)),
         mods: toModViews(state, seatId, rules, catalog),
-        yourSlots: ownSeat === undefined ? 0 : rules.itemSlots(state, seatId),
-        shop: toShopView(state, stage.stock, ownSeat, catalog),
         readySeatIds: readySeatIds(state, stage.ready),
       };
     case "camp":
@@ -538,8 +542,9 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
     case "draft":
       return {
         tag: "draft",
-        cleared: stage.cleared,
-        payout: stage.payout,
+        next: stage.next,
+        cleared: stage.next - 1,
+        payout: state.history.find((result) => result.camp === stage.next - 1 && result.status === "cleared")?.coins ?? 0,
         yourOffer: ownSeat?.offers[0] === undefined ? null : { kind: ownSeat.offers[0].kind, bundles: ownSeat.offers[0].bundles.map((bundle) => Array.from(bundle)) },
         pendingSeatIds: state.seats.filter((seat) => seat.offers.length > 0).map((seat) => seat.seatId),
       };
@@ -550,12 +555,7 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
         ballots: toBallotViews(state, stage.ballots),
       };
     case "event":
-      return {
-        tag: "event",
-        event: stage.route.next.event ?? "",
-        next: toPreviewView(state, stage.route.next, catalog, surveyOf(stage.route.next)),
-        readySeatIds: readySeatIds(state, stage.ready),
-      };
+      return { tag: "event", event: stage.event, next: stage.next, readySeatIds: readySeatIds(state, stage.ready) };
     case "ended":
       return { tag: "ended", result: stage.result };
   }
@@ -582,6 +582,7 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
     seats: state.seats.map((seat) => toSeatView(state, seat, seatId, rules, catalog)),
     kicked: state.kicked.map((k) => ({ seatId: k.seat.seatId, characterId: k.seat.characterId, upgradeId: k.seat.upgradeId, back: k.back })),
     yourAbilities: ownSeat !== undefined ? toAbilityViews(state, ownSeat, catalog) : [],
+    yourItemSlots: ownSeat === undefined ? 0 : rules.itemSlots(state, seatId),
     history: state.history.map(toCampResultView),
     lastVote:
       lastVote === null

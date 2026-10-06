@@ -87,7 +87,7 @@ function makeRun(input: {
   const spec = campSpecAt(seed, "standard", campIndex(2), CATALOG);
   const stage: RunState["stage"] =
     input.camp === null
-      ? { tag: "loadout", camp: spec, stock: null, ready: {} }
+      ? { tag: "loadout", camp: spec, ready: {} }
       : {
           tag: "camp",
           camp: spec,

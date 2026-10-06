@@ -119,7 +119,7 @@ test.describe("Expedition characters and abilities", () => {
 
       rw.current = (g: Game) => ({
         ...g,
-        stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: { kind: "standard", bundles: [["whetstone", "parrot"], ["bait", "puffball"], ["parrot"]] }, pendingSeatIds: [g.yourSeatId] },
+        stage: { tag: "draft", next: 2, cleared: 1, payout: 8, yourOffer: { kind: "standard", bundles: [["whetstone", "parrot"], ["bait", "puffball"], ["parrot"]] }, pendingSeatIds: [g.yourSeatId] },
         history: [{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", coins: 8 }],
       });
       await page.reload();
@@ -237,7 +237,8 @@ test.describe("Expedition characters and abilities", () => {
     test.setTimeout(300_000);
     const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
     try {
-      for (const [i, id] of ["jd", "explorer", "leader"].entries()) await musterPick(pages[i]!, id);
+      // Not J.D. for the host: Lucky Start's item and the first draft's would fill both slots.
+      for (const [i, id] of ["explorer", "jd", "leader"].entries()) await musterPick(pages[i]!, id);
       await readyAll(pages);
       await giveRopeLadder(page);
 
@@ -269,7 +270,8 @@ test.describe("Expedition characters and abilities", () => {
     test.setTimeout(300_000);
     const { pages, contexts } = await startExpeditionGame(browser, page, ["Roger", "Bianca", "Sam"]);
     try {
-      for (const [i, id] of ["jd", "explorer", "leader"].entries()) await musterPick(pages[i]!, id);
+      // Not J.D. for the host: Lucky Start's item and the first draft's would fill both slots.
+      for (const [i, id] of ["explorer", "jd", "leader"].entries()) await musterPick(pages[i]!, id);
       await readyAll(pages);
       await giveRopeLadder(page);
       expect(await playUntilRescue(page, pages), "an objective failed and the Rope Ladder's holder was asked to rescue it").toBe(true);

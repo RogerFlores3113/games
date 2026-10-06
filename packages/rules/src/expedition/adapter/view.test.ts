@@ -15,7 +15,7 @@ import { createRun } from "../run/lifecycle";
 import { campIndex } from "../run/plan";
 import { applyRunAction } from "../run/stages/registry";
 import { defineItem, itemAbility } from "../content/source-def";
-import { advanceTo, enumerateLegalRunActions, setupRun, testCatalog } from "../run/run-test-support";
+import { advanceTo, enumerateLegalRunActions, setupRun, setupShop, testCatalog } from "../run/run-test-support";
 import { CATALOG } from "../run/catalog";
 import type { RunState } from "../run/types";
 import type { CampState } from "../state";
@@ -54,27 +54,31 @@ describe("toExpeditionPlayerView", () => {
     const run: RunState = {
       ...base,
       seats: base.seats.map((s) => (s.seatId === "p0" ? { ...s, offers: [offer, queued] } : s)),
-      stage: { tag: "draft", cleared: campIndex(2), payout: 6 },
+      history: [{ camp: campIndex(2), attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 6 }],
+      stage: { tag: "draft", next: campIndex(3) },
     };
 
     const own = toExpeditionPlayerView(run, "p0", CATALOG);
     const other = toExpeditionPlayerView(run, "p1", CATALOG);
 
-    expect(own.stage).toEqual({ tag: "draft", cleared: 2, payout: 6, yourOffer: { kind: "standard", bundles: offer.bundles.map((b) => [...b]) }, pendingSeatIds: ["p0"] });
-    expect(other.stage).toEqual({ tag: "draft", cleared: 2, payout: 6, yourOffer: null, pendingSeatIds: ["p0"] });
+    expect(own.stage).toEqual({ tag: "draft", next: 3, cleared: 2, payout: 6, yourOffer: { kind: "standard", bundles: offer.bundles.map((b) => [...b]) }, pendingSeatIds: ["p0"] });
+    expect(other.stage).toEqual({ tag: "draft", next: 3, cleared: 2, payout: 6, yourOffer: null, pendingSeatIds: ["p0"] });
+    expect(toExpeditionPlayerView({ ...run, history: [], stage: { tag: "draft", next: campIndex(1) } }, "p1", CATALOG).stage).toMatchObject({ next: 1, cleared: 0, payout: 0 });
     expect(JSON.stringify(own).includes(seed)).toBe(false);
     expect(JSON.stringify(own).includes(JSON.stringify(queued.bundles))).toBe(false);
     for (const seat of other.seats) expect(Object.keys(seat).sort()).toEqual(["characterId", "items", "seatId", "upgradeId", "usage"]);
   });
 
-  it("loadout: previews the camp, lists the seats that readied, and closes the shop before a plain camp", () => {
+  it("loadout: previews the camp, lists the seats that readied; the viewer's slots are on the view", () => {
     const run = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 2 });
     const readied = applyRunAction(run, "p1", { type: "ready" }, CATALOG);
     if (!readied.ok) throw new Error(readied.error);
 
     const view = toExpeditionPlayerView(readied.state, "p0", CATALOG);
 
-    expect(view.stage).toMatchObject({ tag: "loadout", yourSlots: 2, shop: null, readySeatIds: ["p1"], camp: { index: 2, shop: false } });
+    expect(view.stage).toMatchObject({ tag: "loadout", readySeatIds: ["p1"], camp: { index: 2, shop: false } });
+    expect(Object.keys(view.stage).sort()).toEqual(["camp", "mods", "readySeatIds", "tag"]);
+    expect(view.yourItemSlots).toBe(2);
     expect([view.length, view.campCount, view.purse, view.supplies]).toEqual(["standard", 6, 0, { count: 3, max: 4 }]);
     expect(view.plan).toEqual([{ at: 3, tier: "animal", bossId: null }, { at: 6, tier: "temple", bossId: "temple" }]);
   });
@@ -101,13 +105,13 @@ describe("toExpeditionPlayerView", () => {
     expect(pairedView).toMatchObject({ camp: { pairing: "fair" }, mods: [{ id: "thunderstorm" }, { id: "fair" }] });
   });
 
-  it("loadout before a boss camp: the shared stock, and only the viewer's own character's upgrades while it has none", () => {
-    const run = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3, characters: { p0: "explorer", p1: "leader" }, upgrades: { p1: "leader.delegate" } });
-    const stock = run.stage.tag === "loadout" ? run.stage.stock! : [];
+  it("the shop before a boss camp: the shared stock, and only the viewer's own character's upgrades while it has none", () => {
+    const run = setupShop({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3, characters: { p0: "explorer", p1: "leader" }, upgrades: { p1: "leader.delegate" } });
+    const stock = run.stage.stock;
     const own = toExpeditionPlayerView(run, "p0", CATALOG);
 
-    expect(own.stage).toMatchObject({ tag: "loadout", camp: { index: 3, shop: true } });
-    expect(own.stage.tag === "loadout" && own.stage.shop).toEqual({
+    expect(own.stage).toMatchObject({ tag: "shop", next: 3, camp: null, readySeatIds: [] });
+    expect(own.stage.tag === "shop" && own.stage.shop).toEqual({
       stock: stock.map((e) => ({ stockId: e.stockId, what: e.what, price: e.price, soldTo: null })),
       yourUpgrades: [
         { stockId: "upgrade:explorer.second-wind", upgradeId: "explorer.second-wind", price: 8 },
@@ -117,8 +121,8 @@ describe("toExpeditionPlayerView", () => {
     });
     expect(stock.map((e) => e.stockId)).toEqual(["supplies", "item0", "item1", "item2"]);
     const upgraded = toExpeditionPlayerView(run, "p1", CATALOG);
-    expect(upgraded.stage.tag === "loadout" && upgraded.stage.shop!.yourUpgrades).toEqual([]);
-    expect(toExpeditionPlayerView(run, "spectator", CATALOG).stage).toMatchObject({ yourSlots: 0, shop: { yourUpgrades: [] } });
+    expect(upgraded.stage.tag === "shop" && upgraded.stage.shop.yourUpgrades).toEqual([]);
+    expect(toExpeditionPlayerView(run, "spectator", CATALOG)).toMatchObject({ yourItemSlots: 0, stage: { shop: { yourUpgrades: [] } } });
   });
 
   it("muster votes: every seat's ballot is public, and the resolved length vote is reported with its tally", () => {
@@ -155,7 +159,20 @@ describe("toExpeditionPlayerView", () => {
       tied: null,
       winner: "long",
     });
-    expect([view.length, view.campCount, view.stage.tag]).toEqual(["long", 8, "loadout"]);
+    expect([view.length, view.campCount, view.stage.tag]).toEqual(["long", 8, "draft"]);
+  });
+
+  it("event: names the event and the camp it comes before, and who has readied", () => {
+    const base = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 2 });
+    const run: RunState = { ...base, stage: { tag: "event", next: campIndex(2), event: "event", ready: { p2: true } } };
+    expect(toExpeditionPlayerView(run, "p0", CATALOG).stage).toEqual({ tag: "event", event: "event", next: 2, readySeatIds: ["p2"] });
+  });
+
+  it("shop on a replay previews the camp it reopens", () => {
+    const base = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3 });
+    const spec = base.stage.tag === "loadout" ? base.stage.camp : null;
+    const run: RunState = { ...base, stage: { tag: "shop", next: campIndex(3), camp: spec, stock: [], ready: {} } };
+    expect(toExpeditionPlayerView(run, "p0", CATALOG).stage).toMatchObject({ tag: "shop", next: 3, camp: { index: 3, shop: true }, shop: { stock: [] } });
   });
 
   it("ended: the run result shows and the stage carries nothing else", () => {

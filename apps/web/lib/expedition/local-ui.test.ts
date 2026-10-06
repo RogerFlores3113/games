@@ -71,11 +71,12 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     ],
     kicked: [],
     yourAbilities: [EXPLORER, MONKEY, BAIT, PARROT],
+    yourItemSlots: 2,
     history: [],
     lastVote: null,
     stage: {
       tag: "camp",
-      camp: { index: 1, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false, survey: null },
+      camp: { index: 1, location: "jungle", weather: "fair", pairing: null, slotKinds: [], bossId: null, shop: false, survey: null },
       mods: [],
       attempt: {
       attemptNumber: 1,

@@ -66,7 +66,7 @@ describe("botMove", () => {
   it("readies in the event between camps", () => {
     const loadout = DEV_SHORTCUTS["jump-to-camp"].apply(crewed(), { length: "standard", camp: 2, stage: "loadout" }, CATALOG);
     const next = (loadout.stage as Extract<RunState["stage"], { tag: "loadout" }>).camp;
-    const event: RunState = { ...loadout, stage: { tag: "event", route: { id: "a", next, reroll: 0, swapBoss: null }, ready: { a: true } } };
+    const event: RunState = { ...loadout, stage: { tag: "event", next: next.index, event: "event", ready: { a: true } } };
     expect(botMove(event, ["a"], CATALOG)).toBeNull();
     expect(botMove(event, ["a", "b"], CATALOG)).toEqual({ seatId: "b", request: { type: "ready" } });
   });

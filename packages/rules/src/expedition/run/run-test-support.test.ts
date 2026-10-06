@@ -9,7 +9,7 @@ import { attemptOf } from "./attempt";
 import { createRun, runStatus } from "./lifecycle";
 import { campIndex } from "./plan";
 import { applyRunAction } from "./stages/registry";
-import { advanceTo, driveRun, enumerateLegalRunActions, replayRun, setupRun, testCatalog } from "./run-test-support";
+import { advanceTo, driveRun, enumerateLegalRunActions, replayRun, setupRun, setupShop, testCatalog } from "./run-test-support";
 import type { RunState } from "./types";
 import { currentWindow } from "./windows";
 
@@ -151,7 +151,7 @@ describe("enumerateLegalRunActions", () => {
     const run: RunState = {
       ...base,
       seats: base.seats.map((s) => (s.seatId === "p0" ? { ...s, offers: [{ kind: "standard", bundles: [["item-passive"], ["item-between"]] }] } : s)),
-      stage: { tag: "draft", cleared: campIndex(1), payout: 5 },
+      stage: { tag: "draft", next: campIndex(2) },
     };
     const candidates = enumerateLegalRunActions(run, catalog);
     expect(candidates.map((c) => [c.seatId, c.action])).toEqual([
@@ -160,8 +160,8 @@ describe("enumerateLegalRunActions", () => {
     ]);
   });
 
-  it("at a shop loadout, offers the readies, an equip of the newest items when it changes the set, and every buy", () => {
-    const run = setupRun({ seatIds: SEAT_IDS, seed: "enum-shop", catalog, camp: 3, purse: 30, items: { p0: ["item-passive", "item-passive", "item-between"] } });
+  it("at a shop, offers the readies, an equip of the newest items when it changes the set, and every buy", () => {
+    const run = setupShop({ seatIds: SEAT_IDS, seed: "enum-shop", catalog, camp: 3, purse: 30, items: { p0: ["item-passive", "item-passive", "item-between"] } });
     const candidates = enumerateLegalRunActions(run, catalog);
     expect(candidates.filter((c) => c.action.type === "equip").map((c) => [c.seatId, c.action])).toEqual([["p0", { type: "equip", itemUids: ["it1", "it2"] }]]);
     expect(candidates.filter((c) => c.seatId === "p1" && c.action.type === "buy").map((c) => c.action)).toEqual(

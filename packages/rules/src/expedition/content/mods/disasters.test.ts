@@ -324,7 +324,7 @@ describe("Monsoon", () => {
       if (!result.ok) throw new Error(result.error);
       run = result.state;
     }
-    expect(run.stage.tag).toBe("draft");
+    expect(run.stage.tag).toBe("shop");
     expect(run.history.at(-1)).toEqual({ camp: 2, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 6 });
   });
 });

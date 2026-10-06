@@ -123,10 +123,10 @@ describe("autoPassAbsentSeats: Expedition", () => {
   }
 
   /** The room's auto-pass alarm firing, a moment apart, until nobody absent is due. */
-  function alarms(state: RoomState): RoomState {
+  function alarms(state: RoomState, from = DUE): RoomState {
     let current = state;
     for (let i = 0; i < 10; i++) {
-      const next = autoPassAbsentSeats(current, DUE + i);
+      const next = autoPassAbsentSeats(current, from + i);
       if (next === current) return current;
       current = next;
     }
@@ -135,7 +135,7 @@ describe("autoPassAbsentSeats: Expedition", () => {
 
   const run = (state: RoomState) => state.game as RunState;
 
-  it("picks a character, abstains and locks in for a seat that dropped at the muster, then readies it into camp 1", () => {
+  it("picks a character, abstains, locks in and drafts for a seat that dropped at the muster, then readies it into camp 1", () => {
     let state = markConnected(expeditionRoom(), "e2", false, LEFT_AT);
     state = act(state, "e0", { type: "pick-character", characterId: "leader" }, 20);
     state = act(state, "e1", { type: "pick-character", characterId: "hermit" }, 21);
@@ -146,12 +146,16 @@ describe("autoPassAbsentSeats: Expedition", () => {
     expect(run(state).stage.tag).toBe("muster");
 
     state = alarms(state);
-    expect(run(state).stage.tag).toBe("loadout");
+    expect(run(state).stage.tag).toBe("draft");
     expect(run(state).seats.map((seat) => seat.characterId)).toEqual(["leader", "hermit", "jd"]);
+    expect(run(state).seats.map((seat) => seat.offers.length)).toEqual([1, 1, 0]);
+    state = act(state, "e0", { type: "pick-bundle", bundle: 0 }, 26);
+    state = act(state, "e1", { type: "pick-bundle", bundle: 0 }, 27);
+    expect(run(state).stage.tag).toBe("loadout");
 
-    state = act(state, "e0", { type: "ready" }, 26);
-    state = act(state, "e1", { type: "ready" }, 27);
-    state = alarms(state);
+    state = act(state, "e0", { type: "ready" }, 28);
+    state = act(state, "e1", { type: "ready" }, 29);
+    state = alarms(state, DUE + 10);
     expect(run(state).stage.tag).toBe("camp");
   });
 

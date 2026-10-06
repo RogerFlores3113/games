@@ -122,7 +122,7 @@ export interface MusterCrewRow {
 /** A camp as a route card or the loadout shows it. */
 export interface CampPreview {
   title: string;
-  /** A boss camp: its loadout opens the shop. */
+  /** A boss camp: the shop opens before it. */
   shop: boolean;
   location: string;
   weather: string;
@@ -133,8 +133,6 @@ export interface CampPreview {
   weatherId: string;
   /** What the location and weather make together; null for none. */
   pairing: string | null;
-  /** The event's name on the way there; null at camp 1. */
-  event: string | null;
   /** "3 cards to win", "Win 2 in order", "A trick count". */
   objectives: string[];
   /** "Animal boss", "The Temple"; null for a plain camp. */
@@ -197,9 +195,12 @@ export type TrailPanel =
   | { kind: "muster"; characters: CharacterCard[]; lengths: LengthOption[]; crew: MusterCrewRow[]; locked: string }
   | { kind: "draft"; draft: DraftPanel }
   | { kind: "route"; options: RouteCard[] }
-  | { kind: "event"; name: string; text: string; next: CampPreview }
-  /** `gear` is null for a spectator; `shop` is open before a boss camp. */
-  | { kind: "loadout"; next: CampPreview; gear: Gear | null; shop: ShopPanel | null };
+  /** `nextTitle`: "Camp 2 of 6", the camp the event comes before. */
+  | { kind: "event"; name: string; text: string; nextTitle: string }
+  /** The loadout, or the shop before a boss camp (`shop` set). `next` is
+   * null at a shop whose route is not voted yet; `title` heads the panel.
+   * `gear` is null for a spectator. */
+  | { kind: "loadout"; title: string; next: CampPreview | null; gear: Gear | null; shop: ShopPanel | null };
 
 /** One of your live sources: `sourceKey` is what you act through, and
  * `sourceId` the def it names. */
@@ -310,7 +311,6 @@ export function campPreview(view: View, camp: ExpeditionCampPreviewView): CampPr
     backdrop,
     weatherId: camp.weather,
     pairing: camp.pairing === null ? null : modDisplayName(camp.pairing),
-    event: camp.event === null ? null : (EVENT_DISPLAY[camp.event]?.name ?? modName(camp.event)),
     objectives: objectiveLabels(camp.slotKinds),
     boss: bossLabel(view, camp.index),
     bossId,
@@ -464,7 +464,7 @@ const POWER_ACTION: Readonly<Record<string, string>> = { businessman: "Sell an i
 
 function buildPowers(view: View, ui: LocalUiState): PowerButton[] {
   const stage = view.stage.tag;
-  if (stage !== "loadout" && stage !== "draft" && stage !== "route") return [];
+  if (stage !== "shop" && stage !== "loadout" && stage !== "draft" && stage !== "route") return [];
   const reroll = rerollAbility(view);
   return view.yourAbilities
     .filter((a) => a.usableNow && a.sourceKey !== reroll?.sourceKey)
@@ -505,16 +505,24 @@ function pickOf(ui: LocalUiState, view: View, entity: PickEntity, rawId: string)
   return choiceFor(ui, view, entity, rawId) !== null && !isPicked(ui, entity, rawId);
 }
 
-function buildLoadout(server: SceneServerInput, stage: Extract<View["stage"], { tag: "loadout" }>, ui: LocalUiState): TrailPanel {
+function campTitle(view: View, index: number): string {
+  return view.campCount === null ? `Camp ${index}` : `Camp ${index} of ${view.campCount}`;
+}
+
+/** The loadout, or the shop before a boss camp: your gear beside the camp
+ * ahead (once its route is chosen) and the shop's stock. */
+function buildLoadout(server: SceneServerInput, stage: Extract<View["stage"], { tag: "loadout" | "shop" }>, ui: LocalUiState): TrailPanel {
   const view = server.game;
   const you = view.seats.find((s) => s.seatId === view.yourSeatId);
   const ready = you !== undefined && stage.readySeatIds.includes(you.seatId);
+  const next = stage.camp === null ? null : campPreview(view, stage.camp);
   return {
     kind: "loadout",
-    next: campPreview(view, stage.camp),
-    gear: you === undefined ? null : aimGear(view, ui, buildGear(you, stage.yourSlots, ready, ui.packPage)),
+    title: stage.tag === "shop" && next === null ? `Before camp ${stage.next}` : (next?.title ?? ""),
+    next,
+    gear: you === undefined ? null : aimGear(view, ui, buildGear(you, view.yourItemSlots, ready, ui.packPage)),
     shop:
-      stage.shop === null
+      stage.tag !== "shop"
         ? null
         : buildShop({ shop: stage.shop, purse: view.purse, supplies: view.supplies, you, ready, nameOf: (seatId) => (seatId === view.yourSeatId ? "you" : nameOf(server, seatId)) }),
   };
@@ -532,12 +540,15 @@ function buildPanel(server: SceneServerInput, ui: LocalUiState): TrailPanel {
       return { kind: "route", options: buildRoutes(server, stage) };
     case "event": {
       const event = EVENT_DISPLAY[stage.event];
-      return { kind: "event", name: event?.name ?? modName(stage.event), text: event?.text ?? "", next: campPreview(view, stage.next) };
+      return { kind: "event", name: event?.name ?? modName(stage.event), text: event?.text ?? "", nextTitle: campTitle(view, stage.next) };
     }
+    case "shop":
     case "loadout":
       return buildLoadout(server, stage, ui);
-    case "camp":
-      return { kind: "loadout", next: campPreview(view, stage.camp), gear: null, shop: null };
+    case "camp": {
+      const next = campPreview(view, stage.camp);
+      return { kind: "loadout", title: next.title, next, gear: null, shop: null };
+    }
     case "ended":
       return { kind: "draft", draft: { kind: "none", text: "" } };
   }
@@ -558,6 +569,7 @@ function crewStatus(view: View, seatId: string): CrewRow["status"] {
       return stage.ballots.some((b) => b.seatId === seatId) ? "voted" : "voting";
     case "muster":
       return stage.lockedSeatIds.includes(seatId) ? "ready" : "waiting";
+    case "shop":
     case "loadout":
     case "event":
       return stage.readySeatIds.includes(seatId) ? "ready" : "waiting";
@@ -614,7 +626,7 @@ function buildReady(view: View): TrailModel["ready"] {
     const chosen = you.characterId !== null && stage.ballots.some((b) => b.seatId === you.seatId);
     return { objectId: READY_ID, label: "Lock in", state: chosen ? "open" : "disabled" };
   }
-  if (stage.tag !== "loadout" && stage.tag !== "event") return null;
+  if (stage.tag !== "loadout" && stage.tag !== "event" && stage.tag !== "shop") return null;
   return { objectId: READY_ID, label: stage.tag === "loadout" ? "Set out" : "Continue", state: stage.readySeatIds.includes(view.yourSeatId) ? "done" : "open" };
 }
 
@@ -637,13 +649,13 @@ function choiceGlyph(topic: "length" | "route", choice: string): string {
   return String(RUN_LENGTH_DISPLAY[choice as keyof typeof RUN_LENGTH_DISPLAY]?.camps ?? choice.charAt(0));
 }
 
-/** The route vote on the event that follows it; the length vote on camp 1's
- * first loadout. */
+/** The route vote on the loadout it chose, until that camp is first played;
+ * the length vote on camp 1's first loadout. */
 function buildVote(view: View): VoteResult | null {
   const vote = view.lastVote;
   if (vote === null) return null;
   const stage = view.stage;
-  const showsRoute = vote.topic === "route" && stage.tag === "event";
+  const showsRoute = vote.topic === "route" && stage.tag === "loadout" && !view.history.some((h) => h.camp === stage.camp.index);
   const showsLength = vote.topic === "length" && stage.tag === "loadout" && view.history.length === 0;
   if (!showsRoute && !showsLength) return null;
   const label = (choice: string) => choiceLabel(vote.topic, choice);
