@@ -2733,3 +2733,109 @@ How each of the nine fits (for unit 13):
   vote and an objective's hover, both loadouts, the inventory empty, with
   items and hover, full, the discard confirm, a full backpack at the draft
   and the shop, the Pack Rat's three slots, a sale aimed into the window).
+
+### Implementation notes (batch 6 unit F)
+
+- The kit bar (decision 14, and the lead's review of unit E). One model,
+  `lib/expedition/kit-bar-model.ts` (`buildKitBar(view, ui)`: one entry per
+  item slot, empty slots as null, then the powers: the character's, its
+  further powers, the upgrade, and a camp's grant such as the temple's
+  Skip), drawn by `phaser/draw/draw-kit-bar.ts` in both scenes. Items sit in
+  18 px slots sunk into a stitched leather strip (dark rim above and left,
+  lit below and right, Minecraft's inventory look); powers sit on 18 px
+  tiles raised out of a stone strip (lit above and left). The header reads
+  "Kit" with an arrow; a click pops the bar out ("Your kit"), widening each
+  row to 90 px for the name and what is left (`LocalUiState.kitOpen`, kept
+  across scenes), over one dark backing so nothing behind shows between the
+  strips. Hover names the source in the tooltip strip: title, rules, and
+  the live uses in place of the limit badge (`liveRulesText`: "Once per
+  camp", "Used this camp", "Not earned"), with why it can't be used now.
+  A usable entry glows (the turn colour, pulsing); one being aimed has a
+  solid sun ring; a spent one is dimmed. A click uses it: in camp it starts
+  targeting as the old kit rows did, between camps it is the power button's
+  `onPower`, and either way the bar folds. In camp the bar stands in the
+  `kit` zone, items and powers side by side (two columns, room for the Pack
+  Rat's three slots, its backpack and four powers); between camps it is one
+  column at the left edge (`TRAIL_ZONES.kit`, 2..24), the powers under the
+  items. Deviation: to make room, every trail zone that began at x 16 (panel,
+  tooltip, item bar, route and draft rows) begins at 24, 8 px narrower; the
+  trail map keeps its place above the bar. Ids: in camp a kit entry keeps
+  the old kit row's `source:<key>` (every spec and the tour click those),
+  between camps `kit:<key>`; the header is `kit-toggle`. The muster has no
+  kit bar.
+- The pre-camp item bar is "Item slots" with "X of N", the slot tiles and the
+  backpack button only; the Explorer area, its tiles (`drawKitTile`) and
+  `ItemBar.explorer` are deleted, and the bar's plate is only as wide as
+  its contents (`itemBarLayout(...).plate`). The power buttons beside Ready
+  stay (Quartermaster, the sale): the kit bar is a second way to the same
+  powers, not their only one.
+- The hand boards (decision 15) are gone: `drawBoard`, the seven
+  `tables/board-<id>.png`, their registry entries, prompt specs and credits,
+  and `TABLE_ROWS`' board rows (`boardArtAt`, `tableSpan().boardTop`). The
+  hand keeps its height (`HAND_CARD_Y` 300): the table's foot runs behind it.
+  The old "Your kit" rows (`drawKit`) are deleted with them; `drawYouAndKit`
+  is `drawYouPanel`.
+- The trail map in camp (decision 16). The camp label (`map`) toggles
+  `LocalUiState.mapOpen`; the camp hangs the parchment trail map
+  (`drawTrailMap`, the pre-camp one, now exported, at the trail zone) over
+  the crowd, the label lit sun-orange while it is shown; Esc closes it too,
+  and leaving the camp drops it (`reconcileLocalUi`). While the map hangs the
+  plates, the whispers, the boss and its caption are not drawn, so nothing
+  under it peeks out. The stop being played is captioned "here" in camp
+  ("try 2" on a replay), "next" between camps. `TrailStop` and `buildTrail`
+  moved to `trail-stops.ts` so the camp model can use them without a cycle.
+  Between camps the map is always on screen, so the label only reads there
+  (`TopBar.map` is true only in camp). The "Map of the run" dialog
+  (`ExpeditionMapModal`), `progress-map.ts`, the store's `openMap` and the
+  board's `onOpenMap` are deleted; nothing else used them.
+- The Pack Rat's backpack in camp (decision 17). With Pack Animal, the kit
+  bar's item column ends in the backpack icon (`backpack`), dim until the
+  server says Pack Animal is usable (between tricks, once per camp), then
+  glowing; a click starts Pack Animal, whose two item steps open the same
+  inventory window over the table (`SceneModel.inventory`, from
+  `buildInventory`, open only while a step picks an item). The camp scene
+  owns an `InventoryWindow` (its veil from under the prompt, the new
+  `veilTop` argument) and, while it is open, draws only the backdrop, table,
+  top bar, prompt and the window, so nothing under the veil takes a click.
+  A click picks; the second pick uses Pack Animal at once (no Confirm); x,
+  Esc, Cancel or a click on the veil cancel it. Everyone else has no
+  backpack in camp. In camp the window shows no discard patch
+  (`Inventory.discardable`, between camps only) and its hint reads "Point at
+  an item to read it." The tray no longer lists item choices: every item
+  step picks through the window, in camp and between camps.
+- The step-1 pick is highlighted (lead review): `InventoryItem.selected`
+  (`isPicked`), drawn with a sun-orange ring and a check, and no longer
+  dimmed while the next step is aimed.
+- The transition sign (lead follow-up). The plank keeps 16 px clear inside
+  its face on each side (`SIGNBOARD.facePad` 8 -> 16, `signChars(scale)` in
+  `layout.ts`, tested), so a 3x line holds 14 characters: "Boss: the
+  Snake" wraps instead of running to the carved border. A title that must
+  wrap breaks after its colon ("BOSS: / THE SNAKE / CAMP 3").
+- The A♣ click (unit D's tour failure). Not reproduced: four full tours
+  at 1920x1080 and three at 1280x720 (two of them on unit E's head in a
+  worktree with a click-failure probe, the rest on this unit's code) clicked
+  every hand card they tried, so no unclickable card was recorded. What was ruled out by
+  reading: the boards were plain images (never interactive) and nothing
+  interactive overlaps the hand zone at any size (the kit, seat panel,
+  actions, temple path and tooltip zones are disjoint from it); the weather
+  and boss-effect layers above the camp hold no interactive objects; the
+  only object the effects hide is a sliding objective chip; a lingering
+  trail or run-end scene draws nothing interactive over a camp; a rescue
+  window empties `yourLegalCardIds`, so the driver is never offered a card
+  the server would refuse there. What is left are the states that swallow a
+  press without a trace in the model: the page reconnecting (the e2e
+  heartbeat gives up after a 1 s pong, so a busy worker can bounce a page),
+  a sign hanging, or a hand gesture already in flight. The tour now writes
+  which it was next to each card it could not click (`unclickableHandCards`
+  in `audit.json`: the drag phase, connected or reconnecting, the sign's
+  phase, whether the canvas is on top at the click point, and the prompt),
+  read from the test bridge's new `input` getter, so a recurrence names its
+  cause.
+- Verified: `tsc -b` clean; Vitest green (kit bar model, inventory
+  `selected`/`discardable`, local UI, scene and trail models, the sign's
+  lettering, the kit bar's layout in both scenes, the tables without
+  boards); e2e: the map overlay and the kit bar's pop-out (`dev-solo`), the
+  Pack Animal swap through the window in camp (`expedition-characters`);
+  the full Playwright suite (148 specs, the tour skipped without its flag);
+  `TOUR_STRICT=1` tour at 1920x1080 and 1280x720 with 0 layout violations,
+  twice. Screenshots in `tmp/units/F/`.
