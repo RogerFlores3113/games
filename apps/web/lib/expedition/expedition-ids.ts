@@ -119,6 +119,22 @@ export function packObjectId(uid: string): string {
   return `pack:${uid}`;
 }
 
+/** An empty patch of your backpack, by its place. */
+export function packCellObjectId(cell: number): string {
+  return `pack-cell:${cell}`;
+}
+
+/** One of your item slots on the item bar under the trail, by its index. */
+export function barSlotObjectId(slot: number): string {
+  return `bar-slot:${slot}`;
+}
+
+/** An objective icon in a camp preview: the preview's owner (`loadout`, a
+ * route id) and the icon's place in its row. */
+export function previewObjectiveObjectId(owner: string, place: number): string {
+  return `preview-objective:${owner}:${place}`;
+}
+
 /** A shop entry's buy button, by its stock id (`supplies`, `item0`, `upgrade:<id>`). */
 export function shopObjectId(stockId: string): string {
   return `shop:${stockId}`;
@@ -178,8 +194,15 @@ export function interactableObjectId(id: string): string {
 }
 
 export const READY_ID = "ready";
-export const PACK_PREV_ID = "pack-page:prev";
-export const PACK_NEXT_ID = "pack-page:next";
+/** The item bar's backpack, which opens the inventory window. */
+export const BACKPACK_ID = "backpack";
+export const INVENTORY_CLOSE_ID = "inventory:close";
+/** The inventory window's discard patch, and the Discard and Keep of its confirm row. */
+export const DISCARD_ID = "inventory:discard";
+export const DISCARD_CONFIRM_ID = "inventory:discard-confirm";
+export const DISCARD_KEEP_ID = "inventory:discard-keep";
+/** Stops aiming a power at one of your items, from the inventory window. */
+export const INVENTORY_CANCEL_ID = "inventory:cancel";
 export const BOARD_ID = "board";
 export const TRAY_MORE_ID = "pick:more";
 export const SUPPLIES_ID = "supplies";

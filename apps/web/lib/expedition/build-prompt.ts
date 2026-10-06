@@ -1,4 +1,4 @@
-import { CHARACTER_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
+import { EVENT_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
 import { attemptOf, ledSuit, whisperLog } from "./view-access";
 import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
 import { cardLabel, rankLabel, SUIT_GLYPH } from "./expedition-ids";
@@ -307,7 +307,7 @@ export function buildTrailPrompt(view: ExpeditionView, seats: readonly PromptSea
       }
       return waitingFor(stage.pendingSeatIds, "Moving on…");
     case "shop":
-      if (you !== undefined && !stage.readySeatIds.includes(you.seatId)) return { text: `The shop is open before camp ${stage.next}. Continue when ready`, tone: "your-move" };
+      if (you !== undefined && !stage.readySeatIds.includes(you.seatId)) return { text: `Shop | Before camp ${stage.next}`, tone: "your-move" };
       return waitingFor(view.seats.filter((s) => !stage.readySeatIds.includes(s.seatId)).map((s) => s.seatId), "Moving on…");
     case "route": {
       const next = stage.options[0]?.next.index ?? 0;
@@ -315,7 +315,7 @@ export function buildTrailPrompt(view: ExpeditionView, seats: readonly PromptSea
       return waitingFor(view.seats.filter((s) => !voted(stage.ballots, s.seatId)).map((s) => s.seatId), "Setting off…");
     }
     case "event":
-      if (you !== undefined && !stage.readySeatIds.includes(you.seatId)) return { text: "Something on the trail. Continue when ready", tone: "your-move" };
+      if (you !== undefined && !stage.readySeatIds.includes(you.seatId)) return { text: `Event | ${EVENT_DISPLAY[stage.event]?.name ?? stage.event}`, tone: "your-move" };
       return waitingFor(view.seats.filter((s) => !stage.readySeatIds.includes(s.seatId)).map((s) => s.seatId), "Moving on…");
     case "loadout": {
       const last = view.history.at(-1);
@@ -325,8 +325,7 @@ export function buildTrailPrompt(view: ExpeditionView, seats: readonly PromptSea
           const text = `Camp ${last.camp} restarts without ${nameList(view.kicked.map((k) => nameOf(k.seatId)))}. Set out`;
           return { text: text.length <= PROMPT_MAX_CHARS ? text : `Camp ${last.camp} restarts with a smaller crew. Set out`, tone: "alert" };
         }
-        const name = you.characterId === null ? "Crew" : (CHARACTER_DISPLAY[you.characterId]?.name ?? you.characterId);
-        return { text: `${name}, set out for camp ${stage.camp.index} when ready`, tone: "your-move" };
+        return { text: `Prepare for camp ${stage.camp.index}`, tone: "your-move" };
       }
       return waitingFor(view.seats.filter((s) => !stage.readySeatIds.includes(s.seatId)).map((s) => s.seatId), "Setting out…");
     }

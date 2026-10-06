@@ -38,7 +38,6 @@ export const ART_FILES: readonly string[] = [
   "cursors/grabbing.png",
   "cursors/not-allowed.png",
   "cursors/pointer.png",
-  "fireside/backpack-open.png",
   "fireside/bg-fireside.png",
   "fireside/crew-token.png",
   "fireside/marker-animal.png",
@@ -124,6 +123,8 @@ export const ART_FILES: readonly string[] = [
   "tables/table-jungle.png",
   "tables/table-magma.png",
   "tables/table-temple.png",
+  "ui/backpack-icon.png",
   "ui/coin.png",
+  "ui/leather-panel.png",
   "ui/signboard.png",
 ];

@@ -1,0 +1,12 @@
+{
+  "id": "backpack-icon",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "small brown leather explorer backpack icon with a buckled flap and a rolled bedroll on top, front view, game inventory icon, isolated sprite on plain background",
+    "width": 32,
+    "height": 32
+  },
+  "job": "bece17b3-f8b8-4ed6-a17b-bf1578860dc0",
+  "scale": 1,
+  "note": "natively transparent; used as downloaded"
+}

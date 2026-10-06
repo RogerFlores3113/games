@@ -366,6 +366,32 @@ const specs = {
     scale: 1,
     note: "natively transparent; used as downloaded",
   },
+  // The item bar's backpack button and the inventory window's leather. Raw
+  // image jobs; `job` fetches each again.
+  "backpack-icon": {
+    tool: "create_image_pixflux",
+    params: {
+      description:
+        "small brown leather explorer backpack icon with a buckled flap and a rolled bedroll on top, front view, game inventory icon, isolated sprite on plain background",
+      width: 32,
+      height: 32,
+    },
+    job: "bece17b3-f8b8-4ed6-a17b-bf1578860dc0",
+    scale: 1,
+    note: "natively transparent; used as downloaded",
+  },
+  "leather-panel": {
+    tool: "create_image_pixflux",
+    params: {
+      description:
+        "flat rectangular panel of worn tan and chocolate brown saddle leather, the inside of an old explorer's backpack, stitched border seam around the edge, brass rivets in the corners, subtle scuffs and grain, evenly lit, no objects, no text, fills the whole image",
+      width: 256,
+      height: 192,
+    },
+    job: "0144adcc-1fa2-473e-9513-2a990e753833",
+    scale: 1,
+    note: "the off-white backdrop round its edge keyed out (fetch-art --matte); drawn at 1x as the inventory window, its slot patches drawn over it in code",
+  },
   "trail-map": {
     tool: "create_image_pixflux",
     params: {
@@ -379,21 +405,6 @@ const specs = {
       text_guidance_scale: 10,
     },
     scale: 2,
-  },
-  "backpack-open": {
-    tool: "create_image_pixflux",
-    params: {
-      description:
-        "an open explorer's canvas backpack filling the whole frame, seen from above, flap pulled back revealing large empty compartments inside, brown leather straps and brass buckles, isolated on transparent background, no text",
-      width: 96,
-      height: 64,
-      view: "high top-down",
-      outline: "single color outline",
-      shading: "medium shading",
-      no_background: true,
-      text_guidance_scale: 10,
-    },
-    scale: 1,
   },
   "mascot-panda": mascotStrip("idle", "idle: gentle breathing, tail swishing slowly, a slow blink"),
   "mascot-cheer": mascotStrip("cheer", "cheer: hops up happily with both paws raised in the air, then lands"),

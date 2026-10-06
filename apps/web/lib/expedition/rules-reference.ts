@@ -53,9 +53,9 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       heading: "Between camps",
       paragraphs: [
         `A cleared camp pays ${B.payout.base} coins into the crew's purse, plus ${B.payout.perUnplayedTrick} for each unplayed trick, up to ${B.payout.unplayedCap * B.payout.perUnplayedTrick} more.`,
-        `Everyone then drafts one of ${B.draftOptions} bundles of items. The crew votes on the route to the next camp, and a tied vote is settled by a coin flip. An event waits on the trail.`,
+        `Before every camp, camp 1 too, everyone drafts one of ${B.draftOptions} items; after a boss camp, one of ${B.draftOptions} pairs of items. After every other camp an event waits on the trail. Then the crew votes on the route to the next camp, and a tied vote is settled by a coin flip.`,
         `Before a boss camp the crew shops with the purse: supplies (${B.supplyPrice} coins), items, and your own character's upgrades (${B.upgradePrice} coins). An upgrade also gives you ${count(B.whispersPerUpgrade, "more whisper", "more whispers")} each camp.`,
-        `Each explorer has ${B.itemSlots} item slots. Extra items wait in the backpack, and you choose your loadout between camps.`,
+        `Each explorer has ${B.itemSlots} item slots, and only the items in them go into camp. Up to ${B.backpackSize} more wait in the backpack: open it from the item bar between camps to swap items, or to discard one when it is full.`,
       ],
       items: [],
     },

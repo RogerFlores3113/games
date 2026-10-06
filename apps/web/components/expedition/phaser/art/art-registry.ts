@@ -113,6 +113,10 @@ export const ART = {
   /** The plank the scene transitions hang; its chains are one 10 px link
    * pair (`SIGN_CHAIN`) that the scene repeats up to the stage's top. */
   signboard: { file: "ui/signboard.png", w: 192, h: 128, fallback: { color: c(PALETTE.bark), label: "" } },
+  /** The item bar's button that opens the inventory window. */
+  "backpack-icon": { file: "ui/backpack-icon.png", w: 32, h: 32, fallback: { color: c(PALETTE.bark), label: "bag" } },
+  /** The inventory window's leather; its slot patches are drawn over it. */
+  "leather-panel": { file: "ui/leather-panel.png", w: 256, h: 192, fallback: { color: c(PALETTE.bark), label: "" } },
   "seat-pack": { file: "camp/seat-pack.png", w: 16, h: 16, fallback: { color: c(PALETTE.moss), label: "bag" } },
   "leader-sun": { file: "camp/leader-sun.png", w: 16, h: 16, fallback: { color: c(PALETTE.sun), label: "*" } },
   "icon-whisper": { file: "camp/icon-whisper.png", w: 16, h: 16, fallback: { color: c(PALETTE.turn), label: "W" } },
@@ -125,7 +129,6 @@ export const ART = {
   "marker-animal": { file: "fireside/marker-animal.png", w: 16, h: 16, fallback: { color: c(PALETTE.destructive), label: "" } },
   temple: { file: "fireside/temple.png", w: 16, h: 16, fallback: { color: c(PALETTE.moon), label: "" } },
   "crew-token": { file: "fireside/crew-token.png", w: 16, h: 16, fallback: { color: c(PALETTE.turn), label: "" } },
-  "backpack-open": { file: "fireside/backpack-open.png", w: 96, h: 64, fallback: { color: c(PALETTE.moss), label: "backpack" } },
   "bg-temple-dawn": { file: "run-end/bg-temple-dawn.png", w: 640, h: 360, fallback: { color: c(PALETTE.jungle), label: "" } },
   "bg-trail-dusk": { file: "run-end/bg-trail-dusk.png", w: 640, h: 360, fallback: { color: c(PALETTE.letterbox), label: "" } },
   ...LOCATION_ART,

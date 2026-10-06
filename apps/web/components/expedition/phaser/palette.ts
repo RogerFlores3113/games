@@ -69,6 +69,11 @@ export const PALETTE = {
   // ink by the sign's tone, and the lit lower edge of each cut.
   signInk: { neutral: "#2E1E14", good: "#1E4A28", bad: "#7E1C14", boss: "#5C1F0C" },
   signCut: "#E1C8A1",
+  // The inventory window over its leather: the backpack's darker patches
+  // and their stitching, the item slots sunk deeper still.
+  leatherPatch: "#3A2212",
+  leatherStitch: "#C99A62",
+  leatherSlot: "#211207",
 } as const;
 
 /** Parses a "#rrggbb" string into Phaser's `0xrrggbb` integer form. */

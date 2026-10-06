@@ -459,9 +459,14 @@ describe("buildTrailPrompt", () => {
     expect(at(v)).toEqual({ text: "Waiting for Bo", tone: "waiting" });
   });
 
-  it("at an event asks you to continue", () => {
-    const v = trail({ tag: "event", event: "storm", next: 4, readySeatIds: ["ana"] });
-    expect(at(v)).toEqual({ text: "Something on the trail. Continue when ready", tone: "your-move" });
+  it("at an event names it", () => {
+    const v = trail({ tag: "event", event: "event", next: 4, readySeatIds: ["ana"] });
+    expect(at(v)).toEqual({ text: "Event | Quiet trail", tone: "your-move" });
+  });
+
+  it("at the shop names the camp it stocks up for", () => {
+    const v = trail({ tag: "shop", next: 3, camp: null, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] });
+    expect(at(v)).toEqual({ text: "Shop | Before camp 3", tone: "your-move" });
   });
 
   it("at an event names who is not ready once you are", () => {
@@ -469,9 +474,9 @@ describe("buildTrailPrompt", () => {
     expect(at(v)).toEqual({ text: "Waiting for Bo", tone: "waiting" });
   });
 
-  it("at the loadout tells you to set out by your character", () => {
+  it("at the loadout tells you to prepare for the camp", () => {
     const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 2 }, mods: [], readySeatIds: [] }, { history: [{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", coins: 8 }] });
-    expect(at(v)).toEqual({ text: "The Explorer, set out for camp 2 when ready", tone: "your-move" });
+    expect(at(v)).toEqual({ text: "Prepare for camp 2", tone: "your-move" });
   });
 
   it("at the loadout after a kick says the camp restarts without them", () => {

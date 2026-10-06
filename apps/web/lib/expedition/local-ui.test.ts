@@ -162,7 +162,9 @@ describe("initialLocalUi", () => {
       drag: { phase: "idle" },
       trayPage: 0,
       takenBundle: null,
-      packPage: 0,
+      inventoryOpen: null,
+      discardUid: null,
+      tooltipPreviewObjective: null,
     });
   });
 });

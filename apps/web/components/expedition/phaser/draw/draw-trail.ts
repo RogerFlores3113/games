@@ -8,7 +8,7 @@ import type Phaser from "phaser";
 import { CURSOR, pointerIf } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL, SIGN_CELL, WORLD_SIGN_FONT } from "../font/font-keys";
-import { BUNDLE_ITEM_TEXT_Y, BUNDLE_TAKE_H, DRAFT_ZONES, LENGTH_CARD_GAP, MUSTER_LINE, MUSTER_PORTRAIT_W, MUSTER_TEXT_LINES, MUSTER_ZONES, bundleItemH, lengthStopStep, musterBoxes, musterTextChars, ROUTE_ZONES, TRAIL_ZONES, bundleBoxes, bundleTextChars, rowBoxes, trailStopXs, type Rect } from "../layout";
+import { BUNDLE_ITEM_TEXT_Y, BUNDLE_TAKE_H, DRAFT_ZONES, LENGTH_CARD_GAP, MINI_H, MINI_W, MUSTER_LINE, MUSTER_PORTRAIT_W, MUSTER_TEXT_LINES, MUSTER_ZONES, bundleItemH, itemBarLayout, lengthStopStep, musterBoxes, musterTextChars, ROUTE_ZONES, TRAIL_ZONES, bundleBoxes, bundleTextChars, rowBoxes, trailStopXs, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
 import { ART, crewArtId, modArtId, sourceArtId, type ArtId } from "../art/art-registry";
 import type { ObjectIndex } from "../object-index";
@@ -18,8 +18,10 @@ import type {
   CharacterCard,
   CrewRow,
   DraftBundle,
+  ItemBar,
   KitItem,
   LengthOption,
+  ObjectiveIcon,
   MusterCrewRow,
   MusterLine,
   RouteCard,
@@ -32,7 +34,9 @@ import type {
 import { musterLines } from "../../../../lib/expedition/trail-model";
 import { fitLabel, fitUses, wrapWords } from "./text-fit";
 import { PANEL_ALPHA, button, coin, labelWidth, plate, setCoinFace, text, type Layer } from "./ui-kit";
-import { drawExplorer, drawGear, drawShop, type LoadoutHandlers } from "./draw-loadout";
+import { drawShop, type LoadoutHandlers } from "./draw-loadout";
+import type { InventoryItem } from "../../../../lib/expedition/inventory-model";
+import { BACKPACK_ID } from "../../../../lib/expedition/expedition-ids";
 import { ICON_SIZE, fogTile, modIcon } from "./draw-weather";
 
 export interface TrailHandlers extends LoadoutHandlers {
@@ -132,7 +136,6 @@ function drawTrail(ctx: Ctx, stops: TrailStop[]): void {
       scene.tweens.add({ targets: glow, alpha: { from: 1, to: 0.3 }, duration: PULSE_MS, yoyo: true, repeat: -1 });
       const token = ART["crew-token"];
       layer.add(placeArt(scene, "crew-token", x, zone.y + 2 + token.h / 2));
-      layer.add(text(scene, x + token.w / 2 + 2, zone.y + 6, "Crew", INK));
     }
     const marker = placeArt(scene, stop.state === "cleared" ? "marker-cleared" : STOP_ART[stop.kind], x, y);
     if (stop.state === "ahead") marker.setAlpha(0.7);
@@ -302,7 +305,7 @@ function drawMuster(ctx: Ctx, muster: Extract<TrailPanel, { kind: "muster" }>): 
 // Camp previews and the vote result
 // ---------------------------------------------------------------------------
 
-const PLACE_KEY_W = labelWidth("Location") + 6;
+const PLACE_KEY_W = labelWidth("Objectives") + 6;
 
 /** Location, weather and any pairing, each with its icon. Returns the y
  * after the last row. */
@@ -323,21 +326,26 @@ function placeRows(scene: Phaser.Scene, container: Phaser.GameObjects.Container,
   return cy;
 }
 
-/** Objectives as small chips, wrapped to `w`. Returns the y after them. */
-function objectiveChips(scene: Phaser.Scene, container: Phaser.GameObjects.Container, labels: string[], x: number, y: number, w: number): number {
-  let cx = x;
-  let cy = y;
-  for (const label of labels) {
-    const chipW = labelWidth(label) + 6;
-    if (cx + chipW > x + w && cx > x) {
-      cx = x;
-      cy += LINE + 2;
-    }
-    container.add(scene.add.rectangle(cx, cy - 1, chipW, LABEL_CELL.h + 3, toPhaserColor(PALETTE.moss)).setOrigin(0, 0));
-    container.add(text(scene, cx + 3, cy, label));
-    cx += chipW + 4;
-  }
-  return cy + LINE + 2;
+const ICON_GAP = 3;
+
+/** An objective as a small card with its glyph. It is not interactive, so
+ * a click on a route card still votes: the scene finds the icon under the
+ * pointer for its plain words (`TrailScene.update`). */
+function objectiveIcon(ctx: Ctx, container: Phaser.GameObjects.Container, icon: ObjectiveIcon, x: number, y: number): void {
+  const { scene, index } = ctx;
+  const card = scene.add.container(x, y);
+  card.add(scene.add.rectangle(0, 0, MINI_W, MINI_H, toPhaserColor(PALETTE.cardFace)).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(INK)));
+  card.add(text(scene, Math.floor((MINI_W - LABEL_CELL.w) / 2) + 1, Math.floor((MINI_H - LABEL_CELL.h) / 2), icon.glyph, INK));
+  card.setSize(MINI_W, MINI_H);
+  container.add(card);
+  index.register("trail", icon.objectId, card);
+}
+
+/** "Objectives" and a card per objective. Returns the y after the row. */
+function objectiveRow(ctx: Ctx, container: Phaser.GameObjects.Container, icons: ObjectiveIcon[], x: number, y: number): number {
+  container.add(text(ctx.scene, x, y + Math.floor((MINI_H - LABEL_CELL.h) / 2), "Objectives", PALETTE.textDim));
+  icons.forEach((icon, i) => objectiveIcon(ctx, container, icon, x + PLACE_KEY_W + i * (MINI_W + ICON_GAP), y));
+  return y + MINI_H + 3;
 }
 
 /** A boss portrait on a route card or the loadout is half its table size. */
@@ -369,49 +377,36 @@ function bossLine(scene: Phaser.Scene, container: Phaser.GameObjects.Container, 
 function drawPreview(ctx: Ctx, preview: CampPreview, zone: Rect, heading: string): void {
   const { scene, layer } = ctx;
   const container = scene.add.container(zone.x, zone.y);
+  layer.add(container);
   container.add(signText(scene, 8, 6, heading, PALETTE.sun));
   const w = zone.w - 16;
   let y = placeRows(scene, container, preview, 8, 26, w);
-  y += 2;
-  container.add(text(scene, 8, y, "Objectives", PALETTE.textDim));
-  y = objectiveChips(scene, container, preview.objectives, 8, y + LINE, w);
-  bossLine(scene, container, preview, 8, y + 2);
-  layer.add(container);
+  y = objectiveRow(ctx, container, preview.objectives, 8, y + 1);
+  bossLine(scene, container, preview, 8, y + 3);
 }
 
 const FLIP_MS = 1600;
 const FLIP_TURN_MS = 120;
 const COIN_R = 9;
-const PIP = 5;
 
-/** One row per choice: its name and a pip per vote, the winner lit. */
-function tallyRows(scene: Phaser.Scene, layer: Layer, vote: VoteResult, zone: Rect, y: number): void {
-  const chars = Math.floor((zone.w - 16) / LABEL_CELL.w) - 6;
-  vote.tally.forEach((row, i) => {
-    const ry = y + i * LINE;
-    layer.add(text(scene, zone.x + 8, ry, fitLabel(row.label, chars), row.winner ? PALETTE.sun : PALETTE.textDim));
-    const pips = scene.add.graphics();
-    for (let v = 0; v < Math.max(1, row.votes); v++) {
-      pips.fillStyle(toPhaserColor(row.votes === 0 ? PALETTE.plateEdge : row.winner ? PALETTE.sun : PALETTE.textDim), 1);
-      pips.fillRect(zone.x + zone.w - 8 - (v + 1) * (PIP + 2), ry + 1, PIP, PIP);
-    }
-    layer.add(pips);
-  });
+/** The vote box's height: the title and the winner, and for a tie the
+ * coin and what settled it. */
+function voteBoxH(vote: VoteResult): number {
+  return vote.flip === null ? 38 : 74;
 }
 
-/** The vote just resolved: who won and the tally, and for a tie a coin
- * that spins through the tied choices and lands on the winner. */
+/** The vote just resolved: what it chose, and for a tie a coin that spins
+ * through the tied choices and lands on the winner. */
 function drawVoteResult(ctx: Ctx, vote: VoteResult, zone: Rect): void {
   const { scene, layer, flips } = ctx;
-  layer.add(plate(scene, zone.x, zone.y, zone.w, zone.h, PALETTE.letterbox).setAlpha(PANEL_ALPHA));
+  layer.add(plate(scene, zone.x, zone.y, zone.w, voteBoxH(vote), PALETTE.letterbox).setAlpha(PANEL_ALPHA));
   const chars = Math.floor((zone.w - 8) / LABEL_CELL.w);
   const signChars = Math.floor((zone.w - 8) / SIGN_CELL.w);
   const cx = zone.x + Math.floor(zone.w / 2);
-  layer.add(centredText(scene, cx, zone.y + 5, fitLabel(`${vote.title} vote`, chars), PALETTE.textDim));
+  layer.add(centredText(scene, cx, zone.y + 5, fitLabel(vote.title, chars), PALETTE.textDim));
   const winnerY = zone.y + 18;
-  const subtitleY = winnerY + 16;
-  const coinY = subtitleY + 22;
-  tallyRows(scene, layer, vote, zone, vote.flip === null ? subtitleY + 18 : coinY + 18);
+  const subtitleY = winnerY + 18;
+  const coinY = subtitleY + 24;
 
   const winnerText = (value: string, color: string) => {
     const shown = fitLabel(value, signChars);
@@ -419,7 +414,6 @@ function drawVoteResult(ctx: Ctx, vote: VoteResult, zone: Rect): void {
   };
   if (vote.flip === null) {
     layer.add(winnerText(vote.winner, PALETTE.sun));
-    layer.add(centredText(scene, cx, subtitleY, "by majority", PALETTE.text));
     return;
   }
 
@@ -506,21 +500,54 @@ function bundleItem(ctx: Ctx, card: Phaser.GameObjects.Container, item: BundleIt
   return h;
 }
 
-/** A bundle as one card: its items stacked, then one Take button. */
-function drawBundleCard(ctx: Ctx, bundle: DraftBundle, x: number, y: number, w: number, h: number): void {
+const SINGLE_ICON_SCALE = 2;
+const SINGLE_TEXT_Y = 54;
+
+/** A single item as a card: its icon large, its name, its rules in full,
+ * then its uses and its Rare and Pack Rat tags. */
+function singleItem(ctx: Ctx, card: Phaser.GameObjects.Container, item: BundleItem, w: number, h: number): void {
+  const { scene, index, handlers } = ctx;
+  const block = scene.add.container(0, 0);
+  block.add(scene.add.rectangle(w / 2 - 19, 5, 38, 38, toPhaserColor(PALETTE.stump)).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(item.rare ? RARE : PALETTE.plateEdge)));
+  const art = sourceArtId(item.itemId);
+  if (art !== null) block.add(placeArt(scene, art, w / 2, 24).setScale(SINGLE_ICON_SCALE));
+  block.add(centredText(scene, w / 2, 45, fitLabel(item.name, Math.floor((w - 8) / LABEL_CELL.w)), PALETTE.sun));
+  const lines = wrapWords(item.text, bundleTextChars(w));
+  lines.forEach((line, i) => block.add(text(scene, 4, SINGLE_TEXT_Y + 4 + i * LINE, line)));
+  const badgeY = SINGLE_TEXT_Y + 4 + lines.length * LINE + 4;
+  let bx = 4 + chip(scene, block, 4, badgeY, item.uses, PALETTE.plate) + 3;
+  if (item.rare) bx += chip(scene, block, bx, badgeY, "Rare", PALETTE.plate, RARE) + 3;
+  if (item.exclusive) chip(scene, block, bx, badgeY, "Pack Rat", PALETTE.plate, PALETTE.coinShine);
+  const hitH = h - BUNDLE_TAKE_H - 6;
+  const hit = scene.add.zone(0, 0, w, hitH).setOrigin(0, 0).setInteractive();
+  hit.on("pointerover", () => handlers.onSourceHover(item.itemId, item.objectId));
+  hit.on("pointerout", () => handlers.onSourceHover(null));
+  block.add(hit);
+  block.setSize(w, hitH);
+  card.add(block);
+  index.register("trail", item.objectId, block);
+}
+
+/** A bundle as one card: a single item large, or its items stacked, then
+ * one Take button; with no room for it, the button opens the backpack. */
+function drawBundleCard(ctx: Ctx, bundle: DraftBundle, fits: boolean, x: number, y: number, w: number, h: number): void {
   const { scene, layer, index, handlers } = ctx;
   const card = scene.add.container(x, y);
   const bg = scene.add.rectangle(0, 0, w, h, toPhaserColor(PALETTE.bark)).setOrigin(0, 0);
   bg.setStrokeStyle(1, toPhaserColor(PALETTE.plateEdge));
   card.add(bg);
-  let itemY = 0;
-  bundle.items.forEach((item, i) => {
-    if (i > 0) card.add(scene.add.rectangle(4, itemY, w - 8, 1, toPhaserColor(PALETTE.plateEdge)).setOrigin(0, 0));
-    itemY += bundleItem(ctx, card, item, itemY, w, bundle.items.length > 2) + 1;
-  });
+  if (bundle.items.length === 1) singleItem(ctx, card, bundle.items[0]!, w, h);
+  else {
+    let itemY = 0;
+    bundle.items.forEach((item, i) => {
+      if (i > 0) card.add(scene.add.rectangle(4, itemY, w - 8, 1, toPhaserColor(PALETTE.plateEdge)).setOrigin(0, 0));
+      itemY += bundleItem(ctx, card, item, itemY, w, bundle.items.length > 2) + 1;
+    });
+  }
   layer.add(card);
-  const label = bundle.items.length === 1 ? "Take it" : "Take bundle";
-  const take = button(scene, x + w / 2, y + h - 3 - BUNDLE_TAKE_H / 2, w - 8, BUNDLE_TAKE_H, label, { onClick: () => handlers.onBundle(bundle.bundle), outline: true });
+  const label = !fits ? "Backpack full: make room" : bundle.items.length === 1 ? "Take it" : "Take bundle";
+  const onClick = fits ? () => handlers.onBundle(bundle.bundle) : () => handlers.onBackpack();
+  const take = button(scene, x + w / 2, y + h - 3 - BUNDLE_TAKE_H / 2, w - 8, BUNDLE_TAKE_H, label, { onClick, outline: fits, color: fits ? undefined : PALETTE.plate });
   layer.add(take);
   index.register("trail", bundle.objectId, take);
 }
@@ -532,7 +559,7 @@ function drawDraft(ctx: Ctx, draft: Extract<TrailPanel, { kind: "draft" }>): voi
   const offer = draft.draft;
   if (offer.kind === "offer") {
     const zone = DRAFT_ZONES.offer;
-    bundleBoxes(offer.bundles.length).forEach((box, i) => drawBundleCard(ctx, offer.bundles[i]!, box.x, zone.y + 2, box.w, zone.h - 4));
+    bundleBoxes(offer.bundles.length).forEach((box, i) => drawBundleCard(ctx, offer.bundles[i]!, offer.fits, box.x, zone.y + 2, box.w, zone.h - 4));
     return;
   }
   const zone = TRAIL_ZONES.panel;
@@ -547,8 +574,8 @@ function drawDraft(ctx: Ctx, draft: Extract<TrailPanel, { kind: "draft" }>): voi
       layer.add(text(scene, x + 20, cy - 14 + i * 20, item.name, PALETTE.sun));
     });
     const hintY = cy - 14 + offer.items.length * 20 + 6;
-    layer.add(text(scene, x, hintY, "New items fill a free slot; the rest wait", PALETTE.textDim));
-    layer.add(text(scene, x, hintY + LINE, "in your backpack. Swap them before you set out.", PALETTE.textDim));
+    layer.add(text(scene, x, hintY, "New items fill a free slot; the rest wait in", PALETTE.textDim));
+    layer.add(text(scene, x, hintY + LINE, "your backpack. Open it below to swap them.", PALETTE.textDim));
     return;
   }
   if (offer.text !== "") layer.add(centredText(scene, zone.x + zone.w / 2, cy - 4, offer.text, PALETTE.textDim));
@@ -578,7 +605,7 @@ function drawRouteCard(ctx: Ctx, card: RouteCard, x: number, y: number, w: numbe
 
   const inner = w - 12;
   let cy = placeRows(scene, body, card.next, 6, RIBBON_H + 4, inner);
-  cy = objectiveChips(scene, body, card.next.objectives, 6, cy + 2, inner);
+  cy = objectiveRow(ctx, body, card.next.objectives, 6, cy + 1);
   if (card.next.survey !== null) {
     const chars = Math.floor(inner / LABEL_CELL.w);
     for (const line of wrapped(`Survey: ${card.next.survey.join(", ")}`, chars, 2)) {
@@ -607,12 +634,11 @@ function drawRouteCard(ctx: Ctx, card: RouteCard, x: number, y: number, w: numbe
 
     const bg = scene.add.rectangle(0, 0, w, h, toPhaserColor(card.yours ? PALETTE.stump : PALETTE.plate)).setOrigin(0, 0);
     bg.setStrokeStyle(card.yours ? 2 : 1, toPhaserColor(card.yours ? PALETTE.turn : PALETTE.plateEdge));
-    container.add([bg, body]);
     container.setSize(w, h);
     const hit = scene.add.zone(0, 0, w, h).setOrigin(0, 0);
     hit.setInteractive(pointerIf(card.votable));
     if (card.votable) hit.on("pointerdown", () => handlers.onVote(card.id));
-    container.add(hit);
+    container.add([bg, body, hit]);
     layer.add(container);
     index.register("trail", card.objectId, container);
     if (reroll !== null) {
@@ -640,7 +666,7 @@ function drawRoutes(ctx: Ctx, routes: Extract<TrailPanel, { kind: "route" }>): v
 // Event and loadout
 // ---------------------------------------------------------------------------
 
-const VOTE_W = 168;
+const VOTE_W = 150;
 const SIDE_W = 246;
 
 /** The panel split: the main card, and a side card on its right. */
@@ -652,34 +678,43 @@ function panelSplit(sideW: number): { main: Rect; side: Rect } {
   };
 }
 
+/** The event: its name and what happens, then what comes next. */
 function drawEvent(ctx: Ctx, event: Extract<TrailPanel, { kind: "event" }>): void {
   const { scene, layer } = ctx;
-  panel(ctx, TRAIL_ZONES.panel);
-  const { main, side: vote } = panelSplit(ctx.model.vote === null ? 0 : VOTE_W);
-  const chars = Math.floor((main.w - 16) / LABEL_CELL.w);
-  layer.add(text(scene, main.x + 8, main.y + 6, "On the trail", PALETTE.textDim));
-  layer.add(signText(scene, main.x + 8, main.y + 18, event.name, PALETTE.sun));
-  let y = main.y + 36;
-  for (const line of wrapped(event.text, chars, 3)) {
-    layer.add(text(scene, main.x + 8, y, line));
+  const zone = TRAIL_ZONES.panel;
+  panel(ctx, zone);
+  const chars = Math.floor((zone.w - 16) / LABEL_CELL.w);
+  layer.add(signText(scene, zone.x + 8, zone.y + 6, event.name, PALETTE.sun));
+  let y = zone.y + 26;
+  for (const line of wrapped(event.text, chars, 6)) {
+    layer.add(text(scene, zone.x + 8, y, line));
     y += LINE;
   }
   y += 6;
-  layer.add(text(scene, main.x + 8, y, fitLabel(`Next: ${event.nextTitle}`, chars), PALETTE.textDim));
-  if (ctx.model.vote !== null) drawVoteResult(ctx, ctx.model.vote, vote);
+  layer.add(text(scene, zone.x + 8, y, fitLabel(`Next: the route vote for ${event.nextTitle.toLowerCase()}`, chars), PALETTE.textDim));
 }
 
-/** The camp ahead, compact, beside the vote that chose the run, the shop
- * before a boss camp, or your explorer's power and upgrade. */
+/** The camp ahead, beside the vote that chose it or the run's length. */
 function drawLoadout(ctx: Ctx, loadout: Extract<TrailPanel, { kind: "loadout" }>): void {
   panel(ctx, TRAIL_ZONES.panel);
   const vote = ctx.model.vote;
-  const { main, side } = panelSplit(vote !== null ? VOTE_W : SIDE_W);
-  if (loadout.next !== null) drawPreview(ctx, loadout.next, main, loadout.title);
-  else ctx.layer.add(signText(ctx.scene, main.x + 8, main.y + 6, loadout.title, PALETTE.sun));
+  const { main, side } = panelSplit(vote !== null ? VOTE_W : 0);
+  drawPreview(ctx, loadout.next, main, loadout.next.title);
   if (vote !== null) drawVoteResult(ctx, vote, side);
-  else if (loadout.shop !== null) drawShop(ctx, loadout.shop, side);
-  else if (ctx.model.kit !== null) drawExplorer(ctx, ctx.model.kit, side);
+}
+
+/** The shop takes the panel; on a replay the camp it leads to stands
+ * beside it. */
+function drawShopPanel(ctx: Ctx, shop: Extract<TrailPanel, { kind: "shop" }>): void {
+  panel(ctx, TRAIL_ZONES.panel);
+  if (shop.next === null) {
+    const zone = TRAIL_ZONES.panel;
+    drawShop(ctx, shop.shop, { x: zone.x + 8, y: zone.y + 4, w: zone.w - 16, h: zone.h - 8 }, "Shop");
+    return;
+  }
+  const { main, side } = panelSplit(SIDE_W);
+  drawPreview(ctx, shop.next, main, shop.next.title);
+  drawShop(ctx, shop.shop, side, "Shop");
 }
 
 // ---------------------------------------------------------------------------
@@ -746,24 +781,21 @@ function drawCrew(ctx: Ctx): void {
 }
 
 // ---------------------------------------------------------------------------
-// Kit
+// Item bar
 // ---------------------------------------------------------------------------
 
-const KIT_X = 112;
-const KIT_GAP = 3;
-const KIT_ROW_H = 20;
-
-function drawKitTile(ctx: Ctx, item: KitItem, x: number, y: number, w: number): void {
+/** One of your powers or upgrade: icon, name, what is left of it. */
+function drawKitTile(ctx: Ctx, item: KitItem, rect: Rect): void {
   const { scene, layer, index, handlers } = ctx;
-  const container = scene.add.container(x, y);
-  const bg = scene.add.rectangle(0, 0, w, KIT_ROW_H, toPhaserColor(item.kind === "item" ? PALETTE.bark : PALETTE.stump)).setOrigin(0, 0);
+  const container = scene.add.container(rect.x, rect.y);
+  const bg = scene.add.rectangle(0, 0, rect.w, rect.h, toPhaserColor(item.kind === "upgrade" ? PALETTE.bark : PALETTE.stump)).setOrigin(0, 0);
   container.add(bg);
   const art = sourceArtId(item.sourceId);
-  if (art !== null) container.add(placeArt(scene, art, 10, KIT_ROW_H / 2));
-  const chars = Math.floor((w - 22) / LABEL_CELL.w);
+  if (art !== null) container.add(placeArt(scene, art, 10, rect.h / 2));
+  const chars = Math.floor((rect.w - 22) / LABEL_CELL.w);
   container.add(text(scene, 20, 1, fitLabel(item.name, chars)));
-  container.add(text(scene, 20, KIT_ROW_H - LABEL_CELL.h - 1, fitUses(item.charge, chars), PALETTE.textDim));
-  container.setSize(w, KIT_ROW_H);
+  container.add(text(scene, 20, rect.h - LABEL_CELL.h - 1, fitUses(item.charge, chars), PALETTE.textDim));
+  container.setSize(rect.w, rect.h);
   bg.setInteractive();
   bg.on("pointerover", () => handlers.onSourceHover(item.sourceKey, item.objectId));
   bg.on("pointerout", () => handlers.onSourceHover(null));
@@ -771,28 +803,93 @@ function drawKitTile(ctx: Ctx, item: KitItem, x: number, y: number, w: number): 
   index.register("trail", item.objectId, container);
 }
 
-function drawKit(ctx: Ctx): void {
+/** An item slot on the bar: the item's icon, name and uses, or an empty
+ * slot. A click opens the backpack. */
+function drawBarSlot(ctx: Ctx, slot: ItemBar["slots"][number], rect: Rect): void {
+  const { scene, layer, index, handlers } = ctx;
+  const container = scene.add.container(rect.x, rect.y);
+  const item: InventoryItem | null = slot.item;
+  const bg = scene.add.rectangle(0, 0, rect.w, rect.h, toPhaserColor(item === null ? PALETTE.plate : PALETTE.bark)).setOrigin(0, 0);
+  if (item?.rare) bg.setStrokeStyle(1, toPhaserColor(RARE));
+  container.add(bg);
+  if (item === null) {
+    container.add(dashedBox(scene, rect.w, rect.h));
+    container.add(centredText(scene, rect.w / 2, Math.floor((rect.h - LABEL_CELL.h) / 2), "Empty slot", PALETTE.textDim));
+  } else {
+    const art = sourceArtId(item.itemId);
+    if (art !== null) container.add(placeArt(scene, art, 10, Math.floor(rect.h / 2)));
+    const chars = Math.floor((rect.w - 22) / LABEL_CELL.w);
+    const top = Math.max(0, Math.floor((rect.h - 2 * LABEL_CELL.h - 1) / 2));
+    container.add(text(scene, 19, top, fitLabel(item.name, chars)));
+    container.add(text(scene, 19, top + LABEL_CELL.h + 1, fitLabel(item.uses, chars), item.rare ? RARE : PALETTE.textDim));
+  }
+  container.setSize(rect.w, rect.h);
+  bg.setInteractive({ cursor: CURSOR.pointer });
+  bg.on("pointerdown", () => handlers.onBackpack());
+  if (item !== null) {
+    bg.on("pointerover", () => handlers.onSourceHover(item.uid, slot.objectId));
+    bg.on("pointerout", () => handlers.onSourceHover(null));
+  }
+  layer.add(container);
+  index.register("trail", slot.objectId, container);
+}
+
+function dashedBox(scene: Phaser.Scene, w: number, h: number): Phaser.GameObjects.Graphics {
+  const g = scene.add.graphics();
+  g.fillStyle(toPhaserColor(PALETTE.textDim), 1);
+  for (let x = 0; x < w; x += 4) {
+    g.fillRect(x, 0, Math.min(2, w - x), 1);
+    g.fillRect(x, h - 1, Math.min(2, w - x), 1);
+  }
+  for (let y = 0; y < h; y += 4) {
+    g.fillRect(0, y, 1, Math.min(2, h - y));
+    g.fillRect(w - 1, y, 1, Math.min(2, h - y));
+  }
+  return g;
+}
+
+/** The backpack: its icon and how full it is. A click opens the inventory. */
+function drawBackpackButton(ctx: Ctx, backpack: ItemBar["backpack"], rect: Rect): void {
+  const { scene, layer, index, handlers } = ctx;
+  const container = scene.add.container(rect.x, rect.y);
+  const full = backpack.stored >= backpack.capacity;
+  const bg = scene.add.rectangle(0, 0, rect.w, rect.h, toPhaserColor(PALETTE.stump)).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(full ? PALETTE.sun : PALETTE.plateEdge));
+  container.add(bg);
+  container.add(placeArt(scene, "backpack-icon", rect.w / 2, 19));
+  container.add(centredText(scene, rect.w / 2, 37, "Backpack"));
+  container.add(centredText(scene, rect.w / 2, 47, `${backpack.stored} of ${backpack.capacity}`, full ? PALETTE.sun : PALETTE.textDim));
+  container.setSize(rect.w, rect.h);
+  bg.setInteractive({ cursor: CURSOR.pointer });
+  bg.on("pointerdown", () => handlers.onBackpack());
+  bg.on("pointerover", () => bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
+  bg.on("pointerout", () => bg.setStrokeStyle(1, toPhaserColor(full ? PALETTE.sun : PALETTE.plateEdge)));
+  layer.add(container);
+  index.register("trail", BACKPACK_ID, container);
+}
+
+/** Your item slots, the backpack, and your explorer's powers and upgrade. */
+function drawItemBar(ctx: Ctx): void {
   const { scene, layer, model } = ctx;
   const zone = TRAIL_ZONES.backpack;
-  const kit = model.kit;
   panel(ctx, zone);
-  if (model.panel.kind === "loadout" && model.panel.gear !== null) {
-    drawGear(ctx, model.panel.gear);
-    return;
-  }
-  if (kit === null) {
+  const bar = model.itemBar;
+  if (bar === null) {
     layer.add(centredText(scene, zone.x + zone.w / 2, zone.y + zone.h / 2 - 4, "Watching the crew", PALETTE.textDim));
     return;
   }
-  layer.add(text(scene, zone.x + KIT_X, zone.y + 3, "Your kit"));
-  const art = ART["backpack-open"];
-  layer.add(placeArt(scene, "backpack-open", zone.x + 4 + art.w / 2, zone.y + zone.h - art.h / 2 - 2));
-  const x0 = zone.x + KIT_X;
-  const cols = 3;
-  const w = Math.floor((zone.x + zone.w - 4 - x0 - KIT_GAP * (cols - 1)) / cols);
-  kit.forEach((item, i) => {
-    drawKitTile(ctx, item, x0 + (i % cols) * (w + KIT_GAP), zone.y + 14 + Math.floor(i / cols) * (KIT_ROW_H + KIT_GAP), w);
-  });
+  const geo = itemBarLayout(bar.slots.length);
+  const slotsRight = geo.slots[0]!.x + geo.slots[0]!.w;
+  layer.add(text(scene, zone.x + 4, zone.y + 3, "Item slots"));
+  layer.add(text(scene, slotsRight - labelWidth(bar.count), zone.y + 3, bar.count, PALETTE.textDim));
+  bar.slots.forEach((slot, i) => drawBarSlot(ctx, slot, geo.slots[i]!));
+  drawBackpackButton(ctx, bar.backpack, geo.backpack);
+  layer.add(text(scene, geo.explorer.x, zone.y + 3, "Explorer"));
+  const tiles = bar.explorer.slice(0, geo.explorerTiles.length);
+  tiles.forEach((item, i) => drawKitTile(ctx, item, geo.explorerTiles[i]!));
+  const next = geo.explorerTiles[tiles.length];
+  if (!bar.explorer.some((k) => k.kind === "upgrade") && next !== undefined) {
+    layer.add(text(scene, next.x + 2, next.y + Math.floor((next.h - LABEL_CELL.h) / 2), fitLabel("No upgrade yet", Math.floor(next.w / LABEL_CELL.w)), PALETTE.textDim));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -846,7 +943,7 @@ function drawReady(ctx: Ctx): void {
   } else {
     layer.add(button(scene, cx, cy, READY_W, READY_H, `${ready.label} ✓`, { big: true, dim: false, color: PALETTE.moss }));
   }
-  const caption = ready.state === "open" ? "When your kit is ready" : "Waiting for the crew";
+  const caption = ready.state === "open" ? "When you are ready" : "Waiting for the crew";
   layer.add(plate(scene, zone.x + 4, zone.y + READY_H + 6, zone.w - 8, 12).setAlpha(PANEL_ALPHA));
   layer.add(centredText(scene, cx, zone.y + READY_H + 8, caption, ready.state === "open" ? PALETTE.text : PALETTE.textDim));
   drawPowers(ctx, zone.y + READY_H + 20, 1);
@@ -860,6 +957,7 @@ export function drawTrailScene(scene: Phaser.Scene, layer: Layer, model: TrailMo
     return;
   }
   if (model.trail !== null) drawTrail(ctx, model.trail);
+  if (model.inventory?.open) return;
   switch (shown.kind) {
     case "draft":
       drawDraft(ctx, shown);
@@ -872,11 +970,15 @@ export function drawTrailScene(scene: Phaser.Scene, layer: Layer, model: TrailMo
       drawEvent(ctx, shown);
       drawCrew(ctx);
       break;
+    case "shop":
+      drawShopPanel(ctx, shown);
+      drawCrew(ctx);
+      break;
     case "loadout":
       drawLoadout(ctx, shown);
       drawCrew(ctx);
       break;
   }
-  drawKit(ctx);
+  drawItemBar(ctx);
   drawReady(ctx);
 }

@@ -19,7 +19,6 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | icon-whisper | sprites/camp/icon-whisper.png | PixelLab generation, spec `prompts/icon-whisper.json` | PixelLab ToS | 2026-10-02 |
 | icon-tricks | sprites/camp/icon-tricks.png | Hand-drawn in code (`apps/web/art/expedition/draw-icon-tricks.mjs`) | Project original | 2026-10-02 |
 | marker-animal | sprites/fireside/marker-animal.png | Hand-drawn in code (`apps/web/art/expedition/draw-marker-animal.mjs`) | Project original | 2026-10-05 |
-| backpack-open | sprites/fireside/backpack-open.png | PixelLab generation, spec `prompts/backpack-open.json` | PixelLab ToS | 2026-10-02 |
 | mascot-panda | sprites/camp/mascot-panda.png | PixelLab generation (red panda object, v3 animation), spec `prompts/mascot-panda.json` | PixelLab ToS | 2026-10-02 |
 | mascot-cheer | sprites/camp/mascot-cheer.png | PixelLab generation (red panda object, v3 animation), spec `prompts/mascot-cheer.json` | PixelLab ToS | 2026-10-02 |
 | mascot-flop | sprites/camp/mascot-flop.png | PixelLab generation (red panda object, v3 animation), spec `prompts/mascot-flop.json` | PixelLab ToS | 2026-10-02 |
@@ -129,6 +128,8 @@ Every asset is a PixelLab generation used under the PixelLab Terms of Service (h
 | title-trail | title/bg-title-trail.png | PixelLab generation, spec `prompts/title-trail.json` | PixelLab ToS | 2026-10-05 |
 | title-basecamp | title/bg-basecamp.png | PixelLab generation, spec `prompts/title-basecamp.json` | PixelLab ToS | 2026-10-05 |
 | signboard | sprites/ui/signboard.png | PixelLab generation, spec `prompts/signboard.json` | PixelLab ToS | 2026-10-05 |
+| backpack-icon | sprites/ui/backpack-icon.png | PixelLab generation, spec `prompts/backpack-icon.json` | PixelLab ToS | 2026-10-05 |
+| leather-panel | sprites/ui/leather-panel.png | PixelLab generation, spec `prompts/leather-panel.json` | PixelLab ToS | 2026-10-05 |
 
 ## Audio
 

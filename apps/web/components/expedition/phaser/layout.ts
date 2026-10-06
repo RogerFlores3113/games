@@ -449,44 +449,106 @@ export function trailStopXs(count: number): number[] {
 }
 
 // ---------------------------------------------------------------------------
-// Loadout gear: your slots, then the backpack grid, in the backpack zone
+// The item bar under the trail: your slots, the backpack, your explorer
 // ---------------------------------------------------------------------------
 
-export const GEAR_HEADER_H = 13;
-export const GEAR_SLOT_W = 112;
-export const PACK_COLS = 3;
-export const PACK_ROWS = 2;
-const GEAR_TILE_MAX_H = 22;
-const GEAR_GAP = 3;
+const ITEM_BAR_HEADER_H = 13;
+const BAR_SLOT_W = 136;
+const BAR_SLOT_MAX_H = 22;
+const BAR_PACK_W = 56;
+const BAR_EXPLORER_COLS = 2;
+export const BAR_TILE_H = 20;
+const BAR_GAP = 3;
 
-export interface GearLayout {
-  slotArea: Rect;
+export interface ItemBarLayout {
   slots: Rect[];
-  packArea: Rect;
-  /** One cell per backpack item shown on a page, row by row. */
-  pack: Rect[];
+  /** The backpack button: its icon above its two lines of label. */
+  backpack: Rect;
+  explorer: Rect;
+  /** Room for two rows of explorer tiles, two to a row. */
+  explorerTiles: Rect[];
 }
 
-/** Where each slot and backpack cell sits. The scene draws with it and
- * hit-tests drops with it, so a drop lands where the tile is drawn. */
-export function gearLayout(slotCount: number): GearLayout {
+/** Where the item bar puts your slots, the backpack and the explorer's
+ * tiles, in the trail's bar zone. */
+export function itemBarLayout(slotCount: number): ItemBarLayout {
   const zone = TRAIL_ZONES.backpack;
-  const top = zone.y + GEAR_HEADER_H;
+  const top = zone.y + ITEM_BAR_HEADER_H;
   const h = zone.y + zone.h - 3 - top;
-  const slotArea = { x: zone.x + 4, y: top, w: GEAR_SLOT_W, h };
   const n = Math.max(1, slotCount);
-  const slotH = Math.min(GEAR_TILE_MAX_H, Math.floor((h - (n - 1) * 2) / n));
-  const slots = Array.from({ length: slotCount }, (_, i) => ({ x: slotArea.x, y: top + i * (slotH + 2), w: GEAR_SLOT_W, h: slotH }));
-  const packX = slotArea.x + GEAR_SLOT_W + 8;
-  const packArea = { x: packX, y: top, w: zone.x + zone.w - 4 - packX, h };
-  const cellW = Math.floor((packArea.w - (PACK_COLS - 1) * GEAR_GAP) / PACK_COLS);
-  const pack = Array.from({ length: PACK_COLS * PACK_ROWS }, (_, i) => ({
-    x: packX + (i % PACK_COLS) * (cellW + GEAR_GAP),
-    y: top + Math.floor(i / PACK_COLS) * (GEAR_TILE_MAX_H + GEAR_GAP),
-    w: cellW,
-    h: GEAR_TILE_MAX_H,
+  const slotH = Math.min(BAR_SLOT_MAX_H, Math.floor((h - (n - 1) * 2) / n));
+  const slots = Array.from({ length: slotCount }, (_, i) => ({ x: zone.x + 4, y: top + i * (slotH + 2), w: BAR_SLOT_W, h: slotH }));
+  const backpack = { x: zone.x + 4 + BAR_SLOT_W + 6, y: zone.y + 3, w: BAR_PACK_W, h: zone.h - 6 };
+  const ex = backpack.x + backpack.w + 6;
+  const explorer = { x: ex, y: zone.y + 3, w: zone.x + zone.w - 4 - ex, h: zone.h - 6 };
+  const tileW = Math.floor((explorer.w - BAR_GAP * (BAR_EXPLORER_COLS - 1)) / BAR_EXPLORER_COLS);
+  const explorerTiles = Array.from({ length: 2 * BAR_EXPLORER_COLS }, (_, i) => ({
+    x: ex + (i % BAR_EXPLORER_COLS) * (tileW + BAR_GAP),
+    y: top + Math.floor(i / BAR_EXPLORER_COLS) * (BAR_TILE_H + BAR_GAP),
+    w: tileW,
+    h: BAR_TILE_H,
   }));
-  return { slotArea, slots, packArea, pack };
+  return { slots, backpack, explorer, explorerTiles };
+}
+
+// ---------------------------------------------------------------------------
+// The inventory window: the backpack's patches, your slots below, what the
+// hovered item does on the right, the discard patch under it
+// ---------------------------------------------------------------------------
+
+/** The window at its art's size, centred under the trail map. */
+export const INVENTORY_WINDOW: Rect = { x: 192, y: 138, w: 256, h: 192 };
+export const INVENTORY_CELL = 34;
+const INVENTORY_GAP = 4;
+const INVENTORY_PAD = 14;
+const INVENTORY_PACK_ROWS = 2;
+
+export interface InventoryLayout {
+  window: Rect;
+  title: Point;
+  close: Rect;
+  /** One patch per backpack cell, row by row; `packArea` holds them all. */
+  pack: Rect[];
+  packArea: Rect;
+  slotsLabel: Point;
+  slots: Rect[];
+  /** What the hovered item does. */
+  info: Rect;
+  discard: Rect;
+  /** Beside the discard patch: what dropping there does. */
+  discardText: Point;
+  /** The hint, a notice, the discard confirm or the power being aimed. */
+  footer: Rect;
+}
+
+/** The window's parts for `slotCount` slots and `cells` backpack patches
+ * (more than six when a camp rule overfilled the backpack). The scene draws
+ * with it and hit-tests drops with it. */
+export function inventoryLayout(window: Rect, slotCount: number, cells: number): InventoryLayout {
+  const step = INVENTORY_CELL + INVENTORY_GAP;
+  const x = window.x + INVENTORY_PAD;
+  const cols = Math.max(3, Math.ceil(cells / INVENTORY_PACK_ROWS));
+  const packTop = window.y + 30;
+  const pack = Array.from({ length: cells }, (_, i) => ({ x: x + (i % cols) * step, y: packTop + Math.floor(i / cols) * step, w: INVENTORY_CELL, h: INVENTORY_CELL }));
+  const packArea = { x, y: packTop, w: cols * step - INVENTORY_GAP, h: INVENTORY_PACK_ROWS * step - INVENTORY_GAP };
+  const slotsTop = packArea.y + packArea.h + 16;
+  const slots = Array.from({ length: slotCount }, (_, i) => ({ x: x + i * step, y: slotsTop, w: INVENTORY_CELL, h: INVENTORY_CELL }));
+  const right = window.x + window.w - INVENTORY_PAD;
+  const infoX = Math.max(packArea.x + packArea.w, x + slotCount * step - INVENTORY_GAP) + 10;
+  const discard = { x: infoX, y: slotsTop, w: INVENTORY_CELL, h: INVENTORY_CELL };
+  return {
+    window,
+    title: { x, y: window.y + 13 },
+    close: { x: right - 16, y: window.y + 11, w: 16, h: 14 },
+    pack,
+    packArea,
+    slotsLabel: { x, y: slotsTop - 10 },
+    slots,
+    info: { x: infoX, y: packTop, w: right - infoX, h: slotsTop - 14 - packTop },
+    discard,
+    discardText: { x: discard.x + discard.w + 4, y: slotsTop + 4 },
+    footer: { x, y: slotsTop + INVENTORY_CELL + 6, w: right - x, h: 2 * LABEL_CELL.h + 3 },
+  };
 }
 
 /** `count` equal boxes with `gap` between them, filling at most `maxW` px

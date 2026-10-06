@@ -8,6 +8,7 @@ import {
   clickHandCard,
   clickUntilChanged,
   draftOffer,
+  openInventory,
   openVote,
   trailStep,
   walkTrail,
@@ -52,7 +53,7 @@ const NEW_EXPEDITION_ID = "run-end:new-expedition";
 const WANTED = [
   "muster", "muster-picked", "muster-voted", "loadout-first", "objective-pick", "trick-led", "mid-trick", "ability-targeting", "whisper-targeting",
   "whisper-sent", "whisper-received", "last-trick-glance", "objective-hover", "loadout-after-fail", "between-camps-draft", "route-vote",
-  "route-voted", "event", "loadout", "next-camp", "run-end-lost", "run-end-guest",
+  "route-voted", "event", "loadout", "inventory", "next-camp", "run-end-lost", "run-end-guest",
 ];
 /** Phases play rarely reaches; each is also captured from a rewritten view. */
 const RARE = [
@@ -132,6 +133,8 @@ function trailPhase(m: TrailView & { trail?: TrailStopView[] | null }): string {
       return openVote(m) !== null ? "route-vote" : "route-voted";
     case "event":
       return "event";
+    case "shop":
+      return "shop";
     case "loadout":
       if ((m.trail ?? []).some((stop) => stop.state === "here" && stop.caption.startsWith("try"))) return "loadout-after-fail";
       return m.vote != null ? "loadout-first" : "loadout";
@@ -152,6 +155,11 @@ async function trail(page: Page, tour: Tour | null): Promise<void> {
       if (offer !== null && model.panel?.kind === "draft") await hoverObject(page, offer[0]!.objectId);
       await tour.shot(trailPhase(await getModel<TrailView>(page)));
       await page.mouse.move(5, 5);
+      if (!tour.has("inventory") && (await getModel<TrailView>(page)).panel?.kind === "loadout") {
+        await openInventory(page);
+        await tour.shot("inventory");
+        await clickUntilChanged<TrailView>(page, "inventory:close", (m) => m.inventory?.open !== true);
+      }
     }
     if (!(await trailStep(page, { length: "short", preference: DRAFT_PREFERENCE }))) return;
   }
@@ -385,7 +393,7 @@ async function newExpedition(pages: Page[]): Promise<void> {
 
 const h = (camp: number, attempt: number, status: "cleared" | "failed") => ({ camp, attempt, location: "jungle", weather: "fair", status, coins: status === "cleared" ? 7 : 0 });
 
-const PREVIEW = { index: 2, location: "jungle", weather: "fair", pairing: null, event: "event", slotKinds: ["win-card", "win-card", "win-card"], bossId: null, shop: false, survey: null };
+const PREVIEW = { index: 2, location: "jungle", weather: "fair", pairing: null, slotKinds: ["win-card", "win-card", "win-card"], bossId: null, shop: false, survey: null };
 
 function wonView(game: Game): Game {
   return {
@@ -398,13 +406,13 @@ function wonView(game: Game): Game {
   };
 }
 
-/** The event after a three-way route tie, mid coin flip. */
+/** The loadout after a three-way route tie, mid coin flip. */
 function routeTieView(game: Game): Game {
   return {
     ...game,
     history: [h(1, 1, "cleared")],
     lastVote: { topic: "route", tally: [{ choice: "a", votes: 1 }, { choice: "b", votes: 1 }, { choice: "c", votes: 1 }], tied: ["a", "b", "c"], winner: "b" },
-    stage: { tag: "event", event: "event", next: PREVIEW, readySeatIds: [] },
+    stage: { tag: "loadout", camp: PREVIEW, mods: [], readySeatIds: [] },
   };
 }
 
@@ -414,15 +422,15 @@ function lengthTieView(game: Game): Game {
     ...game,
     history: [],
     lastVote: { topic: "length", tally: [{ choice: "short", votes: 1 }, { choice: "standard", votes: 1 }, { choice: "long", votes: 0 }], tied: ["short", "standard"], winner: "standard" },
-    stage: { tag: "loadout", camp: { ...PREVIEW, index: 1, event: null, slotKinds: ["win-card", "win-card"] }, mods: [], yourSlots: 2, shop: null, readySeatIds: [] },
+    stage: { tag: "loadout", camp: { ...PREVIEW, index: 1, slotKinds: ["win-card", "win-card"] }, mods: [], readySeatIds: [] },
   };
 }
 
 const uses = (left: number, of: number) => ({ kind: "uses", left, of });
 
-/** The loadout before camp 3's animal boss: one item equipped and two in
- * the backpack, the shop with supplies, an item a teammate bought, and the
- * Explorer's upgrades just out of reach. */
+/** The shop before camp 3's animal boss: one item equipped and two in the
+ * backpack, supplies, an item a teammate bought, and the Explorer's
+ * upgrades just out of reach. */
 function shopView(game: Game): Game {
   const mate = game.seats.find((s) => s.seatId !== game.yourSeatId)!.seatId;
   return {
@@ -448,10 +456,9 @@ function shopView(game: Game): Game {
           },
     ),
     stage: {
-      tag: "loadout",
-      camp: { ...PREVIEW, index: 3, event: null, bossId: null, shop: true },
-      mods: [],
-      yourSlots: 2,
+      tag: "shop",
+      next: 3,
+      camp: null,
       shop: {
         stock: [
           { stockId: "supplies", what: { kind: "supplies" }, price: 6, soldTo: null },
@@ -592,7 +599,7 @@ function floodView(game: Game): Game {
 
 /** The loadout under Heavy fog: the crew's items hidden. */
 function fogLoadoutView(game: Game): Game {
-  return fogged({ ...game, stage: { tag: "loadout", camp: { ...PREVIEW, weather: "fog" }, mods: [mod("jungle", "location"), mod("fog", "weather")], yourSlots: 2, shop: null, readySeatIds: [] } });
+  return fogged({ ...game, stage: { tag: "loadout", camp: { ...PREVIEW, weather: "fog" }, mods: [mod("jungle", "location"), mod("fog", "weather")], readySeatIds: [] } });
 }
 
 /** A route vote whose options show every weather, and a pairing. */
@@ -777,7 +784,7 @@ async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<v
       (g) => ({
         ...g,
         history: [h(1, 1, "cleared")],
-        stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: { kind: "standard", bundles: [["bait", "smoke-signal"], ["whetstone", "parrot"], ["trail-map"]] }, pendingSeatIds: [g.yourSeatId] },
+        stage: { tag: "draft", next: 2, cleared: 1, payout: 8, yourOffer: { kind: "standard", bundles: [["bait", "smoke-signal"], ["whetstone", "parrot"], ["trail-map"]] }, pendingSeatIds: [g.yourSeatId] },
       }),
       "trail",
       "between-camps-draft-rewritten",
@@ -787,7 +794,7 @@ async function captureRare(host: Page, tour: Tour, rewrite: Rewriter): Promise<v
     (g) => ({
       ...g,
       history: [h(1, 1, "cleared")],
-      stage: { tag: "draft", cleared: 1, payout: 8, yourOffer: { kind: "standard", bundles: [["pocket-glass"], ["signal-flare"], ["first-aid-kit"]] }, pendingSeatIds: [g.yourSeatId] },
+      stage: { tag: "draft", next: 2, cleared: 1, payout: 8, yourOffer: { kind: "standard", bundles: [["pocket-glass"], ["signal-flare"], ["first-aid-kit"]] }, pendingSeatIds: [g.yourSeatId] },
     }),
     "trail",
     "draft-pack-rat",

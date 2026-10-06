@@ -5,8 +5,9 @@ import { buildTrailPrompt, PROMPT_MAX_CHARS } from "./build-prompt";
 import type { SceneServerInput, Tooltip, TopBar } from "./build-scene-model";
 import { buildTopBar } from "./build-scene-model";
 import { characterName, ownPickOf, usesLabel, type UsesLabel, liveSourceKeys, sourceBadges, sourceIdOfKey, sourceKind, sourceName, sourceRulesText, yourSourceId, type SourceKind } from "./source-text";
-import { bundleItemObjectId, bundleObjectId, crewObjectId, draftObjectId, kitObjectId, lengthObjectId, powerObjectId, READY_ID, rerollObjectId, routeObjectId } from "./expedition-ids";
-import { buildGear, buildShop, type Gear, type ShopPanel } from "./loadout-model";
+import { barSlotObjectId, bundleItemObjectId, bundleObjectId, crewObjectId, draftObjectId, kitObjectId, lengthObjectId, powerObjectId, previewObjectiveObjectId, READY_ID, rerollObjectId, routeObjectId } from "./expedition-ids";
+import { buildShop, type ShopPanel } from "./loadout-model";
+import { buildInventory, roomFor, type Inventory, type InventoryItem } from "./inventory-model";
 import { choiceFor, currentStep, isPicked, type LocalUiState, type PickEntity } from "./local-ui";
 import { cardLabel } from "./expedition-ids";
 import { bossLabel, focusCampIndex, modName, plannedBossAt } from "./view-access";
@@ -27,9 +28,8 @@ export interface TrailStop {
   index: number;
   state: "cleared" | "here" | "ahead";
   kind: StopKind;
-  /** Second label line under the marker: "cleared", "next", "try 2", or
-   * "boss" and "temple" ahead. The top bar names the boss of the camp the
-   * crew is at. */
+  /** Second label line under the marker: "cleared", "next" or "try 2";
+   * empty ahead, where the marker shows a boss camp or the temple. */
   caption: string;
 }
 
@@ -119,6 +119,60 @@ export interface MusterCrewRow {
   status: "choosing" | "ready" | "locked";
 }
 
+/** An objective a camp will deal, as a small card with a glyph: `?` win a
+ * card, `1`-`5` win in that order, `L` win in the last trick, `#` an exact
+ * trick count, `0` no tricks. `key` finds its plain words. */
+export interface ObjectiveIcon {
+  glyph: string;
+  key: string;
+  objectId: string;
+}
+
+/** Each objective icon's glyph and plain words, by its key. `A`-`E` (a
+ * second ordered track) and `>` / `<` (more or fewer tricks) are reserved
+ * for kinds the catalogue does not deal yet. */
+const OBJECTIVE_WORDS: Readonly<Record<string, { glyph: string; title: string; text: string }>> = {
+  "win-card": { glyph: "?", title: "Win a card", text: "The deal names a card. Someone in the crew must win it in a trick." },
+  "ordered:last": { glyph: "L", title: "Win it last", text: "The deal names a card. It must be won in the camp's final trick." },
+  "trick-count": { glyph: "#", title: "A trick count", text: "The deal makes this win no tricks, or an exact number of tricks." },
+  "exactly-n": { glyph: "#", title: "Exact tricks", text: "Whoever takes it must win exactly the number of tricks it names." },
+  "no-tricks": { glyph: "0", title: "No tricks", text: "Whoever takes it must win no tricks at all." },
+  "more-tricks": { glyph: ">", title: "More tricks", text: "Whoever takes it must win more tricks than the number it names." },
+  "fewer-tricks": { glyph: "<", title: "Fewer tricks", text: "Whoever takes it must win fewer tricks than the number it names." },
+};
+
+const ORDINAL = ["1st", "2nd", "3rd", "4th", "5th"];
+
+/** An objective icon's glyph and plain words, or null for a key no icon has. */
+export function objectiveWords(key: string): { glyph: string; title: string; text: string } | null {
+  const [kind, place] = key.split(":");
+  const n = Number(place);
+  if (kind === "ordered" && Number.isInteger(n) && n >= 1) {
+    const ordinal = ORDINAL[n - 1] ?? `#${n}`;
+    return { glyph: String(n), title: `Win in order: ${ordinal}`, text: `The deal names a card. Win it ${ordinal} among the ordered cards, before any numbered after it.` };
+  }
+  if (kind === "track-b" && Number.isInteger(n) && n >= 1 && n <= 5) {
+    const letter = "ABCDE"[n - 1]!;
+    return { glyph: letter, title: `Second order: ${letter}`, text: `A second ordered track: win this card ${ORDINAL[n - 1]} of the lettered cards.` };
+  }
+  return OBJECTIVE_WORDS[key] ?? null;
+}
+
+/** Every objective icon the panel shows, for the scene to find the one under
+ * the pointer. */
+export function previewObjectiveIcons(panel: TrailPanel): ObjectiveIcon[] {
+  switch (panel.kind) {
+    case "loadout":
+      return panel.next.objectives;
+    case "shop":
+      return panel.next?.objectives ?? [];
+    case "route":
+      return panel.options.flatMap((option) => option.next.objectives);
+    default:
+      return [];
+  }
+}
+
 /** A camp as a route card or the loadout shows it. */
 export interface CampPreview {
   title: string;
@@ -133,8 +187,8 @@ export interface CampPreview {
   weatherId: string;
   /** What the location and weather make together; null for none. */
   pairing: string | null;
-  /** "3 cards to win", "Win 2 in order", "A trick count". */
-  objectives: string[];
+  /** One icon per objective the camp deals. */
+  objectives: ObjectiveIcon[];
   /** "Animal boss", "The Temple"; null for a plain camp. */
   boss: string | null;
   /** The boss's id and name once a route preview has revealed it; null at
@@ -174,18 +228,18 @@ export interface PowerButton {
 export interface VoteResult {
   /** Unique per vote, so the flip plays once however often the scene redraws. */
   key: string;
+  /** "Run length" or "Route". */
   title: string;
   winner: string;
-  /** Every choice with its votes, in ballot order. */
-  tally: { label: string; votes: number; winner: boolean }[];
   /** Each face is a tied choice and the glyph its side of the coin shows. */
   flip: { faces: { label: string; glyph: string }[]; winner: { label: string; glyph: string } } | null;
 }
 
 export type DraftPanel =
   /** `ownPick`: the character whose own items these are (the Pack Rat's
-   * pick after the draft), else null. */
-  | { kind: "offer"; bundles: DraftBundle[]; ownPick: string | null }
+   * pick after the draft), else null. `fits`: your backpack has room for a
+   * bundle; else each Take opens it. */
+  | { kind: "offer"; bundles: DraftBundle[]; ownPick: string | null; fits: boolean }
   /** What you took, as the bundle's items; after a refresh, the newest item. */
   | { kind: "taken"; items: { sourceId: string; name: string }[] }
   | { kind: "none"; text: string };
@@ -197,10 +251,22 @@ export type TrailPanel =
   | { kind: "route"; options: RouteCard[] }
   /** `nextTitle`: "Camp 2 of 6", the camp the event comes before. */
   | { kind: "event"; name: string; text: string; nextTitle: string }
-  /** The loadout, or the shop before a boss camp (`shop` set). `next` is
-   * null at a shop whose route is not voted yet; `title` heads the panel.
-   * `gear` is null for a spectator. */
-  | { kind: "loadout"; title: string; next: CampPreview | null; gear: Gear | null; shop: ShopPanel | null };
+  /** The shop before a boss camp. `next` previews the camp only on a
+   * replay; on the way there its route is not voted yet. */
+  | { kind: "shop"; next: CampPreview | null; shop: ShopPanel }
+  /** The loadout: the camp it sets out for. */
+  | { kind: "loadout"; next: CampPreview };
+
+/** The bar under the trail: your item slots, the backpack that opens the
+ * inventory window, and your character's powers and upgrade. */
+export interface ItemBar {
+  slots: { objectId: string; item: InventoryItem | null }[];
+  /** "1 of 2". */
+  count: string;
+  backpack: { stored: number; capacity: number };
+  /** Your character's powers, then your upgrade. */
+  explorer: KitItem[];
+}
 
 /** One of your live sources: `sourceKey` is what you act through, and
  * `sourceId` the def it names. */
@@ -239,6 +305,9 @@ export interface TrailModel {
   panel: TrailPanel;
   /** Your character, your upgrade, then your equipped items. Null for a spectator. */
   kit: KitItem[] | null;
+  /** Null for a spectator. */
+  itemBar: ItemBar | null;
+  inventory: Inventory | null;
   crew: CrewRow[];
   /** The muster's Lock in, the loadout's Set out or the event's Continue;
    * null otherwise or for a spectator. Lock in is "disabled" until you have
@@ -282,24 +351,26 @@ function buildTrail(view: View): TrailStop[] | null {
     const parts: string[] = [];
     if (state === "cleared") parts.push("cleared");
     if (state === "here") parts.push(results.length === 0 ? "next" : `try ${results.length + 1}`);
-    if (state === "ahead" && kind !== "camp") parts.push(kind === "temple" ? "temple" : "boss");
     return { index, state, kind, caption: parts.join(", ") };
   });
 }
 
-function objectiveLabels(slotKinds: readonly string[]): string[] {
-  const count = (kind: string) => slotKinds.filter((k) => k === kind).length;
-  const labels: string[] = [];
-  const cards = count("win-card");
-  if (cards > 0) labels.push(`${cards} ${cards === 1 ? "card" : "cards"} to win`);
-  if (count("ordered") > 0) labels.push(`Win ${count("ordered")} in order`);
-  if (count("trick-count") > 0) labels.push("A trick count");
-  if (count("no-tricks") > 0) labels.push("Win no tricks");
-  if (count("exactly-n") > 0) labels.push("Exact tricks");
-  return labels;
+/** The cards to win, then the ordered ones numbered in turn, then the
+ * trick counts. */
+function objectiveIcons(slotKinds: readonly string[], owner: string): ObjectiveIcon[] {
+  const rank = (kind: string) => (kind === "win-card" ? 0 : kind === "ordered" ? 1 : 2);
+  let ordered = 0;
+  return [...slotKinds]
+    .sort((a, b) => rank(a) - rank(b))
+    .flatMap((kind, i) => {
+      const key = kind === "ordered" ? `ordered:${++ordered}` : kind;
+      const words = objectiveWords(key);
+      return words === null ? [] : [{ glyph: words.glyph, key, objectId: previewObjectiveObjectId(owner, i) }];
+    });
 }
 
-export function campPreview(view: View, camp: ExpeditionCampPreviewView): CampPreview {
+/** `owner` names the preview for its icons' ids: `loadout`, `shop`, or a route id. */
+export function campPreview(view: View, camp: ExpeditionCampPreviewView, owner = "loadout"): CampPreview {
   const backdrop = campBackdrop(camp);
   const bossId = backdrop === camp.bossId ? null : camp.bossId;
   return {
@@ -311,7 +382,7 @@ export function campPreview(view: View, camp: ExpeditionCampPreviewView): CampPr
     backdrop,
     weatherId: camp.weather,
     pairing: camp.pairing === null ? null : modDisplayName(camp.pairing),
-    objectives: objectiveLabels(camp.slotKinds),
+    objectives: objectiveIcons(camp.slotKinds, owner),
     boss: bossLabel(view, camp.index),
     bossId,
     bossName: bossId === null ? null : modDisplayName(bossId),
@@ -412,10 +483,13 @@ function bundleFor(itemIds: readonly string[], bundle: number): DraftBundle {
   };
 }
 
-function buildDraft(view: View, yourOffer: { bundles: string[][] } | null, taken: readonly string[] | null): DraftPanel {
+function buildDraft(view: View, yourOffer: { bundles: string[][] } | null, taken: readonly string[] | null, inventory: Inventory | null): DraftPanel {
   const you = view.seats.find((s) => s.seatId === view.yourSeatId);
   if (you === undefined) return { kind: "none", text: "The crew is choosing" };
-  if (yourOffer !== null) return { kind: "offer", bundles: yourOffer.bundles.map(bundleFor), ownPick: ownPickOf(yourOffer.bundles) };
+  if (yourOffer !== null) {
+    const size = Math.max(0, ...yourOffer.bundles.map((b) => b.length));
+    return { kind: "offer", bundles: yourOffer.bundles.map(bundleFor), ownPick: ownPickOf(yourOffer.bundles), fits: inventory === null || roomFor(inventory) >= size };
+  }
   if (taken !== null && taken.length > 0) return { kind: "taken", items: taken.map((sourceId) => ({ sourceId, name: sourceName(sourceId) })) };
   // Instances mint in order, so the newest is the last one taken.
   const newest = [...you.items.equipped, ...(you.items.backpack ?? [])].sort((a, b) => Number(a.uid.slice(2)) - Number(b.uid.slice(2))).at(-1);
@@ -448,7 +522,7 @@ function buildRoutes(server: SceneServerInput, stage: Extract<View["stage"], { t
       id: option.id,
       objectId: routeObjectId(option.id),
       label: `Route ${option.id.toUpperCase()}`,
-      next: campPreview(view, option.next),
+      next: campPreview(view, option.next, option.id),
       voters: votersFor(server, stage.ballots, option.id),
       yours: yourBallot?.choice === option.id,
       votable: view.yourSeatId !== null && view.seats.some((s) => s.seatId === view.yourSeatId),
@@ -479,19 +553,6 @@ function buildPowers(view: View, ui: LocalUiState): PowerButton[] {
     });
 }
 
-/** Marks what the power being aimed may pick: your items for a sale or a
- * gift, with a sale's price as the tile's tag. */
-function aimGear(view: View, ui: LocalUiState, gear: Gear | null): Gear | null {
-  if (gear === null || currentStep(ui, view)?.kind !== "item") return gear;
-  const selling = ui.targeting?.mode === "ability" && yourSourceId(view, ui.targeting.sourceKey) === "businessman";
-  const aim = (item: Gear["backpack"][number]): Gear["backpack"][number] => {
-    const targetable = choiceFor(ui, view, "item", item.uid) !== null;
-    const sellsFor = SOURCE_DISPLAY[item.itemId]?.item?.sellsFor;
-    return { ...item, targetable, tag: targetable && selling && sellsFor !== undefined ? `+${sellsFor}` : null };
-  };
-  return { ...gear, slots: gear.slots.map((slot) => ({ ...slot, item: slot.item === null ? null : aim(slot.item) })), backpack: gear.backpack.map(aim) };
-}
-
 /** While a power is aimed: what to pick next. */
 function aimPrompt(view: View, ui: LocalUiState): Prompt | null {
   const step = currentStep(ui, view);
@@ -509,33 +570,34 @@ function campTitle(view: View, index: number): string {
   return view.campCount === null ? `Camp ${index}` : `Camp ${index} of ${view.campCount}`;
 }
 
-/** The loadout, or the shop before a boss camp: your gear beside the camp
- * ahead (once its route is chosen) and the shop's stock. */
-function buildLoadout(server: SceneServerInput, stage: Extract<View["stage"], { tag: "loadout" | "shop" }>, ui: LocalUiState): TrailPanel {
+/** The shop before a boss camp, and the camp it leads to on a replay. */
+function buildShopPanel(server: SceneServerInput, stage: Extract<View["stage"], { tag: "shop" }>, inventory: Inventory | null): TrailPanel {
   const view = server.game;
   const you = view.seats.find((s) => s.seatId === view.yourSeatId);
   const ready = you !== undefined && stage.readySeatIds.includes(you.seatId);
-  const next = stage.camp === null ? null : campPreview(view, stage.camp);
   return {
-    kind: "loadout",
-    title: stage.tag === "shop" && next === null ? `Before camp ${stage.next}` : (next?.title ?? ""),
-    next,
-    gear: you === undefined ? null : aimGear(view, ui, buildGear(you, view.yourItemSlots, ready, ui.packPage)),
-    shop:
-      stage.tag !== "shop"
-        ? null
-        : buildShop({ shop: stage.shop, purse: view.purse, supplies: view.supplies, you, ready, nameOf: (seatId) => (seatId === view.yourSeatId ? "you" : nameOf(server, seatId)) }),
+    kind: "shop",
+    next: stage.camp === null ? null : campPreview(view, stage.camp, "shop"),
+    shop: buildShop({
+      shop: stage.shop,
+      purse: view.purse,
+      supplies: view.supplies,
+      you,
+      ready,
+      room: inventory === null ? 0 : roomFor(inventory),
+      nameOf: (seatId) => (seatId === view.yourSeatId ? "you" : nameOf(server, seatId)),
+    }),
   };
 }
 
-function buildPanel(server: SceneServerInput, ui: LocalUiState): TrailPanel {
+function buildPanel(server: SceneServerInput, ui: LocalUiState, inventory: Inventory | null): TrailPanel {
   const view = server.game;
   const stage = view.stage;
   switch (stage.tag) {
     case "muster":
       return buildMuster(server, stage);
     case "draft":
-      return { kind: "draft", draft: buildDraft(view, stage.yourOffer, ui.takenBundle) };
+      return { kind: "draft", draft: buildDraft(view, stage.yourOffer, ui.takenBundle, inventory) };
     case "route":
       return { kind: "route", options: buildRoutes(server, stage) };
     case "event": {
@@ -543,12 +605,10 @@ function buildPanel(server: SceneServerInput, ui: LocalUiState): TrailPanel {
       return { kind: "event", name: event?.name ?? modName(stage.event), text: event?.text ?? "", nextTitle: campTitle(view, stage.next) };
     }
     case "shop":
+      return buildShopPanel(server, stage, inventory);
     case "loadout":
-      return buildLoadout(server, stage, ui);
-    case "camp": {
-      const next = campPreview(view, stage.camp);
-      return { kind: "loadout", title: next.title, next, gear: null, shop: null };
-    }
+    case "camp":
+      return { kind: "loadout", next: campPreview(view, stage.camp) };
     case "ended":
       return { kind: "draft", draft: { kind: "none", text: "" } };
   }
@@ -617,6 +677,16 @@ function buildKit(view: View): KitItem[] | null {
   });
 }
 
+function buildItemBar(view: View, inventory: Inventory | null, kit: KitItem[] | null): ItemBar | null {
+  if (inventory === null || kit === null) return null;
+  return {
+    slots: inventory.slots.map((slot, i) => ({ objectId: barSlotObjectId(i), item: slot.item })),
+    count: `${inventory.equipped.length} of ${inventory.slots.length}`,
+    backpack: { stored: inventory.stored, capacity: inventory.capacity },
+    explorer: kit.filter((k) => k.kind !== "item"),
+  };
+}
+
 function buildReady(view: View): TrailModel["ready"] {
   const stage = view.stage;
   const you = view.seats.find((s) => s.seatId === view.yourSeatId);
@@ -663,7 +733,6 @@ function buildVote(view: View): VoteResult | null {
     key: `${vote.topic}:${focusCampIndex(view) ?? 0}`,
     title: vote.topic === "length" ? "Run length" : "Route",
     winner: label(vote.winner),
-    tally: vote.tally.map((t) => ({ label: label(t.choice), votes: t.votes, winner: t.choice === vote.winner })),
     flip:
       vote.tied === null
         ? null
@@ -675,20 +744,34 @@ function buildVote(view: View): VoteResult | null {
 }
 
 function buildTooltip(view: View, ui: LocalUiState): Tooltip | null {
+  if (ui.tooltipPreviewObjective !== null) {
+    const words = objectiveWords(ui.tooltipPreviewObjective);
+    return words === null ? null : { title: words.title, text: words.text, badges: [], reason: null };
+  }
   if (ui.tooltipSourceId === null) return null;
   const rules = sourceRulesText(sourceIdOfKey(view.seats.find((s) => s.seatId === view.yourSeatId), ui.tooltipSourceId));
   return rules === null ? null : { ...rules, reason: null };
 }
 
+/** A draft offer your backpack has no room for asks you to make room first. */
+function fullPrompt(panel: TrailPanel): Prompt | null {
+  return panel.kind === "draft" && panel.draft.kind === "offer" && !panel.draft.fits ? { text: "Your backpack is full. Discard an item to take one", tone: "alert" } : null;
+}
+
 export function buildTrailModel(server: SceneServerInput, ui: LocalUiState, reconnecting = false): TrailModel {
   const { game: view, roomSeats } = server;
+  const inventory = buildInventory(view, ui);
+  const panel = buildPanel(server, ui, inventory);
+  const kit = buildKit(view);
   return {
     sceneKey: "trail",
     topBar: buildTopBar(view),
-    prompt: aimPrompt(view, ui) ?? buildTrailPrompt(view, roomSeats, { reconnecting }),
+    prompt: aimPrompt(view, ui) ?? (reconnecting ? null : fullPrompt(panel)) ?? buildTrailPrompt(view, roomSeats, { reconnecting }),
     trail: buildTrail(view),
-    panel: buildPanel(server, ui),
-    kit: buildKit(view),
+    panel,
+    kit,
+    itemBar: buildItemBar(view, inventory, kit),
+    inventory,
     crew: buildCrew(server, ui),
     ready: buildReady(view),
     status: buildStatus(view),

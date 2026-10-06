@@ -51,6 +51,17 @@ export interface Gear {
   locked: boolean;
 }
 
+/** The inventory window's model (apps/web/lib/expedition/inventory-model.ts). */
+interface Inventory {
+  open: boolean;
+  equipped: string[];
+  slots: { objectId: string; item: GearTile | null }[];
+  /** The backpack's items, then its empty patches. */
+  backpack: { objectId: string; item: GearTile | null }[];
+  locked: boolean;
+  discard: { uid: string } | null;
+}
+
 export interface ShopEntry {
   stockId: string;
   objectId: string;
@@ -60,22 +71,24 @@ export interface ShopEntry {
 
 export type TrailPanel =
   | { kind: "muster"; characters: MusterCard[]; lengths: VoteOption[] }
-  | { kind: "draft"; draft: { kind: "offer"; bundles: DraftTile[] } | { kind: "taken" | "none" } }
+  | { kind: "draft"; draft: { kind: "offer"; bundles: DraftTile[]; fits: boolean } | { kind: "taken" | "none" } }
   | { kind: "route"; options: VoteOption[] }
   | { kind: "event" }
-  | { kind: "loadout"; gear: Gear | null; shop: { purse: number; entries: ShopEntry[] } | null };
+  | { kind: "shop"; shop: { purse: number; entries: ShopEntry[] } }
+  | { kind: "loadout" };
 
 export interface TrailView {
   sceneKey?: string;
   topBar?: { supplies: number; purse: number };
   panel?: TrailPanel;
   kit?: { sourceId: string; objectId: string; name: string }[] | null;
+  inventory?: Inventory | null;
   ready?: { state: "open" | "done" | "disabled"; label: string } | null;
   vote?: { title: string; winner: string; flip: unknown } | null;
 }
 
 /** What you may pick now: the free characters at muster until yours is
- * picked, then the bundles of a draft offer after a cleared camp. */
+ * picked, then the bundles of a draft offer. */
 export function draftOffer(m: TrailView): DraftTile[] | null {
   const panel = m.panel;
   if (panel?.kind === "muster") {
@@ -119,6 +132,10 @@ export async function trailStep(page: Page, choices: TrailChoices = {}): Promise
   const model = await getModel<TrailView>(page);
   const offer = draftOffer(model);
   if (offer !== null && offer.length > 0) {
+    if (model.panel?.kind === "draft" && model.panel.draft.kind === "offer" && model.panel.draft.fits === false) {
+      await discardLast(page);
+      return true;
+    }
     const pick = pickDraftOffer(offer, choices.preference);
     await clickUntilChanged<TrailView>(page, pick.objectId, (m) => m.sceneKey !== "trail" || draftOffer(m) === null, { perAttemptTimeoutMs: 15_000 });
     return true;
@@ -153,23 +170,37 @@ export async function trailToCamp(pages: readonly Page[], choices: TrailChoices 
   throw new Error("trailToCamp: the crew never left the trail");
 }
 
-/** Your slots and backpack in the loadout; null elsewhere or for a spectator. */
+/** Your slots and backpack between camps; null at the muster, in a camp
+ * or for a spectator. */
 export function gearOf(m: TrailView): Gear | null {
-  return m.panel?.kind === "loadout" ? m.panel.gear : null;
+  const inventory = m.inventory ?? null;
+  if (inventory === null || m.sceneKey !== "trail" || m.panel === undefined || m.panel.kind === "muster") return null;
+  return {
+    equipped: inventory.equipped,
+    slots: inventory.slots,
+    backpack: inventory.backpack.flatMap((cell) => (cell.item === null ? [] : [cell.item])),
+    locked: inventory.locked,
+  };
 }
 
 export function shopEntry(m: TrailView, stockId: string): ShopEntry | null {
-  return m.panel?.kind === "loadout" ? (m.panel.shop?.entries.find((e) => e.stockId === stockId) ?? null) : null;
+  return m.panel?.kind === "shop" ? (m.panel.shop.entries.find((e) => e.stockId === stockId) ?? null) : null;
+}
+
+/** Opens the inventory window from the item bar's backpack. */
+export async function openInventory(page: Page): Promise<TrailView> {
+  return clickUntilChanged<TrailView>(page, "backpack", (m) => m.inventory?.open === true);
 }
 
 const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((uid, i) => uid === b[i]);
 
-/** Taps one of your items: an equipped one goes back to the backpack, a
- * backpack one fills the next free slot. Returns the model once the
- * equipped set changed. */
+/** Clicks one of your items in the inventory window, opening it first: an
+ * equipped one goes back to the backpack, a backpack one fills the next
+ * free slot. Returns the model once the equipped set changed. */
 export async function tapGear(page: Page, uid: string): Promise<TrailView> {
   const before = gearOf(await getModel<TrailView>(page));
-  if (before === null) throw new Error("tapGear: not in a loadout");
+  if (before === null) throw new Error("tapGear: not between camps");
+  if ((await getModel<TrailView>(page)).inventory?.open !== true) await openInventory(page);
   return clickUntilChanged<TrailView>(page, objectIdOfItem(before, uid), (m) => !sameSet(gearOf(m)?.equipped ?? [], before.equipped));
 }
 
@@ -179,16 +210,12 @@ function objectIdOfItem(gear: Gear, uid: string): string {
   return tile.objectId;
 }
 
-/** Drags one of your items onto `targetId` (a `slot:<n>`, or any backpack
- * tile) with real mouse moves, and returns the model once the equipped set
- * changed. */
-export async function dragGear(page: Page, uid: string, targetId: string): Promise<TrailView> {
-  const before = gearOf(await getModel<TrailView>(page));
-  if (before === null) throw new Error("dragGear: not in a loadout");
+/** Presses on `fromId` and drags to `toId` with real mouse moves. */
+async function drag(page: Page, fromId: string, toId: string): Promise<void> {
   const at = (id: string) => page.evaluate((i) => window.__expeditionTest?.objects()[i] ?? null, id);
-  const from = await at(objectIdOfItem(before, uid));
-  const to = await at(targetId);
-  if (from === null || to === null) throw new Error(`dragGear: ${uid} or ${targetId} is not on screen`);
+  const from = await at(fromId);
+  const to = await at(toId);
+  if (from === null || to === null) throw new Error(`drag: ${fromId} or ${toId} is not on screen`);
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   for (let step = 1; step <= 8; step++) {
@@ -196,6 +223,16 @@ export async function dragGear(page: Page, uid: string, targetId: string): Promi
     await page.waitForTimeout(30);
   }
   await page.mouse.up();
+}
+
+/** Drags one of your items onto `targetId` (a `slot:<n>`, or any backpack
+ * patch) in the inventory window, opening it first, and returns the model
+ * once the equipped set changed. */
+export async function dragGear(page: Page, uid: string, targetId: string): Promise<TrailView> {
+  const before = gearOf(await getModel<TrailView>(page));
+  if (before === null) throw new Error("dragGear: not between camps");
+  if ((await getModel<TrailView>(page)).inventory?.open !== true) await openInventory(page);
+  await drag(page, objectIdOfItem(before, uid), targetId);
   let model = await getModel<TrailView>(page);
   for (let poll = 0; poll < 50 && sameSet(gearOf(model)?.equipped ?? [], before.equipped); poll++) {
     await page.waitForTimeout(100);
@@ -204,12 +241,27 @@ export async function dragGear(page: Page, uid: string, targetId: string): Promi
   return model;
 }
 
+/** Makes room in a full backpack: drags its last item onto the discard
+ * patch, confirms, and closes the window. */
+export async function discardLast(page: Page): Promise<void> {
+  const gear = gearOf(await openInventory(page));
+  const last = gear?.backpack.at(-1) ?? null;
+  if (gear === null || last === null) throw new Error("discardLast: nothing in the backpack");
+  for (let attempt = 0; attempt < 4 && (await getModel<TrailView>(page)).inventory?.discard?.uid !== last.uid; attempt++) {
+    await drag(page, last.objectId, "inventory:discard");
+    await page.waitForTimeout(150);
+  }
+  await clickUntilChanged<TrailView>(page, "inventory:discard-confirm", (m) => !(gearOf(m)?.backpack ?? []).some((t) => t.uid === last.uid));
+  await clickUntilChanged<TrailView>(page, "inventory:close", (m) => m.inventory?.open !== true);
+}
+
 /** Buys a shop entry and returns the model once the purse paid for it. */
 export async function buyStock(page: Page, stockId: string): Promise<TrailView> {
   const before = await getModel<TrailView>(page);
   const entry = shopEntry(before, stockId);
   if (entry === null || entry.buy.kind !== "buy") throw new Error(`buyStock: ${stockId} is not for sale (${JSON.stringify(entry?.buy)})`);
   const purse = before.topBar?.purse ?? 0;
+  if (before.inventory?.open === true) await clickUntilChanged<TrailView>(page, "inventory:close", (m) => m.inventory?.open !== true);
   return clickUntilChanged<TrailView>(page, entry.objectId, (m) => (m.topBar?.purse ?? purse) === purse - (entry.price ?? 0));
 }
 

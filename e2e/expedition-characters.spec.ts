@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { clickHandCard, clickUntilChanged, draftOffer, openVote, waitForScene, type TrailView } from "./expedition-driver";
+import { clickHandCard, clickUntilChanged, draftOffer, gearOf, openVote, waitForScene, type TrailView } from "./expedition-driver";
 import { getModel } from "./expedition-helpers";
 import { autoplay, shortcut, soloTable } from "./expedition-dev-panel";
 
@@ -38,8 +38,9 @@ interface Trail {
   panel:
     | { kind: "draft"; draft: { kind: string; bundles?: { objectId: string; items: { itemId: string; exclusive: boolean }[] }[] } }
     | { kind: "route"; options: { id: string; objectId: string; swapsBoss: string | null; reroll: { objectId: string } | null; next: { survey: string[] | null } }[] }
-    | { kind: "loadout"; gear: { equipped: string[]; slots: { item: { uid: string; objectId: string; targetable: boolean; tag: string | null } | null }[]; backpack: { uid: string }[] } | null }
     | { kind: string };
+  /** Your slots and backpack; the window opens while a power is aimed at an item. */
+  inventory: { open: boolean; equipped: string[]; slots: { item: { uid: string; objectId: string; targetable: boolean; tag: string | null } | null }[] } | null;
   powers: { sourceKey: string; objectId: string; label: string }[];
   crew: { seatId: string; objectId: string; isYou: boolean; targetable: boolean }[];
 }
@@ -148,8 +149,7 @@ test.describe("the nine characters", () => {
     await autoplay(panel, "others", 6);
     await expect.poll(async () => (await getModel<TrailView>(page)).panel?.kind).toBe("loadout");
     const loadout = await getModel<TrailView>(page);
-    const gear = loadout.panel?.kind === "loadout" ? loadout.panel.gear : null;
-    expect(gear?.equipped).toHaveLength(2);
+    expect(gearOf(loadout)?.equipped).toHaveLength(2);
     expect(loadout.kit?.map((k) => k.sourceId)[0]).toBe("jd");
     await capture(page, "jd-loadout");
   });
@@ -214,9 +214,8 @@ test.describe("the nine characters", () => {
     const before = await trail(page);
     const sell = before.powers.find((p) => p.sourceKey === "businessman")!;
     expect(sell.label).toBe("Sell an item");
-    const aimed = await clickUntilChanged<Trail>(page, sell.objectId, (m) => m.panel.kind === "loadout" && (m.panel as { gear: { slots: { item: { targetable: boolean } | null }[] } }).gear.slots.some((slot) => slot.item?.targetable === true));
-    const gear = (aimed.panel as Extract<Trail["panel"], { kind: "loadout" }>).gear!;
-    const tile = gear.slots.find((slot) => slot.item?.targetable)!.item!;
+    const aimed = await clickUntilChanged<Trail>(page, sell.objectId, (m) => m.inventory?.open === true && m.inventory.slots.some((slot) => slot.item?.targetable === true));
+    const tile = aimed.inventory!.slots.find((slot) => slot.item?.targetable)!.item!;
     expect(tile.tag).toBe("+2");
     await capture(page, "businessman-sell");
     await clickUntilChanged<Trail>(page, tile.objectId, (m) => m.topBar.purse === before.topBar.purse + 2);
@@ -263,7 +262,7 @@ test.describe("the nine characters", () => {
     await shortcut(panel, "jump-to-camp", { length: "short", camp: "2", stage: "loadout" });
     await waitForScene(page, "trail");
     const loadout = await trail(page);
-    expect((loadout.panel as Extract<Trail["panel"], { kind: "loadout" }>).gear!.slots).toHaveLength(3);
+    expect(loadout.inventory!.slots).toHaveLength(3);
     await capture(page, "pack-rat-slots");
     await shortcut(panel, "jump-to-camp", { length: "short", camp: "2", stage: "camp" });
     await waitForScene(page, "camp");
@@ -294,12 +293,12 @@ test.describe("the nine characters", () => {
     await shortcut(panel, "give-item", { seat: (await trail(page)).crew.find((r) => r.isYou)!.seatId, item: "bait" });
     await closePanel(page);
     const give = (await trail(page)).powers.find((p) => p.sourceKey === "pack-rat.quartermaster")!;
-    const aimed = await clickUntilChanged<Trail>(page, give.objectId, (m) => (m.panel as { gear?: { slots: { item: { targetable: boolean } | null }[] } }).gear?.slots.some((slot) => slot.item?.targetable === true) === true);
-    const tile = (aimed.panel as Extract<Trail["panel"], { kind: "loadout" }>).gear!.slots.find((slot) => slot.item?.targetable)!.item!;
+    const aimed = await clickUntilChanged<Trail>(page, give.objectId, (m) => m.inventory?.open === true && m.inventory.slots.some((slot) => slot.item?.targetable === true));
+    const tile = aimed.inventory!.slots.find((slot) => slot.item?.targetable)!.item!;
     const picked = await clickUntilChanged<Trail>(page, tile.objectId, (m) => m.crew.some((r) => r.targetable));
     await capture(page, "pack-rat-quartermaster");
     const mate = picked.crew.find((r) => r.targetable)!;
-    await clickUntilChanged<Trail>(page, mate.objectId, (m) => (m.panel as Extract<Trail["panel"], { kind: "loadout" }>).gear!.equipped.length === 0);
+    await clickUntilChanged<Trail>(page, mate.objectId, (m) => m.inventory!.equipped.length === 0);
   });
 
   test("the Cartographer sees three routes, the third to another boss, and rerolls one for a supply", async ({ page }) => {

@@ -1,5 +1,5 @@
 import { IDLE_DRAG, gestureCardId, type DragState } from "./card-drag";
-import { attemptOf } from "./view-access";
+import { attemptOf, focusCampIndex } from "./view-access";
 import type { ExpeditionAbilityStepView, ExpeditionTargetKind, ExpeditionView, RunAction } from "@games/rules";
 
 /**
@@ -77,12 +77,19 @@ export interface LocalUiState {
   trayPage: number;
   /** The items of the bundle you just took, to name them once the offer is gone. */
   takenBundle: string[] | null;
-  /** Which page of your backpack the loadout shows. */
-  packPage: number;
+  /** The stage (`inventoryStageKey`) the inventory window was opened in,
+   * or null while it is shut: the window closes when the stage moves on. It
+   * also shows while a power is aimed at one of your items. */
+  inventoryOpen: string | null;
+  /** The item the inventory window asks to confirm discarding. */
+  discardUid: string | null;
+  /** An objective icon of a camp preview, by its glyph's key (`win-card`,
+   * `ordered:2`, `no-tricks`), for its plain words. */
+  tooltipPreviewObjective: string | null;
 }
 
 export function initialLocalUi(): LocalUiState {
-  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipSourceId: null, tooltipObjectiveId: null, tooltipMateSource: null, tooltipModId: null, drag: IDLE_DRAG, trayPage: 0, takenBundle: null, packPage: 0 };
+  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipSourceId: null, tooltipObjectiveId: null, tooltipMateSource: null, tooltipModId: null, drag: IDLE_DRAG, trayPage: 0, takenBundle: null, inventoryOpen: null, discardUid: null, tooltipPreviewObjective: null };
 }
 
 function currentHandIds(view: ExpeditionView): string[] {
@@ -270,7 +277,22 @@ export function reconcileLocalUi(ui: LocalUiState, view: ExpeditionView): LocalU
     next = { ...next, hoveredCardId: null };
   }
 
+  if (next.inventoryOpen !== null && next.inventoryOpen !== inventoryStageKey(view)) {
+    next = { ...next, inventoryOpen: null, discardUid: null };
+  }
+  if (next.discardUid !== null) {
+    const you = view.seats.find((s) => s.seatId === view.yourSeatId);
+    const owned = [...(you?.items.equipped ?? []), ...(you?.items.backpack ?? [])].some((item) => item.uid === next.discardUid);
+    if (!owned) next = { ...next, discardUid: null };
+  }
+
   return next;
+}
+
+/** The stage the view is at, as the inventory window remembers it: the
+ * stage and the camp it is on the way to. */
+export function inventoryStageKey(view: ExpeditionView): string {
+  return `${view.stage.tag}:${focusCampIndex(view) ?? 0}`;
 }
 
 export function setHoveredCard(ui: LocalUiState, cardId: string | null): LocalUiState {

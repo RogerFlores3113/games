@@ -38,7 +38,9 @@ import {
   SILHOUETTE_W,
   YOUR_CARD_AT,
   TRAIL_ZONES,
-  gearLayout,
+  INVENTORY_WINDOW,
+  inventoryLayout,
+  itemBarLayout,
   pointInRect,
   rectContains,
   rectsIntersect,
@@ -236,22 +238,45 @@ describe("pointInRect (the drop test)", () => {
   });
 });
 
-describe("gearLayout", () => {
-  it("keeps every slot and backpack cell inside the backpack zone, none overlapping, for 1 to 3 slots", () => {
+describe("itemBarLayout", () => {
+  it("keeps every slot, the backpack and the explorer's tiles inside the bar zone, none overlapping, for 1 to 3 slots", () => {
     for (const slots of [1, 2, 3]) {
-      const geo = gearLayout(slots);
-      const cells = [...geo.slots, ...geo.pack];
-      expect(cells.every((cell) => rectContains(TRAIL_ZONES.backpack, cell))).toBe(true);
-      for (let i = 0; i < cells.length; i++) for (let j = i + 1; j < cells.length; j++) expect(rectsIntersect(cells[i]!, cells[j]!)).toBe(false);
-      expect(geo.slots.map((s) => s.h)).toEqual(Array(slots).fill(slots === 3 ? 17 : 22));
+      const bar = itemBarLayout(slots);
+      const parts = [...bar.slots, bar.backpack, ...bar.explorerTiles];
+      expect(parts.every((part) => rectContains(TRAIL_ZONES.backpack, part))).toBe(true);
+      for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) expect(rectsIntersect(parts[i]!, parts[j]!)).toBe(false);
+      expect(bar.slots.map((s) => s.h)).toEqual(Array(slots).fill(slots === 3 ? 17 : 22));
+    }
+  });
+});
+
+describe("inventoryLayout", () => {
+  it("keeps every part inside the window's leather border, none overlapping, for 2 or 3 slots and an overfilled backpack", () => {
+    const inner = { x: INVENTORY_WINDOW.x + 8, y: INVENTORY_WINDOW.y + 8, w: INVENTORY_WINDOW.w - 16, h: INVENTORY_WINDOW.h - 16 };
+    for (const [slots, cells] of [[2, 6], [3, 6], [1, 7], [2, 8]] as const) {
+      const geo = inventoryLayout(INVENTORY_WINDOW, slots, cells);
+      const parts = [geo.close, ...geo.pack, ...geo.slots, geo.info, geo.discard, geo.footer];
+      expect(parts.filter((part) => !rectContains(inner, part)), `${slots} slots, ${cells} cells`).toEqual([]);
+      for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) expect(rectsIntersect(parts[i]!, parts[j]!), `${slots}/${cells}: ${i} and ${j}`).toBe(false);
+      expect(geo.pack.every((cell) => rectContains(geo.packArea, cell))).toBe(true);
+      expect(geo.info.y + geo.info.h, "the words end above the slots' and Discard's labels").toBeLessThan(geo.slotsLabel.y - 1);
     }
   });
 
-  it("drops onto the slot under the pointer, and the backpack beside the slots", () => {
-    const geo = gearLayout(2);
-    expect(geo.slots.findIndex((r) => pointInRect(r, { x: 60, y: 325 }))).toBe(1);
-    expect(pointInRect(geo.packArea, { x: 300, y: 320 })).toBe(true);
-    expect(pointInRect(geo.packArea, { x: 60, y: 320 })).toBe(false);
+  it("puts the slots below the backpack's two rows of three", () => {
+    const geo = inventoryLayout(INVENTORY_WINDOW, 2, 6);
+    expect(new Set(geo.pack.map((c) => c.y)).size).toBe(2);
+    expect(new Set(geo.pack.map((c) => c.x)).size).toBe(3);
+    expect(geo.slots.every((slot) => slot.y > geo.packArea.y + geo.packArea.h)).toBe(true);
+  });
+
+  it("leaves the hovered item's words 18 characters a line and room for the longest item text", () => {
+    const geo = inventoryLayout(INVENTORY_WINDOW, 3, 6);
+    const chars = Math.floor(geo.info.w / LABEL_CELL.w);
+    expect(chars).toBe(18);
+    const lines = Math.floor(geo.info.h / (LABEL_CELL.h + 1));
+    const longest = Math.max(...Object.values(SOURCE_DISPLAY).filter((d) => d.kind === "item").map((d) => wrapWords(d.text, chars).length));
+    expect(lines - 3, "the name, the uses and a gap above the text").toBeGreaterThanOrEqual(longest);
   });
 });
 

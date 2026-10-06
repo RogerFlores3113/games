@@ -43,9 +43,9 @@ describe("buildRulesReference", () => {
   it("explains the purse, draft, route vote, shop and loadout", () => {
     expect(byId(buildRulesReference(null), "between").paragraphs).toEqual([
       "A cleared camp pays 5 coins into the crew's purse, plus 1 for each unplayed trick, up to 3 more.",
-      "Everyone then drafts one of 3 bundles of items. The crew votes on the route to the next camp, and a tied vote is settled by a coin flip. An event waits on the trail.",
+      "Before every camp, camp 1 too, everyone drafts one of 3 items; after a boss camp, one of 3 pairs of items. After every other camp an event waits on the trail. Then the crew votes on the route to the next camp, and a tied vote is settled by a coin flip.",
       "Before a boss camp the crew shops with the purse: supplies (6 coins), items, and your own character's upgrades (8 coins). An upgrade also gives you one more whisper each camp.",
-      "Each explorer has 2 item slots. Extra items wait in the backpack, and you choose your loadout between camps.",
+      "Each explorer has 2 item slots, and only the items in them go into camp. Up to 6 more wait in the backpack: open it from the item bar between camps to swap items, or to discard one when it is full.",
     ]);
   });
 

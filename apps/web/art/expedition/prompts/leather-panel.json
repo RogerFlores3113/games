@@ -1,0 +1,12 @@
+{
+  "id": "leather-panel",
+  "tool": "create_image_pixflux",
+  "params": {
+    "description": "flat rectangular panel of worn tan and chocolate brown saddle leather, the inside of an old explorer's backpack, stitched border seam around the edge, brass rivets in the corners, subtle scuffs and grain, evenly lit, no objects, no text, fills the whole image",
+    "width": 256,
+    "height": 192
+  },
+  "job": "0144adcc-1fa2-473e-9513-2a990e753833",
+  "scale": 1,
+  "note": "the off-white backdrop round its edge keyed out (fetch-art --matte); drawn at 1x as the inventory window, its slot patches drawn over it in code"
+}
