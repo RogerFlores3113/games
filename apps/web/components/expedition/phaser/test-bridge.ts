@@ -31,6 +31,9 @@ export interface ExpeditionTestBridge {
   readonly model: ActiveModel | null;
   /** The signboard between scenes while one plays: what it says and whether it still hangs. */
   readonly transition: { caseId: string; phase: "sign" | "fade-in"; title: string; sub: string | null } | null;
+  /** What can swallow a click on the canvas: the hand-card gesture in
+   * flight and whether the socket is reconnecting. */
+  readonly input: { drag: string; reconnecting: boolean } | null;
   /** Every registered object's page-CSS-px CENTRE + scaled size, keyed by
    * its test-bridge id. */
   objects(): Record<string, { x: number; y: number; width: number; height: number }>;
@@ -118,6 +121,10 @@ function ensureBridge(): ExpeditionTestBridge {
     },
     get model() {
       return current()?.store.getState().model ?? null;
+    },
+    get input() {
+      const state = current()?.store.getState();
+      return state === undefined ? null : { drag: state.localUi.drag.phase, reconnecting: state.reconnecting };
     },
     get transition() {
       const transition = current()?.store.getState().transition ?? null;

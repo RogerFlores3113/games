@@ -292,6 +292,22 @@ async function captureHostState(host: Page, tour: Tour): Promise<void> {
   }
 }
 
+/** What stood in the way of a hand card's click, for the audit: the
+ * gesture in flight, a reconnect, a sign, and what the page has on top of
+ * the point the driver clicks. */
+async function whyUnclickable(page: Page, objectId: string): Promise<string> {
+  return page
+    .evaluate((id) => {
+      const bridge = window.__expeditionTest!;
+      const entry = bridge.objects()[id];
+      const top = entry === undefined ? null : document.elementFromPoint(entry.x + 0.25 * entry.width, entry.y);
+      const covered = top === null ? "no object" : top.tagName === "CANVAS" ? "canvas on top" : `covered by ${top.tagName.toLowerCase()}${top.getAttribute("data-testid") ? `[${top.getAttribute("data-testid")}]` : ""}`;
+      const prompt = (bridge.model as { prompt?: { text: string } } | null)?.prompt?.text ?? "";
+      return `drag ${bridge.input?.drag}, ${bridge.input?.reconnecting ? "reconnecting" : "connected"}, sign ${bridge.transition?.phase ?? "none"}, ${covered}, prompt "${prompt}"`;
+    }, objectId)
+    .catch((error: unknown) => String(error));
+}
+
 async function stepPage(page: Page, isHost: boolean, tour: Tour): Promise<void> {
   const model = await getModel<CampModel>(page);
   if (model.sceneKey !== "camp") return;
@@ -336,7 +352,7 @@ async function stepPage(page: Page, isHost: boolean, tour: Tour): Promise<void> 
       );
       return;
     } catch {
-      tour.unclickable.add(card.objectId);
+      tour.unclickable.add(`${card.objectId} (${await whyUnclickable(page, card.objectId)})`);
     }
   }
   throw new Error("stepPage: no playable hand card could be clicked: " + [...tour.unclickable].join(", "));
