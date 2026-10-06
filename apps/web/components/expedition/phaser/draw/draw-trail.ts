@@ -8,7 +8,7 @@ import type Phaser from "phaser";
 import { CURSOR, pointerIf } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL, SIGN_CELL, WORLD_SIGN_FONT } from "../font/font-keys";
-import { BUNDLE_ITEM_TEXT_Y, BUNDLE_TAKE_H, DRAFT_ZONES, MUSTER_LINE, MUSTER_PORTRAIT_W, MUSTER_TEXT_LINES, MUSTER_ZONES, bundleItemH, musterBoxes, musterTextChars, ROUTE_ZONES, TRAIL_ZONES, bundleBoxes, bundleTextChars, rowBoxes, trailStopXs, type Rect } from "../layout";
+import { BUNDLE_ITEM_TEXT_Y, BUNDLE_TAKE_H, DRAFT_ZONES, LENGTH_CARD_GAP, MUSTER_LINE, MUSTER_PORTRAIT_W, MUSTER_TEXT_LINES, MUSTER_ZONES, bundleItemH, lengthStopStep, musterBoxes, musterTextChars, ROUTE_ZONES, TRAIL_ZONES, bundleBoxes, bundleTextChars, rowBoxes, trailStopXs, type Rect } from "../layout";
 import { placeArt } from "../art/place-art";
 import { ART, crewArtId, modArtId, sourceArtId, type ArtId } from "../art/art-registry";
 import type { ObjectIndex } from "../object-index";
@@ -42,6 +42,7 @@ export interface TrailHandlers extends LoadoutHandlers {
   onBundle(bundle: number): void;
   /** A length at muster or a route between camps. */
   onVote(choice: string): void;
+  /** Lock in at muster, else Set out or Continue. */
   onReady(): void;
   /** A power's button: uses it, or starts or stops aiming it. */
   onPower(sourceKey: string): void;
@@ -86,7 +87,7 @@ function wrapped(value: string, chars: number, max: number): string[] {
   return wrapWords(value, chars).slice(0, max);
 }
 
-const STOP_ART: Readonly<Record<StopKind, ArtId>> = { camp: "marker-camp", boss: "marker-boss", temple: "temple" };
+const STOP_ART: Readonly<Record<StopKind, ArtId>> = { camp: "marker-camp", animal: "marker-animal", disaster: "marker-boss", temple: "temple" };
 
 // ---------------------------------------------------------------------------
 // Trail map
@@ -200,35 +201,35 @@ function drawCharacterCard(ctx: Ctx, card: CharacterCard, x: number, y: number, 
 // ---------------------------------------------------------------------------
 
 const MUSTER_STATUS: Readonly<Record<MusterCrewRow["status"], { label: string; color: string }>> = {
-  ready: { label: "ready ✓", color: PALETTE.done },
   choosing: { label: "choosing…", color: PALETTE.sun },
-  voting: { label: "voting…", color: PALETTE.sun },
+  ready: { label: "ready to lock", color: PALETTE.turn },
+  locked: { label: "locked in ✓", color: PALETTE.done },
 };
 
 const CREW_ROW_H = 9;
 
-function drawMusterCrew(ctx: Ctx, crew: MusterCrewRow[], votes: string): void {
+/** How many have locked in, then each player and where they are: choosing,
+ * ready to lock in, or locked in (which reads so even offline). */
+function drawMusterCrew(ctx: Ctx, crew: MusterCrewRow[], locked: string): void {
   const { scene, layer } = ctx;
   const zone = MUSTER_ZONES.crew;
   panel(ctx, zone);
-  layer.add(text(scene, zone.x + 4, zone.y + 3, "Crew", PALETTE.textDim));
-  layer.add(text(scene, zone.x + zone.w - 4 - labelWidth(votes), zone.y + 3, votes, PALETTE.textDim));
+  layer.add(text(scene, zone.x + zone.w - 4 - labelWidth(locked), zone.y + 3, locked, PALETTE.textDim));
   crew.forEach((row, i) => {
     const y = zone.y + 13 + i * CREW_ROW_H;
-    const status = row.connected ? MUSTER_STATUS[row.status] : { label: "offline", color: PALETTE.statusDisconnected };
+    const status = row.connected || row.status === "locked" ? MUSTER_STATUS[row.status] : { label: "offline", color: PALETTE.statusDisconnected };
     const statusX = zone.x + zone.w - 4 - labelWidth(status.label);
     const chars = Math.floor((statusX - zone.x - 8) / LABEL_CELL.w);
-    layer.add(text(scene, zone.x + 4, y, fitLabel(row.isYou ? `${row.name} (you)` : row.name, chars), row.isYou ? PALETTE.turn : PALETTE.text));
+    layer.add(text(scene, zone.x + 4, y, fitLabel(row.isYou ? "You" : row.name, chars), row.isYou ? PALETTE.turn : PALETTE.text));
     layer.add(text(scene, statusX, y, status.label, status.color));
   });
 }
 
-const STOP_STEP = 17;
-
 /** One marker per camp, boss camps and the temple marked. */
-function drawStops(scene: Phaser.Scene, container: Phaser.GameObjects.Container, stops: StopKind[], cx: number, y: number): void {
-  const x0 = cx - Math.floor(((stops.length - 1) * STOP_STEP) / 2);
-  stops.forEach((kind, i) => container.add(placeArt(scene, STOP_ART[kind], x0 + i * STOP_STEP, y)));
+function drawStops(scene: Phaser.Scene, container: Phaser.GameObjects.Container, stops: StopKind[], cx: number, y: number, w: number): void {
+  const step = lengthStopStep(stops.length, w);
+  const x0 = cx - Math.floor(((stops.length - 1) * step) / 2);
+  stops.forEach((kind, i) => container.add(placeArt(scene, STOP_ART[kind], x0 + i * step, y)));
 }
 
 function voterLine(voters: string[]): string {
@@ -244,7 +245,7 @@ function drawLengthOption(ctx: Ctx, option: LengthOption, x: number, y: number, 
   const chars = Math.floor((w - 8) / LABEL_CELL.w);
   container.add(signText(scene, 5, 3, option.name, option.yours ? PALETTE.text : PALETTE.sun));
   container.add(text(scene, w - 5 - labelWidth(option.camps), 5, option.camps, PALETTE.textDim));
-  drawStops(scene, container, option.stops, Math.floor(w / 2), 24);
+  drawStops(scene, container, option.stops, Math.floor(w / 2), 24, w);
   container.add(centredText(scene, Math.floor(w / 2), 35, fitLabel(option.summary, chars), PALETTE.text));
   const voters = option.voters.length === 0 ? "No votes yet" : `Votes: ${voterLine(option.voters)}`;
   container.add(centredText(scene, Math.floor(w / 2), 47, fitLabel(voters, chars), option.voters.length === 0 ? PALETTE.textDim : PALETTE.turn));
@@ -257,13 +258,44 @@ function drawLengthOption(ctx: Ctx, option: LengthOption, x: number, y: number, 
   index.register("trail", option.objectId, container);
 }
 
+/** Lock in: two lines of sign text on a tall button, dim until you have
+ * an explorer and a length, "Locked in" once done. */
+function drawLockIn(ctx: Ctx): void {
+  const { scene, layer, model, index, handlers } = ctx;
+  const ready = model.ready;
+  if (ready === null) return;
+  const zone = MUSTER_ZONES.lockIn;
+  const open = ready.state === "open";
+  const container = scene.add.container(zone.x, zone.y);
+  const fill = ready.state === "done" ? PALETTE.moss : open ? PALETTE.stump : PALETTE.plate;
+  const bg = scene.add.rectangle(0, 0, zone.w, zone.h, toPhaserColor(fill)).setOrigin(0, 0);
+  bg.setStrokeStyle(open ? 2 : 1, toPhaserColor(open ? PALETTE.turn : PALETTE.plateEdge));
+  container.add(bg);
+  const lines = ready.state === "done" ? ["Locked", "in ✓"] : ["Lock", "in"];
+  const top = Math.floor((zone.h - (lines.length * SIGN_CELL.h + 4)) / 2);
+  lines.forEach((line, i) => {
+    const w = Array.from(line).length * SIGN_CELL.w;
+    container.add(signText(scene, Math.floor((zone.w - w) / 2), top + i * (SIGN_CELL.h + 4), line, ready.state === "disabled" ? PALETTE.textDim : PALETTE.text));
+  });
+  container.setSize(zone.w, zone.h);
+  if (open) {
+    const hit = scene.add.zone(0, 0, zone.w, zone.h).setOrigin(0, 0).setInteractive({ cursor: CURSOR.pointer });
+    hit.on("pointerdown", () => handlers.onReady());
+    container.add(hit);
+    scene.tweens.add({ targets: bg, alpha: { from: 1, to: 0.8 }, duration: PULSE_MS, yoyo: true, repeat: -1 });
+  }
+  layer.add(container);
+  index.register("trail", ready.objectId, container);
+}
+
 function drawMuster(ctx: Ctx, muster: Extract<TrailPanel, { kind: "muster" }>): void {
   musterBoxes(muster.characters.length).forEach((box, i) => drawCharacterCard(ctx, muster.characters[i]!, box.x, box.y, box.w, box.h));
-  drawMusterCrew(ctx, muster.crew, muster.votes);
+  drawMusterCrew(ctx, muster.crew, muster.locked);
   const zone = MUSTER_ZONES.lengths;
-  rowBoxes(zone.x, zone.w, muster.lengths.length, 6, 200).forEach((box, i) => {
+  rowBoxes(zone.x, zone.w, muster.lengths.length, LENGTH_CARD_GAP, 200).forEach((box, i) => {
     drawLengthOption(ctx, muster.lengths[i]!, box.x, zone.y, box.w, zone.h);
   });
+  drawLockIn(ctx);
 }
 
 // ---------------------------------------------------------------------------

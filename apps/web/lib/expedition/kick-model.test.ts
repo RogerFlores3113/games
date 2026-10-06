@@ -38,7 +38,7 @@ describe("buildKickPanel", () => {
     const room = { youSeatId: "ana", seats: ROOM_SEATS, kickVotes: [{ targetSeatId: "dee", voterSeatIds: [], needed: 2, youCanVote: true }] };
     const loadout = { tag: "loadout", camp: PREVIEW, mods: [], yourSlots: 2, shop: null, readySeatIds: [] } as ExpeditionView["stage"];
     expect(buildKickPanel(room, game(loadout))?.consequence).toBe("Kicking sets out for camp 2 without them. If they come back, they rejoin at the next loadout.");
-    expect(buildKickPanel(room, game({ tag: "muster", ballots: [] }))?.consequence).toBe("Kicking starts the run without them. If they come back, they rejoin at the next loadout.");
+    expect(buildKickPanel(room, game({ tag: "muster", ballots: [], lockedSeatIds: [] }))?.consequence).toBe("Kicking starts the run without them. If they come back, they rejoin at the next loadout.");
     expect(buildKickPanel(room, game({ tag: "draft", cleared: 1, payout: 5, yourOffer: null, pendingSeatIds: [] }))?.consequence).toBe(
       "Kicking goes on without them. If they come back, they rejoin at the next loadout.",
     );

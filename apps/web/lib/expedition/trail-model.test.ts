@@ -86,7 +86,7 @@ const draftStage = (over: Partial<Extract<ExpeditionStageView, { tag: "draft" }>
 
 describe("topBar", () => {
   it("shows supplies against their cap, the purse, and the camp the crew heads to", () => {
-    expect(model(makeView()).topBar).toEqual({ supplies: 3, suppliesMax: 5, purse: 12, camp: "Camp 2 of 6", map: true, suppliesPick: null });
+    expect(model(makeView()).topBar).toEqual({ stores: true, supplies: 3, suppliesMax: 5, purse: 12, camp: "Camp 2 of 6", map: true, suppliesPick: null });
   });
 
   it("labels a boss camp and the temple by their tier", () => {
@@ -95,10 +95,11 @@ describe("topBar", () => {
     expect(model(loadout(6)).topBar.camp).toBe("Camp 6 of 6 - The Temple");
   });
 
-  it("reads Choosing the run at muster", () => {
-    const view = at({ tag: "muster", ballots: [] }, { length: null, campCount: null, plan: [], history: [] });
+  it("reads Choosing the run at muster, with no supplies or coins shown", () => {
+    const view = at({ tag: "muster", ballots: [], lockedSeatIds: [] }, { length: null, campCount: null, plan: [], history: [] });
     expect(model(view).topBar.camp).toBe("Choosing the run");
     expect(model(view).topBar.map).toBe(false);
+    expect(model(view).topBar.stores).toBe(false);
   });
 });
 
@@ -117,7 +118,7 @@ describe("trail", () => {
     expect(model(view).trail).toEqual([
       { index: 1, state: "cleared", kind: "camp", caption: "cleared" },
       { index: 2, state: "cleared", kind: "camp", caption: "cleared" },
-      { index: 3, state: "here", kind: "boss", caption: "next" },
+      { index: 3, state: "here", kind: "animal", caption: "next" },
       { index: 4, state: "ahead", kind: "camp", caption: "" },
       { index: 5, state: "ahead", kind: "camp", caption: "" },
       { index: 6, state: "ahead", kind: "temple", caption: "temple" },
@@ -135,14 +136,14 @@ describe("trail", () => {
   });
 
   it("is null at muster, before the length is chosen", () => {
-    const view = at({ tag: "muster", ballots: [] }, { length: null, campCount: null, plan: [], history: [] });
+    const view = at({ tag: "muster", ballots: [], lockedSeatIds: [] }, { length: null, campCount: null, plan: [], history: [] });
     expect(model(view).trail).toBeNull();
   });
 });
 
 describe("muster", () => {
-  const musterView = (ballots: { seatId: string; choice: string | null }[], over: Partial<ExpeditionView> = {}): ExpeditionView =>
-    at({ tag: "muster", ballots }, { length: null, campCount: null, plan: [], history: [], ...over });
+  const musterView = (ballots: { seatId: string; choice: string | null }[], over: Partial<ExpeditionView> = {}, lockedSeatIds: string[] = []): ExpeditionView =>
+    at({ tag: "muster", ballots, lockedSeatIds }, { length: null, campCount: null, plan: [], history: [], ...over });
   const panel = (view: ExpeditionView) => {
     const p = model(view).panel;
     if (p.kind !== "muster") throw new Error(`expected the muster panel, got ${p.kind}`);
@@ -172,8 +173,8 @@ describe("muster", () => {
         objectId: "length:standard",
         name: "Standard",
         camps: "6 camps",
-        stops: ["camp", "camp", "boss", "camp", "camp", "temple"],
-        summary: "1 boss, then the temple",
+        stops: ["camp", "camp", "animal", "camp", "camp", "temple"],
+        summary: "1 boss, then temple",
         voters: ["You", "Cara"],
         yours: true,
         votable: true,
@@ -183,8 +184,8 @@ describe("muster", () => {
         objectId: "length:long",
         name: "Long",
         camps: "8 camps",
-        stops: ["camp", "camp", "boss", "camp", "camp", "boss", "camp", "temple"],
-        summary: "2 bosses, then the temple",
+        stops: ["camp", "camp", "animal", "camp", "camp", "disaster", "camp", "temple"],
+        summary: "2 bosses, then temple",
         voters: [],
         yours: false,
         votable: true,
@@ -196,22 +197,21 @@ describe("muster", () => {
     expect(panel(musterView([], { yourSeatId: null })).lengths.map((l) => l.votable)).toEqual([false, false, false]);
   });
 
-  it("counts the ballots cast against the seats", () => {
-    expect(panel(musterView([{ seatId: "s1", choice: "short" }])).votes).toBe("1 of 3 voted");
-    expect(panel(musterView([{ seatId: "s1", choice: "short" }, { seatId: "s2", choice: null }, { seatId: "s3", choice: "long" }])).votes).toBe("3 of 3 voted");
+  it("does not let you vote once you have locked in", () => {
+    expect(panel(musterView([{ seatId: "s2", choice: "long" }], {}, ["s2"])).lengths.map((l) => l.votable)).toEqual([false, false, false]);
   });
 
-  it("lists the crew you first: choosing until a character is picked, voting until a ballot is cast, then ready", () => {
-    const view = musterView([{ seatId: "s2", choice: "short" }], {
-      seats: [
-        { seatId: "s1", characterId: null, upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
-        { seatId: "s2", characterId: "leader", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
-        { seatId: "s3", characterId: "jd", upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] },
-      ],
-    });
+  it("counts the seats locked in against the crew", () => {
+    expect(panel(musterView([{ seatId: "s1", choice: "short" }])).locked).toBe("0 of 3 locked in");
+    expect(panel(musterView([{ seatId: "s1", choice: "short" }, { seatId: "s3", choice: "long" }], {}, ["s1", "s3"])).locked).toBe("2 of 3 locked in");
+  });
+
+  it("lists the crew you first: choosing until both an explorer and a length are chosen, ready to lock in, then locked", () => {
+    const seat = (seatId: string, characterId: string | null) => ({ seatId, characterId, upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, usage: [] });
+    const view = musterView([{ seatId: "s2", choice: "short" }, { seatId: "s1", choice: null }, { seatId: "s3", choice: "long" }], { seats: [seat("s1", null), seat("s2", "leader"), seat("s3", "jd")] }, ["s3"]);
     expect(panel(view).crew).toEqual([
       { seatId: "s2", name: "Bob", isYou: true, connected: true, status: "ready" },
-      { seatId: "s3", name: "Cara", isYou: false, connected: false, status: "voting" },
+      { seatId: "s3", name: "Cara", isYou: false, connected: false, status: "locked" },
       { seatId: "s1", name: "Alice", isYou: false, connected: true, status: "choosing" },
     ]);
   });
@@ -219,7 +219,7 @@ describe("muster", () => {
   describe("characters", () => {
     const mustering = (you: Partial<ExpeditionView["seats"][number]>): ExpeditionView => musterView([], { seats: seatsWith({ upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, ...you }) });
 
-    it("shows every character, marking the ones teammates took, all pickable for you until you pick", () => {
+    it("shows every character, marking the ones teammates took, the free ones pickable for you", () => {
       const cards = panel(mustering({ characterId: null })).characters;
       expect(cards.map((c) => c.characterId)).toEqual(Object.keys(CHARACTER_DISPLAY));
       const ids = ["jd", "leader", "explorer", "cartographer"];
@@ -246,10 +246,15 @@ describe("muster", () => {
       });
     });
 
-    it("marks your pick as yours and leaves nothing pickable after it", () => {
+    it("marks your pick as yours and leaves the free ones pickable, to switch to", () => {
       const cards = panel(mustering({ characterId: "leader" })).characters;
       expect(cards.find((c) => c.characterId === "leader")).toMatchObject({ takenBy: "You", yours: true, pickable: false });
-      expect(cards.filter((c) => c.pickable)).toEqual([]);
+      expect(cards.find((c) => c.characterId === "cartographer")).toMatchObject({ takenBy: null, pickable: true });
+    });
+
+    it("leaves nothing pickable once you have locked in", () => {
+      const locked = musterView([{ seatId: "s2", choice: "long" }], { seats: seatsWith({ upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, characterId: "leader" }) }, ["s2"]);
+      expect(panel(locked).characters.filter((c) => c.pickable)).toEqual([]);
     });
   });
 });
@@ -608,7 +613,16 @@ describe("ready", () => {
     expect(model(makeView({ yourSeatId: null })).ready).toBeNull();
     expect(model(at(draftStage())).ready).toBeNull();
     expect(model(at({ tag: "route", options: [], ballots: [] })).ready).toBeNull();
-    expect(model(at({ tag: "muster", ballots: [] })).ready).toBeNull();
+  });
+
+  it("is Lock in at the muster: disabled until you have an explorer and a length, done once locked in", () => {
+    const you = (characterId: string | null) => ({ seats: seatsWith({ upgradeId: null, items: { equipped: [], backpack: [], concealed: false }, characterId }) });
+    const muster = (ballots: { seatId: string; choice: string | null }[], lockedSeatIds: string[], characterId: string | null) => at({ tag: "muster", ballots, lockedSeatIds }, you(characterId));
+    expect(model(muster([], [], "leader")).ready).toEqual({ objectId: "ready", label: "Lock in", state: "disabled" });
+    expect(model(muster([{ seatId: "s2", choice: "long" }], [], null)).ready).toEqual({ objectId: "ready", label: "Lock in", state: "disabled" });
+    expect(model(muster([{ seatId: "s2", choice: "long" }], [], "leader")).ready).toEqual({ objectId: "ready", label: "Lock in", state: "open" });
+    expect(model(muster([{ seatId: "s2", choice: "long" }], ["s2"], "leader")).ready).toEqual({ objectId: "ready", label: "Locked in", state: "done" });
+    expect(model(at({ tag: "muster", ballots: [], lockedSeatIds: [] }, { yourSeatId: null })).ready).toBeNull();
   });
 });
 
@@ -704,7 +718,7 @@ describe("crew", () => {
   });
 
   it("shows a seat with no character yet as having none", () => {
-    const view = at({ tag: "muster", ballots: [] }, { seats: seatsWith({ characterId: null, upgradeId: null, items: { equipped: [], backpack: [], concealed: false } }) });
+    const view = at({ tag: "muster", ballots: [], lockedSeatIds: [] }, { seats: seatsWith({ characterId: null, upgradeId: null, items: { equipped: [], backpack: [], concealed: false } }) });
     expect(model(view).crew[0]).toMatchObject({ seatId: "s2", character: null, sources: [] });
   });
 
@@ -714,7 +728,7 @@ describe("crew", () => {
     expect(statuses({ tag: "event", event: "event", next: preview(4), readySeatIds: ["s3"] })).toEqual(["waiting", "ready", "waiting"]);
     expect(statuses(draftStage({ pendingSeatIds: ["s3"] }))).toEqual(["ready", "drafting", "ready"]);
     expect(statuses({ tag: "route", options: [], ballots: [{ seatId: "s1", choice: "a" }] })).toEqual(["voting", "voting", "voted"]);
-    expect(statuses({ tag: "muster", ballots: [{ seatId: "s2", choice: "short" }] })).toEqual(["voted", "voting", "voting"]);
+    expect(statuses({ tag: "muster", ballots: [{ seatId: "s2", choice: "short" }], lockedSeatIds: ["s2"] })).toEqual(["ready", "waiting", "waiting"]);
   });
 });
 

@@ -26,10 +26,10 @@ function ModGlyph({ id, kind }: { id: string | null; kind: IconKind }) {
 }
 
 const MARKER: Readonly<Record<MapStop["state"], Readonly<Record<MapStop["kind"], ArtId>>>> = {
-  cleared: { camp: "marker-cleared", boss: "marker-cleared", temple: "marker-cleared" },
-  here: { camp: "crew-token", boss: "crew-token", temple: "crew-token" },
-  lost: { camp: "marker-camp", boss: "marker-boss", temple: "temple" },
-  ahead: { camp: "marker-camp", boss: "marker-boss", temple: "temple" },
+  cleared: { camp: "marker-cleared", animal: "marker-cleared", disaster: "marker-cleared", temple: "marker-cleared" },
+  here: { camp: "crew-token", animal: "crew-token", disaster: "crew-token", temple: "crew-token" },
+  lost: { camp: "marker-camp", animal: "marker-animal", disaster: "marker-boss", temple: "temple" },
+  ahead: { camp: "marker-camp", animal: "marker-animal", disaster: "marker-boss", temple: "temple" },
 };
 
 const NOTE_COLOR: Readonly<Record<MapStop["state"], string>> = {

@@ -41,6 +41,7 @@ export const ART_FILES: readonly string[] = [
   "fireside/backpack-open.png",
   "fireside/bg-fireside.png",
   "fireside/crew-token.png",
+  "fireside/marker-animal.png",
   "fireside/marker-boss.png",
   "fireside/marker-camp.png",
   "fireside/marker-cleared.png",

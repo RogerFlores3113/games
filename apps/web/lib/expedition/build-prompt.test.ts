@@ -397,28 +397,33 @@ describe("buildTrailPrompt", () => {
   const failedCamp3 = [{ camp: 3, attempt: 1, location: "jungle", weather: "fair", status: "failed" as const, coins: 0 }];
 
   it("at muster asks for an explorer and a length vote when both are owed", () => {
-    const v = trail({ tag: "muster", ballots: [] }, withCharacter(null));
+    const v = trail({ tag: "muster", ballots: [], lockedSeatIds: [] }, withCharacter(null));
     expect(at(v)).toEqual({ text: "Pick your explorer and vote on the run length", tone: "your-move" });
   });
 
   it("at muster asks only for the explorer once you have voted", () => {
-    const v = trail({ tag: "muster", ballots: [{ seatId: "me", choice: "short" }] }, withCharacter(null));
+    const v = trail({ tag: "muster", ballots: [{ seatId: "me", choice: "short" }], lockedSeatIds: [] }, withCharacter(null));
     expect(at(v)).toEqual({ text: "Pick your explorer", tone: "your-move" });
   });
 
   it("at muster asks only for the vote once you have an explorer", () => {
-    const v = trail({ tag: "muster", ballots: [{ seatId: "ana", choice: "short" }] }, withCharacter("leader"));
+    const v = trail({ tag: "muster", ballots: [{ seatId: "ana", choice: "short" }], lockedSeatIds: [] }, withCharacter("leader"));
     expect(at(v)).toEqual({ text: "Vote on how long the expedition runs", tone: "your-move" });
   });
 
-  it("at muster names who is still choosing or voting once you are done", () => {
-    const v = trail({ tag: "muster", ballots: [{ seatId: "me", choice: "short" }, { seatId: "bo", choice: null }] }, withCharacter("leader"));
+  it("at muster asks you to lock in once you have an explorer and a vote", () => {
+    const v = trail({ tag: "muster", ballots: [{ seatId: "me", choice: "short" }], lockedSeatIds: [] }, withCharacter("leader"));
+    expect(at(v)).toEqual({ text: "Lock in your explorer and run length", tone: "your-move" });
+  });
+
+  it("at muster names who has not locked in once you have", () => {
+    const v = trail({ tag: "muster", ballots: [{ seatId: "me", choice: "short" }, { seatId: "bo", choice: null }], lockedSeatIds: ["me", "bo"] }, withCharacter("leader"));
     expect(at(v)).toEqual({ text: "Waiting for Ana", tone: "waiting" });
   });
 
-  it("at muster says Setting out once every seat has a character and a ballot", () => {
+  it("at muster says Setting out once every seat has locked in", () => {
     const ballots = SEAT_IDS.map((seatId) => ({ seatId, choice: "short" }));
-    expect(at(trail({ tag: "muster", ballots }))).toEqual({ text: "Setting out…", tone: "waiting" });
+    expect(at(trail({ tag: "muster", ballots, lockedSeatIds: [...SEAT_IDS] }))).toEqual({ text: "Setting out…", tone: "waiting" });
   });
 
   it("at the draft announces the cleared camp, its payout and the pick", () => {

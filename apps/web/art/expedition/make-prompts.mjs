@@ -403,6 +403,11 @@ const specs = {
     script: "apps/web/art/expedition/draw-icon-tricks.mjs",
     note: "neither the batch candidate nor a 64-candidate retry read as a card stack",
   },
+  "marker-animal": {
+    tool: "hand-drawn",
+    script: "apps/web/art/expedition/draw-marker-animal.mjs",
+    note: "a paw print in the markers' outline and size, telling an animal boss camp from the disaster's storm cloud",
+  },
 };
 
 for (const file of fs.readdirSync(dir)) {

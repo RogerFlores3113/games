@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { CHARACTER_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
+import { CHARACTER_DISPLAY, RUN_LENGTH_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
 import { buildTrailModel, musterLines } from "../../../lib/expedition/trail-model";
 import { initialLocalUi } from "../../../lib/expedition/local-ui";
 import { wrapWords } from "./draw/text-fit";
 import { TABLE_IDS } from "./art/art-registry";
+import { LABEL_CELL } from "./font/font-keys";
 import {
   BUNDLE_TAKE_H,
   BUNDLE_TEXT_LINES,
@@ -12,6 +13,9 @@ import {
   bundleBoxes,
   bundleItemH,
   bundleTextChars,
+  LENGTH_CARD_GAP,
+  STOP_MARKER,
+  lengthStopStep,
   musterBoxes,
   musterTextChars,
   MUSTER_LINE,
@@ -368,7 +372,7 @@ describe("muster cards", () => {
     const narrowest = Math.min(...boxes.map((b) => b.w));
     const cards = buildTrailModel(
       {
-        game: { yourSeatId: null, runStatus: "in_progress", length: null, campCount: null, purse: 0, supplies: { count: 3, max: 4 }, plan: [], seats: [], kicked: [], yourAbilities: [], history: [], lastVote: null, stage: { tag: "muster", ballots: [] } },
+        game: { yourSeatId: null, runStatus: "in_progress", length: null, campCount: null, purse: 0, supplies: { count: 3, max: 4 }, plan: [], seats: [], kicked: [], yourAbilities: [], history: [], lastVote: null, stage: { tag: "muster", ballots: [], lockedSeatIds: [] } },
         roomSeats: [],
         hostSeatId: null,
       },
@@ -386,5 +390,35 @@ describe("muster cards", () => {
       }
     }
     expect(3 + (3 + MUSTER_TEXT_LINES) * MUSTER_LINE).toBeLessThanOrEqual(Math.min(...boxes.map((b) => b.h)));
+  });
+});
+
+describe("muster run lengths", () => {
+  const zone = MUSTER_ZONES.lengths;
+  const lengths = Object.values(RUN_LENGTH_DISPLAY);
+  const boxes = rowBoxes(zone.x, zone.w, lengths.length, LENGTH_CARD_GAP, 200);
+
+  it("fit every length's stop markers inside its card, side by side without overlapping", () => {
+    for (const box of boxes) {
+      for (const { camps } of lengths) {
+        const step = lengthStopStep(camps, box.w);
+        expect(step).toBeGreaterThanOrEqual(STOP_MARKER);
+        expect((camps - 1) * step + STOP_MARKER).toBeLessThanOrEqual(box.w - 8);
+      }
+    }
+  });
+
+  it("fit every length's summary on its card in full", () => {
+    const muster = buildTrailModel(
+      {
+        game: { yourSeatId: null, runStatus: "in_progress", length: null, campCount: null, purse: 0, supplies: { count: 3, max: 4 }, plan: [], seats: [], kicked: [], yourAbilities: [], history: [], lastVote: null, stage: { tag: "muster", ballots: [], lockedSeatIds: [] } },
+        roomSeats: [],
+        hostSeatId: null,
+      },
+      initialLocalUi(),
+    ).panel;
+    if (muster.kind !== "muster") throw new Error("expected the muster");
+    const chars = Math.floor((Math.min(...boxes.map((b) => b.w)) - 8) / LABEL_CELL.w);
+    expect(muster.lengths.filter((l) => l.summary.length > chars).map((l) => l.summary)).toEqual([]);
   });
 });

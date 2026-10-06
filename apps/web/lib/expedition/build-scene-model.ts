@@ -67,6 +67,8 @@ export type SceneKey = "camp" | "trail" | "run-end";
 
 /** The top bar's readouts, shared by the camp and trail scenes. */
 export interface TopBar {
+  /** Supplies and coins show; not at the muster, before the run sets out. */
+  stores: boolean;
   supplies: number;
   suppliesMax: number;
   /** The crew's shared coins. */
@@ -670,7 +672,7 @@ function buildLastTrick(camp: ExpeditionCampView | null, view: ExpeditionView, u
 
 /** Supplies of their cap, the purse, and which camp of how many. */
 export function buildTopBar(view: ExpeditionView, suppliesPick: PickState | null = null): TopBar {
-  return { supplies: view.supplies.count, suppliesMax: view.supplies.max, purse: view.purse, camp: campLabel(view), map: view.campCount !== null, suppliesPick };
+  return { stores: view.stage.tag !== "muster", supplies: view.supplies.count, suppliesMax: view.supplies.max, purse: view.purse, camp: campLabel(view), map: view.campCount !== null, suppliesPick };
 }
 
 /** In a boss camp or the temple the strip's chip names it, so the label

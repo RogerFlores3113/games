@@ -119,6 +119,7 @@ export const ART = {
   "marker-camp": { file: "fireside/marker-camp.png", w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } },
   "marker-cleared": { file: "fireside/marker-cleared.png", w: 16, h: 16, fallback: { color: c(PALETTE.done), label: "" } },
   "marker-boss": { file: "fireside/marker-boss.png", w: 16, h: 16, fallback: { color: c(PALETTE.destructive), label: "" } },
+  "marker-animal": { file: "fireside/marker-animal.png", w: 16, h: 16, fallback: { color: c(PALETTE.destructive), label: "" } },
   temple: { file: "fireside/temple.png", w: 16, h: 16, fallback: { color: c(PALETTE.moon), label: "" } },
   "crew-token": { file: "fireside/crew-token.png", w: 16, h: 16, fallback: { color: c(PALETTE.turn), label: "" } },
   "backpack-open": { file: "fireside/backpack-open.png", w: 96, h: 64, fallback: { color: c(PALETTE.moss), label: "backpack" } },

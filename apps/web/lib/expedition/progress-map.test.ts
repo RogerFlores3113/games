@@ -42,9 +42,9 @@ describe("buildProgressMap", () => {
       stops: [
         { index: 1, state: "cleared", kind: "camp", boss: null, place: { locationId: "jungle", location: "Jungle", weatherId: "fair", weather: "Fair" }, note: "Cleared" },
         { index: 2, state: "cleared", kind: "camp", boss: null, place: { locationId: "clifftop", location: "Clifftop", weatherId: "rain", weather: "Rain" }, note: "Cleared on try 2" },
-        { index: 3, state: "here", kind: "boss", boss: { id: "tiger", tier: "animal", name: "Tiger" }, place: { locationId: "cave", location: "Cave", weatherId: "night", weather: "Night" }, note: "You are here, try 2" },
+        { index: 3, state: "here", kind: "animal", boss: { id: "tiger", tier: "animal", name: "Tiger" }, place: { locationId: "cave", location: "Cave", weatherId: "night", weather: "Night" }, note: "You are here, try 2" },
         { index: 4, state: "ahead", kind: "camp", boss: null, place: null, note: "" },
-        { index: 5, state: "ahead", kind: "boss", boss: { id: null, tier: "disaster", name: "Disaster boss" }, place: null, note: "" },
+        { index: 5, state: "ahead", kind: "disaster", boss: { id: null, tier: "disaster", name: "Disaster boss" }, place: null, note: "" },
         { index: 6, state: "ahead", kind: "temple", boss: { id: "temple", tier: "temple", name: "The Temple" }, place: null, note: "" },
       ],
     });
@@ -53,7 +53,7 @@ describe("buildProgressMap", () => {
   it("between camps the next camp is where the crew heads, its place unknown until the route is chosen", () => {
     const map = buildProgressMap(view({ history: view().history.slice(0, 4), stage: { tag: "route", options: [{ id: "a", next: preview(3), swapsBoss: false }], ballots: [] } }))!;
     expect(map.heading).toBe("Standard run, camp 3 of 6");
-    expect(map.stops[2]).toEqual({ index: 3, state: "here", kind: "boss", boss: { id: "tiger", tier: "animal", name: "Tiger" }, place: null, note: "Next" });
+    expect(map.stops[2]).toEqual({ index: 3, state: "here", kind: "animal", boss: { id: "tiger", tier: "animal", name: "Tiger" }, place: null, note: "Next" });
   });
 
   it("marks where a lost run ended", () => {
@@ -63,6 +63,6 @@ describe("buildProgressMap", () => {
   });
 
   it("has no map at muster", () => {
-    expect(buildProgressMap(view({ length: null, campCount: null, plan: [], history: [], stage: { tag: "muster", ballots: [] } }))).toBeNull();
+    expect(buildProgressMap(view({ length: null, campCount: null, plan: [], history: [], stage: { tag: "muster", ballots: [], lockedSeatIds: [] } }))).toBeNull();
   });
 });

@@ -2327,3 +2327,39 @@ How each of the nine fits (for unit 13):
   sprite (`art-registry.test.ts`), and these are HTML backdrops the canvas never loads.
   Their prompt specs (`title-trail`, `title-basecamp` in `make-prompts.mjs`) record the
   PixelLab gallery ids and the start of each prompt, as far as the gallery listing shows it.
+
+### Implementation notes (batch 5 muster)
+
+- The muster stage gains `locked: PerSeat<true>` and the action `lock-in`. A seat may
+  re-pick its character until it locks in; the old one is free again, and re-picking the one
+  it holds changes nothing (was refused `wrong_phase`). `lock-in` needs a character and a
+  ballot (an abstention counts) and is refused `incomplete_choices` without them; after it,
+  `pick-character`, `vote` and a second `lock-in` are refused `locked`. The stage advances
+  only once every seat has locked in. Two `RunError`s, wire codes and worker mappings were
+  added (`incomplete_choices`, `locked`). `ROOM_SCHEMA_VERSION` is 17.
+- The view's muster stage carries `lockedSeatIds` (public, like the picks and ballots).
+- A kick at the muster drops the seat's lock-in with its ballot; a kicked seat back in the
+  muster keeps its character and must vote and lock in again. The absent-seat pass picks,
+  abstains, then locks in, so a dropped muster takes three alarms. Dev bots do the same
+  (pick, abstain, lock in), so in a solo room the human's lock-in starts the run. The legal
+  action enumerator offers picks only to seats without a character, so a random driver
+  cannot switch forever. The dev check flags a lock-in without a character and a ballot.
+- Web: Lock in is the muster's `ready` (object id `ready`, states `disabled`/`open`/`done`),
+  so the e2e trail driver locks in after it votes with no change; the scene dispatches
+  `lock-in` from it at the muster. It is a 60x60 tile right of the length cards
+  (`MUSTER_ZONES.lockIn`), "Lock / in" on two lines of sign text, dim until you have an
+  explorer and a length, "Locked / in ✓" on moss after. The lengths zone narrowed to 420
+  (three 137-wide cards, gap 4); `lengthStopStep` spaces the stops a pixel apart where they
+  fit and touching where they don't (the Long card), and the summaries were shortened to fit
+  ("1 boss, then temple"). The cards zone could not move up for more room: it would enter
+  `SETTINGS_SAFE_ZONE`.
+- The bottom-left list lost its "Crew" word; its header line is now "1 of 3 locked in", and
+  each row reads choosing… / ready to lock / locked in ✓ (a locked-in seat reads so even
+  offline; an unlocked offline seat still reads offline). Your own row is "You". You may
+  pick another free character until you lock in (the cards stay "Choose").
+- The top bar hides the crates and the purse at the muster (`TopBar.stores`).
+- `StopKind` names the boss tier (`camp | animal | disaster | temple`): an animal boss camp
+  draws `marker-animal`, a paw print hand-drawn in code (`draw-marker-animal.mjs`, like
+  `icon-tricks`), on the length cards, the trail map and the map of the run; a disaster keeps
+  the storm cloud. So Standard reads camp, camp, paw, camp, camp, temple, and Long has the paw
+  at camp 3 and the storm at camp 6.

@@ -295,7 +295,8 @@ export function buildTrailPrompt(view: ExpeditionView, seats: readonly PromptSea
       if (you !== undefined && you.characterId === null && !voted(stage.ballots, you.seatId)) return { text: "Pick your explorer and vote on the run length", tone: "your-move" };
       if (you !== undefined && you.characterId === null) return { text: "Pick your explorer", tone: "your-move" };
       if (you !== undefined && !voted(stage.ballots, you.seatId)) return { text: "Vote on how long the expedition runs", tone: "your-move" };
-      return waitingFor(view.seats.filter((s) => s.characterId === null || !voted(stage.ballots, s.seatId)).map((s) => s.seatId), "Setting out…");
+      if (you !== undefined && !stage.lockedSeatIds.includes(you.seatId)) return { text: "Lock in your explorer and run length", tone: "your-move" };
+      return waitingFor(view.seats.filter((s) => !stage.lockedSeatIds.includes(s.seatId)).map((s) => s.seatId), "Setting out…");
     }
     case "draft":
       if (stage.yourOffer !== null) {

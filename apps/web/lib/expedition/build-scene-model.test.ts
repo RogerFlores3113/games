@@ -123,7 +123,7 @@ function ui(overrides: Partial<LocalUiState> = {}): LocalUiState {
 describe("sceneKeyFor", () => {
   const preview = { index: 1, location: "jungle", weather: "fair", pairing: null, event: null, slotKinds: [], bossId: null, shop: false, survey: null };
   const stages: [ExpeditionStageView, string][] = [
-    [{ tag: "muster", ballots: [] }, "trail"],
+    [{ tag: "muster", ballots: [], lockedSeatIds: [] }, "trail"],
     [{ tag: "loadout", camp: preview, mods: [], yourSlots: 2, shop: null, readySeatIds: [] }, "trail"],
     [{ tag: "draft", cleared: 1, payout: 8, yourOffer: null, pendingSeatIds: [] }, "trail"],
     [{ tag: "route", options: [], ballots: [] }, "trail"],
@@ -532,6 +532,7 @@ describe("HUD: top bar", () => {
   it("shows supplies against their cap, the purse, and the camp label that opens the map", () => {
     const view = makeView({ campIndex: 2, supplies: { count: 2, max: 5 }, purse: 11 });
     expect(buildSceneModel(server(view), ui(), "big-index").topBar).toEqual({
+      stores: true,
       supplies: 2,
       suppliesMax: 5,
       purse: 11,

@@ -133,6 +133,7 @@ test.describe("the nine characters", () => {
     await clickUntilChanged<TrailView>(page, jd.objectId, (m) => draftOffer(m) === null);
     const short = openVote(await getModel<TrailView>(page))!.find((o) => o.id === "short")!;
     await clickUntilChanged<TrailView>(page, short.objectId, (m) => openVote(m) === null);
+    await clickUntilChanged<TrailView>(page, "ready", (m) => m.ready?.state === "done");
     await openPanel(page);
     await autoplay(panel, "others", 6);
     await expect.poll(async () => (await getModel<TrailView>(page)).panel?.kind).toBe("loadout");

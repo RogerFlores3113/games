@@ -103,11 +103,38 @@ function hoverLabel(scene: Phaser.Scene, layer: Layer, owner: Phaser.GameObjects
 /** Supplies as crates of their cap ("Supplies 3 of 4" on hover), the purse
  * as a coin and its count ("12 coins"), and the camp on the right, which
  * opens the map of the run. The crates are a target while an ability picks
- * the supplies. Returns the span left free between them. */
+ * the supplies. No crates or purse at the muster. Returns the span left
+ * free between them. */
 export function drawTopBar(scene: Phaser.Scene, layer: Layer, bar: TopBar, handlers?: TopBarHandlers): { left: number; right: number } {
   const zone = ZONES.topBar;
   const bg = plate(scene, zone.x, zone.y, zone.w, zone.h).setAlpha(PANEL_ALPHA);
   layer.add(bg);
+  const textY = zone.y + Math.floor((zone.h - LABEL_CELL.h) / 2);
+  const left = bar.stores ? drawStores(scene, layer, bg, bar, handlers) : zone.x + 6;
+
+  const campW = labelWidth(bar.camp) + 8;
+  const campX = zone.x + zone.w - 3 - campW;
+  if (bar.map && handlers !== undefined) {
+    const chip = scene.add.container(campX, zone.y + 2);
+    const bg = plate(scene, 0, 0, campW, zone.h - 4, PALETTE.plate).setStrokeStyle(1, toPhaserColor(PALETTE.plateEdge));
+    chip.add([bg, text(scene, 4, textY - zone.y - 2, bar.camp)]);
+    const hit = scene.add.zone(0, 0, campW, zone.h - 4).setOrigin(0, 0).setInteractive({ cursor: CURSOR.pointer });
+    hit.on("pointerover", () => bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
+    hit.on("pointerout", () => bg.setStrokeStyle(1, toPhaserColor(PALETTE.plateEdge)));
+    hit.on("pointerdown", handlers.onMap);
+    chip.add(hit);
+    chip.setSize(campW, zone.h - 4);
+    layer.add(chip);
+    handlers.index.register(handlers.sceneKey, MAP_ID, chip);
+  } else {
+    layer.add(text(scene, campX + 4, textY, bar.camp));
+  }
+  return { left, right: campX - 8 };
+}
+
+/** The supply crates and the purse at the bar's left; returns where they end. */
+function drawStores(scene: Phaser.Scene, layer: Layer, bg: Phaser.GameObjects.Rectangle, bar: TopBar, handlers?: TopBarHandlers): number {
+  const zone = ZONES.topBar;
   const textY = zone.y + Math.floor((zone.h - LABEL_CELL.h) / 2);
   const icon = ART.crate;
   const cy = zone.y + zone.h / 2;
@@ -140,25 +167,7 @@ export function drawTopBar(scene: Phaser.Scene, layer: Layer, bar: TopBar, handl
   layer.add(text(scene, coinX + ART.coin.w + 3, textY, purse));
   const coinsW = ART.coin.w + 3 + labelWidth(purse) + 2;
   hoverLabel(scene, layer, bg, { x: coinX - 1, y: zone.y + 1, w: coinsW + 1, h: zone.h - 2 }, bar.purse === 1 ? "1 coin" : `${bar.purse} coins`, coinX);
-
-  const campW = labelWidth(bar.camp) + 8;
-  const campX = zone.x + zone.w - 3 - campW;
-  if (bar.map && handlers !== undefined) {
-    const chip = scene.add.container(campX, zone.y + 2);
-    const bg = plate(scene, 0, 0, campW, zone.h - 4, PALETTE.plate).setStrokeStyle(1, toPhaserColor(PALETTE.plateEdge));
-    chip.add([bg, text(scene, 4, textY - zone.y - 2, bar.camp)]);
-    const hit = scene.add.zone(0, 0, campW, zone.h - 4).setOrigin(0, 0).setInteractive({ cursor: CURSOR.pointer });
-    hit.on("pointerover", () => bg.setStrokeStyle(1, toPhaserColor(PALETTE.turn)));
-    hit.on("pointerout", () => bg.setStrokeStyle(1, toPhaserColor(PALETTE.plateEdge)));
-    hit.on("pointerdown", handlers.onMap);
-    chip.add(hit);
-    chip.setSize(campW, zone.h - 4);
-    layer.add(chip);
-    handlers.index.register(handlers.sceneKey, MAP_ID, chip);
-  } else {
-    layer.add(text(scene, campX + 4, textY, bar.camp));
-  }
-  return { left: coinX + coinsW + 8, right: campX - 8 };
+  return coinX + coinsW + 8;
 }
 
 const TONE_COLOR: Readonly<Record<PromptTone, string>> = {

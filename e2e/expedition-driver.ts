@@ -70,7 +70,7 @@ export interface TrailView {
   topBar?: { supplies: number; purse: number };
   panel?: TrailPanel;
   kit?: { sourceId: string; objectId: string; name: string }[] | null;
-  ready?: { state: "open" | "done"; label: string } | null;
+  ready?: { state: "open" | "done" | "disabled"; label: string } | null;
   vote?: { title: string; winner: string; flip: unknown } | null;
 }
 

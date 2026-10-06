@@ -125,8 +125,9 @@ export const MUSTER_ZONES = {
   topBar: { x: 0, y: 0, w: 576, h: 22 },
   prompt: { x: 96, y: 24, w: 448, h: 16 },
   cards: { x: 8, y: 56, w: 624, h: 236 },
-  crew: { x: 8, y: 296, w: 132, h: 60 },
-  lengths: { x: 144, y: 296, w: 488, h: 60 },
+  crew: { x: 8, y: 296, w: 136, h: 60 },
+  lengths: { x: 148, y: 296, w: 420, h: 60 },
+  lockIn: { x: 572, y: 296, w: 60, h: 60 },
 } as const satisfies Record<string, Rect>;
 
 const MUSTER_COLS = 3;
@@ -151,6 +152,19 @@ export function musterBoxes(count: number): Rect[] {
     const left = zone.x + Math.floor((zone.w - (inRow * w + (inRow - 1) * MUSTER_CARD_GAP)) / 2);
     return { x: left + (i % MUSTER_COLS) * (w + MUSTER_CARD_GAP), y: zone.y + row * (h + MUSTER_CARD_GAP), w, h };
   });
+}
+
+/** The run-length cards' gap, and the most room a stop marker takes. */
+export const LENGTH_CARD_GAP = 4;
+export const STOP_MARKER = 16;
+const STOP_STEP_MAX = STOP_MARKER + 1;
+
+/** How far apart a length card `cardW` wide spaces its `stops` markers:
+ * a pixel between them where the card has room, else touching, clear of
+ * the card's edges by 4. */
+export function lengthStopStep(stops: number, cardW: number): number {
+  if (stops < 2) return STOP_STEP_MAX;
+  return Math.min(STOP_STEP_MAX, Math.floor((cardW - 8 - STOP_MARKER) / (stops - 1)));
 }
 
 /** Characters per line in a muster card's text column. */

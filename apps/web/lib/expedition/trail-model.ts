@@ -20,7 +20,8 @@ import { wrapWords } from "../../components/expedition/phaser/draw/text-fit";
  * is legal.
  */
 
-export type StopKind = "camp" | "boss" | "temple";
+/** A camp, or a boss camp by its tier. */
+export type StopKind = "camp" | "animal" | "disaster" | "temple";
 
 export interface TrailStop {
   index: number;
@@ -101,7 +102,7 @@ export interface LengthOption {
   camps: string;
   /** One marker per camp, boss camps and the temple marked. */
   stops: StopKind[];
-  /** "Temple at the end", "1 boss, then the temple". */
+  /** "Temple at the end", "1 boss, then temple". */
   summary: string;
   /** Who voted for it, you first. */
   voters: string[];
@@ -114,7 +115,8 @@ export interface MusterCrewRow {
   name: string;
   isYou: boolean;
   connected: boolean;
-  status: "ready" | "choosing" | "voting";
+  /** "ready": an explorer and a length chosen, not yet locked in. */
+  status: "choosing" | "ready" | "locked";
 }
 
 /** A camp as a route card or the loadout shows it. */
@@ -191,7 +193,8 @@ export type DraftPanel =
   | { kind: "none"; text: string };
 
 export type TrailPanel =
-  | { kind: "muster"; characters: CharacterCard[]; lengths: LengthOption[]; crew: MusterCrewRow[]; votes: string }
+  /** `locked`: "1 of 3 locked in". */
+  | { kind: "muster"; characters: CharacterCard[]; lengths: LengthOption[]; crew: MusterCrewRow[]; locked: string }
   | { kind: "draft"; draft: DraftPanel }
   | { kind: "route"; options: RouteCard[] }
   | { kind: "event"; name: string; text: string; next: CampPreview }
@@ -236,9 +239,10 @@ export interface TrailModel {
   /** Your character, your upgrade, then your equipped items. Null for a spectator. */
   kit: KitItem[] | null;
   crew: CrewRow[];
-  /** The loadout's Set out or the event's Continue; null otherwise or for a
-   * spectator. */
-  ready: { objectId: string; label: string; state: "open" | "done" } | null;
+  /** The muster's Lock in, the loadout's Set out or the event's Continue;
+   * null otherwise or for a spectator. Lock in is "disabled" until you have
+   * an explorer and a length. */
+  ready: { objectId: string; label: string; state: "open" | "done" | "disabled" } | null;
   /** Shown where Ready goes when there is no button: "2 of 3 voted". */
   status: string | null;
   vote: VoteResult | null;
@@ -262,9 +266,7 @@ function votersFor(server: SceneServerInput, ballots: readonly { seatId: string;
 }
 
 function stopKind(view: View, index: number): StopKind {
-  const boss = plannedBossAt(view, index);
-  if (boss === null) return "camp";
-  return boss.tier === "temple" ? "temple" : "boss";
+  return plannedBossAt(view, index)?.tier ?? "camp";
 }
 
 function buildTrail(view: View): TrailStop[] | null {
@@ -279,7 +281,7 @@ function buildTrail(view: View): TrailStop[] | null {
     const parts: string[] = [];
     if (state === "cleared") parts.push("cleared");
     if (state === "here") parts.push(results.length === 0 ? "next" : `try ${results.length + 1}`);
-    if (state === "ahead" && kind !== "camp") parts.push(kind);
+    if (state === "ahead" && kind !== "camp") parts.push(kind === "temple" ? "temple" : "boss");
     return { index, state, kind, caption: parts.join(", ") };
   });
 }
@@ -335,13 +337,15 @@ function surveyLabel(objective: NonNullable<ExpeditionCampPreviewView["survey"]>
 function lengthSummary(bossCamps: readonly { tier: string }[]): string {
   const bosses = bossCamps.filter((b) => b.tier !== "temple").length;
   if (bosses === 0) return "Temple at the end";
-  return `${bosses} ${bosses === 1 ? "boss" : "bosses"}, then the temple`;
+  return `${bosses} ${bosses === 1 ? "boss" : "bosses"}, then temple`;
 }
 
-function buildMuster(server: SceneServerInput, ballots: readonly { seatId: string; choice: string | null }[]): TrailPanel {
+function buildMuster(server: SceneServerInput, stage: Extract<View["stage"], { tag: "muster" }>): TrailPanel {
   const { game: view, roomSeats } = server;
+  const { ballots, lockedSeatIds } = stage;
   const you = view.seats.find((s) => s.seatId === view.yourSeatId);
   const yourBallot = ballots.find((b) => b.seatId === view.yourSeatId);
+  const choosing = you !== undefined && !lockedSeatIds.includes(you.seatId);
   const characters = Object.values(CHARACTER_DISPLAY).map((c): CharacterCard => {
     const holder = view.seats.find((s) => s.characterId === c.id);
     const yours = holder !== undefined && holder.seatId === view.yourSeatId;
@@ -356,7 +360,7 @@ function buildMuster(server: SceneServerInput, ballots: readonly { seatId: strin
       more: c.powerIds.map((id) => ({ sourceId: id, name: SOURCE_DISPLAY[id]?.name ?? id, text: SOURCE_DISPLAY[id]?.text ?? "", badges: sourceBadges(id) })),
       takenBy,
       yours,
-      pickable: holder === undefined && you !== undefined && you.characterId === null,
+      pickable: holder === undefined && choosing,
     };
   });
   const lengths = Object.values(RUN_LENGTH_DISPLAY).map((length): LengthOption => {
@@ -366,14 +370,11 @@ function buildMuster(server: SceneServerInput, ballots: readonly { seatId: strin
       objectId: lengthObjectId(length.id),
       name: length.name,
       camps: `${length.camps} camps`,
-      stops: Array.from({ length: length.camps }, (_, i): StopKind => {
-        const tier = bossAt.get(i + 1);
-        return tier === undefined ? "camp" : tier === "temple" ? "temple" : "boss";
-      }),
+      stops: Array.from({ length: length.camps }, (_, i): StopKind => bossAt.get(i + 1) ?? "camp"),
       summary: lengthSummary(length.bossCamps),
       voters: votersFor(server, ballots, length.id),
       yours: yourBallot?.choice === length.id,
-      votable: you !== undefined,
+      votable: choosing,
     };
   });
   const crew = orderedSeats(view).map((seat): MusterCrewRow => {
@@ -383,10 +384,10 @@ function buildMuster(server: SceneServerInput, ballots: readonly { seatId: strin
       name: roomSeats.find((r) => r.seatId === seat.seatId)?.displayLabel ?? "?",
       isYou: seat.seatId === view.yourSeatId,
       connected: roomSeats.find((r) => r.seatId === seat.seatId)?.connected ?? false,
-      status: seat.characterId === null ? "choosing" : voted ? "ready" : "voting",
+      status: lockedSeatIds.includes(seat.seatId) ? "locked" : seat.characterId !== null && voted ? "ready" : "choosing",
     };
   });
-  return { kind: "muster", characters, lengths, crew, votes: `${ballots.length} of ${view.seats.length} voted` };
+  return { kind: "muster", characters, lengths, crew, locked: `${lockedSeatIds.length} of ${view.seats.length} locked in` };
 }
 
 function bundleFor(itemIds: readonly string[], bundle: number): DraftBundle {
@@ -524,7 +525,7 @@ function buildPanel(server: SceneServerInput, ui: LocalUiState): TrailPanel {
   const stage = view.stage;
   switch (stage.tag) {
     case "muster":
-      return buildMuster(server, stage.ballots);
+      return buildMuster(server, stage);
     case "draft":
       return { kind: "draft", draft: buildDraft(view, stage.yourOffer, ui.takenBundle) };
     case "route":
@@ -554,8 +555,9 @@ function crewStatus(view: View, seatId: string): CrewRow["status"] {
     case "draft":
       return stage.pendingSeatIds.includes(seatId) ? "drafting" : "ready";
     case "route":
-    case "muster":
       return stage.ballots.some((b) => b.seatId === seatId) ? "voted" : "voting";
+    case "muster":
+      return stage.lockedSeatIds.includes(seatId) ? "ready" : "waiting";
     case "loadout":
     case "event":
       return stage.readySeatIds.includes(seatId) ? "ready" : "waiting";
@@ -605,7 +607,13 @@ function buildKit(view: View): KitItem[] | null {
 
 function buildReady(view: View): TrailModel["ready"] {
   const stage = view.stage;
-  if (view.yourSeatId === null || !view.seats.some((s) => s.seatId === view.yourSeatId)) return null;
+  const you = view.seats.find((s) => s.seatId === view.yourSeatId);
+  if (view.yourSeatId === null || you === undefined) return null;
+  if (stage.tag === "muster") {
+    if (stage.lockedSeatIds.includes(you.seatId)) return { objectId: READY_ID, label: "Locked in", state: "done" };
+    const chosen = you.characterId !== null && stage.ballots.some((b) => b.seatId === you.seatId);
+    return { objectId: READY_ID, label: "Lock in", state: chosen ? "open" : "disabled" };
+  }
   if (stage.tag !== "loadout" && stage.tag !== "event") return null;
   return { objectId: READY_ID, label: stage.tag === "loadout" ? "Set out" : "Continue", state: stage.readySeatIds.includes(view.yourSeatId) ? "done" : "open" };
 }

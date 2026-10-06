@@ -69,7 +69,7 @@ export function buildProgressMap(view: ExpeditionView): ProgressMap | null {
     const played = results.at(-1);
     const failed = results.filter((h) => h.status === "failed").length;
     const planned = plannedBossAt(view, index);
-    const kind: StopKind = planned === null ? "camp" : planned.tier === "temple" ? "temple" : "boss";
+    const kind: StopKind = planned?.tier ?? "camp";
     const boss = planned === null ? null : { id: planned.bossId, tier: planned.tier, name: planned.bossId === null ? TIER_NAME[planned.tier] : modDisplayName(planned.bossId) };
     const base = { index, kind, boss };
     if (results.some((h) => h.status === "cleared")) {

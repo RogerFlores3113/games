@@ -110,7 +110,7 @@ export class TrailScene extends Phaser.Scene {
         store.getState().dispatch({ type: "vote", choice });
       },
       onReady() {
-        store.getState().dispatch({ type: "ready" });
+        store.getState().dispatch(trailModel(store)?.panel.kind === "muster" ? { type: "lock-in" } : { type: "ready" });
       },
       onBuy(stockId) {
         store.getState().dispatch({ type: "buy", stockId });
