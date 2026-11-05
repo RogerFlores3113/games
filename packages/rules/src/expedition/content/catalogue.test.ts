@@ -10,6 +10,7 @@ import { evaluateObjective } from "../objectives";
 import type { CampState, CompletedTrick, ExpeditionCard, Objective, StandardIdentity, StandardRank, Suit } from "../state";
 import { trickWinner } from "../trick";
 import { abilityStatus, useAbility } from "../run/abilities";
+import { FAILURE_COST } from "../run/balance";
 import { CATALOG } from "../run/catalog";
 import { rulesFor } from "../run/compose";
 import { attemptOf, withAttempt } from "../run/attempt";
@@ -762,6 +763,21 @@ describe("items", () => {
     expect(whisperAllowance(packed.start)).toEqual([2, 1, 1]);
     expect(packed.end.supplies).toBe(1);
     expect(failing([]).end.supplies).toBe(2);
+  });
+
+  it("Heavy Packs share one extra supply cost across the crew, however many are equipped", () => {
+    const start = table({
+      kit: ["heavy-pack", "heavy-pack"],
+      mateKit: ["heavy-pack"],
+      supplies: 4,
+      hands: { p0: [std("a", "spades", 14)], p1: [std("b", "spades", 3)], p2: [std("c", "spades", 4)] },
+      objectives: [winCard("o1", ident("spades", 14), "p1")],
+      totalTricks: 1,
+      leader: "p0",
+    });
+    expect(whisperAllowance(start)).toEqual([3, 2, 1]);
+    expect(rules(start).failureCost(start)).toBe(FAILURE_COST + 1);
+    expect(playOut(start).supplies).toBe(4 - FAILURE_COST - 1);
   });
 
   it("Mosquito Net lets its owner whisper through a layer that forbids it", () => {

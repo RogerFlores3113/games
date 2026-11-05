@@ -99,7 +99,7 @@ function passiveLayers(run: RunState, catalog: Catalog, last: boolean): RuleModi
     const owner = ownerOf(seat);
     return liveSourceKeys(seat, catalog).flatMap((key) => {
       const passive = defOfKey(seat, key, catalog).passive;
-      return passive === undefined || (passive.foldsLast === true) !== last ? [] : [passive.modifier(owner)];
+      return passive === undefined || (passive.foldsLast === true) !== last ? [] : [passive.modifier(owner, key)];
     });
   });
 }

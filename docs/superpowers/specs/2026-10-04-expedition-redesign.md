@@ -1649,8 +1649,7 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
 - The contract test plays every boss's half body as a temple helper (the boss planned at camp
   1, the temple at camp 2) at 3, 4 and 5 players. The Long-run property plays every camp with
   random legal moves; before the temple a camp failed twice, or a failure that would end the
-  run, is cleared by `force-camp` (Heavy Packs can make one failure cost more than full
-  supplies).
+  run, is cleared by `force-camp` (a Heavy Pack makes one failure cost 2 supplies; more packs don't add to it).
 - `RunState` is unchanged, so `ROOM_SCHEMA_VERSION` stays 11. Rescue still opens only with no
   failed goal, so its view still needs no `failedGoalIds`. The skip's 16x16 icon is drawn in
   code (`apps/web/art/expedition/draw-icon-skip.mjs`).
@@ -1751,7 +1750,7 @@ and a bare identifier lives in `run/balance.ts`. A def's `text` repeats some of 
 | Puffball, Bait | 2 coins, common, single-use | `content/items/<id>.ts` |
 | Camouflage | 4 coins, rare, single-use | `content/items/camouflage.ts` |
 | Rope Ladder | 3 coins, common, single-use | `content/items/rope-ladder.ts` |
-| Heavy Pack | 3 coins, common, passive: +1 whisper, +1 supply per failure | `content/items/heavy-pack.ts` |
+| Heavy Pack | 3 coins, common, passive: +1 whisper per carrier; +1 supply per failure, once for the whole crew however many are equipped | `content/items/heavy-pack.ts` (`EXTRA_FAILURE_COST`) |
 | Mosquito Net | 4 coins, rare, passive | `content/items/mosquito-net.ts` |
 | Fair weather chance | 80% | `NORMAL_WEATHER_CHANCE` |
 | Clifftop's fair weather chance | 50% | `content/mods/clifftop.ts` `normalWeatherChance` |
