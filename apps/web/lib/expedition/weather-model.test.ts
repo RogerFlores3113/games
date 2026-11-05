@@ -24,6 +24,7 @@ function campView(weather: string, mods: ExpeditionModView[], trick = 0, removed
     yourAbilities: [],
     yourItemSlots: 2,
     history: [],
+    lastCamp: null,
     lastVote: null,
     stage: {
       tag: "camp",

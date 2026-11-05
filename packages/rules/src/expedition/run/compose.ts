@@ -31,7 +31,7 @@
 import { baseRulesWith } from "../rules";
 import { cardReading, isTrump } from "../trick";
 import { HOOK_NAMES, baseRunHooks, type HookName, type RuleModifier, type RunRules } from "./run-rules";
-import type { ActiveEffect, Catalog, RunState, SeatEffect } from "./types";
+import type { ActiveEffect, Catalog, LayerOrigin, RunState, SeatEffect } from "./types";
 import { defOfKey, liveSourceKeys, ownerOf, sourceDef } from "./usage";
 import { attemptOf } from "./attempt";
 import { bodyOf } from "../content/mods/mod-def";
@@ -92,21 +92,31 @@ function effectLayer(run: RunState, effect: ActiveEffect, catalog: Catalog): Rul
   return toLayer(effect, modCtx(run, spec, { def, strength: origin.strength }, catalog));
 }
 
+export type LabeledLayer = { readonly origin: LayerOrigin; readonly layer: RuleModifier };
+
+const layersOf = (labeled: readonly LabeledLayer[]): RuleModifier[] => labeled.map((l) => l.layer);
+
 /** Each seat's live passives, in seat order and then [character, upgrade,
  * ...equipped] order; `last` picks the passives that fold after the effects. */
-function passiveLayers(run: RunState, catalog: Catalog, last: boolean): RuleModifier[] {
+function passiveLayers(run: RunState, catalog: Catalog, last: boolean): LabeledLayer[] {
   return run.seats.flatMap((seat) => {
     const owner = ownerOf(seat);
     return liveSourceKeys(seat, catalog).flatMap((key) => {
-      const passive = defOfKey(seat, key, catalog).passive;
-      return passive === undefined || (passive.foldsLast === true) !== last ? [] : [passive.modifier(owner)];
+      const def = defOfKey(seat, key, catalog);
+      const passive = def.passive;
+      if (passive === undefined || (passive.foldsLast === true) !== last) return [];
+      return [{ origin: { kind: "seat" as const, seatId: seat.seatId, sourceId: def.id }, layer: passive.modifier(owner) }];
     });
   });
 }
 
+function effectOrigin(effect: ActiveEffect): LayerOrigin {
+  return effect.origin.kind === "seat" ? { kind: "seat", seatId: effect.origin.seatId, sourceId: effect.origin.sourceId } : { kind: "mod", modId: effect.origin.modId };
+}
+
 /** The attempt's live effects, in stored order; `seatOnly` drops the camp
  * modifiers' own. */
-function effectLayers(run: RunState, catalog: Catalog, seatOnly: boolean): RuleModifier[] {
+function effectLayers(run: RunState, catalog: Catalog, seatOnly: boolean): LabeledLayer[] {
   const attempt = attemptOf(run);
   if (attempt === null) return [];
   const trickIndex = attempt.camp.currentTrick.index;
@@ -115,7 +125,7 @@ function effectLayers(run: RunState, catalog: Catalog, seatOnly: boolean): RuleM
   // equals atTrick, and the next trick's index drops the layer.
   return attempt.effects
     .filter((effect) => !(effect.lasts === "trick" && effect.atTrick !== trickIndex) && !(seatOnly && effect.origin.kind === "mod"))
-    .map((effect) => effectLayer(run, effect, catalog));
+    .map((effect) => ({ origin: effectOrigin(effect), layer: effectLayer(run, effect, catalog) }));
 }
 
 /** Builds the ordered layer list for `run` under `catalog`: each camp-stack
@@ -126,22 +136,32 @@ function effectLayers(run: RunState, catalog: Catalog, seatOnly: boolean): RuleM
  * The dev sandbox's loaded objectives, when set, have the very last word.
  * Throws a named Error for any id missing from the catalog (POLICY A3). */
 export function ruleLayersFor(run: RunState, catalog: Catalog): RuleModifier[] {
+  return layersOf(labeledRuleLayersFor(run, catalog));
+}
+
+/** ruleLayersFor's layers, in the same order, each with where it comes
+ * from, so a composed answer can be split by source (a failed camp's
+ * supply cost, run/recap.ts). */
+export function labeledRuleLayersFor(run: RunState, catalog: Catalog): LabeledLayer[] {
   const spec = specOf(run);
-  const stack = spec === null ? [] : campStack(run, catalog).flatMap((layer) => (layer.body.rules === undefined ? [] : [layer.body.rules(modCtx(run, spec, layer, catalog))]));
+  const stack: LabeledLayer[] =
+    spec === null
+      ? []
+      : campStack(run, catalog).flatMap((layer) => (layer.body.rules === undefined ? [] : [{ origin: { kind: "mod" as const, modId: layer.def.id }, layer: layer.body.rules(modCtx(run, spec, layer, catalog)) }]));
   return [...stack, ...passiveLayers(run, catalog, false), ...effectLayers(run, catalog, false), ...passiveLayers(run, catalog, true), ...loadedLayers(run)];
 }
 
-function loadedLayers(run: RunState): RuleModifier[] {
+function loadedLayers(run: RunState): LabeledLayer[] {
   const decided = attemptOf(run)?.loaded?.objectives;
   if (decided === undefined || Object.keys(decided).length === 0) return [];
-  return [{ objectiveStatus: (prev) => (camp, objective) => decided[objective.id] ?? prev(camp, objective) }];
+  return [{ origin: { kind: "loaded" }, layer: { objectiveStatus: (prev) => (camp, objective) => decided[objective.id] ?? prev(camp, objective) } }];
 }
 
 /** The rules the seats alone make: passives and seat effects, without the
  * camp modifiers. A camp modifier asks these (`ctx.affects`) while its own
  * layer is being built. */
 export function seatRulesFor(run: RunState, catalog: Catalog): RunRules {
-  return composeRules([...passiveLayers(run, catalog, false), ...effectLayers(run, catalog, true), ...passiveLayers(run, catalog, true)]);
+  return composeRules(layersOf([...passiveLayers(run, catalog, false), ...effectLayers(run, catalog, true), ...passiveLayers(run, catalog, true)]));
 }
 
 /** The single entry point every later Phase 10 plan calls: RunRules composed

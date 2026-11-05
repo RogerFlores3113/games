@@ -61,11 +61,45 @@ const header = {
   purse: 8,
   supplies: { count: 3, max: 4 },
   plan: [{ at: 3, tier: "animal", bossId: null }, { at: 6, tier: "temple", bossId: null }],
+  lastCamp: null,
   lastVote: { topic: "length", tally: [{ choice: "short", votes: 1 }, { choice: "standard", votes: 1 }, { choice: "long", votes: 0 }], tied: ["short", "standard"], winner: "standard" },
+};
+
+const recap = {
+  camp: 1,
+  attempt: 2,
+  status: "failed",
+  tricksPlayed: 5,
+  totalTricks: 8,
+  lastTrick: {
+    index: 4,
+    leaderSeatId: "seat-1",
+    plays: [
+      { seatId: "seat-1", card: { id: "card-1", identity: { kind: "standard", suit: "clubs", rank: 7 } }, effectiveRank: null, countsAs: null, burned: false },
+      { seatId: "seat-2", card: { id: "card-2", identity: { kind: "standard", suit: "clubs", rank: 10 } }, effectiveRank: null, countsAs: null, burned: true },
+    ],
+    winnerSeatId: "seat-1",
+  },
+  objectives: [
+    {
+      objective: { id: "o1", kind: "win-card", target: { kind: "standard", suit: "clubs", rank: 10 }, ownerSeatId: "seat-2", status: "failed" },
+      failedAtTrick: 4,
+      fate: { kind: "lost" },
+      ownerTricksWon: 1,
+    },
+    { objective: { id: "o2", kind: "hidden", ownerSeatId: "seat-1", status: "pending" }, failedAtTrick: null, fate: null, ownerTricksWon: 2 },
+  ],
+  failedGoalIds: [],
+  coins: 0,
+  supplyCost: [
+    { origin: { kind: "base" }, amount: 1 },
+    { origin: { kind: "seat", seatId: "seat-2", sourceId: "heavy-pack" }, amount: 1 },
+  ],
 };
 
 const draftView = {
   ...header,
+  lastCamp: recap,
   seats: [
     {
       seatId: "seat-1",
@@ -328,6 +362,11 @@ describe("ExpeditionViewSchema", () => {
       },
     ],
     ["top-level itemSerial", { ...draftView, itemSerial: 3 }],
+    ["a recap carrying hands", { ...draftView, lastCamp: { ...recap, hands: [] } }],
+    [
+      "a hidden recap objective carrying a target",
+      { ...draftView, lastCamp: { ...recap, objectives: [{ ...recap.objectives[1], objective: { ...recap.objectives[1]!.objective, target: { kind: "standard", suit: "clubs", rank: 10 } } }] } },
+    ],
     [
       "a remaining of the removed single-use kind",
       { ...draftView, seats: [{ ...draftView.seats[1], usage: [{ sourceKey: "it0", remaining: { kind: "single-use" } }] }] },

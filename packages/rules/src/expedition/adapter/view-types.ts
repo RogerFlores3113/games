@@ -244,6 +244,40 @@ export type ExpeditionAbilityView = { sourceKey: string; usableNow: boolean; rea
 
 export type ExpeditionCampResultView = { camp: number; attempt: number; location: string; weather: string; status: "cleared" | "failed" | "restarted"; coins: number };
 
+/** One objective of the last attempt: as the table saw it at the end
+ * (hidden if anyone could not see it), the trick whose completion failed
+ * it (null when not failed or failed some other way), a card objective's
+ * target fate (null for a cardless or hidden one) and its holder's tricks. */
+export type ExpeditionRecapObjectiveView = {
+  objective: ExpeditionObjectiveView;
+  failedAtTrick: number | null;
+  fate: { kind: "won"; bySeatId: string } | { kind: "lost" } | { kind: "open" } | null;
+  ownerTricksWon: number | null;
+};
+
+/** One part of a failed camp's supply cost: the base cost, a camp
+ * modifier's extra or a seat's source's extra (Heavy Pack). */
+export type ExpeditionSupplyCostPartView = {
+  origin: { kind: "base" } | { kind: "mod"; modId: string } | { kind: "seat"; seatId: string; sourceId: string };
+  amount: number;
+};
+
+/** The attempt that ended last, shown between camps until the next one is
+ * dealt. Its final trick's plays carry no effectiveRank (null): the rules
+ * that read them are gone. */
+export type ExpeditionCampRecapView = {
+  camp: number;
+  attempt: number;
+  status: "cleared" | "failed";
+  tricksPlayed: number;
+  totalTricks: number;
+  lastTrick: ExpeditionCompletedTrickView | null;
+  objectives: ExpeditionRecapObjectiveView[];
+  failedGoalIds: string[];
+  coins: number;
+  supplyCost: ExpeditionSupplyCostPartView[];
+};
+
 /** A seat the crew voted out while it was away. `back` while it is
  * connected again, waiting to rejoin at the next loadout. */
 export type ExpeditionKickedSeatView = { seatId: string; characterId: string | null; upgradeId: string | null; back: boolean };
@@ -359,6 +393,9 @@ export type ExpeditionView = {
    * holds BALANCE_DISPLAY.backpackSize. */
   yourItemSlots: number;
   history: ExpeditionCampResultView[];
+  /** The last attempt's recap; null in camp (the next attempt is dealt), at
+   * the muster, and before any attempt has ended. */
+  lastCamp: ExpeditionCampRecapView | null;
   lastVote: ExpeditionVoteView | null;
   stage: ExpeditionStageView;
 };

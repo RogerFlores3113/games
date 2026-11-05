@@ -43,14 +43,17 @@ import { abilityKeys, abilityOf, activeOfKey, backpackOf, itemOf, remaining, use
 import { priceFor, upgradeOffers, type StockEntry } from "../run/shop";
 import { currentWindow, gatedPendingSeatIds } from "../run/windows";
 import type { RunRules } from "../run/run-rules";
-import type { ActiveEffect, AttemptState, Catalog, ItemInstance, LogEntry, PerSeat, Reveal, RunState, SeatRun } from "../run/types";
+import type { ActiveEffect, AttemptState, Catalog, ItemInstance, LogEntry, ObjectiveRecap, PerSeat, Reveal, RunState, SeatRun, SupplyCostPart } from "../run/types";
 import { rankOf } from "../trick";
-import type { CampState, CardIdentity, ExpeditionCard, Objective, ResolvedPlay, StandardIdentity } from "../state";
+import type { CampState, CardIdentity, CompletedTrick, ExpeditionCard, Objective, ResolvedPlay, StandardIdentity } from "../state";
 import type {
   ExpeditionAttemptView,
   ExpeditionBallotView,
   ExpeditionCampPreviewView,
+  ExpeditionCampRecapView,
   ExpeditionCampResultView,
+  ExpeditionRecapObjectiveView,
+  ExpeditionSupplyCostPartView,
   ExpeditionCampView,
   ExpeditionCardIdentityView,
   ExpeditionCardView,
@@ -332,6 +335,59 @@ function toCampResultView(result: RunState["history"][number]): ExpeditionCampRe
   return { camp: result.camp, attempt: result.attempt, location: result.location, weather: result.weather, status: result.status, coins: result.coins };
 }
 
+/** A recap's objective as the table saw it at the end: a hidden one shows
+ * no kind, no target and no fate. */
+function toRecapObjectiveView(recap: ObjectiveRecap): ExpeditionRecapObjectiveView {
+  const o = recap.objective;
+  const status = recap.status;
+  let objective: ExpeditionObjectiveView;
+  if (recap.hidden) objective = { id: o.id, kind: "hidden", ownerSeatId: o.ownerSeatId, status };
+  else if (o.kind === "win-card") objective = { id: o.id, kind: "win-card", target: toIdentityView(o.target), ownerSeatId: o.ownerSeatId, status };
+  else if (o.kind === "ordered") objective = { id: o.id, kind: "ordered", target: toStandardIdentityView(o.target), order: o.order, ownerSeatId: o.ownerSeatId, status };
+  else if (o.kind === "no-tricks") objective = { id: o.id, kind: "no-tricks", ownerSeatId: o.ownerSeatId, status };
+  else objective = { id: o.id, kind: "exactly-n", n: o.n, ownerSeatId: o.ownerSeatId, status };
+  const fate = recap.hidden || recap.fate === null ? null : recap.fate.kind === "won" ? { kind: "won" as const, bySeatId: recap.fate.bySeatId } : { kind: recap.fate.kind };
+  return { objective, failedAtTrick: recap.failedAtTrick, fate, ownerTricksWon: recap.ownerTricksWon };
+}
+
+function toSupplyCostPartView(part: SupplyCostPart): ExpeditionSupplyCostPartView {
+  const origin = part.origin;
+  return {
+    origin: origin.kind === "base" ? { kind: "base" } : origin.kind === "mod" ? { kind: "mod", modId: origin.modId } : { kind: "seat", seatId: origin.seatId, sourceId: origin.sourceId },
+    amount: part.amount,
+  };
+}
+
+/** The last attempt's final trick was face up once it completed, so it is
+ * shown whole; the rules that ranked its cards are gone, so no rank. */
+function toRecapTrickView(trick: CompletedTrick): ExpeditionCompletedTrickView {
+  return {
+    index: trick.index,
+    leaderSeatId: trick.leaderSeatId,
+    plays: trick.plays.map((play) => ({ seatId: play.seatId, card: toCardView(play.card), effectiveRank: null, countsAs: play.countsAs === null ? null : toIdentityView(play.countsAs), burned: play.burned })),
+    winnerSeatId: trick.winnerSeatId,
+  };
+}
+
+/** The last attempt's recap between camps; null in camp, where the next
+ * attempt is on the table, and before any attempt has ended. */
+function toCampRecapView(state: RunState): ExpeditionCampRecapView | null {
+  const recap = state.lastAttempt ?? null;
+  if (recap === null || state.stage.tag === "camp" || state.stage.tag === "muster") return null;
+  return {
+    camp: recap.camp,
+    attempt: recap.attempt,
+    status: recap.status,
+    tricksPlayed: recap.tricksPlayed,
+    totalTricks: recap.totalTricks,
+    lastTrick: recap.lastTrick === null ? null : toRecapTrickView(recap.lastTrick),
+    objectives: recap.objectives.map(toRecapObjectiveView),
+    failedGoalIds: Array.from(recap.failedGoalIds),
+    coins: recap.coins,
+    supplyCost: recap.supplyCost.map(toSupplyCostPartView),
+  };
+}
+
 function toSurveyedObjectiveView(objective: Objective): ExpeditionSurveyedObjectiveView {
   switch (objective.kind) {
     case "win-card":
@@ -584,6 +640,7 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
     yourAbilities: ownSeat !== undefined ? toAbilityViews(state, ownSeat, catalog) : [],
     yourItemSlots: ownSeat === undefined ? 0 : rules.itemSlots(state, seatId),
     history: state.history.map(toCampResultView),
+    lastCamp: toCampRecapView(state),
     lastVote:
       lastVote === null
         ? null

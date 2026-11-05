@@ -30,6 +30,7 @@ function view(over: Partial<ExpeditionView> = {}, seat: Partial<ExpeditionView["
     yourAbilities: [],
     yourItemSlots: 2,
     history: [],
+    lastCamp: null,
     lastVote: null,
     stage: LOADOUT,
     ...over,

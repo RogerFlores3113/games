@@ -64,6 +64,7 @@ function game(over: Partial<ExpeditionView> = {}, campOver: Partial<Camp> = {}, 
     yourAbilities: [],
     yourItemSlots: 2,
     history: [],
+    lastCamp: null,
     lastVote: null,
     stage: {
       tag: "camp",

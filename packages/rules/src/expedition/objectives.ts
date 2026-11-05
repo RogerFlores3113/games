@@ -104,10 +104,10 @@ function lostAt(state: CampState, target: CardIdentity): number | undefined {
   return discard === undefined ? undefined : discard.afterTrick - 0.5;
 }
 
-type TargetFate = { readonly kind: "won"; readonly trick: CompletedTrick } | { readonly kind: "lost" } | { readonly kind: "open" };
+export type TargetFate = { readonly kind: "won"; readonly trick: CompletedTrick } | { readonly kind: "lost" } | { readonly kind: "open" };
 
 /** A-LOST: whichever came first, the target's win or its loss. */
-function targetFate(state: CampState, target: CardIdentity): TargetFate {
+export function targetFate(state: CampState, target: CardIdentity): TargetFate {
   const trick = trickContaining(state, target);
   const lost = lostAt(state, target);
   if (trick !== undefined && (lost === undefined || trick.index <= lost)) return { kind: "won", trick };

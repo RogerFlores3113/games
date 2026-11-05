@@ -107,6 +107,7 @@ function makeView({ attempt, campIndex = 2, ...overrides }: ViewOverrides = {}):
     yourAbilities: [],
     yourItemSlots: 2,
     history: [],
+    lastCamp: null,
     lastVote: null,
     stage: { tag: "camp", camp: { index: campIndex, location: "jungle", weather: "fair", pairing: null, slotKinds: [], bossId: null, shop: false, survey: null }, mods: [], attempt: attempt ?? makeAttempt() },
     ...overrides,
