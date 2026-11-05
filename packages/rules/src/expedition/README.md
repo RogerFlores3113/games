@@ -76,7 +76,8 @@ card or was discarded, and fails if never played by the final trick.
   `run/attempt.ts` (`attemptOf`, `withAttempt`), `run/abilities.ts`
   (`abilityStatus`, `useAbility`, `passWindow`), `run/targets.ts`
   (`TARGET_KINDS`, `resolveTargets`, `stepsFor`), `run/windows.ts`
-  (`WINDOWS`, `currentWindow`, `gatedPendingSeatIds`), `run/usage.ts`
+  (`WINDOWS`, `currentWindow`, `gatedPendingSeatIds`), `run/hold.ts`
+  (`holdingSeatIds`, `holdLegality`, `applyHold`), `run/usage.ts`
   (`remaining`, `shareOf`, `liveSourceKeys`, `abilityKeys`,
   `backpackOf`, `defIdOf`), `run/items.ts` (`mintItems`, `roomFor`,
   `equipError`, `discardItem`, `refitSlots`),
@@ -151,7 +152,13 @@ until the tag stops changing.
    events (the deal, picks, plays, completed and started tricks, whispers)
    with toolkit ops; a decided camp settles unless a rescue is pending. The
    backpack is shut in camp: only equipped items act, and only the Pack
-   Rat's Pack Animal swaps one in, once per camp.
+   Rat's Pack Animal swaps one in, once per camp. Between tricks any seat
+   not on lead may send `hold` once per gap (`run/hold.ts`): while a hold
+   stands the next lead is refused `waiting_on_hold`, until the holder
+   whispers, uses an ability or lets go with `skip-window`. The hold and
+   its end are `held` and `released` ledger entries at the gap's stamp, so
+   the next gap starts clean; the view names the holders
+   (`holdingSeatIds`) and says whether the viewer may hold (`youMayHold`).
 4. **Settle.** A failure costs supplies and goes back to the same camp spec
    for a fresh deal (`reopenCamp`: through its shop again before a shop
    camp, then its loadout); 0 supplies ends the run. A clear pays `5`,
@@ -184,7 +191,7 @@ table: `run/absent.ts`'s `absentSeatAction` (the adapter's
 abstains from votes, locks in at the muster, takes the head offer's first
 bundle (discarding its last backpack item first while that bundle does not
 fit), readies at the shop, the event and the loadout with the gear it has,
-and passes a gated window. Bot seats have no disconnect time,
+passes a gated window, and lets go of a hold between tricks. Bot seats have no disconnect time,
 so it never acts for them.
 
 The pass cannot play a card for a seat, so the connected players can also

@@ -26,5 +26,7 @@ export interface CampHandlers extends StripHandlers {
   /** Use or pass in a gated window: before the deal, or a rescue. */
   onGateUse(sourceKey: string): void;
   onGateSkip(): void;
+  /** Hold on between tricks, or Go ahead once your hold stands. */
+  onHold(holding: boolean): void;
   onLastTrickHover(open: boolean): void;
 }

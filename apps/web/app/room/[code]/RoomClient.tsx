@@ -131,6 +131,7 @@ function ConnectedRoom({
   const refusalReason = useRoomStore((state) => state.refusalReason);
   const view = useRoomStore((state) => state.view);
   const closeReason = useRoomStore((state) => state.closeReason);
+  const lastRefusal = useRoomStore((state) => state.lastRefusal);
   // D-11: guards against double-firing reclaimSeat on a double-click — reset
   // whenever we leave "superseded" so a tab superseded AGAIN later still has
   // a live button, never a permanently-disabled one.
@@ -302,6 +303,7 @@ function ConnectedRoom({
         onDeleteRoom={() => send({ type: "delete_room", actionId: nanoid() })}
         onRestartLobby={() => send({ type: "restart_lobby", actionId: nanoid() })}
         onKickVote={(targetSeatId, kick) => send({ type: "kick_vote", targetSeatId, kick })}
+        refusal={lastRefusal}
       />
       {devPanel}
     </>

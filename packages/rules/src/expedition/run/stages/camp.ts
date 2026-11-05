@@ -1,5 +1,5 @@
 import { applyCampAction } from "../../actions";
-import { checkCampOutcome } from "../../camp";
+import { checkCampOutcome, currentActorSeatId } from "../../camp";
 import type { CampError, CampEvent } from "../../state";
 import { passWindow, useAbility } from "../abilities";
 import { withAttempt } from "../attempt";
@@ -9,7 +9,8 @@ import { react } from "../react";
 import type { Catalog, RunAt } from "../types";
 import { applyWhisper } from "../whisper";
 import { currentWindow, gatedPendingSeatIds } from "../windows";
-import { err, ok, type Handler, type StageDef } from "./stage-def";
+import { applyHold, holdingSeatIds, releasedAfter } from "../hold";
+import { err, ok, type Handler, type StageDef, type StageResult } from "./stage-def";
 
 type CampAction = { readonly type: "pick-objective"; readonly objectiveId: string } | { readonly type: "play-card"; readonly cardId: string };
 type Played = { readonly ok: true; readonly run: RunAt<"camp">; readonly events: readonly CampEvent[] } | { readonly ok: false; readonly error: CampError };
@@ -42,7 +43,9 @@ function deferFatalEffects(before: RunAt<"camp">, seatId: string, action: CampAc
   return retried.ok && !failed(retried.run, catalog) ? retried : played;
 }
 
+/** The lead waits while a teammate's Hold on stands (run/hold.ts). */
 const campAction: Handler<"camp", CampAction> = (run, seatId, action, catalog) => {
+  if (action.type === "play-card" && currentActorSeatId(run.stage.attempt.camp, rulesFor(run, catalog)) === seatId && holdingSeatIds(run, catalog).length > 0) return err("waiting_on_hold");
   const played = play(run, seatId, action, catalog);
   if (!played.ok) return err(played.error);
   const settled = deferFatalEffects(run, seatId, action, played, catalog);
@@ -60,11 +63,19 @@ function settleIfDecided(run: RunAt<"camp">, catalog: Catalog) {
   return settleCamp(run, "failed", catalog);
 }
 
+/** A whisper or an ability ends the seat's hold in the gap it was sent in. */
+function letsGo(run: RunAt<"camp">, seatId: string, result: StageResult, catalog: Catalog): StageResult {
+  return result.ok ? ok(releasedAfter(run, result.state, seatId, catalog)) : result;
+}
+
 export const camp: StageDef<"camp"> = {
   on: {
-    "use-ability": (run, seatId, action, catalog) => useAbility(run, seatId, action.sourceKey, action.targets, catalog),
-    "skip-window": (run, seatId, _action, catalog) => passWindow(run, seatId, catalog),
-    whisper: (run, seatId, action, catalog) => applyWhisper(run, seatId, action, catalog),
+    "use-ability": (run, seatId, action, catalog) => letsGo(run, seatId, useAbility(run, seatId, action.sourceKey, action.targets, catalog), catalog),
+    // Between tricks a holding seat's skip lets go of its hold.
+    "skip-window": (run, seatId, _action, catalog) =>
+      holdingSeatIds(run, catalog).includes(seatId) ? ok(releasedAfter(run, run, seatId, catalog)) : passWindow(run, seatId, catalog),
+    hold: (run, seatId, _action, catalog) => applyHold(run, seatId, catalog),
+    whisper: (run, seatId, action, catalog) => letsGo(run, seatId, applyWhisper(run, seatId, action, catalog), catalog),
     "pick-objective": campAction,
     "play-card": campAction,
   },

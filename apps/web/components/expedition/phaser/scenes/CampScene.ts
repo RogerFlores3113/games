@@ -184,6 +184,12 @@ function buildHandlers(store: SceneDeps["store"], pointer: () => Point): CampHan
       if (state.reconnecting) return;
       state.dispatch({ type: "skip-window" });
     },
+    onHold(holding) {
+      const state = store.getState();
+      if (state.reconnecting) return;
+      // Letting go of a hold is the between-tricks skip-window.
+      state.dispatch(holding ? { type: "skip-window" } : { type: "hold" });
+    },
     onLastTrickHover(open) {
       const state = store.getState();
       if (state.reconnecting) return;

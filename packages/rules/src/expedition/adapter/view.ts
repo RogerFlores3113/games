@@ -43,6 +43,7 @@ import { abilityStatus } from "../run/abilities";
 import { abilityKeys, abilityOf, activeOfKey, backpackOf, itemOf, remaining, usedThisAttempt, type Remaining } from "../run/usage";
 import { priceFor, upgradeOffers, type StockEntry } from "../run/shop";
 import { currentWindow, gatedPendingSeatIds } from "../run/windows";
+import { holdLegality, holdingSeatIds } from "../run/hold";
 import type { RunRules } from "../run/run-rules";
 import type { ActiveEffect, AttemptState, Catalog, ItemInstance, LogEntry, ObjectiveRecap, PerSeat, Reveal, RunState, SeatRun, SupplyCostPart } from "../run/types";
 import { rankOf } from "../trick";
@@ -522,8 +523,10 @@ function toAttemptView(state: RunState, rawAttempt: AttemptState, seatId: string
   const derivedCampPhase = campPhase(campState, rules);
   const derivedCurrentActorSeatId = currentActorSeatId(campState, rules);
 
+  // While a teammate's Hold on stands, the lead waits: no card is legal yet.
+  const holding = holdingSeatIds(state, catalog);
   const yourLegalCardIds: string[] =
-    seated && derivedCampPhase === "playing" && derivedCurrentActorSeatId === seatId
+    seated && derivedCampPhase === "playing" && derivedCurrentActorSeatId === seatId && holding.length === 0
       ? rules
           .legalPlays(campState, seatId)
           .map((c) => c.id)
@@ -554,6 +557,8 @@ function toAttemptView(state: RunState, rawAttempt: AttemptState, seatId: string
     // Under fog, a teammate waited on in rescue would be one holding a rescue item.
     pendingSeatIds: gatedPendingSeatIds(state, catalog).filter((pending) => !foggedSeatIds(state, seatId, rules).includes(pending)),
     rescue,
+    holdingSeatIds: [...holding],
+    youMayHold: seated && holdLegality(state, seatId, catalog).legal,
     effects: rawAttempt.effects.map((effect) => toEffectView(effect, yourSeatId, faceDownIds)),
     reveals,
     log,

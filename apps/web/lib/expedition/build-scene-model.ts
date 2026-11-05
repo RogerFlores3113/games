@@ -300,6 +300,10 @@ export interface SceneModel {
    * still send this camp. */
   /** `washes`: the weather will wash your next whisper away. */
   whisper: { shown: boolean; visible: boolean; used: boolean; active: boolean; state: WhisperState; reason: string | null; left: number; washes: boolean };
+  /** The Hold on button between tricks, from the server's `youMayHold` and
+   * `holdingSeatIds`. `shown`: you may ask the lead to wait, or your hold
+   * stands. `holding`: your hold stands, so the button lets go ("Go ahead"). */
+  hold: { shown: boolean; holding: boolean };
   /** Cards teammates named to you, kept face up for the attempt. */
   receivedWhispers: ReceivedWhisper[];
   /** Cards an ability showed you, and who held each. */
@@ -552,9 +556,10 @@ function seatModelFor(seatId: string, ring: number, view: ExpeditionView, roomSe
 
 /** Why a card the server did not list as legal can't be played; phrases
  * the server's answer and never recomputes it. */
-function blockedReasonFor(camp: ExpeditionCampView, view: ExpeditionView, card: ExpeditionCardIdentityView): string {
+function blockedReasonFor(camp: ExpeditionCampView, view: ExpeditionView, card: ExpeditionCardIdentityView, waitsOn: string | null): string {
   if (camp.campPhase !== "playing") return "Wait for the objectives to be picked";
   if (camp.currentActorSeatId !== view.yourSeatId) return "Not your turn yet";
+  if (waitsOn !== null) return `Waiting on ${waitsOn}`;
   const led = ledSuit(camp);
   const legal = camp.yourHand.filter((c) => camp.yourLegalCardIds.includes(c.id));
   const following = led !== null && legal.some((c) => c.identity.kind === "standard" && c.identity.suit === led);
@@ -564,7 +569,7 @@ function blockedReasonFor(camp: ExpeditionCampView, view: ExpeditionView, card: 
   return "You can't play that card now";
 }
 
-function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: LocalUiState): CardModel[] {
+function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: LocalUiState, waitsOn: string | null): CardModel[] {
   if (camp === null) return [];
   const yourTurnToPlay = camp.campPhase === "playing" && camp.currentActorSeatId === view.yourSeatId;
   const step = currentStep(ui, view);
@@ -587,7 +592,7 @@ function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: Lo
       targetable,
       selected,
       lifted: ui.hoveredCardId === c.id && dragged === null,
-      blockedReason: playable ? null : blockedReasonFor(camp, view, c.identity),
+      blockedReason: playable ? null : blockedReasonFor(camp, view, c.identity, waitsOn),
       dragging: (ui.drag.phase === "dragging" || ui.drag.phase === "playing") && dragged === c.id,
       countsAs: shownAs(c.identity, c.countsAs, c.effectiveRank),
     };
@@ -613,6 +618,20 @@ function whisperStatus(view: ExpeditionView, active: boolean): SceneModel["whisp
   }
   const washes = (washing(view)?.left ?? 0) > 0;
   return { shown, visible: shown && state === "ready", used: state === "used" || state === "washed", active, state, reason, left: mine.left, washes };
+}
+
+function holdStatus(view: ExpeditionView): SceneModel["hold"] {
+  const attempt = attemptOf(view);
+  const holding = attempt !== null && view.yourSeatId !== null && attempt.holdingSeatIds.includes(view.yourSeatId);
+  return { shown: holding || (attempt?.youMayHold ?? false), holding };
+}
+
+/** "Ana" or "Ana and Bo": whom your held lead waits on; null when it waits on nobody. */
+function leadWaitsOn(view: ExpeditionView, roomSeats: RoomSeatInfo[]): string | null {
+  const camp = attemptOf(view)?.camp;
+  const holding = attemptOf(view)?.holdingSeatIds ?? [];
+  if (camp === undefined || holding.length === 0 || camp.currentActorSeatId !== view.yourSeatId) return null;
+  return listed(holding.map((id) => roomSeatFor(roomSeats, id).displayLabel));
 }
 
 function buildWhispers(
@@ -837,7 +856,7 @@ export function buildSceneModel(
   const helpers = buildHelpers(view, namer);
   const marks = { ...vowMarks(view), ...seatMarks(boss, helpers) };
   const seats = orderedSeatIds(view).map((seatId, ring) => seatModelFor(seatId, ring, view, roomSeats, ui, marks));
-  const hand = buildHand(camp, view, ui);
+  const hand = buildHand(camp, view, ui, leadWaitsOn(view, roomSeats));
   const trick = buildTrick(camp, view, ui);
   const lastTrick = buildLastTrick(camp, view, ui);
   const faceUpObjectives = objectivesForOwner(camp, null, view, ui);
@@ -876,6 +895,7 @@ export function buildSceneModel(
     prompt,
     tooltip: buildTooltip(server, ui),
     whisper,
+    hold: holdStatus(view),
     ...buildWhispers(view, roomSeats),
     gust: latestGust(view),
     happenings: [...bossHappenings(view, namer), ...washedHappenings(view, namer)],

@@ -69,6 +69,8 @@ function view(campView: ExpeditionCampView, overrides: Partial<ExpeditionView> =
         window: null,
         pendingSeatIds: [],
         rescue: null,
+        holdingSeatIds: [],
+        youMayHold: false,
         effects: [],
         reveals: [],
         log: [],

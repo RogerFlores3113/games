@@ -1,5 +1,14 @@
 import { create } from "zustand";
-import type { RefusalReason, RoomView, ServerMessage } from "@games/schema";
+import type { GameErrorDetail, RefusalReason, RoomView, ServerMessage } from "@games/schema";
+
+/** The server refused one of our requests after we were seated (a game rule
+ * said no, or the room did). `serial` grows with each refusal, so the same
+ * code twice in a row is still news to a board that shows it. */
+export interface ActionRefusal {
+  serial: number;
+  code: RefusalReason;
+  gameError: GameErrorDetail | null;
+}
 
 /**
  * A thin cache of the last server-pushed view — the server is authoritative
@@ -42,6 +51,9 @@ export interface RoomStoreState {
    * the host" copy from "closed for sitting idle" without a second terminal
    * status — the underlying disconnect/cleanup is identical either way. */
   closeReason: "host_deleted" | null;
+  /** The latest refusal of a request we sent while seated; null before any.
+   * Never touches `view`: the server's own broadcast stays the truth. */
+  lastRefusal: ActionRefusal | null;
 }
 
 export interface RoomStoreActions {
@@ -52,6 +64,9 @@ export interface RoomStoreActions {
    * (e.g. "connecting" while the transport opens, "joining" once the
    * `join` frame has been sent but no reply has arrived yet). */
   setStatus: (status: RoomConnectionStatus) => void;
+  /** Records an `error` frame that is not an answer to our `join` (the
+   * socket layer tells the two apart) as `lastRefusal`. */
+  noteRefusal: (message: Extract<ServerMessage, { type: "error" }>) => void;
   /** Returns the store to its pre-connection shape — used when a fresh
    * connection attempt starts from scratch (e.g. a new room code). */
   reset: () => void;
@@ -64,6 +79,7 @@ const initialState: RoomStoreState = {
   seatId: null,
   joinError: null,
   closeReason: null,
+  lastRefusal: null,
 };
 
 export const useRoomStore = create<RoomStoreState & RoomStoreActions>((set, get) => ({
@@ -119,6 +135,9 @@ export const useRoomStore = create<RoomStoreState & RoomStoreActions>((set, get)
   },
 
   setStatus: (status) => set({ status }),
+
+  noteRefusal: (message) =>
+    set({ lastRefusal: { serial: (get().lastRefusal?.serial ?? 0) + 1, code: message.code, gameError: message.gameError ?? null } }),
 
   reset: () => set(initialState),
 }));

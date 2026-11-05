@@ -60,6 +60,8 @@ const StampSchema = z.strictObject({ camp: CampIndexSchema, attempt: z.number().
 const LedgerEntrySchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("used"), sourceKey: z.string().min(1), at: StampSchema, free: z.literal(true).optional() }),
   z.strictObject({ kind: z.literal("passed"), sourceKey: z.string().min(1), at: StampSchema, failedObjectiveIds: z.array(z.string()) }),
+  z.strictObject({ kind: z.literal("held"), at: StampSchema }),
+  z.strictObject({ kind: z.literal("released"), at: StampSchema }),
 ]);
 
 const AudienceSchema = z.union([z.literal("public"), z.array(z.string().min(1))]);

@@ -134,6 +134,10 @@ function mapExpeditionError(error: RunError): GameErrorDetail {
       return { gameId: EXPEDITION_GAME_ID, code: "no_whispers_left" };
     case "nothing_to_skip":
       return { gameId: EXPEDITION_GAME_ID, code: "nothing_to_skip" };
+    case "waiting_on_hold":
+      return { gameId: EXPEDITION_GAME_ID, code: "waiting_on_hold" };
+    case "hold_unavailable":
+      return { gameId: EXPEDITION_GAME_ID, code: "hold_unavailable" };
     default: {
       const exhaustiveCheck: never = error;
       throw new Error(`Unrecognized RunError: ${String(exhaustiveCheck)}`);

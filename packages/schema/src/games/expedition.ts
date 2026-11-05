@@ -255,6 +255,10 @@ const AttemptViewSchema = z.strictObject({
   window: ActiveWindowSchema.nullable(),
   pendingSeatIds: z.array(z.string().min(1)),
   rescue: z.strictObject({ failedObjectiveIds: z.array(z.string().min(1)) }).nullable(),
+  // Between tricks: whose Hold on the next lead waits on, and whether the
+  // viewer may hold now.
+  holdingSeatIds: z.array(z.string().min(1)),
+  youMayHold: z.boolean(),
   effects: z.array(EffectViewSchema),
   reveals: z.array(RevealViewSchema),
   log: z.array(LogEntryViewSchema),

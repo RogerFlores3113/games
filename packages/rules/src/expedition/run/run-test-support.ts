@@ -232,10 +232,13 @@ function loadoutCandidates(run: RunState, catalog: Catalog): Array<{ seatId: str
  * only if `applyRunAction` itself accepts it (T-03-24 discipline: legality
  * is decided ONLY by the real transition, never re-derived here). Votes and
  * characters are offered only to seats without one, so a random driver
- * cannot change its mind forever. */
+ * cannot change its mind forever. `holds` also offers Hold on and letting
+ * go between tricks (off by default: the whole-run properties stay within
+ * their time budgets, and run/hold.test.ts drives holds on its own). */
 export function enumerateLegalRunActions(
   run: RunState,
   catalog: Catalog,
+  opts: { readonly holds?: boolean } = {},
 ): Array<{ seatId: string; action: RunAction }> {
   const stage = run.stage;
   const candidates: Array<{ seatId: string; action: RunAction }> = [];
@@ -291,6 +294,8 @@ export function enumerateLegalRunActions(
 
     if (window === "between-tricks") {
       for (const seat of run.seats) {
+        // A hold, and letting go of one: once per gap, so a driver can't hold forever.
+        if (opts.holds === true) candidates.push({ seatId: seat.seatId, action: { type: "hold" } }, { seatId: seat.seatId, action: { type: "skip-window" } });
         const ownCards = camp.hands.find((h) => h.seatId === seat.seatId)?.cards.slice(0, 2) ?? [];
         for (const teammateId of run.seatIds) {
           if (teammateId === seat.seatId) continue;
@@ -318,6 +323,7 @@ export function driveRun(
   choices: readonly number[],
   catalog: Catalog,
   maxSteps = 20000,
+  opts: { readonly holds?: boolean } = {},
 ): { states: RunState[]; log: Array<{ seatId: string; action: RunAction }> } {
   const states: RunState[] = [initial];
   const log: Array<{ seatId: string; action: RunAction }> = [];
@@ -328,7 +334,7 @@ export function driveRun(
   for (;;) {
     if (runStatus(state) !== "in_progress") break;
 
-    const legal = enumerateLegalRunActions(state, catalog);
+    const legal = enumerateLegalRunActions(state, catalog, opts);
 
     if (legal.length === 0) break;
     if (step >= maxSteps) {

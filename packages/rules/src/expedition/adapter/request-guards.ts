@@ -84,6 +84,11 @@ function parseSkipWindow(record: Record<string, unknown>): RunAction | null {
   return { type: "skip-window" };
 }
 
+function parseHold(record: Record<string, unknown>): RunAction | null {
+  if (!hasExactKeys(record, ["type"])) return null;
+  return { type: "hold" };
+}
+
 function parseWhisper(record: Record<string, unknown>): RunAction | null {
   if (!hasExactKeys(record, ["type", "targetSeatId", "cardId"])) return null;
   if (typeof record.targetSeatId !== "string") return null;
@@ -133,6 +138,8 @@ export function parseRunAction(request: unknown): RunAction | null {
       return parseUseAbility(request);
     case "skip-window":
       return parseSkipWindow(request);
+    case "hold":
+      return parseHold(request);
     case "whisper":
       return parseWhisper(request);
     case "pick-objective":

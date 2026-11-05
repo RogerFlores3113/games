@@ -16,6 +16,8 @@ function camp(index: number, attemptNumber = 1, overrides: Partial<ExpeditionCam
       window: "between-tricks",
       pendingSeatIds: [],
       rescue: null,
+      holdingSeatIds: [],
+      youMayHold: false,
       effects: [],
       reveals: [],
       log: [],
