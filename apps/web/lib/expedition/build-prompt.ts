@@ -223,9 +223,33 @@ function followPrompt(camp: ExpeditionCampView): Prompt {
   return { text: everyCardLegal ? "Your turn: play any card" : "Your turn: play a highlighted card", tone: "your-move" };
 }
 
+/** "Ana", "Ana and Bo", or "2 teammates" when the names don't fit. */
+function holderNames(seatIds: readonly string[], nameOf: (seatId: string | null) => string, room: number): string {
+  const names = nameList(seatIds.map((id) => nameOf(id)));
+  return names.length <= room ? names : `${seatIds.length} teammates`;
+}
+
+/** Between tricks while a Hold on stands: the leader is asked to wait, the
+ * holder is told how it ends, and everyone else whom the lead waits on. */
+function holdPrompt(view: ExpeditionView, camp: ExpeditionCampView, whisperAvailable: boolean, nameOf: (seatId: string | null) => string): Prompt | null {
+  const holding = attemptOf(view)?.holdingSeatIds ?? [];
+  if (holding.length === 0 || camp.currentTrick.plays.length > 0) return null;
+  const you = view.yourSeatId;
+  if (you !== null && holding.includes(you)) return { text: "You asked to wait: Whisper, use a power or Go ahead", tone: "your-move" };
+  if (you !== null && camp.currentActorSeatId === you) {
+    const asked = " asked you to wait";
+    return { text: `${holderNames(holding, nameOf, PROMPT_MAX_CHARS - asked.length)}${asked}`, tone: "waiting" };
+  }
+  const waiting = `Waiting on ${holderNames(holding, nameOf, 26)}`;
+  return { text: whisperAvailable ? `${waiting}. You can Whisper now` : waiting, tone: "waiting" };
+}
+
 function playingPrompt(view: ExpeditionView, camp: ExpeditionCampView, whisperAvailable: boolean, nameOf: (seatId: string | null) => string): Prompt {
   const actor = camp.currentActorSeatId;
   const leading = camp.currentTrick.plays.length === 0;
+
+  const held = holdPrompt(view, camp, whisperAvailable, nameOf);
+  if (held !== null) return held;
 
   if (actor !== null && actor === view.yourSeatId) {
     if (!leading) return withTurnAbility(followPrompt(camp), onYourTurnNames(view));

@@ -1346,3 +1346,33 @@ describe("the temple", () => {
     expect(buildSceneModel(server(five, names), ui(), "big-index").banner?.detail).toBe("You can rescue it with Skip. Alice, Cara, Dan and Eve can too");
   });
 });
+
+describe("Hold on between tricks", () => {
+  // s2 leads trick 0 in these fixtures.
+  function held(yourSeatId: string, holdingSeatIds: string[], youMayHold = false, yourLegalCardIds: string[] = []): ExpeditionView {
+    return makeView({ yourSeatId, attempt: { ...makeAttempt(), window: "between-tricks", holdingSeatIds, youMayHold, camp: makeCamp({ yourLegalCardIds }) } });
+  }
+
+  it("shows Hold on when the server says you may hold, and nothing otherwise", () => {
+    expect(buildSceneModel(server(held("s3", [], true)), ui(), "big-index").hold).toEqual({ shown: true, holding: false });
+    expect(buildSceneModel(server(held("s2", [], false, ["c-as"])), ui(), "big-index").hold).toEqual({ shown: false, holding: false });
+  });
+
+  it("turns into Go ahead while your hold stands", () => {
+    const model = buildSceneModel(server(held("s3", ["s3"])), ui(), "big-index");
+    expect(model.hold).toEqual({ shown: true, holding: true });
+    expect(model.prompt).toEqual({ text: "You asked to wait: Whisper, use a power or Go ahead", tone: "your-move" });
+  });
+
+  it("tells the leader who asked them to wait, and why their cards wait", () => {
+    const model = buildSceneModel(server(held("s2", ["s3"])), ui(), "big-index");
+    expect(model.prompt).toEqual({ text: "Cara asked you to wait", tone: "waiting" });
+    expect(model.hand[0]!.playable).toBe(false);
+    expect(model.hand[0]!.blockedReason).toBe("Waiting on Cara");
+    expect(buildSceneModel(server(held("s2", ["s1", "s3"])), ui(), "big-index").prompt.text).toBe("Alice and Cara asked you to wait");
+  });
+
+  it("tells everyone else whom the lead waits on", () => {
+    expect(buildSceneModel(server(held("s1", ["s3"])), ui(), "big-index").prompt).toEqual({ text: "Waiting on Cara. You can Whisper now", tone: "waiting" });
+  });
+});

@@ -214,6 +214,8 @@ export const MAP_ID = "map";
 /** The trail map hung over the camp. */
 export const TRAIL_MAP_ID = "trail-map";
 export const WHISPER_ID = "whisper";
+/** Hold on between tricks; it reads Go ahead while your hold stands. */
+export const HOLD_ID = "hold";
 export const CONFIRM_ID = "confirm";
 export const CANCEL_ID = "cancel";
 export const GATE_SKIP_ID = "gate-skip";

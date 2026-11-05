@@ -1,7 +1,8 @@
 /**
  * The face-up objective pool on the table, and the `actions` zone: the
- * Whisper button, Confirm / Cancel, and rescue Use / Pass. Every flag
- * drawn (`pickable`, `targetable`, `canConfirm`, `whisper.*`) is already a
+ * Whisper button, Confirm / Cancel, Hold on / Go ahead, and rescue Use /
+ * Pass. Every flag drawn (`pickable`, `targetable`, `canConfirm`,
+ * `whisper.*`, `hold.*`) is already a
  * server-derived fact on the model.
  */
 import type Phaser from "phaser";
@@ -9,7 +10,7 @@ import { CURSOR, pointerIf } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
 import { LABEL_CELL } from "../font/font-keys";
 import { MINI_H, MINI_W, OBJECTIVE_POOL_STEP, ZONES, tableRowXs } from "../layout";
-import { CANCEL_ID, CONFIRM_ID, GATE_SKIP_ID, TRAY_MORE_ID, WHISPER_ID, gateUseObjectId } from "../../../../lib/expedition/expedition-ids";
+import { CANCEL_ID, CONFIRM_ID, GATE_SKIP_ID, HOLD_ID, TRAY_MORE_ID, WHISPER_ID, gateUseObjectId } from "../../../../lib/expedition/expedition-ids";
 import type { ObjectIndex } from "../object-index";
 import type { ObjectiveChip, SceneModel } from "../../../../lib/expedition/build-scene-model";
 import { sourceArtId, type ArtId } from "../art/art-registry";
@@ -93,6 +94,11 @@ function actionList(model: SceneModel, handlers: CampHandlers): Action[] {
         ? { id: WHISPER_ID, label: "Whisper", onClick: () => handlers.onWhisper(), outline: true, icon: "icon-whisper", row: 0, h: WHISPER_H }
         : { id: WHISPER_ID, label: "Whisper", icon: "icon-whisper", row: 0, h: WHISPER_H },
     );
+  }
+  if (model.hold.shown) {
+    // PLACEHOLDER(art): a small raised-hand icon for the Hold on button; it is text only for now.
+    const holding = model.hold.holding;
+    actions.push({ id: HOLD_ID, label: holding ? "Go ahead" : "Hold on", onClick: () => handlers.onHold(holding), outline: !holding, row: 2 });
   }
   if (model.targeting !== null) {
     const confirm: Action = model.targeting.canConfirm

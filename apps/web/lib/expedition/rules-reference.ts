@@ -87,6 +87,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       paragraphs: [
         "Once per camp, between tricks, show one card from your hand to one teammate. Everyone sees that you whispered, but only they see the card.",
         "In Rain or a Downpour the crew's first whispers each camp wash away: they are spent, everyone sees them wash away, and nobody sees the card.",
+        "Need a moment between tricks? Press Hold on (once per gap, if you are not leading). The next lead waits until you whisper, use a power, or press Go ahead.",
       ],
       items: [],
     },
