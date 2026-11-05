@@ -58,6 +58,7 @@ function view(campView: ExpeditionCampView, overrides: Partial<ExpeditionView> =
     yourAbilities: [],
     yourItemSlots: 2,
     history: [],
+    lastCamp: null,
     lastVote: null,
     stage: {
       tag: "camp",

@@ -13,6 +13,7 @@ import { choiceFor, currentStep, isPicked, type LocalUiState, type PickEntity } 
 import { cardLabel } from "./expedition-ids";
 import { bossLabel, focusCampIndex, modName, plannedBossAt } from "./view-access";
 import { buildTrail, type StopKind, type TrailStop } from "./trail-stops";
+import { lastCampStrip, seatNamer, type LastCampStrip } from "./camp-recap";
 
 export type { StopKind, TrailStop } from "./trail-stops";
 import { campBackdrop, modDisplayName } from "./weather-model";
@@ -313,6 +314,9 @@ export interface TrailModel {
   tooltip: Tooltip | null;
   /** The powers you can use now, between camps. */
   powers: PowerButton[];
+  /** The camp just played, in the tooltip's place while nothing is
+   * hovered, until the next camp is dealt; null before the first. */
+  lastCamp: LastCampStrip | null;
 }
 
 type View = ExpeditionView;
@@ -755,5 +759,6 @@ export function buildTrailModel(server: SceneServerInput, ui: LocalUiState, reco
     vote: buildVote(view),
     tooltip: buildTooltip(view, ui),
     powers: buildPowers(view, ui),
+    lastCamp: view.stage.tag === "muster" ? null : lastCampStrip(view.lastCamp, seatNamer(server)),
   };
 }

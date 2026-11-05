@@ -318,6 +318,41 @@ const CampResultViewSchema = z.strictObject({
   coins: z.number().int().min(0),
 });
 
+const CampRecapViewSchema = z.strictObject({
+  camp: CampIndexSchema,
+  attempt: z.number().int().min(1),
+  status: z.enum(["cleared", "failed"]),
+  tricksPlayed: z.number().int().min(0),
+  totalTricks: z.number().int().min(0),
+  lastTrick: CompletedTrickViewSchema.nullable(),
+  objectives: z.array(
+    z.strictObject({
+      objective: ObjectiveViewSchema,
+      failedAtTrick: z.number().int().min(0).nullable(),
+      fate: z
+        .discriminatedUnion("kind", [
+          z.strictObject({ kind: z.literal("won"), bySeatId: z.string().min(1) }),
+          z.strictObject({ kind: z.literal("lost") }),
+          z.strictObject({ kind: z.literal("open") }),
+        ])
+        .nullable(),
+      ownerTricksWon: z.number().int().min(0).nullable(),
+    }),
+  ),
+  failedGoalIds: z.array(z.string().min(1)),
+  coins: z.number().int().min(0),
+  supplyCost: z.array(
+    z.strictObject({
+      origin: z.discriminatedUnion("kind", [
+        z.strictObject({ kind: z.literal("base") }),
+        z.strictObject({ kind: z.literal("mod"), modId: z.string().min(1) }),
+        z.strictObject({ kind: z.literal("seat"), seatId: z.string().min(1), sourceId: z.string().min(1) }),
+      ]),
+      amount: z.number().int(),
+    }),
+  ),
+});
+
 // A seat the crew voted out while it was away; it rejoins at the next loadout.
 const KickedSeatViewSchema = z.strictObject({
   seatId: z.string().min(1),
@@ -441,6 +476,7 @@ export const ExpeditionViewSchema = z.strictObject({
   yourAbilities: z.array(AbilityViewSchema),
   yourItemSlots: z.number().int().min(0),
   history: z.array(CampResultViewSchema),
+  lastCamp: CampRecapViewSchema.nullable(),
   lastVote: VoteViewSchema.nullable(),
   stage: StageViewSchema,
 });

@@ -52,6 +52,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     yourAbilities: [],
     yourItemSlots: 2,
     history: [CLEARED_1],
+    lastCamp: null,
     lastVote: null,
     stage: { tag: "loadout", camp: preview(2), mods: [], readySeatIds: [] },
     ...overrides,
@@ -867,5 +868,56 @@ describe("powers between camps", () => {
       ["s3", true],
       ["s1", true],
     ]);
+  });
+});
+
+describe("last camp", () => {
+  const recap: NonNullable<ExpeditionView["lastCamp"]> = {
+    camp: 1,
+    attempt: 1,
+    status: "failed",
+    tricksPlayed: 4,
+    totalTricks: 8,
+    lastTrick: {
+      index: 3,
+      leaderSeatId: "s1",
+      plays: [
+        { seatId: "s1", card: { id: "a", identity: { kind: "standard", suit: "clubs", rank: 7 } }, effectiveRank: null, countsAs: null, burned: false },
+        { seatId: "s2", card: { id: "b", identity: { kind: "standard", suit: "clubs", rank: 10 } }, effectiveRank: null, countsAs: null, burned: false },
+        { seatId: "s3", card: { id: "c", identity: { kind: "standard", suit: "clubs", rank: 11 } }, effectiveRank: null, countsAs: null, burned: false },
+      ],
+      winnerSeatId: "s3",
+    },
+    objectives: [
+      {
+        objective: { id: "o1", kind: "win-card", target: { kind: "standard", suit: "clubs", rank: 10 }, ownerSeatId: "s1", status: "failed" },
+        failedAtTrick: 3,
+        fate: { kind: "won", bySeatId: "s3" },
+        ownerTricksWon: 1,
+      },
+    ],
+    failedGoalIds: [],
+    coins: 0,
+    supplyCost: [
+      { origin: { kind: "base" }, amount: 1 },
+      { origin: { kind: "seat", seatId: "s2", sourceId: "heavy-pack" }, amount: 1 },
+    ],
+  };
+
+  it("after a lost camp, says which objective failed, the cost by source, the final trick and every objective, by name", () => {
+    expect(model(at({ tag: "loadout", camp: preview(1), mods: [], readySeatIds: [] }, { lastCamp: recap })).lastCamp).toEqual({
+      tone: "bad",
+      lines: [
+        "Last camp: Camp 1 lost. Alice's 10♣ was won by Cara. -1 failed camp, -1 Heavy Pack",
+        "Final trick, won by Cara: Alice 7♣, You 10♣, Cara J♣",
+        "Objectives: Alice's 10♣ failed in trick 4",
+      ],
+    });
+  });
+
+  it("shows at every stage between camps, and not before the first camp ends", () => {
+    expect(model(at(draftStage(), { lastCamp: { ...recap, status: "cleared", coins: 8, supplyCost: [] } })).lastCamp?.tone).toBe("good");
+    expect(model(at({ tag: "event", event: "event", next: 2, readySeatIds: [] }, { lastCamp: recap })).lastCamp).not.toBeNull();
+    expect(model(at(draftStage(), { lastCamp: null })).lastCamp).toBeNull();
   });
 });

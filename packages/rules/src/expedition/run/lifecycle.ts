@@ -18,6 +18,7 @@ import { react } from "./react";
 import { campSlots } from "./stack";
 import { stockFor } from "./shop";
 import { rejoinBack } from "./crew";
+import { recapOf, supplyCostParts } from "./recap";
 import type { CampIndex, CampResult, Catalog, RunAt, RunState, RunStatus, SeatRun } from "./types";
 
 /** The run in muster: every seat still picks a character and votes a
@@ -142,7 +143,8 @@ function settleFailure(run: RunAt<"camp">, catalog: Catalog): RunState {
   const spec = run.stage.camp;
   const result: CampResult = { camp: spec.index, attempt: run.stage.attempt.attemptNumber, location: spec.location, weather: spec.weather, status: "failed", suppliesSpent: cost, coins: 0 };
   const supplies = Math.max(0, run.supplies - cost);
-  const settled: RunState = { ...run, supplies, history: [...run.history, result] };
+  const lastAttempt = recapOf(run, "failed", 0, supplyCostParts(run, catalog), catalog);
+  const settled: RunState = { ...run, supplies, history: [...run.history, result], lastAttempt };
   return supplies === 0 ? { ...settled, stage: { tag: "ended", result: "lost" } } : reopenCamp(settled, spec, catalog);
 }
 
@@ -151,7 +153,7 @@ function settleClear(run: RunAt<"camp">, catalog: Catalog): RunState {
   const spec = run.stage.camp;
   const coins = payoutFor(run.stage.attempt.camp);
   const result: CampResult = { camp: spec.index, attempt: run.stage.attempt.attemptNumber, location: spec.location, weather: spec.weather, status: "cleared", suppliesSpent: 0, coins };
-  const settled: RunState = { ...run, purse: run.purse + coins, history: [...run.history, result] };
+  const settled: RunState = { ...run, purse: run.purse + coins, history: [...run.history, result], lastAttempt: recapOf(run, "cleared", coins, [], catalog) };
   if (isFinalCamp(planOf(run), spec.index)) return { ...settled, stage: { tag: "ended", result: "won" } };
   return openLegAfter(settled, campIndex(spec.index + 1), null, catalog);
 }

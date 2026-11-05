@@ -147,7 +147,13 @@ until the tag stops changing.
    for a fresh deal (`reopenCamp`: through its shop again before a boss
    camp, then its loadout); 0 supplies ends the run. A clear pays `5 +
    min(3, unplayed tricks)` into the shared purse and opens the stages
-   before the next camp, or wins the run at the final camp.
+   before the next camp, or wins the run at the final camp. Either way the
+   attempt's recap is kept on `RunState.lastAttempt` (`run/recap.ts`'s
+   `recapOf`): the final trick, each objective with its holder, final
+   status, the trick that failed it and a card target's fate, the camp
+   rules that failed, the coins and the supply cost split by source
+   (`supplyCostParts`, folded over `labeledRuleLayersFor`). The view shows
+   it as `lastCamp` between camps, never in camp; a kick restart clears it.
 
 **The backpack.** A seat stores `BACKPACK_SIZE` (6) items beside its
 equipped slots (2; the Pack Rat 3). `roomFor` is its free slots plus the

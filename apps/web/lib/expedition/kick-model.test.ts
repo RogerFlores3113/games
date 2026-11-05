@@ -12,7 +12,7 @@ const ROOM_SEATS: RoomView["seats"] = [
 ];
 
 function game(stage: ExpeditionView["stage"], kicked: ExpeditionView["kicked"] = [], runStatus: ExpeditionView["runStatus"] = "in_progress"): ExpeditionView {
-  return { yourSeatId: null, runStatus, length: "standard", campCount: 6, purse: 0, supplies: { count: 3, max: 4 }, plan: [], seats: [], kicked, yourAbilities: [], yourItemSlots: 2, history: [], lastVote: null, stage };
+  return { yourSeatId: null, runStatus, length: "standard", campCount: 6, purse: 0, supplies: { count: 3, max: 4 }, plan: [], seats: [], kicked, yourAbilities: [], yourItemSlots: 2, history: [], lastCamp: null, lastVote: null, stage };
 }
 
 const campStage = { tag: "camp", camp: PREVIEW, mods: [], attempt: {} } as unknown as ExpeditionView["stage"];

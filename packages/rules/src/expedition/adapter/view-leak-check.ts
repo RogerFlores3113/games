@@ -193,6 +193,22 @@ export function secretsForExpeditionSeat(
     }
   }
 
+  // Between camps the last attempt's recap shows its final trick, face up
+  // once it completed, and the targets of the objectives the whole crew
+  // could see at the end. In camp (and at the muster) there is no recap.
+  const recap = state.lastAttempt ?? null;
+  if (recap !== null && state.stage.tag !== "camp" && state.stage.tag !== "muster") {
+    for (const play of recap.lastTrick?.plays ?? []) {
+      bump(play.card.identity);
+      if (play.countsAs !== null) bump(play.countsAs);
+    }
+    for (const entry of recap.objectives) {
+      if (entry.hidden) continue;
+      const objective = entry.objective;
+      if (objective.kind === "win-card" || objective.kind === "ordered") bump(objective.target);
+    }
+  }
+
   // Under fog another seat's items stay hidden until used this attempt.
   const stamp = state.stage.tag === "camp" ? { camp: state.stage.camp.index, attempt: state.stage.attempt.attemptNumber } : null;
   const concealedSeatIds: string[] = [];
