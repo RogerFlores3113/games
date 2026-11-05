@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import type { GameId, RoomView } from "@games/schema";
+import type { ActionRefusal } from "../lib/room-store";
 import { HanabiBoard, type HanabiActionRequest } from "./hanabi/HanabiBoard";
 import { HanabiLobbySettings } from "./hanabi/HanabiLobbySettings";
 import { ExpeditionBoard } from "./expedition/ExpeditionBoard";
@@ -23,6 +24,8 @@ export interface BoardProps {
   onRestartLobby?: () => void;
   /** Votes to kick a disconnected seat out of play (`kick: false` takes it back). */
   onKickVote?: (targetSeatId: string, kick: boolean) => void;
+  /** The latest refusal of a request this seat sent; a board may say why. */
+  refusal?: ActionRefusal | null;
 }
 
 // `Record<GameId, …>` (not `Partial`) makes a future GameId with no

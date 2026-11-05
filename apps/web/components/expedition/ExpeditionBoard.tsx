@@ -17,7 +17,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { BookOpen, Settings } from "lucide-react";
 import type { RoomView } from "@games/schema";
-import { ExpeditionViewSchema } from "@games/schema/games/expedition";
+import type { ActionRefusal } from "../../lib/room-store";
+import { ExpeditionErrorCodeSchema, ExpeditionViewSchema } from "@games/schema/games/expedition";
 import type { ExpeditionView } from "@games/rules";
 import { createExpeditionSceneStore } from "../../lib/expedition/expedition-scene-store";
 import { readCardPackPref, writeCardPackPref } from "../../lib/expedition/expedition-card-pack-pref";
@@ -41,6 +42,8 @@ export interface ExpeditionBoardProps {
   onDeleteRoom?: () => void;
   onRestartLobby?: () => void;
   onKickVote?: (targetSeatId: string, kick: boolean) => void;
+  /** The latest refusal of a request this seat sent. */
+  refusal?: ActionRefusal | null;
 }
 
 export function ExpeditionBoard({
@@ -50,6 +53,7 @@ export function ExpeditionBoard({
   onDeleteRoom,
   onRestartLobby,
   onKickVote,
+  refusal = null,
 }: ExpeditionBoardProps) {
   const isHost = view.youSeatId !== null && view.youSeatId === view.hostSeatId;
 
@@ -128,6 +132,17 @@ export function ExpeditionBoard({
   useEffect(() => {
     store.getState().setReconnecting(reconnecting);
   }, [store, reconnecting]);
+
+  // A rule's refusal (an Expedition error code; the worker only sends this
+  // room's own game's) says why on the prompt for a moment; a room-level
+  // refusal has nothing for the table to say.
+  const shownRefusal = useRef(refusal?.serial ?? 0);
+  useEffect(() => {
+    if (refusal === null || refusal.serial === shownRefusal.current) return;
+    shownRefusal.current = refusal.serial;
+    const code = ExpeditionErrorCodeSchema.safeParse(refusal.gameError?.code);
+    if (code.success) store.getState().showRefusal(code.data);
+  }, [store, refusal]);
 
   const canRestart = isHost && game !== null && game.runStatus !== "in_progress";
   const kickPanel = game === null ? null : buildKickPanel(view, game);

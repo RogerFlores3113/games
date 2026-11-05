@@ -10,6 +10,8 @@ import { buildRunEndModel } from "./run-end-model";
 import type { LocalUiState } from "./local-ui";
 import { confirmTargeting as confirmTargetingUi, initialLocalUi, reconcileLocalUi } from "./local-ui";
 import { TRANSITION_TIMING, swapAt, transitionFor, type SceneTransition, type TransitionSpeed, type TransitionTiming } from "./scene-transitions";
+import type { ExpeditionErrorCode } from "@games/schema/games/expedition";
+import { refusalText } from "./refusal-text";
 
 /**
  * The single dispatch chokepoint for the Phaser scenes (spec §7.1): every
@@ -47,6 +49,9 @@ export interface ExpeditionSceneState {
   sceneKey: SceneKey | null;
   model: ActiveModel | null;
   transition: ActiveTransition | null;
+  /** Why the server just refused your request: it stands in for the
+   * prompt for `REFUSAL_NOTICE_MS`, then the prompt comes back. */
+  notice: { text: string; serial: number } | null;
 }
 
 export interface ExpeditionSceneActions {
@@ -70,15 +75,22 @@ export interface ExpeditionSceneActions {
    * request (if any) and clears `localUi.targeting`. A no-op if targeting
    * is not yet complete. */
   confirmTargeting(): void;
+  /** The server refused one of your requests with this Expedition rule
+   * code: the prompt says why for a moment (`notice`). */
+  showRefusal(code: ExpeditionErrorCode): void;
 }
 
 export type ExpeditionSceneStore = StoreApi<ExpeditionSceneState & ExpeditionSceneActions>;
+
+/** How long a refusal's line stands in for the prompt. */
+export const REFUSAL_NOTICE_MS = 3000;
 
 function rebuild(
   server: SceneServerInput,
   localUi: LocalUiState,
   cardPackId: CardPackId,
   reconnecting: boolean,
+  notice: string | null = null,
 ): Pick<ExpeditionSceneState, "sceneKey" | "model"> {
   const sceneKey = sceneKeyFor(server.game);
   const builders: Record<SceneKey, () => ActiveModel> = {
@@ -86,7 +98,10 @@ function rebuild(
     trail: () => buildTrailModel(server, localUi, reconnecting),
     "run-end": () => buildRunEndModel(server),
   };
-  return { sceneKey, model: builders[sceneKey]() };
+  const model = builders[sceneKey]();
+  // Reconnecting… wins: nothing is sent until it clears anyway.
+  if (notice === null || reconnecting || !("prompt" in model)) return { sceneKey, model };
+  return { sceneKey, model: { ...model, prompt: { text: notice, tone: "alert" } } };
 }
 
 export function createExpeditionSceneStore(opts: {
@@ -105,10 +120,12 @@ export function createExpeditionSceneStore(opts: {
     /** Set when the socket drops: the view that resyncs it may come before
      * or after reconnecting clears, and is history, never a move to sign. */
     let resyncing = false;
+    let noticeSerial = 0;
+    let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
     function show(server: SceneServerInput): void {
       const reconciled = reconcileLocalUi(get().localUi, server.game);
-      set({ server, localUi: reconciled, ...rebuild(server, reconciled, get().cardPackId, get().reconnecting) });
+      set({ server, localUi: reconciled, ...rebuild(server, reconciled, get().cardPackId, get().reconnecting, get().notice?.text ?? null) });
     }
 
     function startTransition(found: SceneTransition, server: SceneServerInput, timing: TransitionTiming, now: () => number): void {
@@ -138,7 +155,7 @@ export function createExpeditionSceneStore(opts: {
         set({ localUi: nextUi });
         return;
       }
-      set({ localUi: nextUi, ...rebuild(server, nextUi, cardPackId, reconnecting) });
+      set({ localUi: nextUi, ...rebuild(server, nextUi, cardPackId, reconnecting, get().notice?.text ?? null) });
     }
 
     return {
@@ -149,6 +166,7 @@ export function createExpeditionSceneStore(opts: {
       sceneKey: null,
       model: null,
       transition: null,
+      notice: null,
 
       setServer(server) {
         const resync = resyncing;
@@ -172,7 +190,7 @@ export function createExpeditionSceneStore(opts: {
           set({ reconnecting });
           return;
         }
-        set({ reconnecting, ...rebuild(server, localUi, cardPackId, reconnecting) });
+        set({ reconnecting, ...rebuild(server, localUi, cardPackId, reconnecting, get().notice?.text ?? null) });
       },
 
       updateLocalUi(fn) {
@@ -187,7 +205,7 @@ export function createExpeditionSceneStore(opts: {
           set({ cardPackId: id });
           return;
         }
-        set({ cardPackId: id, ...rebuild(server, localUi, id, reconnecting) });
+        set({ cardPackId: id, ...rebuild(server, localUi, id, reconnecting, get().notice?.text ?? null) });
       },
 
       dispatch(request) {
@@ -208,6 +226,21 @@ export function createExpeditionSceneStore(opts: {
         if (request === null) return;
         applyLocalUi(nextUi);
         get().dispatch(request);
+      },
+
+      showRefusal(code) {
+        const { server } = get();
+        if (server === null) return;
+        const nameOf = (seatId: string) => server.roomSeats.find((s) => s.seatId === seatId)?.displayLabel ?? "a teammate";
+        const notice = { text: refusalText(code, server.game, nameOf), serial: ++noticeSerial };
+        if (noticeTimer !== null) clearTimeout(noticeTimer);
+        set({ notice, ...rebuild(server, get().localUi, get().cardPackId, get().reconnecting, notice.text) });
+        noticeTimer = setTimeout(() => {
+          noticeTimer = null;
+          const now = get();
+          if (now.notice?.serial !== notice.serial || now.server === null) return;
+          set({ notice: null, ...rebuild(now.server, now.localUi, now.cardPackId, now.reconnecting) });
+        }, REFUSAL_NOTICE_MS);
       },
     };
   });
