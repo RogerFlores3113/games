@@ -47,7 +47,7 @@ describe("botMove", () => {
   });
 
   it("on a route, abstains until the seat has a ballot", () => {
-    const spec = campSpecAt("autoplay", "standard", campIndex(2), CATALOG);
+    const spec = campSpecAt("autoplay", "standard", campIndex(2), CATALOG, 3);
     const route: RunState = {
       ...DEV_SHORTCUTS["jump-to-camp"].apply(crewed(), { length: "standard", camp: 1, stage: "loadout" }, CATALOG),
       stage: { tag: "route", from: campIndex(1), options: [{ id: "a", next: spec, reroll: 0, swapBoss: null }, { id: "b", next: spec, reroll: 0, swapBoss: null }], ballots: { a: "a" } },

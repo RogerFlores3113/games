@@ -179,7 +179,64 @@ describe("canPlayCard", () => {
     const ownerCardId = failed.hands.find((h) => h.seatId === owner)!.cards[0]!.id;
     expect(canPlayCard(failed, owner, ownerCardId)).toEqual({ legal: false, reason: "camp_over" });
   });
+
+  it("rejects the Sun or the Moon as the camp's first lead with no_joker_first_lead", () => {
+    const leading = buildLeadState(SUN_CARD, MOON_CARD, SPADE_CARD);
+    expect(canPlayCard(leading, "a", "sun")).toEqual({ legal: false, reason: "no_joker_first_lead" });
+    expect(canPlayCard(leading, "a", "moon")).toEqual({ legal: false, reason: "no_joker_first_lead" });
+    expect(canPlayCard(leading, "a", "spade")).toEqual({ legal: true });
+  });
+
+  it("lets the first lead be a joker when the leader holds only the Sun and the Moon", () => {
+    const leading = buildLeadState(SUN_CARD, MOON_CARD);
+    expect(canPlayCard(leading, "a", "sun")).toEqual({ legal: true });
+    expect(canPlayCard(leading, "a", "moon")).toEqual({ legal: true });
+  });
+
+  it("lets a joker lead every trick after the first", () => {
+    const first = buildLeadState(SUN_CARD, SPADE_CARD);
+    const done: CompletedTrick = { index: 0, leaderSeatId: "a", plays: [], winnerSeatId: "a" };
+    const second: CampState = { ...first, completedTricks: [done], currentTrick: { index: 1, leaderSeatId: "a", plays: [] } };
+    expect(canPlayCard(second, "a", "sun")).toEqual({ legal: true });
+  });
+
+  it("lets a joker follow on the first trick when the leader's suit is void", () => {
+    const first = buildLeadState(SPADE_CARD);
+    const following: CampState = {
+      ...first,
+      hands: [...first.hands.filter((h) => h.seatId !== "b"), { seatId: "b", cards: [SUN_CARD] }],
+      currentTrick: { index: 0, leaderSeatId: "a", plays: [{ seatId: "a", card: { id: "lead", identity: { kind: "standard", suit: "hearts", rank: 4 } } }] },
+    };
+    expect(canPlayCard(following, "b", "sun")).toEqual({ legal: true });
+  });
 });
+
+const SUN_CARD: ExpeditionCard = { id: "sun", identity: { kind: "joker", joker: "sun" } };
+const MOON_CARD: ExpeditionCard = { id: "moon", identity: { kind: "joker", joker: "moon" } };
+const SPADE_CARD: ExpeditionCard = { id: "spade", identity: { kind: "standard", suit: "spades", rank: 8 } };
+
+/** The first trick of a camp, before any play: seat "a" leads `leaderCards`. */
+function buildLeadState(...leaderCards: ExpeditionCard[]): CampState {
+  const b1: ExpeditionCard = { id: "b1", identity: { kind: "standard", suit: "hearts", rank: 9 } };
+  const c1: ExpeditionCard = { id: "c1", identity: { kind: "standard", suit: "clubs", rank: 3 } };
+  return {
+    seatIds: ["a", "b", "c"],
+    playerCount: 3,
+    removedCards: [],
+    totalTricks: 3,
+    hands: [
+      { seatId: "a", cards: leaderCards },
+      { seatId: "b", cards: [b1] },
+      { seatId: "c", cards: [c1] },
+    ],
+    expeditionLeaderSeatId: "a",
+    objectives: [{ id: "obj1", kind: "no-tricks", ownerSeatId: "c" }],
+    objectiveDeck: [],
+    discards: [], voidedTricks: [],
+    completedTricks: [],
+    currentTrick: { index: 0, leaderSeatId: "a", plays: [] },
+  };
+}
 
 /** A hand-built playing-phase CampState with full control over hand
  * contents, so follow-suit and own-hand-only rejections are deterministic.

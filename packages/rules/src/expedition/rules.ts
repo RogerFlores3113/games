@@ -18,7 +18,7 @@
 import { baseDeckFor } from "./deck";
 import { leaderFor } from "./leader";
 import { evaluateObjective, nextObjectivePicker } from "./objectives";
-import { PRINTED, legalPlaysFor, trickWinner, type CardReading } from "./trick";
+import { PRINTED, isFirstLead, legalPlaysFor, trickWinner, withoutJokerLead, type CardReading } from "./trick";
 import type {
   CampState,
   CardIdentity,
@@ -85,7 +85,8 @@ export function baseRulesWith(reading: CardReading = PRINTED): CoreRules {
       const hand = state.hands.find((h) => h.seatId === seatId);
       if (hand === undefined) return [];
       const lead = state.currentTrick.plays[0];
-      return legalPlaysFor(hand.cards, lead === undefined ? null : reading.identityOf(lead.card), reading);
+      const legal = legalPlaysFor(hand.cards, lead === undefined ? null : reading.identityOf(lead.card), reading);
+      return isFirstLead(state) ? withoutJokerLead(legal, reading) : legal;
     },
     burns() {
       return [];

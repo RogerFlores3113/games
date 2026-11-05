@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createCamp } from "../camp";
 import type { CampState } from "../state";
-import { PLAIN_GROUND, RUN_LENGTHS, SHOP_CAMPS, TRICK_COUNT_N_RANGE, objectiveSlotsFor, payoutFor, payoutRange } from "./balance";
+import { EXTRA_OBJECTIVES_BY_PLAYERS, MIX_FROM_CAMP, OBJECTIVE_RAMP, PLAIN_GROUND, RUN_LENGTHS, SHOP_CAMPS, TRICK_COUNT_N_RANGE, mixFromCampFor, objectiveSlotsFor, payoutFor, payoutRange, seatObjectivesAt } from "./balance";
 import { campIndex } from "./plan";
 import { CATALOG } from "./catalog";
 import { campSpecAt, type CampSpec } from "./route";
@@ -58,6 +58,27 @@ describe("SHOP_CAMPS", () => {
   });
 });
 
+describe("seatObjectivesAt", () => {
+  it("is the ramp at 3 players, one more at 4 and two more at 5, at every camp", () => {
+    expect(EXTRA_OBJECTIVES_BY_PLAYERS).toEqual({ 3: 0, 4: 1, 5: 2 });
+    for (const length of Object.keys(RUN_LENGTHS) as RunLength[]) {
+      OBJECTIVE_RAMP[length].forEach((ramp, i) => {
+        expect([3, 4, 5].map((players) => seatObjectivesAt(length, i + 1, players))).toEqual([ramp, ramp + 1, ramp + 2]);
+      });
+    }
+  });
+
+  it("refuses a camp the run length does not have", () => {
+    expect(() => seatObjectivesAt("short", 5, 3)).toThrow("balance: short run has no camp 5");
+  });
+});
+
+describe("mixFromCampFor", () => {
+  it("mixes from MIX_FROM_CAMP at 3 players and one camp earlier at 4 and 5", () => {
+    expect([3, 4, 5].map(mixFromCampFor)).toEqual([MIX_FROM_CAMP, MIX_FROM_CAMP - 1, MIX_FROM_CAMP - 1]);
+  });
+});
+
 describe("objectiveSlotsFor", () => {
   it("passes win-card and ordered slots through unchanged", () => {
     const spec: CampSpec = { ...trickCountSpec, slots: [{ kind: "ordered", order: 1 }, { kind: "ordered", order: 2 }, { kind: "win-card" }] };
@@ -88,7 +109,7 @@ describe("objectiveSlotsFor", () => {
       for (let k = 1; k <= RUN_LENGTHS[length].camps; k++) {
         for (const players of [3, 4, 5]) {
           const seed = `deal-${length}-${k}-${players}`;
-          const slots = objectiveSlotsFor(seed, campSpecAt(seed, length, campIndex(k), CATALOG), 1);
+          const slots = objectiveSlotsFor(seed, campSpecAt(seed, length, campIndex(k), CATALOG, players), 1);
           expect(createCamp({ seatIds: seatIds(players), seed, objectiveSlots: slots }).objectives).toHaveLength(slots.length);
         }
       }

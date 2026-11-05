@@ -41,7 +41,7 @@ describe("property: route options", () => {
       const run = draftAfter(`dedupe-${n}`);
       const options = routeOptions(run, campIndex(2), CATALOG);
       expect(routeOptions(run, campIndex(2), CATALOG)).toEqual(options);
-      expect(options[0]!.next).toEqual(campSpecAt(`dedupe-${n}`, "long", campIndex(3), CATALOG));
+      expect(options[0]!.next).toEqual(campSpecAt(`dedupe-${n}`, "long", campIndex(3), CATALOG, 3));
     }
   });
 });

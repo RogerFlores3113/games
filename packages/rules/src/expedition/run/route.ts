@@ -4,7 +4,7 @@
 
 import type { ModDef, ModId } from "../content/mods/mod-def";
 import type { ObjectiveSlot } from "../state";
-import { BOTH_MIX_MIN_SLOTS, MIX_FROM_CAMP, NORMAL_WEATHER_CHANCE, OBJECTIVE_RAMP, ROUTE_OPTIONS } from "./balance";
+import { BOTH_MIX_MIN_SLOTS, NORMAL_WEATHER_CHANCE, ROUTE_OPTIONS, mixFromCampFor, seatObjectivesAt } from "./balance";
 import { rulesFor } from "./compose";
 import { bossPool, campIndex, type RunPlan } from "./plan";
 import { STREAMS, seededIndex } from "./rng";
@@ -48,10 +48,11 @@ export function planOf(run: RunState): NonNullable<RunState["plan"]> {
   return run.plan;
 }
 
-/** Camp 1: the Jungle in fair weather, every slot a win-card. */
-export function firstCampSpec(length: RunLength): CampSpec {
+/** Camp 1 for a crew of `players`: the Jungle in fair weather, every slot a
+ * win-card. */
+export function firstCampSpec(length: RunLength, players: number): CampSpec {
   const index = campIndex(1);
-  return { index, location: FIRST_LOCATION, weather: FAIR_WEATHER, slots: slotsFor(OBJECTIVE_RAMP[length][0]!, "plain") };
+  return { index, location: FIRST_LOCATION, weather: FAIR_WEATHER, slots: slotsFor(seatObjectivesAt(length, 1, players), "plain") };
 }
 
 /** One def by weight: ids sorted, a seeded index into the summed weights.
@@ -110,13 +111,13 @@ const MAX_OPTIONS = 3;
  * the vote keeps it anyway (a catalogue too small to tell them apart). */
 const MAX_REDRAWS = 8;
 
-function optionsAfter(seed: string, plan: RunPlan, cleared: CampIndex, catalog: Catalog, rules: RouteRules): readonly RouteOption[] {
+function optionsAfter(seed: string, plan: RunPlan, cleared: CampIndex, players: number, catalog: Catalog, rules: RouteRules): readonly RouteOption[] {
   const length = plan.length;
   const next = campIndex(cleared + 1);
   const count = rules.count(ROUTE_OPTIONS.min + seededIndex(seed, STREAMS.routeCount(next), ROUTE_OPTIONS.max - ROUTE_OPTIONS.min + 1));
   if (!Number.isInteger(count) || count < 1 || count > MAX_OPTIONS) throw new Error(`route: routeOptionCount gave ${count}, outside 1 to ${MAX_OPTIONS}`);
-  const slotCount = OBJECTIVE_RAMP[length][next - 1]!;
-  const mixes: readonly Mix[] = next < MIX_FROM_CAMP ? ["plain"] : ["plain", "ordered", "trick-count", ...(slotCount >= BOTH_MIX_MIN_SLOTS ? (["both"] as const) : [])];
+  const slotCount = seatObjectivesAt(length, next, players);
+  const mixes: readonly Mix[] = next < mixFromCampFor(players) ? ["plain"] : ["plain", "ordered", "trick-count", ...(slotCount >= BOTH_MIX_MIN_SLOTS ? (["both"] as const) : [])];
   const seen = new Set<string>();
   return ROUTE_CHOICES.slice(0, count).map((id, i) => {
     const swapBoss = rules.swapsBoss(i) ? drawSwap(seed, plan, next, i, catalog) : null;
@@ -135,12 +136,13 @@ function optionsAfter(seed: string, plan: RunPlan, cleared: CampIndex, catalog: 
 }
 
 /** 2 or 3 options to the camp after `from` (seeded count, then the crew's
- * routeOptionCount), each with a location by weight, its weather and, from
- * MIX_FROM_CAMP on, a seeded objective mix; an option the crew's swapsBoss
- * names also leads to a different boss. An option the same as an earlier
- * one in location, weather, mix and boss is drawn again. */
+ * routeOptionCount), each with a location by weight, its weather, the seat
+ * objectives its crew size gets and, from the crew's first mixed camp on, a
+ * seeded objective mix; an option the crew's swapsBoss names also leads to
+ * a different boss. An option the same as an earlier one in location,
+ * weather, mix and boss is drawn again. */
 export function routeOptions(run: RunState, from: CampIndex, catalog: Catalog): readonly RouteOption[] {
-  return optionsAfter(run.seed, planOf(run), from, catalog, routeRules(run, catalog));
+  return optionsAfter(run.seed, planOf(run), from, run.seatIds.length, catalog, routeRules(run, catalog));
 }
 
 /** The option with its location and weather drawn again on the next
@@ -162,10 +164,10 @@ export function planAfter(plan: RunPlan, option: RouteOption): RunPlan {
   return swap === null ? plan : { ...plan, bosses: plan.bosses.map((b) => (b.at === swap.at ? { ...b, modId: swap.modId } : b)) };
 }
 
-/** Camp k's spec as a run would reach it by always taking route "a". For
- * the dev sandbox and test fixtures that start mid-run. */
-export function campSpecAt(seed: string, length: RunLength, k: CampIndex, catalog: Catalog): CampSpec {
-  return k === 1 ? firstCampSpec(length) : optionsAfter(seed, { length, bosses: [] }, campIndex(k - 1), catalog, BASE_ROUTE_RULES)[0]!.next;
+/** Camp k's spec for a crew of `players` as a run would reach it by always
+ * taking route "a". For the dev sandbox and test fixtures that start mid-run. */
+export function campSpecAt(seed: string, length: RunLength, k: CampIndex, catalog: Catalog, players: number): CampSpec {
+  return k === 1 ? firstCampSpec(length, players) : optionsAfter(seed, { length, bosses: [] }, campIndex(k - 1), players, catalog, BASE_ROUTE_RULES)[0]!.next;
 }
 
 /** The objective types a route preview shows: the spec's slots after every

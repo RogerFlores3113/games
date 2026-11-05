@@ -65,7 +65,7 @@ for (const [id, def] of Object.entries(OBJECTIVE_KINDS)) {
 }
 
 describe("every ObjectiveSlot kind a camp spec can produce is registered", () => {
-  it("objectiveSlotsFor over every camp of every run length and 20 seeds only ever produces a registered kind", () => {
+  it("objectiveSlotsFor over every camp of every run length, crew size and 20 seeds only ever produces a registered kind", () => {
     const lengths: readonly RunLength[] = ["short", "standard", "long"];
     const registryKeys = new Set(Object.keys(OBJECTIVE_KINDS));
 
@@ -73,9 +73,11 @@ describe("every ObjectiveSlot kind a camp spec can produce is registered", () =>
       const seed = `${SEED}-balance-${i}`;
       for (const length of lengths) {
         for (let k = 1; k <= RUN_LENGTHS[length].camps; k++) {
-          const spec = campSpecAt(seed, length, campIndex(k), CATALOG);
-          for (const slot of objectiveSlotsFor(seed, spec, 1)) {
-            expect(registryKeys.has(slot.kind)).toBe(true);
+          for (const players of [3, 4, 5]) {
+            const spec = campSpecAt(seed, length, campIndex(k), CATALOG, players);
+            for (const slot of objectiveSlotsFor(seed, spec, 1)) {
+              expect(registryKeys.has(slot.kind)).toBe(true);
+            }
           }
         }
       }

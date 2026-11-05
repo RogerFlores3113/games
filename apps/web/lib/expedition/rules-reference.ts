@@ -74,7 +74,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
         "The Sun and Moon form their own two-card suit: if one is led, whoever holds the other must play it.",
         "The Sun beats everything and the Moon beats everything but the Sun. Otherwise the highest card of the led suit wins.",
         "If Bait stops the only card of the led suit from winning, the highest card left wins, and a tie goes to the card played first.",
-        "The winner leads the next trick. Whoever holds the Sun leads the first trick and picks the first objective.",
+        "The winner leads the next trick. Whoever holds the Sun leads the first trick and picks the first objective, but the first lead can't be the Sun or the Moon unless they hold nothing else.",
       ],
       items: [],
     },

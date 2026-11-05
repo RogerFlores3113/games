@@ -75,7 +75,7 @@ function makeSeats(): readonly SeatRun[] {
  * attempt, when camp is null. */
 function makeRun(input: { camp: CampState | null; seed?: string }): RunState {
   const seed = input.seed ?? "toolkit-seed";
-  const spec = campSpecAt(seed, "standard", campIndex(1), CATALOG);
+  const spec = campSpecAt(seed, "standard", campIndex(1), CATALOG, 3);
   const stage: RunState["stage"] =
     input.camp === null
       ? { tag: "loadout", camp: spec, ready: {} }

@@ -16,7 +16,7 @@
 // winner is decided among the plays kept. A trick is resolved once; no rule
 // re-resolves history.
 
-import type { CardIdentity, ExpeditionCard, ResolvedPlay, TrickPlay } from "./state";
+import type { CampState, CardIdentity, ExpeditionCard, ResolvedPlay, TrickPlay } from "./state";
 
 /** True for the Sun and Moon jokers only (the DEFAULT predicate for the
  * isTrump hook). */
@@ -100,6 +100,21 @@ export function legalPlaysFor(hand: readonly ExpeditionCard[], led: CardIdentity
     return !reading.isTrump(identity) && followKey(identity) === ledKey;
   });
   return sameSuit.length > 0 ? sameSuit : [...hand];
+}
+
+/** The lead of a camp's first trick: no trick completed and none played to
+ * yet. A voided trick puts its leader back on this lead. */
+export function isFirstLead(state: CampState): boolean {
+  return state.completedTricks.length === 0 && state.currentTrick.plays.length === 0;
+}
+
+/** The first lead may not be the Sun or the Moon unless the leader holds
+ * nothing else: the Sun's holder leads, and a joker lead would win a card
+ * objective before anyone else had a say. Drops the jokers from `cards`,
+ * keeping them only when nothing else is left. */
+export function withoutJokerLead(cards: readonly ExpeditionCard[], reading: CardReading = PRINTED): ExpeditionCard[] {
+  const plain = cards.filter((c) => reading.identityOf(c).kind !== "joker");
+  return plain.length > 0 ? plain : [...cards];
 }
 
 /** The strongest play by rankOf; equal strength goes to the earliest. */

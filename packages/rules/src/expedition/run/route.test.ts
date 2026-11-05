@@ -7,8 +7,8 @@ import { testCatalog } from "./run-test-support";
 import { defineMod } from "../content/mods/mod-def";
 import type { Catalog, RunAt, RunLength } from "./types";
 
-function draftAfter(seed: string, length: RunLength, cleared: number): RunAt<"draft"> {
-  const run = createRun({ seatIds: ["p0", "p1", "p2"], seed });
+function draftAfter(seed: string, length: RunLength, cleared: number, players = 3): RunAt<"draft"> {
+  const run = createRun({ seatIds: Array.from({ length: players }, (_, i) => `p${i}`), seed });
   return { ...run, plan: drawPlan(seed, length, CATALOG), stage: { tag: "draft", next: campIndex(cleared + 1) } };
 }
 
@@ -19,7 +19,12 @@ function optionsOf(run: RunAt<"draft">, catalog: Catalog): ReturnType<typeof rou
 
 describe("firstCampSpec", () => {
   it("is the Jungle in fair weather with the ramp's first slot count, all win-card", () => {
-    expect(firstCampSpec("long")).toEqual({ index: 1, location: "jungle", weather: "fair", slots: [{ kind: "win-card" }, { kind: "win-card" }] });
+    expect(firstCampSpec("long", 3)).toEqual({ index: 1, location: "jungle", weather: "fair", slots: [{ kind: "win-card" }, { kind: "win-card" }] });
+  });
+
+  it("deals one more win-card at 4 players and two more at 5", () => {
+    expect([3, 4, 5].map((players) => firstCampSpec("short", players).slots.length)).toEqual([2, 3, 4]);
+    expect(firstCampSpec("short", 5).slots.every((slot) => slot.kind === "win-card")).toBe(true);
   });
 });
 
@@ -38,6 +43,23 @@ describe("routeOptions", () => {
     for (const option of optionsOf(draftAfter("s", "long", 2), CATALOG)) {
       expect(option.next).toMatchObject({ index: 3, slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }] });
     }
+  });
+
+  it("adds a seat objective per player over 3 at every camp", () => {
+    for (const [players, extra] of [[3, 0], [4, 1], [5, 2]] as const) {
+      for (const option of optionsOf(draftAfter("crew", "standard", 1, players), CATALOG)) expect(option.next.slots).toHaveLength(3 + extra);
+      for (const option of optionsOf(draftAfter("crew", "long", 6, players), CATALOG)) expect(option.next.slots).toHaveLength(5 + extra);
+    }
+  });
+
+  it("mixes from camp 3 at 4 or more players, and keeps camp 3 plain at 3", () => {
+    const mixed = (players: number) =>
+      Array.from({ length: 60 }, (_, n) => optionsOf(draftAfter(`early-${n}`, "standard", 2, players), CATALOG))
+        .flat()
+        .some((option) => option.next.slots.some((slot) => slot.kind !== "win-card"));
+    expect(mixed(3)).toBe(false);
+    expect(mixed(4)).toBe(true);
+    expect(mixed(5)).toBe(true);
   });
 
   it("is the same for the same seed", () => {
@@ -67,7 +89,7 @@ describe("routeOptions", () => {
   it("a slots layer on the stack shows in the preview's objective types", () => {
     const capybara = defineMod({ id: "jungle", kind: "location", name: "Jungle", weight: 1, text: "Two more cards.", full: { slots: (prev) => [...prev, { kind: "win-card" }, { kind: "win-card" }] } });
     const run = draftAfter("slots", "standard", 1);
-    const spec = firstCampSpec("standard");
+    const spec = firstCampSpec("standard", 3);
     expect(slotKindsFor(run, spec, testCatalog({ mods: { jungle: capybara } }))).toEqual(["win-card", "win-card", "win-card", "win-card"]);
     expect(slotKindsFor(run, spec, CATALOG)).toEqual(["win-card", "win-card"]);
   });
@@ -92,7 +114,8 @@ describe("routeOptions", () => {
 
 describe("campSpecAt", () => {
   it("is camp 1's spec at 1 and route a's spec after", () => {
-    expect(campSpecAt("s", "short", campIndex(1), CATALOG)).toEqual(firstCampSpec("short"));
-    expect(campSpecAt("s", "short", campIndex(3), CATALOG)).toEqual(optionsOf(draftAfter("s", "short", 2), CATALOG)[0]!.next);
+    expect(campSpecAt("s", "short", campIndex(1), CATALOG, 3)).toEqual(firstCampSpec("short", 3));
+    expect(campSpecAt("s", "short", campIndex(3), CATALOG, 3)).toEqual(optionsOf(draftAfter("s", "short", 2), CATALOG)[0]!.next);
+    expect(campSpecAt("s", "short", campIndex(3), CATALOG, 4)).toEqual(optionsOf(draftAfter("s", "short", 2, 4), CATALOG)[0]!.next);
   });
 });

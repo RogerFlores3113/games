@@ -20,8 +20,16 @@ export const OBJECTIVE_RAMP: Readonly<Record<RunLength, readonly number[]>> = {
   long: [2, 3, 3, 4, 4, 4, 5, 4],
 };
 
+/** Seat objectives a camp adds to OBJECTIVE_RAMP for its crew size. The ramp
+ * is tuned for 3 players; bigger crews hold more cards between them, so they
+ * get more to do. */
+export const EXTRA_OBJECTIVES_BY_PLAYERS: Readonly<Record<3 | 4 | 5, number>> = { 3: 0, 4: 1, 5: 2 };
+
 /** Ordered pairs and trick-count slots appear from this camp on. */
 export const MIX_FROM_CAMP = 4;
+
+/** From this crew size on, mixed slots start one camp before MIX_FROM_CAMP. */
+export const EARLY_MIX_PLAYERS = 4;
 
 /** A route may mix in both an ordered pair and a trick-count slot only at a
  * camp with at least this many seat slots. */
@@ -103,6 +111,24 @@ export const WHISPERS_PER_UPGRADE = 1;
 
 /** Placeholder: an exactly-n slot draws N uniformly from this range. */
 export const TRICK_COUNT_N_RANGE = { min: 2, max: 4 } as const;
+
+/** Crew sizes outside 3 to 5 read as the nearest one. */
+function crewSize(players: number): 3 | 4 | 5 {
+  return players <= 3 ? 3 : players >= 5 ? 5 : 4;
+}
+
+/** Camp k's seat objectives for a crew of `players`, before boss and temple
+ * slot layers: OBJECTIVE_RAMP plus EXTRA_OBJECTIVES_BY_PLAYERS. */
+export function seatObjectivesAt(length: RunLength, k: number, players: number): number {
+  const ramp = OBJECTIVE_RAMP[length][k - 1];
+  if (ramp === undefined) throw new Error(`balance: ${length} run has no camp ${k}`);
+  return ramp + EXTRA_OBJECTIVES_BY_PLAYERS[crewSize(players)];
+}
+
+/** The first camp with mixed slots for a crew of `players`. */
+export function mixFromCampFor(players: number): number {
+  return players >= EARLY_MIX_PLAYERS ? MIX_FROM_CAMP - 1 : MIX_FROM_CAMP;
+}
 
 type Ground = Pick<CampSpec, "location" | "weather">;
 

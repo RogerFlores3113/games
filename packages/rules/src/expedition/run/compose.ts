@@ -105,7 +105,7 @@ function passiveLayers(run: RunState, catalog: Catalog, last: boolean): LabeledL
       const def = defOfKey(seat, key, catalog);
       const passive = def.passive;
       if (passive === undefined || (passive.foldsLast === true) !== last) return [];
-      return [{ origin: { kind: "seat" as const, seatId: seat.seatId, sourceId: def.id }, layer: passive.modifier(owner) }];
+      return [{ origin: { kind: "seat" as const, seatId: seat.seatId, sourceId: def.id }, layer: passive.modifier(owner, key) }];
     });
   });
 }

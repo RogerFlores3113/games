@@ -295,7 +295,7 @@ describe("draft", () => {
               itemId: "heavy-pack",
               objectId: "bundle-item:1:0",
               name: "Heavy Pack",
-              text: "You may whisper once more each camp, but a failed camp costs 1 more supply.",
+              text: "Whisper once more each camp; failing costs the crew 1 more supply, and packs don't stack.",
               uses: "Always on",
               rare: false,
               exclusive: false,

@@ -53,17 +53,17 @@ function lcg(seed: number): () => number {
 /** A crew where p0 holds `def`: its character, the upgrade itself, or the
  * item as instance it0, beside one more item; the other seats carry items
  * too, so whispers, failures and wins happen under several rule layers. */
-function crewFor(def: SourceDef, seed: string, camp = 1): RunState {
+function crewFor(def: SourceDef, seed: string, camp = 1, seatIds: readonly string[] = SEATS): RunState {
   const character = characterFor(def);
   const others = Object.keys(CATALOG.characters).filter((id) => id !== character?.id);
   const characters: Record<string, string> = { p0: character?.id ?? others.shift()! };
-  for (const seat of SEATS.slice(1)) characters[seat] = others.shift()!;
+  for (const seat of seatIds.slice(1)) characters[seat] = others.shift()!;
   const spare = ITEM_IDS.filter((id) => id !== def.id);
   // Four items, so even the Pack Rat's three slots leave one in the backpack.
   const items: Record<string, string[]> = { p0: def.kind === "item" ? [def.id, spare[0]!] : spare.slice(0, 4) };
-  SEATS.slice(1).forEach((seat, i) => (items[seat] = [spare[i + 1]!, spare[i + 4]!]));
+  seatIds.slice(1).forEach((seat, i) => (items[seat] = [spare[i + 1]!, spare[i + 4]!]));
   return setupRun({
-    seatIds: SEATS,
+    seatIds: [...seatIds],
     seed,
     catalog: CATALOG,
     camp,
@@ -76,12 +76,14 @@ function crewFor(def: SourceDef, seed: string, camp = 1): RunState {
 }
 
 /** Walks random legal actions from a fresh crew until p0 can use `def`. p0
- * never uses that source on the walk, so the found state is its first use. */
+ * never uses that source on the walk, so the found state is its first use.
+ * Four seats first; then three, whose smaller camps random play clears more
+ * often, for a source only a cleared camp reaches (a draft window). */
 function findUsable(def: SourceDef): RunState {
   const key = keyFor(def);
-  for (let attempt = 0; attempt < 60; attempt++) {
+  for (let attempt = 0; attempt < 120; attempt++) {
     const next = lcg(attempt * 7919 + def.id.length);
-    let state = crewFor(def, `${def.id}-${attempt}`, [1, 3, 4][attempt % 3]);
+    let state = crewFor(def, `${def.id}-${attempt}`, [1, 3, 4][attempt % 3], attempt < 60 ? SEATS : SEATS.slice(0, 3));
     for (let step = 0; step < 400 && state.stage.tag !== "ended"; step++) {
       const status = currentStamp(state) === null ? null : abilityStatus(state, "p0", key, CATALOG);
       if (status?.usable) return state;

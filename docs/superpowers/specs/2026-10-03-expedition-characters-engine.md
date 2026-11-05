@@ -722,7 +722,7 @@ passives. **Limit** is the usage badge. Neither is repeated in the text.
 | Bait | A card on the table can't win this trick. | consumable | IT | single use | card (board) | Banana on a string |
 | Camouflage | Drop one of your open objectives, and the camp fails if you win a trick. | consumable | BT | single use | objective (mine) | Leafy cloak |
 | Rope Ladder | Drop a failed objective. | consumable | RS | single use | failed objective | Rope ladder |
-| Heavy Pack | You may whisper once more each camp, but a failed camp costs 1 more supply. | passive | Always | none | none | Bulging backpack |
+| Heavy Pack | Whisper once more each camp; failing costs the crew 1 more supply, and packs don't stack. | passive | Always | none | none | Bulging backpack |
 | Mosquito Net | Boss twists can't stop your whispers. | passive | Always | none | none | Net with a mosquito |
 
 ### Entry rules

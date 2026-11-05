@@ -393,6 +393,15 @@ describe("drag and drop", () => {
     expect(model.hand.map((c) => c.blockedReason)).toEqual([null, "Must follow ♠"]);
   });
 
+  it("says the first lead can't be the Sun or Moon for a joker the server did not list as legal", () => {
+    const sun = { id: "sun", identity: { kind: "joker" as const, joker: "sun" as const }, effectiveRank: null, countsAs: null };
+    const view = dragView({ yourHand: [cards[0]!, sun], currentActorSeatId: "s2", currentTrick: { index: 0, leaderSeatId: "s2", plays: [] }, completedTricks: [] });
+    expect(buildSceneModel(server(view), ui(), "big-index").hand.map((c) => [c.label, c.blockedReason])).toEqual([
+      ["A♠", null],
+      ["Sun", "The first lead can't be the Sun or Moon"],
+    ]);
+  });
+
   it("says it is not your turn off-turn, and nothing for a legal card", () => {
     const model = buildSceneModel(server(dragView({ currentActorSeatId: "s1", yourLegalCardIds: [] })), ui(), "big-index");
     expect(model.hand.map((c) => c.blockedReason)).toEqual(["Not your turn yet", "Not your turn yet"]);

@@ -103,7 +103,7 @@ export function openLeg(run: RunState, next: CampIndex, leg: Leg, catalog: Catal
       return { ...run, stage: { tag: "route", from: campIndex(next - 1), options: routeOptions(run, campIndex(next - 1), catalog), ballots: {} } };
     case "loadout":
       if (next !== 1) throw new Error(`openLeg: camp ${next}'s loadout opens from its route vote`);
-      return openLoadout(run, firstCampSpec(planOf(run).length), catalog);
+      return openLoadout(run, firstCampSpec(planOf(run).length, run.seatIds.length), catalog);
   }
 }
 

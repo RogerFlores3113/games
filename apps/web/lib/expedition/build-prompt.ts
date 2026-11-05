@@ -28,6 +28,10 @@ export interface PromptSeat {
 export const PROMPT_MAX_CHARS = 56;
 const NAME_MAX_CHARS = 10;
 
+const HEAVY_PACK = "heavy-pack";
+/** Says what the item's own text says: the crew pays 1 more supply, once. */
+const HEAVY_PACK_WARNING = "Heavy Pack: fails cost 1 more supply";
+
 function shortName(name: string): string {
   return name.length <= NAME_MAX_CHARS ? name : `${name.slice(0, NAME_MAX_CHARS - 1)}…`;
 }
@@ -344,11 +348,17 @@ export function buildTrailPrompt(view: ExpeditionView, seats: readonly PromptSea
     case "loadout": {
       const last = view.history.at(-1);
       if (you !== undefined && !stage.readySeatIds.includes(you.seatId)) {
-        if (last?.camp === stage.camp.index && last.status === "failed") return { text: `Camp ${last.camp} failed. Set out to try again`, tone: "alert" };
+        // The crew's warning: the supplies a failure costs are shared, so
+        // anyone's Heavy Pack is everyone's business.
+        const packed = view.seats.some((s) => s.items.equipped.some((item) => item.itemId === HEAVY_PACK));
+        if (last?.camp === stage.camp.index && last.status === "failed") {
+          return { text: packed ? `Camp ${last.camp} failed. ${HEAVY_PACK_WARNING}` : `Camp ${last.camp} failed. Set out to try again`, tone: "alert" };
+        }
         if (last?.camp === stage.camp.index && last.status === "restarted") {
           const text = `Camp ${last.camp} restarts without ${nameList(view.kicked.map((k) => nameOf(k.seatId)))}. Set out`;
           return { text: text.length <= PROMPT_MAX_CHARS ? text : `Camp ${last.camp} restarts with a smaller crew. Set out`, tone: "alert" };
         }
+        if (packed) return { text: `Prepare for camp ${stage.camp.index}. ${HEAVY_PACK_WARNING}`, tone: "your-move" };
         return { text: `Prepare for camp ${stage.camp.index}`, tone: "your-move" };
       }
       return waitingFor(view.seats.filter((s) => !stage.readySeatIds.includes(s.seatId)).map((s) => s.seatId), "Setting out…");

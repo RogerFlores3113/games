@@ -31,7 +31,9 @@ names the exact files and identifiers involved.
 **Core hooks** (`rules.ts`'s `CoreRules`): `deckFor`, `objectiveDeckFor`
 (base: standard cards ranked above the deck's lowest rank), `leaderFor`, the
 card reading `identityOf`, `isTrump` and `rankOf`, `trickWinner(plays,
-led)`, `legalPlays`, `burns(plays, led, winnerOf)`, `nextLeader`,
+led)`, `legalPlays` (base: follow suit, and the camp's first lead may not be
+the Sun or the Moon unless the leader holds nothing else, `trick.ts`'s
+`isFirstLead` and `withoutJokerLead`), `burns(plays, led, winnerOf)`, `nextLeader`,
 `objectiveStatus` (base: `evaluateObjective`), `goals` (camp-wide
 conditions, given every objective's composed status; every one must be
 done), `voidsTrick` (base: false; a voided trick is a hallucination: every
@@ -69,7 +71,8 @@ card or was discarded, and fails if never played by the final trick.
   `settleCamp`), `run/plan.ts`
   (`RunPlan`, `campIndex`, `drawPlan`, `helpersFor`, `horizon`),
   `run/route.ts` (`CampSpec`, `firstCampSpec`, `routeOptions`,
-  `slotKindsFor`), `run/vote.ts` (`tally`),
+  `slotKindsFor`; a spec's seat objectives scale with the crew size through
+  `run/balance.ts`'s `seatObjectivesAt` and `mixFromCampFor`), `run/vote.ts` (`tally`),
   `run/stack.ts` (`campStack`, the one list of a camp's modifiers, and
   `modCtx`), `run/react.ts` (`react`, the camp modifiers' one pass over the
   engine's events),

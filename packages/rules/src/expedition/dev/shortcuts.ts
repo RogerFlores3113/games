@@ -81,7 +81,7 @@ function loadoutAt(run: RunState, length: RunLength, k: number, catalog: Catalog
   // The run's own plan survives a jump within its length, so a boss set with set-plan-boss stays.
   const plan = run.plan?.length === length ? run.plan : drawPlan(run.seed, length, catalog);
   const crewed: RunState = { ...assignCharacters(run, catalog), plan, supplies: Math.max(run.supplies, 1) };
-  return openLoadout({ ...crewed, history: crewed.history.filter((h) => h.camp < k) }, campSpecAt(run.seed, length, campIndex(k), catalog), catalog);
+  return openLoadout({ ...crewed, history: crewed.history.filter((h) => h.camp < k) }, campSpecAt(run.seed, length, campIndex(k), catalog, crewed.seatIds.length), catalog);
 }
 
 /** Where each of a length's camps has `leg` before it, for a refusal. */
@@ -99,7 +99,7 @@ function jumpToCamp(run: RunState, length: RunLength, k: number, stage: Arrival,
   if (!legsTo(length, k).includes(stage)) throw new Error(`camp ${k} has no ${stage === "route" ? "route vote" : stage} before it: ${campsWith(length, stage)}`);
   const before = k === 1 ? loadoutAt(run, length, 1, catalog) : settleCamp(jumpToCamp(run, length, k - 1, "camp", catalog) as RunAt<"camp">, "cleared", catalog);
   const cleared = { ...before, seats: before.seats.map((s) => ({ ...s, offers: [] })) };
-  return stage === "shop" ? openShop(cleared, campSpecAt(run.seed, length, campIndex(k), catalog), catalog) : openLeg(cleared, campIndex(k), stage, catalog);
+  return stage === "shop" ? openShop(cleared, campSpecAt(run.seed, length, campIndex(k), catalog, run.seatIds.length), catalog) : openLeg(cleared, campIndex(k), stage, catalog);
 }
 
 /** The camp the run is in, or the one it is heading to, dealt. */
