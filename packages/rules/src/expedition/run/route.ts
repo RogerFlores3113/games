@@ -106,6 +106,9 @@ function drawSwap(seed: string, plan: RunPlan, next: CampIndex, option: number, 
 }
 
 const MAX_OPTIONS = 3;
+/** How often an option that matches an earlier one is drawn again before
+ * the vote keeps it anyway (a catalogue too small to tell them apart). */
+const MAX_REDRAWS = 8;
 
 function optionsAfter(seed: string, plan: RunPlan, cleared: CampIndex, catalog: Catalog, rules: RouteRules): readonly RouteOption[] {
   const length = plan.length;
@@ -114,18 +117,28 @@ function optionsAfter(seed: string, plan: RunPlan, cleared: CampIndex, catalog: 
   if (!Number.isInteger(count) || count < 1 || count > MAX_OPTIONS) throw new Error(`route: routeOptionCount gave ${count}, outside 1 to ${MAX_OPTIONS}`);
   const slotCount = OBJECTIVE_RAMP[length][next - 1]!;
   const mixes: readonly Mix[] = next < MIX_FROM_CAMP ? ["plain"] : ["plain", "ordered", "trick-count", ...(slotCount >= BOTH_MIX_MIN_SLOTS ? (["both"] as const) : [])];
+  const seen = new Set<string>();
   return ROUTE_CHOICES.slice(0, count).map((id, i) => {
-    const place = drawPlace(seed, next, 0, i, catalog, rules.fairChance);
-    const mix = mixes[seededIndex(seed, STREAMS.routeField(next, 0, i, "mix"), mixes.length)]!;
     const swapBoss = rules.swapsBoss(i) ? drawSwap(seed, plan, next, i, catalog) : null;
-    return { id, next: { index: next, location: place.location, weather: place.weather, slots: slotsFor(slotCount, mix) }, reroll: 0, swapBoss };
+    // Redraw r reads the streams of option i + MAX_OPTIONS * r, which no
+    // option and no reroll (reroll 1 on) ever reads; redraw 0 is option i's own.
+    for (let redraw = 0; ; redraw++) {
+      const stream = i + MAX_OPTIONS * redraw;
+      const place = drawPlace(seed, next, 0, stream, catalog, rules.fairChance);
+      const mix = mixes[seededIndex(seed, STREAMS.routeField(next, 0, stream, "mix"), mixes.length)]!;
+      const key = [place.location, place.weather, mix, swapBoss?.at ?? "", swapBoss?.modId ?? ""].join("|");
+      if (seen.has(key) && redraw < MAX_REDRAWS) continue;
+      seen.add(key);
+      return { id, next: { index: next, location: place.location, weather: place.weather, slots: slotsFor(slotCount, mix) }, reroll: 0, swapBoss };
+    }
   });
 }
 
 /** 2 or 3 options to the camp after `from` (seeded count, then the crew's
  * routeOptionCount), each with a location by weight, its weather and, from
  * MIX_FROM_CAMP on, a seeded objective mix; an option the crew's swapsBoss
- * names also leads to a different boss. */
+ * names also leads to a different boss. An option the same as an earlier
+ * one in location, weather, mix and boss is drawn again. */
 export function routeOptions(run: RunState, from: CampIndex, catalog: Catalog): readonly RouteOption[] {
   return optionsAfter(run.seed, planOf(run), from, catalog, routeRules(run, catalog));
 }
