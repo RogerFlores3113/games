@@ -1716,6 +1716,7 @@ and a bare identifier lives in `run/balance.ts`. A def's `text` repeats some of 
 | What | Current value | Where it lives |
 |---|---|---|
 | Run lengths and boss camps | Short 4 camps, temple at 4; Standard 6, animal at 3, temple at 6; Long 8, animal at 3, disaster at 6, temple at 8 | `RUN_LENGTHS` |
+| Shop camps (a shop after the route vote) | Short 3 and 4; Standard 3 and 6; Long 3, 6 and 8 | `SHOP_CAMPS` |
 | Seat objectives per camp, before boss and temple slots | Short 2, 3, 4, 3; Standard 2, 3, 3, 4, 4, 4; Long 2, 3, 3, 4, 4, 4, 5, 4 | `OBJECTIVE_RAMP` |
 | First camp with mixed slots | camp 4 | `MIX_FROM_CAMP` |
 | Fewest slots for the "both" mix | 4 | `BOTH_MIX_MIN_SLOTS` |
@@ -1723,13 +1724,17 @@ and a bare identifier lives in `run/balance.ts`. A def's `text` repeats some of 
 | Trick-count slot kind | no-tricks or exactly-n, even odds, per attempt | `resolveTrickCountSlot` |
 | Exactly-n's N | 2 to 4, uniform | `TRICK_COUNT_N_RANGE` |
 | Route options | 2 or 3, uniform | `ROUTE_OPTIONS` |
-| Event on a route | uniform over `EVENTS` | `run/route.ts` `optionsAfter` |
+| Event before a camp | uniform over `EVENT_POOL` (Abandoned camp, Dropped pack, Fresh spring; Quiet trail out) | `content/events/registry.ts` `EVENT_POOL`, `run/events.ts` `drawEventId` |
+| Abandoned camp | the purse gains 4 coins | `content/events/event.ts` `effect.coins` |
+| Fresh spring | 1 supply back, up to the cap; with supplies full, 3 coins | `content/events/event.ts` `effect.supplies`, `effect.elseCoins` |
+| Dropped pack | one random common item for each seat with room | `content/events/event.ts`, `run/events.ts` `giveCommonItems` |
 | Supplies at the start | 3 | `SUPPLIES_START` |
 | Supplies cap | 4 | `SUPPLIES_MAX` |
 | Supply price at the shop | 6 coins | `SUPPLY_PRICE` |
 | Failure cost | 1 supply | `FAILURE_COST` |
 | Purse at the start | 0 coins | `PURSE_START` |
-| Payout for a clear | 5, plus 1 per unplayed trick up to 3 | `PAYOUT` |
+| Payout for a clear | 5; +2 off plain ground, +2 in any weather but Fair; plus 1 per unplayed trick up to 2 | `PAYOUT` |
+| Plain ground (no risk bonus) | locations Jungle and Clearing, weather Fair | `PLAIN_GROUND` |
 | Draft offer | 3 bundles of 2 items | `DRAFT.options`, `DRAFT.bundleSize` |
 | Rare chance, draft and shop | 15% | `DRAFT.rareChance` |
 | Shop items | 3 single copies | `SHOP.items` |
@@ -2867,3 +2872,41 @@ How each of the nine fits (for unit 13):
   swallowed like a player's (the tour's "New expedition" click landed in it).
 - `create-room-form.ts`'s comments name the per-game start pages and
   `useCreateRoom`, not the removed landing form.
+
+### Implementation notes (playtest fixes: economy, shops, events)
+
+Owner decisions after the 11-agent playtest, which found that every cleared
+camp paid 8 coins whatever the route, that a Short run had nothing to buy
+until the temple, that the crew shopped before it knew its camp, and that
+events did nothing.
+
+- Payout (`PAYOUT`, `payoutFor(spec, camp)`): 5, plus 2 when the camp's
+  location is not plain ground and 2 when its weather is not Fair, plus 1 per
+  unplayed trick, at most 2. Plain ground (`PLAIN_GROUND`) is the defs that
+  change nothing: the Jungle and the Clearing, and Fair. Lead: the Clearing
+  counts as plain, since it changes nothing and a risk bonus there would pay
+  for no risk. A route option's view carries `pays: { min, max }`
+  (`payoutRange`); each route card shows "Pays 9 to 11 coins" under its
+  objectives.
+- Shops (`SHOP_CAMPS`): every boss camp, and camp 3 of a Short run. The way
+  to a shop camp is now draft, event (when there is one), route, shop,
+  loadout: the route vote opens the shop of the camp it chose
+  (`openChosenCamp`), and the shop's last ready opens that camp's loadout, so
+  `stage.camp` is always the chosen spec and the shop panel always previews
+  it. A failed or restarted shop camp goes back through its shop, as before.
+  The boss is revealed by the route preview, so the shop names it. The draft
+  after a boss camp still offers bundles; camp 3 of a Short run is a shop
+  camp, not a boss camp.
+- Events: an `EventDef` has an optional `effect` (`coins`, `supplies` with
+  `elseCoins`, or `common-item`), applied once as the event stage opens
+  (`openEvent` calls `run/events.ts`'s `applyEvent`). `stage.gains` records
+  what it gave; the view carries it, leaving out an item a seat's loadout
+  hides from the viewer, and the event panel lists it ("The purse gains 4
+  coins", "You take Bait"). Three events replace Quiet trail in
+  `EVENT_POOL`: Abandoned camp, Fresh spring and Dropped pack. Quiet trail
+  stays in `EVENTS`, out of the pool, for tests and the dev panel. Dropped
+  pack mints each item as the draft does (into a free slot, else the
+  backpack), on its own stream `expedition-event-item:camp{k}:seat{id}`.
+  The event screen has no per-event image.
+- `ROOM_SCHEMA_VERSION` 19: the shop's camp is never null and the event stage
+  carries `gains`.
