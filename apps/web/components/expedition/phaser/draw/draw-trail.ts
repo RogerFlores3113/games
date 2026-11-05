@@ -592,7 +592,7 @@ const RIBBON_H = 14;
 const ROUTE_FOOTER_H = 4 + 4 + LINE;
 const REROLL_H = 14;
 
-/** A route as a card: the camp ahead, the boss, then the votes. Draws the
+/** A route as a card: the camp ahead, what it pays, the boss, then the votes. Draws the
  * body and returns its height and a `finish` that draws the card at the
  * row's common height, its votes pinned to the foot. */
 function drawRouteCard(ctx: Ctx, card: RouteCard, x: number, y: number, w: number): { bodyH: number; finish(h: number): void } {
@@ -606,6 +606,8 @@ function drawRouteCard(ctx: Ctx, card: RouteCard, x: number, y: number, w: numbe
   const inner = w - 12;
   let cy = placeRows(scene, body, card.next, 6, RIBBON_H + 4, inner);
   cy = objectiveRow(ctx, body, card.next.objectives, 6, cy + 1);
+  body.add(text(scene, 6, cy, fitLabel(card.pays, Math.floor(inner / LABEL_CELL.w)), PALETTE.coinShine));
+  cy += LINE;
   if (card.next.survey !== null) {
     const chars = Math.floor(inner / LABEL_CELL.w);
     for (const line of wrapped(`Survey: ${card.next.survey.join(", ")}`, chars, 2)) {
@@ -678,7 +680,7 @@ function panelSplit(sideW: number): { main: Rect; side: Rect } {
   };
 }
 
-/** The event: its name and what happens, then what comes next. */
+/** The event: its name and what happens, what it gave, then what comes next. */
 function drawEvent(ctx: Ctx, event: Extract<TrailPanel, { kind: "event" }>): void {
   const { scene, layer } = ctx;
   const zone = TRAIL_ZONES.panel;
@@ -688,6 +690,11 @@ function drawEvent(ctx: Ctx, event: Extract<TrailPanel, { kind: "event" }>): voi
   let y = zone.y + 26;
   for (const line of wrapped(event.text, chars, 6)) {
     layer.add(text(scene, zone.x + 8, y, line));
+    y += LINE;
+  }
+  if (event.gave.length > 0) y += 6;
+  for (const line of event.gave.slice(0, 6)) {
+    layer.add(text(scene, zone.x + 8, y, fitLabel(line, chars), PALETTE.coinShine));
     y += LINE;
   }
   y += 6;
@@ -703,15 +710,9 @@ function drawLoadout(ctx: Ctx, loadout: Extract<TrailPanel, { kind: "loadout" }>
   if (vote !== null) drawVoteResult(ctx, vote, side);
 }
 
-/** The shop takes the panel; on a replay the camp it leads to stands
- * beside it. */
+/** The camp the route vote chose, with the shop beside it. */
 function drawShopPanel(ctx: Ctx, shop: Extract<TrailPanel, { kind: "shop" }>): void {
   panel(ctx, TRAIL_ZONES.panel);
-  if (shop.next === null) {
-    const zone = TRAIL_ZONES.panel;
-    drawShop(ctx, shop.shop, { x: zone.x + 8, y: zone.y + 4, w: zone.w - 16, h: zone.h - 8 }, "Shop");
-    return;
-  }
   const { main, side } = panelSplit(SIDE_W);
   drawPreview(ctx, shop.next, main, shop.next.title);
   drawShop(ctx, shop.shop, side, "Shop");

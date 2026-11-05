@@ -4,7 +4,7 @@ import { shopInfoObjectId, shopObjectId } from "./expedition-ids";
 import { sourceName } from "./source-text";
 
 /**
- * The shop before a boss camp: the shared stock, then your character's
+ * The shop before a shop camp: the shared stock, then your character's
  * upgrades. A buy only calls the worker, which decides.
  */
 

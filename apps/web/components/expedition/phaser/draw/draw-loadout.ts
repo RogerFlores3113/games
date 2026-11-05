@@ -1,5 +1,5 @@
 /**
- * The shop before a boss camp: the purse, then a row per entry. Every value
+ * The shop before a shop camp: the purse, then a row per entry. Every value
  * comes from the trail model; a buy only calls a handler.
  */
 import type Phaser from "phaser";

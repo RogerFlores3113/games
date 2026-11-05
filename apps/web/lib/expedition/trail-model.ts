@@ -157,7 +157,7 @@ export function previewObjectiveIcons(panel: TrailPanel): ObjectiveIcon[] {
     case "loadout":
       return panel.next.objectives;
     case "shop":
-      return panel.next?.objectives ?? [];
+      return panel.next.objectives;
     case "route":
       return panel.options.flatMap((option) => option.next.objectives);
     default:
@@ -168,7 +168,7 @@ export function previewObjectiveIcons(panel: TrailPanel): ObjectiveIcon[] {
 /** A camp as a route card or the loadout shows it. */
 export interface CampPreview {
   title: string;
-  /** A boss camp: the shop opens before it. */
+  /** A shop camp: its shop opens after the route vote. */
   shop: boolean;
   location: string;
   weather: string;
@@ -207,6 +207,8 @@ export interface RouteCard {
   swapsBoss: string | null;
   /** The Cartographer's reroll of this route, while you can afford it. */
   reroll: { objectId: string; choiceId: string; label: string } | null;
+  /** What clearing its camp pays: "Pays 9 to 11 coins". */
+  pays: string;
 }
 
 /** A power you can use between camps, as a button. `active` while you are
@@ -243,11 +245,12 @@ export type TrailPanel =
   | { kind: "muster"; characters: CharacterCard[]; lengths: LengthOption[]; crew: MusterCrewRow[]; locked: string }
   | { kind: "draft"; draft: DraftPanel }
   | { kind: "route"; options: RouteCard[] }
-  /** `nextTitle`: "Camp 2 of 6", the camp the event comes before. */
-  | { kind: "event"; name: string; text: string; nextTitle: string }
-  /** The shop before a boss camp. `next` previews the camp only on a
-   * replay; on the way there its route is not voted yet. */
-  | { kind: "shop"; next: CampPreview | null; shop: ShopPanel }
+  /** `nextTitle`: "Camp 2 of 6", the camp the event comes before.
+   * `gave`: what the event gave the crew, a line each. */
+  | { kind: "event"; name: string; text: string; gave: string[]; nextTitle: string }
+  /** The shop before a shop camp, after its route vote: the camp it leads
+   * to, and the shop. */
+  | { kind: "shop"; next: CampPreview; shop: ShopPanel }
   /** The loadout: the camp it sets out for. */
   | { kind: "loadout"; next: CampPreview };
 
@@ -487,6 +490,24 @@ function swapLabel(view: View, from: number): string {
   return at === undefined ? "Another boss ahead" : `Another boss at camp ${at}`;
 }
 
+/** "Pays 9 to 11 coins": the base and risk bonus, then the most the
+ * unplayed tricks add. */
+export function paysLabel(pays: { min: number; max: number }): string {
+  return pays.min === pays.max ? `Pays ${pays.min} coins` : `Pays ${pays.min} to ${pays.max} coins`;
+}
+
+/** What an event gave, a line each: the purse, the supplies, then each
+ * seat's item, you first. */
+export function eventGaveLines(server: SceneServerInput, gains: Extract<View["stage"], { tag: "event" }>["gains"]): string[] {
+  const lines: string[] = [];
+  if (gains.coins > 0) lines.push(`The purse gains ${gains.coins} ${gains.coins === 1 ? "coin" : "coins"}`);
+  if (gains.supplies > 0) lines.push(`The crew regains ${gains.supplies} ${gains.supplies === 1 ? "supply" : "supplies"}`);
+  const you = server.game.yourSeatId;
+  const items = [...gains.items.filter((i) => i.seatId === you), ...gains.items.filter((i) => i.seatId !== you)];
+  for (const item of items) lines.push(`${nameOf(server, item.seatId)} ${item.seatId === you ? "take" : "takes"} ${sourceName(item.itemId)}`);
+  return lines;
+}
+
 function buildRoutes(server: SceneServerInput, stage: Extract<View["stage"], { tag: "route" }>): RouteCard[] {
   const view = server.game;
   const yourBallot = stage.ballots.find((b) => b.seatId === view.yourSeatId);
@@ -503,6 +524,7 @@ function buildRoutes(server: SceneServerInput, stage: Extract<View["stage"], { t
       votable: view.yourSeatId !== null && view.seats.some((s) => s.seatId === view.yourSeatId),
       swapsBoss: option.swapsBoss ? swapLabel(view, option.next.index) : null,
       reroll: reroll !== null && reroll.choices.includes(choiceId) ? { objectId: rerollObjectId(option.id), choiceId, label: reroll.label } : null,
+      pays: paysLabel(option.pays),
     };
   });
 }
@@ -545,14 +567,14 @@ function campTitle(view: View, index: number): string {
   return view.campCount === null ? `Camp ${index}` : `Camp ${index} of ${view.campCount}`;
 }
 
-/** The shop before a boss camp, and the camp it leads to on a replay. */
+/** The shop before a shop camp, and the camp it leads to. */
 function buildShopPanel(server: SceneServerInput, stage: Extract<View["stage"], { tag: "shop" }>, inventory: Inventory | null): TrailPanel {
   const view = server.game;
   const you = view.seats.find((s) => s.seatId === view.yourSeatId);
   const ready = you !== undefined && stage.readySeatIds.includes(you.seatId);
   return {
     kind: "shop",
-    next: stage.camp === null ? null : campPreview(view, stage.camp, "shop"),
+    next: campPreview(view, stage.camp, "shop"),
     shop: buildShop({
       shop: stage.shop,
       purse: view.purse,
@@ -577,7 +599,7 @@ function buildPanel(server: SceneServerInput, ui: LocalUiState, inventory: Inven
       return { kind: "route", options: buildRoutes(server, stage) };
     case "event": {
       const event = EVENT_DISPLAY[stage.event];
-      return { kind: "event", name: event?.name ?? modName(stage.event), text: event?.text ?? "", nextTitle: campTitle(view, stage.next) };
+      return { kind: "event", name: event?.name ?? modName(stage.event), text: event?.text ?? "", gave: eventGaveLines(server, stage.gains), nextTitle: campTitle(view, stage.next) };
     }
     case "shop":
       return buildShopPanel(server, stage, inventory);

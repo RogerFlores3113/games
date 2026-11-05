@@ -45,7 +45,7 @@ function loadout(index: number, overrides: Partial<ExpeditionCampPreviewView> = 
   return { tag: "loadout", camp: preview({ index, ...overrides }), mods: [], readySeatIds: [] };
 }
 
-function shop(next: number, camp: ExpeditionCampPreviewView | null = null): ExpeditionStageView {
+function shop(next: number, camp: ExpeditionCampPreviewView = preview({ index: next, shop: true })): ExpeditionStageView {
   return { tag: "shop", next, camp, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] };
 }
 
@@ -75,7 +75,7 @@ function view(stage: ExpeditionStageView, overrides: Partial<ExpeditionView> = {
 const muster: ExpeditionStageView = { tag: "muster", ballots: [], lockedSeatIds: [] };
 const route: ExpeditionStageView = { tag: "route", options: [], ballots: [] };
 const draft: ExpeditionStageView = { tag: "draft", next: 3, cleared: 2, payout: 7, yourOffer: null, pendingSeatIds: [] };
-const event: ExpeditionStageView = { tag: "event", event: "event", next: 2, readySeatIds: [] };
+const event: ExpeditionStageView = { tag: "event", event: "event", next: 2, gains: { coins: 0, supplies: 0, items: [] }, readySeatIds: [] };
 const cleared = (camp: number, coins: number) => ({ history: [{ camp, attempt: 1, location: "clifftop", weather: "fair", status: "cleared" as const, coins }] });
 
 function copyOf(shown: ExpeditionView, next: ExpeditionView): { caseId: string; title: string; sub: string | null } | null {
@@ -84,9 +84,8 @@ function copyOf(shown: ExpeditionView, next: ExpeditionView): { caseId: string; 
 }
 
 describe("transitionFor", () => {
-  it("a cleared camp says Camp won! with the payout, on its way to the draft or the shop", () => {
+  it("a cleared camp says Camp won! with the payout, on its way to the draft", () => {
     expect(copyOf(view(camp(1)), view(draft, cleared(1, 7)))).toEqual({ caseId: "camp-won", title: "Camp won!", sub: "+7 coins" });
-    expect(copyOf(view(camp(2)), view(shop(3), cleared(2, 6)))).toEqual({ caseId: "camp-won", title: "Camp won!", sub: "+6 coins" });
   });
 
   it("a failed camp says Camp lost and what it cost", () => {
@@ -119,6 +118,10 @@ describe("transitionFor", () => {
     expect(copyOf(view(route), flipped)).toEqual({ caseId: "route-decided", title: "Heading to the Magma pool", sub: "Fair weather\nA coin flip decided it" });
   });
 
+  it("the route vote to a shop camp says where the crew heads on its way to the shop", () => {
+    expect(copyOf(view(route), view(shop(3, preview({ index: 3, location: "cave", weather: "rain", shop: true }))))).toEqual({ caseId: "route-decided", title: "Heading to the Cave", sub: "Rain" });
+  });
+
 
   it("setting out deals the table: a plain camp, a boss camp, the temple, and a replay's try", () => {
     expect(copyOf(view(loadout(2)), view(camp(2, 1, { location: "cave", weather: "rain", pairing: "flooding" })))).toEqual({
@@ -142,7 +145,7 @@ describe("transitionFor", () => {
 
   it("no sign within a stage, between the stages before a camp, or between two run-end views", () => {
     expect(transitionFor(view(camp(2)), view(camp(2)))).toBeNull();
-    expect(transitionFor(view(shop(3)), view(draft))).toBeNull();
+    expect(transitionFor(view(shop(3)), view(loadout(3)))).toBeNull();
     expect(transitionFor(view(draft), view(event))).toBeNull();
     expect(transitionFor(view(event), view(route))).toBeNull();
     expect(transitionFor(view(draft), view(route))).toBeNull();
