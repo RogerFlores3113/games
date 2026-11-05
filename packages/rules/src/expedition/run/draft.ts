@@ -94,7 +94,9 @@ export function drawOffer(
 
 /** An offer of the draft after camp `cleared` (0 before camp 1), seeded per
  * (cleared camp, seat, ordinal): the ordinal counts the seat's offers from
- * that draft. */
+ * that draft. A shape with the character's own items (the Pack Rat's pick)
+ * is a special offer; any other is standard. */
 export function draftOfferFor(seed: string, cleared: number, seat: SeatRun, ordinal: number, catalog: Catalog, shape: DraftShape = BASE_DRAFT_SHAPE): DraftOffer {
-  return drawOffer(seed, (bundle, item, part) => STREAMS.draftItem(cleared, seat.seatId, ordinal, bundle, item, part), seat.characterId, catalog, shape, "standard");
+  const kind = shape.exclusive > 0 ? "special" : "standard";
+  return drawOffer(seed, (bundle, item, part) => STREAMS.draftItem(cleared, seat.seatId, ordinal, bundle, item, part), seat.characterId, catalog, shape, kind);
 }

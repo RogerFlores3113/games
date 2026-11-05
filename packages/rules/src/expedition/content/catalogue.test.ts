@@ -387,6 +387,7 @@ describe("Pack Rat", () => {
     const exclusive = Object.values(CATALOG.items).filter((item) => item.exclusiveTo === "pack-rat").map((item) => item.id);
     const [standard, packRat] = draft.seats[0]!.offers;
     expect(draft.seats[0]!.offers.map((offer) => offer.bundles.map((bundle) => bundle.length))).toEqual([[1, 1, 1], [1, 1, 1]]);
+    expect(draft.seats[0]!.offers.map((offer) => offer.kind)).toEqual(["standard", "special"]);
     expect(standard!.bundles.flat().some((id) => exclusive.includes(id))).toBe(false);
     expect(packRat!.bundles.flat().filter((id) => exclusive.includes(id))).toHaveLength(3);
     expect(new Set(packRat!.bundles.flat()).size).toBe(3);

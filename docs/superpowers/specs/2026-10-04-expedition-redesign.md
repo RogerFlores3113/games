@@ -2179,7 +2179,8 @@ How each of the nine fits (for unit 13):
   longer carry Pack Rat items. Deviation: a one-item bundle never repeats
   another option's item (`drawOffer`), so the pick is between three
   different items; Treasure Map's one-item options are distinct too now.
-  Both offers are kind "standard"; the web tells the Pack Rat's pick by
+  The Pack Rat's pick is kind "special" (any shape with exclusive items is),
+  the usual offer "standard"; the web tells the Pack Rat's pick by
   every offered item being exclusive to one character (`ownPickOf`).
 - `RunState` is unchanged in shape, so `ROOM_SCHEMA_VERSION` stays 14.
 - Location and weather texts are rewritten as one warm line each (Clifftop:
