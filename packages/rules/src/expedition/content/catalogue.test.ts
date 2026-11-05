@@ -14,7 +14,7 @@ import { CATALOG } from "../run/catalog";
 import { rulesFor } from "../run/compose";
 import { attemptOf, withAttempt } from "../run/attempt";
 import { advanceTo, setupRun, testCatalog } from "../run/run-test-support";
-import { createRun, openLeg } from "../run/lifecycle";
+import { createRun, openShop } from "../run/lifecycle";
 import { campIndex } from "../run/plan";
 import { applyRunAction } from "../run/stages/registry";
 import { resolvedPlay } from "../test-support";
@@ -311,8 +311,11 @@ function toRoute(run: RunState): RunState {
   return next;
 }
 
-/** The shop before boss camp `camp`, from the crew's loadout there. */
-const shopOf = (run: RunState, camp: number): RunState => openLeg(run, campIndex(camp), "shop", CATALOG);
+/** The shop before shop camp `camp`, from the crew's loadout there. */
+const shopOf = (run: RunState, camp: number): RunState => {
+  if (run.stage.tag !== "loadout" || run.stage.camp.index !== camp) throw new Error(`shopOf: expected camp ${camp}'s loadout`);
+  return openShop(run, run.stage.camp, CATALOG);
+};
 
 describe("Businessman", () => {
   it("Bottom Line pays 2 coins for one empty slot taken into camp, 5 for two and none for none", () => {

@@ -19,7 +19,7 @@ import { rulesFor } from "./compose";
 import { buildCatalog } from "./catalog";
 import { abilityStatus } from "./abilities";
 import { mintItems, roomFor } from "./items";
-import { createRun, openLeg, openLoadout, runStatus } from "./lifecycle";
+import { createRun, openLoadout, openShop, runStatus } from "./lifecycle";
 import { campIndex, drawPlan } from "./plan";
 import { campSpecAt } from "./route";
 import { applyRunAction } from "./stages/registry";
@@ -123,10 +123,11 @@ export function setupRun(opts: {
   return openLoadout(crewed, campSpecAt(opts.seed, length, campIndex(opts.camp ?? 1), opts.catalog), opts.catalog);
 }
 
-/** setupRun at boss camp `camp`, then the shop on the way there (the stage
- * before its draft and route vote). */
+/** setupRun at shop camp `camp`, then its shop (the stage after its route
+ * vote, before its loadout). */
 export function setupShop(opts: Parameters<typeof setupRun>[0] & { readonly camp: number }): RunAt<"shop"> {
-  return openLeg(setupRun(opts), campIndex(opts.camp), "shop", opts.catalog) as RunAt<"shop">;
+  const run = setupRun(opts) as RunAt<"loadout">;
+  return openShop(run, run.stage.camp, opts.catalog);
 }
 
 /** Drives `run` forward through applyRunAction ONLY until `target` is

@@ -398,12 +398,19 @@ const ModViewSchema = z.strictObject({
   status: z.array(StatusPartViewSchema),
 });
 
+/** What an event gave as it opened; the same shape in the view and the run. */
+const EventGainsSchema = z.strictObject({
+  coins: z.number().int().min(0),
+  supplies: z.number().int().min(0),
+  items: z.array(z.strictObject({ seatId: z.string().min(1), itemId: z.string().min(1) })),
+});
+
 const StageViewSchema = z.discriminatedUnion("tag", [
   z.strictObject({ tag: z.literal("muster"), ballots: z.array(BallotViewSchema), lockedSeatIds: z.array(z.string().min(1)) }),
   z.strictObject({
     tag: z.literal("shop"),
     next: CampIndexSchema,
-    camp: CampPreviewViewSchema.nullable(),
+    camp: CampPreviewViewSchema,
     shop: ShopViewSchema,
     readySeatIds: z.array(z.string().min(1)),
   }),
@@ -419,10 +426,17 @@ const StageViewSchema = z.discriminatedUnion("tag", [
   }),
   z.strictObject({
     tag: z.literal("route"),
-    options: z.array(z.strictObject({ id: z.string().min(1), next: CampPreviewViewSchema, swapsBoss: z.boolean() })),
+    options: z.array(
+      z.strictObject({
+        id: z.string().min(1),
+        next: CampPreviewViewSchema,
+        swapsBoss: z.boolean(),
+        pays: z.strictObject({ min: z.number().int().min(0), max: z.number().int().min(0) }),
+      }),
+    ),
     ballots: z.array(BallotViewSchema),
   }),
-  z.strictObject({ tag: z.literal("event"), event: z.string().min(1), next: CampIndexSchema, readySeatIds: z.array(z.string().min(1)) }),
+  z.strictObject({ tag: z.literal("event"), event: z.string().min(1), next: CampIndexSchema, gains: EventGainsSchema, readySeatIds: z.array(z.string().min(1)) }),
   z.strictObject({ tag: z.literal("ended"), result: z.enum(["won", "lost"]) }),
 ]);
 

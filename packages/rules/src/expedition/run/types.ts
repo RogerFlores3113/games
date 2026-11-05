@@ -25,7 +25,7 @@ import type { ModDef, ModId, Strength } from "../content/mods/mod-def";
 import type { PairingRule } from "../content/mods/pairings";
 import type { DraftOffer } from "./draft";
 import type { RunPlan } from "./plan";
-import type { EventId } from "../content/events/event-def";
+import type { EventGains, EventId } from "../content/events/event-def";
 import type { CampSpec, RouteChoice, RouteOption } from "./route";
 import type { StockEntry } from "./shop";
 import type { VoteRecord } from "./vote";
@@ -139,10 +139,11 @@ export type KickedSeat = { readonly seat: SeatRun; readonly position: number; re
 
 export type Stage =
   | { readonly tag: "muster"; readonly ballots: PerSeat<RunLength | null>; readonly locked: PerSeat<true> } // null abstains; a locked seat's pick and ballot are final
-  /** Before boss camp `next`. `camp` is its spec on a replay, null on the way there. */
-  | { readonly tag: "shop"; readonly next: CampIndex; readonly camp: CampSpec | null; readonly stock: readonly StockEntry[]; readonly ready: PerSeat<true> }
+  /** Before shop camp `next`, after its route vote (or on a replay): `camp` is its spec. */
+  | { readonly tag: "shop"; readonly next: CampIndex; readonly camp: CampSpec; readonly stock: readonly StockEntry[]; readonly ready: PerSeat<true> }
   | { readonly tag: "draft"; readonly next: CampIndex }
-  | { readonly tag: "event"; readonly next: CampIndex; readonly event: EventId; readonly ready: PerSeat<true> }
+  /** `gains` is what the event gave as it opened. */
+  | { readonly tag: "event"; readonly next: CampIndex; readonly event: EventId; readonly gains: EventGains; readonly ready: PerSeat<true> }
   | { readonly tag: "route"; readonly from: CampIndex; readonly options: readonly RouteOption[]; readonly ballots: PerSeat<RouteChoice | null> }
   | { readonly tag: "loadout"; readonly camp: CampSpec; readonly ready: PerSeat<true> }
   | { readonly tag: "camp"; readonly camp: CampSpec; readonly attempt: AttemptState }

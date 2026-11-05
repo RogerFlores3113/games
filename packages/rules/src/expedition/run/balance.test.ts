@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createCamp } from "../camp";
 import type { CampState } from "../state";
-import { RUN_LENGTHS, TRICK_COUNT_N_RANGE, objectiveSlotsFor, payoutFor } from "./balance";
+import { PLAIN_GROUND, RUN_LENGTHS, SHOP_CAMPS, TRICK_COUNT_N_RANGE, objectiveSlotsFor, payoutFor, payoutRange } from "./balance";
 import { campIndex } from "./plan";
 import { CATALOG } from "./catalog";
 import { campSpecAt, type CampSpec } from "./route";
@@ -17,10 +17,44 @@ describe("payoutFor", () => {
   const camp = (totalTricks: number, completed: number): CampState =>
     ({ totalTricks, completedTricks: Array.from({ length: completed }, (_, index) => ({ index, leaderSeatId: "p0", plays: [], winnerSeatId: "p0" })) }) as unknown as CampState;
 
-  it("pays 5 plus one per unplayed trick, at most 3", () => {
-    expect(payoutFor(camp(18, 18))).toBe(5);
-    expect(payoutFor(camp(18, 16))).toBe(7);
-    expect(payoutFor(camp(18, 3))).toBe(8);
+  const plain = { location: "jungle", weather: "fair" };
+
+  it("pays 5 plus one per unplayed trick, at most 2, on plain ground", () => {
+    expect(payoutFor(plain, camp(18, 18))).toBe(5);
+    expect(payoutFor(plain, camp(18, 17))).toBe(6);
+    expect(payoutFor(plain, camp(18, 3))).toBe(7);
+  });
+
+  it("pays 2 more away from plain ground and 2 more in any weather but fair", () => {
+    expect(payoutFor({ location: "clearing", weather: "fair" }, camp(18, 18))).toBe(5);
+    expect(payoutFor({ location: "cave", weather: "fair" }, camp(18, 18))).toBe(7);
+    expect(payoutFor({ location: "jungle", weather: "downpour" }, camp(18, 18))).toBe(7);
+    expect(payoutFor({ location: "cave", weather: "downpour" }, camp(18, 3))).toBe(11);
+  });
+
+  it("states the range a route pays", () => {
+    expect(payoutRange(plain)).toEqual({ min: 5, max: 7 });
+    expect(payoutRange({ location: "clifftop", weather: "rain" })).toEqual({ min: 9, max: 11 });
+  });
+
+  it("names only defs that change nothing as plain ground", () => {
+    for (const id of [...PLAIN_GROUND.locations, ...PLAIN_GROUND.weathers]) expect(CATALOG.mods[id]?.full).toEqual({});
+  });
+});
+
+describe("SHOP_CAMPS", () => {
+  it("opens a shop before every boss camp, never before camp 1", () => {
+    for (const length of Object.keys(RUN_LENGTHS) as RunLength[]) {
+      for (const boss of RUN_LENGTHS[length].bossCamps) expect(SHOP_CAMPS[length]).toContain(boss.at);
+      for (const at of SHOP_CAMPS[length]) {
+        expect(at).toBeGreaterThan(1);
+        expect(at).toBeLessThanOrEqual(RUN_LENGTHS[length].camps);
+      }
+    }
+  });
+
+  it("gives a Short run a second shop before camp 3", () => {
+    expect(SHOP_CAMPS.short).toEqual([3, 4]);
   });
 });
 

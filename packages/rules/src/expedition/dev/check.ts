@@ -102,8 +102,13 @@ function checkSpec(what: string, spec: CampSpec, catalog: Catalog, problems: str
 function checkSpecs(run: RunState, catalog: Catalog, problems: string[]): void {
   const stage = run.stage;
   if (stage.tag === "loadout" || stage.tag === "camp") checkSpec("the loadout or camp", stage.camp, catalog, problems);
-  if (stage.tag === "shop" && stage.camp !== null) checkSpec("the shop's camp", stage.camp, catalog, problems);
+  if (stage.tag === "shop") checkSpec("the shop's camp", stage.camp, catalog, problems);
   if (stage.tag === "event" && !Object.hasOwn(EVENTS, stage.event)) problems.push(`the event ${stage.event} is not a known event`);
+  if (stage.tag === "event") {
+    const { coins, supplies, items } = stage.gains;
+    if (!Number.isInteger(coins) || coins < 0 || !Number.isInteger(supplies) || supplies < 0) problems.push(`the event's gains must be non-negative whole numbers, got ${coins} coins and ${supplies} supplies`);
+    for (const item of items) if (!Object.hasOwn(catalog.items, item.itemId)) problems.push(`the event gave ${item.seatId} the unknown item ${item.itemId}`);
+  }
   if (stage.tag === "route") {
     for (const option of stage.options) {
       checkSpec(`route ${option.id}`, option.next, catalog, problems);
@@ -166,7 +171,7 @@ function checkRunFields(run: RunState, problems: string[]): void {
   if (run.plan !== null && (stage.tag === "shop" || stage.tag === "draft" || stage.tag === "event") && !legsTo(run.plan.length, stage.next).includes(stage.tag)) {
     problems.push(`a ${run.plan.length} run has no ${stage.tag} before camp ${stage.next}`);
   }
-  if (stage.tag === "shop" && stage.camp !== null && stage.camp.index !== stage.next) problems.push(`the shop before camp ${stage.next} holds camp ${stage.camp.index}'s spec`);
+  if (stage.tag === "shop" && stage.camp.index !== stage.next) problems.push(`the shop before camp ${stage.next} holds camp ${stage.camp.index}'s spec`);
 }
 
 function checkCamp(run: RunState, problems: string[]): void {

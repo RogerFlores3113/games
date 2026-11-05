@@ -1,6 +1,6 @@
-// The shop: the stage before a boss camp (and its replays). The stock is one
+// The shop: the stage after the route vote to a shop camp (and its replays). The stock is one
 // supply line and SHOP.items single copies, drawn on every visit from the
-// same stream names, so a replay of the boss camp offers the same stock
+// same stream names, so a replay of the shop camp offers the same stock
 // again. Upgrades are not stock: each seat sees its own character's upgrades
 // while it owns none. Every buy spends the shared purse; the Durable Object
 // serializes actions, so two buyers never both spend the last coins.

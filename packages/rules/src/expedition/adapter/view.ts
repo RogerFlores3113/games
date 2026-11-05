@@ -31,7 +31,8 @@ import { campGoals, campPhase, currentActorSeatId } from "../camp";
 import { identitiesEqual } from "../deck";
 import { rulesFor } from "../run/compose";
 import { runStatus } from "../run/lifecycle";
-import { SUPPLIES_MAX } from "../run/balance";
+import { SUPPLIES_MAX, payoutRange } from "../run/balance";
+import { isShopCamp } from "../run/trail";
 import { bossAt, campCount, visibleBossId } from "../run/plan";
 import { slotKindsFor, type CampSpec, type RouteOption } from "../run/route";
 import { surveyDeal, surveyedCamps } from "../run/survey";
@@ -371,7 +372,7 @@ function toPreviewView(state: RunState, spec: CampSpec, catalog: Catalog, survey
     pairing: pairingOf(spec, catalog),
     slotKinds: Array.from(slotKindsFor(state, spec, catalog)),
     bossId: boss === null ? null : visibleBossId(state, boss),
-    shop: boss !== null,
+    shop: state.plan !== null && isShopCamp(state.plan.length, spec.index),
     survey,
   };
 }
@@ -521,7 +522,7 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
       return {
         tag: "shop",
         next: stage.next,
-        camp: stage.camp === null ? null : toPreviewView(state, stage.camp, catalog, surveyOf(stage.camp)),
+        camp: toPreviewView(state, stage.camp, catalog, surveyOf(stage.camp)),
         shop: toShopView(state, stage.stock, ownSeat, catalog),
         readySeatIds: readySeatIds(state, stage.ready),
       };
@@ -551,11 +552,27 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
     case "route":
       return {
         tag: "route",
-        options: stage.options.map((option) => ({ id: option.id, next: toPreviewView(state, option.next, catalog, surveyOf(option.next), option.swapBoss), swapsBoss: option.swapBoss !== null })),
+        options: stage.options.map((option) => ({
+          id: option.id,
+          next: toPreviewView(state, option.next, catalog, surveyOf(option.next), option.swapBoss),
+          swapsBoss: option.swapBoss !== null,
+          pays: { ...payoutRange(option.next) },
+        })),
         ballots: toBallotViews(state, stage.ballots),
       };
     case "event":
-      return { tag: "event", event: stage.event, next: stage.next, readySeatIds: readySeatIds(state, stage.ready) };
+      return {
+        tag: "event",
+        event: stage.event,
+        next: stage.next,
+        // An item a seat's loadout hides from the viewer stays hidden here too.
+        gains: {
+          coins: stage.gains.coins,
+          supplies: stage.gains.supplies,
+          items: stage.gains.items.filter((item) => !rules.hides(state, seatId, { kind: "loadout", seatId: item.seatId })).map((item) => ({ seatId: item.seatId, itemId: item.itemId })),
+        },
+        readySeatIds: readySeatIds(state, stage.ready),
+      };
     case "ended":
       return { tag: "ended", result: stage.result };
   }

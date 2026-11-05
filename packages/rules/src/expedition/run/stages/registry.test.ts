@@ -173,7 +173,7 @@ describe("applyRunAction: each stage accepts only its own actions", () => {
   });
 
   it("event: equip, discard and ready", () => {
-    expect(accepted({ ...loadoutRun(), stage: { tag: "event", next: campIndex(2), event: "event", ready: {} } })).toEqual(["equip", "discard-item", "ready"]);
+    expect(accepted({ ...loadoutRun(), stage: { tag: "event", next: campIndex(2), event: "event", gains: { coins: 0, supplies: 0, items: [] }, ready: {} } })).toEqual(["equip", "discard-item", "ready"]);
   });
 
   it("route: votes, equip, discard and abilities", () => {

@@ -49,8 +49,10 @@
  * restarted attempts in the run, and kick votes in the room; 16 for the
  * location and weather each history entry was played at; 17 for the
  * muster's lock-ins; 18 for the shop, draft and event stages between camps
- * (the shop out of the loadout, events off the routes). */
-export const ROOM_SCHEMA_VERSION = 18;
+ * (the shop out of the loadout, events off the routes); 19 for the shop
+ * after the route vote (its camp always set) and events that give coins,
+ * supplies or items (the event stage's gains). */
+export const ROOM_SCHEMA_VERSION = 19;
 
 /** D-01: 32 uppercase-safe characters — no `I`, `O`, `0`, `1` — because the
  * room code is read aloud over a voice call. Do not add lowercase. */

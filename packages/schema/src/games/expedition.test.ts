@@ -229,14 +229,14 @@ describe("ExpeditionViewSchema", () => {
 
   it.each([
     ["loadout", { tag: "loadout", camp: { ...preview, pairing: "steam" }, mods: CAMP_MODS, readySeatIds: ["seat-2"] }],
-    ["shop on a replay", { tag: "shop", next: 3, camp: { ...preview, index: 3, shop: true }, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] }],
+    ["shop with no stock", { tag: "shop", next: 3, camp: { ...preview, index: 3, shop: true }, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] }],
     ["first draft", { tag: "draft", next: 1, cleared: 0, payout: 0, yourOffer: { kind: "standard", bundles: [["bait"], ["parrot"], ["whetstone"]] }, pendingSeatIds: [] }],
     [
       "shop",
       {
         tag: "shop",
         next: 3,
-        camp: null,
+        camp: { ...preview, index: 3, shop: true },
         shop: {
           stock: [
             { stockId: "supplies", what: { kind: "supplies" }, price: 6, soldTo: null },
@@ -252,13 +252,13 @@ describe("ExpeditionViewSchema", () => {
       {
         tag: "route",
         options: [
-          { id: "a", next: { ...preview, survey: [{ kind: "win-card", target: { kind: "standard", suit: "hearts", rank: 9 } }, { kind: "exactly-n", n: 2 }] }, swapsBoss: false },
-          { id: "b", next: { ...preview, slotKinds: ["win-card", "trick-count"] }, swapsBoss: true },
+          { id: "a", next: { ...preview, survey: [{ kind: "win-card", target: { kind: "standard", suit: "hearts", rank: 9 } }, { kind: "exactly-n", n: 2 }] }, swapsBoss: false, pays: { min: 5, max: 7 } },
+          { id: "b", next: { ...preview, slotKinds: ["win-card", "trick-count"] }, swapsBoss: true, pays: { min: 9, max: 11 } },
         ],
         ballots: [{ seatId: "seat-1", choice: "b" }],
       },
     ],
-    ["event", { tag: "event", event: "event", next: 2, readySeatIds: [] }],
+    ["event", { tag: "event", event: "dropped-pack", next: 2, gains: { coins: 0, supplies: 0, items: [{ seatId: "seat-1", itemId: "bait" }] }, readySeatIds: [] }],
     ["ended", { tag: "ended", result: "won" }],
   ])("accepts a %s stage", (_name, stage) => {
     expect(ExpeditionViewSchema.safeParse({ ...draftView, stage }).success).toBe(true);
@@ -462,7 +462,7 @@ describe("ExpeditionViewSchema", () => {
     ],
     ["a modifier of an unknown kind", { ...midCampView, stage: { ...midCampView.stage, mods: [{ id: "x", kind: "volcano", strength: "full", status: [] }] } }],
     ["an effect with no origin", { ...midCampView, stage: { ...midCampView.stage, attempt: { ...midAttempt, effects: [{ sourceId: "bait", seatId: "seat-2", atTrick: 1, lasts: "trick", params: null }] } } }],
-    ["a route option with a bad slot kind", { ...draftView, stage: { tag: "route", options: [{ id: "a", next: { ...preview, slotKinds: ["boss"] }, swapsBoss: false }], ballots: [] } }],
+    ["a route option with a bad slot kind", { ...draftView, stage: { tag: "route", options: [{ id: "a", next: { ...preview, slotKinds: ["boss"] }, swapsBoss: false, pays: { min: 5, max: 7 } }], ballots: [] } }],
   ])("rejects: %s", (_name, input) => {
     expect(ExpeditionViewSchema.safeParse(input).success).toBe(false);
   });
