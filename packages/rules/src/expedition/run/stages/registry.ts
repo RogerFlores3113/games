@@ -39,6 +39,7 @@ const ACTION_TYPES: Readonly<Record<RunAction["type"], true>> = {
   ready: true,
   "use-ability": true,
   "skip-window": true,
+  hold: true,
   whisper: true,
   "pick-objective": true,
   "play-card": true,

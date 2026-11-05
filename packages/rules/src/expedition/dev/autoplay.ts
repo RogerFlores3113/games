@@ -2,11 +2,14 @@
 // for the seats it controls. Never whispers, uses abilities, equips or buys;
 // takes the first bundle (discarding its last backpack item first while it
 // does not fit); abstains from votes so the human's ballot decides, and
-// locks in at the muster once it has picked and abstained.
+// locks in at the muster once it has picked and abstained. Never holds the
+// table between tricks, and lets go of a hold a seat it took over left
+// standing.
 
 import { currentActorSeatId } from "../camp";
 import { platePath, pressedCount } from "../content/mods/temple";
 import { absentSeatAction } from "../run/absent";
+import { holdingSeatIds } from "../run/hold";
 import { rulesFor } from "../run/compose";
 import { campStack, modCtx } from "../run/stack";
 import { applyRunAction } from "../run/stages/registry";
@@ -59,7 +62,7 @@ function candidates(run: RunState, seatIds: readonly string[], catalog: Catalog)
         return move === null ? [] : [{ seatId: seat.seatId, request: move }];
       });
     case "camp": {
-      const out: Candidate[] = gatedPendingSeatIds(run, catalog)
+      const out: Candidate[] = [...gatedPendingSeatIds(run, catalog), ...holdingSeatIds(run, catalog)]
         .filter((seatId) => seatIds.includes(seatId))
         .map((seatId) => ({ seatId, request: { type: "skip-window" } }));
       const camp = stage.attempt.camp;

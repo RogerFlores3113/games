@@ -51,7 +51,10 @@ export type SourceKey = string;
 export type LedgerEntry =
   /** A `free` use counts against no limit. */
   | { readonly kind: "used"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly free?: true }
-  | { readonly kind: "passed"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly failedObjectiveIds: readonly string[] }; // gated-window pass; the failures it declined
+  | { readonly kind: "passed"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly failedObjectiveIds: readonly string[] } // gated-window pass; the failures it declined
+  /** A Hold on between tricks (run/hold.ts): once per gap, until the seat acts or lets go. */
+  | { readonly kind: "held"; readonly at: Stamp }
+  | { readonly kind: "released"; readonly at: Stamp };
 
 export type SeatRun = {
   readonly seatId: SeatId;
@@ -178,7 +181,8 @@ export type RunAction =
   | { readonly type: "pick-bundle"; readonly bundle: number } // draft
   | { readonly type: "ready" } // shop, event, loadout
   | { readonly type: "use-ability"; readonly sourceKey: SourceKey; readonly targets: readonly string[] }
-  | { readonly type: "skip-window" }
+  | { readonly type: "skip-window" } // a gated window's pass; between tricks, lets go of a hold
+  | { readonly type: "hold" } // between tricks: the next lead waits until this seat acts or lets go
   | { readonly type: "whisper"; readonly targetSeatId: string; readonly cardId: string }
   | { readonly type: "pick-objective"; readonly objectiveId: string }
   | { readonly type: "play-card"; readonly cardId: string };
@@ -209,7 +213,9 @@ export type RunError =
   | "invalid_target"
   | "whisper_blocked"
   | "no_whispers_left"
-  | "nothing_to_skip";
+  | "nothing_to_skip"
+  | "waiting_on_hold"
+  | "hold_unavailable";
 
 export type Catalog = {
   readonly characters: Readonly<Record<string, CharacterDef>>;

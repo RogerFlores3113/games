@@ -200,6 +200,11 @@ export type ExpeditionAttemptView = {
   pendingSeatIds: string[];
   /** Set while the rescue window holds a failed camp open. */
   rescue: { failedObjectiveIds: string[] } | null;
+  /** Between tricks: seats whose Hold on stands; the lead waits on them. */
+  holdingSeatIds: string[];
+  /** The viewer may send `hold` now: between tricks, not on lead, and not
+   * held yet in this gap. */
+  youMayHold: boolean;
   effects: ExpeditionEffectView[];
   reveals: ExpeditionRevealView[];
   log: ExpeditionLogEntryView[];

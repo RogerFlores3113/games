@@ -72,6 +72,7 @@ const WELL_SHAPED_NONSENSE_ARB = fc.oneof(
     targets: fc.array(fc.string(), { maxLength: 5 }),
   }),
   fc.record({ type: fc.constant("skip-window" as const) }),
+  fc.record({ type: fc.constant("hold" as const) }),
   fc.record({ type: fc.constant("whisper" as const), targetSeatId: fc.string(), cardId: fc.string() }),
   fc.record({ type: fc.constant("pick-objective" as const), objectiveId: fc.string() }),
   fc.record({ type: fc.constant("play-card" as const), cardId: fc.string() }),

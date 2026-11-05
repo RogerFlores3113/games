@@ -6,7 +6,7 @@ import {
   ExpeditionViewSchema,
 } from "./expedition";
 
-// The 32 RunError names: CampError's 7 members, then RunError's 25
+// The 34 RunError names: CampError's 7 members, then RunError's 27
 // additional members.
 const EXPEDITION_ERROR_CODES = [
   "not_your_turn",
@@ -41,6 +41,8 @@ const EXPEDITION_ERROR_CODES = [
   "whisper_blocked",
   "no_whispers_left",
   "nothing_to_skip",
+  "waiting_on_hold",
+  "hold_unavailable",
 ] as const;
 
 const CAMP_MODS = [
@@ -131,6 +133,8 @@ const midAttempt = {
     window: "between-tricks",
     pendingSeatIds: [],
     rescue: null,
+    holdingSeatIds: ["seat-3"],
+    youMayHold: false,
     effects: [
       { origin: { kind: "seat", seatId: "seat-2", sourceId: "bait" }, atTrick: 1, lasts: "trick", params: { cardId: "card-4" } },
       { origin: { kind: "seat", seatId: "seat-3", sourceId: "explorer" }, atTrick: 1, lasts: "attempt", params: null },
@@ -477,8 +481,8 @@ describe("ExpeditionErrorCodeSchema", () => {
     expect(ExpeditionErrorCodeSchema.safeParse(code).success).toBe(false);
   });
 
-  it("has exactly 32 members", () => {
-    expect(ExpeditionErrorCodeSchema.options.length).toBe(32);
+  it("has exactly 34 members", () => {
+    expect(ExpeditionErrorCodeSchema.options.length).toBe(34);
   });
 });
 

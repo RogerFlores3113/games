@@ -83,6 +83,8 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
       window: "between-tricks",
       pendingSeatIds: [],
       rescue: null,
+      holdingSeatIds: [],
+      youMayHold: false,
       effects: [],
       reveals: [],
       log: [],

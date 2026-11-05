@@ -6,6 +6,7 @@ import { attemptOf } from "./attempt";
 import { BACKPACK_SIZE } from "./balance";
 import { rulesFor } from "./compose";
 import { firstFreeCharacter } from "./crew";
+import { holdingSeatIds } from "./hold";
 import { roomFor } from "./items";
 import { backpackOf } from "./usage";
 import type { Catalog, RunAction, RunState } from "./types";
@@ -16,8 +17,9 @@ import { gatedPendingSeatIds } from "./windows";
  * ready. Loadout: ready, once a set over its slots is cut to its first items
  * (or its last discarded while the backpack has no room). Draft: the head
  * offer's first bundle, after discarding its last backpack items while that
- * bundle does not fit. A gated window: a pass. null when the table is not
- * waiting on the seat. */
+ * bundle does not fit. A gated window: a pass. A Hold on between tricks:
+ * letting go (also skip-window). null when the table is not waiting on the
+ * seat. */
 export function absentSeatAction(run: RunState, seatId: string, catalog: Catalog): RunAction | null {
   const seat = run.seats.find((s) => s.seatId === seatId);
   if (seat === undefined) return null;
@@ -52,7 +54,7 @@ export function absentSeatAction(run: RunState, seatId: string, catalog: Catalog
       return first.length > roomFor(run, seatId, catalog) && last !== undefined ? { type: "discard-item", itemUid: last.uid } : { type: "pick-bundle", bundle: 0 };
     }
     case "camp":
-      return attemptOf(run) !== null && gatedPendingSeatIds(run, catalog).includes(seatId) ? { type: "skip-window" } : null;
+      return attemptOf(run) !== null && (gatedPendingSeatIds(run, catalog).includes(seatId) || holdingSeatIds(run, catalog).includes(seatId)) ? { type: "skip-window" } : null;
     case "ended":
       return null;
   }
