@@ -219,8 +219,8 @@ test.describe("animal bosses on the table", () => {
     await shortcut(panel, "jump-to-camp", { camp: "2", stage: "camp" });
     await shortcut(panel, "set-plan-boss", { camp: "3", boss: "tiger" });
     await shortcut(panel, "force-camp", { outcome: "cleared" });
-    // Every seat readies at the shop, then takes an item in the draft.
-    await autoplay(panel, "everyone", 6);
+    // Every seat takes an item in the draft; the shop comes after the route vote.
+    await autoplay(panel, "everyone", 3);
     await expect.poll(async () => (await getModel<{ panel?: { kind: string } }>(page)).panel?.kind).toBe("route");
     const options = (await getModel<{ panel: { options: { next: { bossId: string | null; bossName: string | null } }[] } }>(page)).panel.options;
     expect(options.map((o) => [o.next.bossId, o.next.bossName])).toEqual(options.map(() => ["tiger", "Tiger"]));
