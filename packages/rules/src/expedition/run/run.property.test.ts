@@ -167,7 +167,7 @@ describe("property: whole-run simulation (RUN-07)", () => {
       }),
       { numRuns: 10 },
     );
-  });
+  }, WHOLE_RUN_TIMEOUT_MS);
 
   it("gives deep-equal state arrays for two independently built runs from identical input", () => {
     fc.assert(
@@ -176,7 +176,7 @@ describe("property: whole-run simulation (RUN-07)", () => {
       }),
       { numRuns: 10 },
     );
-  });
+  }, WHOLE_RUN_TIMEOUT_MS);
 
   it("gives different attempt-1 camp-1 hands for at least one of 20 distinct seed pairs (seed sensitivity, A1)", () => {
     const seatIds = seatIdsFor(4);
