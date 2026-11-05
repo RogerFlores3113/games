@@ -20,6 +20,7 @@ export const ExpeditionErrorCodeSchema = z.enum([
   "camp_over",
   "card_not_in_hand",
   "must_follow_suit",
+  "no_joker_first_lead",
   "objective_not_available",
   "invalid_action",
   "not_a_seat",
@@ -47,5 +48,7 @@ export const ExpeditionErrorCodeSchema = z.enum([
   "whisper_blocked",
   "no_whispers_left",
   "nothing_to_skip",
+  "waiting_on_hold",
+  "hold_unavailable",
 ]);
 export type ExpeditionErrorCode = z.infer<typeof ExpeditionErrorCodeSchema>;

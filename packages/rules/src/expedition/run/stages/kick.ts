@@ -33,13 +33,14 @@ function stageWithout(stage: Stage, seatId: string): Stage {
 }
 
 /** A dealt camp is abandoned for nothing: a `restarted` attempt, then the
- * same camp again (its shop first before a boss camp), whose deal is fresh
+ * same camp again (its shop first before a shop camp), whose deal is fresh
  * for the crew left. */
 function restartCamp(run: RunState, catalog: Catalog): RunState {
   if (run.stage.tag !== "camp") return run;
   const { camp: spec, attempt } = (run as RunAt<"camp">).stage;
   const result: CampResult = { camp: spec.index, attempt: attempt.attemptNumber, location: spec.location, weather: spec.weather, status: "restarted", suppliesSpent: 0, coins: 0 };
-  return reopenCamp({ ...run, history: [...run.history, result] }, spec, catalog);
+  // The camp before it is no longer the last one played.
+  return reopenCamp({ ...run, history: [...run.history, result], lastAttempt: null }, spec, catalog);
 }
 
 /** Takes seatId out of the crew. Its ballot, lock-in or ready mark goes with it, a

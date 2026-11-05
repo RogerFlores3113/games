@@ -16,6 +16,8 @@ function camp(index: number, attemptNumber = 1, overrides: Partial<ExpeditionCam
       window: "between-tricks",
       pendingSeatIds: [],
       rescue: null,
+      holdingSeatIds: [],
+      youMayHold: false,
       effects: [],
       reveals: [],
       log: [],
@@ -45,7 +47,7 @@ function loadout(index: number, overrides: Partial<ExpeditionCampPreviewView> = 
   return { tag: "loadout", camp: preview({ index, ...overrides }), mods: [], readySeatIds: [] };
 }
 
-function shop(next: number, camp: ExpeditionCampPreviewView | null = null): ExpeditionStageView {
+function shop(next: number, camp: ExpeditionCampPreviewView = preview({ index: next, shop: true })): ExpeditionStageView {
   return { tag: "shop", next, camp, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] };
 }
 
@@ -66,6 +68,7 @@ function view(stage: ExpeditionStageView, overrides: Partial<ExpeditionView> = {
     yourAbilities: [],
     yourItemSlots: 2,
     history: [],
+    lastCamp: null,
     lastVote: null,
     stage,
     ...overrides,
@@ -75,7 +78,7 @@ function view(stage: ExpeditionStageView, overrides: Partial<ExpeditionView> = {
 const muster: ExpeditionStageView = { tag: "muster", ballots: [], lockedSeatIds: [] };
 const route: ExpeditionStageView = { tag: "route", options: [], ballots: [] };
 const draft: ExpeditionStageView = { tag: "draft", next: 3, cleared: 2, payout: 7, yourOffer: null, pendingSeatIds: [] };
-const event: ExpeditionStageView = { tag: "event", event: "event", next: 2, readySeatIds: [] };
+const event: ExpeditionStageView = { tag: "event", event: "event", next: 2, gains: { coins: 0, supplies: 0, items: [] }, readySeatIds: [] };
 const cleared = (camp: number, coins: number) => ({ history: [{ camp, attempt: 1, location: "clifftop", weather: "fair", status: "cleared" as const, coins }] });
 
 function copyOf(shown: ExpeditionView, next: ExpeditionView): { caseId: string; title: string; sub: string | null } | null {
@@ -83,10 +86,32 @@ function copyOf(shown: ExpeditionView, next: ExpeditionView): { caseId: string; 
   return found === null ? null : { caseId: found.caseId, ...found.copy };
 }
 
+const lostRecap: NonNullable<ExpeditionView["lastCamp"]> = {
+  camp: 2,
+  attempt: 1,
+  status: "failed",
+  tricksPlayed: 5,
+  totalTricks: 8,
+  lastTrick: null,
+  objectives: [
+    {
+      objective: { id: "o1", kind: "win-card", target: { kind: "standard", suit: "clubs", rank: 10 }, ownerSeatId: "s2", status: "failed" },
+      failedAtTrick: 4,
+      fate: { kind: "won", bySeatId: "s3" },
+      ownerTricksWon: 0,
+    },
+  ],
+  failedGoalIds: [],
+  coins: 0,
+  supplyCost: [
+    { origin: { kind: "base" }, amount: 1 },
+    { origin: { kind: "seat", seatId: "s2", sourceId: "heavy-pack" }, amount: 1 },
+  ],
+};
+
 describe("transitionFor", () => {
-  it("a cleared camp says Camp won! with the payout, on its way to the draft or the shop", () => {
+  it("a cleared camp says Camp won! with the payout, on its way to the draft", () => {
     expect(copyOf(view(camp(1)), view(draft, cleared(1, 7)))).toEqual({ caseId: "camp-won", title: "Camp won!", sub: "+7 coins" });
-    expect(copyOf(view(camp(2)), view(shop(3), cleared(2, 6)))).toEqual({ caseId: "camp-won", title: "Camp won!", sub: "+6 coins" });
   });
 
   it("a failed camp says Camp lost and what it cost", () => {
@@ -94,6 +119,30 @@ describe("transitionFor", () => {
     expect(copyOf(view(camp(2)), failed)).toEqual({ caseId: "camp-lost", title: "Camp lost", sub: "-1 supply. 2 left" });
     const throughShop = view(shop(3, preview({ index: 3 })), { supplies: { count: 2, max: 4 }, history: [{ camp: 3, attempt: 1, location: "clifftop", weather: "fair", status: "failed", coins: 0 }] });
     expect(copyOf(view(camp(3)), throughShop)?.caseId).toBe("camp-lost");
+  });
+
+  it("with the recap, a lost camp names the failed objective and splits the cost by source", () => {
+    const failed = view(loadout(2), {
+      supplies: { count: 1, max: 4 },
+      history: [{ camp: 2, attempt: 1, location: "clifftop", weather: "fair", status: "failed", coins: 0 }],
+      lastCamp: lostRecap,
+    });
+    const names = (id: string) => ({ s1: "You", s2: "Ana", s3: "Ben" })[id] ?? "?";
+    const found = transitionFor(view(camp(2), { supplies: { count: 3, max: 4 } }), failed, names);
+    expect(found?.copy).toEqual({ title: "Camp lost", sub: "Ana's 10♣ was won by Ben\n-1 failed camp, -1 Heavy Pack. 1 left" });
+    expect(found?.hold).toBe(3500);
+    // Without the room's names, a teammate is unnamed.
+    expect(copyOf(view(camp(2)), failed)?.sub).toBe("A teammate's 10♣ was won by A teammate\n-1 failed camp, -1 Heavy Pack. 1 left");
+  });
+
+  it("with the recap, a cleared camp says how many tricks it took", () => {
+    const won = view(draft, { ...cleared(2, 8), lastCamp: { ...lostRecap, status: "cleared", coins: 8, supplyCost: [], objectives: [] } });
+    expect(copyOf(view(camp(2)), won)).toEqual({ caseId: "camp-won", title: "Camp won!", sub: "+8 coins\nIn 5 of 8 tricks" });
+  });
+
+  it("a run lost to its last failure says why", () => {
+    const ended = view({ tag: "ended", result: "lost" }, { supplies: { count: 0, max: 4 }, lastCamp: lostRecap });
+    expect(transitionFor(view(camp(2)), ended, (id) => (id === "s2" ? "Ana" : "Ben"))?.copy).toEqual({ title: "Expedition lost", sub: "Ana's 10♣ was won by Ben\nOut of supplies" });
   });
 
   it("a camp restarted by a kick says so", () => {
@@ -119,6 +168,10 @@ describe("transitionFor", () => {
     expect(copyOf(view(route), flipped)).toEqual({ caseId: "route-decided", title: "Heading to the Magma pool", sub: "Fair weather\nA coin flip decided it" });
   });
 
+  it("the route vote to a shop camp says where the crew heads on its way to the shop", () => {
+    expect(copyOf(view(route), view(shop(3, preview({ index: 3, location: "cave", weather: "rain", shop: true }))))).toEqual({ caseId: "route-decided", title: "Heading to the Cave", sub: "Rain" });
+  });
+
 
   it("setting out deals the table: a plain camp, a boss camp, the temple, and a replay's try", () => {
     expect(copyOf(view(loadout(2)), view(camp(2, 1, { location: "cave", weather: "rain", pairing: "flooding" })))).toEqual({
@@ -142,7 +195,7 @@ describe("transitionFor", () => {
 
   it("no sign within a stage, between the stages before a camp, or between two run-end views", () => {
     expect(transitionFor(view(camp(2)), view(camp(2)))).toBeNull();
-    expect(transitionFor(view(shop(3)), view(draft))).toBeNull();
+    expect(transitionFor(view(shop(3)), view(loadout(3)))).toBeNull();
     expect(transitionFor(view(draft), view(event))).toBeNull();
     expect(transitionFor(view(event), view(route))).toBeNull();
     expect(transitionFor(view(draft), view(route))).toBeNull();
@@ -250,6 +303,17 @@ describe("signLines", () => {
     const lines = signLines({ title: "Boss: the Locust swarm of the long dry season", sub: null }, chars);
     expect(lines.every((l) => l.scale === 2)).toBe(true);
     expect(lines.every((l) => l.text.length <= chars(2))).toBe(true);
+  });
+
+  it("a lost camp's reason and split cost fit the plank, each in two lines", () => {
+    const lines = signLines({ title: "Camp lost", sub: "Ana's 10♣ was won by Ben\n-1 failed camp, -1 Heavy Pack. 1 left" }, chars);
+    expect(lines.map((l) => [l.text, l.scale])).toEqual([
+      ["Camp lost", 3],
+      ["Ana's 10♣ was", 2],
+      ["won by Ben", 2],
+      ["-1 failed camp, -1", 2],
+      ["Heavy Pack. 1 left", 2],
+    ]);
   });
 });
 

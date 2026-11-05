@@ -38,6 +38,10 @@ export const STREAMS = {
   event(nextCamp: number): string {
     return `expedition-event:camp${nextCamp}`;
   },
+  /** The item an event before camp `nextCamp` gives `seatId`. */
+  eventItem(nextCamp: number, seatId: string, part: ItemDrawPart): string {
+    return `expedition-event-item:camp${nextCamp}:seat${seatId}:${part}`;
+  },
   /** `clearedCamp` is 0 for the draft before camp 1. */
   draftItem(clearedCamp: number, seatId: string, offer: number, bundle: number, item: number, part: ItemDrawPart): string {
     return `expedition-draft:camp${clearedCamp}:seat${seatId}:offer${offer}:bundle${bundle}:item${item}:${part}`;

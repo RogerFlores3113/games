@@ -200,6 +200,11 @@ export type ExpeditionAttemptView = {
   pendingSeatIds: string[];
   /** Set while the rescue window holds a failed camp open. */
   rescue: { failedObjectiveIds: string[] } | null;
+  /** Between tricks: seats whose Hold on stands; the lead waits on them. */
+  holdingSeatIds: string[];
+  /** The viewer may send `hold` now: between tricks, not on lead, and not
+   * held yet in this gap. */
+  youMayHold: boolean;
   effects: ExpeditionEffectView[];
   reveals: ExpeditionRevealView[];
   log: ExpeditionLogEntryView[];
@@ -244,6 +249,40 @@ export type ExpeditionAbilityView = { sourceKey: string; usableNow: boolean; rea
 
 export type ExpeditionCampResultView = { camp: number; attempt: number; location: string; weather: string; status: "cleared" | "failed" | "restarted"; coins: number };
 
+/** One objective of the last attempt: as the table saw it at the end
+ * (hidden if anyone could not see it), the trick whose completion failed
+ * it (null when not failed or failed some other way), a card objective's
+ * target fate (null for a cardless or hidden one) and its holder's tricks. */
+export type ExpeditionRecapObjectiveView = {
+  objective: ExpeditionObjectiveView;
+  failedAtTrick: number | null;
+  fate: { kind: "won"; bySeatId: string } | { kind: "lost" } | { kind: "open" } | null;
+  ownerTricksWon: number | null;
+};
+
+/** One part of a failed camp's supply cost: the base cost, a camp
+ * modifier's extra or a seat's source's extra (Heavy Pack). */
+export type ExpeditionSupplyCostPartView = {
+  origin: { kind: "base" } | { kind: "mod"; modId: string } | { kind: "seat"; seatId: string; sourceId: string };
+  amount: number;
+};
+
+/** The attempt that ended last, shown between camps until the next one is
+ * dealt. Its final trick's plays carry no effectiveRank (null): the rules
+ * that read them are gone. */
+export type ExpeditionCampRecapView = {
+  camp: number;
+  attempt: number;
+  status: "cleared" | "failed";
+  tricksPlayed: number;
+  totalTricks: number;
+  lastTrick: ExpeditionCompletedTrickView | null;
+  objectives: ExpeditionRecapObjectiveView[];
+  failedGoalIds: string[];
+  coins: number;
+  supplyCost: ExpeditionSupplyCostPartView[];
+};
+
 /** A seat the crew voted out while it was away. `back` while it is
  * connected again, waiting to rejoin at the next loadout. */
 export type ExpeditionKickedSeatView = { seatId: string; characterId: string | null; upgradeId: string | null; back: boolean };
@@ -255,7 +294,7 @@ export type ExpeditionSlotKindView = SlotTemplate["kind"];
  * during play. `pairing` is the def a location and weather add together.
  * `bossId` is null for a plain camp, a boss not drawn, or a boss beyond the
  * crew's horizon (not yet previewed). `shop` is true for
- * a boss camp, whose loadout opens the shop. */
+ * a shop camp: its shop opens after its route vote. */
 export type ExpeditionCampPreviewView = {
   index: number;
   location: string;
@@ -284,12 +323,14 @@ export type ExpeditionStockView = {
   soldTo: string | null;
 };
 
-/** The shop before a boss camp: the shared stock, and the viewer's own
+/** The shop before a shop camp: the shared stock, and the viewer's own
  * character's upgrades while the viewer owns none. */
 export type ExpeditionShopView = {
   stock: ExpeditionStockView[];
   yourUpgrades: { stockId: string; upgradeId: string; price: number }[];
 };
+
+export type ExpeditionEventGainsView = { coins: number; supplies: number; items: { seatId: string; itemId: string }[] };
 
 /** A seat's public ballot; `choice` null abstains. Seats yet to vote are absent. */
 export type ExpeditionBallotView = { seatId: string; choice: string | null };
@@ -326,17 +367,18 @@ export type ExpeditionModView = { id: string; kind: ModKind; strength: Strength;
 export type ExpeditionStageView =
   /** `lockedSeatIds`: the seats whose character and ballot are final. */
   | { tag: "muster"; ballots: ExpeditionBallotView[]; lockedSeatIds: string[] }
-  /** Before boss camp `next`. `camp` previews it on a replay; null on the
-   * way there, before its route is voted. */
-  | { tag: "shop"; next: number; camp: ExpeditionCampPreviewView | null; shop: ExpeditionShopView; readySeatIds: string[] }
+  /** Before shop camp `next`, after its route vote or on a replay: `camp` previews it. */
+  | { tag: "shop"; next: number; camp: ExpeditionCampPreviewView; shop: ExpeditionShopView; readySeatIds: string[] }
   /** The draft before camp `next`. `cleared` is the camp before it (0
    * before camp 1) and `payout` what clearing it paid. A bundle holds one
    * item, or two after a boss camp. */
   | { tag: "draft"; next: number; cleared: number; payout: number; yourOffer: { kind: "standard" | "special"; bundles: string[][] } | null; pendingSeatIds: string[] }
-  /** The event on the trail before camp `next`. */
-  | { tag: "event"; event: string; next: number; readySeatIds: string[] }
-  /** `swapsBoss`: the option leads to a different boss at the next boss camp. */
-  | { tag: "route"; options: { id: string; next: ExpeditionCampPreviewView; swapsBoss: boolean }[]; ballots: ExpeditionBallotView[] }
+  /** The event on the trail before camp `next`, and what it gave as it
+   * opened (an item a seat's loadout hides from the viewer is left out). */
+  | { tag: "event"; event: string; next: number; gains: ExpeditionEventGainsView; readySeatIds: string[] }
+  /** `swapsBoss`: the option leads to a different boss at the next boss
+   * camp. `pays`: the fewest and most coins clearing its camp pays. */
+  | { tag: "route"; options: { id: string; next: ExpeditionCampPreviewView; swapsBoss: boolean; pays: { min: number; max: number } }[]; ballots: ExpeditionBallotView[] }
   | { tag: "loadout"; camp: ExpeditionCampPreviewView; mods: ExpeditionModView[]; readySeatIds: string[] }
   | { tag: "camp"; camp: ExpeditionCampPreviewView; mods: ExpeditionModView[]; attempt: ExpeditionAttemptView }
   | { tag: "ended"; result: "won" | "lost" };
@@ -359,6 +401,9 @@ export type ExpeditionView = {
    * holds BALANCE_DISPLAY.backpackSize. */
   yourItemSlots: number;
   history: ExpeditionCampResultView[];
+  /** The last attempt's recap; null in camp (the next attempt is dealt), at
+   * the muster, and before any attempt has ended. */
+  lastCamp: ExpeditionCampRecapView | null;
   lastVote: ExpeditionVoteView | null;
   stage: ExpeditionStageView;
 };

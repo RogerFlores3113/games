@@ -73,6 +73,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     yourAbilities: [EXPLORER, MONKEY, BAIT, PARROT],
     yourItemSlots: 2,
     history: [],
+    lastCamp: null,
     lastVote: null,
     stage: {
       tag: "camp",
@@ -83,6 +84,8 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
       window: "between-tricks",
       pendingSeatIds: [],
       rescue: null,
+      holdingSeatIds: [],
+      youMayHold: false,
       effects: [],
       reveals: [],
       log: [],

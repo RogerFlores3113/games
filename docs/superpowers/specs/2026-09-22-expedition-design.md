@@ -88,6 +88,9 @@ A "camp" is one round: one deal, played to the last trick.
 - Whoever holds the Sun is the expedition leader for the camp. If the Sun is not in
   play (see Eclipse), the holder of A♠ is the leader.
 - The leader picks an objective first and leads the first trick.
+- The first lead of a camp may not be the Sun or the Moon unless the leader holds
+  nothing else (a playtest fix: leading the Sun won a card objective for free).
+  A refused joker lead answers `no_joker_first_lead`.
 
 ### Objectives
 - Objective cards are flipped from a second, separately shuffled deck of the same

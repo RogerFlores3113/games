@@ -268,7 +268,7 @@ describe("Downpour", () => {
   });
 
   it("comes about a third as often as Rain", () => {
-    const weathers = Array.from({ length: 3000 }, (_, i) => campSpecAt(`odds-${i}`, "standard", campIndex(2), CATALOG).weather);
+    const weathers = Array.from({ length: 3000 }, (_, i) => campSpecAt(`odds-${i}`, "standard", campIndex(2), CATALOG, 3).weather);
     const count = (id: string) => weathers.filter((w) => w === id).length;
     expect(count("downpour") / count("rain")).toBeGreaterThan(0.25);
     expect(count("downpour") / count("rain")).toBeLessThan(0.42);

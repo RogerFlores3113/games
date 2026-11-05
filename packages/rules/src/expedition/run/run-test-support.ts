@@ -19,7 +19,7 @@ import { rulesFor } from "./compose";
 import { buildCatalog } from "./catalog";
 import { abilityStatus } from "./abilities";
 import { mintItems, roomFor } from "./items";
-import { createRun, openLeg, openLoadout, runStatus } from "./lifecycle";
+import { createRun, openLoadout, openShop, runStatus } from "./lifecycle";
 import { campIndex, drawPlan } from "./plan";
 import { campSpecAt } from "./route";
 import { applyRunAction } from "./stages/registry";
@@ -120,13 +120,14 @@ export function setupRun(opts: {
     (acc, seatId) => mintItems(acc, seatId, opts.items?.[seatId] ?? [], opts.catalog),
     { ...run, plan: drawPlan(opts.seed, length, opts.catalog), supplies: opts.supplies ?? run.supplies, purse: opts.purse ?? run.purse, seats },
   );
-  return openLoadout(crewed, campSpecAt(opts.seed, length, campIndex(opts.camp ?? 1), opts.catalog), opts.catalog);
+  return openLoadout(crewed, campSpecAt(opts.seed, length, campIndex(opts.camp ?? 1), opts.catalog, opts.seatIds.length), opts.catalog);
 }
 
-/** setupRun at boss camp `camp`, then the shop on the way there (the stage
- * before its draft and route vote). */
+/** setupRun at shop camp `camp`, then its shop (the stage after its route
+ * vote, before its loadout). */
 export function setupShop(opts: Parameters<typeof setupRun>[0] & { readonly camp: number }): RunAt<"shop"> {
-  return openLeg(setupRun(opts), campIndex(opts.camp), "shop", opts.catalog) as RunAt<"shop">;
+  const run = setupRun(opts) as RunAt<"loadout">;
+  return openShop(run, run.stage.camp, opts.catalog);
 }
 
 /** Drives `run` forward through applyRunAction ONLY until `target` is
@@ -231,10 +232,13 @@ function loadoutCandidates(run: RunState, catalog: Catalog): Array<{ seatId: str
  * only if `applyRunAction` itself accepts it (T-03-24 discipline: legality
  * is decided ONLY by the real transition, never re-derived here). Votes and
  * characters are offered only to seats without one, so a random driver
- * cannot change its mind forever. */
+ * cannot change its mind forever. `holds` also offers Hold on and letting
+ * go between tricks (off by default: the whole-run properties stay within
+ * their time budgets, and run/hold.test.ts drives holds on its own). */
 export function enumerateLegalRunActions(
   run: RunState,
   catalog: Catalog,
+  opts: { readonly holds?: boolean } = {},
 ): Array<{ seatId: string; action: RunAction }> {
   const stage = run.stage;
   const candidates: Array<{ seatId: string; action: RunAction }> = [];
@@ -290,6 +294,8 @@ export function enumerateLegalRunActions(
 
     if (window === "between-tricks") {
       for (const seat of run.seats) {
+        // A hold, and letting go of one: once per gap, so a driver can't hold forever.
+        if (opts.holds === true) candidates.push({ seatId: seat.seatId, action: { type: "hold" } }, { seatId: seat.seatId, action: { type: "skip-window" } });
         const ownCards = camp.hands.find((h) => h.seatId === seat.seatId)?.cards.slice(0, 2) ?? [];
         for (const teammateId of run.seatIds) {
           if (teammateId === seat.seatId) continue;
@@ -317,6 +323,7 @@ export function driveRun(
   choices: readonly number[],
   catalog: Catalog,
   maxSteps = 20000,
+  opts: { readonly holds?: boolean } = {},
 ): { states: RunState[]; log: Array<{ seatId: string; action: RunAction }> } {
   const states: RunState[] = [initial];
   const log: Array<{ seatId: string; action: RunAction }> = [];
@@ -327,7 +334,7 @@ export function driveRun(
   for (;;) {
     if (runStatus(state) !== "in_progress") break;
 
-    const legal = enumerateLegalRunActions(state, catalog);
+    const legal = enumerateLegalRunActions(state, catalog, opts);
 
     if (legal.length === 0) break;
     if (step >= maxSteps) {

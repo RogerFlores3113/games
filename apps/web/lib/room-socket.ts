@@ -213,8 +213,10 @@ export function useRoomSocket({ code, displayName }: UseRoomSocketOptions): Room
       if (message.type === "error" && !joinReplyPendingRef.current) {
         // WR-04: not an answer to our `join` (see joinReplyPendingRef). The
         // store would otherwise treat it as a failed join while the status
-        // is still "joining"/"reconnecting"; once seated it is a no-op there
-        // anyway, so dropping it here loses nothing.
+        // is still "joining"/"reconnecting". It is the answer to a request
+        // sent while seated, so it is noted as a refusal the board can show
+        // (it never touches the view).
+        useRoomStore.getState().noteRefusal(message);
         return;
       }
       if (message.type === "joined" || message.type === "refused" || message.type === "error") {

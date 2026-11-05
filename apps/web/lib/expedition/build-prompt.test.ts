@@ -58,6 +58,7 @@ function view(campView: ExpeditionCampView, overrides: Partial<ExpeditionView> =
     yourAbilities: [],
     yourItemSlots: 2,
     history: [],
+    lastCamp: null,
     lastVote: null,
     stage: {
       tag: "camp",
@@ -68,6 +69,8 @@ function view(campView: ExpeditionCampView, overrides: Partial<ExpeditionView> =
         window: null,
         pendingSeatIds: [],
         rescue: null,
+        holdingSeatIds: [],
+        youMayHold: false,
         effects: [],
         reveals: [],
         log: [],
@@ -450,27 +453,27 @@ describe("buildTrailPrompt", () => {
   });
 
   it("at the route vote asks for your vote with the camp it leads to", () => {
-    const v = trail({ tag: "route", options: [{ id: "a", next: { ...PREVIEW, index: 3 }, swapsBoss: false }, { id: "b", next: { ...PREVIEW, index: 3 }, swapsBoss: false }], ballots: [{ seatId: "ana", choice: "a" }] });
+    const v = trail({ tag: "route", options: [{ id: "a", next: { ...PREVIEW, index: 3 }, swapsBoss: false, pays: { min: 5, max: 7 } }, { id: "b", next: { ...PREVIEW, index: 3 }, swapsBoss: false, pays: { min: 5, max: 7 } }], ballots: [{ seatId: "ana", choice: "a" }] });
     expect(at(v)).toEqual({ text: "Vote on the route to camp 3", tone: "your-move" });
   });
 
   it("at the route vote names who has not voted once you have", () => {
-    const v = trail({ tag: "route", options: [{ id: "a", next: { ...PREVIEW, index: 3 }, swapsBoss: false }], ballots: [{ seatId: "me", choice: "a" }, { seatId: "ana", choice: "a" }] });
+    const v = trail({ tag: "route", options: [{ id: "a", next: { ...PREVIEW, index: 3 }, swapsBoss: false, pays: { min: 5, max: 7 } }], ballots: [{ seatId: "me", choice: "a" }, { seatId: "ana", choice: "a" }] });
     expect(at(v)).toEqual({ text: "Waiting for Bo", tone: "waiting" });
   });
 
   it("at an event names it", () => {
-    const v = trail({ tag: "event", event: "event", next: 4, readySeatIds: ["ana"] });
+    const v = trail({ tag: "event", event: "event", next: 4, gains: { coins: 0, supplies: 0, items: [] }, readySeatIds: ["ana"] });
     expect(at(v)).toEqual({ text: "Event | Quiet trail", tone: "your-move" });
   });
 
   it("at the shop names the camp it stocks up for", () => {
-    const v = trail({ tag: "shop", next: 3, camp: null, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] });
+    const v = trail({ tag: "shop", next: 3, camp: { ...PREVIEW, index: 3, shop: true }, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] });
     expect(at(v)).toEqual({ text: "Shop | Before camp 3", tone: "your-move" });
   });
 
   it("at an event names who is not ready once you are", () => {
-    const v = trail({ tag: "event", event: "storm", next: 4, readySeatIds: ["me", "ana"] });
+    const v = trail({ tag: "event", event: "storm", next: 4, gains: { coins: 0, supplies: 0, items: [] }, readySeatIds: ["me", "ana"] });
     expect(at(v)).toEqual({ text: "Waiting for Bo", tone: "waiting" });
   });
 
@@ -489,6 +492,16 @@ describe("buildTrailPrompt", () => {
   it("at the loadout after a failure tells you to try the camp again", () => {
     const v = trail({ tag: "loadout", camp: { ...PREVIEW, index: 3 }, mods: [], readySeatIds: [] }, { history: failedCamp3 });
     expect(at(v)).toEqual({ text: "Camp 3 failed. Set out to try again", tone: "alert" });
+  });
+
+  it("at the loadout warns the crew when anyone carries a Heavy Pack", () => {
+    const base = trail({ tag: "loadout", camp: { ...PREVIEW, index: 2 }, mods: [], readySeatIds: [] }, { history: [{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", coins: 8 }] });
+    const packed = { ...base, seats: base.seats.map((s, i) => (i === 1 ? { ...s, items: { equipped: [{ uid: "it3", itemId: "heavy-pack", remaining: null }], backpack: [], concealed: false } } : s)) };
+    expect(at(packed)).toEqual({ text: "Prepare for camp 2. Heavy Pack: fails cost 1 more supply", tone: "your-move" });
+    const failed = { ...packed, history: failedCamp3, stage: { ...packed.stage, camp: { ...PREVIEW, index: 3 } } } as typeof packed;
+    expect(at(failed)).toEqual({ text: "Camp 3 failed. Heavy Pack: fails cost 1 more supply", tone: "alert" });
+    expect(at(failed).text.length).toBeLessThanOrEqual(PROMPT_MAX_CHARS);
+    expect(at({ ...packed, stage: { ...packed.stage, camp: { ...PREVIEW, index: 8 } } } as typeof packed).text.length).toBeLessThanOrEqual(PROMPT_MAX_CHARS);
   });
 
   it("at the loadout names who is not ready once you are", () => {

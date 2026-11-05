@@ -19,13 +19,13 @@
 // of seats that may see a reveal's card; a reveal pins the identity and the
 // holder at reveal time and never follows the card (WR-03).
 
-import type { CampError, CampState } from "../state";
+import type { CampError, CampState, CompletedTrick, Objective, ObjectiveStatus } from "../state";
 import type { CharacterDef, EffectParams, ItemDef, SourceDef, SourceId } from "../content/source-def";
 import type { ModDef, ModId, Strength } from "../content/mods/mod-def";
 import type { PairingRule } from "../content/mods/pairings";
 import type { DraftOffer } from "./draft";
 import type { RunPlan } from "./plan";
-import type { EventId } from "../content/events/event-def";
+import type { EventGains, EventId } from "../content/events/event-def";
 import type { CampSpec, RouteChoice, RouteOption } from "./route";
 import type { StockEntry } from "./shop";
 import type { VoteRecord } from "./vote";
@@ -51,7 +51,10 @@ export type SourceKey = string;
 export type LedgerEntry =
   /** A `free` use counts against no limit. */
   | { readonly kind: "used"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly free?: true }
-  | { readonly kind: "passed"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly failedObjectiveIds: readonly string[] }; // gated-window pass; the failures it declined
+  | { readonly kind: "passed"; readonly sourceKey: SourceKey; readonly at: Stamp; readonly failedObjectiveIds: readonly string[] } // gated-window pass; the failures it declined
+  /** A Hold on between tricks (run/hold.ts): once per gap, until the seat acts or lets go. */
+  | { readonly kind: "held"; readonly at: Stamp }
+  | { readonly kind: "released"; readonly at: Stamp };
 
 export type SeatRun = {
   readonly seatId: SeatId;
@@ -131,6 +134,53 @@ export type CampResult = {
   readonly coins: number;
 };
 
+/** One objective of an ended attempt, as the table last saw it. `hidden`:
+ * some seat of the crew could not see its kind and target at the end (a
+ * Desert mirage), so it is projected as hidden to everyone. `failedAtTrick`
+ * is the index of the trick whose completion failed it, null when it did not
+ * fail or failed some other way (a discard, a camp rule). `fate` is a card
+ * objective's target at the end: won (by whom), lost (burned, counted as
+ * another card or discarded) or never won; null for a cardless one.
+ * `ownerTricksWon` is how many tricks its holder won. */
+export type ObjectiveRecap = {
+  readonly objective: Objective;
+  readonly hidden: boolean;
+  readonly status: ObjectiveStatus;
+  readonly failedAtTrick: number | null;
+  readonly fate: { readonly kind: "won"; readonly bySeatId: string } | { readonly kind: "lost" } | { readonly kind: "open" } | null;
+  readonly ownerTricksWon: number | null;
+};
+
+/** Where a composed rule layer comes from (run/compose.ts): a camp
+ * modifier, a seat's source (its character, upgrade or an item) or the dev
+ * sandbox's loaded dice. */
+export type LayerOrigin =
+  | { readonly kind: "mod"; readonly modId: string }
+  | { readonly kind: "seat"; readonly seatId: string; readonly sourceId: string }
+  | { readonly kind: "loaded" };
+
+/** One part of a failed camp's supply cost: the base cost, or what a camp
+ * modifier or a seat's source (Heavy Pack) added on top. */
+export type SupplyCostPart = { readonly origin: { readonly kind: "base" } | Exclude<LayerOrigin, { kind: "loaded" }>; readonly amount: number };
+
+/** What the table needs to see about the attempt that just ended (the
+ * camp-recap fix): every part of it was public at the end of play. The
+ * final trick's cards were face up once it completed (a face-down play only
+ * hides in the current trick), and no hand is kept. `supplyCost` sums to the
+ * history entry's suppliesSpent; it is empty for a clear. */
+export type AttemptRecap = {
+  readonly camp: CampIndex;
+  readonly attempt: number;
+  readonly status: "cleared" | "failed";
+  readonly tricksPlayed: number;
+  readonly totalTricks: number;
+  readonly lastTrick: CompletedTrick | null;
+  readonly objectives: readonly ObjectiveRecap[];
+  readonly failedGoalIds: readonly string[];
+  readonly coins: number;
+  readonly supplyCost: readonly SupplyCostPart[];
+};
+
 /** A seat the crew voted out while it was disconnected (run/crew.ts). Its
  * SeatRun is kept whole for its return; `position` is where it sat in
  * seatIds. `back` is true while it is connected again, waiting for the next
@@ -139,10 +189,11 @@ export type KickedSeat = { readonly seat: SeatRun; readonly position: number; re
 
 export type Stage =
   | { readonly tag: "muster"; readonly ballots: PerSeat<RunLength | null>; readonly locked: PerSeat<true> } // null abstains; a locked seat's pick and ballot are final
-  /** Before boss camp `next`. `camp` is its spec on a replay, null on the way there. */
-  | { readonly tag: "shop"; readonly next: CampIndex; readonly camp: CampSpec | null; readonly stock: readonly StockEntry[]; readonly ready: PerSeat<true> }
+  /** Before shop camp `next`, after its route vote (or on a replay): `camp` is its spec. */
+  | { readonly tag: "shop"; readonly next: CampIndex; readonly camp: CampSpec; readonly stock: readonly StockEntry[]; readonly ready: PerSeat<true> }
   | { readonly tag: "draft"; readonly next: CampIndex }
-  | { readonly tag: "event"; readonly next: CampIndex; readonly event: EventId; readonly ready: PerSeat<true> }
+  /** `gains` is what the event gave as it opened. */
+  | { readonly tag: "event"; readonly next: CampIndex; readonly event: EventId; readonly gains: EventGains; readonly ready: PerSeat<true> }
   | { readonly tag: "route"; readonly from: CampIndex; readonly options: readonly RouteOption[]; readonly ballots: PerSeat<RouteChoice | null> }
   | { readonly tag: "loadout"; readonly camp: CampSpec; readonly ready: PerSeat<true> }
   | { readonly tag: "camp"; readonly camp: CampSpec; readonly attempt: AttemptState }
@@ -158,6 +209,10 @@ export type RunState = {
   readonly supplies: number; // 0..SUPPLIES_MAX
   readonly plan: RunPlan | null; // null only in muster
   readonly history: readonly CampResult[];
+  /** The attempt that ended last, for the table's recap; null or absent
+   * before the first one ends (a state saved before recaps lacks it) and
+   * after a kick restarts a camp. */
+  readonly lastAttempt?: AttemptRecap | null;
   readonly lastVote: VoteRecord | null; // the latest resolved vote, for the flip the table sees
   readonly itemSerial: number; // the next item instance number; never projected
   readonly stage: Stage;
@@ -178,7 +233,8 @@ export type RunAction =
   | { readonly type: "pick-bundle"; readonly bundle: number } // draft
   | { readonly type: "ready" } // shop, event, loadout
   | { readonly type: "use-ability"; readonly sourceKey: SourceKey; readonly targets: readonly string[] }
-  | { readonly type: "skip-window" }
+  | { readonly type: "skip-window" } // a gated window's pass; between tricks, lets go of a hold
+  | { readonly type: "hold" } // between tricks: the next lead waits until this seat acts or lets go
   | { readonly type: "whisper"; readonly targetSeatId: string; readonly cardId: string }
   | { readonly type: "pick-objective"; readonly objectiveId: string }
   | { readonly type: "play-card"; readonly cardId: string };
@@ -209,7 +265,9 @@ export type RunError =
   | "invalid_target"
   | "whisper_blocked"
   | "no_whispers_left"
-  | "nothing_to_skip";
+  | "nothing_to_skip"
+  | "waiting_on_hold"
+  | "hold_unavailable";
 
 export type Catalog = {
   readonly characters: Readonly<Record<string, CharacterDef>>;

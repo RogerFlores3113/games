@@ -47,7 +47,7 @@ describe("botMove", () => {
   });
 
   it("on a route, abstains until the seat has a ballot", () => {
-    const spec = campSpecAt("autoplay", "standard", campIndex(2), CATALOG);
+    const spec = campSpecAt("autoplay", "standard", campIndex(2), CATALOG, 3);
     const route: RunState = {
       ...DEV_SHORTCUTS["jump-to-camp"].apply(crewed(), { length: "standard", camp: 1, stage: "loadout" }, CATALOG),
       stage: { tag: "route", from: campIndex(1), options: [{ id: "a", next: spec, reroll: 0, swapBoss: null }, { id: "b", next: spec, reroll: 0, swapBoss: null }], ballots: { a: "a" } },
@@ -66,7 +66,7 @@ describe("botMove", () => {
   it("readies in the event between camps", () => {
     const loadout = DEV_SHORTCUTS["jump-to-camp"].apply(crewed(), { length: "standard", camp: 2, stage: "loadout" }, CATALOG);
     const next = (loadout.stage as Extract<RunState["stage"], { tag: "loadout" }>).camp;
-    const event: RunState = { ...loadout, stage: { tag: "event", next: next.index, event: "event", ready: { a: true } } };
+    const event: RunState = { ...loadout, stage: { tag: "event", next: next.index, event: "event", gains: { coins: 0, supplies: 0, items: [] }, ready: { a: true } } };
     expect(botMove(event, ["a"], CATALOG)).toBeNull();
     expect(botMove(event, ["a", "b"], CATALOG)).toEqual({ seatId: "b", request: { type: "ready" } });
   });

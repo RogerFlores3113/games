@@ -45,7 +45,8 @@ export const WINDOWS: { readonly [W in ActiveWindow]: WindowDef } = {
     id: "between-tricks",
     phrase: "Between tricks",
     gated: false,
-    // D-13: closes the instant the trick's leader plays.
+    // D-13: closes the instant the trick's leader plays; a Hold on
+    // (run/hold.ts) makes that lead wait.
     isOpen: (run, rules) => playingTrickSize(run, rules) === 0,
     mayAct: anySeat,
   },

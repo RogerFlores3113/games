@@ -114,8 +114,10 @@ export type ActiveAbility<S extends readonly TargetSpec[] = readonly TargetSpec[
 export type ItemAbility<S extends readonly TargetSpec[] = readonly TargetSpec[], P extends EffectParams = EffectParams> = Omit<ActiveAbility<S, P>, "limit">;
 
 /** `foldsLast` folds the layer after every effect, for a rule that must
- * have the last word over items and abilities. */
-export type PassiveAbility = { modifier(owner: Owner): RuleModifier; readonly foldsLast?: true };
+ * have the last word over items and abilities. `sourceKey` is the key the
+ * layer comes from (an item's instance uid), so a passive that counts once
+ * per crew can tell its own copy from the others. */
+export type PassiveAbility = { modifier(owner: Owner, sourceKey: string): RuleModifier; readonly foldsLast?: true };
 
 export type Rarity = "common" | "rare";
 /** single-use is one charge; a spent instance leaves its owner. per-camp

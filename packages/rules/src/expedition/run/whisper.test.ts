@@ -84,7 +84,7 @@ function makeRun(input: {
   seed?: string;
 }): RunState {
   const seed = input.seed ?? "whisper-seed";
-  const spec = campSpecAt(seed, "standard", campIndex(2), CATALOG);
+  const spec = campSpecAt(seed, "standard", campIndex(2), CATALOG, SEAT_IDS.length);
   const stage: RunState["stage"] =
     input.camp === null
       ? { tag: "loadout", camp: spec, ready: {} }

@@ -26,6 +26,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     yourAbilities: [],
     yourItemSlots: 2,
     history: [result(1, 1, "failed"), result(1, 2, "cleared"), result(2, 1, "failed"), result(2, 2, "failed")],
+    lastCamp: null,
     lastVote: null,
     stage: { tag: "ended", result: "lost" },
     ...overrides,

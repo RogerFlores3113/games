@@ -26,6 +26,7 @@ function view(equipped: string[], backpack: string[], over: Partial<ExpeditionVi
     yourAbilities: [],
     yourItemSlots: 2,
     history: [],
+    lastCamp: null,
     lastVote: null,
     stage: LOADOUT,
     ...over,

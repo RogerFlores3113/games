@@ -10,11 +10,12 @@ import { evaluateObjective } from "../objectives";
 import type { CampState, CompletedTrick, ExpeditionCard, Objective, StandardIdentity, StandardRank, Suit } from "../state";
 import { trickWinner } from "../trick";
 import { abilityStatus, useAbility } from "../run/abilities";
+import { FAILURE_COST } from "../run/balance";
 import { CATALOG } from "../run/catalog";
 import { rulesFor } from "../run/compose";
 import { attemptOf, withAttempt } from "../run/attempt";
 import { advanceTo, setupRun, testCatalog } from "../run/run-test-support";
-import { createRun, openLeg } from "../run/lifecycle";
+import { createRun, openShop } from "../run/lifecycle";
 import { campIndex } from "../run/plan";
 import { applyRunAction } from "../run/stages/registry";
 import { resolvedPlay } from "../test-support";
@@ -181,9 +182,9 @@ describe("J.D.", () => {
     expect(run.seats.map((s) => [s.items, s.equipped])).toEqual([[[{ uid: "it0", itemId: "parrot" }], ["it0"]], [[], []], [[], []]]);
   });
 
-  it("J.D.'s hidden luck adds 5 to every route's chance of fair weather, up to 100", () => {
+  it("J.D.'s hidden luck adds 5 to every route's chance of fair weather, up to 100, but never makes the Clifftop fair", () => {
     const run = table({ character: "jd" });
-    expect([rules(run).normalWeatherChance(run, 80), rules(run).normalWeatherChance(run, 98)]).toEqual([85, 100]);
+    expect([rules(run).normalWeatherChance(run, 80), rules(run).normalWeatherChance(run, 98), rules(run).normalWeatherChance(run, 0)]).toEqual([85, 100, 0]);
     const without = table({ character: "leader", mates: ["explorer", "cartographer"] });
     expect(rules(without).normalWeatherChance(without, 80)).toBe(80);
   });
@@ -311,8 +312,11 @@ function toRoute(run: RunState): RunState {
   return next;
 }
 
-/** The shop before boss camp `camp`, from the crew's loadout there. */
-const shopOf = (run: RunState, camp: number): RunState => openLeg(run, campIndex(camp), "shop", CATALOG);
+/** The shop before shop camp `camp`, from the crew's loadout there. */
+const shopOf = (run: RunState, camp: number): RunState => {
+  if (run.stage.tag !== "loadout" || run.stage.camp.index !== camp) throw new Error(`shopOf: expected camp ${camp}'s loadout`);
+  return openShop(run, run.stage.camp, CATALOG);
+};
 
 describe("Businessman", () => {
   it("Bottom Line pays 2 coins for one empty slot taken into camp, 5 for two and none for none", () => {
@@ -387,6 +391,7 @@ describe("Pack Rat", () => {
     const exclusive = Object.values(CATALOG.items).filter((item) => item.exclusiveTo === "pack-rat").map((item) => item.id);
     const [standard, packRat] = draft.seats[0]!.offers;
     expect(draft.seats[0]!.offers.map((offer) => offer.bundles.map((bundle) => bundle.length))).toEqual([[1, 1, 1], [1, 1, 1]]);
+    expect(draft.seats[0]!.offers.map((offer) => offer.kind)).toEqual(["standard", "special"]);
     expect(standard!.bundles.flat().some((id) => exclusive.includes(id))).toBe(false);
     expect(packRat!.bundles.flat().filter((id) => exclusive.includes(id))).toHaveLength(3);
     expect(new Set(packRat!.bundles.flat()).size).toBe(3);
@@ -723,6 +728,18 @@ describe("items", () => {
     expect(rules(next).trickWinner(plays, plays[0]!.card.identity)).toBe("p2");
   });
 
+  it("Bait on the only card of the led suit hands the trick to the highest card left, the first played on a tie", () => {
+    const hands = {
+      p0: [std("a9", "hearts", 9), std("a8", "hearts", 8)],
+      p1: [std("b9", "clubs", 9), std("b7", "clubs", 7)],
+      p2: [std("c14", "spades", 14), std("c3", "spades", 3)],
+    };
+    const led = play(table({ kit: ["bait"], hands, leader: "p2" }), "p2", "c14");
+    const baited = use(led, "p0", "bait", ["card:c14"]);
+    const done = play(play(baited, "p0", "a9"), "p1", "b9");
+    expect(camp(done).completedTricks[0]!.winnerSeatId).toBe("p0");
+  });
+
   it("Camouflage removes the objective and later fails the camp via a broken guard, with no rescue", () => {
     const objectives = [winCard("mine", ident("hearts", 5), "p0"), PENDING];
     const hands = { p0: [std("a", "spades", 14)], p1: [std("b", "spades", 3)], p2: [std("c", "spades", 4)] };
@@ -762,6 +779,21 @@ describe("items", () => {
     expect(whisperAllowance(packed.start)).toEqual([2, 1, 1]);
     expect(packed.end.supplies).toBe(1);
     expect(failing([]).end.supplies).toBe(2);
+  });
+
+  it("Heavy Packs share one extra supply cost across the crew, however many are equipped", () => {
+    const start = table({
+      kit: ["heavy-pack", "heavy-pack"],
+      mateKit: ["heavy-pack"],
+      supplies: 4,
+      hands: { p0: [std("a", "spades", 14)], p1: [std("b", "spades", 3)], p2: [std("c", "spades", 4)] },
+      objectives: [winCard("o1", ident("spades", 14), "p1")],
+      totalTricks: 1,
+      leader: "p0",
+    });
+    expect(whisperAllowance(start)).toEqual([3, 2, 1]);
+    expect(rules(start).failureCost(start)).toBe(FAILURE_COST + 1);
+    expect(playOut(start).supplies).toBe(4 - FAILURE_COST - 1);
   });
 
   it("Mosquito Net lets its owner whisper through a layer that forbids it", () => {

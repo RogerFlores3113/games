@@ -31,7 +31,8 @@ import { campGoals, campPhase, currentActorSeatId } from "../camp";
 import { identitiesEqual } from "../deck";
 import { rulesFor } from "../run/compose";
 import { runStatus } from "../run/lifecycle";
-import { SUPPLIES_MAX } from "../run/balance";
+import { SUPPLIES_MAX, payoutRange } from "../run/balance";
+import { isShopCamp } from "../run/trail";
 import { bossAt, campCount, visibleBossId } from "../run/plan";
 import { slotKindsFor, type CampSpec, type RouteOption } from "../run/route";
 import { surveyDeal, surveyedCamps } from "../run/survey";
@@ -42,15 +43,19 @@ import { abilityStatus } from "../run/abilities";
 import { abilityKeys, abilityOf, activeOfKey, backpackOf, itemOf, remaining, usedThisAttempt, type Remaining } from "../run/usage";
 import { priceFor, upgradeOffers, type StockEntry } from "../run/shop";
 import { currentWindow, gatedPendingSeatIds } from "../run/windows";
+import { holdLegality, holdingSeatIds } from "../run/hold";
 import type { RunRules } from "../run/run-rules";
-import type { ActiveEffect, AttemptState, Catalog, ItemInstance, LogEntry, PerSeat, Reveal, RunState, SeatRun } from "../run/types";
+import type { ActiveEffect, AttemptState, Catalog, ItemInstance, LogEntry, ObjectiveRecap, PerSeat, Reveal, RunState, SeatRun, SupplyCostPart } from "../run/types";
 import { rankOf } from "../trick";
-import type { CampState, CardIdentity, ExpeditionCard, Objective, ResolvedPlay, StandardIdentity } from "../state";
+import type { CampState, CardIdentity, CompletedTrick, ExpeditionCard, Objective, ResolvedPlay, StandardIdentity } from "../state";
 import type {
   ExpeditionAttemptView,
   ExpeditionBallotView,
   ExpeditionCampPreviewView,
+  ExpeditionCampRecapView,
   ExpeditionCampResultView,
+  ExpeditionRecapObjectiveView,
+  ExpeditionSupplyCostPartView,
   ExpeditionCampView,
   ExpeditionCardIdentityView,
   ExpeditionCardView,
@@ -332,6 +337,59 @@ function toCampResultView(result: RunState["history"][number]): ExpeditionCampRe
   return { camp: result.camp, attempt: result.attempt, location: result.location, weather: result.weather, status: result.status, coins: result.coins };
 }
 
+/** A recap's objective as the table saw it at the end: a hidden one shows
+ * no kind, no target and no fate. */
+function toRecapObjectiveView(recap: ObjectiveRecap): ExpeditionRecapObjectiveView {
+  const o = recap.objective;
+  const status = recap.status;
+  let objective: ExpeditionObjectiveView;
+  if (recap.hidden) objective = { id: o.id, kind: "hidden", ownerSeatId: o.ownerSeatId, status };
+  else if (o.kind === "win-card") objective = { id: o.id, kind: "win-card", target: toIdentityView(o.target), ownerSeatId: o.ownerSeatId, status };
+  else if (o.kind === "ordered") objective = { id: o.id, kind: "ordered", target: toStandardIdentityView(o.target), order: o.order, ownerSeatId: o.ownerSeatId, status };
+  else if (o.kind === "no-tricks") objective = { id: o.id, kind: "no-tricks", ownerSeatId: o.ownerSeatId, status };
+  else objective = { id: o.id, kind: "exactly-n", n: o.n, ownerSeatId: o.ownerSeatId, status };
+  const fate = recap.hidden || recap.fate === null ? null : recap.fate.kind === "won" ? { kind: "won" as const, bySeatId: recap.fate.bySeatId } : { kind: recap.fate.kind };
+  return { objective, failedAtTrick: recap.failedAtTrick, fate, ownerTricksWon: recap.ownerTricksWon };
+}
+
+function toSupplyCostPartView(part: SupplyCostPart): ExpeditionSupplyCostPartView {
+  const origin = part.origin;
+  return {
+    origin: origin.kind === "base" ? { kind: "base" } : origin.kind === "mod" ? { kind: "mod", modId: origin.modId } : { kind: "seat", seatId: origin.seatId, sourceId: origin.sourceId },
+    amount: part.amount,
+  };
+}
+
+/** The last attempt's final trick was face up once it completed, so it is
+ * shown whole; the rules that ranked its cards are gone, so no rank. */
+function toRecapTrickView(trick: CompletedTrick): ExpeditionCompletedTrickView {
+  return {
+    index: trick.index,
+    leaderSeatId: trick.leaderSeatId,
+    plays: trick.plays.map((play) => ({ seatId: play.seatId, card: toCardView(play.card), effectiveRank: null, countsAs: play.countsAs === null ? null : toIdentityView(play.countsAs), burned: play.burned })),
+    winnerSeatId: trick.winnerSeatId,
+  };
+}
+
+/** The last attempt's recap between camps; null in camp, where the next
+ * attempt is on the table, and before any attempt has ended. */
+function toCampRecapView(state: RunState): ExpeditionCampRecapView | null {
+  const recap = state.lastAttempt ?? null;
+  if (recap === null || state.stage.tag === "camp" || state.stage.tag === "muster") return null;
+  return {
+    camp: recap.camp,
+    attempt: recap.attempt,
+    status: recap.status,
+    tricksPlayed: recap.tricksPlayed,
+    totalTricks: recap.totalTricks,
+    lastTrick: recap.lastTrick === null ? null : toRecapTrickView(recap.lastTrick),
+    objectives: recap.objectives.map(toRecapObjectiveView),
+    failedGoalIds: Array.from(recap.failedGoalIds),
+    coins: recap.coins,
+    supplyCost: recap.supplyCost.map(toSupplyCostPartView),
+  };
+}
+
 function toSurveyedObjectiveView(objective: Objective): ExpeditionSurveyedObjectiveView {
   switch (objective.kind) {
     case "win-card":
@@ -371,7 +429,7 @@ function toPreviewView(state: RunState, spec: CampSpec, catalog: Catalog, survey
     pairing: pairingOf(spec, catalog),
     slotKinds: Array.from(slotKindsFor(state, spec, catalog)),
     bossId: boss === null ? null : visibleBossId(state, boss),
-    shop: boss !== null,
+    shop: state.plan !== null && isShopCamp(state.plan.length, spec.index),
     survey,
   };
 }
@@ -465,8 +523,10 @@ function toAttemptView(state: RunState, rawAttempt: AttemptState, seatId: string
   const derivedCampPhase = campPhase(campState, rules);
   const derivedCurrentActorSeatId = currentActorSeatId(campState, rules);
 
+  // While a teammate's Hold on stands, the lead waits: no card is legal yet.
+  const holding = holdingSeatIds(state, catalog);
   const yourLegalCardIds: string[] =
-    seated && derivedCampPhase === "playing" && derivedCurrentActorSeatId === seatId
+    seated && derivedCampPhase === "playing" && derivedCurrentActorSeatId === seatId && holding.length === 0
       ? rules
           .legalPlays(campState, seatId)
           .map((c) => c.id)
@@ -497,6 +557,8 @@ function toAttemptView(state: RunState, rawAttempt: AttemptState, seatId: string
     // Under fog, a teammate waited on in rescue would be one holding a rescue item.
     pendingSeatIds: gatedPendingSeatIds(state, catalog).filter((pending) => !foggedSeatIds(state, seatId, rules).includes(pending)),
     rescue,
+    holdingSeatIds: [...holding],
+    youMayHold: seated && holdLegality(state, seatId, catalog).legal,
     effects: rawAttempt.effects.map((effect) => toEffectView(effect, yourSeatId, faceDownIds)),
     reveals,
     log,
@@ -521,7 +583,7 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
       return {
         tag: "shop",
         next: stage.next,
-        camp: stage.camp === null ? null : toPreviewView(state, stage.camp, catalog, surveyOf(stage.camp)),
+        camp: toPreviewView(state, stage.camp, catalog, surveyOf(stage.camp)),
         shop: toShopView(state, stage.stock, ownSeat, catalog),
         readySeatIds: readySeatIds(state, stage.ready),
       };
@@ -551,11 +613,27 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
     case "route":
       return {
         tag: "route",
-        options: stage.options.map((option) => ({ id: option.id, next: toPreviewView(state, option.next, catalog, surveyOf(option.next), option.swapBoss), swapsBoss: option.swapBoss !== null })),
+        options: stage.options.map((option) => ({
+          id: option.id,
+          next: toPreviewView(state, option.next, catalog, surveyOf(option.next), option.swapBoss),
+          swapsBoss: option.swapBoss !== null,
+          pays: { ...payoutRange(option.next) },
+        })),
         ballots: toBallotViews(state, stage.ballots),
       };
     case "event":
-      return { tag: "event", event: stage.event, next: stage.next, readySeatIds: readySeatIds(state, stage.ready) };
+      return {
+        tag: "event",
+        event: stage.event,
+        next: stage.next,
+        // An item a seat's loadout hides from the viewer stays hidden here too.
+        gains: {
+          coins: stage.gains.coins,
+          supplies: stage.gains.supplies,
+          items: stage.gains.items.filter((item) => !rules.hides(state, seatId, { kind: "loadout", seatId: item.seatId })).map((item) => ({ seatId: item.seatId, itemId: item.itemId })),
+        },
+        readySeatIds: readySeatIds(state, stage.ready),
+      };
     case "ended":
       return { tag: "ended", result: stage.result };
   }
@@ -584,6 +662,7 @@ export function toExpeditionPlayerView(state: RunState, seatId: string, catalog:
     yourAbilities: ownSeat !== undefined ? toAbilityViews(state, ownSeat, catalog) : [],
     yourItemSlots: ownSeat === undefined ? 0 : rules.itemSlots(state, seatId),
     history: state.history.map(toCampResultView),
+    lastCamp: toCampRecapView(state),
     lastVote:
       lastVote === null
         ? null

@@ -1,4 +1,4 @@
-import { openLoadout } from "../lifecycle";
+import { openChosenCamp } from "../lifecycle";
 import { STREAMS } from "../rng";
 import { planAfter, type RouteChoice } from "../route";
 import { tally } from "../vote";
@@ -8,7 +8,7 @@ import { OUTFIT } from "./outfit";
 
 /** Each seat votes for a route option (changeable until the vote resolves);
  * the last ballot picks the route, writes any boss swap it carries into the
- * plan, and opens the chosen camp's loadout. */
+ * plan, and opens the chosen camp's shop before a shop camp, else its loadout. */
 export const route: StageDef<"route"> = {
   on: {
     ...OUTFIT,
@@ -23,6 +23,6 @@ export const route: StageDef<"route"> = {
     const result = tally(run.seed, STREAMS.routeVote(from + 1), options.map((o) => o.id), run.seatIds, ballots);
     if (result === null) return run;
     const chosen = options.find((o) => o.id === result.winner)!;
-    return openLoadout({ ...run, plan: planAfter(run.plan!, chosen), lastVote: { topic: "route", result } }, chosen.next, catalog);
+    return openChosenCamp({ ...run, plan: planAfter(run.plan!, chosen), lastVote: { topic: "route", result } }, chosen.next, catalog);
   },
 };

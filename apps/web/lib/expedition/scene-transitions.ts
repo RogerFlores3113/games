@@ -11,6 +11,7 @@
  */
 import type { ExpeditionView } from "@games/rules";
 import { MOD_DISPLAY, RUN_LENGTH_DISPLAY } from "@games/rules";
+import { clearLine, lossLine, supplyCostLine, type NameOf } from "./camp-recap";
 
 /** `full` normally; `reduced` under prefers-reduced-motion; `fast` the
  * same sequence compressed (e2e); `skip` none at all (a dev jump). */
@@ -53,10 +54,13 @@ export type TransitionCase = {
   /** Milliseconds the sign hangs, when this move deserves more or less than the speed's `hold`. */
   readonly hold?: number;
   readonly when: (shown: ExpeditionView, next: ExpeditionView) => boolean;
-  readonly copy: (shown: ExpeditionView, next: ExpeditionView) => SignCopy;
+  /** `nameOf` names a seat ("You" for the viewer), for a sign that says who. */
+  readonly copy: (shown: ExpeditionView, next: ExpeditionView, nameOf: NameOf) => SignCopy;
 };
 
 const ROUTINE_HOLD = 2000;
+/** A lost camp's sign says why and what it cost: a beat longer to read. */
+const LOSS_HOLD = 3500;
 
 export const TRANSITIONS: readonly TransitionCase[] = [
   {
@@ -71,19 +75,34 @@ export const TRANSITIONS: readonly TransitionCase[] = [
     tone: "bad",
     hold: 3000,
     when: (shown, next) => shown.stage.tag !== "ended" && next.stage.tag === "ended" && next.stage.result === "lost",
-    copy: (_, next) => ({ title: "Expedition lost", sub: next.supplies.count === 0 ? "Out of supplies" : "The crew turns back" }),
+    copy: (_, next, nameOf) => {
+      const end = next.supplies.count === 0 ? "Out of supplies" : "The crew turns back";
+      const why = next.lastCamp === null ? null : lossLine(next.lastCamp, nameOf);
+      return { title: "Expedition lost", sub: why === null ? end : `${why}\n${end}` };
+    },
   },
   {
     id: "camp-won",
     tone: "good",
-    when: (shown, next) => shown.stage.tag === "camp" && (next.stage.tag === "draft" || next.stage.tag === "shop") && next.history.at(-1)?.status === "cleared",
-    copy: (_, next) => ({ title: "Camp won!", sub: `+${next.history.at(-1)?.coins ?? 0} coins` }),
+    when: (shown, next) => shown.stage.tag === "camp" && next.stage.tag === "draft" && next.history.at(-1)?.status === "cleared",
+    copy: (_, next) => {
+      const coins = `+${next.history.at(-1)?.coins ?? 0} coins`;
+      return { title: "Camp won!", sub: next.lastCamp?.status === "cleared" ? `${coins}\n${clearLine(next.lastCamp)}` : coins };
+    },
   },
   {
     id: "camp-lost",
     tone: "bad",
+    hold: LOSS_HOLD,
     when: (shown, next) => shown.stage.tag === "camp" && (next.stage.tag === "loadout" || next.stage.tag === "shop") && next.history.at(-1)?.status === "failed",
-    copy: (shown, next) => ({ title: "Camp lost", sub: suppliesLost(shown.supplies.count - next.supplies.count, next.supplies.count) }),
+    copy: (shown, next, nameOf) => {
+      const left = next.supplies.count;
+      const recap = next.lastCamp?.status === "failed" ? next.lastCamp : null;
+      const costs = recap === null ? null : supplyCostLine(recap);
+      const cost = costs === null ? suppliesLost(shown.supplies.count - left, left) : `${costs}. ${left} left`;
+      const why = recap === null ? null : lossLine(recap, nameOf);
+      return { title: "Camp lost", sub: why === null ? cost : `${why}\n${cost}` };
+    },
   },
   {
     id: "camp-restarted",
@@ -105,9 +124,9 @@ export const TRANSITIONS: readonly TransitionCase[] = [
   {
     id: "route-decided",
     tone: "neutral",
-    when: (shown, next) => shown.stage.tag === "route" && next.stage.tag === "loadout",
+    when: (shown, next) => shown.stage.tag === "route" && (next.stage.tag === "loadout" || next.stage.tag === "shop"),
     copy: (_, next) => {
-      if (next.stage.tag !== "loadout") return { title: "On the trail", sub: null };
+      if (next.stage.tag !== "loadout" && next.stage.tag !== "shop") return { title: "On the trail", sub: null };
       const camp = next.stage.camp;
       const flip = next.lastVote?.topic === "route" && next.lastVote.tied !== null;
       return { title: `Heading to ${placeName(camp.location)}`, sub: `${weatherLine(camp.weather, camp.pairing)}${flip ? "\nA coin flip decided it" : ""}` };
@@ -162,8 +181,7 @@ function suppliesLost(lost: number, left: number): string {
 
 function campOf(view: ExpeditionView): { index: number; location: string; weather: string; pairing: string | null } | null {
   const stage = view.stage;
-  if (stage.tag === "loadout" || stage.tag === "camp") return stage.camp;
-  if (stage.tag === "shop") return stage.camp;
+  if (stage.tag === "loadout" || stage.tag === "camp" || stage.tag === "shop") return stage.camp;
   return null;
 }
 
@@ -185,10 +203,12 @@ function tryLine(view: ExpeditionView): string {
 /** A transition the move from `shown` to `next` plays, or null for none. */
 export type SceneTransition = { readonly caseId: string; readonly tone: TransitionTone; readonly copy: SignCopy; readonly hold: number | null };
 
-export function transitionFor(shown: ExpeditionView, next: ExpeditionView): SceneTransition | null {
+/** `nameOf` names a seat; without one, the viewer is "You" and anyone else "A teammate". */
+export function transitionFor(shown: ExpeditionView, next: ExpeditionView, nameOf?: NameOf): SceneTransition | null {
   const found = TRANSITIONS.find((c) => c.when(shown, next));
   if (found === undefined) return null;
-  return { caseId: found.id, tone: found.tone, copy: found.copy(shown, next), hold: found.hold ?? null };
+  const names: NameOf = nameOf ?? ((seatId) => (seatId === next.yourSeatId ? "You" : "A teammate"));
+  return { caseId: found.id, tone: found.tone, copy: found.copy(shown, next, names), hold: found.hold ?? null };
 }
 
 /** The hold a transition gets at `timing`. */

@@ -126,10 +126,18 @@ export function usesLabel(sourceId: string, remaining: ExpeditionRemainingView |
     }
     case "unlimited":
       return both("No limit");
-    case "whispers":
-      return both(remaining.left === 0 ? "No whispers left" : `${remaining.left} ${remaining.left === 1 ? "whisper" : "whispers"} left`, remaining.left === 0 ? "Used" : `${remaining.left} left`);
+    case "whispers": {
+      const shared = SPENDS_WHISPERS_AS[sourceId];
+      const noun = shared === undefined ? (remaining.left === 1 ? "whisper" : "whispers") : remaining.left === 1 ? `${shared.one} or whisper` : `${shared.many} or whispers`;
+      const none = shared === undefined ? "No whispers left" : `No ${shared.many} or whispers left`;
+      return both(remaining.left === 0 ? none : `${remaining.left} ${noun} left`, remaining.left === 0 ? "Used" : `${remaining.left} left`);
+    }
   }
 }
+
+/** Abilities whose uses come out of the seat's whispers, so one count is
+ * left of both: the Magician's swaps once Double Act trades them. */
+const SPENDS_WHISPERS_AS: Readonly<Record<string, { one: string; many: string }>> = { magician: { one: "swap", many: "swaps" } };
 
 /** Whether a source can't fire again until its limit resets. */
 export function isSpent(remaining: ExpeditionRemainingView | null): boolean {

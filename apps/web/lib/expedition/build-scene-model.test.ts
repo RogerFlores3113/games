@@ -76,6 +76,8 @@ function makeAttempt(): ExpeditionAttemptView {
     window: null,
     pendingSeatIds: [],
     rescue: null,
+    holdingSeatIds: [],
+    youMayHold: false,
     effects: [],
     reveals: [],
     log: [],
@@ -107,6 +109,7 @@ function makeView({ attempt, campIndex = 2, ...overrides }: ViewOverrides = {}):
     yourAbilities: [],
     yourItemSlots: 2,
     history: [],
+    lastCamp: null,
     lastVote: null,
     stage: { tag: "camp", camp: { index: campIndex, location: "jungle", weather: "fair", pairing: null, slotKinds: [], bossId: null, shop: false, survey: null }, mods: [], attempt: attempt ?? makeAttempt() },
     ...overrides,
@@ -128,7 +131,7 @@ describe("sceneKeyFor", () => {
     [{ tag: "loadout", camp: preview, mods: [], readySeatIds: [] }, "trail"],
     [{ tag: "draft", next: 2, cleared: 1, payout: 8, yourOffer: null, pendingSeatIds: [] }, "trail"],
     [{ tag: "route", options: [], ballots: [] }, "trail"],
-    [{ tag: "event", event: "storm", next: 1, readySeatIds: [] }, "trail"],
+    [{ tag: "event", event: "storm", next: 1, gains: { coins: 0, supplies: 0, items: [] }, readySeatIds: [] }, "trail"],
     [{ tag: "camp", camp: preview, mods: [], attempt: makeAttempt() }, "camp"],
     [{ tag: "ended", result: "won" }, "run-end"],
   ];
@@ -166,6 +169,8 @@ describe("seat order and identity", () => {
         window: null,
         pendingSeatIds: [],
         rescue: null,
+        holdingSeatIds: [],
+        youMayHold: false,
         effects: [],
         reveals: [],
         log: [],
@@ -193,6 +198,8 @@ describe("mayAct", () => {
         window: "rescue",
         pendingSeatIds: ["s1", "s3"],
         rescue: { failedObjectiveIds: [] },
+        holdingSeatIds: [],
+        youMayHold: false,
         effects: [],
         reveals: [],
         log: [],
@@ -225,6 +232,8 @@ describe("objectives", () => {
         window: null,
         pendingSeatIds: [],
         rescue: null,
+        holdingSeatIds: [],
+        youMayHold: false,
         effects: [],
         reveals: [],
         log: [],
@@ -289,6 +298,8 @@ describe("hand: dimming, sort, lift, targeting", () => {
         window: null,
         pendingSeatIds: [],
         rescue: null,
+        holdingSeatIds: [],
+        youMayHold: false,
         effects: [],
         reveals: [],
         log: [],
@@ -382,6 +393,15 @@ describe("drag and drop", () => {
     expect(model.hand.map((c) => c.blockedReason)).toEqual([null, "Must follow ♠"]);
   });
 
+  it("says the first lead can't be the Sun or Moon for a joker the server did not list as legal", () => {
+    const sun = { id: "sun", identity: { kind: "joker" as const, joker: "sun" as const }, effectiveRank: null, countsAs: null };
+    const view = dragView({ yourHand: [cards[0]!, sun], currentActorSeatId: "s2", currentTrick: { index: 0, leaderSeatId: "s2", plays: [] }, completedTricks: [] });
+    expect(buildSceneModel(server(view), ui(), "big-index").hand.map((c) => [c.label, c.blockedReason])).toEqual([
+      ["A♠", null],
+      ["Sun", "The first lead can't be the Sun or Moon"],
+    ]);
+  });
+
   it("says it is not your turn off-turn, and nothing for a legal card", () => {
     const model = buildSceneModel(server(dragView({ currentActorSeatId: "s1", yourLegalCardIds: [] })), ui(), "big-index");
     expect(model.hand.map((c) => c.blockedReason)).toEqual(["Not your turn yet", "Not your turn yet"]);
@@ -419,6 +439,8 @@ describe("trick and lastTrick", () => {
         window: null,
         pendingSeatIds: [],
         rescue: null,
+        holdingSeatIds: [],
+        youMayHold: false,
         effects: [],
         reveals: [],
         log: [],
@@ -453,6 +475,8 @@ describe("trick and lastTrick", () => {
         window: null,
         pendingSeatIds: [],
         rescue: null,
+        holdingSeatIds: [],
+        youMayHold: false,
         effects: [],
         reveals: [],
         log: [],
@@ -666,6 +690,8 @@ describe("source chips", () => {
         window: null,
         pendingSeatIds: [],
         rescue: null,
+        holdingSeatIds: [],
+        youMayHold: false,
         effects: [],
         reveals: [],
         log: [],
@@ -705,6 +731,8 @@ describe("reveals", () => {
         window: null,
         pendingSeatIds: [],
         rescue: null,
+        holdingSeatIds: [],
+        youMayHold: false,
         effects: [],
         reveals: [{ cardId: "c1", fromSeatId: "s3", source: "whisper", identity: AS, toSeatId: "s2" }],
         log: [],
@@ -728,6 +756,8 @@ describe("reveals", () => {
         window: null,
         pendingSeatIds: [],
         rescue: null,
+        holdingSeatIds: [],
+        youMayHold: false,
         effects: [],
         reveals: [{ cardId: "c1", fromSeatId: "s1", source: "explorer", identity: KD, toSeatId: null }],
         log: [],
@@ -810,6 +840,8 @@ function whisperView(opts: {
       window: opts.window === undefined ? "between-tricks" : opts.window,
       pendingSeatIds: [],
       rescue: null,
+      holdingSeatIds: [],
+      youMayHold: false,
       effects: [],
       reveals: opts.reveals ?? [],
       log: (opts.log ?? []).map((l) => ({ event: l.washed ? "whisper-washed" : "whisper", actorSeatId: l.actor, subjectSeatIds: [l.to], sourceId: null, private: false })),
@@ -910,6 +942,8 @@ describe("banner", () => {
         window: "rescue",
         pendingSeatIds: pending,
         rescue: { failedObjectiveIds: objectives.map((o) => o.id) },
+        holdingSeatIds: [],
+        youMayHold: false,
         effects: [],
         reveals: [],
         log: [],
@@ -1163,6 +1197,8 @@ describe("removedCardLabels", () => {
         window: null,
         pendingSeatIds: [],
         rescue: null,
+        holdingSeatIds: [],
+        youMayHold: false,
         effects: [],
         reveals: [],
         log: [],
@@ -1318,5 +1354,35 @@ describe("the temple", () => {
     if (five.stage.tag === "camp") five.stage.attempt.pendingSeatIds = ["s1", "s2", "s3", "s4", "s5"];
     const names = roomSeats().concat([{ seatId: "s4", displayLabel: "Dan", connected: true }, { seatId: "s5", displayLabel: "Eve", connected: true }]);
     expect(buildSceneModel(server(five, names), ui(), "big-index").banner?.detail).toBe("You can rescue it with Skip. Alice, Cara, Dan and Eve can too");
+  });
+});
+
+describe("Hold on between tricks", () => {
+  // s2 leads trick 0 in these fixtures.
+  function held(yourSeatId: string, holdingSeatIds: string[], youMayHold = false, yourLegalCardIds: string[] = []): ExpeditionView {
+    return makeView({ yourSeatId, attempt: { ...makeAttempt(), window: "between-tricks", holdingSeatIds, youMayHold, camp: makeCamp({ yourLegalCardIds }) } });
+  }
+
+  it("shows Hold on when the server says you may hold, and nothing otherwise", () => {
+    expect(buildSceneModel(server(held("s3", [], true)), ui(), "big-index").hold).toEqual({ shown: true, holding: false });
+    expect(buildSceneModel(server(held("s2", [], false, ["c-as"])), ui(), "big-index").hold).toEqual({ shown: false, holding: false });
+  });
+
+  it("turns into Go ahead while your hold stands", () => {
+    const model = buildSceneModel(server(held("s3", ["s3"])), ui(), "big-index");
+    expect(model.hold).toEqual({ shown: true, holding: true });
+    expect(model.prompt).toEqual({ text: "You asked to wait: Whisper, use a power or Go ahead", tone: "your-move" });
+  });
+
+  it("tells the leader who asked them to wait, and why their cards wait", () => {
+    const model = buildSceneModel(server(held("s2", ["s3"])), ui(), "big-index");
+    expect(model.prompt).toEqual({ text: "Cara asked you to wait", tone: "waiting" });
+    expect(model.hand[0]!.playable).toBe(false);
+    expect(model.hand[0]!.blockedReason).toBe("Waiting on Cara");
+    expect(buildSceneModel(server(held("s2", ["s1", "s3"])), ui(), "big-index").prompt.text).toBe("Alice and Cara asked you to wait");
+  });
+
+  it("tells everyone else whom the lead waits on", () => {
+    expect(buildSceneModel(server(held("s1", ["s3"])), ui(), "big-index").prompt).toEqual({ text: "Waiting on Cara. You can Whisper now", tone: "waiting" });
   });
 });

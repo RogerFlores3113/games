@@ -72,6 +72,7 @@ const WELL_SHAPED_NONSENSE_ARB = fc.oneof(
     targets: fc.array(fc.string(), { maxLength: 5 }),
   }),
   fc.record({ type: fc.constant("skip-window" as const) }),
+  fc.record({ type: fc.constant("hold" as const) }),
   fc.record({ type: fc.constant("whisper" as const), targetSeatId: fc.string(), cardId: fc.string() }),
   fc.record({ type: fc.constant("pick-objective" as const), objectiveId: fc.string() }),
   fc.record({ type: fc.constant("play-card" as const), cardId: fc.string() }),
@@ -265,7 +266,7 @@ describe("expeditionGame: autoPassRequest", () => {
     expect(readied.state.seats[1]!.equipped).toEqual(loadout.seats[1]!.equipped);
 
     const spec = loadout.stage.tag === "loadout" ? loadout.stage.camp : null;
-    const event: RunState = { ...loadout, stage: { tag: "event", next: spec!.index, event: "event", ready: { p0: true } } };
+    const event: RunState = { ...loadout, stage: { tag: "event", next: spec!.index, event: "event", gains: { coins: 0, supplies: 0, items: [] }, ready: { p0: true } } };
     expect(expeditionGame.autoPassRequest!(event, "p2")).toEqual({ type: "ready" });
     expect(expeditionGame.autoPassRequest!(event, "p0")).toBeNull();
   });

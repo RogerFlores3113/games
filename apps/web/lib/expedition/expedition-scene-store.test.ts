@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExpeditionAbilityView, ExpeditionCampView, ExpeditionStageView, ExpeditionCardIdentityView, ExpeditionView } from "@games/rules";
 import type { RoomSeatInfo, SceneModel, SceneServerInput } from "./build-scene-model";
 import { beginAbilityTargeting, selectTarget, setTooltipSource } from "./local-ui";
-import { createExpeditionSceneStore, type ExpeditionSceneStore } from "./expedition-scene-store";
+import { REFUSAL_NOTICE_MS, createExpeditionSceneStore, type ExpeditionSceneStore } from "./expedition-scene-store";
 
 const EXPLORER: ExpeditionAbilityView = {
   sourceKey: "explorer",
@@ -63,6 +63,7 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
     yourAbilities: [EXPLORER],
     yourItemSlots: 2,
     history: [],
+    lastCamp: null,
     lastVote: null,
     stage: {
       tag: "camp",
@@ -73,6 +74,8 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
         window: "between-tricks",
         pendingSeatIds: [],
         rescue: null,
+        holdingSeatIds: [],
+        youMayHold: false,
         effects: [],
         reveals: [],
         log: [],
@@ -339,5 +342,63 @@ describe("scene transitions", () => {
     plain.getState().setServer(server(onTrail(draftOffer)));
     expect(plain.getState().sceneKey).toBe("trail");
     expect(plain.getState().transition).toBeNull();
+  });
+});
+
+describe("refusal notices", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("a refusal stands in for the prompt for a moment, then the prompt comes back", () => {
+    vi.useFakeTimers();
+    const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
+    store.getState().setServer(server(makeView()));
+    const prompt = campModel(store).prompt;
+    store.getState().showRefusal("wrong_window");
+    expect(campModel(store).prompt).toEqual({ text: "That has to wait for the gap between tricks", tone: "alert" });
+    // A new view while it stands keeps the notice up.
+    store.getState().setServer(server(makeView({ purse: 3 })));
+    expect(campModel(store).prompt.tone).toBe("alert");
+    vi.advanceTimersByTime(REFUSAL_NOTICE_MS);
+    expect(campModel(store).prompt).toEqual(prompt);
+    expect(store.getState().notice).toBeNull();
+  });
+
+  it("a second refusal restarts the moment with its own line", () => {
+    vi.useFakeTimers();
+    const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
+    store.getState().setServer(server(makeView()));
+    store.getState().showRefusal("wrong_window");
+    vi.advanceTimersByTime(REFUSAL_NOTICE_MS - 100);
+    store.getState().showRefusal("no_whispers_left");
+    vi.advanceTimersByTime(200);
+    expect(campModel(store).prompt).toEqual({ text: "No whispers left this camp", tone: "alert" });
+    vi.advanceTimersByTime(REFUSAL_NOTICE_MS);
+    expect(campModel(store).prompt.tone).not.toBe("alert");
+  });
+
+  it("names the teammate a held lead waits on, and shows on the trail too", () => {
+    const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
+    const view = makeView();
+    if (view.stage.tag === "camp") view.stage.attempt.holdingSeatIds = ["s3"];
+    store.getState().setServer(server(view));
+    store.getState().showRefusal("waiting_on_hold");
+    expect(campModel(store).prompt.text).toBe("Waiting on Cara");
+
+    const trail = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
+    trail.getState().setServer(server(onTrail(draftOffer)));
+    trail.getState().showRefusal("backpack_full");
+    expect(trail.getState().model).toMatchObject({ prompt: { text: "Your backpack is full: discard an item first", tone: "alert" } });
+  });
+
+  it("does nothing before a view, and Reconnecting… wins over a notice", () => {
+    const store = createExpeditionSceneStore({ onAction: vi.fn(), cardPackId: "big-index" });
+    store.getState().showRefusal("wrong_window");
+    expect(store.getState().notice).toBeNull();
+    store.getState().setServer(server(makeView()));
+    store.getState().showRefusal("wrong_window");
+    store.getState().setReconnecting(true);
+    expect(campModel(store).prompt.text).toBe("Reconnecting…");
   });
 });

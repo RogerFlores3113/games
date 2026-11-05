@@ -209,5 +209,17 @@ describe("room-store", () => {
     expect(state.status).toBe("connecting");
     expect(state.seatId).toBeNull();
     expect(state.refusalReason).toBeNull();
+    expect(state.lastRefusal).toBeNull();
+  });
+
+  it("noteRefusal records each refusal with a growing serial and never touches the view", () => {
+    const view = makeView({ status: "in_progress" });
+    useRoomStore.getState().applyServerMessage({ type: "state", view });
+    useRoomStore.getState().noteRefusal({ type: "error", code: "bad_request", gameError: { gameId: "expedition", code: "wrong_window" } });
+    expect(useRoomStore.getState().lastRefusal).toEqual({ serial: 1, code: "bad_request", gameError: { gameId: "expedition", code: "wrong_window" } });
+    useRoomStore.getState().noteRefusal({ type: "error", code: "not_host" });
+    expect(useRoomStore.getState().lastRefusal).toEqual({ serial: 2, code: "not_host", gameError: null });
+    expect(useRoomStore.getState().view).toEqual(view);
+    expect(useRoomStore.getState().status).toBe("seated");
   });
 });

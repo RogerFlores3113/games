@@ -28,6 +28,10 @@ export interface PromptSeat {
 export const PROMPT_MAX_CHARS = 56;
 const NAME_MAX_CHARS = 10;
 
+const HEAVY_PACK = "heavy-pack";
+/** Says what the item's own text says: the crew pays 1 more supply, once. */
+const HEAVY_PACK_WARNING = "Heavy Pack: fails cost 1 more supply";
+
 function shortName(name: string): string {
   return name.length <= NAME_MAX_CHARS ? name : `${name.slice(0, NAME_MAX_CHARS - 1)}…`;
 }
@@ -223,9 +227,33 @@ function followPrompt(camp: ExpeditionCampView): Prompt {
   return { text: everyCardLegal ? "Your turn: play any card" : "Your turn: play a highlighted card", tone: "your-move" };
 }
 
+/** "Ana", "Ana and Bo", or "2 teammates" when the names don't fit. */
+function holderNames(seatIds: readonly string[], nameOf: (seatId: string | null) => string, room: number): string {
+  const names = nameList(seatIds.map((id) => nameOf(id)));
+  return names.length <= room ? names : `${seatIds.length} teammates`;
+}
+
+/** Between tricks while a Hold on stands: the leader is asked to wait, the
+ * holder is told how it ends, and everyone else whom the lead waits on. */
+function holdPrompt(view: ExpeditionView, camp: ExpeditionCampView, whisperAvailable: boolean, nameOf: (seatId: string | null) => string): Prompt | null {
+  const holding = attemptOf(view)?.holdingSeatIds ?? [];
+  if (holding.length === 0 || camp.currentTrick.plays.length > 0) return null;
+  const you = view.yourSeatId;
+  if (you !== null && holding.includes(you)) return { text: "You asked to wait: Whisper, use a power or Go ahead", tone: "your-move" };
+  if (you !== null && camp.currentActorSeatId === you) {
+    const asked = " asked you to wait";
+    return { text: `${holderNames(holding, nameOf, PROMPT_MAX_CHARS - asked.length)}${asked}`, tone: "waiting" };
+  }
+  const waiting = `Waiting on ${holderNames(holding, nameOf, 26)}`;
+  return { text: whisperAvailable ? `${waiting}. You can Whisper now` : waiting, tone: "waiting" };
+}
+
 function playingPrompt(view: ExpeditionView, camp: ExpeditionCampView, whisperAvailable: boolean, nameOf: (seatId: string | null) => string): Prompt {
   const actor = camp.currentActorSeatId;
   const leading = camp.currentTrick.plays.length === 0;
+
+  const held = holdPrompt(view, camp, whisperAvailable, nameOf);
+  if (held !== null) return held;
 
   if (actor !== null && actor === view.yourSeatId) {
     if (!leading) return withTurnAbility(followPrompt(camp), onYourTurnNames(view));
@@ -320,11 +348,17 @@ export function buildTrailPrompt(view: ExpeditionView, seats: readonly PromptSea
     case "loadout": {
       const last = view.history.at(-1);
       if (you !== undefined && !stage.readySeatIds.includes(you.seatId)) {
-        if (last?.camp === stage.camp.index && last.status === "failed") return { text: `Camp ${last.camp} failed. Set out to try again`, tone: "alert" };
+        // The crew's warning: the supplies a failure costs are shared, so
+        // anyone's Heavy Pack is everyone's business.
+        const packed = view.seats.some((s) => s.items.equipped.some((item) => item.itemId === HEAVY_PACK));
+        if (last?.camp === stage.camp.index && last.status === "failed") {
+          return { text: packed ? `Camp ${last.camp} failed. ${HEAVY_PACK_WARNING}` : `Camp ${last.camp} failed. Set out to try again`, tone: "alert" };
+        }
         if (last?.camp === stage.camp.index && last.status === "restarted") {
           const text = `Camp ${last.camp} restarts without ${nameList(view.kicked.map((k) => nameOf(k.seatId)))}. Set out`;
           return { text: text.length <= PROMPT_MAX_CHARS ? text : `Camp ${last.camp} restarts with a smaller crew. Set out`, tone: "alert" };
         }
+        if (packed) return { text: `Prepare for camp ${stage.camp.index}. ${HEAVY_PACK_WARNING}`, tone: "your-move" };
         return { text: `Prepare for camp ${stage.camp.index}`, tone: "your-move" };
       }
       return waitingFor(view.seats.filter((s) => !stage.readySeatIds.includes(s.seatId)).map((s) => s.seatId), "Setting out…");

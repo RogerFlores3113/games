@@ -12,7 +12,7 @@ import { campSpecAt } from "../../run/route";
 import { advanceTo, setupRun } from "../../run/run-test-support";
 import { STAGES, applyRunAction } from "../../run/stages/registry";
 import { backpackOf } from "../../run/usage";
-import type { ActiveEffect, RunAt, RunState } from "../../run/types";
+import type { ActiveEffect, RunAction, RunAt, RunState } from "../../run/types";
 import type { CampState, CardIdentity, CompletedTrick, ExpeditionCard, Objective, Suit } from "../../state";
 
 const SEATS = ["p0", "p1", "p2"];
@@ -105,17 +105,22 @@ describe("Rats", () => {
   it("leave every seat one item slot, and a seat carrying two items in sets out with one", () => {
     const run = setupRun({ seatIds: SEATS, seed: "rats", catalog: CATALOG, camp: 2, items: { p0: ["bait", "whetstone"] } });
     expect(run.seats[0]!.equipped).toEqual(["it0", "it1"]);
-    const next = campSpecAt("rats", "standard", campIndex(3), CATALOG);
+    const next = campSpecAt("rats", "standard", campIndex(3), CATALOG, SEATS.length);
     const atRoute: RunState = {
       ...run,
       plan: { ...run.plan!, bosses: [{ at: campIndex(3), tier: "animal", modId: "rats" }] },
       stage: { tag: "route", from: campIndex(2), options: [{ id: "a", next, reroll: 0, swapBoss: null }], ballots: {} },
     };
-    const loadout = SEATS.reduce<RunState>((acc, seatId) => {
-      const result = applyRunAction(acc, seatId, { type: "vote", choice: "a" }, CATALOG);
-      if (!result.ok) throw new Error(result.error);
-      return result.state;
-    }, atRoute);
+    // Camp 3 is a shop camp: the vote opens its shop, whose last ready opens the loadout.
+    const all = (from: RunState, action: RunAction): RunState =>
+      SEATS.reduce<RunState>((acc, seatId) => {
+        const result = applyRunAction(acc, seatId, action, CATALOG);
+        if (!result.ok) throw new Error(result.error);
+        return result.state;
+      }, from);
+    const shop = all(atRoute, { type: "vote", choice: "a" });
+    expect([shop.stage.tag, shop.seats[0]!.equipped]).toEqual(["shop", ["it0", "it1"]]);
+    const loadout = all(shop, { type: "ready" });
 
     expect(loadout.stage.tag).toBe("loadout");
     for (const seatId of SEATS) expect(rulesFor(loadout, CATALOG).itemSlots(loadout, seatId)).toBe(1);
@@ -184,8 +189,10 @@ describe("Capybara", () => {
 
 describe("Beaver", () => {
   it("dams one suit each trick, moving on a suit per trick, unless it is the only suit in a player's hand", () => {
+    // Trick 2, past the first lead, which may not be a joker.
+    const second = { completedTricks: [trick(0, "p0", filler(0))] };
     const fresh = campWith("beaver", camp({}));
-    const [dam] = statusOf(fresh, "p0", "beaver");
+    const [dam] = statusOf(campWith("beaver", camp({ ...second, currentTrick: { index: 1, leaderSeatId: "p0", plays: [] } })), "p0", "beaver");
     if (dam?.kind !== "dam") throw new Error("expected a dam status");
     const other = SUITS.find((s) => s !== dam.suit)!;
     const dammedCard = card("dammed", std(dam.suit, 9));
@@ -193,7 +200,7 @@ describe("Beaver", () => {
     const sun = card("sun", SUN);
 
     const legalFor = (hand: readonly ExpeditionCard[], plays: CampState["currentTrick"]["plays"] = []) => {
-      const run = campWith("beaver", camp({ hands: [{ seatId: "p0", cards: [] }, { seatId: "p1", cards: [...hand] }, { seatId: "p2", cards: [] }], currentTrick: { index: 0, leaderSeatId: plays.length === 0 ? "p1" : "p0", plays } }));
+      const run = campWith("beaver", camp({ ...second, hands: [{ seatId: "p0", cards: [] }, { seatId: "p1", cards: [...hand] }, { seatId: "p2", cards: [] }], currentTrick: { index: 1, leaderSeatId: plays.length === 0 ? "p1" : "p0", plays } }));
       return rulesFor(run, CATALOG).legalPlays(run.stage.attempt.camp, "p1").map((c) => c.id);
     };
     expect(legalFor([dammedCard, otherCard, sun])).toEqual(["other", "sun"]);
@@ -203,8 +210,9 @@ describe("Beaver", () => {
     expect(legalFor([dammedCard, otherCard, sun], damLed)).toEqual(["other", "sun"]);
     expect(legalFor([dammedCard, sun], damLed)).toEqual(["dammed"]);
 
-    const later = campWith("beaver", camp({ completedTricks: [trick(0, "p0", filler(0))], currentTrick: { index: 1, leaderSeatId: "p0", plays: [] } }));
-    expect(statusOf(later, "p0", "beaver")).toEqual([{ kind: "dam", suit: SUITS[(SUITS.indexOf(dam.suit) + 1) % 4] }]);
+    const [first] = statusOf(fresh, "p0", "beaver");
+    if (first?.kind !== "dam") throw new Error("expected a dam status");
+    expect(dam.suit).toBe(SUITS[(SUITS.indexOf(first.suit) + 1) % 4]);
   });
 });
 
@@ -225,7 +233,7 @@ describe("planned bosses", () => {
     expect(atLoadout.plan[0]).toEqual({ at: 3, tier: "animal", bossId: null });
     expect(seen(atLoadout)).toBe(false);
 
-    const atRoute: RunState = { ...run, stage: { tag: "route", from: campIndex(2), options: [{ id: "a", next: campSpecAt("horizon", "standard", campIndex(3), CATALOG), reroll: 0, swapBoss: null }], ballots: {} } };
+    const atRoute: RunState = { ...run, stage: { tag: "route", from: campIndex(2), options: [{ id: "a", next: campSpecAt("horizon", "standard", campIndex(3), CATALOG, SEATS.length), reroll: 0, swapBoss: null }], ballots: {} } };
     const routeView = toExpeditionPlayerView(atRoute, "p0", CATALOG);
     expect(routeView.plan[0]!.bossId).toBe(boss);
     expect(routeView.stage.tag === "route" && routeView.stage.options[0]!.next.bossId).toBe(boss);

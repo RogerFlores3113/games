@@ -5,12 +5,13 @@ import { assertPlayerCount } from "../deck";
 import { createCamp } from "../camp";
 import { rulesFor } from "./compose";
 import { EVENTS } from "../content/events/registry";
+import { applyEvent, drawEventId } from "./events";
 import { draftOfferFor } from "./draft";
 import { currentStamp, ownerOf } from "./usage";
 import { PURSE_START, SUPPLIES_START, objectiveSlotsFor, payoutFor } from "./balance";
 import { campIndex, isFinalCamp } from "./plan";
 import { firstCampSpec, planOf, routeOptions, type CampSpec } from "./route";
-import { STREAMS, attemptSeed, seededIndex } from "./rng";
+import { attemptSeed } from "./rng";
 import { legsTo, replayLegs, type Leg } from "./trail";
 import { refitSlots } from "./items";
 import { nextAttemptNumber } from "./attempt";
@@ -18,6 +19,7 @@ import { react } from "./react";
 import { campSlots } from "./stack";
 import { stockFor } from "./shop";
 import { rejoinBack } from "./crew";
+import { recapOf, supplyCostParts } from "./recap";
 import type { CampIndex, CampResult, Catalog, RunAt, RunState, RunStatus, SeatRun } from "./types";
 
 /** The run in muster: every seat still picks a character and votes a
@@ -54,10 +56,17 @@ export function openLoadout(run: RunState, camp: CampSpec, catalog: Catalog): Ru
   return withinSlots({ ...rejoinBack(run, catalog), stage: { tag: "loadout", camp, ready: {} } }, catalog);
 }
 
-/** The shop before boss camp `next`. Every visit draws the stock afresh from
- * the same streams, so a replay of a boss camp offers the same stock, unsold. */
-function openShop(run: RunState, next: CampIndex, camp: CampSpec | null, catalog: Catalog): RunAt<"shop"> {
-  return { ...run, stage: { tag: "shop", next, camp, stock: stockFor(run.seed, next, catalog), ready: {} } };
+/** The shop before shop camp `camp`, once its route is chosen. Every visit
+ * draws the stock afresh from the same streams, so a replay of a shop camp
+ * offers the same stock, unsold. */
+export function openShop(run: RunState, camp: CampSpec, catalog: Catalog): RunAt<"shop"> {
+  return { ...run, stage: { tag: "shop", next: camp.index, camp, stock: stockFor(run.seed, camp.index, catalog), ready: {} } };
+}
+
+/** What follows the route vote that chose `camp`: its shop before a shop
+ * camp, else its loadout. */
+export function openChosenCamp(run: RunState, camp: CampSpec, catalog: Catalog): RunState {
+  return legsTo(planOf(run).length, camp.index).includes("shop") ? openShop(run, camp, catalog) : openLoadout(run, camp, catalog);
 }
 
 /** The draft before camp `next`: every seat is dealt the offers its
@@ -72,29 +81,29 @@ function openDraft(run: RunState, next: CampIndex, catalog: Catalog): RunAt<"dra
   return { ...drafting, seats };
 }
 
-/** The event before camp `next`: one of EVENTS, ids sorted, on its own stream. */
-function openEvent(run: RunState, next: CampIndex): RunAt<"event"> {
-  const events = Object.keys(EVENTS).sort();
-  const event = events[seededIndex(run.seed, STREAMS.event(next), events.length)]!;
-  return { ...run, stage: { tag: "event", next, event, ready: {} } };
+/** The event before camp `next` (run/events.ts), its effect applied once here. */
+function openEvent(run: RunState, next: CampIndex, catalog: Catalog): RunAt<"event"> {
+  const event = drawEventId(run.seed, next);
+  const applied = applyEvent(run, EVENTS[event as keyof typeof EVENTS], next, catalog);
+  return { ...applied.run, stage: { tag: "event", next, event, gains: applied.gains, ready: {} } };
 }
 
 /** Opens one stage on the way to camp `next` (run/trail.ts). The route vote
- * opens the loadout of the camp it chooses, so a loadout opened here is
- * camp 1's, which has no route. */
+ * opens the shop or loadout of the camp it chooses (openChosenCamp), so a
+ * loadout opened here is camp 1's, which has no route. */
 export function openLeg(run: RunState, next: CampIndex, leg: Leg, catalog: Catalog): RunState {
   switch (leg) {
     case "shop":
-      return openShop(run, next, null, catalog);
+      throw new Error(`openLeg: camp ${next}'s shop opens from its route vote`);
     case "draft":
       return openDraft(run, next, catalog);
     case "event":
-      return openEvent(run, next);
+      return openEvent(run, next, catalog);
     case "route":
       return { ...run, stage: { tag: "route", from: campIndex(next - 1), options: routeOptions(run, campIndex(next - 1), catalog), ballots: {} } };
     case "loadout":
       if (next !== 1) throw new Error(`openLeg: camp ${next}'s loadout opens from its route vote`);
-      return openLoadout(run, firstCampSpec(planOf(run).length), catalog);
+      return openLoadout(run, firstCampSpec(planOf(run).length, run.seatIds.length), catalog);
   }
 }
 
@@ -106,10 +115,10 @@ export function openLegAfter(run: RunState, next: CampIndex, after: Leg | null, 
   return openLeg(run, next, leg, catalog);
 }
 
-/** A failed or restarted camp opens again: through its shop before a boss
+/** A failed or restarted camp opens again: through its shop before a shop
  * camp, then its loadout with the same spec. */
 export function reopenCamp(run: RunState, camp: CampSpec, catalog: Catalog): RunState {
-  return replayLegs(planOf(run).length, camp.index)[0] === "shop" ? refitSlots(openShop(run, camp.index, camp, catalog), catalog) : openLoadout(run, camp, catalog);
+  return replayLegs(planOf(run).length, camp.index)[0] === "shop" ? refitSlots(openShop(run, camp, catalog), catalog) : openLoadout(run, camp, catalog);
 }
 
 /** A camp rule may give fewer slots than the set carried in (Rats): the
@@ -142,23 +151,24 @@ function settleFailure(run: RunAt<"camp">, catalog: Catalog): RunState {
   const spec = run.stage.camp;
   const result: CampResult = { camp: spec.index, attempt: run.stage.attempt.attemptNumber, location: spec.location, weather: spec.weather, status: "failed", suppliesSpent: cost, coins: 0 };
   const supplies = Math.max(0, run.supplies - cost);
-  const settled: RunState = { ...run, supplies, history: [...run.history, result] };
+  const lastAttempt = recapOf(run, "failed", 0, supplyCostParts(run, catalog), catalog);
+  const settled: RunState = { ...run, supplies, history: [...run.history, result], lastAttempt };
   return supplies === 0 ? { ...settled, stage: { tag: "ended", result: "lost" } } : reopenCamp(settled, spec, catalog);
 }
 
 /** A cleared camp opens the way to the next one. */
 function settleClear(run: RunAt<"camp">, catalog: Catalog): RunState {
   const spec = run.stage.camp;
-  const coins = payoutFor(run.stage.attempt.camp);
+  const coins = payoutFor(spec, run.stage.attempt.camp);
   const result: CampResult = { camp: spec.index, attempt: run.stage.attempt.attemptNumber, location: spec.location, weather: spec.weather, status: "cleared", suppliesSpent: 0, coins };
-  const settled: RunState = { ...run, purse: run.purse + coins, history: [...run.history, result] };
+  const settled: RunState = { ...run, purse: run.purse + coins, history: [...run.history, result], lastAttempt: recapOf(run, "cleared", coins, [], catalog) };
   if (isFinalCamp(planOf(run), spec.index)) return { ...settled, stage: { tag: "ended", result: "won" } };
   return openLegAfter(settled, campIndex(spec.index + 1), null, catalog);
 }
 
 /** The camp-settled reactions run first, at the camp. A failure spends
  * rules.failureCost (computed before the attempt is torn down) and reopens
- * the same spec (through the shop before a boss camp), or ends the run at 0
+ * the same spec (through the shop before a shop camp), or ends the run at 0
  * supplies. A clear pays into the purse and opens the stages before the next
  * camp, or wins the run at the final camp. */
 export function settleCamp(run: RunAt<"camp">, status: "cleared" | "failed", catalog: Catalog): RunState {

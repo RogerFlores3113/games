@@ -255,6 +255,10 @@ const AttemptViewSchema = z.strictObject({
   window: ActiveWindowSchema.nullable(),
   pendingSeatIds: z.array(z.string().min(1)),
   rescue: z.strictObject({ failedObjectiveIds: z.array(z.string().min(1)) }).nullable(),
+  // Between tricks: whose Hold on the next lead waits on, and whether the
+  // viewer may hold now.
+  holdingSeatIds: z.array(z.string().min(1)),
+  youMayHold: z.boolean(),
   effects: z.array(EffectViewSchema),
   reveals: z.array(RevealViewSchema),
   log: z.array(LogEntryViewSchema),
@@ -316,6 +320,41 @@ const CampResultViewSchema = z.strictObject({
   weather: z.string().min(1),
   status: z.enum(["cleared", "failed", "restarted"]),
   coins: z.number().int().min(0),
+});
+
+const CampRecapViewSchema = z.strictObject({
+  camp: CampIndexSchema,
+  attempt: z.number().int().min(1),
+  status: z.enum(["cleared", "failed"]),
+  tricksPlayed: z.number().int().min(0),
+  totalTricks: z.number().int().min(0),
+  lastTrick: CompletedTrickViewSchema.nullable(),
+  objectives: z.array(
+    z.strictObject({
+      objective: ObjectiveViewSchema,
+      failedAtTrick: z.number().int().min(0).nullable(),
+      fate: z
+        .discriminatedUnion("kind", [
+          z.strictObject({ kind: z.literal("won"), bySeatId: z.string().min(1) }),
+          z.strictObject({ kind: z.literal("lost") }),
+          z.strictObject({ kind: z.literal("open") }),
+        ])
+        .nullable(),
+      ownerTricksWon: z.number().int().min(0).nullable(),
+    }),
+  ),
+  failedGoalIds: z.array(z.string().min(1)),
+  coins: z.number().int().min(0),
+  supplyCost: z.array(
+    z.strictObject({
+      origin: z.discriminatedUnion("kind", [
+        z.strictObject({ kind: z.literal("base") }),
+        z.strictObject({ kind: z.literal("mod"), modId: z.string().min(1) }),
+        z.strictObject({ kind: z.literal("seat"), seatId: z.string().min(1), sourceId: z.string().min(1) }),
+      ]),
+      amount: z.number().int(),
+    }),
+  ),
 });
 
 // A seat the crew voted out while it was away; it rejoins at the next loadout.
@@ -398,12 +437,19 @@ const ModViewSchema = z.strictObject({
   status: z.array(StatusPartViewSchema),
 });
 
+/** What an event gave as it opened; the same shape in the view and the run. */
+const EventGainsSchema = z.strictObject({
+  coins: z.number().int().min(0),
+  supplies: z.number().int().min(0),
+  items: z.array(z.strictObject({ seatId: z.string().min(1), itemId: z.string().min(1) })),
+});
+
 const StageViewSchema = z.discriminatedUnion("tag", [
   z.strictObject({ tag: z.literal("muster"), ballots: z.array(BallotViewSchema), lockedSeatIds: z.array(z.string().min(1)) }),
   z.strictObject({
     tag: z.literal("shop"),
     next: CampIndexSchema,
-    camp: CampPreviewViewSchema.nullable(),
+    camp: CampPreviewViewSchema,
     shop: ShopViewSchema,
     readySeatIds: z.array(z.string().min(1)),
   }),
@@ -419,10 +465,17 @@ const StageViewSchema = z.discriminatedUnion("tag", [
   }),
   z.strictObject({
     tag: z.literal("route"),
-    options: z.array(z.strictObject({ id: z.string().min(1), next: CampPreviewViewSchema, swapsBoss: z.boolean() })),
+    options: z.array(
+      z.strictObject({
+        id: z.string().min(1),
+        next: CampPreviewViewSchema,
+        swapsBoss: z.boolean(),
+        pays: z.strictObject({ min: z.number().int().min(0), max: z.number().int().min(0) }),
+      }),
+    ),
     ballots: z.array(BallotViewSchema),
   }),
-  z.strictObject({ tag: z.literal("event"), event: z.string().min(1), next: CampIndexSchema, readySeatIds: z.array(z.string().min(1)) }),
+  z.strictObject({ tag: z.literal("event"), event: z.string().min(1), next: CampIndexSchema, gains: EventGainsSchema, readySeatIds: z.array(z.string().min(1)) }),
   z.strictObject({ tag: z.literal("ended"), result: z.enum(["won", "lost"]) }),
 ]);
 
@@ -441,6 +494,7 @@ export const ExpeditionViewSchema = z.strictObject({
   yourAbilities: z.array(AbilityViewSchema),
   yourItemSlots: z.number().int().min(0),
   history: z.array(CampResultViewSchema),
+  lastCamp: CampRecapViewSchema.nullable(),
   lastVote: VoteViewSchema.nullable(),
   stage: StageViewSchema,
 });

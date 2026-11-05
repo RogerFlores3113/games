@@ -6,7 +6,7 @@ import {
   ExpeditionViewSchema,
 } from "./expedition";
 
-// The 32 RunError names: CampError's 7 members, then RunError's 25
+// The 35 RunError names: CampError's 8 members, then RunError's 27
 // additional members.
 const EXPEDITION_ERROR_CODES = [
   "not_your_turn",
@@ -14,6 +14,7 @@ const EXPEDITION_ERROR_CODES = [
   "camp_over",
   "card_not_in_hand",
   "must_follow_suit",
+  "no_joker_first_lead",
   "objective_not_available",
   "invalid_action",
   "not_a_seat",
@@ -41,6 +42,8 @@ const EXPEDITION_ERROR_CODES = [
   "whisper_blocked",
   "no_whispers_left",
   "nothing_to_skip",
+  "waiting_on_hold",
+  "hold_unavailable",
 ] as const;
 
 const CAMP_MODS = [
@@ -61,11 +64,45 @@ const header = {
   purse: 8,
   supplies: { count: 3, max: 4 },
   plan: [{ at: 3, tier: "animal", bossId: null }, { at: 6, tier: "temple", bossId: null }],
+  lastCamp: null,
   lastVote: { topic: "length", tally: [{ choice: "short", votes: 1 }, { choice: "standard", votes: 1 }, { choice: "long", votes: 0 }], tied: ["short", "standard"], winner: "standard" },
+};
+
+const recap = {
+  camp: 1,
+  attempt: 2,
+  status: "failed",
+  tricksPlayed: 5,
+  totalTricks: 8,
+  lastTrick: {
+    index: 4,
+    leaderSeatId: "seat-1",
+    plays: [
+      { seatId: "seat-1", card: { id: "card-1", identity: { kind: "standard", suit: "clubs", rank: 7 } }, effectiveRank: null, countsAs: null, burned: false },
+      { seatId: "seat-2", card: { id: "card-2", identity: { kind: "standard", suit: "clubs", rank: 10 } }, effectiveRank: null, countsAs: null, burned: true },
+    ],
+    winnerSeatId: "seat-1",
+  },
+  objectives: [
+    {
+      objective: { id: "o1", kind: "win-card", target: { kind: "standard", suit: "clubs", rank: 10 }, ownerSeatId: "seat-2", status: "failed" },
+      failedAtTrick: 4,
+      fate: { kind: "lost" },
+      ownerTricksWon: 1,
+    },
+    { objective: { id: "o2", kind: "hidden", ownerSeatId: "seat-1", status: "pending" }, failedAtTrick: null, fate: null, ownerTricksWon: 2 },
+  ],
+  failedGoalIds: [],
+  coins: 0,
+  supplyCost: [
+    { origin: { kind: "base" }, amount: 1 },
+    { origin: { kind: "seat", seatId: "seat-2", sourceId: "heavy-pack" }, amount: 1 },
+  ],
 };
 
 const draftView = {
   ...header,
+  lastCamp: recap,
   seats: [
     {
       seatId: "seat-1",
@@ -131,6 +168,8 @@ const midAttempt = {
     window: "between-tricks",
     pendingSeatIds: [],
     rescue: null,
+    holdingSeatIds: ["seat-3"],
+    youMayHold: false,
     effects: [
       { origin: { kind: "seat", seatId: "seat-2", sourceId: "bait" }, atTrick: 1, lasts: "trick", params: { cardId: "card-4" } },
       { origin: { kind: "seat", seatId: "seat-3", sourceId: "explorer" }, atTrick: 1, lasts: "attempt", params: null },
@@ -229,14 +268,14 @@ describe("ExpeditionViewSchema", () => {
 
   it.each([
     ["loadout", { tag: "loadout", camp: { ...preview, pairing: "steam" }, mods: CAMP_MODS, readySeatIds: ["seat-2"] }],
-    ["shop on a replay", { tag: "shop", next: 3, camp: { ...preview, index: 3, shop: true }, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] }],
+    ["shop with no stock", { tag: "shop", next: 3, camp: { ...preview, index: 3, shop: true }, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] }],
     ["first draft", { tag: "draft", next: 1, cleared: 0, payout: 0, yourOffer: { kind: "standard", bundles: [["bait"], ["parrot"], ["whetstone"]] }, pendingSeatIds: [] }],
     [
       "shop",
       {
         tag: "shop",
         next: 3,
-        camp: null,
+        camp: { ...preview, index: 3, shop: true },
         shop: {
           stock: [
             { stockId: "supplies", what: { kind: "supplies" }, price: 6, soldTo: null },
@@ -252,13 +291,13 @@ describe("ExpeditionViewSchema", () => {
       {
         tag: "route",
         options: [
-          { id: "a", next: { ...preview, survey: [{ kind: "win-card", target: { kind: "standard", suit: "hearts", rank: 9 } }, { kind: "exactly-n", n: 2 }] }, swapsBoss: false },
-          { id: "b", next: { ...preview, slotKinds: ["win-card", "trick-count"] }, swapsBoss: true },
+          { id: "a", next: { ...preview, survey: [{ kind: "win-card", target: { kind: "standard", suit: "hearts", rank: 9 } }, { kind: "exactly-n", n: 2 }] }, swapsBoss: false, pays: { min: 5, max: 7 } },
+          { id: "b", next: { ...preview, slotKinds: ["win-card", "trick-count"] }, swapsBoss: true, pays: { min: 9, max: 11 } },
         ],
         ballots: [{ seatId: "seat-1", choice: "b" }],
       },
     ],
-    ["event", { tag: "event", event: "event", next: 2, readySeatIds: [] }],
+    ["event", { tag: "event", event: "dropped-pack", next: 2, gains: { coins: 0, supplies: 0, items: [{ seatId: "seat-1", itemId: "bait" }] }, readySeatIds: [] }],
     ["ended", { tag: "ended", result: "won" }],
   ])("accepts a %s stage", (_name, stage) => {
     expect(ExpeditionViewSchema.safeParse({ ...draftView, stage }).success).toBe(true);
@@ -328,6 +367,11 @@ describe("ExpeditionViewSchema", () => {
       },
     ],
     ["top-level itemSerial", { ...draftView, itemSerial: 3 }],
+    ["a recap carrying hands", { ...draftView, lastCamp: { ...recap, hands: [] } }],
+    [
+      "a hidden recap objective carrying a target",
+      { ...draftView, lastCamp: { ...recap, objectives: [{ ...recap.objectives[1], objective: { ...recap.objectives[1]!.objective, target: { kind: "standard", suit: "clubs", rank: 10 } } }] } },
+    ],
     [
       "a remaining of the removed single-use kind",
       { ...draftView, seats: [{ ...draftView.seats[1], usage: [{ sourceKey: "it0", remaining: { kind: "single-use" } }] }] },
@@ -462,7 +506,7 @@ describe("ExpeditionViewSchema", () => {
     ],
     ["a modifier of an unknown kind", { ...midCampView, stage: { ...midCampView.stage, mods: [{ id: "x", kind: "volcano", strength: "full", status: [] }] } }],
     ["an effect with no origin", { ...midCampView, stage: { ...midCampView.stage, attempt: { ...midAttempt, effects: [{ sourceId: "bait", seatId: "seat-2", atTrick: 1, lasts: "trick", params: null }] } } }],
-    ["a route option with a bad slot kind", { ...draftView, stage: { tag: "route", options: [{ id: "a", next: { ...preview, slotKinds: ["boss"] }, swapsBoss: false }], ballots: [] } }],
+    ["a route option with a bad slot kind", { ...draftView, stage: { tag: "route", options: [{ id: "a", next: { ...preview, slotKinds: ["boss"] }, swapsBoss: false, pays: { min: 5, max: 7 } }], ballots: [] } }],
   ])("rejects: %s", (_name, input) => {
     expect(ExpeditionViewSchema.safeParse(input).success).toBe(false);
   });
@@ -477,8 +521,8 @@ describe("ExpeditionErrorCodeSchema", () => {
     expect(ExpeditionErrorCodeSchema.safeParse(code).success).toBe(false);
   });
 
-  it("has exactly 32 members", () => {
-    expect(ExpeditionErrorCodeSchema.options.length).toBe(32);
+  it("has exactly 35 members", () => {
+    expect(ExpeditionErrorCodeSchema.options.length).toBe(35);
   });
 });
 

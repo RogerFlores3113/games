@@ -47,6 +47,9 @@ describe("STREAMS distinctness (A1)", () => {
       for (const item of options) {
         for (const part of parts) names.push(STREAMS.shopItem(camp, item, part));
       }
+      for (const seat of seats) {
+        for (const part of parts) names.push(STREAMS.eventItem(camp, seat, part));
+      }
       for (const attempt of attempts) {
         names.push(STREAMS.trickCountKind(camp, attempt));
         names.push(STREAMS.trickCountN(camp, attempt));

@@ -284,14 +284,16 @@ export const RUN_LENGTHS = {
   standard: { camps: 6, bossCamps: [{ at: 3, tier: "animal" }, { at: 6, tier: "temple" }] },
   long:     { camps: 8, bossCamps: [{ at: 3, tier: "animal" }, { at: 6, tier: "disaster" }, { at: 8, tier: "temple" }] },
 } as const;
-/** Seat objectives per camp, before boss and temple slot layers. The temple adds the Sun. */
+/** Seat objectives per camp at 3 players, before boss and temple slot layers. The temple adds the Sun. */
 export const OBJECTIVE_RAMP: Record<RunLength, readonly number[]> = {
   short: [2, 3, 4, 3], standard: [2, 3, 3, 4, 4, 4], long: [2, 3, 3, 4, 4, 4, 5, 4],
 };
+export const EXTRA_OBJECTIVES_BY_PLAYERS = { 3: 0, 4: 1, 5: 2 }; // added at every camp
 export const MIX_FROM_CAMP = 4;            // ordered pairs and trick-count slots from camp 4
+export const EARLY_MIX_PLAYERS = 4;        // from this crew size, mixes start one camp earlier
 export const SUPPLIES_START = 3, SUPPLIES_MAX = 4, SUPPLY_PRICE = 6;
 export const PAYOUT = { base: 5, perUnplayedTrick: 1, unplayedCap: 3 };
-export const NORMAL_WEATHER_CHANCE = 80;   // percent; a location may override (Clifftop 50)
+export const NORMAL_WEATHER_CHANCE = 80;   // percent; a location may override (Clifftop 0)
 export const ROUTE_OPTIONS = { min: 2, max: 3 };
 export const DRAFT = { options: 3, bundleSize: 2, rareChance: 15 };
 export const SHOP = { items: 3, upgradePrice: 8 };
@@ -343,10 +345,13 @@ export type VoteRecord = { readonly topic: "length" | "route"; readonly result: 
 export function tally<C extends string>(seed: string, stream: string, choices: readonly C[], seatIds: readonly SeatId[], ballots: PerSeat<C | null>): VoteResult<C> | null;
 ```
 
-**Slot mixes.** Camp `k` gets `OBJECTIVE_RAMP[length][k-1]` seat slots, all win-card below
-`MIX_FROM_CAMP`. From camp 4 on each route option draws a mix: plain, an ordered pair (two slots
-become ordered 1 and 2), a trick-count slot (resolved per attempt, as today), or both when the camp
-has 4 or more slots. A replay keeps the spec, so it keeps its mix.
+**Slot mixes.** Camp `k` gets `seatObjectivesAt(length, k, players)` seat slots:
+`OBJECTIVE_RAMP[length][k-1]` plus `EXTRA_OBJECTIVES_BY_PLAYERS` for the crew size when the spec is
+drawn (none at 3 players, 1 at 4, 2 at 5), all win-card below `mixFromCampFor(players)`
+(`MIX_FROM_CAMP`, one camp earlier from `EARLY_MIX_PLAYERS`). From then on each route option draws
+a mix: plain, an ordered pair (two slots become ordered 1 and 2), a trick-count slot (resolved per
+attempt, as today), or both when the camp has 4 or more slots. A replay keeps the spec, so it keeps
+its mix and its slot count, even when a kick changed the crew.
 
 ### Seats, items, upgrades, draft and shop
 
@@ -579,7 +584,7 @@ or `slots`. Half bodies are placeholders for owner review.
 | Mod | Kind | Channel | Full | Half |
 |---|---|---|---|---|
 | clearing, jungle | location | none | empty body | |
-| clifftop | location | plan | `normalWeatherChance: 50` | |
+| clifftop | location | plan | `normalWeatherChance: 0` (never fair; J.D.'s luck leaves a 0 at 0) | |
 | desert (Mirage) | location | rule | `hides` one objective (`roll("mirage")`) from everyone until the first trick completes | |
 | cave (Darkness) | location | rule | `hides` every current-trick play from all but its player | |
 | magma (Heat) | location | deal | `deckFor`: no 2s or 3s, then 4s (clubs, diamonds, hearts, spades) until the deck divides by the seat count (45, 44, 45 cards); the floor makes targets 5+ | |
@@ -1644,8 +1649,7 @@ group. Dev: `set-character` follows the registry; `check.ts` drops pool checks.
 - The contract test plays every boss's half body as a temple helper (the boss planned at camp
   1, the temple at camp 2) at 3, 4 and 5 players. The Long-run property plays every camp with
   random legal moves; before the temple a camp failed twice, or a failure that would end the
-  run, is cleared by `force-camp` (Heavy Packs can make one failure cost more than full
-  supplies).
+  run, is cleared by `force-camp` (a Heavy Pack makes one failure cost 2 supplies; more packs don't add to it).
 - `RunState` is unchanged, so `ROOM_SCHEMA_VERSION` stays 11. Rescue still opens only with no
   failed goal, so its view still needs no `failedGoalIds`. The skip's 16x16 icon is drawn in
   code (`apps/web/art/expedition/draw-icon-skip.mjs`).
@@ -1716,20 +1720,26 @@ and a bare identifier lives in `run/balance.ts`. A def's `text` repeats some of 
 | What | Current value | Where it lives |
 |---|---|---|
 | Run lengths and boss camps | Short 4 camps, temple at 4; Standard 6, animal at 3, temple at 6; Long 8, animal at 3, disaster at 6, temple at 8 | `RUN_LENGTHS` |
-| Seat objectives per camp, before boss and temple slots | Short 2, 3, 4, 3; Standard 2, 3, 3, 4, 4, 4; Long 2, 3, 3, 4, 4, 4, 5, 4 | `OBJECTIVE_RAMP` |
-| First camp with mixed slots | camp 4 | `MIX_FROM_CAMP` |
+| Shop camps (a shop after the route vote) | Short 3 and 4; Standard 3 and 6; Long 3, 6 and 8 | `SHOP_CAMPS` |
+| Seat objectives per camp at 3 players, before boss and temple slots | Short 2, 3, 4, 3; Standard 2, 3, 3, 4, 4, 4; Long 2, 3, 3, 4, 4, 4, 5, 4 | `OBJECTIVE_RAMP` |
+| Extra seat objectives at every camp, by crew size | 3 players 0, 4 players 1, 5 players 2 | `EXTRA_OBJECTIVES_BY_PLAYERS` (read by `seatObjectivesAt`) |
+| First camp with mixed slots | camp 4; camp 3 at 4 or more players | `MIX_FROM_CAMP`, `EARLY_MIX_PLAYERS` (read by `mixFromCampFor`) |
 | Fewest slots for the "both" mix | 4 | `BOTH_MIX_MIN_SLOTS` |
 | Mix choices | plain, ordered pair (2 slots), trick-count, both; uniform | `run/route.ts` `optionsAfter`, `slotsFor` |
 | Trick-count slot kind | no-tricks or exactly-n, even odds, per attempt | `resolveTrickCountSlot` |
 | Exactly-n's N | 2 to 4, uniform | `TRICK_COUNT_N_RANGE` |
 | Route options | 2 or 3, uniform | `ROUTE_OPTIONS` |
-| Event on a route | uniform over `EVENTS` | `run/route.ts` `optionsAfter` |
+| Event before a camp | uniform over `EVENT_POOL` (Abandoned camp, Dropped pack, Fresh spring; Quiet trail out) | `content/events/registry.ts` `EVENT_POOL`, `run/events.ts` `drawEventId` |
+| Abandoned camp | the purse gains 4 coins | `content/events/event.ts` `effect.coins` |
+| Fresh spring | 1 supply back, up to the cap; with supplies full, 3 coins | `content/events/event.ts` `effect.supplies`, `effect.elseCoins` |
+| Dropped pack | one random common item for each seat with room | `content/events/event.ts`, `run/events.ts` `giveCommonItems` |
 | Supplies at the start | 3 | `SUPPLIES_START` |
 | Supplies cap | 4 | `SUPPLIES_MAX` |
 | Supply price at the shop | 6 coins | `SUPPLY_PRICE` |
 | Failure cost | 1 supply | `FAILURE_COST` |
 | Purse at the start | 0 coins | `PURSE_START` |
-| Payout for a clear | 5, plus 1 per unplayed trick up to 3 | `PAYOUT` |
+| Payout for a clear | 5; +2 off plain ground, +2 in any weather but Fair; plus 1 per unplayed trick up to 2 | `PAYOUT` |
+| Plain ground (no risk bonus) | locations Jungle and Clearing, weather Fair | `PLAIN_GROUND` |
 | Draft offer | 3 bundles of 2 items | `DRAFT.options`, `DRAFT.bundleSize` |
 | Rare chance, draft and shop | 15% | `DRAFT.rareChance` |
 | Shop items | 3 single copies | `SHOP.items` |
@@ -1745,10 +1755,10 @@ and a bare identifier lives in `run/balance.ts`. A def's `text` repeats some of 
 | Puffball, Bait | 2 coins, common, single-use | `content/items/<id>.ts` |
 | Camouflage | 4 coins, rare, single-use | `content/items/camouflage.ts` |
 | Rope Ladder | 3 coins, common, single-use | `content/items/rope-ladder.ts` |
-| Heavy Pack | 3 coins, common, passive: +1 whisper, +1 supply per failure | `content/items/heavy-pack.ts` |
+| Heavy Pack | 3 coins, common, passive: +1 whisper per carrier; +1 supply per failure, once for the whole crew however many are equipped | `content/items/heavy-pack.ts` (`EXTRA_FAILURE_COST`) |
 | Mosquito Net | 4 coins, rare, passive | `content/items/mosquito-net.ts` |
 | Fair weather chance | 80% | `NORMAL_WEATHER_CHANCE` |
-| Clifftop's fair weather chance | 50% | `content/mods/clifftop.ts` `normalWeatherChance` |
+| Clifftop's fair weather chance | 0% (never fair, so its harsher weather always applies; J.D.'s hidden luck does not lift it) | `content/mods/clifftop.ts` `normalWeatherChance` |
 | Location weights | clearing, jungle, clifftop, desert, cave, magma: 1 each | each def's `weight` in `content/mods/<id>.ts` |
 | Weather weights | rain, fog, thunderstorm, night: 3 each; downpour 1 (a third of Rain); fair 0 (drawn by chance) | each def's `weight` |
 | Rain, Downpour washes | first whispers each camp, crew-wide: Rain players - 2, Downpour players - 1; on an exposed location (Clifftop) 2 and 3 more | `WASHES` |
@@ -2179,11 +2189,12 @@ How each of the nine fits (for unit 13):
   longer carry Pack Rat items. Deviation: a one-item bundle never repeats
   another option's item (`drawOffer`), so the pick is between three
   different items; Treasure Map's one-item options are distinct too now.
-  Both offers are kind "standard"; the web tells the Pack Rat's pick by
+  The Pack Rat's pick is kind "special" (any shape with exclusive items is),
+  the usual offer "standard"; the web tells the Pack Rat's pick by
   every offered item being exclusive to one character (`ownPickOf`).
 - `RunState` is unchanged in shape, so `ROOM_SCHEMA_VERSION` stays 14.
 - Location and weather texts are rewritten as one warm line each (Clifftop:
-  "Exposed to the elements up here: weather hits harder."). Each is still
+  "Exposed to the elements: the weather is never fair up here, and bad weather hits harder."). Each is still
   the rules sentence the chip tooltip and the rules modal show.
 - Web: the weather chip reads "1 of 2 wash away" while washes are left,
   then "Heard now"; its tooltip says "1 of 2 whispers will wash away". Your
@@ -2867,3 +2878,41 @@ How each of the nine fits (for unit 13):
   swallowed like a player's (the tour's "New expedition" click landed in it).
 - `create-room-form.ts`'s comments name the per-game start pages and
   `useCreateRoom`, not the removed landing form.
+
+### Implementation notes (playtest fixes: economy, shops, events)
+
+Owner decisions after the 11-agent playtest, which found that every cleared
+camp paid 8 coins whatever the route, that a Short run had nothing to buy
+until the temple, that the crew shopped before it knew its camp, and that
+events did nothing.
+
+- Payout (`PAYOUT`, `payoutFor(spec, camp)`): 5, plus 2 when the camp's
+  location is not plain ground and 2 when its weather is not Fair, plus 1 per
+  unplayed trick, at most 2. Plain ground (`PLAIN_GROUND`) is the defs that
+  change nothing: the Jungle and the Clearing, and Fair. Lead: the Clearing
+  counts as plain, since it changes nothing and a risk bonus there would pay
+  for no risk. A route option's view carries `pays: { min, max }`
+  (`payoutRange`); each route card shows "Pays 9 to 11 coins" under its
+  objectives.
+- Shops (`SHOP_CAMPS`): every boss camp, and camp 3 of a Short run. The way
+  to a shop camp is now draft, event (when there is one), route, shop,
+  loadout: the route vote opens the shop of the camp it chose
+  (`openChosenCamp`), and the shop's last ready opens that camp's loadout, so
+  `stage.camp` is always the chosen spec and the shop panel always previews
+  it. A failed or restarted shop camp goes back through its shop, as before.
+  The boss is revealed by the route preview, so the shop names it. The draft
+  after a boss camp still offers bundles; camp 3 of a Short run is a shop
+  camp, not a boss camp.
+- Events: an `EventDef` has an optional `effect` (`coins`, `supplies` with
+  `elseCoins`, or `common-item`), applied once as the event stage opens
+  (`openEvent` calls `run/events.ts`'s `applyEvent`). `stage.gains` records
+  what it gave; the view carries it, leaving out an item a seat's loadout
+  hides from the viewer, and the event panel lists it ("The purse gains 4
+  coins", "You take Bait"). Three events replace Quiet trail in
+  `EVENT_POOL`: Abandoned camp, Fresh spring and Dropped pack. Quiet trail
+  stays in `EVENTS`, out of the pool, for tests and the dev panel. Dropped
+  pack mints each item as the draft does (into a free slot, else the
+  backpack), on its own stream `expedition-event-item:camp{k}:seat{id}`.
+  The event screen has no per-event image.
+- `ROOM_SCHEMA_VERSION` 19: the shop's camp is never null and the event stage
+  carries `gains`.

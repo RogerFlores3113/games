@@ -20,8 +20,16 @@ export const OBJECTIVE_RAMP: Readonly<Record<RunLength, readonly number[]>> = {
   long: [2, 3, 3, 4, 4, 4, 5, 4],
 };
 
+/** Seat objectives a camp adds to OBJECTIVE_RAMP for its crew size. The ramp
+ * is tuned for 3 players; bigger crews hold more cards between them, so they
+ * get more to do. */
+export const EXTRA_OBJECTIVES_BY_PLAYERS: Readonly<Record<3 | 4 | 5, number>> = { 3: 0, 4: 1, 5: 2 };
+
 /** Ordered pairs and trick-count slots appear from this camp on. */
 export const MIX_FROM_CAMP = 4;
+
+/** From this crew size on, mixed slots start one camp before MIX_FROM_CAMP. */
+export const EARLY_MIX_PLAYERS = 4;
 
 /** A route may mix in both an ordered pair and a trick-count slot only at a
  * camp with at least this many seat slots. */
@@ -36,7 +44,14 @@ export const FAILURE_COST = 1;
 
 export const PURSE_START = 0;
 
-export const PAYOUT = { base: 5, perUnplayedTrick: 1, unplayedCap: 3 } as const;
+/** Coins a cleared camp pays: `base`, plus `riskyLocation` away from plain
+ * ground and `riskyWeather` in anything but fair weather, plus
+ * `perUnplayedTrick` per trick left unplayed, for at most `unplayedCap`
+ * tricks. */
+export const PAYOUT = { base: 5, riskyLocation: 2, riskyWeather: 2, perUnplayedTrick: 1, unplayedCap: 2 } as const;
+
+/** The locations and weathers that change nothing, so pay no risk bonus. */
+export const PLAIN_GROUND: { readonly locations: readonly string[]; readonly weathers: readonly string[] } = { locations: ["jungle", "clearing"], weathers: ["fair"] };
 
 export const ROUTE_OPTIONS = { min: 2, max: 3 } as const;
 
@@ -71,9 +86,17 @@ export const DRAFT = { options: 3, bundleSize: 1, bossBundleSize: 2, rareChance:
  * after it, while a camp follows. */
 export const EVENT_EVERY = 2;
 
-/** The shop before a boss camp: `items` single copies beside the supplies,
- * and each seat's own character's upgrades. */
+/** The shop: `items` single copies beside the supplies, and each seat's own
+ * character's upgrades. */
 export const SHOP = { items: 3, upgradePrice: 8 } as const;
+
+/** The camps a shop opens before, after their route vote: every boss camp,
+ * and camp 3 of a Short run too. */
+export const SHOP_CAMPS: Readonly<Record<RunLength, readonly number[]>> = {
+  short: [3, 4],
+  standard: [3, 6],
+  long: [3, 6, 8],
+};
 
 /** Item slots a seat starts with; camp rules and passives move it. */
 export const ITEM_SLOTS = 2;
@@ -89,10 +112,43 @@ export const WHISPERS_PER_UPGRADE = 1;
 /** Placeholder: an exactly-n slot draws N uniformly from this range. */
 export const TRICK_COUNT_N_RANGE = { min: 2, max: 4 } as const;
 
-/** Coins a cleared camp pays: the base plus a bonus per trick left unplayed. */
-export function payoutFor(camp: CampState): number {
+/** Crew sizes outside 3 to 5 read as the nearest one. */
+function crewSize(players: number): 3 | 4 | 5 {
+  return players <= 3 ? 3 : players >= 5 ? 5 : 4;
+}
+
+/** Camp k's seat objectives for a crew of `players`, before boss and temple
+ * slot layers: OBJECTIVE_RAMP plus EXTRA_OBJECTIVES_BY_PLAYERS. */
+export function seatObjectivesAt(length: RunLength, k: number, players: number): number {
+  const ramp = OBJECTIVE_RAMP[length][k - 1];
+  if (ramp === undefined) throw new Error(`balance: ${length} run has no camp ${k}`);
+  return ramp + EXTRA_OBJECTIVES_BY_PLAYERS[crewSize(players)];
+}
+
+/** The first camp with mixed slots for a crew of `players`. */
+export function mixFromCampFor(players: number): number {
+  return players >= EARLY_MIX_PLAYERS ? MIX_FROM_CAMP - 1 : MIX_FROM_CAMP;
+}
+
+type Ground = Pick<CampSpec, "location" | "weather">;
+
+/** The coins a camp pays before its unplayed tricks: the base and its risk bonus. */
+export function basePayout(spec: Ground): number {
+  const location = PLAIN_GROUND.locations.includes(spec.location) ? 0 : PAYOUT.riskyLocation;
+  const weather = PLAIN_GROUND.weathers.includes(spec.weather) ? 0 : PAYOUT.riskyWeather;
+  return PAYOUT.base + location + weather;
+}
+
+/** The fewest and most coins clearing `spec` pays. */
+export function payoutRange(spec: Ground): { readonly min: number; readonly max: number } {
+  const min = basePayout(spec);
+  return { min, max: min + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap };
+}
+
+/** Coins a cleared camp pays: its base payout plus a bonus per trick left unplayed. */
+export function payoutFor(spec: Ground, camp: CampState): number {
   const unplayed = camp.totalTricks - camp.completedTricks.length;
-  return PAYOUT.base + PAYOUT.perUnplayedTrick * Math.min(PAYOUT.unplayedCap, unplayed);
+  return basePayout(spec) + PAYOUT.perUnplayedTrick * Math.min(PAYOUT.unplayedCap, unplayed);
 }
 
 function resolveTrickCountSlot(seed: string, spec: CampSpec, attemptNumber: number): ObjectiveSlot {

@@ -444,7 +444,7 @@ function lengthTieView(game: Game): Game {
 
 const uses = (left: number, of: number) => ({ kind: "uses", left, of });
 
-/** The shop before camp 3's animal boss: one item equipped and two in the
+/** The shop before camp 3's animal boss, after the route vote: one item equipped and two in the
  * backpack, supplies, an item a teammate bought, and the Explorer's
  * upgrades just out of reach. */
 function shopView(game: Game): Game {
@@ -474,7 +474,7 @@ function shopView(game: Game): Game {
     stage: {
       tag: "shop",
       next: 3,
-      camp: null,
+      camp: { ...PREVIEW, index: 3, location: "cave", weather: "rain", bossId: "crocodile", shop: true },
       shop: {
         stock: [
           { stockId: "supplies", what: { kind: "supplies" }, price: 6, soldTo: null },
@@ -627,9 +627,9 @@ function routeWeatherView(game: Game): Game {
     stage: {
       tag: "route",
       options: [
-        { id: "a", next: next("clearing", "thunderstorm", null), swapsBoss: false },
-        { id: "b", next: next("magma", "rain", "steam"), swapsBoss: false },
-        { id: "c", next: next("cave", "rain", "flooding"), swapsBoss: false },
+        { id: "a", next: next("clearing", "thunderstorm", null), swapsBoss: false, pays: { min: 7, max: 9 } },
+        { id: "b", next: next("magma", "rain", "steam"), swapsBoss: false, pays: { min: 9, max: 11 } },
+        { id: "c", next: next("cave", "rain", "flooding"), swapsBoss: false, pays: { min: 9, max: 11 } },
       ],
       ballots: [],
     },
@@ -732,9 +732,9 @@ function routeBossView(game: Game): Game {
     stage: {
       tag: "route",
       options: [
-        { id: "a", next: next("clearing", "fair", null), swapsBoss: false },
-        { id: "b", next: next("magma", "rain", "steam"), swapsBoss: false },
-        { id: "c", next: next("cave", "fog", null), swapsBoss: false },
+        { id: "a", next: next("clearing", "fair", null), swapsBoss: false, pays: { min: 5, max: 7 } },
+        { id: "b", next: next("magma", "rain", "steam"), swapsBoss: false, pays: { min: 9, max: 11 } },
+        { id: "c", next: next("cave", "fog", null), swapsBoss: false, pays: { min: 9, max: 11 } },
       ],
       ballots: [],
     },

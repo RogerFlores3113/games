@@ -150,6 +150,7 @@ describe("applyRunAction: each stage accepts only its own actions", () => {
     { type: "ready" },
     { type: "use-ability", sourceKey: "spare", targets: [] },
     { type: "skip-window" },
+    { type: "hold" },
     { type: "whisper", targetSeatId: "p1", cardId: "x" },
     { type: "pick-objective", objectiveId: "x" },
     { type: "play-card", cardId: "x" },
@@ -173,15 +174,15 @@ describe("applyRunAction: each stage accepts only its own actions", () => {
   });
 
   it("event: equip, discard and ready", () => {
-    expect(accepted({ ...loadoutRun(), stage: { tag: "event", next: campIndex(2), event: "event", ready: {} } })).toEqual(["equip", "discard-item", "ready"]);
+    expect(accepted({ ...loadoutRun(), stage: { tag: "event", next: campIndex(2), event: "event", gains: { coins: 0, supplies: 0, items: [] }, ready: {} } })).toEqual(["equip", "discard-item", "ready"]);
   });
 
   it("route: votes, equip, discard and abilities", () => {
     expect(accepted({ ...loadoutRun(), stage: { tag: "route", from: campIndex(1), options: [], ballots: {} } })).toEqual(["vote", "equip", "discard-item", "use-ability"]);
   });
 
-  it("camp: abilities, window passes, whispers and the two camp actions", () => {
-    expect(accepted(campRun())).toEqual(["use-ability", "skip-window", "whisper", "pick-objective", "play-card"]);
+  it("camp: abilities, window passes, holds, whispers and the two camp actions", () => {
+    expect(accepted(campRun())).toEqual(["use-ability", "skip-window", "hold", "whisper", "pick-objective", "play-card"]);
   });
 
   it("draft: equip, discard, pick-bundle and abilities", () => {
