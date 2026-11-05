@@ -36,6 +36,12 @@ function kitSection(view: RulesView | null): RulesSection {
 const { short, standard, long } = RUN_LENGTH_DISPLAY;
 const B = BALANCE_DISPLAY;
 const count = (n: number, one: string, many: string): string => `${n === 1 ? "one" : n} ${n === 1 ? one : many}`;
+const nameList = (names: readonly string[]): string => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
+const plainNames = (ids: readonly string[]): string => nameList(ids.map((id) => `the ${MOD_DISPLAY[id]?.name ?? id}`));
+/** The shop camps that are not boss camps: "camp 3 of a Short run". */
+const extraShops = [short, standard, long].flatMap((length) =>
+  B.shopCamps[length.id].filter((at) => !length.bossCamps.some((boss) => boss.at === at)).map((at) => `camp ${at} of a ${length.name} run`),
+);
 
 export function buildRulesReference(view: ExpeditionView | null): RulesSection[] {
   return [
@@ -53,9 +59,9 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       id: "between",
       heading: "Between camps",
       paragraphs: [
-        `A cleared camp pays ${B.payout.base} coins into the crew's purse, plus ${B.payout.perUnplayedTrick} for each unplayed trick, up to ${B.payout.unplayedCap * B.payout.perUnplayedTrick} more.`,
-        `Before every camp, camp 1 too, everyone drafts one of ${B.draftOptions} items; after a boss camp, one of ${B.draftOptions} pairs of items. After every other camp an event waits on the trail. Then the crew votes on the route to the next camp, and a tied vote is settled by a coin flip.`,
-        `Before a boss camp the crew shops with the purse: supplies (${B.supplyPrice} coins), items, and your own character's upgrades (${B.upgradePrice} coins). An upgrade also gives you ${count(B.whispersPerUpgrade, "more whisper", "more whispers")} each camp.`,
+        `A cleared camp pays ${B.payout.base} coins into the crew's purse, ${B.payout.riskyLocation} more anywhere but ${plainNames(B.plainGround.locations)}, ${B.payout.riskyWeather} more in any weather but ${nameList(B.plainGround.weathers.map((id) => MOD_DISPLAY[id]?.name ?? id))}, and ${B.payout.perUnplayedTrick} for each unplayed trick, up to ${B.payout.unplayedCap * B.payout.perUnplayedTrick} more. Each route card says what its camp pays.`,
+        `Before every camp, camp 1 too, everyone drafts one of ${B.draftOptions} items; after a boss camp, one of ${B.draftOptions} pairs of items. After every other camp an event waits on the trail, and it may give the crew coins, a supply or items. Then the crew votes on the route to the next camp, and a tied vote is settled by a coin flip.`,
+        `Before every boss camp${extraShops.length === 0 ? "" : `, and before ${nameList(extraShops)}`}, a shop opens once the route is chosen. The crew spends the purse on supplies (${B.supplyPrice} coins), items, and your own character's upgrades (${B.upgradePrice} coins). An upgrade also gives you ${count(B.whispersPerUpgrade, "more whisper", "more whispers")} each camp.`,
         `Each explorer has ${B.itemSlots} item slots, and only the items in them go into camp. Up to ${B.backpackSize} more wait in the backpack: open it from the item bar between camps to swap items, or to discard one when it is full.`,
       ],
       items: [],

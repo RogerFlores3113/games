@@ -84,7 +84,7 @@ export const TRANSITIONS: readonly TransitionCase[] = [
   {
     id: "camp-won",
     tone: "good",
-    when: (shown, next) => shown.stage.tag === "camp" && (next.stage.tag === "draft" || next.stage.tag === "shop") && next.history.at(-1)?.status === "cleared",
+    when: (shown, next) => shown.stage.tag === "camp" && next.stage.tag === "draft" && next.history.at(-1)?.status === "cleared",
     copy: (_, next) => {
       const coins = `+${next.history.at(-1)?.coins ?? 0} coins`;
       return { title: "Camp won!", sub: next.lastCamp?.status === "cleared" ? `${coins}\n${clearLine(next.lastCamp)}` : coins };
@@ -124,9 +124,9 @@ export const TRANSITIONS: readonly TransitionCase[] = [
   {
     id: "route-decided",
     tone: "neutral",
-    when: (shown, next) => shown.stage.tag === "route" && next.stage.tag === "loadout",
+    when: (shown, next) => shown.stage.tag === "route" && (next.stage.tag === "loadout" || next.stage.tag === "shop"),
     copy: (_, next) => {
-      if (next.stage.tag !== "loadout") return { title: "On the trail", sub: null };
+      if (next.stage.tag !== "loadout" && next.stage.tag !== "shop") return { title: "On the trail", sub: null };
       const camp = next.stage.camp;
       const flip = next.lastVote?.topic === "route" && next.lastVote.tied !== null;
       return { title: `Heading to ${placeName(camp.location)}`, sub: `${weatherLine(camp.weather, camp.pairing)}${flip ? "\nA coin flip decided it" : ""}` };
@@ -181,8 +181,7 @@ function suppliesLost(lost: number, left: number): string {
 
 function campOf(view: ExpeditionView): { index: number; location: string; weather: string; pairing: string | null } | null {
   const stage = view.stage;
-  if (stage.tag === "loadout" || stage.tag === "camp") return stage.camp;
-  if (stage.tag === "shop") return stage.camp;
+  if (stage.tag === "loadout" || stage.tag === "camp" || stage.tag === "shop") return stage.camp;
   return null;
 }
 

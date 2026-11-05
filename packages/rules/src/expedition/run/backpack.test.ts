@@ -63,8 +63,8 @@ describe("the backpack", () => {
   });
 
   it("the shop refuses an item that does not fit as backpack_full, but still sells supplies", () => {
-    const run = setupRun({ seatIds: SEATS, seed: "backpack", catalog, camp: 2, purse: 30, supplies: 2, items: { p0: ITEMS.slice(0, 8) } });
-    const shop = settleCamp(dealCamp(run as RunAt<"loadout">, catalog), "cleared", catalog);
+    const run = setupRun({ seatIds: SEATS, seed: "backpack", catalog, camp: 3, purse: 30, supplies: 3, items: { p0: ITEMS.slice(0, 8) } });
+    const shop = settleCamp(dealCamp(run as RunAt<"loadout">, catalog), "failed", catalog);
     expect(shop.stage.tag).toBe("shop");
     expect(applyRunAction(shop, "p0", { type: "buy", stockId: "item0" }, catalog)).toEqual({ ok: false, error: "backpack_full" });
     expect(act(shop, "p0", { type: "buy", stockId: "supplies" }).supplies).toBe(3);
@@ -126,11 +126,15 @@ describe("a camp rule that takes a slot", () => {
       plan: { ...run.plan!, bosses: [{ at: campIndex(3), tier: "animal", modId: "rats" }] },
       stage: { tag: "route", from: campIndex(2), options: [{ id: "a", next, reroll: 0, swapBoss: null }], ballots: {} },
     };
-    const loadout = SEATS.reduce((acc, seatId) => {
-      const result = applyRunAction(acc, seatId, { type: "vote", choice: "a" }, ratsCatalog);
+    // Camp 3 is a shop camp: the vote opens its shop, whose last ready opens the loadout.
+    const step = (acc: RunState, seatId: string, action: RunAction): RunState => {
+      const result = applyRunAction(acc, seatId, action, ratsCatalog);
       if (!result.ok) throw new Error(result.error);
       return result.state;
-    }, atRoute);
+    };
+    const shop = SEATS.reduce((acc, seatId) => step(acc, seatId, { type: "vote", choice: "a" }), atRoute);
+    expect([shop.stage.tag, shop.seats[0]!.equipped]).toEqual(["shop", ["it0", "it1"]]);
+    const loadout = SEATS.reduce((acc, seatId) => step(acc, seatId, { type: "ready" }), shop);
     expect(loadout.seats[0]!.equipped).toEqual(["it0"]);
     expect(backpackOf(loadout.seats[0]!)).toHaveLength(7);
     expect(applyRunAction(loadout, "p0", { type: "equip", itemUids: [] }, ratsCatalog)).toEqual({ ok: false, error: "backpack_full" });

@@ -90,8 +90,10 @@ card or was discarded, and fails if never played by the final trick.
   lives in that def), `run/rng.ts` (`STREAMS`,
   `seededIndex`) and `run/catalog.ts`'s `CATALOG` (`{ characters, items,
   mods, pairings }` plus the flattened `sources` index). `content/events/`
-  holds the trail's events: `event-def.ts` (`EventDef`, `defineEvent`), one
-  file per event and its `registry.ts` (`EVENTS`).
+  holds the trail's events: `event-def.ts` (`EventDef` with its optional
+  `effect`, `defineEvent`), `event.ts` and its `registry.ts` (`EVENTS`, and
+  `EVENT_POOL`, the ones the trail draws; Quiet trail stays out of it).
+  `run/events.ts` draws an event and applies its effect.
 
 **The run loop.** A run is a stored stage, and `applyRunAction` is the one
 transition: it refuses an action type the stage does not accept
@@ -110,26 +112,33 @@ until the tag stops changing.
    route preview leads to its camp (`run/plan.ts`'s `horizon`); the leak
    check flags it before then.
 2. **The way to a camp** (`run/trail.ts`'s `legsTo(length, next)`, in
-   order): the **shop** before a boss camp, the item **draft**, the
-   **event** after camp 1 and every other camp after it, the **route**
-   vote, then the **loadout**. Camp 1 is the Jungle in fair weather, so
-   before it there is only the draft and the loadout. Short runs:
+   order): the item **draft**, the **event** after camp 1 and every other
+   camp after it, the **route** vote, the **shop** before a shop camp
+   (`SHOP_CAMPS` in `run/balance.ts`: every boss camp, and camp 3 of a
+   Short run), then the **loadout**. Camp 1 is the Jungle in fair weather,
+   so before it there is only the draft and the loadout. Short runs:
    `[draft, loadout]`, `[draft, event, route, loadout]`, `[draft, route,
-   loadout]`, `[shop, draft, event, route, loadout]`; Standard and Long add
-   shops before their animal and disaster camps. Each stage's `advance`
-   opens the next one (`lifecycle.ts`'s `openLegAfter`); the route vote
-   opens the loadout of the camp it chose.
+   shop, loadout]`, `[draft, event, route, shop, loadout]`; Standard and
+   Long shop before their animal, disaster and temple camps. Each stage's
+   `advance` opens the next one (`lifecycle.ts`'s `openLegAfter`); the
+   route vote opens the shop of the camp it chose before a shop camp, else
+   its loadout (`openChosenCamp`), so the crew shops knowing the camp.
    - **Shop** (`buy { stockId }`: supplies, three single items, and the
-     seat's own character's upgrades while it has none; then `ready`). The
-     stock is drawn afresh on every visit from the same streams.
+     seat's own character's upgrades while it has none; then `ready`, and
+     the last ready opens the camp's loadout). `stage.camp` is the chosen
+     camp. The stock is drawn afresh on every visit from the same streams.
    - **Draft.** Each seat is dealt the offers its composed `draftShapes`
      names: three single items, or after a boss camp three bundles of two,
      then for the Pack Rat a pick of one of three Pack Rat items. Each seat
      with an offer sends `pick-bundle { bundle }`: one instance per item of
      its head offer's bundle, equipped while a slot is free, else into the
      backpack. The draft ends once no seat has an offer.
-   - **Event.** A stub with no effect yet (`stage.event`, drawn from
-     `EVENTS`). Each seat sends `ready`.
+   - **Event.** `stage.event` is drawn from `EVENT_POOL` by the run's seed.
+     Its effect applies once as the stage opens, and `stage.gains` records
+     what it gave (coins, supplies, each seat's item): Abandoned camp puts
+     4 coins in the purse, Fresh spring gives back a supply (3 coins with
+     supplies full), Dropped pack gives each seat with room a random common
+     item. Each seat sends `ready`.
    - **Route.** Each seat votes over 2 or 3 options to the next camp.
    - **Loadout.** Each seat readies, which re-checks the slots. A loadout
      opens with each equipped set cut to the camp's slots (Rats take one),
@@ -144,16 +153,19 @@ until the tag stops changing.
    backpack is shut in camp: only equipped items act, and only the Pack
    Rat's Pack Animal swaps one in, once per camp.
 4. **Settle.** A failure costs supplies and goes back to the same camp spec
-   for a fresh deal (`reopenCamp`: through its shop again before a boss
-   camp, then its loadout); 0 supplies ends the run. A clear pays `5 +
-   min(3, unplayed tricks)` into the shared purse and opens the stages
-   before the next camp, or wins the run at the final camp. Either way the
-   attempt's recap is kept on `RunState.lastAttempt` (`run/recap.ts`'s
-   `recapOf`): the final trick, each objective with its holder, final
-   status, the trick that failed it and a card target's fate, the camp
-   rules that failed, the coins and the supply cost split by source
-   (`supplyCostParts`, folded over `labeledRuleLayersFor`). The view shows
-   it as `lastCamp` between camps, never in camp; a kick restart clears it.
+   for a fresh deal (`reopenCamp`: through its shop again before a shop
+   camp, then its loadout); 0 supplies ends the run. A clear pays `5`,
+   `+2` off plain ground (anywhere but the Jungle and the Clearing), `+2`
+   in any weather but Fair, and `+ min(2, unplayed tricks)` into the shared
+   purse (`PAYOUT`, `payoutFor`; a route option's view carries the range as
+   `pays`), and opens the stages before the next camp, or wins the run at
+   the final camp. Either way the attempt's recap is kept on
+   `RunState.lastAttempt` (`run/recap.ts`'s `recapOf`): the final trick,
+   each objective with its holder, final status, the trick that failed it
+   and a card target's fate, the camp rules that failed, the coins and the
+   supply cost split by source (`supplyCostParts`, folded over
+   `labeledRuleLayersFor`). The view shows it as `lastCamp` between camps,
+   never in camp; a kick restart clears it.
 
 **The backpack.** A seat stores `BACKPACK_SIZE` (6) items beside its
 equipped slots (2; the Pack Rat 3). `roomFor` is its free slots plus the
@@ -182,7 +194,7 @@ vote a disconnected seat out (the room's kick vote, through the adapter's
 `RunState.kicked` whole, so every per-player rule reads the crew in play:
 its ballot, lock-in or ready mark goes, its unpicked offers go, and a dealt
 camp is abandoned (a `restarted` history entry, no supplies) and the camp
-reopens for a fresh deal (through its shop before a boss camp). `seatPresence` marks a kicked seat `back` while
+reopens for a fresh deal (through its shop before a shop camp). `seatPresence` marks a kicked seat `back` while
 it is connected; `openLoadout` puts every back seat in again at its old
 place (at once while the muster or a loadout is open), with its character,
 items, upgrade and ledger. A kicked seat's character stays taken.
@@ -274,8 +286,9 @@ draw derives a fresh, uniquely named stream via `run/rng.ts`'s `STREAMS`:
 | Route option count | `expedition-route:camp{k}:count` |
 | Route option field | `expedition-route:camp{k}:reroll{r}:option{i}:{location\|fair\|weather\|mix\|boss}` |
 | Event | `expedition-event:camp{k}` (k = the camp it comes before) |
+| Event item | `expedition-event-item:camp{k}:seat{id}:{rarity\|pick}` (Dropped pack) |
 | Draft item | `expedition-draft:camp{k}:seat{id}:offer{o}:bundle{b}:item{j}:{rarity\|pick}` (k = the cleared camp, 0 for the draft before camp 1) |
-| Shop item | `expedition-shop:camp{k}:item{i}:{rarity\|pick}` (a replay of the boss camp draws the same stock) |
+| Shop item | `expedition-shop:camp{k}:item{i}:{rarity\|pick}` (a replay of the shop camp draws the same stock) |
 | Attempt deal seed | `{seed}:camp{k}:attempt{A}` |
 | Trick-count kind and N | `expedition-trickcount-{kind\|n}:camp{k}:attempt{A}` |
 | Ability draws (`ctx.randomCards`, `ctx.randomIndex`) | `expedition-ability:camp{k}:attempt{A}:seat{id}:use{u}:draw{j}` |

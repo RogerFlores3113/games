@@ -265,9 +265,9 @@ describe("dev shortcuts for a solo playtest", () => {
     expect(() => run("jump-to-camp", fresh(), { length: "long", camp: 1, stage: "route" })).toThrow("camp 1 has no route vote before it");
   });
 
-  it("jump-to-camp arrives at the shop before a boss camp, and names the shops when the camp has none", () => {
+  it("jump-to-camp arrives at the shop before a shop camp, and names the shops when the camp has none", () => {
     const shop = run("jump-to-camp", fresh(), { length: "long", camp: 6, stage: "shop" });
-    expect(shop.stage.tag === "shop" && [shop.stage.next, shop.stage.camp, shop.stage.stock.length]).toEqual([6, null, 4]);
+    expect(shop.stage.tag === "shop" && [shop.stage.next, shop.stage.camp.index, shop.stage.stock.length]).toEqual([6, 6, 4]);
     expect(shop.history.map((h) => [h.camp, h.status])).toEqual([[5, "cleared"]]);
     expect(checkRunState(shop, CATALOG)).toEqual([]);
     expect(() => run("jump-to-camp", fresh(), { length: "long", camp: 5, stage: "shop" })).toThrow("camp 5 has no shop before it: a long run's shops are before camps 3, 6, 8");
@@ -320,7 +320,7 @@ describe("dev shortcuts for a solo playtest", () => {
     const dealt = run("jump-to-camp", fresh(), { length: "standard", camp: 2, stage: "camp" });
     const ids = attemptOf(dealt)!.camp.objectives.map((o) => o.id);
     const cleared = ids.reduce((state, objective) => run("set-objective-status", state, { objective, status: "done" }), dealt);
-    expect([cleared.stage.tag, cleared.history.at(-1)?.status]).toEqual(["shop", "cleared"]);
+    expect([cleared.stage.tag, cleared.history.at(-1)?.status]).toEqual(["draft", "cleared"]);
     const failed = run("set-objective-status", dealt, { objective: ids[0]!, status: "failed" });
     expect([failed.stage.tag, failed.history.at(-1)?.status, failed.supplies]).toEqual(["loadout", "failed", 2]);
     expect(() => run("set-objective-status", run("force-camp", dealt, { outcome: "cleared" }), { objective: ids[0]!, status: "done" })).toThrow("there is no dealt camp with objectives");

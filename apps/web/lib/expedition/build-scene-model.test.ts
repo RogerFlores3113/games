@@ -129,7 +129,7 @@ describe("sceneKeyFor", () => {
     [{ tag: "loadout", camp: preview, mods: [], readySeatIds: [] }, "trail"],
     [{ tag: "draft", next: 2, cleared: 1, payout: 8, yourOffer: null, pendingSeatIds: [] }, "trail"],
     [{ tag: "route", options: [], ballots: [] }, "trail"],
-    [{ tag: "event", event: "storm", next: 1, readySeatIds: [] }, "trail"],
+    [{ tag: "event", event: "storm", next: 1, gains: { coins: 0, supplies: 0, items: [] }, readySeatIds: [] }, "trail"],
     [{ tag: "camp", camp: preview, mods: [], attempt: makeAttempt() }, "camp"],
     [{ tag: "ended", result: "won" }, "run-end"],
   ];

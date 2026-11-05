@@ -54,6 +54,7 @@ export type {
   ExpeditionSeatView,
   ExpeditionItemView,
   ExpeditionShopView,
+  ExpeditionEventGainsView,
   ExpeditionStockView,
   ExpeditionAbilityView,
   ExpeditionAbilityStepView,

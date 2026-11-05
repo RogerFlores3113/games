@@ -2,8 +2,8 @@ import { openLegAfter } from "../lifecycle";
 import { err, everySeat, ok, readied, type StageDef } from "./stage-def";
 import { OUTFIT } from "./outfit";
 
-/** The event after every other camp has no effect yet: every seat readies,
- * then the route vote opens. */
+/** The event after every other camp: its effect applied as it opened
+ * (run/events.ts), every seat readies, then the route vote opens. */
 export const event: StageDef<"event"> = {
   on: {
     ...OUTFIT,

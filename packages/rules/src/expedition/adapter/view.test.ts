@@ -105,12 +105,12 @@ describe("toExpeditionPlayerView", () => {
     expect(pairedView).toMatchObject({ camp: { pairing: "fair" }, mods: [{ id: "thunderstorm" }, { id: "fair" }] });
   });
 
-  it("the shop before a boss camp: the shared stock, and only the viewer's own character's upgrades while it has none", () => {
+  it("the shop before a shop camp: the camp, the shared stock, and only the viewer's own character's upgrades while it has none", () => {
     const run = setupShop({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3, characters: { p0: "explorer", p1: "leader" }, upgrades: { p1: "leader.delegate" } });
     const stock = run.stage.stock;
     const own = toExpeditionPlayerView(run, "p0", CATALOG);
 
-    expect(own.stage).toMatchObject({ tag: "shop", next: 3, camp: null, readySeatIds: [] });
+    expect(own.stage).toMatchObject({ tag: "shop", next: 3, camp: { index: 3, shop: true }, readySeatIds: [] });
     expect(own.stage.tag === "shop" && own.stage.shop).toEqual({
       stock: stock.map((e) => ({ stockId: e.stockId, what: e.what, price: e.price, soldTo: null })),
       yourUpgrades: [
@@ -162,15 +162,31 @@ describe("toExpeditionPlayerView", () => {
     expect([view.length, view.campCount, view.stage.tag]).toEqual(["long", 8, "draft"]);
   });
 
-  it("event: names the event and the camp it comes before, and who has readied", () => {
+  it("event: names the event, the camp it comes before, what it gave, and who has readied", () => {
     const base = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 2 });
-    const run: RunState = { ...base, stage: { tag: "event", next: campIndex(2), event: "event", ready: { p2: true } } };
-    expect(toExpeditionPlayerView(run, "p0", CATALOG).stage).toEqual({ tag: "event", event: "event", next: 2, readySeatIds: ["p2"] });
+    const gains = { coins: 4, supplies: 0, items: [{ seatId: "p1", itemId: "bait" }] };
+    const run: RunState = { ...base, stage: { tag: "event", next: campIndex(2), event: "abandoned-camp", gains, ready: { p2: true } } };
+    expect(toExpeditionPlayerView(run, "p0", CATALOG).stage).toEqual({ tag: "event", event: "abandoned-camp", next: 2, gains, readySeatIds: ["p2"] });
   });
 
-  it("shop on a replay previews the camp it reopens", () => {
+  it("route: each option says the fewest and most coins its camp pays", () => {
+    const base = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 2 });
+    if (base.stage.tag !== "loadout") throw new Error("expected the loadout");
+    const spec = base.stage.camp;
+    const plain = { ...spec, location: "jungle", weather: "fair" };
+    const risky = { ...spec, location: "cave", weather: "downpour" };
+    const run: RunState = {
+      ...base,
+      stage: { tag: "route", from: campIndex(1), options: [{ id: "a", next: plain, reroll: 0, swapBoss: null }, { id: "b", next: risky, reroll: 0, swapBoss: null }], ballots: {} },
+    };
+    const stage = toExpeditionPlayerView(run, "p0", CATALOG).stage;
+    expect(stage.tag === "route" && stage.options.map((o) => o.pays)).toEqual([{ min: 5, max: 7 }, { min: 9, max: 11 }]);
+  });
+
+  it("shop previews the camp it opens before", () => {
     const base = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3 });
-    const spec = base.stage.tag === "loadout" ? base.stage.camp : null;
+    if (base.stage.tag !== "loadout") throw new Error("expected the loadout");
+    const spec = base.stage.camp;
     const run: RunState = { ...base, stage: { tag: "shop", next: campIndex(3), camp: spec, stock: [], ready: {} } };
     expect(toExpeditionPlayerView(run, "p0", CATALOG).stage).toMatchObject({ tag: "shop", next: 3, camp: { index: 3, shop: true }, shop: { stock: [] } });
   });

@@ -143,7 +143,7 @@ describe("checkRunState: the stages between camps", () => {
   it("flags a shop, a draft or an event before a camp that has none, and an unknown event", () => {
     const shop = jump("shop", "3");
     if (shop.stage.tag !== "shop") throw new Error("expected the shop");
-    expect(checkRunState({ ...shop, stage: { ...shop.stage, next: campIndex(4) } }, CATALOG)).toEqual(["a standard run has no shop before camp 4"]);
+    expect(checkRunState({ ...shop, stage: { ...shop.stage, next: campIndex(4) } }, CATALOG)).toEqual(["a standard run has no shop before camp 4", "the shop before camp 4 holds camp 3's spec"]);
     const event = jump("event", "2");
     if (event.stage.tag !== "event") throw new Error("expected the event");
     expect(checkRunState({ ...event, stage: { ...event.stage, next: campIndex(3), event: "volcano" } }, CATALOG)).toEqual(["the event volcano is not a known event", "a standard run has no event before camp 3"]);

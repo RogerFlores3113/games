@@ -251,10 +251,10 @@ describe("settling a clear", () => {
     items: { "item-a": plainItem("item-a"), "item-b": plainItem("item-b"), "item-c": plainItem("item-c") },
   });
 
-  it("a clear pays 5 + min(3, unplayed tricks) into the purse", () => {
+  it("a clear on plain ground pays 5 + min(2, unplayed tricks) into the purse", () => {
     const run = setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog });
     const fresh = clearedCamp(run, catalog);
-    expect(settleCamp(fresh, "cleared", catalog).purse).toBe(8);
+    expect(settleCamp(fresh, "cleared", catalog).purse).toBe(7);
 
     const withUnplayed = (n: number): RunAt<"camp"> =>
       withAttempt(fresh, { ...fresh.stage.attempt, camp: { ...fresh.stage.attempt.camp, totalTricks: n } }) as RunAt<"camp">;
@@ -268,11 +268,20 @@ describe("settling a clear", () => {
     const run = setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog, items: { p0: ["item-a"] } });
     const settled = settleCamp(clearedCamp(run, catalog), "cleared", catalog);
     expect(settled.stage).toEqual({ tag: "draft", next: 2 });
-    expect(settled.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 8 }]);
+    expect(settled.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 7 }]);
     for (const seat of settled.seats) {
       expect(seat.offers).toHaveLength(1);
       expect([...seat.offers[0]!.bundles.flat()].sort()).toEqual(["item-a", "item-b", "item-c"]);
     }
+  });
+
+  it("a clear away from plain ground, in foul weather, pays the risk bonus", () => {
+    const run = setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog });
+    const fresh = clearedCamp(run, catalog);
+    const risky = { ...fresh, stage: { ...fresh.stage, camp: { ...fresh.stage.camp, location: "cave", weather: "rain" } } } as RunAt<"camp">;
+    const settled = settleCamp(risky, "cleared", catalog);
+    expect(settled.history.at(-1)).toMatchObject({ location: "cave", weather: "rain", coins: 11 });
+    expect(settled.purse).toBe(11);
   });
 
   it("clearing the final camp wins: camp 4 of a short run, camp 8 of a long one", () => {
@@ -296,7 +305,7 @@ describe("between camps: draft, event and route vote", () => {
   };
 
   it("the last draft pick after camp 4 opens the route vote; after camp 1 the event comes first", () => {
-    expect(drafting(1).seats.reduce((next, seat) => act(next, seat.seatId, { type: "pick-bundle", bundle: 0 }, catalog), drafting(1) as RunState).stage).toEqual({ tag: "event", next: 2, event: "event", ready: {} });
+    expect(drafting(1).seats.reduce((next, seat) => act(next, seat.seatId, { type: "pick-bundle", bundle: 0 }, catalog), drafting(1) as RunState).stage).toMatchObject({ tag: "event", next: 2, ready: {} });
     expect(drafted(drafting(4)).stage).toMatchObject({ tag: "route", from: 4 });
   });
 

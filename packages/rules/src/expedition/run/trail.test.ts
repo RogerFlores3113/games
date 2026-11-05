@@ -1,7 +1,8 @@
-// The stages between two camps (owner decisions, 2026-10-05): the shop
-// before a boss camp, the item draft, the event after every other camp, the
-// route vote, then the loadout that sets out. Driven through applyRunAction
-// the way the room drives it; camps are settled through the real settle.
+// The stages between two camps (owner decisions, 2026-10-05, reordered
+// after the playtest): the item draft, the event after every other camp, the
+// route vote, the shop before a shop camp, then the loadout that sets out.
+// Driven through applyRunAction the way the room drives it; camps are
+// settled through the real settle.
 
 import { describe, expect, it } from "vitest";
 import { absentSeatAction } from "./absent";
@@ -68,12 +69,12 @@ function legsOfRun(length: RunLength): StageTag[][] {
 }
 
 describe("legsTo: the stages before each camp", () => {
-  it("Short: a draft before camp 1, events after camps 1 and 3, the shop before the temple", () => {
+  it("Short: a draft before camp 1, events after camps 1 and 3, shops before camp 3 and the temple", () => {
     expect([1, 2, 3, 4].map((k) => legsTo("short", k))).toEqual([
       ["draft", "loadout"],
       ["draft", "event", "route", "loadout"],
-      ["draft", "route", "loadout"],
-      ["shop", "draft", "event", "route", "loadout"],
+      ["draft", "route", "shop", "loadout"],
+      ["draft", "event", "route", "shop", "loadout"],
     ]);
   });
 
@@ -81,10 +82,10 @@ describe("legsTo: the stages before each camp", () => {
     expect([1, 2, 3, 4, 5, 6].map((k) => legsTo("standard", k))).toEqual([
       ["draft", "loadout"],
       ["draft", "event", "route", "loadout"],
-      ["shop", "draft", "route", "loadout"],
+      ["draft", "route", "shop", "loadout"],
       ["draft", "event", "route", "loadout"],
       ["draft", "route", "loadout"],
-      ["shop", "draft", "event", "route", "loadout"],
+      ["draft", "event", "route", "shop", "loadout"],
     ]);
   });
 
@@ -92,17 +93,18 @@ describe("legsTo: the stages before each camp", () => {
     expect([1, 2, 3, 4, 5, 6, 7, 8].map((k) => legsTo("long", k))).toEqual([
       ["draft", "loadout"],
       ["draft", "event", "route", "loadout"],
-      ["shop", "draft", "route", "loadout"],
+      ["draft", "route", "shop", "loadout"],
       ["draft", "event", "route", "loadout"],
       ["draft", "route", "loadout"],
-      ["shop", "draft", "event", "route", "loadout"],
+      ["draft", "event", "route", "shop", "loadout"],
       ["draft", "route", "loadout"],
-      ["shop", "draft", "event", "route", "loadout"],
+      ["draft", "event", "route", "shop", "loadout"],
     ]);
   });
 
-  it("a replay goes back through the shop only before a boss camp", () => {
+  it("a replay goes back through the shop only before a shop camp", () => {
     expect([1, 2, 3, 6].map((k) => replayLegs("standard", k))).toEqual([["loadout"], ["loadout"], ["shop", "loadout"], ["shop", "loadout"]]);
+    expect([2, 3, 4].map((k) => replayLegs("short", k))).toEqual([["loadout"], ["shop", "loadout"], ["shop", "loadout"]]);
   });
 });
 
@@ -122,7 +124,7 @@ describe("a whole run passes through those stages", () => {
   it("the event stage names its event and the camp it leads to; the route vote follows it", () => {
     let run = settleCamp(walkToCamp(mustered("standard")).run, "cleared", catalog);
     while (run.stage.tag === "draft") run = act(run, run.seats.find((s) => s.offers.length > 0)!.seatId, { type: "pick-bundle", bundle: 0 });
-    expect(run.stage).toEqual({ tag: "event", next: 2, event: "event", ready: {} });
+    expect(run.stage).toMatchObject({ tag: "event", next: 2, ready: {} });
     for (const seatId of SEATS) run = act(run, seatId, { type: "ready" });
     expect(run.stage).toMatchObject({ tag: "route", from: 1 });
     for (const seatId of SEATS) run = act(run, seatId, { type: "vote", choice: "a" });
@@ -131,26 +133,56 @@ describe("a whole run passes through those stages", () => {
 });
 
 describe("the shop stage", () => {
-  /** Camp 2 of a standard run, cleared: the shop before the animal at camp 3. */
-  function atShop(purse = 20): RunAt<"shop"> {
-    const run = setupRun({ seatIds: SEATS, seed: "shop-stage", catalog, camp: 2, purse });
-    const settled = settleCamp(dealCamp(run as RunAt<"loadout">, catalog), "cleared", catalog);
-    return settled as RunAt<"shop">;
+  /** Every seat makes the plain move until the run reaches `tag`. */
+  function walkTo(start: RunState, tag: StageTag): RunState {
+    let run = start;
+    for (let step = 0; step < 30 && run.stage.tag !== tag; step++) {
+      const stage = run.stage;
+      if (stage.tag === "draft") run = act(run, run.seats.find((s) => s.offers.length > 0)!.seatId, { type: "pick-bundle", bundle: 0 });
+      else if (stage.tag === "route") run = act(run, run.seatIds.find((id) => !Object.hasOwn(stage.ballots, id))!, { type: "vote", choice: "a" });
+      else if (stage.tag === "event") run = act(run, run.seatIds.find((id) => !Object.hasOwn(stage.ready, id))!, { type: "ready" });
+      else throw new Error(`walkTo: stuck at ${stage.tag}`);
+    }
+    return run;
   }
 
-  it("opens after the camp before a boss camp, with the stock and no offers dealt yet", () => {
-    const shop = atShop();
-    expect(shop.stage).toMatchObject({ tag: "shop", next: 3, camp: null, ready: {} });
+  /** Camp 2 of a standard run cleared, then the draft and the route vote:
+   * the shop before the animal at camp 3. */
+  function atShop(purse = 20): RunAt<"shop"> {
+    const run = setupRun({ seatIds: SEATS, seed: "shop-stage", catalog, camp: 2, purse });
+    return walkTo(settleCamp(dealCamp(run as RunAt<"loadout">, catalog), "cleared", catalog), "shop") as RunAt<"shop">;
+  }
+
+  it("opens after the route vote to a shop camp, with the chosen camp and the stock", () => {
+    const cleared = settleCamp(dealCamp(setupRun({ seatIds: SEATS, seed: "shop-stage", catalog, camp: 2, purse: 20 }) as RunAt<"loadout">, catalog), "cleared", catalog);
+    expect(cleared.stage.tag).toBe("draft");
+    const route = walkTo(cleared, "route") as RunAt<"route">;
+    const chosen = route.stage.options.find((o) => o.id === "a")!.next;
+    const shop = walkTo(route, "shop") as RunAt<"shop">;
+    expect(shop.stage).toMatchObject({ tag: "shop", next: 3, camp: chosen, ready: {} });
     expect(shop.stage.stock.map((e) => e.stockId)).toEqual(["supplies", "item0", "item1", "item2"]);
-    expect(shop.seats.map((s) => s.offers)).toEqual([[], [], []]);
   });
 
-  it("accepts buys and readies; the last ready opens the draft", () => {
-    let run: RunState = act(atShop(), "p0", { type: "buy", stockId: "item0" });
-    expect(run.seats[0]!.items).toHaveLength(1);
+  it("a route to a camp with no shop opens its loadout", () => {
+    const run = setupRun({ seatIds: SEATS, seed: "shop-stage", catalog, camp: 3 });
+    const loadout = walkTo(settleCamp(dealCamp(run as RunAt<"loadout">, catalog), "cleared", catalog), "loadout");
+    expect(loadout.stage).toMatchObject({ tag: "loadout", camp: { index: 4 } });
+  });
+
+  it("accepts buys and readies; the last ready opens the chosen camp's loadout", () => {
+    const shop = atShop();
+    let run: RunState = act(shop, "p0", { type: "buy", stockId: "item0" });
+    expect(run.seats[0]!.items.length).toBe(shop.seats[0]!.items.length + 1);
     for (const seatId of SEATS) run = act(run, seatId, { type: "ready" });
-    expect(run.stage).toEqual({ tag: "draft", next: 3 });
-    expect(run.seats.map((s) => s.offers.length)).toEqual([1, 1, 1]);
+    expect(run.stage).toEqual({ tag: "loadout", camp: shop.stage.camp, ready: {} });
+  });
+
+  it("a Short run shops before camp 3 and before the temple", () => {
+    for (const camp of [2, 3]) {
+      const run = setupRun({ seatIds: SEATS, seed: "short-shops", catalog, length: "short", camp, purse: 20 });
+      const shop = walkTo(settleCamp(dealCamp(run as RunAt<"loadout">, catalog), "cleared", catalog), "shop");
+      expect(shop.stage).toMatchObject({ tag: "shop", next: camp + 1 });
+    }
   });
 
   it("a failed boss camp goes back through the same shop, then that camp's loadout", () => {
@@ -175,14 +207,13 @@ describe("the shop stage", () => {
     expect(applyRunAction(run, "p0", { type: "buy", stockId: "supplies" }, catalog)).toEqual({ ok: false, error: "wrong_stage" });
   });
 
-  it("the boss ahead stays beyond the horizon at the shop, the draft and the event, until the route preview", () => {
-    const shop = atShop();
-    expect(horizon(shop)).toBe(2);
-    let run: RunState = shop;
-    for (const seatId of SEATS) run = act(run, seatId, { type: "ready" });
-    expect([run.stage.tag, horizon(run)]).toEqual(["draft", 2]);
-    while (run.stage.tag === "draft") run = act(run, run.seats.find((s) => s.offers.length > 0)!.seatId, { type: "pick-bundle", bundle: 0 });
-    expect([run.stage.tag, horizon(run)]).toEqual(["route", 3]);
+  it("the boss ahead stays beyond the horizon at the draft, until the route preview; the shop after it names it", () => {
+    const run = setupRun({ seatIds: SEATS, seed: "shop-stage", catalog, camp: 2, purse: 20 });
+    const draft = settleCamp(dealCamp(run as RunAt<"loadout">, catalog), "cleared", catalog);
+    expect([draft.stage.tag, horizon(draft)]).toEqual(["draft", 2]);
+    const route = walkTo(draft, "route");
+    expect(horizon(route)).toBe(3);
+    expect(horizon(walkTo(route, "shop"))).toBe(3);
   });
 });
 
@@ -194,14 +225,7 @@ describe("draft offers", () => {
     if (next === 1) return mustered(length);
     const using = opts.catalog ?? catalog;
     const run = setupRun({ seatIds: SEATS, seed: `draft-${length}-${next}`, catalog: using, length, camp: next - 1, characters: opts.characters });
-    let settled = settleCamp(dealCamp(run as RunAt<"loadout">, using), "cleared", using);
-    for (const seatId of SEATS) {
-      if (settled.stage.tag !== "shop") break;
-      const result = applyRunAction(settled, seatId, { type: "ready" }, using);
-      if (!result.ok) throw new Error(result.error);
-      settled = result.state;
-    }
-    return settled;
+    return settleCamp(dealCamp(run as RunAt<"loadout">, using), "cleared", using);
   }
 
   it("before camp 1 every seat is offered three single items, all different", () => {

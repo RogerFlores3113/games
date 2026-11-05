@@ -10,6 +10,7 @@ import { runStatus } from "../run/lifecycle";
 import { campCount, horizon } from "../run/plan";
 import { backpackOf } from "../run/usage";
 import { campStack, modCtx, pairingOf, specOf } from "../run/stack";
+import type { EventGains } from "../content/events/event-def";
 import type { StatusPart } from "../content/mods/mod-def";
 import type { CampSpec } from "../run/route";
 import type { Concealable, RunRules } from "../run/run-rules";
@@ -87,6 +88,11 @@ function perSeat<V>(run: RunState, values: PerSeat<V>): string {
   return run.seatIds.map((seatId) => `${seatId} ${Object.hasOwn(values, seatId) ? String(values[seatId] ?? "abstain") : "-"}`).join(", ");
 }
 
+function gainsLabel(gains: EventGains): string {
+  const parts = [...(gains.coins > 0 ? [`${gains.coins} coins`] : []), ...(gains.supplies > 0 ? [`${gains.supplies} supplies`] : []), ...gains.items.map((i) => `${i.itemId} to ${i.seatId}`)];
+  return parts.length === 0 ? "nothing" : parts.join(", ");
+}
+
 function stageLines(run: RunState, catalog: Catalog): string[] {
   const stage = run.stage;
   switch (stage.tag) {
@@ -94,7 +100,7 @@ function stageLines(run: RunState, catalog: Catalog): string[] {
       return [`length ballots: ${perSeat(run, stage.ballots)}`, `locked in: ${perSeat(run, stage.locked)}`];
     case "shop":
       return [
-        stage.camp === null ? `before camp ${stage.next}` : `replay of ${specLabel(stage.camp, catalog)}`,
+        `before ${specLabel(stage.camp, catalog)}`,
         `stock: ${stage.stock.map((e) => `${e.stockId} ${e.what.kind === "item" ? e.what.itemId : "supply"} ${e.price}${e.soldTo === null ? "" : ` sold to ${e.soldTo}`}`).join(", ")}`,
         `ready: ${perSeat(run, stage.ready)}`,
       ];
@@ -113,7 +119,7 @@ function stageLines(run: RunState, catalog: Catalog): string[] {
         `route ballots: ${perSeat(run, stage.ballots)}`,
       ];
     case "event":
-      return [`event ${stage.event} before camp ${stage.next}`, `ready: ${perSeat(run, stage.ready)}`];
+      return [`event ${stage.event} before camp ${stage.next}`, `gave: ${gainsLabel(stage.gains)}`, `ready: ${perSeat(run, stage.ready)}`];
     case "ended":
       return [`run ${stage.result}`];
   }

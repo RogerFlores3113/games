@@ -451,27 +451,27 @@ describe("buildTrailPrompt", () => {
   });
 
   it("at the route vote asks for your vote with the camp it leads to", () => {
-    const v = trail({ tag: "route", options: [{ id: "a", next: { ...PREVIEW, index: 3 }, swapsBoss: false }, { id: "b", next: { ...PREVIEW, index: 3 }, swapsBoss: false }], ballots: [{ seatId: "ana", choice: "a" }] });
+    const v = trail({ tag: "route", options: [{ id: "a", next: { ...PREVIEW, index: 3 }, swapsBoss: false, pays: { min: 5, max: 7 } }, { id: "b", next: { ...PREVIEW, index: 3 }, swapsBoss: false, pays: { min: 5, max: 7 } }], ballots: [{ seatId: "ana", choice: "a" }] });
     expect(at(v)).toEqual({ text: "Vote on the route to camp 3", tone: "your-move" });
   });
 
   it("at the route vote names who has not voted once you have", () => {
-    const v = trail({ tag: "route", options: [{ id: "a", next: { ...PREVIEW, index: 3 }, swapsBoss: false }], ballots: [{ seatId: "me", choice: "a" }, { seatId: "ana", choice: "a" }] });
+    const v = trail({ tag: "route", options: [{ id: "a", next: { ...PREVIEW, index: 3 }, swapsBoss: false, pays: { min: 5, max: 7 } }], ballots: [{ seatId: "me", choice: "a" }, { seatId: "ana", choice: "a" }] });
     expect(at(v)).toEqual({ text: "Waiting for Bo", tone: "waiting" });
   });
 
   it("at an event names it", () => {
-    const v = trail({ tag: "event", event: "event", next: 4, readySeatIds: ["ana"] });
+    const v = trail({ tag: "event", event: "event", next: 4, gains: { coins: 0, supplies: 0, items: [] }, readySeatIds: ["ana"] });
     expect(at(v)).toEqual({ text: "Event | Quiet trail", tone: "your-move" });
   });
 
   it("at the shop names the camp it stocks up for", () => {
-    const v = trail({ tag: "shop", next: 3, camp: null, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] });
+    const v = trail({ tag: "shop", next: 3, camp: { ...PREVIEW, index: 3, shop: true }, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] });
     expect(at(v)).toEqual({ text: "Shop | Before camp 3", tone: "your-move" });
   });
 
   it("at an event names who is not ready once you are", () => {
-    const v = trail({ tag: "event", event: "storm", next: 4, readySeatIds: ["me", "ana"] });
+    const v = trail({ tag: "event", event: "storm", next: 4, gains: { coins: 0, supplies: 0, items: [] }, readySeatIds: ["me", "ana"] });
     expect(at(v)).toEqual({ text: "Waiting for Bo", tone: "waiting" });
   });
 

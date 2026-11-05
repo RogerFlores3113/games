@@ -12,7 +12,7 @@ import { campSpecAt } from "../../run/route";
 import { advanceTo, setupRun } from "../../run/run-test-support";
 import { STAGES, applyRunAction } from "../../run/stages/registry";
 import { backpackOf } from "../../run/usage";
-import type { ActiveEffect, RunAt, RunState } from "../../run/types";
+import type { ActiveEffect, RunAction, RunAt, RunState } from "../../run/types";
 import type { CampState, CardIdentity, CompletedTrick, ExpeditionCard, Objective, Suit } from "../../state";
 
 const SEATS = ["p0", "p1", "p2"];
@@ -111,11 +111,16 @@ describe("Rats", () => {
       plan: { ...run.plan!, bosses: [{ at: campIndex(3), tier: "animal", modId: "rats" }] },
       stage: { tag: "route", from: campIndex(2), options: [{ id: "a", next, reroll: 0, swapBoss: null }], ballots: {} },
     };
-    const loadout = SEATS.reduce<RunState>((acc, seatId) => {
-      const result = applyRunAction(acc, seatId, { type: "vote", choice: "a" }, CATALOG);
-      if (!result.ok) throw new Error(result.error);
-      return result.state;
-    }, atRoute);
+    // Camp 3 is a shop camp: the vote opens its shop, whose last ready opens the loadout.
+    const all = (from: RunState, action: RunAction): RunState =>
+      SEATS.reduce<RunState>((acc, seatId) => {
+        const result = applyRunAction(acc, seatId, action, CATALOG);
+        if (!result.ok) throw new Error(result.error);
+        return result.state;
+      }, from);
+    const shop = all(atRoute, { type: "vote", choice: "a" });
+    expect([shop.stage.tag, shop.seats[0]!.equipped]).toEqual(["shop", ["it0", "it1"]]);
+    const loadout = all(shop, { type: "ready" });
 
     expect(loadout.stage.tag).toBe("loadout");
     for (const seatId of SEATS) expect(rulesFor(loadout, CATALOG).itemSlots(loadout, seatId)).toBe(1);

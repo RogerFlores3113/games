@@ -11,7 +11,7 @@ import { CATALOG } from "../run/catalog";
 import { salePrice } from "../content/characters/businessman";
 import type { TargetKind } from "../run/targets";
 import { WINDOWS, type ActiveWindow } from "../run/windows";
-import { BACKPACK_SIZE, DRAFT, FAILURE_COST, ITEM_SLOTS, NORMAL_WEATHER_CHANCE, PAYOUT, RUN_LENGTHS, SHOP, SUPPLIES_MAX, SUPPLIES_START, SUPPLY_PRICE, THUNDERSTORM, WASHES, WHISPERS_PER_UPGRADE } from "../run/balance";
+import { BACKPACK_SIZE, DRAFT, FAILURE_COST, ITEM_SLOTS, NORMAL_WEATHER_CHANCE, PAYOUT, PLAIN_GROUND, RUN_LENGTHS, SHOP, SHOP_CAMPS, SUPPLIES_MAX, SUPPLIES_START, SUPPLY_PRICE, THUNDERSTORM, WASHES, WHISPERS_PER_UPGRADE } from "../run/balance";
 import type { BossTier } from "../run/plan";
 import type { RunLength } from "../run/types";
 import { EVENTS } from "../content/events/registry";
@@ -231,6 +231,8 @@ export const BALANCE_DISPLAY = {
   supplyPrice: SUPPLY_PRICE,
   failureCost: FAILURE_COST,
   payout: { ...PAYOUT },
+  plainGround: { locations: [...PLAIN_GROUND.locations], weathers: [...PLAIN_GROUND.weathers] },
+  shopCamps: { short: [...SHOP_CAMPS.short], standard: [...SHOP_CAMPS.standard], long: [...SHOP_CAMPS.long] },
   draftOptions: DRAFT.options,
   itemSlots: ITEM_SLOTS,
   backpackSize: BACKPACK_SIZE,

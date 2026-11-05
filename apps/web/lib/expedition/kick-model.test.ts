@@ -53,7 +53,7 @@ describe("buildKickPanel", () => {
       returning: [],
       yours: { title: "You're out of the crew for now", text: "The crew went on while you were away. You rejoin as The Hermit, with your items and upgrade, at the next loadout, once camp 2 ends." },
     });
-    const event = { tag: "event", event: "event", next: 4, readySeatIds: [] } as ExpeditionView["stage"];
+    const event = { tag: "event", event: "event", next: 4, gains: { coins: 0, supplies: 0, items: [] }, readySeatIds: [] } as ExpeditionView["stage"];
     expect(buildKickPanel(room, game(event, kicked))?.yours?.text).toBe("The crew went on while you were away. You rejoin as The Hermit, with your items and upgrade, at the loadout before camp 4.");
     expect(buildKickPanel(room, game({ tag: "ended", result: "won" }, kicked, "won"))?.yours).toEqual({ title: "The run is over", text: "The crew finished the run without you." });
   });
