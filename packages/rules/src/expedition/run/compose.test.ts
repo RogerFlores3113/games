@@ -35,7 +35,7 @@ function carrying(first: number, ...itemIds: string[]): Pick<SeatRun, "items" | 
 function makeRun(overrides: Partial<RunState> & { attempt?: AttemptState } = {}): RunState {
   const { attempt, ...rest } = overrides;
   const seatIds = rest.seatIds ?? ["p0", "p1", "p2"];
-  const spec = campSpecAt("test-seed", "standard", campIndex(2), CATALOG);
+  const spec = campSpecAt("test-seed", "standard", campIndex(2), CATALOG, seatIds.length);
   return {
     seed: "test-seed",
     seatIds,

@@ -284,11 +284,13 @@ export const RUN_LENGTHS = {
   standard: { camps: 6, bossCamps: [{ at: 3, tier: "animal" }, { at: 6, tier: "temple" }] },
   long:     { camps: 8, bossCamps: [{ at: 3, tier: "animal" }, { at: 6, tier: "disaster" }, { at: 8, tier: "temple" }] },
 } as const;
-/** Seat objectives per camp, before boss and temple slot layers. The temple adds the Sun. */
+/** Seat objectives per camp at 3 players, before boss and temple slot layers. The temple adds the Sun. */
 export const OBJECTIVE_RAMP: Record<RunLength, readonly number[]> = {
   short: [2, 3, 4, 3], standard: [2, 3, 3, 4, 4, 4], long: [2, 3, 3, 4, 4, 4, 5, 4],
 };
+export const EXTRA_OBJECTIVES_BY_PLAYERS = { 3: 0, 4: 1, 5: 2 }; // added at every camp
 export const MIX_FROM_CAMP = 4;            // ordered pairs and trick-count slots from camp 4
+export const EARLY_MIX_PLAYERS = 4;        // from this crew size, mixes start one camp earlier
 export const SUPPLIES_START = 3, SUPPLIES_MAX = 4, SUPPLY_PRICE = 6;
 export const PAYOUT = { base: 5, perUnplayedTrick: 1, unplayedCap: 3 };
 export const NORMAL_WEATHER_CHANCE = 80;   // percent; a location may override (Clifftop 50)
@@ -343,10 +345,13 @@ export type VoteRecord = { readonly topic: "length" | "route"; readonly result: 
 export function tally<C extends string>(seed: string, stream: string, choices: readonly C[], seatIds: readonly SeatId[], ballots: PerSeat<C | null>): VoteResult<C> | null;
 ```
 
-**Slot mixes.** Camp `k` gets `OBJECTIVE_RAMP[length][k-1]` seat slots, all win-card below
-`MIX_FROM_CAMP`. From camp 4 on each route option draws a mix: plain, an ordered pair (two slots
-become ordered 1 and 2), a trick-count slot (resolved per attempt, as today), or both when the camp
-has 4 or more slots. A replay keeps the spec, so it keeps its mix.
+**Slot mixes.** Camp `k` gets `seatObjectivesAt(length, k, players)` seat slots:
+`OBJECTIVE_RAMP[length][k-1]` plus `EXTRA_OBJECTIVES_BY_PLAYERS` for the crew size when the spec is
+drawn (none at 3 players, 1 at 4, 2 at 5), all win-card below `mixFromCampFor(players)`
+(`MIX_FROM_CAMP`, one camp earlier from `EARLY_MIX_PLAYERS`). From then on each route option draws
+a mix: plain, an ordered pair (two slots become ordered 1 and 2), a trick-count slot (resolved per
+attempt, as today), or both when the camp has 4 or more slots. A replay keeps the spec, so it keeps
+its mix and its slot count, even when a kick changed the crew.
 
 ### Seats, items, upgrades, draft and shop
 
@@ -1716,8 +1721,9 @@ and a bare identifier lives in `run/balance.ts`. A def's `text` repeats some of 
 | What | Current value | Where it lives |
 |---|---|---|
 | Run lengths and boss camps | Short 4 camps, temple at 4; Standard 6, animal at 3, temple at 6; Long 8, animal at 3, disaster at 6, temple at 8 | `RUN_LENGTHS` |
-| Seat objectives per camp, before boss and temple slots | Short 2, 3, 4, 3; Standard 2, 3, 3, 4, 4, 4; Long 2, 3, 3, 4, 4, 4, 5, 4 | `OBJECTIVE_RAMP` |
-| First camp with mixed slots | camp 4 | `MIX_FROM_CAMP` |
+| Seat objectives per camp at 3 players, before boss and temple slots | Short 2, 3, 4, 3; Standard 2, 3, 3, 4, 4, 4; Long 2, 3, 3, 4, 4, 4, 5, 4 | `OBJECTIVE_RAMP` |
+| Extra seat objectives at every camp, by crew size | 3 players 0, 4 players 1, 5 players 2 | `EXTRA_OBJECTIVES_BY_PLAYERS` (read by `seatObjectivesAt`) |
+| First camp with mixed slots | camp 4; camp 3 at 4 or more players | `MIX_FROM_CAMP`, `EARLY_MIX_PLAYERS` (read by `mixFromCampFor`) |
 | Fewest slots for the "both" mix | 4 | `BOTH_MIX_MIN_SLOTS` |
 | Mix choices | plain, ordered pair (2 slots), trick-count, both; uniform | `run/route.ts` `optionsAfter`, `slotsFor` |
 | Trick-count slot kind | no-tricks or exactly-n, even odds, per attempt | `resolveTrickCountSlot` |

@@ -105,7 +105,7 @@ describe("Rats", () => {
   it("leave every seat one item slot, and a seat carrying two items in sets out with one", () => {
     const run = setupRun({ seatIds: SEATS, seed: "rats", catalog: CATALOG, camp: 2, items: { p0: ["bait", "whetstone"] } });
     expect(run.seats[0]!.equipped).toEqual(["it0", "it1"]);
-    const next = campSpecAt("rats", "standard", campIndex(3), CATALOG);
+    const next = campSpecAt("rats", "standard", campIndex(3), CATALOG, SEATS.length);
     const atRoute: RunState = {
       ...run,
       plan: { ...run.plan!, bosses: [{ at: campIndex(3), tier: "animal", modId: "rats" }] },
@@ -225,7 +225,7 @@ describe("planned bosses", () => {
     expect(atLoadout.plan[0]).toEqual({ at: 3, tier: "animal", bossId: null });
     expect(seen(atLoadout)).toBe(false);
 
-    const atRoute: RunState = { ...run, stage: { tag: "route", from: campIndex(2), options: [{ id: "a", next: campSpecAt("horizon", "standard", campIndex(3), CATALOG), reroll: 0, swapBoss: null }], ballots: {} } };
+    const atRoute: RunState = { ...run, stage: { tag: "route", from: campIndex(2), options: [{ id: "a", next: campSpecAt("horizon", "standard", campIndex(3), CATALOG, SEATS.length), reroll: 0, swapBoss: null }], ballots: {} } };
     const routeView = toExpeditionPlayerView(atRoute, "p0", CATALOG);
     expect(routeView.plan[0]!.bossId).toBe(boss);
     expect(routeView.stage.tag === "route" && routeView.stage.options[0]!.next.bossId).toBe(boss);

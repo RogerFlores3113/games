@@ -69,7 +69,8 @@ card or was discarded, and fails if never played by the final trick.
   `settleCamp`), `run/plan.ts`
   (`RunPlan`, `campIndex`, `drawPlan`, `helpersFor`, `horizon`),
   `run/route.ts` (`CampSpec`, `firstCampSpec`, `routeOptions`,
-  `slotKindsFor`), `run/vote.ts` (`tally`),
+  `slotKindsFor`; a spec's seat objectives scale with the crew size through
+  `run/balance.ts`'s `seatObjectivesAt` and `mixFromCampFor`), `run/vote.ts` (`tally`),
   `run/stack.ts` (`campStack`, the one list of a camp's modifiers, and
   `modCtx`), `run/react.ts` (`react`, the camp modifiers' one pass over the
   engine's events),

@@ -120,7 +120,7 @@ export function setupRun(opts: {
     (acc, seatId) => mintItems(acc, seatId, opts.items?.[seatId] ?? [], opts.catalog),
     { ...run, plan: drawPlan(opts.seed, length, opts.catalog), supplies: opts.supplies ?? run.supplies, purse: opts.purse ?? run.purse, seats },
   );
-  return openLoadout(crewed, campSpecAt(opts.seed, length, campIndex(opts.camp ?? 1), opts.catalog), opts.catalog);
+  return openLoadout(crewed, campSpecAt(opts.seed, length, campIndex(opts.camp ?? 1), opts.catalog, opts.seatIds.length), opts.catalog);
 }
 
 /** setupRun at boss camp `camp`, then the shop on the way there (the stage
