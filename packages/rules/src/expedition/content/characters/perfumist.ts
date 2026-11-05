@@ -44,7 +44,7 @@ export const perfumist = defineCharacter({
             },
           },
         ],
-        canUse: (ctx) => (ctx.camp!.currentTrick.plays[0]?.card.identity.kind === "standard" ? true : "A joker's lead can't turn"),
+        canUse: (ctx) => (ctx.camp!.currentTrick.plays[0]?.card.identity.kind === "standard" ? true : "A Sun or Moon lead can't turn"),
         apply: (ctx) => [{ op: "add-modifier", lasts: "trick", audience: "public", params: { cardId: ctx.camp!.currentTrick.plays[0]!.card.id, suit: ctx.targets[0].value } }],
         effect: (effect) => ({
           identityOf: (prev) => (card) => {

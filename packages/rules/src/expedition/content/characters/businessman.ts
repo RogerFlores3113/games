@@ -86,7 +86,7 @@ export const businessman = defineCharacter({
   name: "The Businessman",
   theme: "Power now for money later",
   power: "Bottom Line",
-  text: "Empty slots pay 2 coins a camp, 5 for two; you can sell at the shop.",
+  text: "Empty item slots pay 2 coins a camp, 5 for two, but drafted items fill empty slots, so move them to the backpack to keep the pay; you can sell at the shop.",
   on: {
     "camp-dealt": (ctx) => {
       const seat = ctx.run.seats.find((s) => s.seatId === ctx.self)!;

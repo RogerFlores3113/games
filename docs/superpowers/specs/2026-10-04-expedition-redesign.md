@@ -291,7 +291,7 @@ export const OBJECTIVE_RAMP: Record<RunLength, readonly number[]> = {
 export const MIX_FROM_CAMP = 4;            // ordered pairs and trick-count slots from camp 4
 export const SUPPLIES_START = 3, SUPPLIES_MAX = 4, SUPPLY_PRICE = 6;
 export const PAYOUT = { base: 5, perUnplayedTrick: 1, unplayedCap: 3 };
-export const NORMAL_WEATHER_CHANCE = 80;   // percent; a location may override (Clifftop 50)
+export const NORMAL_WEATHER_CHANCE = 80;   // percent; a location may override (Clifftop 0)
 export const ROUTE_OPTIONS = { min: 2, max: 3 };
 export const DRAFT = { options: 3, bundleSize: 2, rareChance: 15 };
 export const SHOP = { items: 3, upgradePrice: 8 };
@@ -579,7 +579,7 @@ or `slots`. Half bodies are placeholders for owner review.
 | Mod | Kind | Channel | Full | Half |
 |---|---|---|---|---|
 | clearing, jungle | location | none | empty body | |
-| clifftop | location | plan | `normalWeatherChance: 50` | |
+| clifftop | location | plan | `normalWeatherChance: 0` (never fair; J.D.'s luck leaves a 0 at 0) | |
 | desert (Mirage) | location | rule | `hides` one objective (`roll("mirage")`) from everyone until the first trick completes | |
 | cave (Darkness) | location | rule | `hides` every current-trick play from all but its player | |
 | magma (Heat) | location | deal | `deckFor`: no 2s or 3s, then 4s (clubs, diamonds, hearts, spades) until the deck divides by the seat count (45, 44, 45 cards); the floor makes targets 5+ | |
@@ -1748,7 +1748,7 @@ and a bare identifier lives in `run/balance.ts`. A def's `text` repeats some of 
 | Heavy Pack | 3 coins, common, passive: +1 whisper, +1 supply per failure | `content/items/heavy-pack.ts` |
 | Mosquito Net | 4 coins, rare, passive | `content/items/mosquito-net.ts` |
 | Fair weather chance | 80% | `NORMAL_WEATHER_CHANCE` |
-| Clifftop's fair weather chance | 50% | `content/mods/clifftop.ts` `normalWeatherChance` |
+| Clifftop's fair weather chance | 0% (never fair, so its harsher weather always applies; J.D.'s hidden luck does not lift it) | `content/mods/clifftop.ts` `normalWeatherChance` |
 | Location weights | clearing, jungle, clifftop, desert, cave, magma: 1 each | each def's `weight` in `content/mods/<id>.ts` |
 | Weather weights | rain, fog, thunderstorm, night: 3 each; downpour 1 (a third of Rain); fair 0 (drawn by chance) | each def's `weight` |
 | Rain, Downpour washes | first whispers each camp, crew-wide: Rain players - 2, Downpour players - 1; on an exposed location (Clifftop) 2 and 3 more | `WASHES` |
@@ -2183,7 +2183,7 @@ How each of the nine fits (for unit 13):
   every offered item being exclusive to one character (`ownPickOf`).
 - `RunState` is unchanged in shape, so `ROOM_SCHEMA_VERSION` stays 14.
 - Location and weather texts are rewritten as one warm line each (Clifftop:
-  "Exposed to the elements up here: weather hits harder."). Each is still
+  "Exposed to the elements: the weather is never fair up here, and bad weather hits harder."). Each is still
   the rules sentence the chip tooltip and the rules modal show.
 - Web: the weather chip reads "1 of 2 wash away" while washes are left,
   then "Heard now"; its tooltip says "1 of 2 whispers will wash away". Your

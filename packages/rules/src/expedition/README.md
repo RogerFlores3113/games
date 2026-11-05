@@ -468,7 +468,7 @@ Locations, weathers, pairings, bosses and the temple are all `ModDef`s
    - A location may set `exposed: true` (Clifftop): bad weather is harsher
      there. A weather reads `ctx.exposed` and decides how.
    - A location may set `normalWeatherChance`, the percent chance of fair
-     weather there (Clifftop: 50). Without it the route uses
+     weather there (Clifftop: 0, never fair). Without it the route uses
      `NORMAL_WEATHER_CHANCE`.
 2. Write the `full` body with the channels from "The channel rule".
    - In `rules` and `status`, `ctx.roll(label, n)` is seeded and gives the

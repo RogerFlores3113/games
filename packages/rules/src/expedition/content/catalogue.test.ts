@@ -181,9 +181,9 @@ describe("J.D.", () => {
     expect(run.seats.map((s) => [s.items, s.equipped])).toEqual([[[{ uid: "it0", itemId: "parrot" }], ["it0"]], [[], []], [[], []]]);
   });
 
-  it("J.D.'s hidden luck adds 5 to every route's chance of fair weather, up to 100", () => {
+  it("J.D.'s hidden luck adds 5 to every route's chance of fair weather, up to 100, but never makes the Clifftop fair", () => {
     const run = table({ character: "jd" });
-    expect([rules(run).normalWeatherChance(run, 80), rules(run).normalWeatherChance(run, 98)]).toEqual([85, 100]);
+    expect([rules(run).normalWeatherChance(run, 80), rules(run).normalWeatherChance(run, 98), rules(run).normalWeatherChance(run, 0)]).toEqual([85, 100, 0]);
     const without = table({ character: "leader", mates: ["explorer", "cartographer"] });
     expect(rules(without).normalWeatherChance(without, 80)).toBe(80);
   });

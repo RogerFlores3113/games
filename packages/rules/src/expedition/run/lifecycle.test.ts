@@ -309,7 +309,7 @@ describe("between camps: draft, event and route vote", () => {
     expect([2, 3]).toContain(run.stage.options.length);
     expect(run.stage.options[0]).toEqual({
       id: "a",
-      next: { index: 2, location: "clifftop", weather: "fair", slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }] },
+      next: { index: 2, location: "clifftop", weather: "fog", slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }] },
       reroll: 0,
       swapBoss: null,
     });
