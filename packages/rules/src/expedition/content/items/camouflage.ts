@@ -8,7 +8,7 @@ export const camouflage = defineItem({
   rarity: "rare",
   price: 4,
   uses: { kind: "single-use" },
-  text: "If you have won no tricks this camp, drop one of your open objectives, and the camp fails if you then win a trick.",
+  text: "Drop an objective of yours if you've won no tricks; win one and the camp fails.",
   active: itemAbility({
     window: "between-tricks",
     targets: [{ kind: "objective", whose: "mine" }],

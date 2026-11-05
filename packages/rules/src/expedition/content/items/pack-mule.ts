@@ -7,7 +7,7 @@ export const packMule = defineItem({
   rarity: "common",
   price: 3,
   uses: { kind: "per-camp" },
-  text: "Give a trick you won to a teammate, where it counts toward their trick-count objectives, but never a trick holding a card objective's card.",
+  text: "Give a won trick to a teammate: it counts for their trick counts only.",
   active: itemAbility({
     window: "between-tricks",
     targets: [{ kind: "won-trick" }, { kind: "player", who: "teammate" }],
