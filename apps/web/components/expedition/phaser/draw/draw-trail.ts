@@ -31,6 +31,7 @@ import type {
   VoteResult,
 } from "../../../../lib/expedition/trail-model";
 import { musterLines } from "../../../../lib/expedition/trail-model";
+import { stripRows } from "../../../../lib/expedition/camp-recap";
 import { fitLabel, wrapWords } from "./text-fit";
 import { PANEL_ALPHA, button, coin, labelWidth, plate, setCoinFace, text, type Layer } from "./ui-kit";
 import { drawShop, type LoadoutHandlers } from "./draw-loadout";
@@ -956,4 +957,26 @@ export function drawTrailScene(scene: Phaser.Scene, layer: Layer, model: TrailMo
   }
   drawItemBar(ctx);
   drawReady(ctx);
+  // The tooltip takes this zone while something is hovered.
+  if (model.tooltip === null) drawLastCamp(ctx, TRAIL_ZONES.tooltip);
+}
+
+// ---------------------------------------------------------------------------
+// The camp just played
+// ---------------------------------------------------------------------------
+
+/** "Last camp": what happened at the camp just played, its final trick and
+ * every objective's end, in the tooltip's zone while nothing is hovered.
+ * Text only. PLACEHOLDER(art): a small recap panel (a torn note or a camp
+ * log page) with the final trick as mini cards and done/failed marks. */
+function drawLastCamp(ctx: Ctx, zone: Rect): void {
+  const strip = ctx.model.lastCamp;
+  if (strip === null) return;
+  const chars = Math.floor((zone.w - 4) / LABEL_CELL.w);
+  const rows = stripRows(strip, chars, Math.floor(zone.h / LABEL_CELL.h));
+  ctx.layer.add(plate(ctx.scene, zone.x, zone.y, zone.w, zone.h).setAlpha(PANEL_ALPHA));
+  rows.forEach((row, i) => {
+    const color = i === 0 ? (strip.tone === "good" ? PALETTE.done : PALETTE.destructive) : i === 1 ? PALETTE.text : PALETTE.textDim;
+    ctx.layer.add(text(ctx.scene, zone.x + 2, zone.y + i * LABEL_CELL.h, row, color));
+  });
 }

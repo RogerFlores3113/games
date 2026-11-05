@@ -10,6 +10,7 @@ import { buildRunEndModel } from "./run-end-model";
 import type { LocalUiState } from "./local-ui";
 import { confirmTargeting as confirmTargetingUi, initialLocalUi, reconcileLocalUi } from "./local-ui";
 import { TRANSITION_TIMING, swapAt, transitionFor, type SceneTransition, type TransitionSpeed, type TransitionTiming } from "./scene-transitions";
+import { seatNamer } from "./camp-recap";
 
 /**
  * The single dispatch chokepoint for the Phaser scenes (spec §7.1): every
@@ -159,7 +160,7 @@ export function createExpeditionSceneStore(opts: {
         }
         const shown = get().server;
         const transitions = opts.transitions;
-        const found = shown === null || resync || transitions === undefined ? null : transitionFor(shown.game, server.game);
+        const found = shown === null || resync || transitions === undefined ? null : transitionFor(shown.game, server.game, seatNamer(server));
         const speed = found === null ? "skip" : transitions!.speed();
         if (found === null || speed === "skip") show(server);
         else startTransition(found, server, TRANSITION_TIMING[speed], transitions!.now);
