@@ -723,6 +723,18 @@ describe("items", () => {
     expect(rules(next).trickWinner(plays, plays[0]!.card.identity)).toBe("p2");
   });
 
+  it("Bait on the only card of the led suit hands the trick to the highest card left, the first played on a tie", () => {
+    const hands = {
+      p0: [std("a9", "hearts", 9), std("a8", "hearts", 8)],
+      p1: [std("b9", "clubs", 9), std("b7", "clubs", 7)],
+      p2: [std("c14", "spades", 14), std("c3", "spades", 3)],
+    };
+    const led = play(table({ kit: ["bait"], hands, leader: "p2" }), "p2", "c14");
+    const baited = use(led, "p0", "bait", ["card:c14"]);
+    const done = play(play(baited, "p0", "a9"), "p1", "b9");
+    expect(camp(done).completedTricks[0]!.winnerSeatId).toBe("p0");
+  });
+
   it("Camouflage removes the objective and later fails the camp via a broken guard, with no rescue", () => {
     const objectives = [winCard("mine", ident("hearts", 5), "p0"), PENDING];
     const hands = { p0: [std("a", "spades", 14)], p1: [std("b", "spades", 3)], p2: [std("c", "spades", 4)] };
