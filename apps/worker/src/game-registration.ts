@@ -65,7 +65,7 @@ function mapError(error: AdapterError): GameErrorDetail {
   }
 }
 
-/** Expedition's own error mapper — an exhaustive switch over all 31
+/** Expedition's own error mapper — an exhaustive switch over all 33
  * `RunError` members with a `never`-typed default, mirroring Hanabi's
  * `mapError` above exactly (D-07, D-08). No `String(error)` fallback. */
 function mapExpeditionError(error: RunError): GameErrorDetail {
@@ -80,6 +80,8 @@ function mapExpeditionError(error: RunError): GameErrorDetail {
       return { gameId: EXPEDITION_GAME_ID, code: "card_not_in_hand" };
     case "must_follow_suit":
       return { gameId: EXPEDITION_GAME_ID, code: "must_follow_suit" };
+    case "no_joker_first_lead":
+      return { gameId: EXPEDITION_GAME_ID, code: "no_joker_first_lead" };
     case "objective_not_available":
       return { gameId: EXPEDITION_GAME_ID, code: "objective_not_available" };
     case "invalid_action":

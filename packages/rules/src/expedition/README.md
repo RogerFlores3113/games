@@ -31,7 +31,9 @@ names the exact files and identifiers involved.
 **Core hooks** (`rules.ts`'s `CoreRules`): `deckFor`, `objectiveDeckFor`
 (base: standard cards ranked above the deck's lowest rank), `leaderFor`, the
 card reading `identityOf`, `isTrump` and `rankOf`, `trickWinner(plays,
-led)`, `legalPlays`, `burns(plays, led, winnerOf)`, `nextLeader`,
+led)`, `legalPlays` (base: follow suit, and the camp's first lead may not be
+the Sun or the Moon unless the leader holds nothing else, `trick.ts`'s
+`isFirstLead` and `withoutJokerLead`), `burns(plays, led, winnerOf)`, `nextLeader`,
 `objectiveStatus` (base: `evaluateObjective`), `goals` (camp-wide
 conditions, given every objective's composed status; every one must be
 done), `voidsTrick` (base: false; a voided trick is a hallucination: every

@@ -561,6 +561,8 @@ function blockedReasonFor(camp: ExpeditionCampView, view: ExpeditionView, card: 
   const boss = following ? null : bossBlockReason(view, card, legal.length);
   if (boss !== null) return boss;
   if (led !== null) return `Must follow ${SUIT_GLYPH[led]}`;
+  const firstLead = camp.completedTricks.length === 0 && camp.currentTrick.plays.length === 0;
+  if (firstLead && card.kind === "joker") return "The first lead can't be the Sun or Moon";
   return "You can't play that card now";
 }
 

@@ -18,6 +18,7 @@
 
 import { campPhase, checkCampOutcome, currentActorSeatId } from "./camp";
 import { baseRules, type CoreRules } from "./rules";
+import { isFirstLead } from "./trick";
 import type { CampError, CampState, ExpeditionCard } from "./state";
 
 export type Legality = { legal: true } | { legal: false; reason: CampError };
@@ -65,7 +66,8 @@ export function canPickObjective(
 /** Legal only for the seat currentActorSeatId names during playing, naming a
  * card in that seat's own hand that appears in rules.legalPlays (the shared
  * follow-suit resolver — T-09-13). camp_over and wrong_phase are checked
- * before any turn/hand lookup. */
+ * before any turn/hand lookup. A joker refused on the camp's first lead says
+ * no_joker_first_lead; any other refused card, must_follow_suit. */
 export function canPlayCard(
   state: CampState,
   actorSeatId: string,
@@ -87,7 +89,8 @@ export function canPlayCard(
   }
   const legalPlays = rules.legalPlays(state, actorSeatId);
   if (!legalPlays.some((c) => c.id === cardId)) {
-    return { legal: false, reason: "must_follow_suit" };
+    const jokerFirst = isFirstLead(state) && rules.identityOf(card).kind === "joker";
+    return { legal: false, reason: jokerFirst ? "no_joker_first_lead" : "must_follow_suit" };
   }
   return { legal: true };
 }

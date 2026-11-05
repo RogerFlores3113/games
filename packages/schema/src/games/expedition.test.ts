@@ -6,7 +6,7 @@ import {
   ExpeditionViewSchema,
 } from "./expedition";
 
-// The 32 RunError names: CampError's 7 members, then RunError's 25
+// The 33 RunError names: CampError's 8 members, then RunError's 25
 // additional members.
 const EXPEDITION_ERROR_CODES = [
   "not_your_turn",
@@ -14,6 +14,7 @@ const EXPEDITION_ERROR_CODES = [
   "camp_over",
   "card_not_in_hand",
   "must_follow_suit",
+  "no_joker_first_lead",
   "objective_not_available",
   "invalid_action",
   "not_a_seat",
@@ -477,8 +478,8 @@ describe("ExpeditionErrorCodeSchema", () => {
     expect(ExpeditionErrorCodeSchema.safeParse(code).success).toBe(false);
   });
 
-  it("has exactly 32 members", () => {
-    expect(ExpeditionErrorCodeSchema.options.length).toBe(32);
+  it("has exactly 33 members", () => {
+    expect(ExpeditionErrorCodeSchema.options.length).toBe(33);
   });
 });
 

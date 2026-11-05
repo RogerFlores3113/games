@@ -65,7 +65,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       paragraphs: [
         "Follow the led suit if you can. Otherwise play anything.",
         "The Sun beats everything and the Moon beats everything but the Sun. Otherwise the highest card of the led suit wins.",
-        "The winner leads the next trick. Whoever holds the Sun leads the first trick and picks the first objective.",
+        "The winner leads the next trick. Whoever holds the Sun leads the first trick and picks the first objective, but the first lead can't be the Sun or the Moon unless they hold nothing else.",
       ],
       items: [],
     },
