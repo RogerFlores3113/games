@@ -44,7 +44,7 @@ describe("routeOptions", () => {
     expect(optionsOf(draftAfter("same", "short", 3), CATALOG)).toEqual(optionsOf(draftAfter("same", "short", 3), CATALOG));
   });
 
-  it("draws every weighted location and weather, and fair about 80% of the time away from the clifftop", () => {
+  it("draws every weighted location and weather, fair about 80% of the time away from the clifftop and never on it", () => {
     const places = Array.from({ length: 400 }, (_, n) => optionsOf(draftAfter(`place-${n}`, "standard", 1), CATALOG)).flat().map((o) => o.next);
     expect(new Set(places.map((p) => p.location))).toEqual(new Set(["clearing", "jungle", "clifftop", "desert", "cave", "magma"]));
     expect(new Set(places.map((p) => p.weather))).toEqual(new Set(["fair", "rain", "downpour", "thunderstorm", "fog", "night"]));
@@ -54,8 +54,7 @@ describe("routeOptions", () => {
     };
     expect(fairShare("jungle")).toBeGreaterThan(0.7);
     expect(fairShare("jungle")).toBeLessThan(0.9);
-    expect(fairShare("clifftop")).toBeGreaterThan(0.4);
-    expect(fairShare("clifftop")).toBeLessThan(0.6);
+    expect(fairShare("clifftop")).toBe(0);
   });
 
   it("never draws a weight-0 def by weight, and falls back to fair when no weather is left", () => {

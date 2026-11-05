@@ -1,7 +1,8 @@
 import { DRAFT } from "../../run/balance";
 import { ability, defineCharacter, defineUpgrade } from "../source-def";
 
-/** Points added to every route's chance of fair weather. Never shown. */
+/** Points added to every route's chance of fair weather, except where a
+ * location is never fair (the Clifftop). Never shown. */
 const HIDDEN_LUCK = 5;
 
 export const jd = defineCharacter({
@@ -16,7 +17,14 @@ export const jd = defineCharacter({
       return itemId === undefined ? [] : [{ op: "grant-item", seatId: ctx.self, itemId }];
     },
   },
-  passive: { modifier: () => ({ normalWeatherChance: (prev) => (run, chance) => Math.min(100, prev(run, chance) + HIDDEN_LUCK) }) },
+  passive: {
+    modifier: () => ({
+      normalWeatherChance: (prev) => (run, chance) => {
+        const before = prev(run, chance);
+        return before === 0 ? 0 : Math.min(100, before + HIDDEN_LUCK);
+      },
+    }),
+  },
   upgrades: [
     defineUpgrade({
       id: "jd.blend-in",

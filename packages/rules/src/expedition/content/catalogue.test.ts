@@ -181,9 +181,9 @@ describe("J.D.", () => {
     expect(run.seats.map((s) => [s.items, s.equipped])).toEqual([[[{ uid: "it0", itemId: "parrot" }], ["it0"]], [[], []], [[], []]]);
   });
 
-  it("J.D.'s hidden luck adds 5 to every route's chance of fair weather, up to 100", () => {
+  it("J.D.'s hidden luck adds 5 to every route's chance of fair weather, up to 100, but never makes the Clifftop fair", () => {
     const run = table({ character: "jd" });
-    expect([rules(run).normalWeatherChance(run, 80), rules(run).normalWeatherChance(run, 98)]).toEqual([85, 100]);
+    expect([rules(run).normalWeatherChance(run, 80), rules(run).normalWeatherChance(run, 98), rules(run).normalWeatherChance(run, 0)]).toEqual([85, 100, 0]);
     const without = table({ character: "leader", mates: ["explorer", "cartographer"] });
     expect(rules(without).normalWeatherChance(without, 80)).toBe(80);
   });
@@ -387,6 +387,7 @@ describe("Pack Rat", () => {
     const exclusive = Object.values(CATALOG.items).filter((item) => item.exclusiveTo === "pack-rat").map((item) => item.id);
     const [standard, packRat] = draft.seats[0]!.offers;
     expect(draft.seats[0]!.offers.map((offer) => offer.bundles.map((bundle) => bundle.length))).toEqual([[1, 1, 1], [1, 1, 1]]);
+    expect(draft.seats[0]!.offers.map((offer) => offer.kind)).toEqual(["standard", "special"]);
     expect(standard!.bundles.flat().some((id) => exclusive.includes(id))).toBe(false);
     expect(packRat!.bundles.flat().filter((id) => exclusive.includes(id))).toHaveLength(3);
     expect(new Set(packRat!.bundles.flat()).size).toBe(3);
@@ -721,6 +722,18 @@ describe("items", () => {
     const next = play(play(baited, "p0", "a9"), "p1", "b6");
     expect(camp(next).completedTricks[0]!.winnerSeatId).toBe("p0");
     expect(rules(next).trickWinner(plays, plays[0]!.card.identity)).toBe("p2");
+  });
+
+  it("Bait on the only card of the led suit hands the trick to the highest card left, the first played on a tie", () => {
+    const hands = {
+      p0: [std("a9", "hearts", 9), std("a8", "hearts", 8)],
+      p1: [std("b9", "clubs", 9), std("b7", "clubs", 7)],
+      p2: [std("c14", "spades", 14), std("c3", "spades", 3)],
+    };
+    const led = play(table({ kit: ["bait"], hands, leader: "p2" }), "p2", "c14");
+    const baited = use(led, "p0", "bait", ["card:c14"]);
+    const done = play(play(baited, "p0", "a9"), "p1", "b9");
+    expect(camp(done).completedTricks[0]!.winnerSeatId).toBe("p0");
   });
 
   it("Camouflage removes the objective and later fails the camp via a broken guard, with no rescue", () => {

@@ -55,6 +55,30 @@ describe("buildRulesReference", () => {
     );
   });
 
+  it("says a replay goes straight back to the camp's loadout", () => {
+    expect(byId(buildRulesReference(null), "goal").paragraphs[2]).toBe(
+      "A replay skips the draft, the event and the route vote: the crew goes back to the same camp's loadout, through the shop again before a boss camp.",
+    );
+  });
+
+  it("explains the Sun and Moon's own suit and a baited led suit", () => {
+    const tricks = byId(buildRulesReference(null), "tricks").paragraphs;
+    expect(tricks).toContain("The Sun and Moon form their own two-card suit: if one is led, whoever holds the other must play it.");
+    expect(tricks).toContain("If Bait stops the only card of the led suit from winning, the highest card left wins, and a tie goes to the card played first.");
+  });
+
+  it("says when whispers can be sent", () => {
+    expect(byId(buildRulesReference(null), "whisper").paragraphs).toContain(
+      "Whispers go only between tricks, before the next lead: never while objectives are being picked, and never once a trick has started.",
+    );
+  });
+
+  it("explains an off-plate lead and the Sun's lead at the temple", () => {
+    expect(byId(buildRulesReference(null), "temple").paragraphs).toContain(
+      "A trick led in any other suit presses nothing, and the camp fails once too few tricks remain for the plates left. The Sun must lead the trick for the last plate: if it is led before the other plates are pressed, or played or discarded any other way, the camp fails.",
+    );
+  });
+
   it("lists the usage wordings", () => {
     expect(byId(buildRulesReference(null), "gear").items.map((i) => i.label)).toEqual([
       "Once per run",
@@ -125,7 +149,7 @@ describe("buildRulesReference", () => {
     expect(groups[0]!.entries.map((e) => e.id)).toContain("thunderstorm");
     expect(groups[0]!.entries.find((e) => e.id === "downpour")!.icon[4]).toBe("b.b.b.b.b");
     expect(groups[0]!.note).toBe(
-      "Most camps have fair weather (80% of routes, fewer on the Clifftop). Other weather is drawn for the route. On the Clifftop bad weather hits harder: Rain washes away 2 more whispers, a Downpour 3 more, and lightning can strike 3 times.",
+      "Most camps have fair weather (80% of routes, never on the Clifftop). Other weather is drawn for the route. On the Clifftop bad weather hits harder: Rain washes away 2 more whispers, a Downpour 3 more, and lightning can strike 3 times.",
     );
     expect(groups[0]!.entries.find((e) => e.id === "fair")!.icon).toEqual(["....o....", ".o.....o.", "...ooo...", "..ooooo..", "o.ooooo.o", "..ooooo..", "...ooo...", ".o.....o.", "....o...."]);
   });

@@ -45,6 +45,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       paragraphs: [
         `Before camp 1 the crew votes on the run: ${short.name} (${short.camps} camps), ${standard.name} (${standard.camps}) or ${long.name} (${long.camps}). The last camp is the temple.`,
         `A camp is cleared when every objective is done. A failed camp costs ${count(B.failureCost, "supply", "supplies")} and is replayed with a fresh deal. The crew starts with ${B.suppliesStart} supplies and holds at most ${B.suppliesMax}. With none left, the run ends.`,
+        "A replay skips the draft, the event and the route vote: the crew goes back to the same camp's loadout, through the shop again before a boss camp.",
       ],
       items: [],
     },
@@ -64,7 +65,9 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       heading: "Tricks",
       paragraphs: [
         "Follow the led suit if you can. Otherwise play anything.",
+        "The Sun and Moon form their own two-card suit: if one is led, whoever holds the other must play it.",
         "The Sun beats everything and the Moon beats everything but the Sun. Otherwise the highest card of the led suit wins.",
+        "If Bait stops the only card of the led suit from winning, the highest card left wins, and a tie goes to the card played first.",
         "The winner leads the next trick. Whoever holds the Sun leads the first trick and picks the first objective.",
       ],
       items: [],
@@ -86,6 +89,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       heading: "The Whisper",
       paragraphs: [
         "Once per camp, between tricks, show one card from your hand to one teammate. Everyone sees that you whispered, but only they see the card.",
+        "Whispers go only between tricks, before the next lead: never while objectives are being picked, and never once a trick has started.",
         "In Rain or a Downpour the crew's first whispers each camp wash away: they are spent, everyone sees them wash away, and nobody sees the card.",
       ],
       items: [],
@@ -111,6 +115,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       heading: "The temple",
       paragraphs: [
         "At the last camp, lead each plate's suit in order, ending with the Sun. Every plate must be pressed, or the camp fails. The Sun is also an objective someone must win.",
+        "A trick led in any other suit presses nothing, and the camp fails once too few tricks remain for the plates left. The Sun must lead the trick for the last plate: if it is led before the other plates are pressed, or played or discarded any other way, the camp fails.",
         "Winning the Sun earns the crew a Skip. Any seat can spend it between tricks or in rescue to drop one open objective.",
         "Bosses you beat earlier return as helpers at half strength.",
       ],
@@ -178,7 +183,7 @@ export function buildModPages(): ModPage[] {
           id: "weather",
           heading: "Weather",
           note:
-            `Most camps have fair weather (${B.fairWeatherChance}% of routes, fewer on the Clifftop). Other weather is drawn for the route. ` +
+            `Most camps have fair weather (${B.fairWeatherChance}% of routes, never on the Clifftop). Other weather is drawn for the route. ` +
             `On the Clifftop bad weather hits harder: Rain washes away ${B.washes.rain.exposed} more whispers, a Downpour ${B.washes.downpour.exposed} more, ` +
             `and lightning can strike ${B.strikes.max + B.strikes.exposed} times.`,
           entries: entriesOf("weather", () => null),
