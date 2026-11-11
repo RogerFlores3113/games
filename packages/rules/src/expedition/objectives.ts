@@ -298,6 +298,20 @@ export function conflictsForSeat(state: CampState, seatId: string, objective: Ob
   return state.objectives.some((owned) => owned.ownerSeatId === seatId && owned.id !== objective.id && objectivesConflict(owned, objective));
 }
 
+/** Whether `seatId` must take an open no-tricks objective now: it holds no
+ * objective yet, and no more seats are left without one than there are open
+ * no-tricks objectives. Any seat that already holds another objective would
+ * clash with a no-tricks one, so the last seats without an objective take
+ * them before a no-tricks objective is forced onto a clashing seat. */
+export function mustTakeNoTricks(state: CampState, seatId: string): boolean {
+  const owns = (id: string) => state.objectives.some((o) => o.ownerSeatId === id);
+  if (owns(seatId)) return false;
+  const openNoTricks = state.objectives.filter((o) => o.ownerSeatId === null && o.kind === "no-tricks").length;
+  if (openNoTricks === 0) return false;
+  const seatsWithout = state.seatIds.filter((id) => !owns(id)).length;
+  return seatsWithout <= openNoTricks;
+}
+
 /** Whether some open objective would not conflict for `seatId`. */
 export function hasOpenWithoutConflict(state: CampState, seatId: string): boolean {
   return state.objectives.some((o) => o.ownerSeatId === null && !conflictsForSeat(state, seatId, o));

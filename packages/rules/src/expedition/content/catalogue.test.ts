@@ -557,6 +557,8 @@ describe("Perfumist", () => {
 
   it("the Perfumist whispers once until upgraded", () => {
     expect(whisperAllowance(table({ character: "perfumist" }))[0]).toBe(1);
+    // Items still add to an unupgraded Perfumist's one whisper.
+    expect(whisperAllowance(table({ character: "perfumist", kit: ["heavy-pack"] }))[0]).toBe(2);
     expect(whisperAllowance(table({ character: "perfumist", kit: ["perfumist.turncoat", "rain-poncho"] }))[0]).toBe(3);
   });
 

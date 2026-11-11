@@ -6,7 +6,7 @@ import { applyCampAction } from "./actions";
 import { currentActorSeatId } from "./camp";
 import { botMove } from "./dev/autoplay";
 import { canPickObjective } from "./legality";
-import { objectivesConflict } from "./objectives";
+import { mustTakeNoTricks, objectivesConflict } from "./objectives";
 import { baseRules, type CoreRules } from "./rules";
 import { attemptOf, withAttempt } from "./run/attempt";
 import { CATALOG } from "./run/catalog";
@@ -101,5 +101,27 @@ describe("a bot's pick", () => {
     const move = botMove(forced, [scheduled], CATALOG);
     expect(move).toEqual({ seatId: scheduled, request: { type: "pick-objective", objectiveId: "n2" } });
     expect(applyRunAction(forced, scheduled, move!.request, CATALOG).ok).toBe(true);
+  });
+});
+
+describe("the last seats without an objective take the no-tricks one", () => {
+  it("makes the last seat with no objective take an open no-tricks objective", () => {
+    // a and b hold cards; c holds nothing, and one no-tricks objective is open.
+    const state = pickCamp([winCard("w1", "a"), winCard("w2", "b"), winCard("w3"), noTricks("n")]);
+    expect(currentActorSeatId(state)).toBe("c");
+    expect(mustTakeNoTricks(state, "c")).toBe(true);
+    expect(canPickObjective(state, "c", "w3")).toEqual({ legal: false, reason: "objective_reserved" });
+    expect(canPickObjective(state, "c", "n")).toEqual({ legal: true });
+  });
+
+  it("leaves the choice free while more seats without an objective remain", () => {
+    const state = pickCamp([winCard("w1"), winCard("w2"), noTricks("n")]);
+    expect(mustTakeNoTricks(state, "a")).toBe(false);
+    expect(canPickObjective(state, "a", "w1")).toEqual({ legal: true });
+  });
+
+  it("never binds a seat that already holds an objective", () => {
+    const state = pickCamp([winCard("w1", "a"), winCard("w2", "b"), winCard("w3", "c"), winCard("w4"), noTricks("n")]);
+    expect(mustTakeNoTricks(state, "a")).toBe(false);
   });
 });

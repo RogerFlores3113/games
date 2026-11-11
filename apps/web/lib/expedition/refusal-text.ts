@@ -18,6 +18,7 @@ const REFUSAL_TEXT: Readonly<Partial<Record<ExpeditionErrorCode, string>>> = {
   card_not_in_hand: "That card is not in your hand any more",
   objective_not_available: "That objective is taken",
   objective_conflict: "You can't finish that with an objective you hold",
+  objective_reserved: "Take win NO tricks; nobody else can hold it",
   no_whispers_left: "No whispers left this camp",
   whisper_blocked: "Whispers are blocked right now",
   ability_spent: "That power is spent",

@@ -18,7 +18,7 @@
 
 import { campPhase, checkCampOutcome, currentActorSeatId } from "./camp";
 import { baseRules, type CoreRules } from "./rules";
-import { conflictsForSeat, hasOpenWithoutConflict } from "./objectives";
+import { conflictsForSeat, hasOpenWithoutConflict, mustTakeNoTricks } from "./objectives";
 import { isFirstLead } from "./trick";
 import type { CampError, CampState, ExpeditionCard } from "./state";
 
@@ -63,6 +63,9 @@ export function canPickObjective(
   }
   if (conflictsForSeat(state, actorSeatId, objective) && hasOpenWithoutConflict(state, actorSeatId)) {
     return { legal: false, reason: "objective_conflict" };
+  }
+  if (mustTakeNoTricks(state, actorSeatId) && objective.kind !== "no-tricks") {
+    return { legal: false, reason: "objective_reserved" };
   }
   return { legal: true };
 }

@@ -23,6 +23,7 @@ export const ExpeditionErrorCodeSchema = z.enum([
   "no_joker_first_lead",
   "objective_not_available",
   "objective_conflict",
+  "objective_reserved",
   "invalid_action",
   "not_a_seat",
   "run_over",

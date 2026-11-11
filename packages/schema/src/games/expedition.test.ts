@@ -17,6 +17,7 @@ const EXPEDITION_ERROR_CODES = [
   "no_joker_first_lead",
   "objective_not_available",
   "objective_conflict",
+  "objective_reserved",
   "invalid_action",
   "not_a_seat",
   "run_over",
@@ -522,8 +523,8 @@ describe("ExpeditionErrorCodeSchema", () => {
     expect(ExpeditionErrorCodeSchema.safeParse(code).success).toBe(false);
   });
 
-  it("has exactly 36 members", () => {
-    expect(ExpeditionErrorCodeSchema.options.length).toBe(36);
+  it("has exactly 37 members", () => {
+    expect(ExpeditionErrorCodeSchema.options.length).toBe(37);
   });
 });
 
