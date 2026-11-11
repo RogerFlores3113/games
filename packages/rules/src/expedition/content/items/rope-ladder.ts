@@ -3,8 +3,8 @@ import { defineItem, itemAbility } from "../source-def";
 export const ropeLadder = defineItem({
   id: "rope-ladder",
   name: "Rope Ladder",
-  rarity: "rare",
-  price: 5,
+  rarity: "common",
+  price: 4,
   uses: { kind: "single-use" },
   text: "Drop a failed objective.",
   active: itemAbility({

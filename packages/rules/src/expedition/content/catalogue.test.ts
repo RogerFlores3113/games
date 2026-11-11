@@ -962,7 +962,7 @@ describe("items", () => {
   it("the second round's prices and rarities", () => {
     const at = (id: string) => [CATALOG.items[id]!.rarity, CATALOG.items[id]!.price];
     expect([at("rope-ladder"), at("heavy-pack"), at("smoke-signal"), at("trail-rations"), at("conch-shell"), at("parrot"), at("signal-flare"), at("rain-poncho"), at("trained-monkey")]).toEqual([
-      ["rare", 5], ["common", 2], ["rare", 4], ["rare", 5], ["common", 2], ["common", 2], ["common", 1], ["common", 3], ["common", 3],
+      ["common", 4], ["common", 2], ["rare", 4], ["rare", 5], ["common", 2], ["common", 2], ["common", 1], ["common", 3], ["common", 3],
     ]);
     expect(CATALOG.items["trail-rations"]!.noFreeUse).toBe(true);
     expect(CATALOG.items["first-aid-kit"]!.noFreeUse).toBe(true);
