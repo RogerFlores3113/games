@@ -130,7 +130,7 @@ describe("property: whole-run per-seat leak checker (COMM-03/ENG-03)", () => {
       }),
       { numRuns: 25, examples: examples.map((example) => [example] as const) },
     );
-  }, 30_000);
+  }, 90_000); // About 15 s alone; whole runs got longer and each view now checks play warnings, so leave room under a loaded full run.
 
   it("draft-offer coverage: every seat holding a real private draft offer leaks nothing (3, 4 and 5 seats)", () => {
     for (const seatCount of [3, 4, 5]) {
