@@ -4,8 +4,8 @@ import { defineItem, itemAbility } from "../source-def";
 export const packMule = defineItem({
   id: "pack-mule",
   name: "Pack Mule",
-  rarity: "common",
-  price: 3,
+  rarity: "uncommon",
+  price: 4,
   uses: { kind: "per-camp" },
   text: "Give a won trick to a teammate: it counts for their trick counts only.",
   active: itemAbility({

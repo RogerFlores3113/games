@@ -50,15 +50,15 @@ describe("SOURCE_DISPLAY", () => {
   it("carries an item with a null characterId, and flags passive-only sources", () => {
     expect(SOURCE_DISPLAY["trained-monkey"]).toMatchObject({ kind: "item", characterId: null, active: { targets: ["card", "whisper"] } });
     expect(SOURCE_DISPLAY["heavy-pack"]).toMatchObject({ kind: "item", characterId: null, active: null, passive: true });
-    expect(SOURCE_DISPLAY["heavy-pack"]!.item).toEqual({ rarity: "common", price: 2, sellsFor: 1, exclusiveTo: null, uses: null, usesKind: null });
+    expect(SOURCE_DISPLAY["heavy-pack"]!.item).toEqual({ rarity: "uncommon", price: 3, sellsFor: 1, exclusiveTo: null, uses: null, usesKind: null });
     expect(SOURCE_DISPLAY.leader).toMatchObject({ kind: "character", active: null, passive: true });
     expect(SOURCE_DISPLAY["cartographer.redraw"]).toMatchObject({ kind: "power", characterId: "cartographer", active: { windows: ["objective-pick"], targets: ["objective"] } });
   });
 
   it("carries an item's rarity, price and uses badge", () => {
     expect(SOURCE_DISPLAY["trail-map"]!.item).toEqual({ rarity: "rare", price: 5, sellsFor: 2, exclusiveTo: null, uses: "Single use", usesKind: "single-use" });
-    expect(SOURCE_DISPLAY["pack-mule"]!.item).toEqual({ rarity: "common", price: 3, sellsFor: 1, exclusiveTo: null, uses: "Once per camp", usesKind: "per-camp" });
-    expect(SOURCE_DISPLAY["rain-poncho"]!.item).toEqual({ rarity: "common", price: 3, sellsFor: 1, exclusiveTo: null, uses: "2 charges", usesKind: "charges" });
+    expect(SOURCE_DISPLAY["pack-mule"]!.item).toEqual({ rarity: "uncommon", price: 4, sellsFor: 2, exclusiveTo: null, uses: "Once per camp", usesKind: "per-camp" });
+    expect(SOURCE_DISPLAY["rain-poncho"]!.item).toEqual({ rarity: "uncommon", price: 3, sellsFor: 1, exclusiveTo: null, uses: "2 charges", usesKind: "charges" });
     expect(SOURCE_DISPLAY["pocket-glass"]!.item).toMatchObject({ price: 1, sellsFor: 1, exclusiveTo: "pack-rat" });
     expect(SOURCE_DISPLAY["explorer.second-wind"]!.item).toBeNull();
   });

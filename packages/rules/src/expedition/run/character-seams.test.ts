@@ -256,7 +256,7 @@ describe("draftShapes, shopPrice and the offers ops", () => {
         limit: { kind: "per-run", times: 1 },
         targets: [],
         apply: (ctx) => [
-          ...ctx.run.seatIds.flatMap((seatId) => [0, 1].map((): ToolkitOp => ({ op: "add-offer", seatId, offer: ctx.drawOffer(seatId, { options: 3, bundleSize: 1, exclusive: 0, rareChance: 100 }) }))),
+          ...ctx.run.seatIds.flatMap((seatId) => [0, 1].map((): ToolkitOp => ({ op: "add-offer", seatId, offer: ctx.drawOffer(seatId, { options: 3, bundleSize: 1, exclusive: 0, odds: { rare: 100, uncommon: 0 } }) }))),
           { op: "adjust-coins", delta: 10 },
         ],
       }),
@@ -604,7 +604,7 @@ function playTrickWith(run: RunState, catalog: Catalog): { run: RunState } {
 describe("source reactions", () => {
   it("lets a character take a seeded item when the length vote opens the run", () => {
     const lucky = seamCharacter("lucky", {
-      on: { "run-started": (ctx) => [{ op: "grant-item", seatId: ctx.self, itemId: ctx.drawOffer(ctx.self, { options: 1, bundleSize: 1, exclusive: 0, rareChance: 0 }).bundles[0]![0]! }] },
+      on: { "run-started": (ctx) => [{ op: "grant-item", seatId: ctx.self, itemId: ctx.drawOffer(ctx.self, { options: 1, bundleSize: 1, exclusive: 0, odds: { rare: 0, uncommon: 0 } }).bundles[0]![0]! }] },
     });
     const catalog = catalogWith(lucky);
     let run = createRun({ seatIds: SEATS, seed: "lucky" });

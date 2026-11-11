@@ -17,10 +17,11 @@ export type DraftOffer = { readonly kind: "standard" | "special"; readonly bundl
 
 /** One offer: `options` bundles, each of `bundleSize` items anyone may
  * draft plus `exclusive` items only the seat's character drafts. Each item
- * is rare with `rareChance` percent. */
-export type DraftShape = { readonly options: number; readonly bundleSize: number; readonly exclusive: number; readonly rareChance: number };
+ * rolls its rarity by `odds` (percent; common is the rest). */
+export type DraftOdds = { readonly rare: number; readonly uncommon: number };
+export type DraftShape = { readonly options: number; readonly bundleSize: number; readonly exclusive: number; readonly odds: DraftOdds };
 
-export const BASE_DRAFT_SHAPE: DraftShape = { options: DRAFT.options, bundleSize: DRAFT.bundleSize, exclusive: 0, rareChance: DRAFT.rareChance };
+export const BASE_DRAFT_SHAPE: DraftShape = { options: DRAFT.options, bundleSize: DRAFT.bundleSize, exclusive: 0, odds: DRAFT.odds };
 export const BOSS_DRAFT_SHAPE: DraftShape = { ...BASE_DRAFT_SHAPE, bundleSize: DRAFT.bossBundleSize };
 
 /** The standard offer of the draft the run is at: bundles after a boss camp. */
@@ -35,7 +36,7 @@ export type ItemPool = Readonly<Record<Rarity, readonly string[]>>;
 function poolOf(catalog: Catalog, keep: (item: ItemDef) => boolean): ItemPool {
   const kept = Object.values(catalog.items).filter(keep);
   const ids = (rarity: Rarity): string[] => kept.filter((item) => item.rarity === rarity).map((item) => item.id).sort();
-  return { common: ids("common"), rare: ids("rare") };
+  return { common: ids("common"), uncommon: ids("uncommon"), rare: ids("rare") };
 }
 
 /** Items no character holds exclusively: the draft's bundles and the shop. */
@@ -48,12 +49,20 @@ export function exclusivePool(catalog: Catalog, characterId: string | null): Ite
   return poolOf(catalog, (item) => characterId !== null && item.exclusiveTo === characterId);
 }
 
-/** Rolls a rarity (rare at `rareChance` percent), then picks an item of it
- * not in `taken`; falls back to the other rarity when that one has none
- * left. null when the pool has nothing left at all. */
-export function drawItem(seed: string, stream: (part: ItemDrawPart) => string, pool: ItemPool, taken: ReadonlySet<string>, rareChance: number): string | null {
-  const rolled: Rarity = seededIndex(seed, stream("rarity"), 100) < rareChance ? "rare" : "common";
-  for (const rarity of [rolled, rolled === "rare" ? "common" : "rare"] as const) {
+/** Next tier to try when the rolled one has nothing left: down first, then up. */
+const FALLBACK: Readonly<Record<Rarity, readonly Rarity[]>> = {
+  rare: ["rare", "uncommon", "common"],
+  uncommon: ["uncommon", "common", "rare"],
+  common: ["common", "uncommon", "rare"],
+};
+
+/** Rolls a rarity by `odds`, then picks an item of it not in `taken`; falls
+ * back to the next tier down, then up, when that one has none left. null
+ * when the pool has nothing left at all. */
+export function drawItem(seed: string, stream: (part: ItemDrawPart) => string, pool: ItemPool, taken: ReadonlySet<string>, odds: DraftOdds): string | null {
+  const roll = seededIndex(seed, stream("rarity"), 100);
+  const rolled: Rarity = roll < odds.rare ? "rare" : roll < odds.rare + odds.uncommon ? "uncommon" : "common";
+  for (const rarity of FALLBACK[rolled]) {
     const left = pool[rarity].filter((id) => !taken.has(id));
     if (left.length > 0) return left[seededIndex(seed, stream("pick"), left.length)]!;
   }
@@ -80,7 +89,7 @@ export function drawOffer(
   const bundles = Array.from({ length: shape.options }, (_, bundle) => {
     const taken = new Set<string>();
     const pick = (pool: ItemPool, item: number): void => {
-      const id = drawItem(seed, (part) => stream(bundle, item, part), pool, single ? offered : taken, shape.rareChance);
+      const id = drawItem(seed, (part) => stream(bundle, item, part), pool, single ? offered : taken, shape.odds);
       if (id === null) return;
       taken.add(id);
       offered.add(id);

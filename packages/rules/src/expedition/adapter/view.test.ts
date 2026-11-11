@@ -50,7 +50,8 @@ describe("toExpeditionPlayerView", () => {
     const seed = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const base = setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG, camp: 2, characters: { p0: "explorer" } });
     const offer = draftOfferFor(seed, campIndex(2), base.seats[0]!, 0, CATALOG);
-    const queued = draftOfferFor(seed, campIndex(2), base.seats[0]!, 1, CATALOG);
+    // A later offer that differs from the head, so its absence from the view is meaningful.
+    const queued = [1, 2, 3, 4, 5, 6].map((n) => draftOfferFor(seed, campIndex(2), base.seats[0]!, n, CATALOG)).find((o) => JSON.stringify(o.bundles) !== JSON.stringify(offer.bundles))!;
     const run: RunState = {
       ...base,
       seats: base.seats.map((s) => (s.seatId === "p0" ? { ...s, offers: [offer, queued] } : s)),

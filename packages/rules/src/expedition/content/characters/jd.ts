@@ -13,7 +13,7 @@ export const jd = defineCharacter({
   text: "Start the run with an extra random item.",
   on: {
     "run-started": (ctx) => {
-      const itemId = ctx.drawOffer(ctx.self, { options: 1, bundleSize: 1, exclusive: 0, rareChance: DRAFT.rareChance }).bundles[0]?.[0];
+      const itemId = ctx.drawOffer(ctx.self, { options: 1, bundleSize: 1, exclusive: 0, odds: DRAFT.odds }).bundles[0]?.[0];
       return itemId === undefined ? [] : [{ op: "grant-item", seatId: ctx.self, itemId }];
     },
   },

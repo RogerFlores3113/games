@@ -10,6 +10,7 @@ import { placeArt } from "../art/place-art";
 import { sourceArtId } from "../art/art-registry";
 import type { ObjectIndex } from "../object-index";
 import type { ShopEntry, ShopPanel } from "../../../../lib/expedition/loadout-model";
+import { rarityColor } from "./rarity-color";
 import { fitLabel } from "./text-fit";
 import { button, coin, labelWidth, text, type Layer } from "./ui-kit";
 
@@ -27,7 +28,6 @@ export interface LoadoutCtx {
   handlers: LoadoutHandlers;
 }
 
-const RARE = PALETTE.rain;
 const SHOP_ROW_H = 19;
 const SHOP_ROW_STEP = 20;
 const BUY_W = 70;
@@ -42,7 +42,7 @@ function shopRow(ctx: LoadoutCtx, entry: ShopEntry, x: number, y: number, w: num
   if (art !== null) info.add(placeArt(scene, art, 10, Math.floor(SHOP_ROW_H / 2)));
   const chars = Math.floor((infoW - 22) / LABEL_CELL.w);
   info.add(text(scene, 20, 1, fitLabel(entry.name, chars)));
-  info.add(text(scene, 20, LABEL_CELL.h + 2, fitLabel(entry.detail, chars), entry.rare ? RARE : PALETTE.textDim));
+  info.add(text(scene, 20, LABEL_CELL.h + 2, fitLabel(entry.detail, chars), rarityColor(entry.rarity)));
   if (entry.infoId !== null && entry.sourceId !== null) {
     const hit = scene.add.zone(0, 0, infoW, SHOP_ROW_H).setOrigin(0, 0).setInteractive();
     hit.on("pointerover", () => handlers.onSourceHover(entry.sourceId, entry.infoId!));

@@ -4,7 +4,7 @@ import { defineItem, itemAbility } from "../source-def";
 export const rainPoncho = defineItem({
   id: "rain-poncho",
   name: "Rain Poncho",
-  rarity: "common",
+  rarity: "uncommon",
   price: 3,
   uses: { kind: "charges", n: 2 },
   text: "Whisper once more this camp, and rain can't wash your whispers this camp.",

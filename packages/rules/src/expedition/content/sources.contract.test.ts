@@ -178,7 +178,7 @@ describe("source shape", () => {
     expect(def.active === undefined).toBe(def.uses === undefined);
     expect(def.active === undefined).toBe(def.passive !== undefined);
     if (def.active !== undefined) expect("limit" in def.active).toBe(false);
-    expect(["common", "rare"]).toContain(def.rarity);
+    expect(["common", "uncommon", "rare"]).toContain(def.rarity);
     expect(Number.isInteger(def.price) && def.price > 0).toBe(true);
   });
 

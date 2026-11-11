@@ -75,7 +75,7 @@ describe("buildShop", () => {
       sourceId: "leader.open-ears",
       name: "Open Ears",
       detail: "Upgrade, +1 whisper",
-      rare: false,
+      rarity: "common",
       price: null,
       buy: { kind: "status", label: "Owned" },
     });

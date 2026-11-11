@@ -4,8 +4,8 @@ import { defineItem, itemAbility } from "../source-def";
 export const whetstone = defineItem({
   id: "whetstone",
   name: "Whetstone",
-  rarity: "common",
-  price: 2,
+  rarity: "uncommon",
+  price: 3,
   uses: { kind: "single-use" },
   text: "A card in your hand counts up to two ranks higher or lower this camp.",
   active: itemAbility({

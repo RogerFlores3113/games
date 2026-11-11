@@ -323,10 +323,11 @@ draft before camp 1, camp 1's first), so `k` and `A` there are that camp's.
 ## Add an item
 
 1. Create `content/items/<id>.ts` exporting `defineItem({ id, name, rarity,
-   price, text, ... })`. `rarity` is `"common"` or `"rare"`. The draft and
-   the shop roll the rarity first, rare at `DRAFT.rareChance` percent
-   (`run/balance.ts`), then pick an item of it. `price` is its cost in coins
-   at the shop. The optional `exclusiveTo` names the one character it is
+   price, text, ... })`. `rarity` is `"common"`, `"uncommon"` or `"rare"`, set by the
+   strength of the effect. The draft and the shop roll the rarity first by
+   `DRAFT.odds` (percent, `run/balance.ts`; common is the rest), then pick an
+   item of it. `price` is its cost in coins at the shop and lies in the
+   rarity's `PRICE_BANDS` band (common 1-2, uncommon 3-4, rare 5-6). The optional `exclusiveTo` names the one character it is
    drafted for, and the shop never stocks such an item. `text` is one short
    sentence about the effect; the window and uses render as badges from the
    def, so the text never repeats them.
@@ -424,7 +425,7 @@ as the engine did before them.
   hidden while beyond the horizon; `draftShapes(run, seatId)` lists the
   offers a draft deals the seat, picked in order (the base: three single
   items, or three bundles of two after a boss camp) (`DraftShape`: options, bundle
-  size, items exclusive to the character, rare chance; a one-item bundle
+  size, items exclusive to the character, rarity odds; a one-item bundle
   never repeats another option's item); `shopPrice(run, seatId, price)`, which the shop
   view shows per viewer; `affectsSeat(run, seatId, origin)`, which the
   animal bosses ask through `ctx.affects` before singling a seat out (it

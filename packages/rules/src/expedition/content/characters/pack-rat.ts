@@ -9,7 +9,7 @@ import { ability, defineCharacter, defineUpgrade } from "../source-def";
 const ITEM_UID = /^it\d+$/;
 
 /** After the usual draft, a pick of one of three Pack Rat items. */
-const PACK_RAT_PICK: DraftShape = { options: 3, bundleSize: 0, exclusive: 1, rareChance: DRAFT.rareChance };
+const PACK_RAT_PICK: DraftShape = { options: 3, bundleSize: 0, exclusive: 1, odds: DRAFT.odds };
 
 export const packRat = defineCharacter({
   id: "pack-rat",

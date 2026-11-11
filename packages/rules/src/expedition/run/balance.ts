@@ -88,8 +88,13 @@ export const TORNADO = { every: 3, cards: 3 } as const;
 export const RIVER_SHARE = 3 / 4;
 
 /** A draft offer: `options` single items, or after a boss camp `options`
- * bundles of `bossBundleSize`; each item is rare with `rareChance` percent. */
-export const DRAFT = { options: 3, bundleSize: 1, bossBundleSize: 2, rareChance: 15 } as const;
+ * bundles of `bossBundleSize`. Each item rolls 0..99: below `odds.rare` it
+ * is rare, below `odds.rare + odds.uncommon` uncommon, else common. */
+export const DRAFT = { options: 3, bundleSize: 1, bossBundleSize: 2, odds: { rare: 10, uncommon: 30 } } as const;
+
+/** Every item's price lies in its rarity's band (inclusive). Rarity follows
+ * the strength of an item's effect, not its win rate. */
+export const PRICE_BANDS = { common: { min: 1, max: 2 }, uncommon: { min: 3, max: 4 }, rare: { min: 5, max: 6 } } as const;
 
 /** An event waits on the trail after camp 1 and every `EVENT_EVERY`th camp
  * after it, while a camp follows. */

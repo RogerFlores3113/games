@@ -3,8 +3,8 @@ import { defineItem, itemAbility } from "../source-def";
 export const conchShell = defineItem({
   id: "conch-shell",
   name: "Conch Shell",
-  rarity: "common",
-  price: 2,
+  rarity: "uncommon",
+  price: 3,
   uses: { kind: "single-use" },
   text: "Choose who leads the next trick.",
   active: itemAbility({

@@ -15,8 +15,8 @@ function costlyPack(run: RunState): string | undefined {
 export const heavyPack = defineItem({
   id: ID,
   name: "Heavy Pack",
-  rarity: "common",
-  price: 2,
+  rarity: "uncommon",
+  price: 3,
   text: "Whisper once more each camp; a failed camp costs 2 coins, and packs don't stack.",
   passive: {
     modifier: (owner, sourceKey) => ({

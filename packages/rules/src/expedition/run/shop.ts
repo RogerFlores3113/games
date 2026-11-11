@@ -29,7 +29,7 @@ export function stockFor(seed: string, at: CampIndex, catalog: Catalog): readonl
   const taken = new Set<string>();
   const items: StockEntry[] = [];
   for (let i = 0; i < SHOP.items; i++) {
-    const itemId = drawItem(seed, (part) => STREAMS.shopItem(at, i, part), pool, taken, DRAFT.rareChance);
+    const itemId = drawItem(seed, (part) => STREAMS.shopItem(at, i, part), pool, taken, DRAFT.odds);
     if (itemId === null) break;
     taken.add(itemId);
     items.push({ stockId: `item${i}`, what: { kind: "item", itemId }, price: catalog.items[itemId]!.price, soldTo: null });

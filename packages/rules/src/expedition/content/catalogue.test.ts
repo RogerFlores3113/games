@@ -10,7 +10,7 @@ import { evaluateObjective } from "../objectives";
 import type { CampState, CompletedTrick, ExpeditionCard, Objective, StandardIdentity, StandardRank, Suit } from "../state";
 import { trickWinner } from "../trick";
 import { abilityStatus, useAbility } from "../run/abilities";
-import { FAILED_ATTEMPT_COINS, FAILURE_COST } from "../run/balance";
+import { FAILED_ATTEMPT_COINS, FAILURE_COST, PRICE_BANDS } from "../run/balance";
 import { CATALOG } from "../run/catalog";
 import { rulesFor } from "../run/compose";
 import { attemptOf, withAttempt } from "../run/attempt";
@@ -179,7 +179,7 @@ describe("J.D.", () => {
     for (const [seatId, characterId] of [["p0", "jd"], ["p1", "leader"], ["p2", "explorer"]] as const) run = act(run, seatId, { type: "pick-character", characterId });
     for (const seatId of SEATS) run = act(act(run, seatId, { type: "vote", choice: "short" }), seatId, { type: "lock-in" });
     expect(run.stage.tag).toBe("draft");
-    expect(run.seats.map((s) => [s.items, s.equipped])).toEqual([[[{ uid: "it0", itemId: "pack-mule" }], ["it0"]], [[], []], [[], []]]);
+    expect(run.seats.map((s) => [s.items, s.equipped])).toEqual([[[{ uid: "it0", itemId: "mosquito-net" }], ["it0"]], [[], []], [[], []]]);
   });
 
   it("J.D.'s hidden luck adds 5 to every route's chance of fair weather, up to 100, but never makes the Clifftop fair", () => {
@@ -964,7 +964,7 @@ describe("items", () => {
   it("the second round's prices and rarities", () => {
     const at = (id: string) => [CATALOG.items[id]!.rarity, CATALOG.items[id]!.price];
     expect([at("rope-ladder"), at("heavy-pack"), at("smoke-signal"), at("trail-rations"), at("conch-shell"), at("parrot"), at("signal-flare"), at("rain-poncho"), at("trained-monkey")]).toEqual([
-      ["common", 4], ["common", 2], ["rare", 4], ["rare", 5], ["common", 2], ["common", 2], ["common", 1], ["common", 3], ["common", 3],
+      ["rare", 6], ["uncommon", 3], ["rare", 5], ["rare", 5], ["uncommon", 3], ["common", 2], ["common", 1], ["uncommon", 3], ["rare", 5],
     ]);
     expect(CATALOG.items["trail-rations"]!.noFreeUse).toBe(true);
     expect(CATALOG.items["first-aid-kit"]!.noFreeUse).toBe(true);
@@ -983,3 +983,20 @@ describe("items", () => {
 function campOutcome(run: RunState) {
   return checkCampOutcome(camp(run), rules(run));
 }
+
+describe("item rarity and price", () => {
+  it("prices every item inside its rarity's band", () => {
+    const items = Object.values(CATALOG.items);
+    expect(items.length).toBeGreaterThan(0);
+    for (const item of items) {
+      const band = PRICE_BANDS[item.rarity];
+      expect(item.price, `${item.id} (${item.rarity})`).toBeGreaterThanOrEqual(band.min);
+      expect(item.price, `${item.id} (${item.rarity})`).toBeLessThanOrEqual(band.max);
+    }
+  });
+
+  it("has items of all three rarities", () => {
+    const rarities = new Set(Object.values(CATALOG.items).map((item) => item.rarity));
+    expect([...rarities].sort()).toEqual(["common", "rare", "uncommon"]);
+  });
+});

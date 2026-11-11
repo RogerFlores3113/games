@@ -5,7 +5,7 @@ import { defineItem, itemAbility } from "../source-def";
 export const camouflage = defineItem({
   id: "camouflage",
   name: "Camouflage",
-  rarity: "rare",
+  rarity: "uncommon",
   price: 4,
   uses: { kind: "single-use" },
   text: "Drop an objective of yours if you've won no tricks; win one and the camp fails.",

@@ -1,6 +1,6 @@
 import type { ExpeditionSeatView, ExpeditionShopView } from "@games/rules";
-import { SOURCE_DISPLAY } from "@games/rules";
 import { shopInfoObjectId, shopObjectId } from "./expedition-ids";
+import { rarityItemLabel, rarityOf, type ItemRarity } from "./rarity";
 import { sourceName } from "./source-text";
 
 /**
@@ -29,7 +29,7 @@ export interface ShopEntry {
   sourceId: string | null;
   name: string;
   detail: string;
-  rare: boolean;
+  rarity: ItemRarity;
   /** Null once it is sold or owned. */
   price: number | null;
   buy: ShopBuy;
@@ -71,7 +71,7 @@ function itemEntry(stockId: string, sourceId: string, name: string, detail: stri
     sourceId,
     name,
     detail,
-    rare: SOURCE_DISPLAY[sourceId]?.item?.rarity === "rare",
+    rarity: rarityOf(sourceId),
     price,
     buy,
   };
@@ -91,13 +91,13 @@ export function buildShop(input: ShopInput): ShopPanel {
         sourceId: null,
         name: `Supplies ${input.supplies.count} of ${input.supplies.max}`,
         detail: "One per failed camp",
-        rare: false,
+        rarity: "common",
         price: entry.price,
         buy: buyState(entry.price, input, full ? { kind: "disabled", reason: "Full" } : null),
       };
     }
     const sold: ShopBuy | null = entry.soldTo === null ? null : { kind: "status", label: `Sold to ${input.nameOf(entry.soldTo)}` };
-    const rarity = SOURCE_DISPLAY[what.itemId]?.item?.rarity === "rare" ? "Rare item" : "Common item";
+    const rarity = rarityItemLabel(rarityOf(what.itemId));
     return itemEntry(entry.stockId, what.itemId, sourceName(what.itemId), rarity, sold === null ? entry.price : null, buyState(entry.price, input, sold, true));
   });
   const upgrades = input.shop.yourUpgrades.map((offer) =>

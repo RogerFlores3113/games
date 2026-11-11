@@ -4,7 +4,8 @@
 import { describe, expect, it } from "vitest";
 import { defineItem, type Rarity } from "../content/source-def";
 import { CATALOG } from "./catalog";
-import { BOSS_DRAFT_SHAPE, draftOfferFor } from "./draft";
+import { BASE_DRAFT_SHAPE, BOSS_DRAFT_SHAPE, draftOfferFor } from "./draft";
+import { DRAFT } from "./balance";
 import { campIndex } from "./plan";
 import { STREAMS, seededIndex } from "./rng";
 import { testCatalog } from "./run-test-support";
@@ -14,8 +15,11 @@ const plain = (id: string, rarity: Rarity, exclusiveTo?: string) =>
   defineItem({ id, name: id, rarity, price: 1, text: "Nothing happens.", passive: { modifier: () => ({}) }, ...(exclusiveTo === undefined ? {} : { exclusiveTo }) });
 
 const COMMONS = ["c-1", "c-2", "c-3", "c-4"];
+const UNCOMMONS = ["u-1", "u-2", "u-3"];
 const RARES = ["r-1", "r-2", "r-3"];
-const MIXED = testCatalog({ items: Object.fromEntries([...COMMONS.map((id) => plain(id, "common")), ...RARES.map((id) => plain(id, "rare"))].map((def) => [def.id, def])) });
+const MIXED = testCatalog({
+  items: Object.fromEntries([...COMMONS.map((id) => plain(id, "common")), ...UNCOMMONS.map((id) => plain(id, "uncommon")), ...RARES.map((id) => plain(id, "rare"))].map((def) => [def.id, def])),
+});
 const CAMP_1 = campIndex(1);
 
 function seat(seatId: string, characterId: string | null = "plain-1"): SeatRun {
@@ -46,26 +50,46 @@ describe("draftOfferFor", () => {
     expect(draftOfferFor("pinned", CAMP_1, seat("p0", "explorer"), 0, CATALOG, BOSS_DRAFT_SHAPE)).toEqual({
       kind: "standard",
       bundles: [
-        ["rope-ladder", "trail-map"],
-        ["rain-poncho", "conch-shell"],
-        ["puffball", "parrot"],
+        ["puffball", "trail-rations"],
+        ["parrot", "bait"],
+        ["parrot", "mosquito-net"],
       ],
     });
   });
 
   it("gives each item the rarity its roll names, while that rarity has items left", () => {
-    let rares = 0;
-    for (let n = 0; n < 80; n++) {
+    const tally = { common: 0, uncommon: 0, rare: 0 };
+    for (let n = 0; n < 150; n++) {
       const offer = draftOfferFor(`roll-${n}`, CAMP_1, seat("p1"), 0, MIXED);
       offer.bundles.forEach((bundle, b) =>
         bundle.forEach((id, j) => {
-          const rolledRare = seededIndex(`roll-${n}`, STREAMS.draftItem(1, "p1", 0, b, j, "rarity"), 100) < 15;
-          expect(RARES.includes(id)).toBe(rolledRare);
-          if (rolledRare) rares++;
+          const roll = seededIndex(`roll-${n}`, STREAMS.draftItem(1, "p1", 0, b, j, "rarity"), 100);
+          const rolled = roll < DRAFT.odds.rare ? "rare" : roll < DRAFT.odds.rare + DRAFT.odds.uncommon ? "uncommon" : "common";
+          const pool = { common: COMMONS, uncommon: UNCOMMONS, rare: RARES }[rolled];
+          expect(pool).toContain(id);
+          tally[rolled]++;
         }),
       );
     }
-    expect(rares).toBeGreaterThan(0);
+    expect(tally.rare).toBeGreaterThan(0);
+    expect(tally.uncommon).toBeGreaterThan(0);
+    expect(tally.common).toBeGreaterThan(tally.uncommon);
+  });
+
+  it("falls back down a tier, then up, when the rolled one has nothing left", () => {
+    const only = (...ids: [string, Rarity][]) => testCatalog({ items: Object.fromEntries(ids.map(([id, r]) => [id, plain(id, r)])) });
+    const pick = (catalog: ReturnType<typeof only>, odds: { rare: number; uncommon: number }) =>
+      draftOfferFor("fallback", CAMP_1, seat("p0"), 0, catalog, { ...BASE_DRAFT_SHAPE, odds, options: 1 }).bundles[0]![0];
+    const ALWAYS = { rare: { rare: 100, uncommon: 0 }, uncommon: { rare: 0, uncommon: 100 }, common: { rare: 0, uncommon: 0 } };
+    // rare rolled, no rares: uncommon beats common
+    expect(pick(only(["c", "common"], ["u", "uncommon"]), ALWAYS.rare)).toBe("u");
+    expect(pick(only(["c", "common"]), ALWAYS.rare)).toBe("c");
+    // uncommon rolled, none left: common before rare
+    expect(pick(only(["c", "common"], ["r", "rare"]), ALWAYS.uncommon)).toBe("c");
+    expect(pick(only(["r", "rare"]), ALWAYS.uncommon)).toBe("r");
+    // common rolled, none left: uncommon before rare
+    expect(pick(only(["u", "uncommon"], ["r", "rare"]), ALWAYS.common)).toBe("u");
+    expect(pick(only(["r", "rare"]), ALWAYS.common)).toBe("r");
   });
 
   it("falls back to the other rarity when the rolled one has nothing left", () => {

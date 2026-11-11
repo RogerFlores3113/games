@@ -5,7 +5,7 @@ export const smokeSignal = defineItem({
   id: "smoke-signal",
   name: "Smoke Signal",
   rarity: "rare",
-  price: 4,
+  price: 5,
   uses: { kind: "charges", n: 2 },
   text: "Everyone may whisper once more this camp.",
   active: itemAbility({

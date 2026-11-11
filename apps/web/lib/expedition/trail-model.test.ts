@@ -280,8 +280,8 @@ describe("draft", () => {
           objectId: "bundle:0",
           name: "Rain Poncho + Trail Map",
           items: [
-            { itemId: "rain-poncho", objectId: "bundle-item:0:0", name: "Rain Poncho", text: "Whisper once more this camp, and rain can't wash your whispers this camp.", uses: "2 charges", rare: false, exclusive: false },
-            { itemId: "trail-map", objectId: "bundle-item:0:1", name: "Trail Map", text: "Swap all your open objectives with a teammate's.", uses: "Single use", rare: true, exclusive: false },
+            { itemId: "rain-poncho", objectId: "bundle-item:0:0", name: "Rain Poncho", text: "Whisper once more this camp, and rain can't wash your whispers this camp.", uses: "2 charges", rarity: "uncommon", exclusive: false },
+            { itemId: "trail-map", objectId: "bundle-item:0:1", name: "Trail Map", text: "Swap all your open objectives with a teammate's.", uses: "Single use", rarity: "rare", exclusive: false },
           ],
         },
         {
@@ -297,7 +297,7 @@ describe("draft", () => {
               name: "Heavy Pack",
               text: "Whisper once more each camp; a failed camp costs 2 coins, and packs don't stack.",
               uses: "Always on",
-              rare: false,
+              rarity: "uncommon",
               exclusive: false,
             },
           ],
@@ -504,7 +504,7 @@ describe("item bar and inventory", () => {
       slots: [
         {
           objectId: "bar-slot:0",
-          item: { uid: "trained-monkey", itemId: "trained-monkey", objectId: "slot:0", name: "Trained Monkey", text: "Swap a card for one a teammate whispered to you, if they still hold it.", uses: "Once per camp", rare: false, targetable: false, selected: false, tag: null },
+          item: { uid: "trained-monkey", itemId: "trained-monkey", objectId: "slot:0", name: "Trained Monkey", text: "Swap a card for one a teammate whispered to you, if they still hold it.", uses: "Once per camp", rarity: "rare", targetable: false, selected: false, tag: null },
         },
         { objectId: "bar-slot:1", item: null },
       ],
@@ -552,10 +552,10 @@ describe("shop", () => {
       shop: {
         purse: 7,
         entries: [
-          { stockId: "supplies", objectId: "shop:supplies", infoId: null, sourceId: null, name: "Supplies 3 of 5", detail: "One per failed camp", rare: false, price: 6, buy: { kind: "buy" } },
-          { stockId: "item0", objectId: "shop:item0", infoId: "shop-info:item0", sourceId: "smoke-signal", name: "Smoke Signal", detail: "Rare item", rare: true, price: null, buy: { kind: "status", label: "Sold to Alice" } },
-          { stockId: "item1", objectId: "shop:item1", infoId: "shop-info:item1", sourceId: "bait", name: "Bait", detail: "Common item", rare: false, price: 3, buy: { kind: "buy" } },
-          { stockId: "upgrade:leader.delegate", objectId: "shop:upgrade:leader.delegate", infoId: "shop-info:upgrade:leader.delegate", sourceId: "leader.delegate", name: "Delegate", detail: "Upgrade, +1 whisper", rare: false, price: 8, buy: { kind: "disabled", reason: "Need 1 more" } },
+          { stockId: "supplies", objectId: "shop:supplies", infoId: null, sourceId: null, name: "Supplies 3 of 5", detail: "One per failed camp", rarity: "common", price: 6, buy: { kind: "buy" } },
+          { stockId: "item0", objectId: "shop:item0", infoId: "shop-info:item0", sourceId: "smoke-signal", name: "Smoke Signal", detail: "Rare item", rarity: "rare", price: null, buy: { kind: "status", label: "Sold to Alice" } },
+          { stockId: "item1", objectId: "shop:item1", infoId: "shop-info:item1", sourceId: "bait", name: "Bait", detail: "Common item", rarity: "common", price: 3, buy: { kind: "buy" } },
+          { stockId: "upgrade:leader.delegate", objectId: "shop:upgrade:leader.delegate", infoId: "shop-info:upgrade:leader.delegate", sourceId: "leader.delegate", name: "Delegate", detail: "Upgrade, +1 whisper", rarity: "common", price: 8, buy: { kind: "disabled", reason: "Need 1 more" } },
         ],
       },
     });

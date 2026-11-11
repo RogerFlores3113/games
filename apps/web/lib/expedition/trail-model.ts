@@ -1,5 +1,6 @@
 import type { ExpeditionCampPreviewView, ExpeditionView } from "@games/rules";
 import { CHARACTER_DISPLAY, EVENT_DISPLAY, RUN_LENGTH_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
+import type { ItemRarity } from "./rarity";
 import type { Prompt } from "./build-prompt";
 import { buildTrailPrompt, PROMPT_MAX_CHARS } from "./build-prompt";
 import type { SceneServerInput, Tooltip, TopBar } from "./build-scene-model";
@@ -35,7 +36,7 @@ export interface BundleItem {
   text: string;
   /** "Single use", "Once per camp", "2 charges", "Always on". */
   uses: string;
-  rare: boolean;
+  rarity: ItemRarity;
   /** Drafted only by one character (the Pack Rat's own items). */
   exclusive: boolean;
 }
@@ -458,7 +459,7 @@ function bundleFor(itemIds: readonly string[], bundle: number): DraftBundle {
         name: sourceName(itemId),
         text: display?.text ?? "",
         uses: display?.item?.uses ?? "Always on",
-        rare: display?.item?.rarity === "rare",
+        rarity: display?.item?.rarity ?? "common",
         exclusive: (display?.item?.exclusiveTo ?? null) !== null,
       };
     }),

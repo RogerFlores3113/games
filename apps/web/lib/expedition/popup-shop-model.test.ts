@@ -24,7 +24,7 @@ describe("the Pop-up Shop panel", () => {
           itemId: "bait",
           name: "Bait",
           price: 4,
-          rare: false,
+          rarity: "common",
           infoId: "popup-info:0",
           buys: [
             { choiceId: choices[0], objectId: "popup:buy:0:bait:4:p0", label: "You", selected: false },
@@ -35,7 +35,7 @@ describe("the Pop-up Shop panel", () => {
           itemId: "trail-map",
           name: "Trail Map",
           price: 9,
-          rare: true,
+          rarity: "rare",
           infoId: "popup-info:2",
           buys: [
             { choiceId: choices[2], objectId: "popup:buy:2:trail-map:9:p0", label: "You", selected: false },

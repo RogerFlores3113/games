@@ -4,8 +4,8 @@ import { defineItem, itemAbility } from "../source-def";
 export const trainedMonkey = defineItem({
   id: "trained-monkey",
   name: "Trained Monkey",
-  rarity: "common",
-  price: 3,
+  rarity: "rare",
+  price: 5,
   uses: { kind: "per-camp" },
   text: "Swap a card for one a teammate whispered to you, if they still hold it.",
   active: itemAbility({
