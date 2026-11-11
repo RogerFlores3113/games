@@ -94,10 +94,10 @@ describe("checkRunState", () => {
     const loadout = DEV_SHORTCUTS["jump-to-camp"].apply(createRun({ seatIds: SEATS, seed: "check" }), { length: "standard", camp: 1, stage: "loadout" }, CATALOG);
     const run: RunState = { ...loadout, supplies: -1, stage: { ...(loadout.stage as Extract<RunState["stage"], { tag: "loadout" }>), ready: { zed: true } } };
     expect(checkRunState(run, CATALOG)).toEqual([
-      "supplies must be a whole number from 0 to 4, got -1",
+      "supplies must be a whole number from 0 to 5, got -1",
       "the ready list holds unknown seat zed",
     ]);
-    expect(checkRunState({ ...loadout, supplies: 5 }, CATALOG)).toEqual(["supplies must be a whole number from 0 to 4, got 5"]);
+    expect(checkRunState({ ...loadout, supplies: 6 }, CATALOG)).toEqual(["supplies must be a whole number from 0 to 5, got 6"]);
   });
 
   it("flags a muster lock-in without a character and a ballot, or for an unknown seat", () => {

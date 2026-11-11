@@ -84,6 +84,8 @@ function mapExpeditionError(error: RunError): GameErrorDetail {
       return { gameId: EXPEDITION_GAME_ID, code: "no_joker_first_lead" };
     case "objective_not_available":
       return { gameId: EXPEDITION_GAME_ID, code: "objective_not_available" };
+    case "objective_conflict":
+      return { gameId: EXPEDITION_GAME_ID, code: "objective_conflict" };
     case "invalid_action":
       return { gameId: EXPEDITION_GAME_ID, code: "invalid_action" };
     case "not_a_seat":

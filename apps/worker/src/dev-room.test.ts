@@ -143,7 +143,7 @@ describe("dev-room: shortcuts and states", () => {
     const room = startedWithBots(2);
     expect(applyDevCommand(room, "host", { kind: "shortcut", id: "set-supplies", params: { supplies: -1 } }, devInput())).toEqual({
       state: room,
-      reply: { ok: false, message: "supplies must be a whole number from 0 to 4" },
+      reply: { ok: false, message: "supplies must be a whole number from 0 to 5" },
     });
   });
 

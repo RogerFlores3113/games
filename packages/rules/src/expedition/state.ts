@@ -169,6 +169,7 @@ export type CampError =
   | "must_follow_suit"
   | "no_joker_first_lead"
   | "objective_not_available"
+  | "objective_conflict"
   | "invalid_action";
 
 export type CampOutcome =

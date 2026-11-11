@@ -149,11 +149,14 @@ describe("whisperLegality", () => {
     expect(result).toEqual({ legal: false, reason: "whisper_blocked" });
   });
 
-  it("rejects a second whisper by the same seat with no_whispers_left (base whispersPerCamp 1)", () => {
+  it("rejects a second whisper by the same seat with no_whispers_left (base whispersPerCamp 2)", () => {
     const camp = betweenTricksCamp();
     const run = makeRun({
       camp,
-      log: [{ event: "whisper", actorSeatId: "p0", subjectSeatIds: ["p1"], sourceId: null, audience: "public" }],
+      log: [
+        { event: "whisper", actorSeatId: "p0", subjectSeatIds: ["p1"], sourceId: null, audience: "public" },
+        { event: "whisper", actorSeatId: "p0", subjectSeatIds: ["p1"], sourceId: null, audience: "public" },
+      ],
     });
     const cardId = camp.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
     const result = whisperLegality(run, "p0", "p2", cardId, emptyCatalog());

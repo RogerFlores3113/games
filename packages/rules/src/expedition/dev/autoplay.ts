@@ -68,8 +68,7 @@ function candidates(run: RunState, seatIds: readonly string[], catalog: Catalog)
       const camp = stage.attempt.camp;
       const actor = currentActorSeatId(camp, rulesFor(run, catalog));
       if (actor !== null && seatIds.includes(actor)) {
-        const unowned = camp.objectives.find((o) => o.ownerSeatId === null);
-        if (unowned !== undefined) out.push({ seatId: actor, request: { type: "pick-objective", objectiveId: unowned.id } });
+        for (const open of camp.objectives.filter((o) => o.ownerSeatId === null)) out.push({ seatId: actor, request: { type: "pick-objective", objectiveId: open.id } });
         for (const card of templeOrder(run as RunAt<"camp">, camp.hands.find((h) => h.seatId === actor)?.cards ?? [], catalog)) out.push({ seatId: actor, request: { type: "play-card", cardId: card.id } });
       }
       return out;

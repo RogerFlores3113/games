@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { campIndex, drawPlan } from "./plan";
 import { campSpecAt, firstCampSpec, routeOptions, slotKindsFor } from "./route";
+import { seatObjectivesAt } from "./balance";
 import { createRun } from "./lifecycle";
 import { CATALOG } from "./catalog";
 import { testCatalog } from "./run-test-support";
@@ -22,8 +23,8 @@ describe("firstCampSpec", () => {
     expect(firstCampSpec("long", 3)).toEqual({ index: 1, location: "jungle", weather: "fair", slots: [{ kind: "win-card" }, { kind: "win-card" }] });
   });
 
-  it("deals one more win-card at 4 players and two more at 5", () => {
-    expect([3, 4, 5].map((players) => firstCampSpec("short", players).slots.length)).toEqual([2, 3, 4]);
+  it("deals camp 1's extras by crew size: none at 3 and 4 players, one at 5, in a Short run", () => {
+    expect([3, 4, 5].map((players) => firstCampSpec("short", players).slots.length)).toEqual([2, 2, 3]);
     expect(firstCampSpec("short", 5).slots.every((slot) => slot.kind === "win-card")).toBe(true);
   });
 });
@@ -45,11 +46,14 @@ describe("routeOptions", () => {
     }
   });
 
-  it("adds a seat objective per player over 3 at every camp", () => {
-    for (const [players, extra] of [[3, 0], [4, 1], [5, 2]] as const) {
-      for (const option of optionsOf(draftAfter("crew", "standard", 1, players), CATALOG)) expect(option.next.slots).toHaveLength(3 + extra);
-      for (const option of optionsOf(draftAfter("crew", "long", 6, players), CATALOG)) expect(option.next.slots).toHaveLength(5 + extra);
+  it("adds each crew size's extras at the camps EXTRA_OBJECTIVES names, never past MAX_SEAT_OBJECTIVES", () => {
+    for (const [players, expected] of [[3, 3], [4, 4], [5, 5]] as const) {
+      for (const option of optionsOf(draftAfter("crew", "standard", 1, players), CATALOG)) expect(option.next.slots).toHaveLength(expected);
     }
+    for (const players of [3, 4, 5]) {
+      for (const option of optionsOf(draftAfter("crew", "long", 6, players), CATALOG)) expect(option.next.slots).toHaveLength(seatObjectivesAt("long", 7, players));
+    }
+    expect(seatObjectivesAt("long", 7, 5)).toBe(5);
   });
 
   it("mixes from camp 3 at 4 or more players, and keeps camp 3 plain at 3", () => {

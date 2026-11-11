@@ -99,7 +99,9 @@ export const TRANSITIONS: readonly TransitionCase[] = [
       const left = next.supplies.count;
       const recap = next.lastCamp?.status === "failed" ? next.lastCamp : null;
       const costs = recap === null ? null : supplyCostLine(recap);
-      const cost = costs === null ? suppliesLost(shown.supplies.count - left, left) : `${costs}. ${left} left`;
+      const spent = costs === null ? suppliesLost(shown.supplies.count - left, left) : `${costs}. ${left} left`;
+      const coins = recap === null || recap.coins <= 0 ? 0 : recap.coins;
+      const cost = coins > 0 ? `${spent}. +${coins} ${coins === 1 ? "coin" : "coins"} consolation` : spent;
       const why = recap === null ? null : lossLine(recap, nameOf);
       return { title: "Camp lost", sub: why === null ? cost : `${why}\n${cost}` };
     },

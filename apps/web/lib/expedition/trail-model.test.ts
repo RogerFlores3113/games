@@ -241,7 +241,7 @@ describe("muster", () => {
         objectId: "draft:leader",
         name: "The Leader",
         theme: "Communicates",
-        power: { sourceId: "leader", name: "Megaphone", text: "Whisper twice each camp.", badges: ["Always on"] },
+        power: { sourceId: "leader", name: "Megaphone", text: "Whisper once more each camp.", badges: ["Always on"] },
         more: [],
         takenBy: null,
         yours: false,
