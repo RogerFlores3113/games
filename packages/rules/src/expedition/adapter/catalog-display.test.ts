@@ -17,10 +17,10 @@ describe("SOURCE_DISPLAY", () => {
     expect(SOURCE_DISPLAY.temple).toEqual({
       id: "temple",
       name: "Skip",
-      text: "Drop one open objective.",
+      text: "Drop one open objective, between tricks only.",
       kind: "grant",
       characterId: null,
-      active: { windows: ["between-tricks", "rescue"], windowPhrase: "Between tricks or when an objective fails", limitBadge: "Crew token", limitKind: "crew-tokens", targets: ["objective"] },
+      active: { windows: ["between-tricks"], windowPhrase: "Between tricks", limitBadge: "Crew token", limitKind: "crew-tokens", targets: ["objective"] },
       passive: false,
       item: null,
     });

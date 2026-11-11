@@ -96,7 +96,7 @@ describe("buildShop", () => {
       infoId: "shop-info:upgrade:leader.open-ears",
       sourceId: "leader.open-ears",
       name: "Open Ears",
-      detail: "Upgrade, +1 whisper",
+      detail: "Upgrade",
       rarity: "common",
       price: null,
       buy: { kind: "status", label: "Owned" },

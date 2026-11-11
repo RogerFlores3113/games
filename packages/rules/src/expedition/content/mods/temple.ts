@@ -97,9 +97,9 @@ export const temple = defineMod({
     },
     grants: {
       name: "Skip",
-      text: "Drop one open objective.",
+      text: "Drop one open objective, between tricks only.",
       ...ability({
-        window: ["between-tricks", "rescue"],
+        window: ["between-tricks"],
         limit: { kind: "crew-tokens", earned: (run, rules) => (sunWon(run, rules) ? 1 : 0), locked: "Win the Sun to earn it" },
         targets: [{ kind: "objective", whose: "open" }],
         apply: (ctx) => [{ op: "remove-objective", objectiveId: ctx.targets[0].objective.id }],

@@ -15,7 +15,7 @@ export const RUN_LENGTHS: Readonly<Record<RunLength, { readonly camps: number; r
 
 /** Seat objectives per camp, before boss and temple slot layers. */
 export const OBJECTIVE_RAMP: Readonly<Record<RunLength, readonly number[]>> = {
-  short: [2, 2, 3, 3],
+  short: [2, 3, 3, 4],
   standard: [2, 2, 3, 3, 3, 4],
   long: [2, 3, 3, 4, 4, 4, 5, 4],
 };
@@ -105,7 +105,7 @@ export const EVENT_EVERY = 2;
 /** The part of the purse the shop deals out as per-seat shares, split evenly
  * (each seat gets floor(purse * SHOP_SHARE_PORTION / seats)); the rest is the
  * crew pot anyone's buy may draw on after their own share. */
-export const SHOP_SHARE_PORTION = 1 / 2;
+export const SHOP_SHARE_PORTION = 1;
 
 export const SHOP = { items: 3, upgradePrice: 6 } as const;
 

@@ -567,7 +567,7 @@ appends a win-card slot `fixed` on the Sun. `rules` adds the plates goal
 over `platePath`, which rolls `floor(totalTricks / 2) - 1` suits with
 `ctx.roll`, one label `plate{i}` per plate, and ends with the Sun.
 `status` reports the `path` part. `grants` is the Skip: an ability with a `name` and `text`, usable
-`between-tricks` or in `rescue`, whose `crew-tokens` limit earns one token
+`between-tricks` only, whose `crew-tokens` limit earns one token
 when the Sun objective is done. Its key is the def id `temple`, through
 `run/usage.ts`'s `abilityKeys`.
 

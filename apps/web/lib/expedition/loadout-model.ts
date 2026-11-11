@@ -1,7 +1,7 @@
-import type { ExpeditionSeatView, ExpeditionShopView } from "@games/rules";
+import { BALANCE_DISPLAY, type ExpeditionSeatView, type ExpeditionShopView } from "@games/rules";
+import { sourceName } from "./source-text";
 import { shopInfoObjectId, shopObjectId } from "./expedition-ids";
 import { rarityItemLabel, rarityOf, type ItemRarity } from "./rarity";
-import { sourceName } from "./source-text";
 
 /**
  * The shop before a shop camp: the shared stock, then your character's
@@ -11,6 +11,12 @@ import { sourceName } from "./source-text";
 // ---------------------------------------------------------------------------
 // Shop
 // ---------------------------------------------------------------------------
+
+/** The upgrade line's detail: names the whisper only while an upgrade still adds one. */
+function upgradeDetail(whispers: number): string {
+  return whispers > 0 ? `Upgrade, +${whispers} whisper${whispers === 1 ? "" : "s"}` : "Upgrade";
+}
+const UPGRADE_DETAIL = upgradeDetail(BALANCE_DISPLAY.whispersPerUpgrade);
 
 /** `buy`: the button is live. `disabled`: a dimmed button saying why it
  * can't be bought now ("Need 2 more", "Full", "Locked"). `full`: an item
@@ -122,10 +128,10 @@ export function buildShop(input: ShopInput): ShopPanel {
     return itemEntry(entry.stockId, what.itemId, sourceName(what.itemId), rarity, sold === null ? entry.price : null, buyState(entry.price, input, sold, true));
   });
   const upgrades = input.shop.yourUpgrades.map((offer) =>
-    itemEntry(offer.stockId, offer.upgradeId, sourceName(offer.upgradeId), "Upgrade, +1 whisper", offer.price, buyState(offer.price, input, null)),
+    itemEntry(offer.stockId, offer.upgradeId, sourceName(offer.upgradeId), UPGRADE_DETAIL, offer.price, buyState(offer.price, input, null)),
   );
   const owned = input.you?.upgradeId ?? null;
-  const ownedEntry = owned === null ? [] : [itemEntry(`upgrade:${owned}`, owned, sourceName(owned), "Upgrade, +1 whisper", null, { kind: "status", label: "Owned" })];
+  const ownedEntry = owned === null ? [] : [itemEntry(`upgrade:${owned}`, owned, sourceName(owned), UPGRADE_DETAIL, null, { kind: "status", label: "Owned" })];
   const share = shareOf(input);
   const give: ShopGive[] =
     input.you === undefined

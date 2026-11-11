@@ -40,8 +40,8 @@ describe("dev shortcuts", () => {
 
     const short = run("jump-to-camp", fresh(), { length: "short", camp: 4, stage: "camp" });
     expect([short.stage.tag, short.stage.tag === "camp" && short.stage.camp.index, short.plan?.length]).toEqual(["camp", 4, "short"]);
-    expect(attemptOf(short)?.camp.objectives.map((o) => o.kind)).toEqual(["ordered", "ordered", "win-card", "no-tricks", "win-card"]);
-    expect(attemptOf(short)?.camp.objectives[4]).toMatchObject({ kind: "win-card", target: { kind: "joker", joker: "sun" } });
+    expect(attemptOf(short)?.camp.objectives.map((o) => o.kind)).toEqual(["ordered", "ordered", "win-card", "win-card", "no-tricks", "win-card"]);
+    expect(attemptOf(short)?.camp.objectives.at(-1)).toMatchObject({ kind: "win-card", target: { kind: "joker", joker: "sun" } });
   });
 
   it("jump-to-camp refuses a camp past the length's last", () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { toExpeditionPlayerView } from "../../adapter/view";
 import { checkCampOutcome } from "../../camp";
 import { abilityStatus } from "../../run/abilities";
-import { PAYOUT } from "../../run/balance";
+import { PAYOUT, seatObjectivesAt } from "../../run/balance";
 import { CATALOG } from "../../run/catalog";
 import { composeRules, rulesFor } from "../../run/compose";
 import { campIndex } from "../../run/plan";
@@ -107,8 +107,9 @@ describe("the temple", () => {
     }, run);
     if (dealt.stage.tag !== "camp") throw new Error("expected a dealt camp");
     const targets = dealt.stage.attempt.camp.objectives.map((o) => (o.kind === "win-card" ? o.target : o.kind));
-    expect(targets).toHaveLength(5);
-    expect(targets[4]).toEqual(SUN);
+    const seatObjectives = seatObjectivesAt("short", 4, SEATS.length);
+    expect(targets).toHaveLength(seatObjectives + 1);
+    expect(targets[seatObjectives]).toEqual(SUN);
   });
 });
 
@@ -151,21 +152,18 @@ describe("the temple's skip", () => {
     expect(applyRunAction(used.state, "p1", { type: "use-ability", sourceKey: "temple", targets: ["objective:o2"] }, catalog)).toEqual({ ok: false, error: "ability_spent" });
   });
 
-  it("holds rescue for every seat while unspent, and a spent token ends the wait", () => {
+  it("is refused in the rescue window and still works between tricks", () => {
     const lost = (id: string, rank: number): Objective => ({ id, kind: "win-card", target: std("clubs", rank), ownerSeatId: "p2" });
-    // p0 won the clubs 2 and 3 that p2 needed: two failed objectives.
-    const run = templeCamp({ objectives: [winSun("o1", "p0"), lost("o2", 2), lost("o3", 3)], completedTricks: [...plated, led(2, card("s", SUN))], currentTrick: nextTrick(3) });
-    expect(gatedPendingSeatIds(run, catalog)).toEqual(["p0", "p1", "p2"]);
+    // p0 won the clubs 2 that p2 needed: one failed objective, the Sun already won, so the camp waits in rescue.
+    const rescue = templeCamp({ objectives: [winSun("o1", "p0"), lost("o2", 2)], completedTricks: [...plated, led(2, card("s", SUN))], currentTrick: nextTrick(3) });
+    expect(abilityStatus(rescue, "p1", "temple", catalog)).toMatchObject({ usable: false });
+    expect(applyRunAction(rescue, "p1", { type: "use-ability", sourceKey: "temple", targets: ["objective:o2"] }, catalog).ok).toBe(false);
+    // The Skip does not hold the rescue wait: nobody is pending on it.
+    expect(gatedPendingSeatIds(rescue, catalog)).toEqual([]);
 
-    const passed = applyRunAction(run, "p0", { type: "skip-window" }, catalog);
-    if (!passed.ok) throw new Error(passed.error);
-    expect(gatedPendingSeatIds(passed.state, catalog)).toEqual(["p1", "p2"]);
-
-    const used = applyRunAction(passed.state, "p1", { type: "use-ability", sourceKey: "temple", targets: ["objective:o2"] }, catalog);
-    if (!used.ok) throw new Error(used.error);
-    // o3 still failed and nobody holds a token: the camp settles as failed.
-    expect(used.state.stage.tag).toBe("loadout");
-    expect(used.state.history.map((h) => h.status)).toEqual(["failed"]);
+    // Between tricks, with an open objective still undecided, the same token drops it.
+    const between = templeCamp({ objectives: [winSun("o1", "p0"), open], hands, completedTricks: [...plated, led(2, card("s", SUN))], currentTrick: nextTrick(3) });
+    expect(abilityStatus(between, "p1", "temple", catalog)).toMatchObject({ usable: true });
   });
 });
 

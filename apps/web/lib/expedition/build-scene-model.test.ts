@@ -1330,7 +1330,7 @@ describe("the temple", () => {
     const skipOf = (m: typeof locked, seatId: string) => m.seats.find((s) => s.seatId === seatId)?.sources.find((c) => c.sourceKey === "temple");
     expect(skipOf(locked, "s2")).toMatchObject({ sourceId: "temple", objectId: "source:temple", name: "Skip", kind: "grant", charge: { full: "Not earned", short: "Not earned" }, usable: false, reason: "Win the Sun to earn it" });
     expect(skipOf(locked, "s1")).toMatchObject({ name: "Skip", charge: { full: "Not earned", short: "Not earned" }, usable: false });
-    expect(locked.tooltip).toEqual({ title: "Skip", text: "Drop one open objective.", badges: ["Between tricks or when an objective fails", "Not earned"], reason: "Win the Sun to earn it" });
+    expect(locked.tooltip).toEqual({ title: "Skip", text: "Drop one open objective, between tricks only.", badges: ["Between tricks", "Not earned"], reason: "Win the Sun to earn it" });
 
     const earned = templeView({ token: [1, 1], abilities: [ability("temple", { kind: "objective", choices: ["objective:o2"] })] });
     const m = buildSceneModel(server(earned), ui(), "big-index");
@@ -1339,21 +1339,20 @@ describe("the temple", () => {
     expect(skipOf(buildSceneModel(server(templeView({ token: [0, 1] })), ui(), "big-index"), "s1")).toMatchObject({ charge: { full: "Used", short: "Used" }, spent: true });
   });
 
-  it("offers the Skip in rescue like any rescue ability", () => {
+  it("offers a rescue ability in the rescue banner (the Skip is between tricks only, so it is not that ability)", () => {
     const failed: ExpeditionObjectiveView = { id: "o2", kind: "win-card", target: KD, ownerSeatId: "s2", status: "failed" };
     const view = templeView({
-      token: [1, 1],
-      objectives: [sunObjective("s1", "done"), failed],
-      abilities: [ability("temple", { kind: "objective", choices: ["objective:o2"] })],
+            objectives: [sunObjective("s1", "done"), failed],
+      abilities: [ability("rope-ladder", { kind: "objective", choices: ["objective:o2"] })],
       attempt: { window: "rescue", pendingSeatIds: ["s1", "s2", "s3"], rescue: { failedObjectiveIds: ["o2"] } },
     });
     const banner = buildSceneModel(server(view), ui(), "big-index").banner!;
-    expect(banner).toMatchObject({ title: "Objective failed: K♦ (yours)", detail: "You can rescue it with Skip. Alice and Cara can too", youPending: true });
-    expect(banner.uses.map((u) => u.sourceKey)).toEqual(["temple"]);
+    expect(banner).toMatchObject({ title: "Objective failed: K♦ (yours)", detail: "You can rescue it with Rope Ladder. Alice and Cara can too", youPending: true });
+    expect(banner.uses.map((u) => u.sourceKey)).toEqual(["rope-ladder"]);
     const five = { ...view, seats: [...view.seats, seat("s4", null), seat("s5", null)] };
     if (five.stage.tag === "camp") five.stage.attempt.pendingSeatIds = ["s1", "s2", "s3", "s4", "s5"];
     const names = roomSeats().concat([{ seatId: "s4", displayLabel: "Dan", connected: true }, { seatId: "s5", displayLabel: "Eve", connected: true }]);
-    expect(buildSceneModel(server(five, names), ui(), "big-index").banner?.detail).toBe("You can rescue it with Skip. Alice, Cara, Dan and Eve can too");
+    expect(buildSceneModel(server(five, names), ui(), "big-index").banner?.detail).toBe("You can rescue it with Rope Ladder. Alice, Cara, Dan and Eve can too");
   });
 });
 

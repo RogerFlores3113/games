@@ -70,7 +70,7 @@ describe("seatObjectivesAt", () => {
         });
       }
     }
-    expect([1, 2, 3, 4].map((k) => seatObjectivesAt("short", k, 4))).toEqual([2, 2, 3, 4]);
+    expect([1, 2, 3, 4].map((k) => seatObjectivesAt("short", k, 4))).toEqual(OBJECTIVE_RAMP.short.map((ramp, i) => ramp + EXTRA_OBJECTIVES.short[4][i]!));
     expect([1, 2, 3, 4, 5, 6].map((k) => seatObjectivesAt("standard", k, 4))).toEqual([2, 2, 3, 3, 3, 5]);
   });
 

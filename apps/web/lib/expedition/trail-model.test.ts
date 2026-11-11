@@ -565,7 +565,7 @@ describe("shop", () => {
           { stockId: "supplies", objectId: "shop:supplies", infoId: null, sourceId: null, name: "Supplies 3 of 5", detail: "One per failed camp", rarity: "common", price: 6, buy: { kind: "disabled", reason: "Need 3 more" } },
           { stockId: "item0", objectId: "shop:item0", infoId: "shop-info:item0", sourceId: "smoke-signal", name: "Smoke Signal", detail: "Rare item", rarity: "rare", price: null, buy: { kind: "status", label: "Sold to Alice" } },
           { stockId: "item1", objectId: "shop:item1", infoId: "shop-info:item1", sourceId: "bait", name: "Bait", detail: "Common item", rarity: "common", price: 3, buy: { kind: "buy" } },
-          { stockId: "upgrade:leader.delegate", objectId: "shop:upgrade:leader.delegate", infoId: "shop-info:upgrade:leader.delegate", sourceId: "leader.delegate", name: "Delegate", detail: "Upgrade, +1 whisper", rarity: "common", price: 8, buy: { kind: "disabled", reason: "Need 5 more" } },
+          { stockId: "upgrade:leader.delegate", objectId: "shop:upgrade:leader.delegate", infoId: "shop-info:upgrade:leader.delegate", sourceId: "leader.delegate", name: "Delegate", detail: "Upgrade", rarity: "common", price: 8, buy: { kind: "disabled", reason: "Need 5 more" } },
         ],
       },
     });
