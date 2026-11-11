@@ -1,7 +1,7 @@
-import type { ExpeditionSeatView, ExpeditionShopView } from "@games/rules";
-import { SOURCE_DISPLAY } from "@games/rules";
-import { shopInfoObjectId, shopObjectId } from "./expedition-ids";
+import { BALANCE_DISPLAY, type ExpeditionSeatView, type ExpeditionShopView } from "@games/rules";
 import { sourceName } from "./source-text";
+import { shopInfoObjectId, shopObjectId } from "./expedition-ids";
+import { rarityItemLabel, rarityOf, type ItemRarity } from "./rarity";
 
 /**
  * The shop before a shop camp: the shared stock, then your character's
@@ -11,6 +11,12 @@ import { sourceName } from "./source-text";
 // ---------------------------------------------------------------------------
 // Shop
 // ---------------------------------------------------------------------------
+
+/** The upgrade line's detail: names the whisper only while an upgrade still adds one. */
+function upgradeDetail(whispers: number): string {
+  return whispers > 0 ? `Upgrade, +${whispers} whisper${whispers === 1 ? "" : "s"}` : "Upgrade";
+}
+const UPGRADE_DETAIL = upgradeDetail(BALANCE_DISPLAY.whispersPerUpgrade);
 
 /** `buy`: the button is live. `disabled`: a dimmed button saying why it
  * can't be bought now ("Need 2 more", "Full", "Locked"). `full`: an item
@@ -29,14 +35,29 @@ export interface ShopEntry {
   sourceId: string | null;
   name: string;
   detail: string;
-  rare: boolean;
+  rarity: ItemRarity;
   /** Null once it is sold or owned. */
   price: number | null;
   buy: ShopBuy;
 }
 
+/** A teammate you can hand a coin of your share to. */
+export interface ShopGive {
+  seatId: string;
+  name: string;
+  /** Their share now. */
+  share: number;
+  /** Your share has a coin to give and you are not ready. */
+  enabled: boolean;
+}
+
 export interface ShopPanel {
   purse: number;
+  /** Your own share of the purse (0 for a spectator) and the crew pot. */
+  share: number;
+  pot: number;
+  /** One per teammate; empty for a spectator. */
+  give: ShopGive[];
   entries: ShopEntry[];
 }
 
@@ -58,9 +79,15 @@ function buyState(price: number, input: ShopInput, refusal: ShopBuy | null, item
   if (refusal !== null) return refusal;
   if (input.you === undefined) return { kind: "status", label: "" };
   if (input.ready) return { kind: "disabled", reason: "Locked" };
-  if (input.purse < price) return { kind: "disabled", reason: `Need ${price - input.purse} more` };
+  const spendable = shareOf(input) + input.shop.pot;
+  if (spendable < price) return { kind: "disabled", reason: `Need ${price - spendable} more` };
   if (item && input.room === 0) return { kind: "full" };
   return { kind: "buy" };
+}
+
+/** Your own share, from the view's public share list. */
+function shareOf(input: ShopInput): number {
+  return input.you === undefined ? 0 : (input.shop.shares.find((s) => s.seatId === input.you!.seatId)?.coins ?? 0);
 }
 
 function itemEntry(stockId: string, sourceId: string, name: string, detail: string, price: number | null, buy: ShopBuy): ShopEntry {
@@ -71,7 +98,7 @@ function itemEntry(stockId: string, sourceId: string, name: string, detail: stri
     sourceId,
     name,
     detail,
-    rare: SOURCE_DISPLAY[sourceId]?.item?.rarity === "rare",
+    rarity: rarityOf(sourceId),
     price,
     buy,
   };
@@ -91,19 +118,24 @@ export function buildShop(input: ShopInput): ShopPanel {
         sourceId: null,
         name: `Supplies ${input.supplies.count} of ${input.supplies.max}`,
         detail: "One per failed camp",
-        rare: false,
+        rarity: "common",
         price: entry.price,
         buy: buyState(entry.price, input, full ? { kind: "disabled", reason: "Full" } : null),
       };
     }
     const sold: ShopBuy | null = entry.soldTo === null ? null : { kind: "status", label: `Sold to ${input.nameOf(entry.soldTo)}` };
-    const rarity = SOURCE_DISPLAY[what.itemId]?.item?.rarity === "rare" ? "Rare item" : "Common item";
+    const rarity = rarityItemLabel(rarityOf(what.itemId));
     return itemEntry(entry.stockId, what.itemId, sourceName(what.itemId), rarity, sold === null ? entry.price : null, buyState(entry.price, input, sold, true));
   });
   const upgrades = input.shop.yourUpgrades.map((offer) =>
-    itemEntry(offer.stockId, offer.upgradeId, sourceName(offer.upgradeId), "Upgrade, +1 whisper", offer.price, buyState(offer.price, input, null)),
+    itemEntry(offer.stockId, offer.upgradeId, sourceName(offer.upgradeId), UPGRADE_DETAIL, offer.price, buyState(offer.price, input, null)),
   );
   const owned = input.you?.upgradeId ?? null;
-  const ownedEntry = owned === null ? [] : [itemEntry(`upgrade:${owned}`, owned, sourceName(owned), "Upgrade, +1 whisper", null, { kind: "status", label: "Owned" })];
-  return { purse: input.purse, entries: [...entries, ...upgrades, ...ownedEntry] };
+  const ownedEntry = owned === null ? [] : [itemEntry(`upgrade:${owned}`, owned, sourceName(owned), UPGRADE_DETAIL, null, { kind: "status", label: "Owned" })];
+  const share = shareOf(input);
+  const give: ShopGive[] =
+    input.you === undefined
+      ? []
+      : input.shop.shares.filter((s) => s.seatId !== input.you!.seatId).map((s) => ({ seatId: s.seatId, name: input.nameOf(s.seatId), share: s.coins, enabled: share >= 1 && !input.ready }));
+  return { purse: input.purse, share, pot: input.shop.pot, give, entries: [...entries, ...upgrades, ...ownedEntry] };
 }

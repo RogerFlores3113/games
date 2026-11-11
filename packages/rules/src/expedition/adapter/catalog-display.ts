@@ -11,7 +11,7 @@ import { CATALOG } from "../run/catalog";
 import { salePrice } from "../content/characters/businessman";
 import type { TargetKind } from "../run/targets";
 import { WINDOWS, type ActiveWindow } from "../run/windows";
-import { BACKPACK_SIZE, DRAFT, FAILURE_COST, ITEM_SLOTS, NORMAL_WEATHER_CHANCE, PAYOUT, PLAIN_GROUND, RUN_LENGTHS, SHOP, SHOP_CAMPS, SUPPLIES_MAX, SUPPLIES_START, SUPPLY_PRICE, THUNDERSTORM, WASHES, WHISPERS_PER_UPGRADE } from "../run/balance";
+import { BACKPACK_SIZE, DRAFT, FAILED_ATTEMPT_COINS, FAILURE_COST, ITEM_SLOTS, NORMAL_WEATHER_CHANCE, PAYOUT, PLAIN_GROUND, RUN_LENGTHS, SHOP, SHOP_CAMPS, SUPPLIES_MAX, SUPPLIES_START, SUPPLY_PRICE, THUNDERSTORM, WASHES, WHISPERS_PER_CAMP, WHISPERS_PER_UPGRADE, WHISPER_CAP, SHOP_SHARE_PORTION } from "../run/balance";
 import type { BossTier } from "../run/plan";
 import type { RunLength } from "../run/types";
 import { EVENTS } from "../content/events/registry";
@@ -230,6 +230,8 @@ export const BALANCE_DISPLAY = {
   suppliesMax: SUPPLIES_MAX,
   supplyPrice: SUPPLY_PRICE,
   failureCost: FAILURE_COST,
+  failedAttemptCoins: FAILED_ATTEMPT_COINS,
+  whispersPerCamp: WHISPERS_PER_CAMP,
   payout: { ...PAYOUT },
   plainGround: { locations: [...PLAIN_GROUND.locations], weathers: [...PLAIN_GROUND.weathers] },
   shopCamps: { short: [...SHOP_CAMPS.short], standard: [...SHOP_CAMPS.standard], long: [...SHOP_CAMPS.long] },
@@ -238,6 +240,8 @@ export const BALANCE_DISPLAY = {
   backpackSize: BACKPACK_SIZE,
   upgradePrice: SHOP.upgradePrice,
   whispersPerUpgrade: WHISPERS_PER_UPGRADE,
+  whisperCap: WHISPER_CAP,
+  shopSharePortion: SHOP_SHARE_PORTION,
   fairWeatherChance: NORMAL_WEATHER_CHANCE,
   washes: { rain: { ...WASHES.rain }, downpour: { ...WASHES.downpour } },
   strikes: { max: THUNDERSTORM.maxStrikes, exposed: THUNDERSTORM.exposedStrikes },

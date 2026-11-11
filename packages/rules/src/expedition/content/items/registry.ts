@@ -11,6 +11,8 @@ import { puffball } from "./puffball";
 import { rainPoncho } from "./rain-poncho";
 import { ropeLadder } from "./rope-ladder";
 import { smokeSignal } from "./smoke-signal";
+import { trailRations } from "./trail-rations";
+import { conchShell } from "./conch-shell";
 import { trailMap } from "./trail-map";
 import { trainedMonkey } from "./trained-monkey";
 import { whetstone } from "./whetstone";
@@ -38,4 +40,6 @@ export const ITEMS = {
   "message-bottle": messageBottle,
   "first-aid-kit": firstAidKit,
   "signal-flare": signalFlare,
+  "trail-rations": trailRations,
+  "conch-shell": conchShell,
 } satisfies Readonly<Record<string, ItemDef>>;

@@ -78,6 +78,7 @@ describe("why a camp was lost", () => {
   it("a camp rule that failed is named, and more failures are counted", () => {
     expect(lossLine(recap({ objectives: [], failedGoalIds: ["hermit:s2"] }), nameOf)).toBe("Ana won a trick");
     expect(lossLine(recap({ objectives: [], failedGoalIds: ["temple"] }), nameOf)).toBe("The plates were not all pressed");
+    expect(lossLine(recap({ objectives: [], failedGoalIds: ["temple:sun"] }), nameOf)).toBe("The Sun was played before its plate");
     expect(lossLine(recap({ failedGoalIds: ["camouflage:s1"] }), nameOf)).toBe("Ana's 10♣ was won by Ben, and 1 more");
     expect(lossLine(recap({ status: "cleared" }), nameOf)).toBeNull();
   });
@@ -105,6 +106,11 @@ describe("the trail's Last camp lines", () => {
         "Objectives: Ana's 10♣ failed in trick 5, Your no tricks open",
       ],
     });
+  });
+
+  it("a loss names the coins the failed attempt paid the purse", () => {
+    const [head] = lastCampStrip(recap({ coins: 2 }), nameOf)!.lines;
+    expect(head).toBe("Last camp: Camp 2 lost. Ana's 10♣ was won by Ben. -1 failed camp, -1 Heavy Pack. +2 coins consolation");
   });
 
   it("a clear: the tricks it took and its coins, on a later try", () => {

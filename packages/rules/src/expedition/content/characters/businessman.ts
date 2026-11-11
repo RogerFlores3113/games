@@ -36,7 +36,7 @@ function popupState(run: RunState, seatId: string): { readonly refreshes: number
 /** The stock: POPUP_STOCK distinct items any character drafts, rolled anew
  * on each refresh. */
 function popupStock(scope: OptionScope, refreshes: number): readonly string[] {
-  const left = [...openPool(scope.catalog).common, ...openPool(scope.catalog).rare].sort();
+  const left = (() => { const pool = openPool(scope.catalog); return [...pool.common, ...pool.uncommon, ...pool.rare].sort(); })();
   const stock: string[] = [];
   for (let i = 0; i < POPUP_STOCK && left.length > 0; i++) stock.push(left.splice(scope.roll(`stock-r${refreshes}-i${i}`, left.length), 1)[0]!);
   return stock;

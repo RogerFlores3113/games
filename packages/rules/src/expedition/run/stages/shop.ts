@@ -1,5 +1,5 @@
 import { openLoadout } from "../lifecycle";
-import { buy } from "../shop";
+import { buy, giveCoins } from "../shop";
 import { useAbility } from "../abilities";
 import { err, everySeat, ok, readied, type StageDef } from "./stage-def";
 import { OUTFIT } from "./outfit";
@@ -11,6 +11,7 @@ export const shop: StageDef<"shop"> = {
     ...OUTFIT,
     "use-ability": (run, seatId, action, catalog) => useAbility(run, seatId, action.sourceKey, action.targets, catalog),
     buy: (run, seatId, action, catalog) => buy(run, seatId, action.stockId, catalog),
+    "give-coins": (run, seatId, action) => giveCoins(run, seatId, action.to, action.coins),
     ready: (run, seatId) => {
       const ready = readied(run.stage.ready, seatId);
       return ready === null ? err("already_ready") : ok({ ...run, stage: { ...run.stage, ready } });

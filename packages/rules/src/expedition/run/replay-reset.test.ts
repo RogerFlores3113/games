@@ -7,6 +7,7 @@
 // Poncho (one more whisper for its owner) and Camouflage.
 
 import { describe, expect, it } from "vitest";
+import { FAILED_ATTEMPT_COINS, SUPPLIES_START } from "./balance";
 import { abilityStatus } from "./abilities";
 import { guard } from "../camp";
 import { defineItem, itemAbility } from "../content/source-def";
@@ -71,7 +72,7 @@ describe("fail-then-replay resets every camp-scoped resource (RUN-06)", () => {
     const camp1Hands = attemptOf(run)!.camp.hands;
 
     run = act(run, explorerSeat, { type: "use-ability", sourceKey: poncho, targets: [] });
-    expect(whispersOf(run, explorerSeat)).toBe(2);
+    expect(whispersOf(run, explorerSeat)).toBe(3);
 
     // A whisper reveals one card to its target alone (COMM-02).
     const named = attemptOf(run)!.camp.hands.find((h) => h.seatId === explorerSeat)!.cards[0]!.id;
@@ -96,12 +97,12 @@ describe("fail-then-replay resets every camp-scoped resource (RUN-06)", () => {
     run = act(run, sabotageSeat, { type: "use-ability", sourceKey: sabotage, targets: [] });
 
     expect(run.stage.tag).toBe("shop"); // camp 3 is a boss camp: its replay goes back through the shop
-    expect(suppliesBefore).toBe(3);
-    expect(run.supplies).toBe(2);
+    expect(suppliesBefore).toBe(SUPPLIES_START);
+    expect(run.supplies).toBe(SUPPLIES_START - 1);
     expect(run.seats.every((seat) => seat.offers.length === 0)).toBe(true); // D-01: no draft on a failure
     expect(run.seats.map((s) => s.items)).toEqual([[{ uid: poncho, itemId: "rain-poncho" }], [], []]); // single-use items are spent
     expect(run.seats.map((s) => s.ledger.map((e) => (e.kind === "used" ? e.sourceKey : e.kind)))).toEqual([[poncho, "explorer"], [camouflage], [sabotage]]);
-    expect(run.history).toEqual([{ camp: 3, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 0 }]);
+    expect(run.history).toEqual([{ camp: 3, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: FAILED_ATTEMPT_COINS }]);
     expect(nextAttemptNumber(run, campIndex(3))).toBe(2);
 
     // Replay: ready every seat through the shop, then the loadout.
@@ -117,7 +118,7 @@ describe("fail-then-replay resets every camp-scoped resource (RUN-06)", () => {
 
     // Rain Poncho's charges survive the replay: one left, and its extra whisper is gone.
     expect(remaining(run, explorerSeat, poncho, catalog)).toEqual({ kind: "uses", left: 1, of: 2 });
-    expect(whispersOf(run, explorerSeat)).toBe(1);
+    expect(whispersOf(run, explorerSeat)).toBe(2);
 
     run = advanceTo(run, "between-tricks", catalog);
 

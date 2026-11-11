@@ -35,6 +35,7 @@ function kitSection(view: RulesView | null): RulesSection {
 
 const { short, standard, long } = RUN_LENGTH_DISPLAY;
 const B = BALANCE_DISPLAY;
+const timesWord = (n: number): string => (n === 1 ? "Once" : n === 2 ? "Twice" : `${n} times`);
 const count = (n: number, one: string, many: string): string => `${n === 1 ? "one" : n} ${n === 1 ? one : many}`;
 const nameList = (names: readonly string[]): string => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
 const plainNames = (ids: readonly string[]): string => nameList(ids.map((id) => `the ${MOD_DISPLAY[id]?.name ?? id}`));
@@ -50,7 +51,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       heading: "Goal",
       paragraphs: [
         `Before camp 1 the crew votes on the run: ${short.name} (${short.camps} camps), ${standard.name} (${standard.camps}) or ${long.name} (${long.camps}). The last camp is the temple.`,
-        `A camp is cleared when every objective is done. A failed camp costs ${count(B.failureCost, "supply", "supplies")} and is replayed with a fresh deal. The crew starts with ${B.suppliesStart} supplies and holds at most ${B.suppliesMax}. With none left, the run ends.`,
+        `A camp is cleared when every objective is done. A failed camp costs ${count(B.failureCost, "supply", "supplies")} and is replayed with a fresh deal; the crew's purse gets ${count(B.failedAttemptCoins, "coin", "coins")} as consolation. The crew starts with ${B.suppliesStart} supplies and holds at most ${B.suppliesMax}. With none left, the run ends.`,
         "A replay skips the draft, the event and the route vote: the crew goes back to the same camp's loadout, through the shop again before a boss camp.",
       ],
       items: [],
@@ -61,7 +62,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       paragraphs: [
         `A cleared camp pays ${B.payout.base} coins into the crew's purse, ${B.payout.riskyLocation} more anywhere but ${plainNames(B.plainGround.locations)}, ${B.payout.riskyWeather} more in any weather but ${nameList(B.plainGround.weathers.map((id) => MOD_DISPLAY[id]?.name ?? id))}, and ${B.payout.perUnplayedTrick} for each unplayed trick, up to ${B.payout.unplayedCap * B.payout.perUnplayedTrick} more. Each route card says what its camp pays.`,
         `Before every camp, camp 1 too, everyone drafts one of ${B.draftOptions} items; after a boss camp, one of ${B.draftOptions} pairs of items. After every other camp an event waits on the trail, and it may give the crew coins, a supply or items. Then the crew votes on the route to the next camp, and a tied vote is settled by a coin flip.`,
-        `Before every boss camp${extraShops.length === 0 ? "" : `, and before ${nameList(extraShops)}`}, a shop opens once the route is chosen. The crew spends the purse on supplies (${B.supplyPrice} coins), items, and your own character's upgrades (${B.upgradePrice} coins). An upgrade also gives you ${count(B.whispersPerUpgrade, "more whisper", "more whispers")} each camp.`,
+        `Before every boss camp${extraShops.length === 0 ? "" : `, and before ${nameList(extraShops)}`}, a shop opens once the route is chosen. The purse splits: ${B.shopSharePortion === 1 ? "all of it" : `${Math.round(B.shopSharePortion * 100)}%`} is dealt out as an equal share for each explorer and any coins left over (or the rest, if it is not all) are the crew pot; a buy spends your share first, then the pot, and you can give coins of your share to a teammate to pool them. You spend it on supplies (${B.supplyPrice} coins), items, and your own character's upgrades (${B.upgradePrice} coins).${B.whispersPerUpgrade > 0 ? ` An upgrade also gives you ${count(B.whispersPerUpgrade, "more whisper", "more whispers")} each camp.` : ""}`,
         `Each explorer has ${B.itemSlots} item slots, and only the items in them go into camp. Up to ${B.backpackSize} more wait in the backpack: open it from the item bar between camps to swap items, or to discard one when it is full.`,
       ],
       items: [],
@@ -94,7 +95,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       id: "whisper",
       heading: "The Whisper",
       paragraphs: [
-        "Once per camp, between tricks, show one card from your hand to one teammate. Everyone sees that you whispered, but only they see the card.",
+        `${timesWord(B.whispersPerCamp)} per camp, between tricks, show one card from your hand to one teammate. Everyone sees that you whispered, but only they see the card. No one can have more than ${B.whisperCap} whispers in a camp, however many things add to it.`,
         "Whispers go only between tricks, before the next lead: never while objectives are being picked, and never once a trick has started.",
         "In Rain or a Downpour the crew's first whispers each camp wash away: they are spent, everyone sees them wash away, and nobody sees the card.",
         "Need a moment between tricks? Press Hold on (once per gap, if you are not leading). The next lead waits until you whisper, use a power, or press Go ahead.",
@@ -123,7 +124,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       paragraphs: [
         "At the last camp, lead each plate's suit in order, ending with the Sun. Every plate must be pressed, or the camp fails. The Sun is also an objective someone must win.",
         "A trick led in any other suit presses nothing, and the camp fails once too few tricks remain for the plates left. The Sun must lead the trick for the last plate: if it is led before the other plates are pressed, or played or discarded any other way, the camp fails.",
-        "Winning the Sun earns the crew a Skip. Any seat can spend it between tricks or in rescue to drop one open objective.",
+        "Playing the Sun too early shows a warning first, and playing the same card again confirms it. Winning the Sun earns the crew a Skip. Any seat can spend it between tricks, not in rescue, to drop one open objective.",
         "Bosses you beat earlier return as helpers at half strength.",
       ],
       items: [],

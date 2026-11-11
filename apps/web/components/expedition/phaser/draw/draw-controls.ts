@@ -5,6 +5,7 @@
  * `whisper.*`, `hold.*`) is already a
  * server-derived fact on the model.
  */
+import { rarityColor } from "./rarity-color";
 import type Phaser from "phaser";
 import { CURSOR, pointerIf } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
@@ -270,7 +271,7 @@ function drawPopupShop(scene: Phaser.Scene, layer: Layer, model: SceneModel, ind
     const y = zone.y + 14 + i * POPUP_ROW_H;
     const art = sourceArtId(row.itemId);
     if (art !== null) layer.add(placeArt(scene, art, zone.x + 12, y + 7));
-    const name = text(scene, zone.x + 22, y + 3, fitLabel(row.name, Math.floor((nameW - 4) / LABEL_CELL.w)), row.rare ? PALETTE.rain : PALETTE.text);
+    const name = text(scene, zone.x + 22, y + 3, fitLabel(row.name, Math.floor((nameW - 4) / LABEL_CELL.w)), rarityColor(row.rarity, PALETTE.text));
     name.setInteractive();
     name.on("pointerover", () => handlers.onSourceHover(row.itemId));
     name.on("pointerout", () => handlers.onSourceHover(null));

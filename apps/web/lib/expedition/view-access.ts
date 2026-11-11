@@ -33,6 +33,19 @@ export function whispersSent(view: ExpeditionView): (ExpeditionLogEntryView & { 
   );
 }
 
+/** The log event prefix of a Parrot's void signal: `void-signal:<suit>`. */
+export const VOID_SIGNAL_PREFIX = "void-signal:";
+
+/** The void signals this attempt that you sent or were sent (the view keeps
+ * the rest from you), in order, with their place in the log. */
+export function voidSignals(view: ExpeditionView): { actorSeatId: string; toSeatId: string; suit: string; logIndex: number }[] {
+  return (attemptOf(view)?.log ?? []).flatMap((l, logIndex) =>
+    l.event.startsWith(VOID_SIGNAL_PREFIX) && l.actorSeatId !== null && l.subjectSeatIds[0] !== undefined
+      ? [{ actorSeatId: l.actorSeatId, toSeatId: l.subjectSeatIds[0], suit: l.event.slice(VOID_SIGNAL_PREFIX.length), logIndex }]
+      : [],
+  );
+}
+
 /** The camp the crew is at, or the next one it heads to; null at muster and
  * once the run ends. */
 export function focusCampIndex(view: ExpeditionView): number | null {

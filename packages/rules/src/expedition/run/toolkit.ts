@@ -47,7 +47,7 @@ export type ToolkitOp<P extends EffectParams = EffectParams> =
   | { readonly op: "drop-offer"; readonly seatId: string } // the head offer
   | { readonly op: "add-offer"; readonly seatId: string; readonly offer: DraftOffer } // queued behind the others
   | { readonly op: "reroll-route"; readonly option: RouteChoice } // location, weather and event again, on the next reroll's streams
-  | { readonly op: "add-objective"; readonly ownerSeatId: string | null } // a win-card from the objective deck
+  | { readonly op: "add-objective"; readonly ownerSeatId: string | null } // a win-card from the objective deck, on a card still in a hand
   | { readonly op: "retarget-objective"; readonly objectiveId: string; readonly target: StandardIdentity }
   | { readonly op: "void-trick"; readonly trickIndex: number } // the last completed trick becomes a hallucination
   | { readonly op: "log"; readonly event: string; readonly subjectSeatIds: readonly string[]; readonly audience: "public" | readonly string[] };
@@ -412,11 +412,12 @@ function applyAttemptOp(run: RunState, attempt: AttemptState, origin: Origin, op
 
     case "add-objective": {
       const camp = attempt.camp;
-      const target = camp.objectiveDeck[0];
-      if (target === undefined) throw new Error("toolkit: add-objective: the objective deck is empty");
+      // A card some hand still holds, so the objective can still be won.
+      const target = camp.objectiveDeck.find((identity) => camp.hands.some((h) => h.cards.some((c) => identitiesEqual(c.identity, identity))));
+      if (target === undefined) throw new Error("toolkit: add-objective: no objective-deck card is still in a hand");
       if (op.ownerSeatId !== null && !run.seatIds.includes(op.ownerSeatId)) throw new Error(`toolkit: add-objective: unknown seat ${op.ownerSeatId}`);
       const objective: Objective = { id: addedObjectiveId(run, camp, attempt), kind: "win-card", target, ownerSeatId: op.ownerSeatId };
-      return { ...attempt, camp: { ...camp, objectives: [...camp.objectives, objective], objectiveDeck: camp.objectiveDeck.slice(1) } };
+      return { ...attempt, camp: { ...camp, objectives: [...camp.objectives, objective], objectiveDeck: camp.objectiveDeck.filter((identity) => identity !== target) } };
     }
 
     case "retarget-objective": {

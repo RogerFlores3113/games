@@ -119,7 +119,7 @@ export type ItemAbility<S extends readonly TargetSpec[] = readonly TargetSpec[],
  * per crew can tell its own copy from the others. */
 export type PassiveAbility = { modifier(owner: Owner, sourceKey: string): RuleModifier; readonly foldsLast?: true };
 
-export type Rarity = "common" | "rare";
+export type Rarity = "common" | "uncommon" | "rare";
 /** single-use is one charge; a spent instance leaves its owner. per-camp
  * resets with every attempt and never runs out. */
 export type ItemUses = { readonly kind: "single-use" } | { readonly kind: "per-camp" } | { readonly kind: "charges"; readonly n: number };
@@ -143,6 +143,9 @@ export type ItemDef = Named & {
   readonly price: number;
   /** Drafted only by this character. */
   readonly exclusiveTo?: string;
+  /** A use of this item is never made free by a freeUse layer (Sturdy
+   * Straps skips supply items). */
+  readonly noFreeUse?: true;
 } & (
     | { readonly uses: ItemUses; readonly active: ItemAbility; readonly passive?: never }
     | { readonly uses?: never; readonly active?: never; readonly passive: PassiveAbility }

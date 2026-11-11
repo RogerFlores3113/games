@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MOD_DISPLAY, SOURCE_DISPLAY, type ExpeditionView } from "@games/rules";
+import { BALANCE_DISPLAY, MOD_DISPLAY, SOURCE_DISPLAY, type ExpeditionView } from "@games/rules";
 import { REFERENCE_PAGES, buildModPages, buildRulesReference } from "./rules-reference";
 
 function viewWith(over: { characterId?: string | null; kit?: string[] }) {
@@ -42,16 +42,16 @@ describe("buildRulesReference", () => {
 
   it("explains the purse, draft, route vote, shop and loadout", () => {
     expect(byId(buildRulesReference(null), "between").paragraphs).toEqual([
-      "A cleared camp pays 5 coins into the crew's purse, 2 more anywhere but the Jungle and the Clearing, 2 more in any weather but Fair, and 1 for each unplayed trick, up to 2 more. Each route card says what its camp pays.",
+      `A cleared camp pays ${BALANCE_DISPLAY.payout.base} coins into the crew's purse, ${BALANCE_DISPLAY.payout.riskyLocation} more anywhere but the Jungle and the Clearing, ${BALANCE_DISPLAY.payout.riskyWeather} more in any weather but Fair, and ${BALANCE_DISPLAY.payout.perUnplayedTrick} for each unplayed trick, up to ${BALANCE_DISPLAY.payout.perUnplayedTrick * BALANCE_DISPLAY.payout.unplayedCap} more. Each route card says what its camp pays.`,
       "Before every camp, camp 1 too, everyone drafts one of 3 items; after a boss camp, one of 3 pairs of items. After every other camp an event waits on the trail, and it may give the crew coins, a supply or items. Then the crew votes on the route to the next camp, and a tied vote is settled by a coin flip.",
-      "Before every boss camp, and before camp 3 of a Short run, a shop opens once the route is chosen. The crew spends the purse on supplies (6 coins), items, and your own character's upgrades (8 coins). An upgrade also gives you one more whisper each camp.",
+      `Before every boss camp, and before camp 3 of a Short run, a shop opens once the route is chosen. The purse splits: all of it is dealt out as an equal share for each explorer and any coins left over (or the rest, if it is not all) are the crew pot; a buy spends your share first, then the pot, and you can give coins of your share to a teammate to pool them. You spend it on supplies (${BALANCE_DISPLAY.supplyPrice} coins), items, and your own character's upgrades (${BALANCE_DISPLAY.upgradePrice} coins).`,
       "Each explorer has 2 item slots, and only the items in them go into camp. Up to 6 more wait in the backpack: open it from the item bar between camps to swap items, or to discard one when it is full.",
     ]);
   });
 
   it("states the supplies and the failure cost", () => {
     expect(byId(buildRulesReference(null), "goal").paragraphs[1]).toBe(
-      "A camp is cleared when every objective is done. A failed camp costs one supply and is replayed with a fresh deal. The crew starts with 3 supplies and holds at most 4. With none left, the run ends.",
+      `A camp is cleared when every objective is done. A failed camp costs one supply and is replayed with a fresh deal; the crew's purse gets ${BALANCE_DISPLAY.failedAttemptCoins === 1 ? "one coin" : `${BALANCE_DISPLAY.failedAttemptCoins} coins`} as consolation. The crew starts with ${BALANCE_DISPLAY.suppliesStart} supplies and holds at most ${BALANCE_DISPLAY.suppliesMax}. With none left, the run ends.`,
     );
   });
 
@@ -65,6 +65,10 @@ describe("buildRulesReference", () => {
     const tricks = byId(buildRulesReference(null), "tricks").paragraphs;
     expect(tricks).toContain("The Sun and Moon form their own two-card suit: if one is led, whoever holds the other must play it.");
     expect(tricks).toContain("If Bait stops the only card of the led suit from winning, the highest card left wins, and a tie goes to the card played first.");
+  });
+
+  it("says how many whispers each seat has per camp", () => {
+    expect(byId(buildRulesReference(null), "whisper").paragraphs[0]).toMatch(/^Twice per camp, between tricks/);
   });
 
   it("says when whispers can be sent", () => {
@@ -118,7 +122,7 @@ describe("buildRulesReference", () => {
 
   it("marks a passive-only source as always on", () => {
     const kit = byId(buildRulesReference(viewWith({ characterId: "leader" })), "kit");
-    expect(kit.items[0]!.body).toBe("Always on. Whisper twice each camp.");
+    expect(kit.items[0]!.body).toBe("Always on. Whisper once more each camp.");
   });
 
   it("skips kit ids missing from the catalogue and says so when nothing is left", () => {

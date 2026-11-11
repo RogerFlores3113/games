@@ -1,3 +1,4 @@
+import { PERFUMIST_WHISPERS_UNUPGRADED, WHISPERS_PER_CAMP } from "../../run/balance";
 import { lowestSeat } from "../helpers";
 import { ability, defineCharacter, defineUpgrade } from "../source-def";
 import { SUITS } from "../../deck";
@@ -8,7 +9,7 @@ export const perfumist = defineCharacter({
   name: "The Perfumist",
   theme: "Bends what a trick does",
   power: "Pink Mist",
-  text: "Mist a trick you lead so every card goes back to its hand; no whispers until upgraded.",
+  text: "Mist a trick you lead so every card goes back to its hand; one whisper until upgraded.",
   active: ability({
     window: "between-tricks",
     limit: { kind: "per-camp", times: 1 },
@@ -18,10 +19,14 @@ export const perfumist = defineCharacter({
     effect: () => ({ voidsTrick: () => () => true }),
   }),
   passive: {
-    // Last, so no item or teammate's gift lets an unupgraded Perfumist whisper.
+    // Last, so the cut comes off the whole count: an unupgraded Perfumist
+    // whispers fewer than the crew, but items and gifts still add to it.
     foldsLast: true,
     modifier: (owner) => ({
-      whispersPerCamp: (prev) => (run, seatId) => (seatId === owner.seatId && run.seats.find((s) => s.seatId === seatId)?.upgradeId === null ? 0 : prev(run, seatId)),
+      whispersPerCamp: (prev) => (run, seatId) =>
+        seatId === owner.seatId && run.seats.find((s) => s.seatId === seatId)?.upgradeId === null
+          ? Math.max(0, prev(run, seatId) - (WHISPERS_PER_CAMP - PERFUMIST_WHISPERS_UNUPGRADED))
+          : prev(run, seatId),
     }),
   },
   upgrades: [

@@ -115,6 +115,9 @@ export class TrailScene extends Phaser.Scene {
       onBuy(stockId) {
         store.getState().dispatch({ type: "buy", stockId });
       },
+      onGive(seatId) {
+        store.getState().dispatch({ type: "give-coins", to: seatId, coins: 1 });
+      },
       onBackpack() {
         const state = store.getState();
         const view = state.server?.game;

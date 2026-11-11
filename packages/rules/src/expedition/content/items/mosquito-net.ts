@@ -3,8 +3,8 @@ import { defineItem } from "../source-def";
 export const mosquitoNet = defineItem({
   id: "mosquito-net",
   name: "Mosquito Net",
-  rarity: "rare",
-  price: 4,
+  rarity: "common",
+  price: 1,
   text: "Rain can't stop your whispers.",
   passive: {
     modifier: (owner) => ({

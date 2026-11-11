@@ -58,6 +58,18 @@ export function whisperedTo(run: RunState, fromSeatId: string, toSeatId: string)
   );
 }
 
+/** This attempt's whispers by `seatId`, heard or washed away. */
+export function whispersBy(run: RunState, seatId: string): number {
+  return (attemptOf(run)?.log ?? []).filter((entry) => (entry.event === "whisper" || entry.event === "whisper-washed") && entry.actorSeatId === seatId).length;
+}
+
+/** The card a received whisper named (by its ordinal among whispers), and
+ * the seat that whispered it. */
+export function whisperedCard(run: RunState, ordinal: number): { readonly cardId: string; readonly fromSeatId: string } | undefined {
+  const reveal = (attemptOf(run)?.reveals ?? []).filter((r) => r.source === "whisper")[ordinal];
+  return reveal === undefined ? undefined : { cardId: reveal.cardId, fromSeatId: reveal.fromSeatId };
+}
+
 /** A layer granting `seatId`, or every seat when null, one more whisper. */
 export function extraWhisper(seatId: string | null): RuleModifier {
   return {

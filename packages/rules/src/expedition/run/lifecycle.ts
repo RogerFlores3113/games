@@ -8,7 +8,7 @@ import { EVENTS } from "../content/events/registry";
 import { applyEvent, drawEventId } from "./events";
 import { draftOfferFor } from "./draft";
 import { currentStamp, ownerOf } from "./usage";
-import { PURSE_START, SUPPLIES_START, objectiveSlotsFor, payoutFor } from "./balance";
+import { FAILED_ATTEMPT_COINS, PURSE_START, SUPPLIES_START, objectiveSlotsFor, payoutFor } from "./balance";
 import { campIndex, isFinalCamp } from "./plan";
 import { firstCampSpec, planOf, routeOptions, type CampSpec } from "./route";
 import { attemptSeed } from "./rng";
@@ -17,7 +17,7 @@ import { refitSlots } from "./items";
 import { nextAttemptNumber } from "./attempt";
 import { react } from "./react";
 import { campSlots } from "./stack";
-import { stockFor } from "./shop";
+import { splitPurse, stockFor } from "./shop";
 import { rejoinBack } from "./crew";
 import { recapOf, supplyCostParts } from "./recap";
 import type { CampIndex, CampResult, Catalog, RunAt, RunState, RunStatus, SeatRun } from "./types";
@@ -60,7 +60,7 @@ export function openLoadout(run: RunState, camp: CampSpec, catalog: Catalog): Ru
  * draws the stock afresh from the same streams, so a replay of a shop camp
  * offers the same stock, unsold. */
 export function openShop(run: RunState, camp: CampSpec, catalog: Catalog): RunAt<"shop"> {
-  return { ...run, stage: { tag: "shop", next: camp.index, camp, stock: stockFor(run.seed, camp.index, catalog), ready: {} } };
+  return { ...run, stage: { tag: "shop", next: camp.index, camp, stock: stockFor(run.seed, camp.index, catalog), shares: splitPurse(run), ready: {} } };
 }
 
 /** What follows the route vote that chose `camp`: its shop before a shop
@@ -147,12 +147,14 @@ export function dealCamp(run: RunAt<"loadout">, catalog: Catalog): RunAt<"camp">
 
 function settleFailure(run: RunAt<"camp">, catalog: Catalog): RunState {
   const cost = rulesFor(run, catalog).failureCost(run);
-  if (!Number.isInteger(cost) || cost < 1) throw new Error(`settleCamp: failureCost must be an integer >= 1, got ${cost}`);
+  if (!Number.isInteger(cost) || cost < 0) throw new Error(`settleCamp: failureCost must be an integer >= 0, got ${cost}`);
   const spec = run.stage.camp;
-  const result: CampResult = { camp: spec.index, attempt: run.stage.attempt.attemptNumber, location: spec.location, weather: spec.weather, status: "failed", suppliesSpent: cost, coins: 0 };
+  const result: CampResult = { camp: spec.index, attempt: run.stage.attempt.attemptNumber, location: spec.location, weather: spec.weather, status: "failed", suppliesSpent: cost, coins: FAILED_ATTEMPT_COINS };
   const supplies = Math.max(0, run.supplies - cost);
-  const lastAttempt = recapOf(run, "failed", 0, supplyCostParts(run, catalog), catalog);
-  const settled: RunState = { ...run, supplies, history: [...run.history, result], lastAttempt };
+  const lastAttempt = recapOf(run, "failed", FAILED_ATTEMPT_COINS, supplyCostParts(run, catalog), catalog);
+  // The consolation is paid first; a rule may then take coins back (Heavy Pack), never below 0.
+  const purse = Math.max(0, run.purse + FAILED_ATTEMPT_COINS - Math.max(0, rulesFor(run, catalog).failureCoins(run)));
+  const settled: RunState = { ...run, supplies, purse, history: [...run.history, result], lastAttempt };
   return supplies === 0 ? { ...settled, stage: { tag: "ended", result: "lost" } } : reopenCamp(settled, spec, catalog);
 }
 

@@ -6,6 +6,7 @@
 // short/word-shaped seed.
 
 import { describe, expect, it } from "vitest";
+import { PAYOUT, SHOP, SHOP_SHARE_PORTION, SUPPLIES_MAX, SUPPLIES_START } from "../run/balance";
 import { currentActorSeatId } from "../camp";
 import { evaluateObjective } from "../objectives";
 import { rulesFor } from "../run/compose";
@@ -50,7 +51,8 @@ describe("toExpeditionPlayerView", () => {
     const seed = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const base = setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG, camp: 2, characters: { p0: "explorer" } });
     const offer = draftOfferFor(seed, campIndex(2), base.seats[0]!, 0, CATALOG);
-    const queued = draftOfferFor(seed, campIndex(2), base.seats[0]!, 1, CATALOG);
+    // A later offer that differs from the head, so its absence from the view is meaningful.
+    const queued = [1, 2, 3, 4, 5, 6].map((n) => draftOfferFor(seed, campIndex(2), base.seats[0]!, n, CATALOG)).find((o) => JSON.stringify(o.bundles) !== JSON.stringify(offer.bundles))!;
     const run: RunState = {
       ...base,
       seats: base.seats.map((s) => (s.seatId === "p0" ? { ...s, offers: [offer, queued] } : s)),
@@ -79,7 +81,7 @@ describe("toExpeditionPlayerView", () => {
     expect(view.stage).toMatchObject({ tag: "loadout", readySeatIds: ["p1"], camp: { index: 2, shop: false } });
     expect(Object.keys(view.stage).sort()).toEqual(["camp", "mods", "readySeatIds", "tag"]);
     expect(view.yourItemSlots).toBe(2);
-    expect([view.length, view.campCount, view.purse, view.supplies]).toEqual(["standard", 6, 0, { count: 3, max: 4 }]);
+    expect([view.length, view.campCount, view.purse, view.supplies]).toEqual(["standard", 6, 0, { count: SUPPLIES_START, max: SUPPLIES_MAX }]);
     expect(view.plan).toEqual([{ at: 3, tier: "animal", bossId: null }, { at: 6, tier: "temple", bossId: "temple" }]);
   });
 
@@ -114,10 +116,12 @@ describe("toExpeditionPlayerView", () => {
     expect(own.stage.tag === "shop" && own.stage.shop).toEqual({
       stock: stock.map((e) => ({ stockId: e.stockId, what: e.what, price: e.price, soldTo: null })),
       yourUpgrades: [
-        { stockId: "upgrade:explorer.second-wind", upgradeId: "explorer.second-wind", price: 8 },
-        { stockId: "upgrade:explorer.true-form", upgradeId: "explorer.true-form", price: 8 },
-        { stockId: "upgrade:explorer.reshape", upgradeId: "explorer.reshape", price: 8 },
+        { stockId: "upgrade:explorer.second-wind", upgradeId: "explorer.second-wind", price: SHOP.upgradePrice },
+        { stockId: "upgrade:explorer.true-form", upgradeId: "explorer.true-form", price: SHOP.upgradePrice },
+        { stockId: "upgrade:explorer.reshape", upgradeId: "explorer.reshape", price: SHOP.upgradePrice },
       ],
+      shares: SEATS.map((seatId) => ({ seatId, coins: Math.floor(run.purse / SEATS.length) })),
+      pot: run.purse % SEATS.length,
     });
     expect(stock.map((e) => e.stockId)).toEqual(["supplies", "item0", "item1", "item2"]);
     const upgraded = toExpeditionPlayerView(run, "p1", CATALOG);
@@ -180,15 +184,24 @@ describe("toExpeditionPlayerView", () => {
       stage: { tag: "route", from: campIndex(1), options: [{ id: "a", next: plain, reroll: 0, swapBoss: null }, { id: "b", next: risky, reroll: 0, swapBoss: null }], ballots: {} },
     };
     const stage = toExpeditionPlayerView(run, "p0", CATALOG).stage;
-    expect(stage.tag === "route" && stage.options.map((o) => o.pays)).toEqual([{ min: 5, max: 7 }, { min: 9, max: 11 }]);
+    expect(stage.tag === "route" && stage.options.map((o) => o.pays)).toEqual([{ min: PAYOUT.base, max: PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap }, { min: PAYOUT.base + PAYOUT.riskyLocation + PAYOUT.riskyWeather, max: PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap + PAYOUT.riskyLocation + PAYOUT.riskyWeather }]);
   });
 
   it("shop previews the camp it opens before", () => {
     const base = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3 });
     if (base.stage.tag !== "loadout") throw new Error("expected the loadout");
     const spec = base.stage.camp;
-    const run: RunState = { ...base, stage: { tag: "shop", next: campIndex(3), camp: spec, stock: [], ready: {} } };
+    const run: RunState = { ...base, stage: { tag: "shop", next: campIndex(3), camp: spec, stock: [], shares: {}, ready: {} } };
     expect(toExpeditionPlayerView(run, "p0", CATALOG).stage).toMatchObject({ tag: "shop", next: 3, camp: { index: 3, shop: true }, shop: { stock: [] } });
+  });
+
+  it("shop shows every seat's share and the pot, and the viewer a price it can reach", () => {
+    const shop = setupShop({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3, purse: 11 });
+    const view = toExpeditionPlayerView(shop, SEATS[1]!, CATALOG);
+    if (view.stage.tag !== "shop") throw new Error("expected the shop");
+    const each = Math.floor((11 * SHOP_SHARE_PORTION) / SEATS.length);
+    expect(view.stage.shop.shares).toEqual(SEATS.map((seatId) => ({ seatId, coins: each })));
+    expect(view.stage.shop.pot).toBe(11 - each * SEATS.length);
   });
 
   it("ended: the run result shows and the stage carries nothing else", () => {
@@ -197,7 +210,7 @@ describe("toExpeditionPlayerView", () => {
 
     const view = toExpeditionPlayerView(lost, "p0", CATALOG);
 
-    expect([view.runStatus, view.stage, view.supplies]).toEqual(["lost", { tag: "ended", result: "lost" }, { count: 0, max: 4 }]);
+    expect([view.runStatus, view.stage, view.supplies]).toEqual(["lost", { tag: "ended", result: "lost" }, { count: 0, max: SUPPLIES_MAX }]);
   });
 
   it("seats[] carry each seat's public character, upgrade, equipped and backpack items, and usage by key", () => {
@@ -368,16 +381,16 @@ describe("toExpeditionPlayerView", () => {
     expect(attemptViewOf(otherView).camp.yourLegalCardIds).toEqual([]);
   });
 
-  it("yourWhisper: one whisper allowed per camp, spent after sending, null when unseated", () => {
+  it("yourWhisper: two whispers allowed per camp, spent after sending, null when unseated", () => {
     const seed = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const setup = advanceTo(setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG }), "between-tricks", CATALOG);
     const cardId = attemptOf(setup)!.camp.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
-    expect(attemptViewOf(toExpeditionPlayerView(setup, "p0", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 1 });
+    expect(attemptViewOf(toExpeditionPlayerView(setup, "p0", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 2 });
 
     const sent = applyRunAction(setup, "p0", { type: "whisper", targetSeatId: "p1", cardId }, CATALOG);
     if (!sent.ok) throw new Error(sent.error);
-    expect(attemptViewOf(toExpeditionPlayerView(sent.state, "p0", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 0 });
-    expect(attemptViewOf(toExpeditionPlayerView(sent.state, "p1", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 1 });
+    expect(attemptViewOf(toExpeditionPlayerView(sent.state, "p0", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 1 });
+    expect(attemptViewOf(toExpeditionPlayerView(sent.state, "p1", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 2 });
     expect(attemptViewOf(toExpeditionPlayerView(sent.state, "watcher", CATALOG)).yourWhisper).toBeNull();
   });
 
@@ -386,8 +399,8 @@ describe("toExpeditionPlayerView", () => {
     const run = advanceTo(setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG, camp: 3, items: { p0: ["rain-poncho"] } }), "between-tricks", CATALOG);
     const used = applyRunAction(run, "p0", { type: "use-ability", sourceKey: "it0", targets: [] }, CATALOG);
     if (!used.ok) throw new Error(used.error);
-    expect(attemptViewOf(toExpeditionPlayerView(used.state, "p0", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 2 });
-    expect(attemptViewOf(toExpeditionPlayerView(used.state, "p1", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 1 });
+    expect(attemptViewOf(toExpeditionPlayerView(used.state, "p0", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 3 });
+    expect(attemptViewOf(toExpeditionPlayerView(used.state, "p1", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 2 });
   });
 
   it("is pure: two calls return deep-equal views, the input state is unchanged, and the view round-trips through JSON", () => {

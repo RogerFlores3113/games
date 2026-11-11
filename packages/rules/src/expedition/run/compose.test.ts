@@ -9,6 +9,7 @@ import { baseRules } from "../rules";
 import { isTrump, trickWinner } from "../trick";
 import { currentActorSeatId } from "../camp";
 import { winnerExcluding } from "../content/helpers";
+import { WHISPERS_PER_CAMP, WHISPER_CAP } from "./balance";
 import { composeRules, ruleLayersFor, rulesFor } from "./compose";
 import { attemptOf } from "./attempt";
 import { campIndex } from "./plan";
@@ -123,7 +124,7 @@ describe("composeRules([])", () => {
     const run = makeRun();
     const composed = composeRules([]);
     expect(composed.whisperAllowed(run, "p0")).toBe(true);
-    expect(composed.whispersPerCamp(run, "p0")).toBe(1);
+    expect(composed.whispersPerCamp(run, "p0")).toBe(WHISPERS_PER_CAMP);
     expect(composed.whisperAudience(run, "p0", "p1")).toEqual(["p1"]);
     expect(composed.failureCost(run)).toBe(1);
   });
@@ -133,13 +134,26 @@ describe("composeRules layer folding", () => {
   it("folds two whispersPerCamp layers in order (non-commutative)", () => {
     const doubler: RuleModifier = { whispersPerCamp: (prev) => (run, seatId) => prev(run, seatId) * 2 };
     const incrementer: RuleModifier = { whispersPerCamp: (prev) => (run, seatId) => prev(run, seatId) + 1 };
+    const cut: RuleModifier = { whispersPerCamp: (prev) => (run, seatId) => prev(run, seatId) - (WHISPERS_PER_CAMP - 1) }; // down to 1, so both orders stay under WHISPER_CAP
     const run = makeRun();
 
-    const doublerThenIncrementer = composeRules([doubler, incrementer]);
+    const doublerThenIncrementer = composeRules([cut, doubler, incrementer]);
     expect(doublerThenIncrementer.whispersPerCamp(run, "p0")).toBe(3); // (1*2)+1
 
-    const incrementerThenDoubler = composeRules([incrementer, doubler]);
+    const incrementerThenDoubler = composeRules([cut, incrementer, doubler]);
     expect(incrementerThenDoubler.whispersPerCamp(run, "p0")).toBe(4); // (1+1)*2
+  });
+
+  it("caps whispersPerCamp at WHISPER_CAP after every layer folds in, however many stack", () => {
+    const run = makeRun();
+    const add = (n: number): RuleModifier => ({ whispersPerCamp: (prev) => (r, seatId) => prev(r, seatId) + n });
+    const stacked = composeRules([add(1), add(2), add(3), add(4)]); // 2 + 10
+    expect(stacked.whispersPerCamp(run, "p0")).toBe(WHISPER_CAP);
+    // Exactly the cap stays; just under the cap is untouched.
+    expect(composeRules([add(WHISPER_CAP - WHISPERS_PER_CAMP)]).whispersPerCamp(run, "p0")).toBe(WHISPER_CAP);
+    expect(composeRules([add(WHISPER_CAP - WHISPERS_PER_CAMP - 1)]).whispersPerCamp(run, "p0")).toBe(WHISPER_CAP - 1);
+    // A later cut comes off the stack before the cap, so it still counts: 2 + 10 - 9 = 3.
+    expect(composeRules([add(1), add(2), add(3), add(4), add(-9)]).whispersPerCamp(run, "p0")).toBe(WHISPERS_PER_CAMP + 1);
   });
 
   it("an isTrump-only layer changes the composed trickWinner (WR-03)", () => {
@@ -231,8 +245,8 @@ describe("rulesFor / ruleLayersFor", () => {
       attempt: makeAttempt(),
     });
     const rules = rulesFor(run, catalog);
-    expect(rules.whispersPerCamp(run, "p1")).toBe(3);
-    expect(rules.whispersPerCamp(run, "p0")).toBe(1);
+    expect(rules.whispersPerCamp(run, "p1")).toBe(4);
+    expect(rules.whispersPerCamp(run, "p0")).toBe(2);
   });
 
   it("applies a character's passive, and tunes it by the owner's upgrades", () => {
@@ -254,19 +268,19 @@ describe("rulesFor / ruleLayersFor", () => {
     const upgraded = makeRun({ seats: [seat("p0", { characterId: "tuned", upgradeId: "tuned.a" }), seat("p1"), seat("p2")], attempt: makeAttempt() });
     expect(rulesFor(plain, tunedCatalog).whispersPerCamp(plain, "p0")).toBe(2);
     expect(rulesFor(upgraded, tunedCatalog).whispersPerCamp(upgraded, "p0")).toBe(4);
-    expect(rulesFor(upgraded, tunedCatalog).whispersPerCamp(upgraded, "p1")).toBe(1);
+    expect(rulesFor(upgraded, tunedCatalog).whispersPerCamp(upgraded, "p1")).toBe(2);
   });
 
   it("applies an attempt effect through its source's active.effect", () => {
     const run = makeRun({ attempt: makeAttempt({ effects: [effect] }) });
-    expect(rulesFor(run, catalog).whispersPerCamp(run, "p0")).toBe(2);
+    expect(rulesFor(run, catalog).whispersPerCamp(run, "p0")).toBe(3);
   });
 
   it("recomputes on every call, with no cache (T-10-08)", () => {
     const withoutEffect = makeRun({ attempt: makeAttempt({ effects: [] }) });
     const withEffect = makeRun({ attempt: makeAttempt({ effects: [effect] }) });
-    expect(rulesFor(withoutEffect, catalog).whispersPerCamp(withoutEffect, "p0")).toBe(1);
-    expect(rulesFor(withEffect, catalog).whispersPerCamp(withEffect, "p0")).toBe(2);
+    expect(rulesFor(withoutEffect, catalog).whispersPerCamp(withoutEffect, "p0")).toBe(2);
+    expect(rulesFor(withEffect, catalog).whispersPerCamp(withEffect, "p0")).toBe(3);
   });
 
   it("throws naming an equipped item id missing from the catalogue (POLICY A3)", () => {

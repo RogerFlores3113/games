@@ -3,6 +3,7 @@
 // a view carrying every seat's steps passes the per-seat leak check.
 
 import { describe, expect, it } from "vitest";
+import { SUPPLIES_MAX, SUPPLIES_START } from "./balance";
 import { applyCampAction } from "../actions";
 import { currentActorSeatId } from "../camp";
 import type { CampState, Objective, StandardIdentity, TrickPlay } from "../state";
@@ -132,7 +133,7 @@ describe("target-kind registry", () => {
     expect(ids("p0", { kind: "completed-objective" })).toEqual(["objective:obj-done"]);
     expect(ids("p0", { kind: "board" })).toEqual(["board"]);
     expect(choicesFor(scopeFor(run, "p0"), { kind: "supplies" })).toEqual([
-      { id: "supplies", target: { kind: "supplies", current: 3, max: 4 } },
+      { id: "supplies", target: { kind: "supplies", current: SUPPLIES_START, max: SUPPLIES_MAX } },
     ]);
     const failed = choicesFor(scopeFor(run, "p0"), { kind: "failed-objective" });
     expect(failed.map((c) => [c.id, c.target.kind === "failed-objective" && c.target.cardWinnerSeatId])).toEqual([
@@ -156,7 +157,7 @@ describe("target-kind registry", () => {
     expect(resolveTargets(scope, [{ kind: "supplies" }], []).ok).toBe(false);
     expect(resolveTargets(scope, [{ kind: "supplies" }], ["supplies"])).toEqual({
       ok: true,
-      targets: [{ kind: "supplies", current: 3, max: 4 }],
+      targets: [{ kind: "supplies", current: SUPPLIES_START, max: SUPPLIES_MAX }],
     });
   });
 

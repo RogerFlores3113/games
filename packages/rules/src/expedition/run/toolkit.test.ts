@@ -4,6 +4,7 @@
 // of the pick-order rule — mirrors test-support.ts's own discipline).
 
 import { describe, expect, it } from "vitest";
+import { SUPPLIES_MAX } from "./balance";
 import fc from "fast-check";
 import { applyCampAction } from "../actions";
 import { cardLabel } from "../deck";
@@ -561,8 +562,8 @@ describe("applyToolkitOps: rescue and sharing ops", () => {
 
   it("adjust-supplies throws when the result would spend the last supply or pass the maximum", () => {
     const { run } = afterOneTrick();
-    expect(() => applyToolkitOps(run, by("p0", "triage"), [{ op: "adjust-supplies", delta: -2 }], rules, CATALOG)).toThrow(/adjust-supplies/);
-    expect(() => applyToolkitOps(run, by("p0", "field-kit"), [{ op: "adjust-supplies", delta: 3 }], rules, CATALOG)).toThrow(/adjust-supplies/);
+    expect(() => applyToolkitOps(run, by("p0", "triage"), [{ op: "adjust-supplies", delta: -4 }], rules, CATALOG)).toThrow(/adjust-supplies/);
+    expect(() => applyToolkitOps(run, by("p0", "field-kit"), [{ op: "adjust-supplies", delta: SUPPLIES_MAX - run.supplies + 1 }], rules, CATALOG)).toThrow(/adjust-supplies/);
     expect(() => applyToolkitOps(run, by("p0", "field-kit"), [{ op: "adjust-supplies", delta: 0.5 }], rules, CATALOG)).toThrow(/adjust-supplies/);
   });
 
@@ -649,7 +650,7 @@ describe("applyToolkitOps: rescue and sharing ops", () => {
         }
         expect(campCardIds(attemptOf(after)!.camp)).toEqual(campCardIds(camp));
         expect(after.supplies).toBeGreaterThanOrEqual(1);
-        expect(after.supplies).toBeLessThanOrEqual(4);
+        expect(after.supplies).toBeLessThanOrEqual(5);
         expect(run).toEqual(before);
       }),
       { numRuns: 300 },

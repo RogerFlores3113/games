@@ -2,6 +2,7 @@
 // by a test-only source. With no such source every seam answers as before,
 // which the rest of the suite already pins.
 
+import { FAILED_ATTEMPT_COINS } from "./balance";
 import { describe, expect, it } from "vitest";
 import { applyCampAction } from "../actions";
 import { campPhase, currentActorSeatId } from "../camp";
@@ -248,6 +249,19 @@ describe("draftShapes, shopPrice and the offers ops", () => {
     expect(view.stage.shop.stock.find((e) => e.stockId === item.stockId)!.price).toBe(item.price - 1);
   });
 
+  it("affords a haggled price from the seat's share plus the pot, and spends the share first", () => {
+    const haggler = seamCharacter("haggler", { passive: passive((self) => ({ shopPrice: (prev) => (run, seatId, price) => (seatId === self ? price - 1 : prev(run, seatId, price)) })) });
+    const catalog = catalogWith(haggler);
+    const shop = setupShop({ seatIds: SEATS, seed: "haggle", catalog, characters: { p0: "haggler" }, camp: 3, purse: 20 });
+    const item = shop.stage.stock.find((e) => e.what.kind === "item")!;
+    // p0 holds price - 2, p1 the same, and the pot has 1: p0 reaches the haggled price, p1 the full price short by one.
+    const tight = { ...shop, purse: 2 * (item.price - 2) + 1, stage: { ...shop.stage, shares: { p0: item.price - 2, p1: item.price - 2, p2: 0 } } };
+    const bought = act(tight, "p0", { type: "buy", stockId: item.stockId }, catalog);
+    expect(bought.stage.tag === "shop" && bought.stage.shares).toEqual({ p0: 0, p1: item.price - 2, p2: 0 });
+    expect(bought.purse).toBe(tight.purse - (item.price - 1));
+    expect(applyRunAction(tight, "p1", { type: "buy", stockId: item.stockId }, catalog)).toEqual({ ok: false, error: "cannot_afford" });
+  });
+
   it("queues special offers drawn with the ability's shape behind the standard one, never repeating a one-item option", () => {
     const mapper = seamCharacter("mapper", {
       active: ability({
@@ -255,7 +269,7 @@ describe("draftShapes, shopPrice and the offers ops", () => {
         limit: { kind: "per-run", times: 1 },
         targets: [],
         apply: (ctx) => [
-          ...ctx.run.seatIds.flatMap((seatId) => [0, 1].map((): ToolkitOp => ({ op: "add-offer", seatId, offer: ctx.drawOffer(seatId, { options: 3, bundleSize: 1, exclusive: 0, rareChance: 100 }) }))),
+          ...ctx.run.seatIds.flatMap((seatId) => [0, 1].map((): ToolkitOp => ({ op: "add-offer", seatId, offer: ctx.drawOffer(seatId, { options: 3, bundleSize: 1, exclusive: 0, odds: { rare: 100, uncommon: 0 } }) }))),
           { op: "adjust-coins", delta: 10 },
         ],
       }),
@@ -322,7 +336,7 @@ describe("freeUse", () => {
 
 describe("foldsLast", () => {
   it("folds a passive after every effect, so it has the last word", () => {
-    const counted = seamCharacter("counted", { passive: passive((self) => ({ whispersPerCamp: (prev) => (run, seatId) => (seatId === self ? 7 : prev(run, seatId)) }), true) });
+    const counted = seamCharacter("counted", { passive: passive((self) => ({ whispersPerCamp: (prev) => (run, seatId) => (seatId === self ? 1 : prev(run, seatId)) }), true) });
     const shouter = defineItem({
       id: "shouter",
       name: "Shouter",
@@ -336,7 +350,7 @@ describe("foldsLast", () => {
     const camp = advanceTo(setupRun({ seatIds: SEATS, seed: "last", catalog, characters: { p0: "counted" }, items: { p1: ["shouter"] } }), "between-tricks", catalog);
     const shouted = use(camp, "p1", "it0", [], catalog);
     const rules = rulesFor(shouted, catalog);
-    expect([rules.whispersPerCamp(shouted, "p0"), rules.whispersPerCamp(shouted, "p1")]).toEqual([7, 2]);
+    expect([rules.whispersPerCamp(shouted, "p0"), rules.whispersPerCamp(shouted, "p1")]).toEqual([1, 3]);
   });
 });
 
@@ -603,7 +617,7 @@ function playTrickWith(run: RunState, catalog: Catalog): { run: RunState } {
 describe("source reactions", () => {
   it("lets a character take a seeded item when the length vote opens the run", () => {
     const lucky = seamCharacter("lucky", {
-      on: { "run-started": (ctx) => [{ op: "grant-item", seatId: ctx.self, itemId: ctx.drawOffer(ctx.self, { options: 1, bundleSize: 1, exclusive: 0, rareChance: 0 }).bundles[0]![0]! }] },
+      on: { "run-started": (ctx) => [{ op: "grant-item", seatId: ctx.self, itemId: ctx.drawOffer(ctx.self, { options: 1, bundleSize: 1, exclusive: 0, odds: { rare: 0, uncommon: 0 } }).bundles[0]![0]! }] },
     });
     const catalog = catalogWith(lucky);
     let run = createRun({ seatIds: SEATS, seed: "lucky" });
@@ -632,7 +646,7 @@ describe("source reactions", () => {
     const cleared = withAttempt(dealt, { ...dealt.stage.attempt, camp: { ...dealt.stage.attempt.camp, objectives: [] } }) as RunAt<"camp">;
     const settled = settleCamp(cleared, "cleared", catalog);
     expect(settled.purse).toBe(2 + 1 + settled.history.at(-1)!.coins);
-    expect(settleCamp(cleared, "failed", catalog).purse).toBe(2);
+    expect(settleCamp(cleared, "failed", catalog).purse).toBe(2 + FAILED_ATTEMPT_COINS);
   });
 });
 

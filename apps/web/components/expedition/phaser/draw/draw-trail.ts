@@ -4,6 +4,8 @@
  * and Ready. Every value drawn comes from `TrailModel`; clicks only call the
  * handlers.
  */
+import { rarityTag } from "../../../../lib/expedition/rarity";
+import { rarityColor } from "./rarity-color";
 import type Phaser from "phaser";
 import { CURSOR, pointerIf } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
@@ -70,7 +72,6 @@ interface Ctx {
 }
 
 const INK = PALETTE.cardEdge;
-const RARE = PALETTE.rain;
 const PULSE_MS = 600;
 const LINE = LABEL_CELL.h + 2;
 
@@ -489,7 +490,8 @@ function bundleItem(ctx: Ctx, card: Phaser.GameObjects.Container, item: BundleIt
   const h = compact ? BUNDLE_ITEM_TEXT_Y + LINE + 2 : bundleItemH(lines.length);
   const badgeY = h - LINE - 2;
   let bx = 4 + chip(scene, block, 4, badgeY, item.uses, PALETTE.plate) + 3;
-  if (item.rare) bx += chip(scene, block, bx, badgeY, "Rare", PALETTE.plate, RARE) + 3;
+  const tag = rarityTag(item.rarity);
+  if (tag !== null) bx += chip(scene, block, bx, badgeY, tag, PALETTE.plate, rarityColor(item.rarity)) + 3;
   if (item.exclusive) chip(scene, block, bx, badgeY, "Pack Rat", PALETTE.plate, PALETTE.coinShine);
   const hit = scene.add.zone(0, 0, w, h).setOrigin(0, 0).setInteractive();
   hit.on("pointerover", () => handlers.onSourceHover(item.itemId, item.objectId));
@@ -509,7 +511,7 @@ const SINGLE_TEXT_Y = 54;
 function singleItem(ctx: Ctx, card: Phaser.GameObjects.Container, item: BundleItem, w: number, h: number): void {
   const { scene, index, handlers } = ctx;
   const block = scene.add.container(0, 0);
-  block.add(scene.add.rectangle(w / 2 - 19, 5, 38, 38, toPhaserColor(PALETTE.stump)).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(item.rare ? RARE : PALETTE.plateEdge)));
+  block.add(scene.add.rectangle(w / 2 - 19, 5, 38, 38, toPhaserColor(PALETTE.stump)).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(rarityColor(item.rarity, PALETTE.plateEdge))));
   const art = sourceArtId(item.itemId);
   if (art !== null) block.add(placeArt(scene, art, w / 2, 24).setScale(SINGLE_ICON_SCALE));
   block.add(centredText(scene, w / 2, 45, fitLabel(item.name, Math.floor((w - 8) / LABEL_CELL.w)), PALETTE.sun));
@@ -517,7 +519,8 @@ function singleItem(ctx: Ctx, card: Phaser.GameObjects.Container, item: BundleIt
   lines.forEach((line, i) => block.add(text(scene, 4, SINGLE_TEXT_Y + 4 + i * LINE, line)));
   const badgeY = SINGLE_TEXT_Y + 4 + lines.length * LINE + 4;
   let bx = 4 + chip(scene, block, 4, badgeY, item.uses, PALETTE.plate) + 3;
-  if (item.rare) bx += chip(scene, block, bx, badgeY, "Rare", PALETTE.plate, RARE) + 3;
+  const tag = rarityTag(item.rarity);
+  if (tag !== null) bx += chip(scene, block, bx, badgeY, tag, PALETTE.plate, rarityColor(item.rarity)) + 3;
   if (item.exclusive) chip(scene, block, bx, badgeY, "Pack Rat", PALETTE.plate, PALETTE.coinShine);
   const hitH = h - BUNDLE_TAKE_H - 6;
   const hit = scene.add.zone(0, 0, w, hitH).setOrigin(0, 0).setInteractive();
@@ -793,7 +796,7 @@ function drawBarSlot(ctx: Ctx, slot: ItemBar["slots"][number], rect: Rect): void
   const container = scene.add.container(rect.x, rect.y);
   const item: InventoryItem | null = slot.item;
   const bg = scene.add.rectangle(0, 0, rect.w, rect.h, toPhaserColor(item === null ? PALETTE.plate : PALETTE.bark)).setOrigin(0, 0);
-  if (item?.rare) bg.setStrokeStyle(1, toPhaserColor(RARE));
+  if (item !== null && item.rarity !== "common") bg.setStrokeStyle(1, toPhaserColor(rarityColor(item.rarity)));
   container.add(bg);
   if (item === null) {
     container.add(dashedBox(scene, rect.w, rect.h));
@@ -804,7 +807,7 @@ function drawBarSlot(ctx: Ctx, slot: ItemBar["slots"][number], rect: Rect): void
     const chars = Math.floor((rect.w - 22) / LABEL_CELL.w);
     const top = Math.max(0, Math.floor((rect.h - 2 * LABEL_CELL.h - 1) / 2));
     container.add(text(scene, 19, top, fitLabel(item.name, chars)));
-    container.add(text(scene, 19, top + LABEL_CELL.h + 1, fitLabel(item.uses, chars), item.rare ? RARE : PALETTE.textDim));
+    container.add(text(scene, 19, top + LABEL_CELL.h + 1, fitLabel(item.uses, chars), rarityColor(item.rarity)));
   }
   container.setSize(rect.w, rect.h);
   bg.setInteractive({ cursor: CURSOR.pointer });

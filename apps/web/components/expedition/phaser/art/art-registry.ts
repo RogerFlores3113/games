@@ -37,6 +37,7 @@ export const SOURCE_ICON_IDS = [
   "trained-monkey", "pack-mule", "parrot", "trail-map", "rain-poncho", "smoke-signal", "whetstone",
   "puffball", "bait", "camouflage", "rope-ladder", "heavy-pack", "mosquito-net",
   "pocket-glass", "message-bottle", "first-aid-kit", "signal-flare",
+  "trail-rations", "conch-shell",
   "temple",
 ] as const;
 
@@ -47,8 +48,15 @@ export const CREW_IDS = ["jd", "businessman", "magician", "perfumist", "cartogra
 type SourceIconId = `source-${(typeof SOURCE_ICON_IDS)[number]}`;
 type CrewArtId = `crew-${(typeof CREW_IDS)[number]}`;
 
+/** PLACEHOLDER art: items with no icon of their own yet borrow another
+ * item's PNG under sources/. Delete an entry when its own PNG lands. */
+export const PLACEHOLDER_SOURCE_ICONS: Readonly<Record<string, string>> = {
+  "trail-rations": "first-aid-kit", // PLACEHOLDER: the kit's icon until Trail Rations has its own
+  "conch-shell": "message-bottle", // PLACEHOLDER: the bottle's icon until the Conch Shell has its own
+};
+
 const SOURCE_ART = Object.fromEntries(
-  SOURCE_ICON_IDS.map((id) => [`source-${id}`, { file: `sources/${id}.png`, w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } }]),
+  SOURCE_ICON_IDS.map((id) => [`source-${id}`, { file: `sources/${PLACEHOLDER_SOURCE_ICONS[id] ?? id}.png`, w: 16, h: 16, fallback: { color: c(PALETTE.bark), label: "" } }]),
 ) as Record<SourceIconId, ArtDef>;
 
 const CREW_ART = Object.fromEntries(

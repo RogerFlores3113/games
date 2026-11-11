@@ -23,6 +23,7 @@
 // rule objects.
 
 import type { CoreRules } from "../rules";
+import type { CampState } from "../state";
 import { FAILURE_COST, ITEM_SLOTS, WHISPERS_PER_CAMP, WHISPERS_PER_UPGRADE } from "./balance";
 import { standardDraftShape, type DraftShape } from "./draft";
 import type { Origin, RunState, SourceKey } from "./types";
@@ -47,6 +48,10 @@ export type RunHooks = {
    * with nobody seeing the card. */
   washedWhispers(run: RunState): number;
   failureCost(run: RunState): number;
+  /** Coins a failed camp takes from the crew's purse (never below 0). */
+  failureCoins(run: RunState): number;
+  /** Whether the weather leaves `seatId`'s whispers alone. */
+  washProof(run: RunState, seatId: string): boolean;
   itemSlots(run: RunState, seatId: string): number;
   /** Percent chance of fair weather on a route, given the location's own. */
   normalWeatherChance(run: RunState, chance: number): number;
@@ -68,6 +73,10 @@ export type RunHooks = {
   freeUse(run: RunState, seatId: string, sourceKey: SourceKey): boolean;
   /** Whether `seatId` sees the objectives a coming camp will deal. */
   surveys(run: RunState, seatId: string): boolean;
+  /** A warning for `seatId` playing `cardId` now, or null. Only a hand's
+   * owner is ever shown it. A layer returns what the previous layer said
+   * unless that was null: the first non-null wins. */
+  playWarning(camp: CampState, seatId: string, cardId: string): string | null;
 };
 
 export type RunRules = CoreRules & RunHooks;
@@ -99,6 +108,8 @@ const HOOK_NAME_SET: Record<HookName, true> = {
   whispersPerCamp: true,
   washedWhispers: true,
   failureCost: true,
+  failureCoins: true,
+  washProof: true,
   itemSlots: true,
   voidsTrick: true,
   objectivePicker: true,
@@ -110,6 +121,7 @@ const HOOK_NAME_SET: Record<HookName, true> = {
   affectsSeat: true,
   freeUse: true,
   surveys: true,
+  playWarning: true,
 };
 
 export const HOOK_NAMES: readonly HookName[] = Object.keys(HOOK_NAME_SET) as HookName[];
@@ -133,6 +145,12 @@ export const baseRunHooks: RunHooks = {
   },
   failureCost(_run) {
     return FAILURE_COST;
+  },
+  failureCoins(_run) {
+    return 0;
+  },
+  washProof(_run, _seatId) {
+    return false;
   },
   itemSlots(_run, _seatId) {
     return ITEM_SLOTS;
@@ -160,5 +178,8 @@ export const baseRunHooks: RunHooks = {
   },
   surveys(_run, _seatId) {
     return false;
+  },
+  playWarning(_camp, _seatId, _cardId) {
+    return null;
   },
 };

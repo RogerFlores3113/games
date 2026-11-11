@@ -24,8 +24,8 @@ function camp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampView {
     discards: [], voidedTricks: [],
     objectives: [],
     yourHand: [
-      { id: "h7", identity: H7, effectiveRank: null, countsAs: null },
-      { id: "s9", identity: S9, effectiveRank: null, countsAs: null },
+      { id: "h7", identity: H7, effectiveRank: null, countsAs: null, warning: null },
+      { id: "s9", identity: S9, effectiveRank: null, countsAs: null, warning: null },
     ],
     yourLegalCardIds: ["h7", "s9"],
     handSizes: [],
@@ -163,7 +163,7 @@ const ROWS: [string, ExpeditionView, LocalUiState, typeof playing, Prompt][] = [
     "your turn, cannot follow",
     view(
       camp({
-        yourHand: [{ id: "s9", identity: S9, effectiveRank: null, countsAs: null }],
+        yourHand: [{ id: "s9", identity: S9, effectiveRank: null, countsAs: null, warning: null }],
         yourLegalCardIds: ["s9"],
         currentTrick: { index: 0, leaderSeatId: "ana", plays: [{ seatId: "ana", hidden: false, card: { id: "h2", identity: H2 }, effectiveRank: null, countsAs: null }] },
       }),
@@ -355,6 +355,32 @@ describe("buildPrompt", () => {
   });
 });
 
+describe("buildPrompt: a warned play", () => {
+  const SUN_WARNING = "Playing the Sun now fails the Temple: lead spades first.";
+  const warned = view(
+    camp({
+      yourHand: [
+        { id: "h7", identity: H7, effectiveRank: null, countsAs: null, warning: null },
+        { id: "sun", identity: { kind: "joker", joker: "sun" }, effectiveRank: null, countsAs: null, warning: SUN_WARNING },
+      ],
+      yourLegalCardIds: ["h7", "sun"],
+    }),
+  );
+
+  it("shows the warning, or a short line when it does not fit, once the card is pending", () => {
+    expect(buildPrompt(warned, SEATS, ui(), playing).text).toBe("Your lead: play any card");
+    const pending = buildPrompt(warned, SEATS, ui({ pendingPlay: "sun" }), playing);
+    expect(pending.tone).toBe("alert");
+    expect(pending.text.length).toBeLessThanOrEqual(PROMPT_MAX_CHARS);
+    const short = view(camp({ yourHand: [{ id: "sun", identity: { kind: "joker", joker: "sun" }, effectiveRank: null, countsAs: null, warning: "The Sun fails the Temple now." }] }));
+    expect(buildPrompt(short, SEATS, ui({ pendingPlay: "sun" }), playing)).toEqual({ text: "The Sun fails the Temple now.", tone: "alert" });
+  });
+
+  it("ignores a pending card that has no warning", () => {
+    expect(buildPrompt(warned, SEATS, ui({ pendingPlay: "h7" }), playing).text).toBe("Your lead: play any card");
+  });
+});
+
 describe("describeChoice", () => {
   const nameOf = (id: string | null): string => SEATS.find((s) => s.seatId === id)?.displayLabel ?? "Someone";
   const v = view(
@@ -468,7 +494,7 @@ describe("buildTrailPrompt", () => {
   });
 
   it("at the shop names the camp it stocks up for", () => {
-    const v = trail({ tag: "shop", next: 3, camp: { ...PREVIEW, index: 3, shop: true }, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] });
+    const v = trail({ tag: "shop", next: 3, camp: { ...PREVIEW, index: 3, shop: true }, shop: { stock: [], yourUpgrades: [], shares: [], pot: 0 }, readySeatIds: [] });
     expect(at(v)).toEqual({ text: "Shop | Before camp 3", tone: "your-move" });
   });
 

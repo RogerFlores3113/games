@@ -9,12 +9,15 @@ import type { Rect } from "../layout";
 import { placeArt } from "../art/place-art";
 import { sourceArtId } from "../art/art-registry";
 import type { ObjectIndex } from "../object-index";
-import type { ShopEntry, ShopPanel } from "../../../../lib/expedition/loadout-model";
+import type { ShopEntry, ShopGive, ShopPanel } from "../../../../lib/expedition/loadout-model";
+import { rarityColor } from "./rarity-color";
 import { fitLabel } from "./text-fit";
 import { button, coin, labelWidth, text, type Layer } from "./ui-kit";
 
 export interface LoadoutHandlers {
   onBuy(stockId: string): void;
+  /** Gives one coin of your share to a teammate. */
+  onGive(seatId: string): void;
   onSourceHover(sourceKey: string | null, objectId?: string): void;
   /** Opens the inventory window. */
   onBackpack(): void;
@@ -27,7 +30,6 @@ export interface LoadoutCtx {
   handlers: LoadoutHandlers;
 }
 
-const RARE = PALETTE.rain;
 const SHOP_ROW_H = 19;
 const SHOP_ROW_STEP = 20;
 const BUY_W = 70;
@@ -42,7 +44,7 @@ function shopRow(ctx: LoadoutCtx, entry: ShopEntry, x: number, y: number, w: num
   if (art !== null) info.add(placeArt(scene, art, 10, Math.floor(SHOP_ROW_H / 2)));
   const chars = Math.floor((infoW - 22) / LABEL_CELL.w);
   info.add(text(scene, 20, 1, fitLabel(entry.name, chars)));
-  info.add(text(scene, 20, LABEL_CELL.h + 2, fitLabel(entry.detail, chars), entry.rare ? RARE : PALETTE.textDim));
+  info.add(text(scene, 20, LABEL_CELL.h + 2, fitLabel(entry.detail, chars), rarityColor(entry.rarity)));
   if (entry.infoId !== null && entry.sourceId !== null) {
     const hit = scene.add.zone(0, 0, infoW, SHOP_ROW_H).setOrigin(0, 0).setInteractive();
     hit.on("pointerover", () => handlers.onSourceHover(entry.sourceId, entry.infoId!));
@@ -75,15 +77,30 @@ function shopRow(ctx: LoadoutCtx, entry: ShopEntry, x: number, y: number, w: num
   layer.add(text(scene, x + w - 2 - labelWidth(shown), y + Math.floor((SHOP_ROW_H - LABEL_CELL.h) / 2), shown, PALETTE.textDim));
 }
 
+const GIVE_H = 17;
+
+/** "Give 1" to each teammate: a button per seat, beside its name and share. */
+function giveRow(ctx: LoadoutCtx, give: readonly ShopGive[], x: number, y: number, w: number): void {
+  const { scene, layer, handlers } = ctx;
+  const cell = Math.floor(w / give.length);
+  give.forEach((g, i) => {
+    const label = fitLabel(`Give 1: ${g.name} ${g.share}`, Math.floor((cell - 4) / LABEL_CELL.w));
+    const b = button(scene, x + i * cell + cell / 2, y + 7, cell - 4, 14, label, g.enabled ? { onClick: () => handlers.onGive(g.seatId) } : {});
+    layer.add(b);
+  });
+}
+
 /** The shop in `rect`: its heading and the purse, then a row per entry. */
 export function drawShop(ctx: LoadoutCtx, shop: ShopPanel, rect: Rect, heading: string): void {
   const { scene, layer } = ctx;
   layer.add(text(scene, rect.x, rect.y + 2, heading, PALETTE.sun));
-  const purse = `${shop.purse} ${shop.purse === 1 ? "coin" : "coins"} to spend`;
+  const purse = `Your share ${shop.share}, crew pot ${shop.pot}`;
   const purseX = rect.x + rect.w - labelWidth(purse);
   layer.add(coin(scene, purseX - 8, rect.y + 5, 5));
   layer.add(text(scene, purseX, rect.y + 2, purse, PALETTE.coin));
   // Three upgrades and full stock need seven rows: they close up to fit.
-  const step = Math.min(SHOP_ROW_STEP, Math.floor((rect.h - 14) / Math.max(1, shop.entries.length)));
+  const giveH = shop.give.length === 0 ? 0 : GIVE_H;
+  const step = Math.min(SHOP_ROW_STEP, Math.floor((rect.h - 14 - giveH) / Math.max(1, shop.entries.length)));
   shop.entries.forEach((entry, i) => shopRow(ctx, entry, rect.x, rect.y + 14 + i * step, rect.w));
+  if (giveH > 0) giveRow(ctx, shop.give, rect.x, rect.y + rect.h - giveH + 2, rect.w);
 }

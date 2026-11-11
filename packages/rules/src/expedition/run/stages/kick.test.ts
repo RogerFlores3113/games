@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SUPPLIES_START } from "../balance";
 import { currentActorSeatId } from "../../camp";
 import { defineItem, itemAbility } from "../../content/source-def";
 import { absentSeatAction } from "../absent";
@@ -148,7 +149,7 @@ describe("a kick at each stage", () => {
     expect(currentWindow(paused, rulesFor(paused, ropeCatalog))).toBe("rescue");
     const kicked = kickSeat(paused, "p3", ropeCatalog);
     expect(kicked.stage.tag).toBe("loadout");
-    expect(kicked.supplies).toBe(3);
+    expect(kicked.supplies).toBe(SUPPLIES_START);
     expect(kicked.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "restarted", suppliesSpent: 0, coins: 0 }]);
     expect(kicked.seats[0]!.items).toEqual([{ uid: "it0", itemId: "test-rope" }]);
   });
@@ -196,17 +197,17 @@ describe("a kick at each stage", () => {
 });
 
 describe("every per-player rule reads the crew in play", () => {
-  it("a kick from five deals a four-player deck and Rain washes 4 - 2 whispers", () => {
+  it("a kick from five deals a four-player deck and Rain washes 4 - 3 whispers", () => {
     const five = ["p0", "p1", "p2", "p3", "p4"];
     const base = setupRun({ seatIds: five, seed: "rain-kick", catalog: CATALOG, camp: 2 }) as RunAt<"loadout">;
     const rainy: RunState = { ...base, stage: { ...base.stage, camp: { ...base.stage.camp, location: "jungle", weather: "rain" } } };
     const dealt = readyAll(rainy, rainy.seatIds, CATALOG);
-    expect(rulesFor(dealt, CATALOG).washedWhispers(dealt)).toBe(3);
+    expect(rulesFor(dealt, CATALOG).washedWhispers(dealt)).toBe(2);
     const kicked = readyAll(kickSeat(dealt, "p4", CATALOG), ["p0", "p1", "p2", "p3"], CATALOG);
     const camp = attemptOf(kicked)!.camp;
     expect(camp.playerCount).toBe(4);
     expect(camp.hands.map((hand) => hand.seatId)).toEqual(["p0", "p1", "p2", "p3"]);
-    expect(rulesFor(kicked, CATALOG).washedWhispers(kicked)).toBe(2);
+    expect(rulesFor(kicked, CATALOG).washedWhispers(kicked)).toBe(1);
   });
 
   it("a kicked seat is not a seat: it cannot act and the room never auto-passes for it", () => {

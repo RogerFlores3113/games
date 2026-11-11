@@ -2,13 +2,14 @@ import { DRAFT } from "../../run/balance";
 import type { DraftShape } from "../../run/draft";
 import { roomFor } from "../../run/items";
 import { currentStamp } from "../../run/usage";
+import { ITEMS } from "../items/registry";
 import { ability, defineCharacter, defineUpgrade } from "../source-def";
 
 /** Item instance uids are minted as it<n> (run/items.ts). */
 const ITEM_UID = /^it\d+$/;
 
 /** After the usual draft, a pick of one of three Pack Rat items. */
-const PACK_RAT_PICK: DraftShape = { options: 3, bundleSize: 0, exclusive: 1, rareChance: DRAFT.rareChance };
+const PACK_RAT_PICK: DraftShape = { options: 3, bundleSize: 0, exclusive: 1, odds: DRAFT.odds };
 
 export const packRat = defineCharacter({
   id: "pack-rat",
@@ -49,15 +50,21 @@ export const packRat = defineCharacter({
     defineUpgrade({
       id: "pack-rat.sturdy-straps",
       name: "Sturdy Straps",
-      text: "The first item you use each camp isn't used up.",
+      text: "The first item you use each camp isn't used up, except supply items.",
       passive: {
         modifier: (owner) => ({
           freeUse: (prev) => (run, seatId, key) => {
             if (seatId !== owner.seatId || !ITEM_UID.test(key)) return prev(run, seatId, key);
             const stamp = currentStamp(run);
             const seat = run.seats.find((s) => s.seatId === seatId)!;
-            const usedAnItem = seat.ledger.some((e) => e.kind === "used" && ITEM_UID.test(e.sourceKey) && stamp !== null && e.at.camp === stamp.camp && e.at.attempt === stamp.attempt);
-            return !usedAnItem || prev(run, seatId, key);
+            // A supply item (First Aid Kit, Trail Rations) is never made free, and does not use the Straps up.
+            const itemId = seat.items.find((item) => item.uid === key)?.itemId;
+            if (itemId !== undefined && Object.hasOwn(ITEMS, itemId) && ITEMS[itemId as keyof typeof ITEMS].noFreeUse === true) return prev(run, seatId, key);
+            // The Straps are spent once an item went free this camp.
+            const spent = seat.ledger.some(
+              (e) => e.kind === "used" && e.free === true && ITEM_UID.test(e.sourceKey) && stamp !== null && e.at.camp === stamp.camp && e.at.attempt === stamp.attempt,
+            );
+            return !spent || prev(run, seatId, key);
           },
         }),
       },

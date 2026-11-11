@@ -4,10 +4,11 @@ import { defineItem, itemAbility } from "../source-def";
 export const firstAidKit = defineItem({
   id: "first-aid-kit",
   name: "First Aid Kit",
-  rarity: "common",
-  price: 2,
+  rarity: "rare",
+  price: 5,
   exclusiveTo: "pack-rat",
   uses: { kind: "single-use" },
+  noFreeUse: true,
   text: "Restore 1 supply.",
   active: itemAbility({
     window: "between-tricks",

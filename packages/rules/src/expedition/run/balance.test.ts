@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createCamp } from "../camp";
 import type { CampState } from "../state";
-import { EXTRA_OBJECTIVES_BY_PLAYERS, MIX_FROM_CAMP, OBJECTIVE_RAMP, PLAIN_GROUND, RUN_LENGTHS, SHOP_CAMPS, TRICK_COUNT_N_RANGE, mixFromCampFor, objectiveSlotsFor, payoutFor, payoutRange, seatObjectivesAt } from "./balance";
+import { EXTRA_OBJECTIVES, FAILED_ATTEMPT_COINS, PAYOUT, MAX_SEAT_OBJECTIVES, SUPPLIES_MAX, SUPPLIES_START, WASHES, WHISPERS_PER_CAMP, MIX_FROM_CAMP, OBJECTIVE_RAMP, PLAIN_GROUND, RUN_LENGTHS, SHOP_CAMPS, TRICK_COUNT_N_RANGE, mixFromCampFor, objectiveSlotsFor, payoutFor, payoutRange, seatObjectivesAt } from "./balance";
 import { campIndex } from "./plan";
 import { CATALOG } from "./catalog";
 import { campSpecAt, type CampSpec } from "./route";
@@ -19,22 +19,22 @@ describe("payoutFor", () => {
 
   const plain = { location: "jungle", weather: "fair" };
 
-  it("pays 5 plus one per unplayed trick, at most 2, on plain ground", () => {
-    expect(payoutFor(plain, camp(18, 18))).toBe(5);
-    expect(payoutFor(plain, camp(18, 17))).toBe(6);
-    expect(payoutFor(plain, camp(18, 3))).toBe(7);
+  it("pays the base plus one per unplayed trick, at most the cap, on plain ground", () => {
+    expect(payoutFor(plain, camp(18, 18))).toBe(PAYOUT.base);
+    expect(payoutFor(plain, camp(18, 17))).toBe(PAYOUT.base + PAYOUT.perUnplayedTrick);
+    expect(payoutFor(plain, camp(18, 3))).toBe(PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap);
   });
 
-  it("pays 2 more away from plain ground and 2 more in any weather but fair", () => {
-    expect(payoutFor({ location: "clearing", weather: "fair" }, camp(18, 18))).toBe(5);
-    expect(payoutFor({ location: "cave", weather: "fair" }, camp(18, 18))).toBe(7);
-    expect(payoutFor({ location: "jungle", weather: "downpour" }, camp(18, 18))).toBe(7);
-    expect(payoutFor({ location: "cave", weather: "downpour" }, camp(18, 3))).toBe(11);
+  it("pays the risk bonus away from plain ground and in any weather but fair", () => {
+    expect(payoutFor({ location: "clearing", weather: "fair" }, camp(18, 18))).toBe(PAYOUT.base);
+    expect(payoutFor({ location: "cave", weather: "fair" }, camp(18, 18))).toBe(PAYOUT.base + PAYOUT.riskyLocation);
+    expect(payoutFor({ location: "jungle", weather: "downpour" }, camp(18, 18))).toBe(PAYOUT.base + PAYOUT.riskyWeather);
+    expect(payoutFor({ location: "cave", weather: "downpour" }, camp(18, 3))).toBe(PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap + PAYOUT.riskyLocation + PAYOUT.riskyWeather);
   });
 
   it("states the range a route pays", () => {
-    expect(payoutRange(plain)).toEqual({ min: 5, max: 7 });
-    expect(payoutRange({ location: "clifftop", weather: "rain" })).toEqual({ min: 9, max: 11 });
+    expect(payoutRange(plain)).toEqual({ min: PAYOUT.base, max: PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap });
+    expect(payoutRange({ location: "clifftop", weather: "rain" })).toEqual({ min: PAYOUT.base + PAYOUT.riskyLocation + PAYOUT.riskyWeather, max: PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap + PAYOUT.riskyLocation + PAYOUT.riskyWeather });
   });
 
   it("names only defs that change nothing as plain ground", () => {
@@ -59,13 +59,29 @@ describe("SHOP_CAMPS", () => {
 });
 
 describe("seatObjectivesAt", () => {
-  it("is the ramp at 3 players, one more at 4 and two more at 5, at every camp", () => {
-    expect(EXTRA_OBJECTIVES_BY_PLAYERS).toEqual({ 3: 0, 4: 1, 5: 2 });
+  it("adds each crew size's extras at the camps EXTRA_OBJECTIVES names", () => {
+    expect(EXTRA_OBJECTIVES.short).toEqual({ 3: [0, 0, 1, 1], 4: [0, 0, 0, 1], 5: [1, 1, 1, 2] });
+    expect(EXTRA_OBJECTIVES.standard).toEqual({ 3: [0, 0, 0, 0, 0, 0], 4: [0, 0, 0, 0, 0, 1], 5: [1, 2, 2, 2, 2, 2] });
     for (const length of Object.keys(RUN_LENGTHS) as RunLength[]) {
-      OBJECTIVE_RAMP[length].forEach((ramp, i) => {
-        expect([3, 4, 5].map((players) => seatObjectivesAt(length, i + 1, players))).toEqual([ramp, ramp + 1, ramp + 2]);
-      });
+      for (const players of [3, 4, 5] as const) {
+        expect(EXTRA_OBJECTIVES[length][players]).toHaveLength(RUN_LENGTHS[length].camps);
+        OBJECTIVE_RAMP[length].forEach((ramp, i) => {
+          expect(seatObjectivesAt(length, i + 1, players)).toBe(Math.min(MAX_SEAT_OBJECTIVES, ramp + EXTRA_OBJECTIVES[length][players][i]!));
+        });
+      }
     }
+    expect([1, 2, 3, 4].map((k) => seatObjectivesAt("short", k, 4))).toEqual(OBJECTIVE_RAMP.short.map((ramp, i) => ramp + EXTRA_OBJECTIVES.short[4][i]!));
+    expect([1, 2, 3, 4, 5, 6].map((k) => seatObjectivesAt("standard", k, 4))).toEqual([2, 2, 3, 3, 3, 5]);
+  });
+
+  it("never returns more than MAX_SEAT_OBJECTIVES", () => {
+    expect(MAX_SEAT_OBJECTIVES).toBe(5);
+    for (const length of Object.keys(RUN_LENGTHS) as RunLength[]) {
+      for (let k = 1; k <= RUN_LENGTHS[length].camps; k++) {
+        for (const players of [3, 4, 5]) expect(seatObjectivesAt(length, k, players)).toBeLessThanOrEqual(MAX_SEAT_OBJECTIVES);
+      }
+    }
+    expect(seatObjectivesAt("long", 7, 5)).toBe(5);
   });
 
   it("refuses a camp the run length does not have", () => {
@@ -114,5 +130,25 @@ describe("objectiveSlotsFor", () => {
         }
       }
     }
+  });
+});
+
+describe("round 2 numbers", () => {
+  it("starts the crew with 5 supplies and holds 6 at most (A2)", () => {
+    expect([SUPPLIES_START, SUPPLIES_MAX]).toEqual([5, 6]);
+  });
+
+  it("spares 3 players' whispers from Rain and 2 from a Downpour (A3)", () => {
+    expect([WASHES.rain.spared, WASHES.downpour.spared]).toEqual([3, 2]);
+    expect([3, 4, 5].map((players) => Math.max(0, players - WASHES.rain.spared))).toEqual([0, 1, 2]);
+    expect([3, 4, 5].map((players) => Math.max(0, players - WASHES.downpour.spared))).toEqual([1, 2, 3]);
+  });
+
+  it("gives every seat 2 whispers a camp (A4)", () => {
+    expect(WHISPERS_PER_CAMP).toBe(2);
+  });
+
+  it("pays 1 coin for a failed attempt (A5)", () => {
+    expect(FAILED_ATTEMPT_COINS).toBe(1);
   });
 });

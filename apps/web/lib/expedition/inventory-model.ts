@@ -1,5 +1,6 @@
 import type { ExpeditionItemView, ExpeditionView } from "@games/rules";
 import { BALANCE_DISPLAY, SOURCE_DISPLAY } from "@games/rules";
+import type { ItemRarity } from "./rarity";
 import { packCellObjectId, packObjectId, slotObjectId } from "./expedition-ids";
 import { choiceFor, currentStep, isPicked, type LocalUiState } from "./local-ui";
 import { sourceName, usesLabel, yourSourceId } from "./source-text";
@@ -20,7 +21,7 @@ export interface InventoryItem {
   text: string;
   /** What is left: "Single use", "Once per camp", "1 of 2 charges", "Always on". */
   uses: string;
-  rare: boolean;
+  rarity: ItemRarity;
   /** A choice of the power you are aiming (a sale, a gift). */
   targetable: boolean;
   /** Already picked by the power you are aiming (Pack Animal's item out). */
@@ -77,7 +78,7 @@ function itemOf(view: ExpeditionView, ui: LocalUiState, item: ExpeditionItemView
     name: sourceName(item.itemId),
     text: display?.text ?? "",
     uses: usesLabel(item.itemId, item.remaining).full,
-    rare: display?.item?.rarity === "rare",
+    rarity: display?.item?.rarity ?? "common",
     targetable,
     selected: isPicked(ui, "item", item.uid),
     tag: targetable && selling && sellsFor !== undefined ? `+${sellsFor}` : null,

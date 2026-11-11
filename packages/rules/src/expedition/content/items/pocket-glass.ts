@@ -7,10 +7,10 @@ export const pocketGlass = defineItem({
   price: 1,
   exclusiveTo: "pack-rat",
   uses: { kind: "single-use" },
-  text: "See a random card in a teammate's hand.",
+  text: "See 2 random cards in a teammate's hand.",
   active: itemAbility({
     window: "between-tricks",
     targets: [{ kind: "hand" }],
-    apply: (ctx) => ctx.randomCards(ctx.targets[0].seatId, 1).map((cardId) => ({ op: "reveal", cardId, audience: [ctx.self] })),
+    apply: (ctx) => ctx.randomCards(ctx.targets[0].seatId, 2).map((cardId) => ({ op: "reveal", cardId, audience: [ctx.self] })),
   }),
 });

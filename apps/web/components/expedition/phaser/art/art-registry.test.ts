@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { MOD_DISPLAY } from "@games/rules";
-import { ART, backdropArtId, fittedFallbackLabel, crewArtId, resolveArt, sourceArtId, stopArtId, tableOf, type ArtId } from "./art-registry";
+import { ART, PLACEHOLDER_SOURCE_ICONS, backdropArtId, fittedFallbackLabel, crewArtId, resolveArt, sourceArtId, stopArtId, tableOf, type ArtId } from "./art-registry";
 import { ART_FILES } from "./art-files.generated";
 
 const SPRITES_DIR = fileURLToPath(new URL("../../../../public/expedition/sprites/", import.meta.url));
@@ -78,8 +78,9 @@ describe("ART and ART_FILES", () => {
     expect(tableOf("nowhere")).toBe("jungle");
   });
 
-  it("no two entries share a file", () => {
-    const files = (Object.keys(ART) as ArtId[]).map((id) => ART[id].file);
+  it("no two entries share a file, bar the marked placeholders", () => {
+    const placeholders = Object.keys(PLACEHOLDER_SOURCE_ICONS).map((id) => `source-${id}`);
+    const files = (Object.keys(ART) as ArtId[]).filter((id) => !placeholders.includes(id)).map((id) => ART[id].file);
     expect(files.length - new Set(files).size).toBe(0);
   });
 });

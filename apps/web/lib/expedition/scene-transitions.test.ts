@@ -48,7 +48,7 @@ function loadout(index: number, overrides: Partial<ExpeditionCampPreviewView> = 
 }
 
 function shop(next: number, camp: ExpeditionCampPreviewView = preview({ index: next, shop: true })): ExpeditionStageView {
-  return { tag: "shop", next, camp, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] };
+  return { tag: "shop", next, camp, shop: { stock: [], yourUpgrades: [], shares: [], pot: 0 }, readySeatIds: [] };
 }
 
 function view(stage: ExpeditionStageView, overrides: Partial<ExpeditionView> = {}): ExpeditionView {

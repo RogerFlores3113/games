@@ -2,7 +2,7 @@ import { ability, defineCharacter, definePower, defineUpgrade } from "../source-
 import type { ToolkitOp } from "../../run/toolkit";
 
 /** Treasure Map: special drafts per player, their shape, and the coins found. */
-const TREASURE = { drafts: 2, shape: { options: 3, bundleSize: 1, exclusive: 0, rareChance: 50 }, coins: 10 } as const;
+const TREASURE = { drafts: 2, shape: { options: 3, bundleSize: 1, exclusive: 0, odds: { rare: 40, uncommon: 40 } }, coins: 10 } as const;
 
 export const cartographer = defineCharacter({
   id: "cartographer",

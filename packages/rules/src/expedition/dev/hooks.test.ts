@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SUPPLIES_MAX } from "../run/balance";
 import { expeditionGame } from "../adapter/adapter";
 import { createRun } from "../run/lifecycle";
 import { expeditionDevHooks as hooks } from "./hooks";
@@ -87,7 +88,7 @@ describe("expeditionDevHooks", () => {
     expect(hooks.runShortcut(fresh(), "toString", {})).toEqual({ ok: false, error: "unknown shortcut toString" });
     expect(hooks.runShortcut(fresh(), "set-supplies", { supplies: "many" })).toEqual({
       ok: false,
-      error: "supplies must be a whole number from 0 to 4",
+      error: `supplies must be a whole number from 0 to ${SUPPLIES_MAX}`,
     });
   });
 
@@ -95,7 +96,7 @@ describe("expeditionDevHooks", () => {
     const result = hooks.runShortcut(fresh(), "give-item", { seat: "a", item: "bait" });
     expect(result.ok).toBe(true);
     const bad = hooks.runShortcut({ ...fresh(), supplies: -1 }, "give-item", { seat: "a", item: "bait" });
-    expect(bad).toEqual({ ok: false, error: "shortcut give-item produced an invalid state: supplies must be a whole number from 0 to 4, got -1" });
+    expect(bad).toEqual({ ok: false, error: `shortcut give-item produced an invalid state: supplies must be a whole number from 0 to ${SUPPLIES_MAX}, got -1` });
   });
 
   it("moves the milestone only when a camp settles or the run ends", () => {

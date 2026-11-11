@@ -75,6 +75,15 @@ function crewFor(def: SourceDef, seed: string, camp = 1, seatIds: readonly strin
   });
 }
 
+/** Whether some combination of the key's target choices is accepted now (a
+ * canTarget rule may refuse every pick in a state where the window is open). */
+function someChoiceAccepted(state: RunState, key: string): boolean {
+  const status = abilityStatus(state, "p0", key, CATALOG);
+  if (status === null || !status.usable) return false;
+  const combos = status.steps.reduce<string[][]>((acc, step) => acc.flatMap((prefix) => step.choices.map((c) => [...prefix, c])), [[]]);
+  return combos.some((targets) => useAbility(state, "p0", key, targets, CATALOG).ok);
+}
+
 /** Walks random legal actions from a fresh crew until p0 can use `def`. p0
  * never uses that source on the walk, so the found state is its first use.
  * Four seats first; then three, whose smaller camps random play clears more
@@ -86,7 +95,7 @@ function findUsable(def: SourceDef): RunState {
     let state = crewFor(def, `${def.id}-${attempt}`, [1, 3, 4][attempt % 3], attempt < 60 ? SEATS : SEATS.slice(0, 3));
     for (let step = 0; step < 400 && state.stage.tag !== "ended"; step++) {
       const status = currentStamp(state) === null ? null : abilityStatus(state, "p0", key, CATALOG);
-      if (status?.usable) return state;
+      if (status?.usable && someChoiceAccepted(state, key)) return state;
       const legal = enumerateLegalRunActions(state, CATALOG).filter(
         (c) =>
           !(c.seatId === "p0" && c.action.type === "use-ability" && c.action.sourceKey === key) &&
@@ -140,13 +149,13 @@ function withLedger(state: RunState, seatId: string, extra: readonly LedgerEntry
 const USABLE = new Map<string, RunState>(ACTIVE_SOURCES.map((def) => [def.id, findUsable(def)]));
 
 describe("source shape", () => {
-  it("has 9 characters, 2 powers, 26 upgrades and 17 items with unique ids", () => {
+  it("has 9 characters, 2 powers, 26 upgrades and 19 items with unique ids", () => {
     const kinds = SOURCES.map((def) => def.kind);
     expect(kinds.filter((k) => k === "character")).toHaveLength(9);
     expect(kinds.filter((k) => k === "power")).toHaveLength(2);
     expect(kinds.filter((k) => k === "upgrade")).toHaveLength(26);
-    expect(kinds.filter((k) => k === "item")).toHaveLength(17);
-    expect(new Set(SOURCES.map((def) => def.id)).size).toBe(54);
+    expect(kinds.filter((k) => k === "item")).toHaveLength(19);
+    expect(new Set(SOURCES.map((def) => def.id)).size).toBe(56);
   });
 
   it.each(SOURCES.map((def) => [def.id, def] as const))("%s: text is one plain sentence about the effect", (_id, def) => {
@@ -169,13 +178,15 @@ describe("source shape", () => {
     expect(def.active === undefined).toBe(def.uses === undefined);
     expect(def.active === undefined).toBe(def.passive !== undefined);
     if (def.active !== undefined) expect("limit" in def.active).toBe(false);
-    expect(["common", "rare"]).toContain(def.rarity);
+    expect(["common", "uncommon", "rare"]).toContain(def.rarity);
     expect(Number.isInteger(def.price) && def.price > 0).toBe(true);
   });
 
   it("the catalogue uses every target kind", () => {
     const used = new Set(ACTIVE_SOURCES.flatMap((def) => def.active!.targets.map((spec) => spec.kind)));
-    expect([...used].sort()).toEqual(Object.keys(TARGET_KINDS).sort());
+    // The Signal Flare no longer picks a completed objective; the kind stays for the next item that does.
+    const unused = ["completed-objective"];
+    expect([...used, ...unused].sort()).toEqual(Object.keys(TARGET_KINDS).sort());
   });
 });
 

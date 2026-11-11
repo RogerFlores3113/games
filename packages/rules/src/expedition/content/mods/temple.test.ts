@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { toExpeditionPlayerView } from "../../adapter/view";
 import { checkCampOutcome } from "../../camp";
 import { abilityStatus } from "../../run/abilities";
+import { PAYOUT, seatObjectivesAt } from "../../run/balance";
 import { CATALOG } from "../../run/catalog";
-import { rulesFor } from "../../run/compose";
+import { composeRules, rulesFor } from "../../run/compose";
 import { campIndex } from "../../run/plan";
 import { setupRun, testCatalog } from "../../run/run-test-support";
+import { baseRunHooks } from "../../run/run-rules";
 import { campStack } from "../../run/stack";
 import { applyRunAction } from "../../run/stages/registry";
 import type { RunAt, RunLength, RunState } from "../../run/types";
@@ -93,7 +95,7 @@ describe("the temple", () => {
 
   it("fails the camp once the Sun leaves play without pressing the last plate", () => {
     const early = templeCamp({ completedTricks: [led(0, card("s", SUN))], currentTrick: nextTrick(1) });
-    expect(outcome(early)).toEqual({ status: "failed", failedObjectiveIds: [], failedGoalIds: ["temple"] });
+    expect(outcome(early)).toEqual({ status: "failed", failedObjectiveIds: [], failedGoalIds: ["temple:sun"] });
   });
 
   it("adds a Sun objective beside the seat objectives", () => {
@@ -105,8 +107,9 @@ describe("the temple", () => {
     }, run);
     if (dealt.stage.tag !== "camp") throw new Error("expected a dealt camp");
     const targets = dealt.stage.attempt.camp.objectives.map((o) => (o.kind === "win-card" ? o.target : o.kind));
-    expect(targets).toHaveLength(4);
-    expect(targets[3]).toEqual(SUN);
+    const seatObjectives = seatObjectivesAt("short", 4, SEATS.length);
+    expect(targets).toHaveLength(seatObjectives + 1);
+    expect(targets[seatObjectives]).toEqual(SUN);
   });
 });
 
@@ -126,7 +129,7 @@ describe("the temple's skip", () => {
     const used = applyRunAction(after, "p1", { type: "use-ability", sourceKey: "temple", targets: ["objective:o2"] }, catalog);
     if (!used.ok) throw new Error(used.error);
     // The last open objective dropped and every plate pressed: the camp clears.
-    expect(used.state.history).toEqual([{ camp: 2, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 7 }]);
+    expect(used.state.history).toEqual([{ camp: 2, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap }]);
   });
 
   it("shows every seat the crew's token in its usage: not earned, then 1 left, then used", () => {
@@ -149,21 +152,18 @@ describe("the temple's skip", () => {
     expect(applyRunAction(used.state, "p1", { type: "use-ability", sourceKey: "temple", targets: ["objective:o2"] }, catalog)).toEqual({ ok: false, error: "ability_spent" });
   });
 
-  it("holds rescue for every seat while unspent, and a spent token ends the wait", () => {
+  it("is refused in the rescue window and still works between tricks", () => {
     const lost = (id: string, rank: number): Objective => ({ id, kind: "win-card", target: std("clubs", rank), ownerSeatId: "p2" });
-    // p0 won the clubs 2 and 3 that p2 needed: two failed objectives.
-    const run = templeCamp({ objectives: [winSun("o1", "p0"), lost("o2", 2), lost("o3", 3)], completedTricks: [...plated, led(2, card("s", SUN))], currentTrick: nextTrick(3) });
-    expect(gatedPendingSeatIds(run, catalog)).toEqual(["p0", "p1", "p2"]);
+    // p0 won the clubs 2 that p2 needed: one failed objective, the Sun already won, so the camp waits in rescue.
+    const rescue = templeCamp({ objectives: [winSun("o1", "p0"), lost("o2", 2)], completedTricks: [...plated, led(2, card("s", SUN))], currentTrick: nextTrick(3) });
+    expect(abilityStatus(rescue, "p1", "temple", catalog)).toMatchObject({ usable: false });
+    expect(applyRunAction(rescue, "p1", { type: "use-ability", sourceKey: "temple", targets: ["objective:o2"] }, catalog).ok).toBe(false);
+    // The Skip does not hold the rescue wait: nobody is pending on it.
+    expect(gatedPendingSeatIds(rescue, catalog)).toEqual([]);
 
-    const passed = applyRunAction(run, "p0", { type: "skip-window" }, catalog);
-    if (!passed.ok) throw new Error(passed.error);
-    expect(gatedPendingSeatIds(passed.state, catalog)).toEqual(["p1", "p2"]);
-
-    const used = applyRunAction(passed.state, "p1", { type: "use-ability", sourceKey: "temple", targets: ["objective:o2"] }, catalog);
-    if (!used.ok) throw new Error(used.error);
-    // o3 still failed and nobody holds a token: the camp settles as failed.
-    expect(used.state.stage.tag).toBe("loadout");
-    expect(used.state.history.map((h) => h.status)).toEqual(["failed"]);
+    // Between tricks, with an open objective still undecided, the same token drops it.
+    const between = templeCamp({ objectives: [winSun("o1", "p0"), open], hands, completedTricks: [...plated, led(2, card("s", SUN))], currentTrick: nextTrick(3) });
+    expect(abilityStatus(between, "p1", "temple", catalog)).toMatchObject({ usable: true });
   });
 });
 
@@ -178,5 +178,55 @@ describe("temple helpers", () => {
     expect(helpers("standard", 6)).toEqual(["tiger"]);
     expect(helpers("long", 8)).toEqual(["tiger", "tornado"]);
     expect(helpers("long", 7)).toEqual([]);
+  });
+});
+
+describe("the temple's play warning", () => {
+  const PATH_SPADES_CLUBS = "Playing the Sun now fails the Temple: lead spades, then clubs first.";
+  const hands = (p0: ExpeditionCard[], p1: ExpeditionCard[] = [card("p1c", std("hearts", 5))]) => [
+    { seatId: "p0", cards: p0 },
+    { seatId: "p1", cards: p1 },
+    { seatId: "p2", cards: [card("p2c", std("hearts", 6))] },
+  ];
+  const warn = (run: RunAt<"camp">, seatId: string, cardId: string) => rulesFor(run, catalog).playWarning(run.stage.attempt.camp, seatId, cardId);
+  const plated = [led(0, card("a", std("spades", 4))), led(1, card("b", std("clubs", 4)))];
+
+  it("warns on the Sun while its plate is not the next one, naming the plates left", () => {
+    const run = templeCamp({ hands: hands([card("sun", SUN), card("h9", std("hearts", 9))]) });
+    expect(warn(run, "p0", "sun")).toBe(PATH_SPADES_CLUBS);
+    const one = templeCamp({ hands: hands([card("sun", SUN)]), completedTricks: [plated[0]!], currentTrick: nextTrick(1) });
+    expect(warn(one, "p0", "sun")).toBe("Playing the Sun now fails the Temple: lead clubs first.");
+    expect(PATH_SPADES_CLUBS.length).toBeLessThan(80);
+  });
+
+  it("warns on a follow too, and says nothing for the Sun led on its own plate or any other card", () => {
+    const ready = templeCamp({ hands: hands([card("sun", SUN), card("h9", std("hearts", 9))]), completedTricks: plated, currentTrick: nextTrick(2) });
+    expect(warn(ready, "p0", "sun")).toBeNull();
+    expect(warn(ready, "p0", "h9")).toBeNull();
+    const follow = templeCamp({
+      hands: hands([card("sun", SUN)]),
+      completedTricks: plated,
+      currentTrick: { index: 2, leaderSeatId: "p1", plays: [{ seatId: "p1", card: card("l", std("hearts", 2)) }] },
+    });
+    expect(warn(follow, "p0", "sun")).toBe("Playing the Sun now fails the Temple: it must lead.");
+    expect(warn(templeCamp({ hands: hands([card("h9", std("hearts", 9))]) }), "p0", "h9")).toBeNull();
+  });
+
+  it("is a view field of the viewer's own hand only: another seat's Sun never carries one to the viewer", () => {
+    const run = templeCamp({ hands: hands([card("hidden-sun", SUN)], [card("p1c", std("hearts", 5))]) });
+    const own = toExpeditionPlayerView(run, "p0", catalog);
+    const other = toExpeditionPlayerView(run, "p1", catalog);
+    if (own.stage.tag !== "camp" || other.stage.tag !== "camp") throw new Error("expected a camp view");
+    expect(own.stage.attempt.camp.yourHand.map((c) => [c.id, c.warning])).toEqual([["hidden-sun", PATH_SPADES_CLUBS]]);
+    expect(other.stage.attempt.camp.yourHand.map((c) => [c.id, c.warning])).toEqual([["p1c", null]]);
+    expect(JSON.stringify(other)).not.toContain("Playing the Sun");
+    expect(JSON.stringify(other)).not.toContain("hidden-sun");
+  });
+
+  it("a mod's warning wins by layer order: the first non-null answer stays", () => {
+    const run = templeCamp({ hands: hands([card("sun", SUN)]) });
+    const composed = composeRules([{ playWarning: (prev) => (camp, seatId, cardId) => prev(camp, seatId, cardId) ?? "first" }, { playWarning: (prev) => (camp, seatId, cardId) => prev(camp, seatId, cardId) ?? "second" }]);
+    expect(composed.playWarning(run.stage.attempt.camp, "p0", "sun")).toBe("first");
+    expect(baseRunHooks.playWarning(run.stage.attempt.camp, "p0", "sun")).toBeNull();
   });
 });

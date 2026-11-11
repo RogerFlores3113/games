@@ -241,7 +241,7 @@ describe("muster", () => {
         objectId: "draft:leader",
         name: "The Leader",
         theme: "Communicates",
-        power: { sourceId: "leader", name: "Megaphone", text: "Whisper twice each camp.", badges: ["Always on"] },
+        power: { sourceId: "leader", name: "Megaphone", text: "Whisper once more each camp.", badges: ["Always on"] },
         more: [],
         takenBy: null,
         yours: false,
@@ -280,8 +280,8 @@ describe("draft", () => {
           objectId: "bundle:0",
           name: "Rain Poncho + Trail Map",
           items: [
-            { itemId: "rain-poncho", objectId: "bundle-item:0:0", name: "Rain Poncho", text: "Whisper once more this camp.", uses: "2 charges", rare: false, exclusive: false },
-            { itemId: "trail-map", objectId: "bundle-item:0:1", name: "Trail Map", text: "Swap all your open objectives with a teammate's.", uses: "Single use", rare: true, exclusive: false },
+            { itemId: "rain-poncho", objectId: "bundle-item:0:0", name: "Rain Poncho", text: "Whisper once more this camp, and rain can't wash your whispers this camp.", uses: "2 charges", rarity: "uncommon", exclusive: false },
+            { itemId: "trail-map", objectId: "bundle-item:0:1", name: "Trail Map", text: "Swap all your open objectives with a teammate's.", uses: "Single use", rarity: "rare", exclusive: false },
           ],
         },
         {
@@ -295,9 +295,9 @@ describe("draft", () => {
               itemId: "heavy-pack",
               objectId: "bundle-item:1:0",
               name: "Heavy Pack",
-              text: "Whisper once more each camp; failing costs the crew 1 more supply, and packs don't stack.",
+              text: "Whisper once more each camp; a failed camp costs 2 coins, and packs don't stack.",
               uses: "Always on",
-              rare: false,
+              rarity: "uncommon",
               exclusive: false,
             },
           ],
@@ -504,7 +504,7 @@ describe("item bar and inventory", () => {
       slots: [
         {
           objectId: "bar-slot:0",
-          item: { uid: "trained-monkey", itemId: "trained-monkey", objectId: "slot:0", name: "Trained Monkey", text: "Swap a card in your hand with a random card from a teammate's hand.", uses: "Once per camp", rare: false, targetable: false, selected: false, tag: null },
+          item: { uid: "trained-monkey", itemId: "trained-monkey", objectId: "slot:0", name: "Trained Monkey", text: "Swap a card for one a teammate whispered to you, if they still hold it.", uses: "Once per camp", rarity: "rare", targetable: false, selected: false, tag: null },
         },
         { objectId: "bar-slot:1", item: null },
       ],
@@ -541,21 +541,31 @@ describe("shop", () => {
       { stockId: "item1", what: { kind: "item", itemId: "bait" }, price: 3, soldTo: null },
     ],
     yourUpgrades: [{ stockId: "upgrade:leader.delegate", upgradeId: "leader.delegate", price: 8 }],
+    shares: [{ seatId: "s1", coins: 2 }, { seatId: "s2", coins: 3 }, { seatId: "s3", coins: 0 }],
+    pot: 7,
   };
   const shopView = (over: Partial<ExpeditionView> = {}, readySeatIds: string[] = []) => at({ tag: "shop", next: 3, camp: preview(3, { shop: true }), shop, readySeatIds }, over);
 
   it("opens before a shop camp with the camp, the purse, the cap, sold items and your upgrades", () => {
-    const view = shopView({ purse: 7 });
+    // A purse of 7 split among three: 2 each and a pot of 1; you hold 2.
+    const poor = { ...shop, shares: [{ seatId: "s1", coins: 2 }, { seatId: "s2", coins: 2 }, { seatId: "s3", coins: 2 }], pot: 1 };
+    const view = at({ tag: "shop", next: 3, camp: preview(3, { shop: true }), shop: poor, readySeatIds: [] }, { purse: 7 });
     expect(model(view).panel).toEqual({
       kind: "shop",
       next: campPreview(view, preview(3, { shop: true }), "shop"),
       shop: {
         purse: 7,
+        share: 2,
+        pot: 1,
+        give: [
+          { seatId: "s1", name: "Alice", share: 2, enabled: true },
+          { seatId: "s3", name: "Cara", share: 2, enabled: true },
+        ],
         entries: [
-          { stockId: "supplies", objectId: "shop:supplies", infoId: null, sourceId: null, name: "Supplies 3 of 5", detail: "One per failed camp", rare: false, price: 6, buy: { kind: "buy" } },
-          { stockId: "item0", objectId: "shop:item0", infoId: "shop-info:item0", sourceId: "smoke-signal", name: "Smoke Signal", detail: "Rare item", rare: true, price: null, buy: { kind: "status", label: "Sold to Alice" } },
-          { stockId: "item1", objectId: "shop:item1", infoId: "shop-info:item1", sourceId: "bait", name: "Bait", detail: "Common item", rare: false, price: 3, buy: { kind: "buy" } },
-          { stockId: "upgrade:leader.delegate", objectId: "shop:upgrade:leader.delegate", infoId: "shop-info:upgrade:leader.delegate", sourceId: "leader.delegate", name: "Delegate", detail: "Upgrade, +1 whisper", rare: false, price: 8, buy: { kind: "disabled", reason: "Need 1 more" } },
+          { stockId: "supplies", objectId: "shop:supplies", infoId: null, sourceId: null, name: "Supplies 3 of 5", detail: "One per failed camp", rarity: "common", price: 6, buy: { kind: "disabled", reason: "Need 3 more" } },
+          { stockId: "item0", objectId: "shop:item0", infoId: "shop-info:item0", sourceId: "smoke-signal", name: "Smoke Signal", detail: "Rare item", rarity: "rare", price: null, buy: { kind: "status", label: "Sold to Alice" } },
+          { stockId: "item1", objectId: "shop:item1", infoId: "shop-info:item1", sourceId: "bait", name: "Bait", detail: "Common item", rarity: "common", price: 3, buy: { kind: "buy" } },
+          { stockId: "upgrade:leader.delegate", objectId: "shop:upgrade:leader.delegate", infoId: "shop-info:upgrade:leader.delegate", sourceId: "leader.delegate", name: "Delegate", detail: "Upgrade", rarity: "common", price: 8, buy: { kind: "disabled", reason: "Need 5 more" } },
         ],
       },
     });
@@ -789,7 +799,7 @@ describe("tooltip", () => {
     const poncho = model(at(draftStage({ yourOffer: { kind: "standard", bundles: [["rain-poncho"]] } })), ui({ tooltipSourceId: "rain-poncho" })).tooltip;
     expect(poncho).toEqual({
       title: "Rain Poncho",
-      text: "Whisper once more this camp.",
+      text: "Whisper once more this camp, and rain can't wash your whispers this camp.",
       badges: ["Between tricks", "2 charges"],
       reason: null,
     });

@@ -62,7 +62,7 @@ describe("buildInventory", () => {
       name: "Bait",
       text: "A card on the table can't win this trick.",
       uses: "Single use",
-      rare: false,
+      rarity: "common",
       targetable: false,
       selected: false,
       tag: null,

@@ -1,9 +1,10 @@
 // Item instances in the loadout: equip and its refusals, the ready re-check,
-// what is live, and upgrades' extra whisper.
+// what is live, and the upgrade whisper bonus (none now).
 
 import { describe, expect, it } from "vitest";
 import { defineCharacter, defineItem, defineUpgrade, itemAbility } from "../content/source-def";
 import { attemptOf } from "./attempt";
+import { WHISPERS_PER_CAMP, WHISPERS_PER_UPGRADE } from "./balance";
 import { rulesFor } from "./compose";
 import { advanceTo, plainItem, setupRun, testCatalog } from "./run-test-support";
 import { applyRunAction } from "./stages/registry";
@@ -111,9 +112,9 @@ describe("what is live", () => {
   it("a backpack item's passive does nothing; equipped, it applies", () => {
     const run = loadout({ p0: ["item-a", "item-b", "loud"] });
     expect(seat0(run).equipped).toEqual(["it0", "it1"]);
-    expect(rulesFor(run, catalog).whispersPerCamp(run, "p0")).toBe(1);
+    expect(rulesFor(run, catalog).whispersPerCamp(run, "p0")).toBe(2);
     const worn = act(run, "p0", { type: "equip", itemUids: ["it2"] });
-    expect(rulesFor(worn, catalog).whispersPerCamp(worn, "p0")).toBe(2);
+    expect(rulesFor(worn, catalog).whispersPerCamp(worn, "p0")).toBe(3);
   });
 
   it("a backpack item's ability cannot be used", () => {
@@ -121,9 +122,9 @@ describe("what is live", () => {
     expect(applyRunAction(run, "p0", { type: "use-ability", sourceKey: "it0", targets: [] }, catalog)).toEqual({ ok: false, error: "not_owned" });
   });
 
-  it("an upgrade gives its owner one more whisper per camp", () => {
+  it("an upgrade gives its owner no more whispers per camp", () => {
     const run = loadout({}, { upgrades: { p0: "plain-1.a" } });
-    expect(SEATS.map((seatId) => rulesFor(run, catalog).whispersPerCamp(run, seatId))).toEqual([2, 1, 1]);
+    expect(SEATS.map((seatId) => rulesFor(run, catalog).whispersPerCamp(run, seatId))).toEqual([WHISPERS_PER_CAMP + WHISPERS_PER_UPGRADE, WHISPERS_PER_CAMP, WHISPERS_PER_CAMP]);
   });
 
   it("two instances of one item spend their uses apart", () => {

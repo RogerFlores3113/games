@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SUPPLIES_MAX } from "../run/balance";
 import { cardLabel } from "../deck";
 import { CATALOG } from "../run/catalog";
 import { attemptOf, withAttempt } from "../run/attempt";
@@ -94,10 +95,10 @@ describe("checkRunState", () => {
     const loadout = DEV_SHORTCUTS["jump-to-camp"].apply(createRun({ seatIds: SEATS, seed: "check" }), { length: "standard", camp: 1, stage: "loadout" }, CATALOG);
     const run: RunState = { ...loadout, supplies: -1, stage: { ...(loadout.stage as Extract<RunState["stage"], { tag: "loadout" }>), ready: { zed: true } } };
     expect(checkRunState(run, CATALOG)).toEqual([
-      "supplies must be a whole number from 0 to 4, got -1",
+      `supplies must be a whole number from 0 to ${SUPPLIES_MAX}, got -1`,
       "the ready list holds unknown seat zed",
     ]);
-    expect(checkRunState({ ...loadout, supplies: 5 }, CATALOG)).toEqual(["supplies must be a whole number from 0 to 4, got 5"]);
+    expect(checkRunState({ ...loadout, supplies: SUPPLIES_MAX + 1 }, CATALOG)).toEqual([`supplies must be a whole number from 0 to ${SUPPLIES_MAX}, got ${SUPPLIES_MAX + 1}`]);
   });
 
   it("flags a muster lock-in without a character and a ballot, or for an unknown seat", () => {

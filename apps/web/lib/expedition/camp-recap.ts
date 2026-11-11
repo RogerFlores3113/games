@@ -75,7 +75,7 @@ function goalReason(goalId: string, nameOf: NameOf): string {
   const [kind, seatId] = goalId.split(":");
   if ((kind === "hermit" || kind === "camouflage") && seatId !== undefined) return `${nameOf(seatId)} won a trick`;
   if (kind === "crocodile") return "The crocodile's mark won a trick";
-  if (kind === "temple") return "The plates were not all pressed";
+  if (kind === "temple") return seatId === "sun" ? "The Sun was played before its plate" : "The plates were not all pressed";
   return "A camp rule failed";
 }
 
@@ -158,7 +158,8 @@ export function lastCampStrip(recap: ExpeditionCampRecapView | null, nameOf: Nam
   } else {
     const spent = recap.supplyCost.reduce((sum, p) => sum + p.amount, 0);
     const cost = supplyCostLine(recap) ?? `-${spent} ${spent === 1 ? "supply" : "supplies"}`;
-    head = [`Last camp: Camp ${recap.camp}${tryText} lost`, lossLine(recap, nameOf), cost].filter((p): p is string => p !== null).join(". ");
+    const consolation = recap.coins > 0 ? `+${recap.coins} ${recap.coins === 1 ? "coin" : "coins"} consolation` : null;
+    head = [`Last camp: Camp ${recap.camp}${tryText} lost`, lossLine(recap, nameOf), cost, consolation].filter((p): p is string => p !== null).join(". ");
   }
   const lines = [head, finalTrickLine(recap, nameOf), objectivesLine(recap, nameOf)].filter((l): l is string => l !== null);
   return { tone: recap.status === "cleared" ? "good" : "bad", lines };

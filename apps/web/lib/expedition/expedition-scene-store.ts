@@ -197,7 +197,9 @@ export function createExpeditionSceneStore(opts: {
       updateLocalUi(fn) {
         const { server, localUi } = get();
         if (server === null) return;
-        applyLocalUi(fn(localUi, server.game));
+        const next = fn(localUi, server.game);
+        // Starting or changing a targeting is another action: it ends a pending confirm.
+        applyLocalUi(next.pendingPlay === localUi.pendingPlay && next.targeting !== localUi.targeting ? { ...next, pendingPlay: null } : next);
       },
 
       setCardPack(id) {
@@ -212,6 +214,8 @@ export function createExpeditionSceneStore(opts: {
       dispatch(request) {
         const { server, reconnecting, transition } = get();
         if (server === null || reconnecting || transition?.phase === "sign") return;
+        // Any action ends a pending confirm of a warned play.
+        if (get().localUi.pendingPlay !== null) applyLocalUi({ ...get().localUi, pendingPlay: null });
         opts.onAction(request);
       },
 

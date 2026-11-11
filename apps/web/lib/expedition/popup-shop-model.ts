@@ -1,5 +1,5 @@
 import type { ExpeditionView } from "@games/rules";
-import { SOURCE_DISPLAY } from "@games/rules";
+import { rarityOf, type ItemRarity } from "./rarity";
 import type { LocalUiState } from "./local-ui";
 import { currentStep } from "./local-ui";
 import { sourceName, yourSourceId } from "./source-text";
@@ -22,7 +22,7 @@ export interface PopupPick {
 
 export interface PopupShopModel {
   title: string;
-  rows: { itemId: string; name: string; price: number; rare: boolean; infoId: string; buys: PopupPick[] }[];
+  rows: { itemId: string; name: string; price: number; rarity: ItemRarity; infoId: string; buys: PopupPick[] }[];
   refresh: PopupPick | null;
   purse: number;
 }
@@ -48,7 +48,7 @@ export function buildPopupShop(view: ExpeditionView, ui: LocalUiState, nameOf: (
     const [place, itemId, price, seatId] = rest as [string, string, string, string];
     let row = rows.find((r) => r.infoId === `popup-info:${place}`);
     if (row === undefined) {
-      row = { itemId, name: sourceName(itemId), price: Number(price), rare: SOURCE_DISPLAY[itemId]?.item?.rarity === "rare", infoId: `popup-info:${place}`, buys: [] };
+      row = { itemId, name: sourceName(itemId), price: Number(price), rarity: rarityOf(itemId), infoId: `popup-info:${place}`, buys: [] };
       rows.push(row);
     }
     row.buys.push(pick(choiceId, seatId === view.yourSeatId ? "You" : nameOf(seatId)));

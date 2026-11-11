@@ -7,6 +7,8 @@
  * Every value comes from the `Inventory` model and every change goes
  * through the handlers, so the camp scene can open the same window.
  */
+import { rarityTag } from "../../../../lib/expedition/rarity";
+import { rarityColor } from "./rarity-color";
 import type Phaser from "phaser";
 import { CURSOR } from "../cursors";
 import { PALETTE, toPhaserColor } from "../palette";
@@ -163,7 +165,7 @@ export class InventoryWindow {
     if (item !== null) {
       const art = sourceArtId(item.itemId);
       if (art !== null) box.add(placeArt(scene, art, rect.w / 2, rect.h / 2).setScale(ICON_SCALE));
-      if (item.rare) box.add(scene.add.rectangle(2, 2, rect.w - 4, rect.h - 4, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(PALETTE.rain)));
+      if (item.rarity !== "common") box.add(scene.add.rectangle(2, 2, rect.w - 4, rect.h - 4, 0, 0).setOrigin(0, 0).setStrokeStyle(1, toPhaserColor(rarityColor(item.rarity))));
       if (item.targetable) box.add(scene.add.rectangle(1, 1, rect.w - 2, rect.h - 2, 0, 0).setOrigin(0, 0).setStrokeStyle(2, toPhaserColor(PALETTE.turn)));
       if (item.selected) {
         box.add(scene.add.rectangle(1, 1, rect.w - 2, rect.h - 2, 0, 0).setOrigin(0, 0).setStrokeStyle(2, toPhaserColor(PALETTE.sun)));
@@ -233,8 +235,8 @@ export class InventoryWindow {
         ? wrapWords(this.model?.locked || this.model?.aiming != null ? READ_HINT : INFO_HINT, chars).map((line) => ({ text: line, color: PALETTE.textDim }))
         : [
             ...wrapWords(item.name, chars).map((line) => ({ text: line, color: PALETTE.sun })),
-            { text: fitLabel(item.uses, chars), color: item.rare ? PALETTE.rain : PALETTE.textDim },
-            ...(item.rare ? [{ text: "Rare", color: PALETTE.rain }] : []),
+            { text: fitLabel(item.uses, chars), color: rarityColor(item.rarity) },
+            ...(rarityTag(item.rarity) !== null ? [{ text: rarityTag(item.rarity)!, color: rarityColor(item.rarity) }] : []),
             { text: "", color: PALETTE.text },
             ...wrapWords(item.text, chars).map((line) => ({ text: line, color: PALETTE.text })),
           ];

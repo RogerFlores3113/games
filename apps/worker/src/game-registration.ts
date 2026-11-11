@@ -84,6 +84,10 @@ function mapExpeditionError(error: RunError): GameErrorDetail {
       return { gameId: EXPEDITION_GAME_ID, code: "no_joker_first_lead" };
     case "objective_not_available":
       return { gameId: EXPEDITION_GAME_ID, code: "objective_not_available" };
+    case "objective_conflict":
+      return { gameId: EXPEDITION_GAME_ID, code: "objective_conflict" };
+    case "objective_reserved":
+      return { gameId: EXPEDITION_GAME_ID, code: "objective_reserved" };
     case "invalid_action":
       return { gameId: EXPEDITION_GAME_ID, code: "invalid_action" };
     case "not_a_seat":
@@ -116,6 +120,8 @@ function mapExpeditionError(error: RunError): GameErrorDetail {
       return { gameId: EXPEDITION_GAME_ID, code: "upgrade_owned" };
     case "not_your_upgrade":
       return { gameId: EXPEDITION_GAME_ID, code: "not_your_upgrade" };
+    case "not_a_teammate":
+      return { gameId: EXPEDITION_GAME_ID, code: "not_a_teammate" };
     case "already_ready":
       return { gameId: EXPEDITION_GAME_ID, code: "already_ready" };
     case "not_owned":

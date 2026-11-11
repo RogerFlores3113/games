@@ -1,5 +1,5 @@
 import type { ExpeditionCampView, ExpeditionCardIdentityView, ExpeditionObjectiveView, ExpeditionTargetKind, ExpeditionView } from "@games/rules";
-import { attemptOf, campHeadline, focusCampIndex, ledSuit, whisperLog, whispersSent } from "./view-access";
+import { attemptOf, campHeadline, focusCampIndex, ledSuit, voidSignals, whisperLog, whispersSent } from "./view-access";
 import { SOURCE_DISPLAY } from "@games/rules";
 import type { CardPackId } from "./card-pack-ids";
 import {
@@ -116,6 +116,9 @@ export interface CardModel {
   /** Why this hand card can't be played right now; null when it can, or
    * for a card that is not in your hand. */
   blockedReason: string | null;
+  /** What playing this card now would cost the crew (a camp rule's warning,
+   * from the server); null when nothing. Only your own cards carry one. */
+  warning: string | null;
   /** Being dragged: the fan keeps an empty slot for it. */
   dragging: boolean;
   /** What the card counts as right now, when not its printed card: the
@@ -493,6 +496,7 @@ function buildTrickPlayModel(
       selected: pick.selected,
       lifted: false,
       blockedReason: null,
+      warning: null,
       dragging: false,
       countsAs,
     },
@@ -595,6 +599,7 @@ function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: Lo
       selected,
       lifted: ui.hoveredCardId === c.id && dragged === null,
       blockedReason: playable ? null : blockedReasonFor(camp, view, c.identity, waitsOn),
+      warning: c.warning,
       dragging: (ui.drag.phase === "dragging" || ui.drag.phase === "playing") && dragged === c.id,
       countsAs: shownAs(c.identity, c.countsAs, c.effectiveRank),
     };
@@ -653,15 +658,22 @@ function buildWhispers(
   );
 
   let sentSoFar = 0;
-  const whisperLines = whispersSent(view).map((l) => {
+  const sentLines = whispersSent(view).map((l) => {
     const to = l.subjectSeatIds[0] ?? "";
-    if (l.washed) return `${l.actorSeatId === you ? "Your" : `${nameOf(l.actorSeatId)}'s`} whisper to ${to === you ? "you" : nameOf(to)} washed away`;
-    if (l.actorSeatId === you) {
+    let line: string;
+    if (l.washed) line = `${l.actorSeatId === you ? "Your" : `${nameOf(l.actorSeatId)}'s`} whisper to ${to === you ? "you" : nameOf(to)} washed away`;
+    else if (l.actorSeatId === you) {
       const card = mineSent[sentSoFar++];
-      return card === undefined ? `You whispered to ${nameOf(to)}` : `You whispered ${cardLabel(card.identity)} to ${nameOf(to)}`;
-    }
-    return `${nameOf(l.actorSeatId)} whispered to ${to === you ? "you" : nameOf(to)}`;
+      line = card === undefined ? `You whispered to ${nameOf(to)}` : `You whispered ${cardLabel(card.identity)} to ${nameOf(to)}`;
+    } else line = `${nameOf(l.actorSeatId)} whispered to ${to === you ? "you" : nameOf(to)}`;
+    return { logIndex: l.logIndex, line };
   });
+  // A Parrot's void signal reads as a line of the whisper log, for the two it was private to.
+  const signalLines = voidSignals(view).map((s) => ({
+    logIndex: s.logIndex,
+    line: s.actorSeatId === you ? `You told ${nameOf(s.toSeatId)} you have no ${s.suit}` : `${nameOf(s.actorSeatId)} has no ${s.suit}`,
+  }));
+  const whisperLines = [...sentLines, ...signalLines].sort((a, b) => a.logIndex - b.logIndex).map((entry) => entry.line);
 
   const shownCards = (attemptOf(view)?.reveals ?? [])
     .filter((r) => r.source !== "whisper" && r.source !== TORNADO_ID)

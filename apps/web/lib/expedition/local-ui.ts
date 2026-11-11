@@ -90,10 +90,13 @@ export interface LocalUiState {
   kitOpen: boolean;
   /** The trail map hangs over the camp (the camp label toggles it). */
   mapOpen: boolean;
+  /** A hand card whose play carries a warning, played once: the second play of
+   * the same card confirms. Any other action clears it. */
+  pendingPlay: string | null;
 }
 
 export function initialLocalUi(): LocalUiState {
-  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipSourceId: null, tooltipObjectiveId: null, tooltipMateSource: null, tooltipModId: null, drag: IDLE_DRAG, trayPage: 0, takenBundle: null, inventoryOpen: null, discardUid: null, tooltipPreviewObjective: null, kitOpen: false, mapOpen: false };
+  return { targeting: null, hoveredCardId: null, lastTrickOpen: false, tooltipSourceId: null, tooltipObjectiveId: null, tooltipMateSource: null, tooltipModId: null, drag: IDLE_DRAG, trayPage: 0, takenBundle: null, inventoryOpen: null, discardUid: null, tooltipPreviewObjective: null, kitOpen: false, mapOpen: false, pendingPlay: null };
 }
 
 function currentHandIds(view: ExpeditionView): string[] {
@@ -281,6 +284,10 @@ export function reconcileLocalUi(ui: LocalUiState, view: ExpeditionView): LocalU
     next = { ...next, hoveredCardId: null };
   }
 
+  if (next.pendingPlay !== null && attemptOf(view)?.camp.yourHand.find((c) => c.id === next.pendingPlay)?.warning == null) {
+    next = { ...next, pendingPlay: null };
+  }
+
   if (next.inventoryOpen !== null && next.inventoryOpen !== inventoryStageKey(view)) {
     next = { ...next, inventoryOpen: null, discardUid: null };
   }
@@ -300,6 +307,11 @@ export function reconcileLocalUi(ui: LocalUiState, view: ExpeditionView): LocalU
  * stage and the camp it is on the way to. */
 export function inventoryStageKey(view: ExpeditionView): string {
   return `${view.stage.tag}:${focusCampIndex(view) ?? 0}`;
+}
+
+/** The card whose warned play awaits its confirming second play, or null. */
+export function setPendingPlay(ui: LocalUiState, cardId: string | null): LocalUiState {
+  return ui.pendingPlay === cardId ? ui : { ...ui, pendingPlay: cardId };
 }
 
 export function setHoveredCard(ui: LocalUiState, cardId: string | null): LocalUiState {
