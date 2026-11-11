@@ -120,6 +120,8 @@ function mapExpeditionError(error: RunError): GameErrorDetail {
       return { gameId: EXPEDITION_GAME_ID, code: "upgrade_owned" };
     case "not_your_upgrade":
       return { gameId: EXPEDITION_GAME_ID, code: "not_your_upgrade" };
+    case "not_a_teammate":
+      return { gameId: EXPEDITION_GAME_ID, code: "not_a_teammate" };
     case "already_ready":
       return { gameId: EXPEDITION_GAME_ID, code: "already_ready" };
     case "not_owned":

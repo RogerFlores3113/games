@@ -32,6 +32,7 @@ const ALL_RUN_ERRORS: readonly RunError[] = [
   "supplies_full",
   "upgrade_owned",
   "not_your_upgrade",
+  "not_a_teammate",
   "already_ready",
   "not_owned",
   "wrong_window",

@@ -75,7 +75,7 @@ function goalReason(goalId: string, nameOf: NameOf): string {
   const [kind, seatId] = goalId.split(":");
   if ((kind === "hermit" || kind === "camouflage") && seatId !== undefined) return `${nameOf(seatId)} won a trick`;
   if (kind === "crocodile") return "The crocodile's mark won a trick";
-  if (kind === "temple") return "The plates were not all pressed";
+  if (kind === "temple") return seatId === "sun" ? "The Sun was played before its plate" : "The plates were not all pressed";
   return "A camp rule failed";
 }
 

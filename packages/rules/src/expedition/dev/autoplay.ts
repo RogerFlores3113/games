@@ -69,7 +69,11 @@ function candidates(run: RunState, seatIds: readonly string[], catalog: Catalog)
       const actor = currentActorSeatId(camp, rulesFor(run, catalog));
       if (actor !== null && seatIds.includes(actor)) {
         for (const open of camp.objectives.filter((o) => o.ownerSeatId === null)) out.push({ seatId: actor, request: { type: "pick-objective", objectiveId: open.id } });
-        for (const card of templeOrder(run as RunAt<"camp">, camp.hands.find((h) => h.seatId === actor)?.cards ?? [], catalog)) out.push({ seatId: actor, request: { type: "play-card", cardId: card.id } });
+        const rules = rulesFor(run, catalog);
+        // A play with no warning comes before any warned one; the order within each holds.
+        const ordered = templeOrder(run as RunAt<"camp">, camp.hands.find((h) => h.seatId === actor)?.cards ?? [], catalog);
+        const warned = (card: ExpeditionCard) => rules.playWarning(camp, actor, card.id) !== null;
+        for (const card of [...ordered.filter((c) => !warned(c)), ...ordered.filter(warned)]) out.push({ seatId: actor, request: { type: "play-card", cardId: card.id } });
       }
       return out;
     }

@@ -2,7 +2,8 @@
 // supply line and SHOP.items single copies, drawn on every visit from the
 // same stream names, so a replay of the shop camp offers the same stock
 // again. Upgrades are not stock: each seat sees its own character's upgrades
-// while it owns none. Every buy spends the shared purse; the Durable Object
+// while it owns none. When the shop opens the purse splits into one share
+// per seat and a crew pot; a buy spends the buyer's share, then the pot; the Durable Object
 // serializes actions, so two buyers never both spend the last coins.
 
 import { DRAFT, SHOP, SUPPLIES_MAX, SUPPLY_PRICE } from "./balance";
@@ -10,7 +11,7 @@ import { rulesFor } from "./compose";
 import { drawItem, openPool } from "./draft";
 import { mintItems, roomFor } from "./items";
 import { STREAMS } from "./rng";
-import type { CampIndex, Catalog, RunAt, RunError, RunState, SeatId, SeatRun } from "./types";
+import type { CampIndex, Catalog, PerSeat, RunAt, RunError, RunState, SeatId, SeatRun } from "./types";
 import { seatOf } from "./usage";
 
 export type StockEntry = {
@@ -91,6 +92,37 @@ export function buy(run: RunAt<"shop">, seatId: SeatId, stockId: string, catalog
       : stockPurchase(run, seatId, entry, catalog);
   if (typeof purchase === "string") return { ok: false, error: purchase };
   const price = priceFor(run, seatId, purchase.price, catalog);
-  if (run.purse < price) return { ok: false, error: "cannot_afford" };
-  return { ok: true, state: purchase.take({ ...run, purse: run.purse - price }) };
+  const share = shareOf(run, seatId);
+  if (share + potOf(run) < price) return { ok: false, error: "cannot_afford" };
+  const fromShare = Math.min(share, price);
+  const shares = { ...run.stage.shares, [seatId]: share - fromShare };
+  return { ok: true, state: purchase.take({ ...run, purse: run.purse - price, stage: { ...run.stage, shares } }) };
+}
+
+/** The shop's purse split: each seat in the crew gets floor(purse / seats)
+ * as its own share; the remainder is the crew pot (potOf). */
+export function splitPurse(run: RunState): PerSeat<number> {
+  const seats = run.seatIds.length;
+  const each = seats === 0 ? 0 : Math.floor(run.purse / seats);
+  return Object.fromEntries(run.seatIds.map((seatId) => [seatId, each]));
+}
+
+/** What `seatId` holds as its own share (never more than the purse). */
+export function shareOf(run: RunAt<"shop">, seatId: SeatId): number {
+  return Math.min(run.stage.shares[seatId] ?? 0, run.purse);
+}
+
+/** The crew pot: the purse less every share, never below 0. */
+export function potOf(run: RunAt<"shop">): number {
+  return Math.max(0, run.purse - run.seatIds.reduce((sum, id) => sum + (run.stage.shares[id] ?? 0), 0));
+}
+
+/** already_ready (the giver is ready), not_a_teammate (unknown or self),
+ * cannot_afford (the share is too small); a ready teammate may receive. */
+export function giveCoins(run: RunAt<"shop">, seatId: SeatId, to: SeatId, coins: number): { readonly ok: true; readonly state: RunState } | { readonly ok: false; readonly error: RunError } {
+  if (Object.hasOwn(run.stage.ready, seatId)) return { ok: false, error: "already_ready" };
+  if (to === seatId || !run.seatIds.includes(to)) return { ok: false, error: "not_a_teammate" };
+  if (!Number.isInteger(coins) || coins < 1 || shareOf(run, seatId) < coins) return { ok: false, error: "cannot_afford" };
+  const shares = { ...run.stage.shares, [seatId]: shareOf(run, seatId) - coins, [to]: (run.stage.shares[to] ?? 0) + coins };
+  return { ok: true, state: { ...run, stage: { ...run.stage, shares } } };
 }

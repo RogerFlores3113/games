@@ -241,7 +241,7 @@ const CampViewSchema = z.strictObject({
   goals: z.array(GoalViewSchema),
   discards: z.array(DiscardViewSchema),
   voidedTricks: z.array(VoidedTrickViewSchema),
-  yourHand: z.array(RankedCardViewSchema),
+  yourHand: z.array(RankedCardViewSchema.extend({ warning: z.string().min(1).nullable() })),
   yourLegalCardIds: z.array(z.string().min(1)),
   handSizes: z.array(HandSizeViewSchema),
   completedTricks: z.array(CompletedTrickViewSchema),
@@ -397,6 +397,8 @@ const StockViewSchema = z.strictObject({
 const ShopViewSchema = z.strictObject({
   stock: z.array(StockViewSchema),
   yourUpgrades: z.array(z.strictObject({ stockId: z.string().min(1), upgradeId: z.string().min(1), price: z.number().int().min(0) })),
+  shares: z.array(z.strictObject({ seatId: z.string().min(1), coins: z.number().int().min(0) })),
+  pot: z.number().int().min(0),
 });
 
 const BallotViewSchema = z.strictObject({ seatId: z.string().min(1), choice: z.string().min(1).nullable() });

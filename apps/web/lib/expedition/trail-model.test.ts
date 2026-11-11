@@ -541,21 +541,31 @@ describe("shop", () => {
       { stockId: "item1", what: { kind: "item", itemId: "bait" }, price: 3, soldTo: null },
     ],
     yourUpgrades: [{ stockId: "upgrade:leader.delegate", upgradeId: "leader.delegate", price: 8 }],
+    shares: [{ seatId: "s1", coins: 2 }, { seatId: "s2", coins: 3 }, { seatId: "s3", coins: 0 }],
+    pot: 7,
   };
   const shopView = (over: Partial<ExpeditionView> = {}, readySeatIds: string[] = []) => at({ tag: "shop", next: 3, camp: preview(3, { shop: true }), shop, readySeatIds }, over);
 
   it("opens before a shop camp with the camp, the purse, the cap, sold items and your upgrades", () => {
-    const view = shopView({ purse: 7 });
+    // A purse of 7 split among three: 2 each and a pot of 1; you hold 2.
+    const poor = { ...shop, shares: [{ seatId: "s1", coins: 2 }, { seatId: "s2", coins: 2 }, { seatId: "s3", coins: 2 }], pot: 1 };
+    const view = at({ tag: "shop", next: 3, camp: preview(3, { shop: true }), shop: poor, readySeatIds: [] }, { purse: 7 });
     expect(model(view).panel).toEqual({
       kind: "shop",
       next: campPreview(view, preview(3, { shop: true }), "shop"),
       shop: {
         purse: 7,
+        share: 2,
+        pot: 1,
+        give: [
+          { seatId: "s1", name: "Alice", share: 2, enabled: true },
+          { seatId: "s3", name: "Cara", share: 2, enabled: true },
+        ],
         entries: [
-          { stockId: "supplies", objectId: "shop:supplies", infoId: null, sourceId: null, name: "Supplies 3 of 5", detail: "One per failed camp", rare: false, price: 6, buy: { kind: "buy" } },
+          { stockId: "supplies", objectId: "shop:supplies", infoId: null, sourceId: null, name: "Supplies 3 of 5", detail: "One per failed camp", rare: false, price: 6, buy: { kind: "disabled", reason: "Need 3 more" } },
           { stockId: "item0", objectId: "shop:item0", infoId: "shop-info:item0", sourceId: "smoke-signal", name: "Smoke Signal", detail: "Rare item", rare: true, price: null, buy: { kind: "status", label: "Sold to Alice" } },
           { stockId: "item1", objectId: "shop:item1", infoId: "shop-info:item1", sourceId: "bait", name: "Bait", detail: "Common item", rare: false, price: 3, buy: { kind: "buy" } },
-          { stockId: "upgrade:leader.delegate", objectId: "shop:upgrade:leader.delegate", infoId: "shop-info:upgrade:leader.delegate", sourceId: "leader.delegate", name: "Delegate", detail: "Upgrade, +1 whisper", rare: false, price: 8, buy: { kind: "disabled", reason: "Need 1 more" } },
+          { stockId: "upgrade:leader.delegate", objectId: "shop:upgrade:leader.delegate", infoId: "shop-info:upgrade:leader.delegate", sourceId: "leader.delegate", name: "Delegate", detail: "Upgrade, +1 whisper", rare: false, price: 8, buy: { kind: "disabled", reason: "Need 5 more" } },
         ],
       },
     });

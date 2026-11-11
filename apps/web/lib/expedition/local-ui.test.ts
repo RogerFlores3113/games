@@ -14,6 +14,7 @@ import {
   selectTarget,
   setHoveredCard,
   setLastTrickOpen,
+  setPendingPlay,
   setTooltipMateSource,
   setTooltipObjective,
   setTooltipSource,
@@ -103,8 +104,8 @@ function makeView(overrides: Partial<ExpeditionView> = {}): ExpeditionView {
           { id: "o3", kind: "no-tricks", ownerSeatId: "p0", status: "done" },
         ],
         yourHand: [
-          { id: "c1", identity: { kind: "standard", suit: "hearts", rank: 12 }, effectiveRank: null, countsAs: null },
-          { id: "c2", identity: { kind: "standard", suit: "spades", rank: 10 }, effectiveRank: null, countsAs: null },
+          { id: "c1", identity: { kind: "standard", suit: "hearts", rank: 12 }, effectiveRank: null, countsAs: null, warning: null },
+          { id: "c2", identity: { kind: "standard", suit: "spades", rank: 10 }, effectiveRank: null, countsAs: null, warning: null },
         ],
         yourLegalCardIds: ["c1", "c2"],
         handSizes: [
@@ -135,7 +136,7 @@ function withAttempt(view: ExpeditionView, patch: Partial<ExpeditionAttemptView>
 
 const handWithoutC1 = (view: ExpeditionView): ExpeditionView =>
   withAttempt(view, {
-    camp: { ...attemptOf(view).camp, yourHand: [{ id: "c2", identity: { kind: "standard" as const, suit: "spades" as const, rank: 10 as const }, effectiveRank: null, countsAs: null }] },
+    camp: { ...attemptOf(view).camp, yourHand: [{ id: "c2", identity: { kind: "standard" as const, suit: "spades" as const, rank: 10 as const }, effectiveRank: null, countsAs: null, warning: null }] },
   });
 
 function deepFreeze<T>(value: T): T {
@@ -170,6 +171,7 @@ describe("initialLocalUi", () => {
       tooltipPreviewObjective: null,
       kitOpen: false,
       mapOpen: false,
+      pendingPlay: null,
     });
   });
 });
@@ -403,6 +405,32 @@ describe("cancelTargeting", () => {
     expect(next.targeting).toBeNull();
     expect(next.hoveredCardId).toBe("c1");
     expect(next.lastTrickOpen).toBe(true);
+  });
+});
+
+describe("a warned play's pending confirm", () => {
+  const warnedView = (warning: string | null) => {
+    const view = makeView();
+    const attempt = view.stage.tag === "camp" ? view.stage.attempt : null;
+    if (attempt === null) throw new Error("expected a camp");
+    return withAttempt(view, { camp: { ...attempt.camp, yourHand: attempt.camp.yourHand.map((c, i) => (i === 0 ? { ...c, warning } : c)) } });
+  };
+  const firstId = (view: ExpeditionView) => (view.stage.tag === "camp" ? view.stage.attempt.camp.yourHand[0]!.id : "");
+
+  it("sets and clears, and keeps the same object when nothing changes", () => {
+    const ui = initialLocalUi();
+    const pending = setPendingPlay(ui, "c1");
+    expect(pending.pendingPlay).toBe("c1");
+    expect(setPendingPlay(pending, "c1")).toBe(pending);
+    expect(setPendingPlay(pending, null).pendingPlay).toBeNull();
+  });
+
+  it("survives a view that still warns, and clears when the warning or the card is gone", () => {
+    const warned = warnedView("Careful");
+    const ui = setPendingPlay(initialLocalUi(), firstId(warned));
+    expect(reconcileLocalUi(ui, warned).pendingPlay).toBe(firstId(warned));
+    expect(reconcileLocalUi(ui, warnedView(null)).pendingPlay).toBeNull();
+    expect(reconcileLocalUi(setPendingPlay(initialLocalUi(), "gone"), warned).pendingPlay).toBeNull();
   });
 });
 

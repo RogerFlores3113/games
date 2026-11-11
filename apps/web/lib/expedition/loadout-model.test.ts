@@ -21,6 +21,8 @@ describe("buildShop", () => {
       { stockId: "item0", what: { kind: "item", itemId: "bait" }, price: 2, soldTo: null },
     ],
     yourUpgrades: [],
+    shares: [],
+    pot: 10,
   };
   const input = (over: Partial<ShopInput> = {}): ShopInput => ({
     shop,
@@ -42,7 +44,7 @@ describe("buildShop", () => {
   });
 
   it("marks supplies Full at the cap before checking the purse", () => {
-    expect(buys({ supplies: { count: 4, max: 4 }, purse: 0 })).toEqual([
+    expect(buys({ supplies: { count: 4, max: 4 }, shop: { ...shop, pot: 0 } })).toEqual([
       ["supplies", { kind: "disabled", reason: "Full" }],
       ["item0", { kind: "disabled", reason: "Need 2 more" }],
     ]);
@@ -57,6 +59,26 @@ describe("buildShop", () => {
       ["supplies", { kind: "status", label: "" }],
       ["item0", { kind: "status", label: "" }],
     ]);
+  });
+
+  it("reads affordability from your share plus the crew pot, not the whole purse", () => {
+    const split: ExpeditionShopView = { ...shop, shares: [{ seatId: "s1", coins: 1 }, { seatId: "s2", coins: 5 }], pot: 1 };
+    // You hold 1 and the pot 1: 2 buys the item (2), not the supplies (6), though the purse holds 7.
+    expect(buys({ shop: split, purse: 7 })).toEqual([
+      ["supplies", { kind: "disabled", reason: "Need 4 more" }],
+      ["item0", { kind: "buy" }],
+    ]);
+    const panel = buildShop(input({ shop: split, purse: 7 }));
+    expect([panel.share, panel.pot]).toEqual([1, 1]);
+    expect(panel.give).toEqual([{ seatId: "s2", name: "s2", share: 5, enabled: true }]);
+  });
+
+  it("offers no Give to a spectator, and dims it once you are ready or hold nothing", () => {
+    const split: ExpeditionShopView = { ...shop, shares: [{ seatId: "s1", coins: 0 }, { seatId: "s2", coins: 5 }], pot: 0 };
+    expect(buildShop(input({ shop: split, you: undefined })).give).toEqual([]);
+    expect(buildShop(input({ shop: split })).give.map((g) => g.enabled)).toEqual([false]);
+    const rich: ExpeditionShopView = { ...split, shares: [{ seatId: "s1", coins: 3 }, { seatId: "s2", coins: 5 }] };
+    expect(buildShop(input({ shop: rich, ready: true })).give.map((g) => g.enabled)).toEqual([false]);
   });
 
   it("sends you to your backpack for an item it has no room for", () => {

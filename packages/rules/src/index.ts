@@ -60,6 +60,7 @@ export type {
   ExpeditionAbilityStepView,
   ExpeditionRemainingView,
   ExpeditionRankedCardView,
+  ExpeditionHandCardView,
   ExpeditionEffectView,
   ExpeditionEffectOriginView,
   ExpeditionModView,

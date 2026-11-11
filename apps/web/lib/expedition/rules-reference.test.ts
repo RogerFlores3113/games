@@ -44,7 +44,7 @@ describe("buildRulesReference", () => {
     expect(byId(buildRulesReference(null), "between").paragraphs).toEqual([
       "A cleared camp pays 5 coins into the crew's purse, 2 more anywhere but the Jungle and the Clearing, 2 more in any weather but Fair, and 1 for each unplayed trick, up to 2 more. Each route card says what its camp pays.",
       "Before every camp, camp 1 too, everyone drafts one of 3 items; after a boss camp, one of 3 pairs of items. After every other camp an event waits on the trail, and it may give the crew coins, a supply or items. Then the crew votes on the route to the next camp, and a tied vote is settled by a coin flip.",
-      "Before every boss camp, and before camp 3 of a Short run, a shop opens once the route is chosen. The crew spends the purse on supplies (6 coins), items, and your own character's upgrades (8 coins). An upgrade also gives you one more whisper each camp.",
+      "Before every boss camp, and before camp 3 of a Short run, a shop opens once the route is chosen. The purse splits into an equal share for each explorer and a crew pot of what is left; a buy spends your share first, then the pot, and you can give coins of your share to a teammate. You spend it on supplies (6 coins), items, and your own character's upgrades (8 coins). An upgrade also gives you one more whisper each camp.",
       "Each explorer has 2 item slots, and only the items in them go into camp. Up to 6 more wait in the backpack: open it from the item bar between camps to swap items, or to discard one when it is full.",
     ]);
   });

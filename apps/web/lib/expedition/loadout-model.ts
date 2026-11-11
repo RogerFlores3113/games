@@ -35,8 +35,23 @@ export interface ShopEntry {
   buy: ShopBuy;
 }
 
+/** A teammate you can hand a coin of your share to. */
+export interface ShopGive {
+  seatId: string;
+  name: string;
+  /** Their share now. */
+  share: number;
+  /** Your share has a coin to give and you are not ready. */
+  enabled: boolean;
+}
+
 export interface ShopPanel {
   purse: number;
+  /** Your own share of the purse (0 for a spectator) and the crew pot. */
+  share: number;
+  pot: number;
+  /** One per teammate; empty for a spectator. */
+  give: ShopGive[];
   entries: ShopEntry[];
 }
 
@@ -58,9 +73,15 @@ function buyState(price: number, input: ShopInput, refusal: ShopBuy | null, item
   if (refusal !== null) return refusal;
   if (input.you === undefined) return { kind: "status", label: "" };
   if (input.ready) return { kind: "disabled", reason: "Locked" };
-  if (input.purse < price) return { kind: "disabled", reason: `Need ${price - input.purse} more` };
+  const spendable = shareOf(input) + input.shop.pot;
+  if (spendable < price) return { kind: "disabled", reason: `Need ${price - spendable} more` };
   if (item && input.room === 0) return { kind: "full" };
   return { kind: "buy" };
+}
+
+/** Your own share, from the view's public share list. */
+function shareOf(input: ShopInput): number {
+  return input.you === undefined ? 0 : (input.shop.shares.find((s) => s.seatId === input.you!.seatId)?.coins ?? 0);
 }
 
 function itemEntry(stockId: string, sourceId: string, name: string, detail: string, price: number | null, buy: ShopBuy): ShopEntry {
@@ -105,5 +126,10 @@ export function buildShop(input: ShopInput): ShopPanel {
   );
   const owned = input.you?.upgradeId ?? null;
   const ownedEntry = owned === null ? [] : [itemEntry(`upgrade:${owned}`, owned, sourceName(owned), "Upgrade, +1 whisper", null, { kind: "status", label: "Owned" })];
-  return { purse: input.purse, entries: [...entries, ...upgrades, ...ownedEntry] };
+  const share = shareOf(input);
+  const give: ShopGive[] =
+    input.you === undefined
+      ? []
+      : input.shop.shares.filter((s) => s.seatId !== input.you!.seatId).map((s) => ({ seatId: s.seatId, name: input.nameOf(s.seatId), share: s.coins, enabled: share >= 1 && !input.ready }));
+  return { purse: input.purse, share, pot: input.shop.pot, give, entries: [...entries, ...upgrades, ...ownedEntry] };
 }

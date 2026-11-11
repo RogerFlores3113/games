@@ -22,6 +22,7 @@ const REFUSAL_TEXT: Readonly<Partial<Record<ExpeditionErrorCode, string>>> = {
   no_whispers_left: "No whispers left this camp",
   whisper_blocked: "Whispers are blocked right now",
   ability_spent: "That power is spent",
+  not_a_teammate: "Pick a teammate to give coins to",
   cannot_afford: "The crew can't afford that",
   ability_unavailable: "That can't be used right now",
   invalid_target: "That pick is not allowed any more",

@@ -118,6 +118,8 @@ describe("toExpeditionPlayerView", () => {
         { stockId: "upgrade:explorer.true-form", upgradeId: "explorer.true-form", price: 8 },
         { stockId: "upgrade:explorer.reshape", upgradeId: "explorer.reshape", price: 8 },
       ],
+      shares: SEATS.map((seatId) => ({ seatId, coins: Math.floor(run.purse / SEATS.length) })),
+      pot: run.purse % SEATS.length,
     });
     expect(stock.map((e) => e.stockId)).toEqual(["supplies", "item0", "item1", "item2"]);
     const upgraded = toExpeditionPlayerView(run, "p1", CATALOG);
@@ -187,8 +189,17 @@ describe("toExpeditionPlayerView", () => {
     const base = setupRun({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3 });
     if (base.stage.tag !== "loadout") throw new Error("expected the loadout");
     const spec = base.stage.camp;
-    const run: RunState = { ...base, stage: { tag: "shop", next: campIndex(3), camp: spec, stock: [], ready: {} } };
+    const run: RunState = { ...base, stage: { tag: "shop", next: campIndex(3), camp: spec, stock: [], shares: {}, ready: {} } };
     expect(toExpeditionPlayerView(run, "p0", CATALOG).stage).toMatchObject({ tag: "shop", next: 3, camp: { index: 3, shop: true }, shop: { stock: [] } });
+  });
+
+  it("shop shows every seat's share and the pot, and the viewer a price it can reach", () => {
+    const shop = setupShop({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3, purse: 11 });
+    const view = toExpeditionPlayerView(shop, SEATS[1]!, CATALOG);
+    if (view.stage.tag !== "shop") throw new Error("expected the shop");
+    const each = Math.floor(11 / SEATS.length);
+    expect(view.stage.shop.shares).toEqual(SEATS.map((seatId) => ({ seatId, coins: each })));
+    expect(view.stage.shop.pot).toBe(11 - each * SEATS.length);
   });
 
   it("ended: the run result shows and the stage carries nothing else", () => {

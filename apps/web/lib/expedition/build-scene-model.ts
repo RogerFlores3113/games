@@ -116,6 +116,9 @@ export interface CardModel {
   /** Why this hand card can't be played right now; null when it can, or
    * for a card that is not in your hand. */
   blockedReason: string | null;
+  /** What playing this card now would cost the crew (a camp rule's warning,
+   * from the server); null when nothing. Only your own cards carry one. */
+  warning: string | null;
   /** Being dragged: the fan keeps an empty slot for it. */
   dragging: boolean;
   /** What the card counts as right now, when not its printed card: the
@@ -493,6 +496,7 @@ function buildTrickPlayModel(
       selected: pick.selected,
       lifted: false,
       blockedReason: null,
+      warning: null,
       dragging: false,
       countsAs,
     },
@@ -595,6 +599,7 @@ function buildHand(camp: ExpeditionCampView | null, view: ExpeditionView, ui: Lo
       selected,
       lifted: ui.hoveredCardId === c.id && dragged === null,
       blockedReason: playable ? null : blockedReasonFor(camp, view, c.identity, waitsOn),
+      warning: c.warning,
       dragging: (ui.drag.phase === "dragging" || ui.drag.phase === "playing") && dragged === c.id,
       countsAs: shownAs(c.identity, c.countsAs, c.effectiveRank),
     };

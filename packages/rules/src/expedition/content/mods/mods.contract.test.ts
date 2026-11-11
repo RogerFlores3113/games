@@ -102,11 +102,11 @@ function laterRollsMoved(ctx: ModCtx): ModCtx {
 }
 
 describe.each(DEFS.map((def) => [def.id, def] as const))("camp modifier %s", (id, def) => {
-  it("is registered under its id, with a known kind, a name, one sentence and a whole weight", () => {
+  it("is registered under its id, with a known kind, a name, a sentence or more and a whole weight", () => {
     expect(MODS[id as keyof typeof MODS]).toBe(def);
     expect(KINDS).toContain(def.kind);
     expect(def.name.trim()).not.toBe("");
-    expect(def.text).toMatch(/^[A-Z][^.]*\.$/);
+    expect(def.text).toMatch(/^[A-Z][^]*\.$/);
     expect(Number.isInteger(def.weight) && def.weight >= 0).toBe(true);
     if (def.kind === "location" && def.normalWeatherChance !== undefined) {
       expect(def.normalWeatherChance).toBeGreaterThanOrEqual(0);

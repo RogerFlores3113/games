@@ -61,6 +61,12 @@ function parseBuy(record: Record<string, unknown>): RunAction | null {
   return { type: "buy", stockId: record.stockId };
 }
 
+function parseGiveCoins(record: Record<string, unknown>): RunAction | null {
+  if (!hasExactKeys(record, ["type", "to", "coins"])) return null;
+  if (typeof record.to !== "string" || typeof record.coins !== "number" || !Number.isInteger(record.coins) || record.coins < 1) return null;
+  return { type: "give-coins", to: record.to, coins: record.coins };
+}
+
 function parsePickBundle(record: Record<string, unknown>): RunAction | null {
   if (!hasExactKeys(record, ["type", "bundle"])) return null;
   if (typeof record.bundle !== "number" || !Number.isInteger(record.bundle) || record.bundle < 0) return null;
@@ -130,6 +136,8 @@ export function parseRunAction(request: unknown): RunAction | null {
       return parseDiscardItem(request);
     case "buy":
       return parseBuy(request);
+    case "give-coins":
+      return parseGiveCoins(request);
     case "pick-bundle":
       return parsePickBundle(request);
     case "ready":
