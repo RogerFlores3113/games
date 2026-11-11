@@ -143,6 +143,9 @@ export type ItemDef = Named & {
   readonly price: number;
   /** Drafted only by this character. */
   readonly exclusiveTo?: string;
+  /** A use of this item is never made free by a freeUse layer (Sturdy
+   * Straps skips supply items). */
+  readonly noFreeUse?: true;
 } & (
     | { readonly uses: ItemUses; readonly active: ItemAbility; readonly passive?: never }
     | { readonly uses?: never; readonly active?: never; readonly passive: PassiveAbility }

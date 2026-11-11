@@ -11,7 +11,7 @@ import { attemptOf } from "./view-access";
  * fanned-out hands while a swap is aimed.
  */
 
-/** Seats under the Hermit's vow: a trick they win now fails the camp. */
+/** Seats under the Hermit's vow: a trick they win now earns them a new objective. */
 export function vowMarks(view: ExpeditionView): Record<string, SeatBossMark> {
   const effects = attemptOf(view)?.effects ?? [];
   const sworn = effects.flatMap((e) => (e.origin.kind === "seat" && e.origin.sourceId === "hermit" && e.params !== null && typeof e.params.seatId === "string" ? [e.params.seatId] : []));

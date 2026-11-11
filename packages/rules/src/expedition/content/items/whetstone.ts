@@ -9,7 +9,7 @@ export const whetstone = defineItem({
   uses: { kind: "single-use" },
   text: "A card in your hand counts up to two ranks higher or lower this camp.",
   active: itemAbility({
-    window: "between-tricks",
+    window: ["between-tricks", "in-trick"],
     targets: [{ kind: "card-value", spread: 2 }],
     apply: (ctx) => [
       { op: "add-modifier", lasts: "attempt", audience: "owner", params: { cardId: ctx.targets[0].cardId, rank: ctx.targets[0].rank } },

@@ -147,12 +147,14 @@ export function dealCamp(run: RunAt<"loadout">, catalog: Catalog): RunAt<"camp">
 
 function settleFailure(run: RunAt<"camp">, catalog: Catalog): RunState {
   const cost = rulesFor(run, catalog).failureCost(run);
-  if (!Number.isInteger(cost) || cost < 1) throw new Error(`settleCamp: failureCost must be an integer >= 1, got ${cost}`);
+  if (!Number.isInteger(cost) || cost < 0) throw new Error(`settleCamp: failureCost must be an integer >= 0, got ${cost}`);
   const spec = run.stage.camp;
   const result: CampResult = { camp: spec.index, attempt: run.stage.attempt.attemptNumber, location: spec.location, weather: spec.weather, status: "failed", suppliesSpent: cost, coins: 0 };
   const supplies = Math.max(0, run.supplies - cost);
   const lastAttempt = recapOf(run, "failed", 0, supplyCostParts(run, catalog), catalog);
-  const settled: RunState = { ...run, supplies, history: [...run.history, result], lastAttempt };
+  // A rule may take coins from the purse on a failure (Heavy Pack); the purse never goes below 0.
+  const purse = Math.max(0, run.purse - Math.max(0, rulesFor(run, catalog).failureCoins(run)));
+  const settled: RunState = { ...run, supplies, purse, history: [...run.history, result], lastAttempt };
   return supplies === 0 ? { ...settled, stage: { tag: "ended", result: "lost" } } : reopenCamp(settled, spec, catalog);
 }
 

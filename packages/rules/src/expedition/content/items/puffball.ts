@@ -7,9 +7,9 @@ export const puffball = defineItem({
   rarity: "common",
   price: 2,
   uses: { kind: "single-use" },
-  text: "You can't win the next trick.",
+  text: "You can't win the coming trick, or this one if you use it on your turn.",
   active: itemAbility({
-    window: "between-tricks",
+    window: ["between-tricks", "in-trick"],
     targets: [{ kind: "self" }],
     apply: () => [{ op: "add-modifier", lasts: "trick", audience: "public", params: {} }],
     effect: (effect) => ({

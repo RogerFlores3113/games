@@ -215,17 +215,17 @@ describe("settling a failure", () => {
     expect(failed.stage).toEqual({ tag: "ended", result: "lost" });
   });
 
-  it("throws if a failure's composed cost is not an integer >= 1 (POLICY A3)", () => {
-    const zero = defineItem({
-      id: "zero",
-      name: "Zero",
+  it("throws if a failure's composed cost is not an integer >= 0 (POLICY A3)", () => {
+    const negative = defineItem({
+      id: "negative",
+      name: "Negative",
       rarity: "common",
       price: 2,
-      text: "Failures are free.",
-      passive: { modifier: () => ({ goals: () => () => [guard("forced", true)], failureCost: () => () => 0 }) },
+      text: "Failures pay out.",
+      passive: { modifier: () => ({ goals: () => () => [guard("forced", true)], failureCost: () => () => -1 }) },
     });
-    const cat = testCatalog({ items: { zero } });
-    expect(() => readyAll(setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog: cat, items: { p0: ["zero"] } }), cat)).toThrow();
+    const cat = testCatalog({ items: { negative } });
+    expect(() => readyAll(setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog: cat, items: { p0: ["negative"] } }), cat)).toThrow();
   });
 
   it("supplies at 0 end the run lost, and every later action is run_over", () => {

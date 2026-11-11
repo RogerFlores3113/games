@@ -47,6 +47,10 @@ export type RunHooks = {
    * with nobody seeing the card. */
   washedWhispers(run: RunState): number;
   failureCost(run: RunState): number;
+  /** Coins a failed camp takes from the crew's purse (never below 0). */
+  failureCoins(run: RunState): number;
+  /** Whether the weather leaves `seatId`'s whispers alone. */
+  washProof(run: RunState, seatId: string): boolean;
   itemSlots(run: RunState, seatId: string): number;
   /** Percent chance of fair weather on a route, given the location's own. */
   normalWeatherChance(run: RunState, chance: number): number;
@@ -99,6 +103,8 @@ const HOOK_NAME_SET: Record<HookName, true> = {
   whispersPerCamp: true,
   washedWhispers: true,
   failureCost: true,
+  failureCoins: true,
+  washProof: true,
   itemSlots: true,
   voidsTrick: true,
   objectivePicker: true,
@@ -133,6 +139,12 @@ export const baseRunHooks: RunHooks = {
   },
   failureCost(_run) {
     return FAILURE_COST;
+  },
+  failureCoins(_run) {
+    return 0;
+  },
+  washProof(_run, _seatId) {
+    return false;
   },
   itemSlots(_run, _seatId) {
     return ITEM_SLOTS;

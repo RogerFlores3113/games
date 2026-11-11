@@ -8,6 +8,7 @@ export const firstAidKit = defineItem({
   price: 2,
   exclusiveTo: "pack-rat",
   uses: { kind: "single-use" },
+  noFreeUse: true,
   text: "Restore 1 supply.",
   active: itemAbility({
     window: "between-tricks",

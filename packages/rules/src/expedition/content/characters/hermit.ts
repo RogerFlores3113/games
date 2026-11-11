@@ -1,4 +1,6 @@
-import { guard } from "../../camp";
+import { identitiesEqual } from "../../deck";
+import { attemptOf } from "../../run/attempt";
+import type { ToolkitOp } from "../../run/toolkit";
 import { currentStamp } from "../../run/usage";
 import type { RunState } from "../../run/types";
 import { extraWhisper } from "../helpers";
@@ -17,7 +19,7 @@ export const hermit = defineCharacter({
   name: "The Hermit",
   theme: "Sheds objectives it takes",
   power: "Lone Vow",
-  text: "Drop one of your open objectives if you've won no tricks, then win none this camp.",
+  text: "Drop an open objective if you've won no tricks, then take a new one if you win a trick later this camp.",
   active: ability({
     window: "between-tricks",
     limit: (owner) => ({ kind: "per-camp", times: owner.hasUpgrade("hermit.burden") ? 2 : 1 }),
@@ -25,25 +27,27 @@ export const hermit = defineCharacter({
     canUse: (ctx) => (ctx.camp!.completedTricks.some((trick) => trick.winnerSeatId === ctx.self) ? "You've already won a trick" : true),
     apply: (ctx) => [
       { op: "remove-objective", objectiveId: ctx.targets[0].objective.id },
+      // The vow's mark; its reward is the Hermit's own trick-completed reaction.
       { op: "add-modifier", lasts: "attempt", audience: "public", params: { seatId: ctx.self } },
     ],
-    effect: (effect) => {
-      const seatId = effect.params.seatId as string;
-      const id = `hermit:${seatId}`;
-      return {
-        goals: (prev) => (camp, statuses) => {
-          const goals = prev(camp, statuses);
-          return goals.some((g) => g.id === id) ? goals : [...goals, guard(id, camp.completedTricks.some((trick) => trick.winnerSeatId === seatId))];
-        },
-      };
-    },
+    effect: () => ({}),
   }),
+  on: {
+    // Winning the first trick after vowing pays each vow with a fresh objective.
+    "trick-completed": (ctx) => {
+      if (ctx.event.winnerSeatId !== ctx.self || ctx.camp === null) return [];
+      const camp = ctx.camp;
+      if (camp.completedTricks.filter((trick) => trick.winnerSeatId === ctx.self).length !== 1) return [];
+      const vows = (attemptOf(ctx.run)?.effects ?? []).filter((e) => e.origin.kind === "seat" && e.origin.sourceId === "hermit" && e.params !== null && e.params.seatId === ctx.self).length;
+      const fresh = camp.objectiveDeck.filter((identity) => camp.hands.some((hand) => hand.cards.some((card) => identitiesEqual(card.identity, identity)))).length;
+      return Array.from({ length: Math.min(vows, fresh) }, (): ToolkitOp => ({ op: "add-objective", ownerSeatId: ctx.self }));
+    },
+  },
   upgrades: [
     defineUpgrade({
       id: "hermit.burden",
       name: "Burden",
-      text: "Start each camp with an extra objective, and your vow drops up to two.",
-      on: { "camp-dealt": (ctx) => [{ op: "add-objective", ownerSeatId: ctx.self }] },
+      text: "Your vow can drop up to two objectives each camp.",
     }),
     defineUpgrade({
       id: "hermit.first-pick",

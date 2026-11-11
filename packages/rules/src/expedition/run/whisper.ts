@@ -26,7 +26,9 @@
 //
 // WASHED WHISPERS: while fewer than rules.washedWhispers crew whispers have
 // been sent this attempt (Rain, Downpour), a whisper is spent with no
-// Reveal at all; its public "whisper-washed" log entry tells the table.
+// Reveal at all; its public "whisper-washed" log entry tells the table. A
+// seat the weather leaves alone (rules.washProof) is heard, though its
+// whisper still counts toward the crew's.
 //
 // Sources that change whisper legality, audience or count act
 // ONLY through the composed RunHooks (whisperAllowed/whisperAudience/
@@ -108,7 +110,7 @@ export function applyWhisper(
   const ordinal = crewWhispers(run);
   const sent = { type: "whisper-sent", ordinal, fromSeatId: actorSeatId, toSeatId: action.targetSeatId } as const;
 
-  if (ordinal < rules.washedWhispers(run)) {
+  if (ordinal < rules.washedWhispers(run) && !rules.washProof(run, actorSeatId)) {
     const washed: LogEntry = { event: "whisper-washed", actorSeatId, subjectSeatIds: [action.targetSeatId], sourceId: null, audience: "public" };
     return { ok: true, state: react(withAttempt(run, { ...attempt, log: [...attempt.log, washed] }) as RunAt<"camp">, [sent], catalog) };
   }
