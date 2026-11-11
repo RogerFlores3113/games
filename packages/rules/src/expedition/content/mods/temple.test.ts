@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { toExpeditionPlayerView } from "../../adapter/view";
 import { checkCampOutcome } from "../../camp";
 import { abilityStatus } from "../../run/abilities";
+import { PAYOUT } from "../../run/balance";
 import { CATALOG } from "../../run/catalog";
 import { composeRules, rulesFor } from "../../run/compose";
 import { campIndex } from "../../run/plan";
@@ -127,7 +128,7 @@ describe("the temple's skip", () => {
     const used = applyRunAction(after, "p1", { type: "use-ability", sourceKey: "temple", targets: ["objective:o2"] }, catalog);
     if (!used.ok) throw new Error(used.error);
     // The last open objective dropped and every plate pressed: the camp clears.
-    expect(used.state.history).toEqual([{ camp: 2, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 7 }]);
+    expect(used.state.history).toEqual([{ camp: 2, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap }]);
   });
 
   it("shows every seat the crew's token in its usage: not earned, then 1 left, then used", () => {

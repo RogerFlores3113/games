@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SUPPLIES_MAX, SUPPLIES_START } from "../run/balance";
+import { FAILED_ATTEMPT_COINS, SUPPLIES_MAX, SUPPLIES_START } from "../run/balance";
 import { CATALOG } from "../run/catalog";
 import { attemptOf } from "../run/attempt";
 import { createRun, runStatus } from "../run/lifecycle";
@@ -62,7 +62,7 @@ describe("dev shortcuts", () => {
   it("force-camp failed spends a supply, records the failure and reopens the loadout", () => {
     const failed = run("force-camp", fresh(), { outcome: "failed" });
     expect(failed.supplies).toBe(SUPPLIES_START - 1);
-    expect(failed.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 2 }]);
+    expect(failed.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: FAILED_ATTEMPT_COINS }]);
     expect(failed.stage.tag).toBe("loadout");
   });
 

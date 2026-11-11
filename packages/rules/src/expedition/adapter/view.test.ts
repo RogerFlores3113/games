@@ -6,7 +6,7 @@
 // short/word-shaped seed.
 
 import { describe, expect, it } from "vitest";
-import { SUPPLIES_MAX, SUPPLIES_START } from "../run/balance";
+import { PAYOUT, SHOP, SHOP_SHARE_PORTION, SUPPLIES_MAX, SUPPLIES_START } from "../run/balance";
 import { currentActorSeatId } from "../camp";
 import { evaluateObjective } from "../objectives";
 import { rulesFor } from "../run/compose";
@@ -116,9 +116,9 @@ describe("toExpeditionPlayerView", () => {
     expect(own.stage.tag === "shop" && own.stage.shop).toEqual({
       stock: stock.map((e) => ({ stockId: e.stockId, what: e.what, price: e.price, soldTo: null })),
       yourUpgrades: [
-        { stockId: "upgrade:explorer.second-wind", upgradeId: "explorer.second-wind", price: 8 },
-        { stockId: "upgrade:explorer.true-form", upgradeId: "explorer.true-form", price: 8 },
-        { stockId: "upgrade:explorer.reshape", upgradeId: "explorer.reshape", price: 8 },
+        { stockId: "upgrade:explorer.second-wind", upgradeId: "explorer.second-wind", price: SHOP.upgradePrice },
+        { stockId: "upgrade:explorer.true-form", upgradeId: "explorer.true-form", price: SHOP.upgradePrice },
+        { stockId: "upgrade:explorer.reshape", upgradeId: "explorer.reshape", price: SHOP.upgradePrice },
       ],
       shares: SEATS.map((seatId) => ({ seatId, coins: Math.floor(run.purse / SEATS.length) })),
       pot: run.purse % SEATS.length,
@@ -184,7 +184,7 @@ describe("toExpeditionPlayerView", () => {
       stage: { tag: "route", from: campIndex(1), options: [{ id: "a", next: plain, reroll: 0, swapBoss: null }, { id: "b", next: risky, reroll: 0, swapBoss: null }], ballots: {} },
     };
     const stage = toExpeditionPlayerView(run, "p0", CATALOG).stage;
-    expect(stage.tag === "route" && stage.options.map((o) => o.pays)).toEqual([{ min: 5, max: 7 }, { min: 9, max: 11 }]);
+    expect(stage.tag === "route" && stage.options.map((o) => o.pays)).toEqual([{ min: PAYOUT.base, max: PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap }, { min: PAYOUT.base + PAYOUT.riskyLocation + PAYOUT.riskyWeather, max: PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap + PAYOUT.riskyLocation + PAYOUT.riskyWeather }]);
   });
 
   it("shop previews the camp it opens before", () => {
@@ -199,7 +199,7 @@ describe("toExpeditionPlayerView", () => {
     const shop = setupShop({ seatIds: [...SEATS], seed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", catalog: CATALOG, camp: 3, purse: 11 });
     const view = toExpeditionPlayerView(shop, SEATS[1]!, CATALOG);
     if (view.stage.tag !== "shop") throw new Error("expected the shop");
-    const each = Math.floor(11 / SEATS.length);
+    const each = Math.floor((11 * SHOP_SHARE_PORTION) / SEATS.length);
     expect(view.stage.shop.shares).toEqual(SEATS.map((seatId) => ({ seatId, coins: each })));
     expect(view.stage.shop.pot).toBe(11 - each * SEATS.length);
   });

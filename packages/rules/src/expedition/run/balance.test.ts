@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createCamp } from "../camp";
 import type { CampState } from "../state";
-import { EXTRA_OBJECTIVES, FAILED_ATTEMPT_COINS, MAX_SEAT_OBJECTIVES, SUPPLIES_MAX, SUPPLIES_START, WASHES, WHISPERS_PER_CAMP, MIX_FROM_CAMP, OBJECTIVE_RAMP, PLAIN_GROUND, RUN_LENGTHS, SHOP_CAMPS, TRICK_COUNT_N_RANGE, mixFromCampFor, objectiveSlotsFor, payoutFor, payoutRange, seatObjectivesAt } from "./balance";
+import { EXTRA_OBJECTIVES, FAILED_ATTEMPT_COINS, PAYOUT, MAX_SEAT_OBJECTIVES, SUPPLIES_MAX, SUPPLIES_START, WASHES, WHISPERS_PER_CAMP, MIX_FROM_CAMP, OBJECTIVE_RAMP, PLAIN_GROUND, RUN_LENGTHS, SHOP_CAMPS, TRICK_COUNT_N_RANGE, mixFromCampFor, objectiveSlotsFor, payoutFor, payoutRange, seatObjectivesAt } from "./balance";
 import { campIndex } from "./plan";
 import { CATALOG } from "./catalog";
 import { campSpecAt, type CampSpec } from "./route";
@@ -19,22 +19,22 @@ describe("payoutFor", () => {
 
   const plain = { location: "jungle", weather: "fair" };
 
-  it("pays 5 plus one per unplayed trick, at most 2, on plain ground", () => {
-    expect(payoutFor(plain, camp(18, 18))).toBe(5);
-    expect(payoutFor(plain, camp(18, 17))).toBe(6);
-    expect(payoutFor(plain, camp(18, 3))).toBe(7);
+  it("pays the base plus one per unplayed trick, at most the cap, on plain ground", () => {
+    expect(payoutFor(plain, camp(18, 18))).toBe(PAYOUT.base);
+    expect(payoutFor(plain, camp(18, 17))).toBe(PAYOUT.base + PAYOUT.perUnplayedTrick);
+    expect(payoutFor(plain, camp(18, 3))).toBe(PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap);
   });
 
-  it("pays 2 more away from plain ground and 2 more in any weather but fair", () => {
-    expect(payoutFor({ location: "clearing", weather: "fair" }, camp(18, 18))).toBe(5);
-    expect(payoutFor({ location: "cave", weather: "fair" }, camp(18, 18))).toBe(7);
-    expect(payoutFor({ location: "jungle", weather: "downpour" }, camp(18, 18))).toBe(7);
-    expect(payoutFor({ location: "cave", weather: "downpour" }, camp(18, 3))).toBe(11);
+  it("pays the risk bonus away from plain ground and in any weather but fair", () => {
+    expect(payoutFor({ location: "clearing", weather: "fair" }, camp(18, 18))).toBe(PAYOUT.base);
+    expect(payoutFor({ location: "cave", weather: "fair" }, camp(18, 18))).toBe(PAYOUT.base + PAYOUT.riskyLocation);
+    expect(payoutFor({ location: "jungle", weather: "downpour" }, camp(18, 18))).toBe(PAYOUT.base + PAYOUT.riskyWeather);
+    expect(payoutFor({ location: "cave", weather: "downpour" }, camp(18, 3))).toBe(PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap + PAYOUT.riskyLocation + PAYOUT.riskyWeather);
   });
 
   it("states the range a route pays", () => {
-    expect(payoutRange(plain)).toEqual({ min: 5, max: 7 });
-    expect(payoutRange({ location: "clifftop", weather: "rain" })).toEqual({ min: 9, max: 11 });
+    expect(payoutRange(plain)).toEqual({ min: PAYOUT.base, max: PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap });
+    expect(payoutRange({ location: "clifftop", weather: "rain" })).toEqual({ min: PAYOUT.base + PAYOUT.riskyLocation + PAYOUT.riskyWeather, max: PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap + PAYOUT.riskyLocation + PAYOUT.riskyWeather });
   });
 
   it("names only defs that change nothing as plain ground", () => {
@@ -148,7 +148,7 @@ describe("round 2 numbers", () => {
     expect(WHISPERS_PER_CAMP).toBe(2);
   });
 
-  it("pays 2 coins for a failed attempt (A5)", () => {
-    expect(FAILED_ATTEMPT_COINS).toBe(2);
+  it("pays 1 coin for a failed attempt (A5)", () => {
+    expect(FAILED_ATTEMPT_COINS).toBe(1);
   });
 });

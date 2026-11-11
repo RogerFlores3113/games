@@ -42,16 +42,16 @@ describe("buildRulesReference", () => {
 
   it("explains the purse, draft, route vote, shop and loadout", () => {
     expect(byId(buildRulesReference(null), "between").paragraphs).toEqual([
-      "A cleared camp pays 5 coins into the crew's purse, 2 more anywhere but the Jungle and the Clearing, 2 more in any weather but Fair, and 1 for each unplayed trick, up to 2 more. Each route card says what its camp pays.",
+      `A cleared camp pays ${BALANCE_DISPLAY.payout.base} coins into the crew's purse, ${BALANCE_DISPLAY.payout.riskyLocation} more anywhere but the Jungle and the Clearing, ${BALANCE_DISPLAY.payout.riskyWeather} more in any weather but Fair, and ${BALANCE_DISPLAY.payout.perUnplayedTrick} for each unplayed trick, up to ${BALANCE_DISPLAY.payout.perUnplayedTrick * BALANCE_DISPLAY.payout.unplayedCap} more. Each route card says what its camp pays.`,
       "Before every camp, camp 1 too, everyone drafts one of 3 items; after a boss camp, one of 3 pairs of items. After every other camp an event waits on the trail, and it may give the crew coins, a supply or items. Then the crew votes on the route to the next camp, and a tied vote is settled by a coin flip.",
-      "Before every boss camp, and before camp 3 of a Short run, a shop opens once the route is chosen. The purse splits into an equal share for each explorer and a crew pot of what is left; a buy spends your share first, then the pot, and you can give coins of your share to a teammate. You spend it on supplies (6 coins), items, and your own character's upgrades (8 coins). An upgrade also gives you one more whisper each camp.",
+      `Before every boss camp, and before camp 3 of a Short run, a shop opens once the route is chosen. The purse splits: half of it is dealt out as an equal share for each explorer and the rest is the crew pot; a buy spends your share first, then the pot, and you can give coins of your share to a teammate. You spend it on supplies (${BALANCE_DISPLAY.supplyPrice} coins), items, and your own character's upgrades (${BALANCE_DISPLAY.upgradePrice} coins).`,
       "Each explorer has 2 item slots, and only the items in them go into camp. Up to 6 more wait in the backpack: open it from the item bar between camps to swap items, or to discard one when it is full.",
     ]);
   });
 
   it("states the supplies and the failure cost", () => {
     expect(byId(buildRulesReference(null), "goal").paragraphs[1]).toBe(
-      `A camp is cleared when every objective is done. A failed camp costs one supply and is replayed with a fresh deal; the crew's purse gets 2 coins as consolation. The crew starts with ${BALANCE_DISPLAY.suppliesStart} supplies and holds at most ${BALANCE_DISPLAY.suppliesMax}. With none left, the run ends.`,
+      `A camp is cleared when every objective is done. A failed camp costs one supply and is replayed with a fresh deal; the crew's purse gets ${BALANCE_DISPLAY.failedAttemptCoins === 1 ? "one coin" : `${BALANCE_DISPLAY.failedAttemptCoins} coins`} as consolation. The crew starts with ${BALANCE_DISPLAY.suppliesStart} supplies and holds at most ${BALANCE_DISPLAY.suppliesMax}. With none left, the run ends.`,
     );
   });
 

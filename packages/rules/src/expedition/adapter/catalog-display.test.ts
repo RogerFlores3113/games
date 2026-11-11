@@ -4,7 +4,7 @@
 // per-entry values are literal, so a drift in what the client shows fails.
 
 import { describe, expect, it } from "vitest";
-import { SUPPLIES_MAX, SUPPLIES_START } from "../run/balance";
+import { FAILED_ATTEMPT_COINS, FAILURE_COST, PAYOUT, SHOP, SHOP_SHARE_PORTION, SUPPLIES_MAX, SUPPLIES_START, SUPPLY_PRICE, WHISPERS_PER_CAMP, WHISPERS_PER_UPGRADE, WHISPER_CAP } from "../run/balance";
 import { CATALOG } from "../run/catalog";
 import { BALANCE_DISPLAY, CHARACTER_DISPLAY, MOD_DISPLAY, SOURCE_DISPLAY } from "./catalog-display";
 
@@ -141,18 +141,20 @@ describe("BALANCE_DISPLAY", () => {
     expect(BALANCE_DISPLAY).toEqual({
       suppliesStart: SUPPLIES_START,
       suppliesMax: SUPPLIES_MAX,
-      supplyPrice: 6,
-      failureCost: 1,
-      failedAttemptCoins: 2,
-      whispersPerCamp: 2,
-      payout: { base: 5, riskyLocation: 2, riskyWeather: 2, perUnplayedTrick: 1, unplayedCap: 2 },
+      supplyPrice: SUPPLY_PRICE,
+      failureCost: FAILURE_COST,
+      failedAttemptCoins: FAILED_ATTEMPT_COINS,
+      whispersPerCamp: WHISPERS_PER_CAMP,
+      payout: { ...PAYOUT },
       plainGround: { locations: ["jungle", "clearing"], weathers: ["fair"] },
       shopCamps: { short: [3, 4], standard: [3, 6], long: [3, 6, 8] },
       draftOptions: 3,
       itemSlots: 2,
       backpackSize: 6,
-      upgradePrice: 8,
-      whispersPerUpgrade: 1,
+      upgradePrice: SHOP.upgradePrice,
+      whispersPerUpgrade: WHISPERS_PER_UPGRADE,
+      whisperCap: WHISPER_CAP,
+      shopSharePortion: SHOP_SHARE_PORTION,
       fairWeatherChance: 80,
       washes: { rain: { spared: 3, exposed: 2 }, downpour: { spared: 2, exposed: 3 } },
       strikes: { max: 2, exposed: 1 },

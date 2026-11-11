@@ -50,9 +50,9 @@ describe("draftOfferFor", () => {
     expect(draftOfferFor("pinned", CAMP_1, seat("p0", "explorer"), 0, CATALOG, BOSS_DRAFT_SHAPE)).toEqual({
       kind: "standard",
       bundles: [
-        ["puffball", "trail-rations"],
+        ["parrot", "trail-rations"],
         ["parrot", "bait"],
-        ["parrot", "mosquito-net"],
+        ["mosquito-net", "bait"],
       ],
     });
   });

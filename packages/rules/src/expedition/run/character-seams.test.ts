@@ -336,7 +336,7 @@ describe("freeUse", () => {
 
 describe("foldsLast", () => {
   it("folds a passive after every effect, so it has the last word", () => {
-    const counted = seamCharacter("counted", { passive: passive((self) => ({ whispersPerCamp: (prev) => (run, seatId) => (seatId === self ? 7 : prev(run, seatId)) }), true) });
+    const counted = seamCharacter("counted", { passive: passive((self) => ({ whispersPerCamp: (prev) => (run, seatId) => (seatId === self ? 1 : prev(run, seatId)) }), true) });
     const shouter = defineItem({
       id: "shouter",
       name: "Shouter",
@@ -350,7 +350,7 @@ describe("foldsLast", () => {
     const camp = advanceTo(setupRun({ seatIds: SEATS, seed: "last", catalog, characters: { p0: "counted" }, items: { p1: ["shouter"] } }), "between-tricks", catalog);
     const shouted = use(camp, "p1", "it0", [], catalog);
     const rules = rulesFor(shouted, catalog);
-    expect([rules.whispersPerCamp(shouted, "p0"), rules.whispersPerCamp(shouted, "p1")]).toEqual([7, 3]);
+    expect([rules.whispersPerCamp(shouted, "p0"), rules.whispersPerCamp(shouted, "p1")]).toEqual([1, 3]);
   });
 });
 

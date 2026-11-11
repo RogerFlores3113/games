@@ -10,7 +10,7 @@ import { evaluateObjective } from "../objectives";
 import type { CampState, CompletedTrick, ExpeditionCard, Objective, StandardIdentity, StandardRank, Suit } from "../state";
 import { trickWinner } from "../trick";
 import { abilityStatus, useAbility } from "../run/abilities";
-import { FAILED_ATTEMPT_COINS, FAILURE_COST, PRICE_BANDS } from "../run/balance";
+import { FAILED_ATTEMPT_COINS, FAILURE_COST, PRICE_BANDS, WHISPERS_PER_CAMP } from "../run/balance";
 import { CATALOG } from "../run/catalog";
 import { rulesFor } from "../run/compose";
 import { attemptOf, withAttempt } from "../run/attempt";
@@ -237,14 +237,13 @@ describe("Leader", () => {
 
   it("Delegate hands one of the Leader's whispers to a teammate, until none are left", () => {
     const start = table({ character: "leader", kit: ["leader.delegate"], mates: ["jd", "explorer"] });
-    expect(whisperAllowance(start)).toEqual([4, 2, 2]);
+    expect(whisperAllowance(start)).toEqual([3, 2, 2]); // an upgrade adds no whisper now
     const once = use(start, "p0", "leader.delegate", ["seat:p1"]);
-    expect(whisperAllowance(once)).toEqual([3, 3, 2]);
+    expect(whisperAllowance(once)).toEqual([2, 3, 2]);
     const thrice = use(use(once, "p0", "leader.delegate", ["seat:p2"]), "p0", "leader.delegate", ["seat:p2"]);
-    expect(whisperAllowance(thrice)).toEqual([1, 3, 4]);
-    const all = use(thrice, "p0", "leader.delegate", ["seat:p1"]);
-    expect(whisperAllowance(all)).toEqual([0, 4, 4]);
-    expect(refusal(all, "p0", "leader.delegate", ["seat:p1"])).toBe("ability_spent");
+    expect(whisperAllowance(thrice)).toEqual([0, 3, 4]);
+    // The Leader had three whispers to hand over, so none are left now.
+    expect(refusal(thrice, "p0", "leader.delegate", ["seat:p1"])).toBe("ability_spent");
   });
 
   it("Momentum gives the Leader a whisper per trick won, and no other bonus reaches them", () => {
@@ -521,11 +520,11 @@ describe("Magician", () => {
 
   it("Double Act adds two swaps that trade with whispers, one count for both", () => {
     const start = table({ character: "magician", kit: ["magician.double-act"], hands });
-    expect([whisperAllowance(start)[0], remaining(start, "p0", "magician", CATALOG)]).toEqual([5, { kind: "whispers", left: 5 }]);
+    expect([whisperAllowance(start)[0], remaining(start, "p0", "magician", CATALOG)]).toEqual([4, { kind: "whispers", left: 4 }]);
     const swapped = use(start, "p0", "magician", ["card:a", "fan:p1:0"]);
-    expect([whisperAllowance(swapped)[0], remaining(swapped, "p0", "magician", CATALOG)]).toEqual([4, { kind: "whispers", left: 4 }]);
+    expect([whisperAllowance(swapped)[0], remaining(swapped, "p0", "magician", CATALOG)]).toEqual([3, { kind: "whispers", left: 3 }]);
     const whispered = whisper(swapped, "p0", "p2", handIds(swapped, "p0")[0]!);
-    expect(remaining(whispered, "p0", "magician", CATALOG)).toEqual({ kind: "whispers", left: 3 });
+    expect(remaining(whispered, "p0", "magician", CATALOG)).toEqual({ kind: "whispers", left: 2 });
   });
 
   it("Misdirection swaps cards between two teammates' hands, from the Magician's two swaps", () => {
@@ -559,7 +558,7 @@ describe("Perfumist", () => {
     expect(whisperAllowance(table({ character: "perfumist" }))[0]).toBe(1);
     // Items still add to an unupgraded Perfumist's one whisper.
     expect(whisperAllowance(table({ character: "perfumist", kit: ["heavy-pack"] }))[0]).toBe(2);
-    expect(whisperAllowance(table({ character: "perfumist", kit: ["perfumist.turncoat", "rain-poncho"] }))[0]).toBe(3);
+    expect(whisperAllowance(table({ character: "perfumist", kit: ["perfumist.turncoat", "rain-poncho"] }))[0]).toBe(WHISPERS_PER_CAMP); // upgraded: the normal count, with no cut and no upgrade bonus
   });
 
   it("Turncoat changes the led suit mid-trick, so the next players follow the new suit", () => {
@@ -645,7 +644,7 @@ describe("Hermit", () => {
     const start = table({ character: "hermit", kit: ["hermit.alms"], objectives: [winCard("mine", ident("hearts", 9), "p0"), PENDING] });
     expect(refusal(start, "p0", "hermit.alms", ["seat:p1"])).toBe("ability_unavailable");
     const given = use(use(start, "p0", "hermit", ["objective:mine"]), "p0", "hermit.alms", ["seat:p1"]);
-    expect(whisperAllowance(given)).toEqual([3, 3, 2]);
+    expect(whisperAllowance(given)).toEqual([2, 3, 2]);
     expect(refusal(given, "p0", "hermit.alms", ["seat:p2"])).toBe("ability_unavailable");
   });
 });
@@ -885,8 +884,8 @@ describe("items", () => {
     expect(whisperAllowance(packed.start)).toEqual([3, 2, 2]);
     expect(packed.end.history.at(-1)!.status).toBe("failed");
     expect(packed.end.supplies).toBe(failing([], 5).end.supplies);
-    // The consolation is paid first and the pack takes it back: a failed camp nets 0 coins.
-    expect(packed.end.purse).toBe(5);
+    // The consolation is paid first and the pack takes 2 coins back: a failed camp nets FAILED_ATTEMPT_COINS - 2.
+    expect(packed.end.purse).toBe(5 + FAILED_ATTEMPT_COINS - 2);
     expect(failing([], 5).end.purse).toBe(5 + FAILED_ATTEMPT_COINS);
     // The purse never goes below 0.
     expect(failing(["heavy-pack"], 0).end.purse).toBe(0);
@@ -906,7 +905,7 @@ describe("items", () => {
     expect(whisperAllowance(start)).toEqual([4, 3, 2]);
     expect(rules(start).failureCoins(start)).toBe(2);
     expect(rules(start).failureCost(start)).toBe(FAILURE_COST);
-    expect(playOut(start).purse).toBe(10);
+    expect(playOut(start).purse).toBe(10 + FAILED_ATTEMPT_COINS - 2);
     expect(playOut(start).supplies).toBe(4 - FAILURE_COST);
   });
 
@@ -964,7 +963,7 @@ describe("items", () => {
   it("the second round's prices and rarities", () => {
     const at = (id: string) => [CATALOG.items[id]!.rarity, CATALOG.items[id]!.price];
     expect([at("rope-ladder"), at("heavy-pack"), at("smoke-signal"), at("trail-rations"), at("conch-shell"), at("parrot"), at("signal-flare"), at("rain-poncho"), at("trained-monkey")]).toEqual([
-      ["rare", 6], ["uncommon", 3], ["rare", 5], ["rare", 5], ["uncommon", 3], ["common", 2], ["common", 1], ["uncommon", 3], ["rare", 5],
+      ["rare", 6], ["uncommon", 3], ["rare", 5], ["rare", 5], ["uncommon", 3], ["common", 1], ["common", 1], ["uncommon", 3], ["rare", 5],
     ]);
     expect(CATALOG.items["trail-rations"]!.noFreeUse).toBe(true);
     expect(CATALOG.items["first-aid-kit"]!.noFreeUse).toBe(true);

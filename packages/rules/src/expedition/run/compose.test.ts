@@ -9,6 +9,7 @@ import { baseRules } from "../rules";
 import { isTrump, trickWinner } from "../trick";
 import { currentActorSeatId } from "../camp";
 import { winnerExcluding } from "../content/helpers";
+import { WHISPERS_PER_CAMP, WHISPER_CAP } from "./balance";
 import { composeRules, ruleLayersFor, rulesFor } from "./compose";
 import { attemptOf } from "./attempt";
 import { campIndex } from "./plan";
@@ -123,7 +124,7 @@ describe("composeRules([])", () => {
     const run = makeRun();
     const composed = composeRules([]);
     expect(composed.whisperAllowed(run, "p0")).toBe(true);
-    expect(composed.whispersPerCamp(run, "p0")).toBe(2);
+    expect(composed.whispersPerCamp(run, "p0")).toBe(WHISPERS_PER_CAMP);
     expect(composed.whisperAudience(run, "p0", "p1")).toEqual(["p1"]);
     expect(composed.failureCost(run)).toBe(1);
   });
@@ -133,13 +134,26 @@ describe("composeRules layer folding", () => {
   it("folds two whispersPerCamp layers in order (non-commutative)", () => {
     const doubler: RuleModifier = { whispersPerCamp: (prev) => (run, seatId) => prev(run, seatId) * 2 };
     const incrementer: RuleModifier = { whispersPerCamp: (prev) => (run, seatId) => prev(run, seatId) + 1 };
+    const cut: RuleModifier = { whispersPerCamp: (prev) => (run, seatId) => prev(run, seatId) - (WHISPERS_PER_CAMP - 1) }; // down to 1, so both orders stay under WHISPER_CAP
     const run = makeRun();
 
-    const doublerThenIncrementer = composeRules([doubler, incrementer]);
-    expect(doublerThenIncrementer.whispersPerCamp(run, "p0")).toBe(5); // (2*2)+1
+    const doublerThenIncrementer = composeRules([cut, doubler, incrementer]);
+    expect(doublerThenIncrementer.whispersPerCamp(run, "p0")).toBe(3); // (1*2)+1
 
-    const incrementerThenDoubler = composeRules([incrementer, doubler]);
-    expect(incrementerThenDoubler.whispersPerCamp(run, "p0")).toBe(6); // (2+1)*2
+    const incrementerThenDoubler = composeRules([cut, incrementer, doubler]);
+    expect(incrementerThenDoubler.whispersPerCamp(run, "p0")).toBe(4); // (1+1)*2
+  });
+
+  it("caps whispersPerCamp at WHISPER_CAP after every layer folds in, however many stack", () => {
+    const run = makeRun();
+    const add = (n: number): RuleModifier => ({ whispersPerCamp: (prev) => (r, seatId) => prev(r, seatId) + n });
+    const stacked = composeRules([add(1), add(2), add(3), add(4)]); // 2 + 10
+    expect(stacked.whispersPerCamp(run, "p0")).toBe(WHISPER_CAP);
+    // Exactly the cap stays; just under the cap is untouched.
+    expect(composeRules([add(WHISPER_CAP - WHISPERS_PER_CAMP)]).whispersPerCamp(run, "p0")).toBe(WHISPER_CAP);
+    expect(composeRules([add(WHISPER_CAP - WHISPERS_PER_CAMP - 1)]).whispersPerCamp(run, "p0")).toBe(WHISPER_CAP - 1);
+    // A later cut comes off the stack before the cap, so it still counts: 2 + 10 - 9 = 3.
+    expect(composeRules([add(1), add(2), add(3), add(4), add(-9)]).whispersPerCamp(run, "p0")).toBe(WHISPERS_PER_CAMP + 1);
   });
 
   it("an isTrump-only layer changes the composed trickWinner (WR-03)", () => {

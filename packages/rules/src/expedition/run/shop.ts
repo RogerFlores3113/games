@@ -3,10 +3,10 @@
 // same stream names, so a replay of the shop camp offers the same stock
 // again. Upgrades are not stock: each seat sees its own character's upgrades
 // while it owns none. When the shop opens the purse splits into one share
-// per seat and a crew pot; a buy spends the buyer's share, then the pot; the Durable Object
+// per seat (half the purse in all) and a crew pot (the other half); a buy spends the buyer's share, then the pot; the Durable Object
 // serializes actions, so two buyers never both spend the last coins.
 
-import { DRAFT, SHOP, SUPPLIES_MAX, SUPPLY_PRICE } from "./balance";
+import { DRAFT, SHOP, SHOP_SHARE_PORTION, SUPPLIES_MAX, SUPPLY_PRICE } from "./balance";
 import { rulesFor } from "./compose";
 import { drawItem, openPool } from "./draft";
 import { mintItems, roomFor } from "./items";
@@ -99,11 +99,12 @@ export function buy(run: RunAt<"shop">, seatId: SeatId, stockId: string, catalog
   return { ok: true, state: purchase.take({ ...run, purse: run.purse - price, stage: { ...run.stage, shares } }) };
 }
 
-/** The shop's purse split: each seat in the crew gets floor(purse / seats)
- * as its own share; the remainder is the crew pot (potOf). */
+/** The shop's purse split: SHOP_SHARE_PORTION of the purse is dealt out, so
+ * each seat gets floor(purse * SHOP_SHARE_PORTION / seats) as its own share;
+ * everything else is the crew pot (potOf). */
 export function splitPurse(run: RunState): PerSeat<number> {
   const seats = run.seatIds.length;
-  const each = seats === 0 ? 0 : Math.floor(run.purse / seats);
+  const each = seats === 0 ? 0 : Math.floor((run.purse * SHOP_SHARE_PORTION) / seats);
   return Object.fromEntries(run.seatIds.map((seatId) => [seatId, each]));
 }
 

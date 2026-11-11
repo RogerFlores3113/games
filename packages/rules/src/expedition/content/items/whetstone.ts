@@ -5,7 +5,7 @@ export const whetstone = defineItem({
   id: "whetstone",
   name: "Whetstone",
   rarity: "uncommon",
-  price: 3,
+  price: 4,
   uses: { kind: "single-use" },
   text: "A card in your hand counts up to two ranks higher or lower this camp.",
   active: itemAbility({

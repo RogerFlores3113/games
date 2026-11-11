@@ -22,7 +22,7 @@ export const parrot = defineItem({
   id: "parrot",
   name: "Parrot",
   rarity: "common",
-  price: 2,
+  price: 1,
   uses: { kind: "per-camp" },
   text: "Tell a teammate one suit you have none of.",
   active: itemAbility({

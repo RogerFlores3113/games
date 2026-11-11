@@ -6,15 +6,15 @@ export const blankEvent = defineEvent({ id: "event", name: "Quiet trail", text: 
 export const abandonedCamp = defineEvent({
   id: "abandoned-camp",
   name: "Abandoned camp",
-  text: "Someone left in a hurry. The crew finds 4 coins in the ashes.",
-  effect: { kind: "coins", coins: 4 },
+  text: "Someone left in a hurry. The crew finds 3 coins in the ashes.",
+  effect: { kind: "coins", coins: 3 },
 });
 
 export const freshSpring = defineEvent({
   id: "fresh-spring",
   name: "Fresh spring",
-  text: "Clean water to refill the canteens: the crew regains 1 supply. With supplies full, it finds 3 coins instead.",
-  effect: { kind: "supplies", supplies: 1, elseCoins: 3 },
+  text: "Clean water to refill the canteens: the crew regains 1 supply. With supplies full, it finds 2 coins instead.",
+  effect: { kind: "supplies", supplies: 1, elseCoins: 2 },
 });
 
 export const droppedPack = defineEvent({

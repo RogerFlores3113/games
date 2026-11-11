@@ -6,7 +6,7 @@
 // characters through testCatalog.
 
 import { describe, expect, it } from "vitest";
-import { SUPPLIES_START, seatObjectivesAt } from "./balance";
+import { FAILED_ATTEMPT_COINS, PAYOUT, SUPPLIES_START, seatObjectivesAt } from "./balance";
 import { campPhase, currentActorSeatId, guard } from "../camp";
 import { ability, defineCharacter, defineItem, defineUpgrade, itemAbility } from "../content/source-def";
 import { attemptOf, nextAttemptNumber, withAttempt } from "./attempt";
@@ -181,8 +181,8 @@ describe("settling a failure", () => {
     const failed = readyAll(before, cat);
 
     expect(failed.supplies).toBe(SUPPLIES_START - 1);
-    expect(failed.purse).toBe(2);
-    expect(failed.history).toEqual([{ camp: 3, attempt: 1, location: "cave", weather: "fair", status: "failed", suppliesSpent: 1, coins: 2 }]);
+    expect(failed.purse).toBe(FAILED_ATTEMPT_COINS);
+    expect(failed.history).toEqual([{ camp: 3, attempt: 1, location: "cave", weather: "fair", status: "failed", suppliesSpent: 1, coins: FAILED_ATTEMPT_COINS }]);
     expect(failed.stage).toMatchObject({ tag: "shop", next: 3, camp: before.stage.camp, ready: {} });
     expect(readyAll(failed, cat).stage).toEqual({ ...before.stage, ready: {} });
     expect(failed.seats.map((s) => s.offers)).toEqual([[], [], []]);
@@ -247,29 +247,31 @@ describe("settling a failure", () => {
   });
 });
 
+const RISKY_MAX = PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap + PAYOUT.riskyLocation + PAYOUT.riskyWeather;
+
 describe("settling a clear", () => {
   const catalog = testCatalog({
     items: { "item-a": plainItem("item-a"), "item-b": plainItem("item-b"), "item-c": plainItem("item-c") },
   });
 
-  it("a clear on plain ground pays 5 + min(2, unplayed tricks) into the purse", () => {
+  it("a clear on plain ground pays base + min(cap, unplayed tricks) into the purse", () => {
     const run = setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog });
     const fresh = clearedCamp(run, catalog);
-    expect(settleCamp(fresh, "cleared", catalog).purse).toBe(7);
+    expect(settleCamp(fresh, "cleared", catalog).purse).toBe(PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap);
 
     const withUnplayed = (n: number): RunAt<"camp"> =>
       withAttempt(fresh, { ...fresh.stage.attempt, camp: { ...fresh.stage.attempt.camp, totalTricks: n } }) as RunAt<"camp">;
     const settled = settleCamp({ ...withUnplayed(1), purse: 4 }, "cleared", catalog);
-    expect(settled.purse).toBe(10);
-    expect(settled.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 6 }]);
-    expect(settleCamp(withUnplayed(0), "cleared", catalog).purse).toBe(5);
+    expect(settled.purse).toBe(4 + PAYOUT.base + PAYOUT.perUnplayedTrick);
+    expect(settled.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: PAYOUT.base + PAYOUT.perUnplayedTrick }]);
+    expect(settleCamp(withUnplayed(0), "cleared", catalog).purse).toBe(PAYOUT.base);
   });
 
   it("opens the draft and deals every seat one offer of three single items, owned items included", () => {
     const run = setupRun({ seatIds: SEAT_IDS, seed: "fixture", catalog, items: { p0: ["item-a"] } });
     const settled = settleCamp(clearedCamp(run, catalog), "cleared", catalog);
     expect(settled.stage).toEqual({ tag: "draft", next: 2 });
-    expect(settled.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 7 }]);
+    expect(settled.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: PAYOUT.base + PAYOUT.perUnplayedTrick * PAYOUT.unplayedCap }]);
     for (const seat of settled.seats) {
       expect(seat.offers).toHaveLength(1);
       expect([...seat.offers[0]!.bundles.flat()].sort()).toEqual(["item-a", "item-b", "item-c"]);
@@ -281,8 +283,8 @@ describe("settling a clear", () => {
     const fresh = clearedCamp(run, catalog);
     const risky = { ...fresh, stage: { ...fresh.stage, camp: { ...fresh.stage.camp, location: "cave", weather: "rain" } } } as RunAt<"camp">;
     const settled = settleCamp(risky, "cleared", catalog);
-    expect(settled.history.at(-1)).toMatchObject({ location: "cave", weather: "rain", coins: 11 });
-    expect(settled.purse).toBe(11);
+    expect(settled.history.at(-1)).toMatchObject({ location: "cave", weather: "rain", coins: RISKY_MAX });
+    expect(settled.purse).toBe(RISKY_MAX);
   });
 
   it("clearing the final camp wins: camp 4 of a short run, camp 8 of a long one", () => {
@@ -445,7 +447,7 @@ describe("the rescue window", () => {
     const passed = use(paused, "p0", { type: "skip-window" });
     expect(passed.stage.tag).toBe("loadout");
     expect(passed.supplies).toBe(SUPPLIES_START - 1);
-    expect(passed.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 2 }]);
+    expect(passed.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: FAILED_ATTEMPT_COINS }]);
     expect(passed.seats[0]!.ledger).toEqual([{ kind: "passed", sourceKey: "it0", at: { camp: 1, attempt: 1, trick: 1 }, failedObjectiveIds: [`duck-${winner}`] }]);
   });
 
@@ -467,7 +469,7 @@ describe("the rescue window", () => {
     const failed = playTrick(everyoneDucks({}));
     expect(failed.stage.tag).toBe("loadout");
     expect(failed.supplies).toBe(SUPPLIES_START - 1);
-    expect(failed.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 2 }]);
+    expect(failed.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: FAILED_ATTEMPT_COINS }]);
   });
 
   it("a pass is stamped with its trick, so a later failure at another trick reopens rescue for that seat", () => {

@@ -4,7 +4,7 @@ export const mosquitoNet = defineItem({
   id: "mosquito-net",
   name: "Mosquito Net",
   rarity: "common",
-  price: 2,
+  price: 1,
   text: "Rain can't stop your whispers.",
   passive: {
     modifier: (owner) => ({

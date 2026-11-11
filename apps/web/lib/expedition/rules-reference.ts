@@ -62,7 +62,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       paragraphs: [
         `A cleared camp pays ${B.payout.base} coins into the crew's purse, ${B.payout.riskyLocation} more anywhere but ${plainNames(B.plainGround.locations)}, ${B.payout.riskyWeather} more in any weather but ${nameList(B.plainGround.weathers.map((id) => MOD_DISPLAY[id]?.name ?? id))}, and ${B.payout.perUnplayedTrick} for each unplayed trick, up to ${B.payout.unplayedCap * B.payout.perUnplayedTrick} more. Each route card says what its camp pays.`,
         `Before every camp, camp 1 too, everyone drafts one of ${B.draftOptions} items; after a boss camp, one of ${B.draftOptions} pairs of items. After every other camp an event waits on the trail, and it may give the crew coins, a supply or items. Then the crew votes on the route to the next camp, and a tied vote is settled by a coin flip.`,
-        `Before every boss camp${extraShops.length === 0 ? "" : `, and before ${nameList(extraShops)}`}, a shop opens once the route is chosen. The purse splits into an equal share for each explorer and a crew pot of what is left; a buy spends your share first, then the pot, and you can give coins of your share to a teammate. You spend it on supplies (${B.supplyPrice} coins), items, and your own character's upgrades (${B.upgradePrice} coins). An upgrade also gives you ${count(B.whispersPerUpgrade, "more whisper", "more whispers")} each camp.`,
+        `Before every boss camp${extraShops.length === 0 ? "" : `, and before ${nameList(extraShops)}`}, a shop opens once the route is chosen. The purse splits: ${B.shopSharePortion === 1 / 2 ? "half" : `${Math.round(B.shopSharePortion * 100)}%`} of it is dealt out as an equal share for each explorer and the rest is the crew pot; a buy spends your share first, then the pot, and you can give coins of your share to a teammate. You spend it on supplies (${B.supplyPrice} coins), items, and your own character's upgrades (${B.upgradePrice} coins).${B.whispersPerUpgrade > 0 ? ` An upgrade also gives you ${count(B.whispersPerUpgrade, "more whisper", "more whispers")} each camp.` : ""}`,
         `Each explorer has ${B.itemSlots} item slots, and only the items in them go into camp. Up to ${B.backpackSize} more wait in the backpack: open it from the item bar between camps to swap items, or to discard one when it is full.`,
       ],
       items: [],
@@ -95,7 +95,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       id: "whisper",
       heading: "The Whisper",
       paragraphs: [
-        `${timesWord(B.whispersPerCamp)} per camp, between tricks, show one card from your hand to one teammate. Everyone sees that you whispered, but only they see the card.`,
+        `${timesWord(B.whispersPerCamp)} per camp, between tricks, show one card from your hand to one teammate. Everyone sees that you whispered, but only they see the card. No one can have more than ${B.whisperCap} whispers in a camp, however many things add to it.`,
         "Whispers go only between tricks, before the next lead: never while objectives are being picked, and never once a trick has started.",
         "In Rain or a Downpour the crew's first whispers each camp wash away: they are spent, everyone sees them wash away, and nobody sees the card.",
         "Need a moment between tricks? Press Hold on (once per gap, if you are not leading). The next lead waits until you whisper, use a power, or press Go ahead.",

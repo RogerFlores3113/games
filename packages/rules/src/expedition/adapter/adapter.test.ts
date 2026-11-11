@@ -4,7 +4,7 @@
 // independent Expedition-shaped suite instead, mirroring its shape.
 
 import { describe, expect, it } from "vitest";
-import { SUPPLIES_START } from "../run/balance";
+import { FAILED_ATTEMPT_COINS, SUPPLIES_START } from "../run/balance";
 import fc from "fast-check";
 import { expeditionGame } from "./adapter";
 import { toExpeditionPlayerView } from "./view";
@@ -220,7 +220,7 @@ describe("expeditionGame: autoPassRequest", () => {
     const passed = expeditionGame.applyAction(rescue!, "p0", expeditionGame.autoPassRequest!(rescue!, "p0"));
     if (!passed.ok) throw new Error(passed.error);
     expect(passed.state.stage.tag).toBe("shop");
-    expect(passed.state.history).toEqual([{ camp: 3, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 2 }]);
+    expect(passed.state.history).toEqual([{ camp: 3, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: FAILED_ATTEMPT_COINS }]);
     expect(expeditionGame.autoPassRequest!(passed.state, "p0")).toEqual({ type: "ready" });
   });
 

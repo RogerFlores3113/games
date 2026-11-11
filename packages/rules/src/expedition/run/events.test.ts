@@ -41,16 +41,16 @@ describe("applyEvent", () => {
     expect(applyEvent(before, EVENTS.event, next, catalog)).toEqual({ run: before, gains: NO_GAINS });
   });
 
-  it("Abandoned camp: the purse gains 4 coins", () => {
+  it("Abandoned camp: the purse gains 3 coins", () => {
     const { run: after, gains } = applyEvent(run({ purse: 3 }), EVENTS["abandoned-camp"], next, catalog);
-    expect([after.purse, gains]).toEqual([7, { coins: 4, supplies: 0, items: [] }]);
+    expect([after.purse, gains]).toEqual([6, { coins: 3, supplies: 0, items: [] }]);
   });
 
-  it("Fresh spring: one supply back, or 3 coins with supplies full", () => {
+  it("Fresh spring: one supply back, or 2 coins with supplies full", () => {
     const low = applyEvent(run({ supplies: 2, purse: 1 }), EVENTS["fresh-spring"], next, catalog);
     expect([low.run.supplies, low.run.purse, low.gains]).toEqual([3, 1, { coins: 0, supplies: 1, items: [] }]);
     const full = applyEvent(run({ supplies: SUPPLIES_MAX, purse: 1 }), EVENTS["fresh-spring"], next, catalog);
-    expect([full.run.supplies, full.run.purse, full.gains]).toEqual([SUPPLIES_MAX, 4, { coins: 3, supplies: 0, items: [] }]);
+    expect([full.run.supplies, full.run.purse, full.gains]).toEqual([SUPPLIES_MAX, 3, { coins: 2, supplies: 0, items: [] }]);
   });
 
   it("Dropped pack: each seat with room gets one common item; a full pack gets nothing", () => {

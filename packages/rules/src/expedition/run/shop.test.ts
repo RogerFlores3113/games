@@ -2,7 +2,7 @@
 // refusal, the replay visit, and no shop before a plain camp.
 
 import { describe, expect, it } from "vitest";
-import { SUPPLIES_MAX } from "./balance";
+import { SHOP, SHOP_SHARE_PORTION, SUPPLIES_MAX, SUPPLY_PRICE } from "./balance";
 import { attemptOf } from "./attempt";
 import { settleCamp } from "./lifecycle";
 import { campIndex } from "./plan";
@@ -50,12 +50,12 @@ describe("the shop", () => {
 
   it("a supply spends its price from the shared purse", () => {
     const run = act(shopRun({ purse: 20, supplies: 2 }), "p1", { type: "buy", stockId: "supplies" });
-    expect([run.purse, run.supplies]).toEqual([14, 3]);
+    expect([run.purse, run.supplies]).toEqual([20 - SUPPLY_PRICE, 3]);
   });
 
   it("refuses a buy the purse cannot cover as cannot_afford", () => {
     expect(refusal(shopRun({ purse: 5, supplies: 2 }), "p0", "supplies")).toEqual({ ok: false, error: "cannot_afford" });
-    expect(refusal(shopRun({ purse: 7 }), "p0", "upgrade:plain-1.a")).toEqual({ ok: false, error: "cannot_afford" });
+    expect(refusal(shopRun({ purse: SHOP.upgradePrice - 1 }), "p0", "upgrade:plain-1.a")).toEqual({ ok: false, error: "cannot_afford" });
   });
 
   it("refuses a supply at the cap as supplies_full", () => {
@@ -73,7 +73,7 @@ describe("the shop", () => {
 
   it("sells a seat its own character's upgrade once: upgrade_owned after, not_your_upgrade for another's", () => {
     const run = act(shopRun(), "p0", { type: "buy", stockId: "upgrade:plain-1.a" });
-    expect([run.purse, run.seats[0]!.upgradeId]).toEqual([12, "plain-1.a"]);
+    expect([run.purse, run.seats[0]!.upgradeId]).toEqual([20 - SHOP.upgradePrice, "plain-1.a"]);
     expect(refusal(run, "p0", "upgrade:plain-1.b")).toEqual({ ok: false, error: "upgrade_owned" });
     expect(refusal(run, "p1", "upgrade:plain-1.b")).toEqual({ ok: false, error: "not_your_upgrade" });
     expect(refusal(run, "p1", "upgrade:nobody.x")).toEqual({ ok: false, error: "not_your_upgrade" });
@@ -102,34 +102,53 @@ describe("shop shares", () => {
   const shares = (run: RunState) => (run.stage.tag === "shop" ? run.stage.shares : null);
   const give = (run: RunState, seatId: string, to: string, coins: number) => applyRunAction(run, seatId, { type: "give-coins", to, coins }, catalog);
 
-  it("splits the purse when the shop opens: floor(purse / seats) each, the rest is the pot", () => {
+  it("splits the purse when the shop opens: SHOP_SHARE_PORTION of it dealt out evenly, the rest is the pot", () => {
     const run = shopRun({ purse: 20 });
-    expect(shares(run)).toEqual({ p0: 6, p1: 6, p2: 6 });
-    expect(potOf(run)).toBe(2);
-    expect(splitPurse({ ...run, purse: 2 })).toEqual({ p0: 0, p1: 0, p2: 0 });
-    expect(potOf({ ...run, purse: 2, stage: { ...run.stage, shares: { p0: 0, p1: 0, p2: 0 } } })).toBe(2);
+    const each = Math.floor((20 * SHOP_SHARE_PORTION) / 3);
+    expect(each).toBe(3);
+    expect(shares(run)).toEqual({ p0: each, p1: each, p2: each });
+    expect(potOf(run)).toBe(20 - 3 * each);
+    expect(potOf(run)).toBe(11);
+    expect(splitPurse({ ...run, purse: 4 })).toEqual({ p0: 0, p1: 0, p2: 0 });
+    expect(potOf({ ...run, purse: 4, stage: { ...run.stage, shares: { p0: 0, p1: 0, p2: 0 } } })).toBe(4);
+  });
+
+  it("deals about half the purse to the crew pot, for any crew size", () => {
+    const run = shopRun({ purse: 20 });
+    for (const [seats, purse] of [[3, 20], [4, 17], [5, 30], [3, 1]] as const) {
+      const ids = ["p0", "p1", "p2", "p3", "p4"].slice(0, seats);
+      const split = splitPurse({ ...run, seatIds: ids, purse });
+      const each = Math.floor((purse * SHOP_SHARE_PORTION) / seats);
+      expect(Object.keys(split)).toEqual(ids);
+      expect(Object.values(split).every((share) => share === each)).toBe(true);
+      expect(purse - seats * each).toBeGreaterThanOrEqual(purse * (1 - SHOP_SHARE_PORTION));
+    }
+    expect(Object.values(splitPurse({ ...run, seatIds: ["p0", "p1", "p2", "p3"], purse: 17 }))).toEqual([2, 2, 2, 2]);
   });
 
   it("a buy spends the buyer's share first, then the pot", () => {
-    let run = act(shopRun({ purse: 20 }), "p0", { type: "buy", stockId: "item0" }); // 3
-    expect([run.purse, shares(run), potOf(run as RunAt<"shop">)]).toEqual([17, { p0: 3, p1: 6, p2: 6 }, 2]);
-    run = act(run, "p0", { type: "buy", stockId: "item1" }); // 4: 3 from the share, 1 from the pot
-    expect([run.purse, shares(run), potOf(run as RunAt<"shop">)]).toEqual([13, { p0: 0, p1: 6, p2: 6 }, 1]);
-    expect(shareOf(run as RunAt<"shop">, "p1")).toBe(6);
+    let run = act(shopRun({ purse: 20 }), "p0", { type: "buy", stockId: "item0" }); // 3: all from the share
+    expect([run.purse, shares(run), potOf(run as RunAt<"shop">)]).toEqual([17, { p0: 0, p1: 3, p2: 3 }, 11]);
+    run = act(run, "p0", { type: "buy", stockId: "item1" }); // 4: all from the pot
+    expect([run.purse, shares(run), potOf(run as RunAt<"shop">)]).toEqual([13, { p0: 0, p1: 3, p2: 3 }, 7]);
+    expect(shareOf(run as RunAt<"shop">, "p1")).toBe(3);
   });
 
-  it("is cannot_afford when share plus pot falls short, whatever the purse holds", () => {
-    const run = shopRun({ purse: 20 }); // p0 has 6, the pot 2: 8 reaches an upgrade (8) but not twice
+  it("a share and the pot together reach an upgrade; the pot runs dry for the next buyer", () => {
+    const run = shopRun({ purse: 20 }); // p0 has 3, the pot 11: 14 reaches two upgrades' worth
     const bought = act(run, "p0", { type: "buy", stockId: "upgrade:plain-1.a" });
-    expect([bought.purse, shares(bought), potOf(bought as RunAt<"shop">)]).toEqual([12, { p0: 0, p1: 6, p2: 6 }, 0]);
-    expect(refusal(bought, "p0", "supplies")).toEqual({ ok: false, error: "cannot_afford" });
-    expect(refusal(bought, "p1", "supplies")).toEqual({ ok: true, state: expect.anything() });
+    expect([bought.purse, shares(bought), potOf(bought as RunAt<"shop">)]).toEqual([20 - SHOP.upgradePrice, { p0: 0, p1: 3, p2: 3 }, 8]);
+    const drained = shopRun({ purse: 20, supplies: 2 });
+    const spent = act(act(drained, "p0", { type: "buy", stockId: "supplies" }), "p0", { type: "buy", stockId: "supplies" }); // 12: 3 share + 9 pot
+    expect([spent.purse, potOf(spent as RunAt<"shop">)]).toEqual([8, 2]);
+    expect(refusal(spent, "p0", "supplies")).toEqual({ ok: false, error: "cannot_afford" });
+    expect(refusal(spent, "p1", "item0")).toEqual({ ok: true, state: expect.anything() }); // p1 still has its own share of 3
   });
 
   it("give-coins moves coins from the giver's share to a teammate's, and a ready teammate may receive", () => {
     let run = act(shopRun({ purse: 20 }), "p1", { type: "ready" });
-    run = act(run, "p0", { type: "give-coins", to: "p1", coins: 4 });
-    expect(shares(run)).toEqual({ p0: 2, p1: 10, p2: 6 });
+    run = act(run, "p0", { type: "give-coins", to: "p1", coins: 2 });
+    expect(shares(run)).toEqual({ p0: 1, p1: 5, p2: 3 });
     expect(run.purse).toBe(20);
   });
 
@@ -139,7 +158,7 @@ describe("shop shares", () => {
     expect(give(run, "p0", "p0", 1)).toEqual({ ok: false, error: "not_a_teammate" });
     expect(give(run, "p0", "nobody", 1)).toEqual({ ok: false, error: "not_a_teammate" });
     expect(give(run, "p0", "toString", 1)).toEqual({ ok: false, error: "not_a_teammate" });
-    expect(give(run, "p0", "p1", 7)).toEqual({ ok: false, error: "cannot_afford" });
+    expect(give(run, "p0", "p1", 4)).toEqual({ ok: false, error: "cannot_afford" });
     expect(give(run, "p0", "p1", 0)).toEqual({ ok: false, error: "cannot_afford" });
     const plain = setupRun({ seatIds: SEATS, seed: SEED, catalog, camp: 2, purse: 20 });
     expect(give(plain, "p0", "p1", 1)).toEqual({ ok: false, error: "wrong_stage" });

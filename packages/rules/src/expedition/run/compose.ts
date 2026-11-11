@@ -28,6 +28,7 @@
 // RESET-ON-REPLAY (RUN-06) falls out structurally: a fresh AttemptState has
 // no effects, so a replay's first rulesFor call omits the old effects.
 
+import { WHISPER_CAP } from "./balance";
 import { baseRulesWith } from "../rules";
 import { cardReading, isTrump } from "../trick";
 import { HOOK_NAMES, baseRunHooks, type HookName, type RuleModifier, type RunRules } from "./run-rules";
@@ -73,7 +74,9 @@ export function composeRules(layers: readonly RuleModifier[]): RunRules {
       return { ...acc, [key]: nextValue };
     }, result);
   }
-  return result;
+  // The cap folds after every layer, Perfumist's cut included.
+  const counted = result.whispersPerCamp;
+  return { ...result, whispersPerCamp: (run, seatId) => Math.min(WHISPER_CAP, counted(run, seatId)) };
 }
 
 /** The rule layer an effect switches on: a seat ability's `active.effect`

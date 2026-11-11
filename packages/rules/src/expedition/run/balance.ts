@@ -49,7 +49,7 @@ export const SUPPLY_PRICE = 6;
 /** Supplies a failed camp costs before items add to it (Heavy Pack). */
 export const FAILURE_COST = 1;
 /** Coins a failed attempt pays into the crew purse, as consolation. */
-export const FAILED_ATTEMPT_COINS = 2;
+export const FAILED_ATTEMPT_COINS = 1;
 
 export const PURSE_START = 0;
 
@@ -57,7 +57,7 @@ export const PURSE_START = 0;
  * ground and `riskyWeather` in anything but fair weather, plus
  * `perUnplayedTrick` per trick left unplayed, for at most `unplayedCap`
  * tricks. */
-export const PAYOUT = { base: 5, riskyLocation: 2, riskyWeather: 2, perUnplayedTrick: 1, unplayedCap: 2 } as const;
+export const PAYOUT = { base: 3, riskyLocation: 1, riskyWeather: 1, perUnplayedTrick: 1, unplayedCap: 2 } as const;
 
 /** The locations and weathers that change nothing, so pay no risk bonus. */
 export const PLAIN_GROUND: { readonly locations: readonly string[]; readonly weathers: readonly string[] } = { locations: ["jungle", "clearing"], weathers: ["fair"] };
@@ -102,7 +102,12 @@ export const EVENT_EVERY = 2;
 
 /** The shop: `items` single copies beside the supplies, and each seat's own
  * character's upgrades. */
-export const SHOP = { items: 3, upgradePrice: 8 } as const;
+/** The part of the purse the shop deals out as per-seat shares, split evenly
+ * (each seat gets floor(purse * SHOP_SHARE_PORTION / seats)); the rest is the
+ * crew pot anyone's buy may draw on after their own share. */
+export const SHOP_SHARE_PORTION = 1 / 2;
+
+export const SHOP = { items: 3, upgradePrice: 6 } as const;
 
 /** The camps a shop opens before, after their route vote: every boss camp,
  * and camp 3 of a Short run too. */
@@ -121,7 +126,10 @@ export const BACKPACK_SIZE = 6;
 /** Whispers each seat has per camp, before items add to it. */
 export const WHISPERS_PER_CAMP = 2;
 /** Extra whispers per camp for a seat that owns an upgrade. */
-export const WHISPERS_PER_UPGRADE = 1;
+export const WHISPERS_PER_UPGRADE = 0;
+/** No seat has more than this many whispers in a camp, whatever stacks
+ * (Leader, items, upgrades). Applied last, where the composed count is read. */
+export const WHISPER_CAP = 4;
 /** Whispers per camp for a Perfumist until it owns an upgrade. */
 export const PERFUMIST_WHISPERS_UNUPGRADED = 1;
 

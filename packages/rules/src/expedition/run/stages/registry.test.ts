@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { defineItem, itemAbility } from "../../content/source-def";
 import type { CampState } from "../../state";
 import { attemptOf } from "../attempt";
+import { PAYOUT } from "../balance";
 import { createRun, runStatus } from "../lifecycle";
 import { campIndex } from "../plan";
 import { advanceTo, plainItem, setupRun, setupShop, testCatalog } from "../run-test-support";
@@ -353,7 +354,7 @@ describe("applyRunAction: camp delegation", () => {
 
   it("settles a decided camp in the same call: history gains one entry, the draft opens", () => {
     const state = ok(applyRunAction(campRun({ p0: ["item-a"] }), "p0", { type: "play-card", cardId: "c-p0" }, catalog));
-    expect(state.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 5 }]);
+    expect(state.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: PAYOUT.base }]);
     expect(state.stage).toEqual({ tag: "draft", next: 2 });
     expect(attemptOf(state)).toBeNull();
   });
