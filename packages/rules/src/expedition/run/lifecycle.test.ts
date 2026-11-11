@@ -6,7 +6,7 @@
 // characters through testCatalog.
 
 import { describe, expect, it } from "vitest";
-import { SUPPLIES_START } from "./balance";
+import { SUPPLIES_START, seatObjectivesAt } from "./balance";
 import { campPhase, currentActorSeatId, guard } from "../camp";
 import { ability, defineCharacter, defineItem, defineUpgrade, itemAbility } from "../content/source-def";
 import { attemptOf, nextAttemptNumber, withAttempt } from "./attempt";
@@ -319,7 +319,7 @@ describe("between camps: draft, event and route vote", () => {
     expect([2, 3]).toContain(run.stage.options.length);
     expect(run.stage.options[0]).toEqual({
       id: "a",
-      next: { index: 2, location: "clifftop", weather: "fog", slots: [{ kind: "win-card" }, { kind: "win-card" }, { kind: "win-card" }] },
+      next: { index: 2, location: "clifftop", weather: "fog", slots: [{ kind: "win-card" }, { kind: "win-card" }] },
       reroll: 0,
       swapBoss: null,
     });
@@ -349,7 +349,7 @@ describe("between camps: draft, event and route vote", () => {
       if (run.stage.tag !== "route") throw new Error("expected the route vote");
       for (const option of run.stage.options) {
         expect(option.next.index).toBe(4);
-        expect(option.next.slots).toHaveLength(4);
+        expect(option.next.slots).toHaveLength(seatObjectivesAt("standard", 4, 3));
         for (const slot of option.next.slots) kinds.add(slot.kind);
       }
     }

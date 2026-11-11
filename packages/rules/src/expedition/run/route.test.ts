@@ -47,7 +47,8 @@ describe("routeOptions", () => {
   });
 
   it("adds each crew size's extras at the camps EXTRA_OBJECTIVES names, never past MAX_SEAT_OBJECTIVES", () => {
-    for (const [players, expected] of [[3, 3], [4, 4], [5, 5]] as const) {
+    for (const [players, expected] of [[3, 2], [4, 2], [5, 4]] as const) {
+      expect(seatObjectivesAt("standard", 2, players)).toBe(expected);
       for (const option of optionsOf(draftAfter("crew", "standard", 1, players), CATALOG)) expect(option.next.slots).toHaveLength(expected);
     }
     for (const players of [3, 4, 5]) {

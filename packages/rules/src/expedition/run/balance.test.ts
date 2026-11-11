@@ -61,7 +61,7 @@ describe("SHOP_CAMPS", () => {
 describe("seatObjectivesAt", () => {
   it("adds each crew size's extras at the camps EXTRA_OBJECTIVES names", () => {
     expect(EXTRA_OBJECTIVES.short).toEqual({ 3: [0, 0, 1, 1], 4: [0, 0, 0, 1], 5: [1, 1, 1, 2] });
-    expect(EXTRA_OBJECTIVES.standard).toEqual({ 3: [0, 0, 0, 0, 0, 0], 4: [0, 1, 1, 1, 1, 1], 5: [1, 2, 2, 2, 2, 2] });
+    expect(EXTRA_OBJECTIVES.standard).toEqual({ 3: [0, 0, 0, 0, 0, 0], 4: [0, 0, 0, 0, 0, 1], 5: [1, 2, 2, 2, 2, 2] });
     for (const length of Object.keys(RUN_LENGTHS) as RunLength[]) {
       for (const players of [3, 4, 5] as const) {
         expect(EXTRA_OBJECTIVES[length][players]).toHaveLength(RUN_LENGTHS[length].camps);
@@ -71,6 +71,7 @@ describe("seatObjectivesAt", () => {
       }
     }
     expect([1, 2, 3, 4].map((k) => seatObjectivesAt("short", k, 4))).toEqual([2, 2, 3, 4]);
+    expect([1, 2, 3, 4, 5, 6].map((k) => seatObjectivesAt("standard", k, 4))).toEqual([2, 2, 3, 3, 3, 5]);
   });
 
   it("never returns more than MAX_SEAT_OBJECTIVES", () => {

@@ -479,7 +479,7 @@ describe("Cartographer", () => {
     const desert: RunState = { ...loadout, stage: { ...loadout.stage, camp: { ...loadout.stage.camp, location: "desert", weather: "fair" } } };
     const view = toExpeditionPlayerView(desert, "p0", CATALOG);
     if (view.stage.tag !== "loadout") throw new Error("expected a loadout view");
-    const survey = [{ kind: "win-card", target: ident("clubs", 6) }, { kind: "win-card", target: ident("diamonds", 12) }, { kind: "hidden" }];
+    const survey = [{ kind: "win-card", target: ident("clubs", 6) }, { kind: "hidden" }];
     expect(view.stage.camp.survey).toEqual(survey);
     const dealt = attemptViewOf(toExpeditionPlayerView(advanceTo(desert, "objective-pick", CATALOG), "p0", CATALOG)).camp.objectives;
     expect(dealt.map((o) => ("target" in o ? { kind: o.kind, target: o.target } : { kind: o.kind }))).toEqual(survey);
