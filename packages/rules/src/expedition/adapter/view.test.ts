@@ -79,7 +79,7 @@ describe("toExpeditionPlayerView", () => {
     expect(view.stage).toMatchObject({ tag: "loadout", readySeatIds: ["p1"], camp: { index: 2, shop: false } });
     expect(Object.keys(view.stage).sort()).toEqual(["camp", "mods", "readySeatIds", "tag"]);
     expect(view.yourItemSlots).toBe(2);
-    expect([view.length, view.campCount, view.purse, view.supplies]).toEqual(["standard", 6, 0, { count: 3, max: 4 }]);
+    expect([view.length, view.campCount, view.purse, view.supplies]).toEqual(["standard", 6, 0, { count: 4, max: 5 }]);
     expect(view.plan).toEqual([{ at: 3, tier: "animal", bossId: null }, { at: 6, tier: "temple", bossId: "temple" }]);
   });
 
@@ -197,7 +197,7 @@ describe("toExpeditionPlayerView", () => {
 
     const view = toExpeditionPlayerView(lost, "p0", CATALOG);
 
-    expect([view.runStatus, view.stage, view.supplies]).toEqual(["lost", { tag: "ended", result: "lost" }, { count: 0, max: 4 }]);
+    expect([view.runStatus, view.stage, view.supplies]).toEqual(["lost", { tag: "ended", result: "lost" }, { count: 0, max: 5 }]);
   });
 
   it("seats[] carry each seat's public character, upgrade, equipped and backpack items, and usage by key", () => {
@@ -368,16 +368,16 @@ describe("toExpeditionPlayerView", () => {
     expect(attemptViewOf(otherView).camp.yourLegalCardIds).toEqual([]);
   });
 
-  it("yourWhisper: one whisper allowed per camp, spent after sending, null when unseated", () => {
+  it("yourWhisper: two whispers allowed per camp, spent after sending, null when unseated", () => {
     const seed = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const setup = advanceTo(setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG }), "between-tricks", CATALOG);
     const cardId = attemptOf(setup)!.camp.hands.find((h) => h.seatId === "p0")!.cards[0]!.id;
-    expect(attemptViewOf(toExpeditionPlayerView(setup, "p0", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 1 });
+    expect(attemptViewOf(toExpeditionPlayerView(setup, "p0", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 2 });
 
     const sent = applyRunAction(setup, "p0", { type: "whisper", targetSeatId: "p1", cardId }, CATALOG);
     if (!sent.ok) throw new Error(sent.error);
-    expect(attemptViewOf(toExpeditionPlayerView(sent.state, "p0", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 0 });
-    expect(attemptViewOf(toExpeditionPlayerView(sent.state, "p1", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 1 });
+    expect(attemptViewOf(toExpeditionPlayerView(sent.state, "p0", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 1 });
+    expect(attemptViewOf(toExpeditionPlayerView(sent.state, "p1", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 2 });
     expect(attemptViewOf(toExpeditionPlayerView(sent.state, "watcher", CATALOG)).yourWhisper).toBeNull();
   });
 
@@ -386,8 +386,8 @@ describe("toExpeditionPlayerView", () => {
     const run = advanceTo(setupRun({ seatIds: [...SEATS], seed, catalog: CATALOG, camp: 3, items: { p0: ["rain-poncho"] } }), "between-tricks", CATALOG);
     const used = applyRunAction(run, "p0", { type: "use-ability", sourceKey: "it0", targets: [] }, CATALOG);
     if (!used.ok) throw new Error(used.error);
-    expect(attemptViewOf(toExpeditionPlayerView(used.state, "p0", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 2 });
-    expect(attemptViewOf(toExpeditionPlayerView(used.state, "p1", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 1 });
+    expect(attemptViewOf(toExpeditionPlayerView(used.state, "p0", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 3 });
+    expect(attemptViewOf(toExpeditionPlayerView(used.state, "p1", CATALOG)).yourWhisper).toEqual({ allowed: true, left: 2 });
   });
 
   it("is pure: two calls return deep-equal views, the input state is unchanged, and the view round-trips through JSON", () => {

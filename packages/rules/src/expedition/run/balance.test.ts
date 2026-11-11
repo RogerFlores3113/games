@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createCamp } from "../camp";
 import type { CampState } from "../state";
-import { EXTRA_OBJECTIVES_BY_PLAYERS, MIX_FROM_CAMP, OBJECTIVE_RAMP, PLAIN_GROUND, RUN_LENGTHS, SHOP_CAMPS, TRICK_COUNT_N_RANGE, mixFromCampFor, objectiveSlotsFor, payoutFor, payoutRange, seatObjectivesAt } from "./balance";
+import { EXTRA_OBJECTIVES, FAILED_ATTEMPT_COINS, MAX_SEAT_OBJECTIVES, SUPPLIES_MAX, SUPPLIES_START, WASHES, WHISPERS_PER_CAMP, MIX_FROM_CAMP, OBJECTIVE_RAMP, PLAIN_GROUND, RUN_LENGTHS, SHOP_CAMPS, TRICK_COUNT_N_RANGE, mixFromCampFor, objectiveSlotsFor, payoutFor, payoutRange, seatObjectivesAt } from "./balance";
 import { campIndex } from "./plan";
 import { CATALOG } from "./catalog";
 import { campSpecAt, type CampSpec } from "./route";
@@ -59,13 +59,28 @@ describe("SHOP_CAMPS", () => {
 });
 
 describe("seatObjectivesAt", () => {
-  it("is the ramp at 3 players, one more at 4 and two more at 5, at every camp", () => {
-    expect(EXTRA_OBJECTIVES_BY_PLAYERS).toEqual({ 3: 0, 4: 1, 5: 2 });
+  it("adds each crew size's extras at the camps EXTRA_OBJECTIVES names", () => {
+    expect(EXTRA_OBJECTIVES.short).toEqual({ 3: [0, 0, 1, 1], 4: [0, 1, 0, 1], 5: [1, 1, 1, 2] });
+    expect(EXTRA_OBJECTIVES.standard).toEqual({ 3: [0, 0, 0, 0, 0, 0], 4: [0, 1, 1, 1, 1, 1], 5: [1, 2, 2, 2, 2, 2] });
     for (const length of Object.keys(RUN_LENGTHS) as RunLength[]) {
-      OBJECTIVE_RAMP[length].forEach((ramp, i) => {
-        expect([3, 4, 5].map((players) => seatObjectivesAt(length, i + 1, players))).toEqual([ramp, ramp + 1, ramp + 2]);
-      });
+      for (const players of [3, 4, 5] as const) {
+        expect(EXTRA_OBJECTIVES[length][players]).toHaveLength(RUN_LENGTHS[length].camps);
+        OBJECTIVE_RAMP[length].forEach((ramp, i) => {
+          expect(seatObjectivesAt(length, i + 1, players)).toBe(Math.min(MAX_SEAT_OBJECTIVES, ramp + EXTRA_OBJECTIVES[length][players][i]!));
+        });
+      }
     }
+    expect([1, 2, 3, 4].map((k) => seatObjectivesAt("short", k, 4))).toEqual([2, 4, 4, 4]);
+  });
+
+  it("never returns more than MAX_SEAT_OBJECTIVES", () => {
+    expect(MAX_SEAT_OBJECTIVES).toBe(5);
+    for (const length of Object.keys(RUN_LENGTHS) as RunLength[]) {
+      for (let k = 1; k <= RUN_LENGTHS[length].camps; k++) {
+        for (const players of [3, 4, 5]) expect(seatObjectivesAt(length, k, players)).toBeLessThanOrEqual(MAX_SEAT_OBJECTIVES);
+      }
+    }
+    expect(seatObjectivesAt("long", 7, 5)).toBe(5);
   });
 
   it("refuses a camp the run length does not have", () => {
@@ -114,5 +129,25 @@ describe("objectiveSlotsFor", () => {
         }
       }
     }
+  });
+});
+
+describe("round 2 numbers", () => {
+  it("starts the crew with 4 supplies and holds 5 at most (A2)", () => {
+    expect([SUPPLIES_START, SUPPLIES_MAX]).toEqual([4, 5]);
+  });
+
+  it("spares 3 players' whispers from Rain and 2 from a Downpour (A3)", () => {
+    expect([WASHES.rain.spared, WASHES.downpour.spared]).toEqual([3, 2]);
+    expect([3, 4, 5].map((players) => Math.max(0, players - WASHES.rain.spared))).toEqual([0, 1, 2]);
+    expect([3, 4, 5].map((players) => Math.max(0, players - WASHES.downpour.spared))).toEqual([1, 2, 3]);
+  });
+
+  it("gives every seat 2 whispers a camp (A4)", () => {
+    expect(WHISPERS_PER_CAMP).toBe(2);
+  });
+
+  it("pays 2 coins for a failed attempt (A5)", () => {
+    expect(FAILED_ATTEMPT_COINS).toBe(2);
   });
 });

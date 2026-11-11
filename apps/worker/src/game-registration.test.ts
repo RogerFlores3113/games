@@ -14,6 +14,7 @@ const ALL_RUN_ERRORS: readonly RunError[] = [
   "must_follow_suit",
   "no_joker_first_lead",
   "objective_not_available",
+  "objective_conflict",
   "invalid_action",
   "not_a_seat",
   "run_over",

@@ -241,7 +241,7 @@ describe("muster", () => {
         objectId: "draft:leader",
         name: "The Leader",
         theme: "Communicates",
-        power: { sourceId: "leader", name: "Megaphone", text: "Whisper twice each camp.", badges: ["Always on"] },
+        power: { sourceId: "leader", name: "Megaphone", text: "Whisper once more each camp.", badges: ["Always on"] },
         more: [],
         takenBy: null,
         yours: false,
@@ -280,7 +280,7 @@ describe("draft", () => {
           objectId: "bundle:0",
           name: "Rain Poncho + Trail Map",
           items: [
-            { itemId: "rain-poncho", objectId: "bundle-item:0:0", name: "Rain Poncho", text: "Whisper once more this camp.", uses: "2 charges", rare: false, exclusive: false },
+            { itemId: "rain-poncho", objectId: "bundle-item:0:0", name: "Rain Poncho", text: "Whisper once more this camp, and rain can't wash your whispers this camp.", uses: "2 charges", rare: false, exclusive: false },
             { itemId: "trail-map", objectId: "bundle-item:0:1", name: "Trail Map", text: "Swap all your open objectives with a teammate's.", uses: "Single use", rare: true, exclusive: false },
           ],
         },
@@ -295,7 +295,7 @@ describe("draft", () => {
               itemId: "heavy-pack",
               objectId: "bundle-item:1:0",
               name: "Heavy Pack",
-              text: "Whisper once more each camp; failing costs the crew 1 more supply, and packs don't stack.",
+              text: "Whisper once more each camp; a failed camp costs 2 coins, and packs don't stack.",
               uses: "Always on",
               rare: false,
               exclusive: false,
@@ -504,7 +504,7 @@ describe("item bar and inventory", () => {
       slots: [
         {
           objectId: "bar-slot:0",
-          item: { uid: "trained-monkey", itemId: "trained-monkey", objectId: "slot:0", name: "Trained Monkey", text: "Swap a card in your hand with a random card from a teammate's hand.", uses: "Once per camp", rare: false, targetable: false, selected: false, tag: null },
+          item: { uid: "trained-monkey", itemId: "trained-monkey", objectId: "slot:0", name: "Trained Monkey", text: "Swap a card for one a teammate whispered to you, if they still hold it.", uses: "Once per camp", rare: false, targetable: false, selected: false, tag: null },
         },
         { objectId: "bar-slot:1", item: null },
       ],
@@ -789,7 +789,7 @@ describe("tooltip", () => {
     const poncho = model(at(draftStage({ yourOffer: { kind: "standard", bundles: [["rain-poncho"]] } })), ui({ tooltipSourceId: "rain-poncho" })).tooltip;
     expect(poncho).toEqual({
       title: "Rain Poncho",
-      text: "Whisper once more this camp.",
+      text: "Whisper once more this camp, and rain can't wash your whispers this camp.",
       badges: ["Between tricks", "2 charges"],
       reason: null,
     });

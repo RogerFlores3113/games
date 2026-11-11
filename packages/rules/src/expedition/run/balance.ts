@@ -20,10 +20,17 @@ export const OBJECTIVE_RAMP: Readonly<Record<RunLength, readonly number[]>> = {
   long: [2, 3, 3, 4, 4, 4, 5, 4],
 };
 
-/** Seat objectives a camp adds to OBJECTIVE_RAMP for its crew size. The ramp
- * is tuned for 3 players; bigger crews hold more cards between them, so they
- * get more to do. */
-export const EXTRA_OBJECTIVES_BY_PLAYERS: Readonly<Record<3 | 4 | 5, number>> = { 3: 0, 4: 1, 5: 2 };
+/** Seat objectives each camp adds to OBJECTIVE_RAMP for its crew size, one
+ * entry per camp. The ramp is tuned for 3 players; bigger crews hold more
+ * cards between them, so they get more to do, at the camps chosen here. */
+export const EXTRA_OBJECTIVES: Readonly<Record<RunLength, Readonly<Record<3 | 4 | 5, readonly number[]>>>> = {
+  short: { 3: [0, 0, 1, 1], 4: [0, 1, 0, 1], 5: [1, 1, 1, 2] },
+  standard: { 3: [0, 0, 0, 0, 0, 0], 4: [0, 1, 1, 1, 1, 1], 5: [1, 2, 2, 2, 2, 2] },
+  long: { 3: [0, 0, 0, 0, 0, 0, 0, 0], 4: [0, 1, 1, 1, 1, 1, 1, 1], 5: [1, 2, 2, 2, 2, 2, 2, 2] },
+};
+
+/** No seat is ever dealt more objectives than this in one camp. */
+export const MAX_SEAT_OBJECTIVES = 5;
 
 /** Ordered pairs and trick-count slots appear from this camp on. */
 export const MIX_FROM_CAMP = 4;
@@ -35,12 +42,14 @@ export const EARLY_MIX_PLAYERS = 4;
  * camp with at least this many seat slots. */
 export const BOTH_MIX_MIN_SLOTS = 4;
 
-export const SUPPLIES_START = 3;
-export const SUPPLIES_MAX = 4;
+export const SUPPLIES_START = 4;
+export const SUPPLIES_MAX = 5;
 /** Coins for one supply at the shop. */
 export const SUPPLY_PRICE = 6;
 /** Supplies a failed camp costs before items add to it (Heavy Pack). */
 export const FAILURE_COST = 1;
+/** Coins a failed attempt pays into the crew purse, as consolation. */
+export const FAILED_ATTEMPT_COINS = 2;
 
 export const PURSE_START = 0;
 
@@ -66,8 +75,8 @@ export const THUNDERSTORM = { firstChance: 20, perTrick: 10, maxStrikes: 2, expo
  * player count less `spared`, plus `exposed` more at an exposed location
  * (Clifftop). A washed whisper is spent and nobody sees its card. */
 export const WASHES = {
-  rain: { spared: 2, exposed: 2 },
-  downpour: { spared: 1, exposed: 3 },
+  rain: { spared: 3, exposed: 2 },
+  downpour: { spared: 2, exposed: 3 },
 } as const;
 
 /** Tornado: after every `every`th trick, `cards` random cards from every
@@ -105,9 +114,11 @@ export const ITEM_SLOTS = 2;
 export const BACKPACK_SIZE = 6;
 
 /** Whispers each seat has per camp, before items add to it. */
-export const WHISPERS_PER_CAMP = 1;
+export const WHISPERS_PER_CAMP = 2;
 /** Extra whispers per camp for a seat that owns an upgrade. */
 export const WHISPERS_PER_UPGRADE = 1;
+/** Whispers per camp for a Perfumist until it owns an upgrade. */
+export const PERFUMIST_WHISPERS_UNUPGRADED = 1;
 
 /** Placeholder: an exactly-n slot draws N uniformly from this range. */
 export const TRICK_COUNT_N_RANGE = { min: 2, max: 4 } as const;
@@ -118,11 +129,12 @@ function crewSize(players: number): 3 | 4 | 5 {
 }
 
 /** Camp k's seat objectives for a crew of `players`, before boss and temple
- * slot layers: OBJECTIVE_RAMP plus EXTRA_OBJECTIVES_BY_PLAYERS. */
+ * slot layers: OBJECTIVE_RAMP plus EXTRA_OBJECTIVES, at most MAX_SEAT_OBJECTIVES. */
 export function seatObjectivesAt(length: RunLength, k: number, players: number): number {
   const ramp = OBJECTIVE_RAMP[length][k - 1];
   if (ramp === undefined) throw new Error(`balance: ${length} run has no camp ${k}`);
-  return ramp + EXTRA_OBJECTIVES_BY_PLAYERS[crewSize(players)];
+  const extra = EXTRA_OBJECTIVES[length][crewSize(players)][k - 1] ?? 0;
+  return Math.min(MAX_SEAT_OBJECTIVES, ramp + extra);
 }
 
 /** The first camp with mixed slots for a crew of `players`. */

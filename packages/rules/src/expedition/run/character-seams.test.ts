@@ -2,6 +2,7 @@
 // by a test-only source. With no such source every seam answers as before,
 // which the rest of the suite already pins.
 
+import { FAILED_ATTEMPT_COINS } from "./balance";
 import { describe, expect, it } from "vitest";
 import { applyCampAction } from "../actions";
 import { campPhase, currentActorSeatId } from "../camp";
@@ -336,7 +337,7 @@ describe("foldsLast", () => {
     const camp = advanceTo(setupRun({ seatIds: SEATS, seed: "last", catalog, characters: { p0: "counted" }, items: { p1: ["shouter"] } }), "between-tricks", catalog);
     const shouted = use(camp, "p1", "it0", [], catalog);
     const rules = rulesFor(shouted, catalog);
-    expect([rules.whispersPerCamp(shouted, "p0"), rules.whispersPerCamp(shouted, "p1")]).toEqual([7, 2]);
+    expect([rules.whispersPerCamp(shouted, "p0"), rules.whispersPerCamp(shouted, "p1")]).toEqual([7, 3]);
   });
 });
 
@@ -632,7 +633,7 @@ describe("source reactions", () => {
     const cleared = withAttempt(dealt, { ...dealt.stage.attempt, camp: { ...dealt.stage.attempt.camp, objectives: [] } }) as RunAt<"camp">;
     const settled = settleCamp(cleared, "cleared", catalog);
     expect(settled.purse).toBe(2 + 1 + settled.history.at(-1)!.coins);
-    expect(settleCamp(cleared, "failed", catalog).purse).toBe(2);
+    expect(settleCamp(cleared, "failed", catalog).purse).toBe(2 + FAILED_ATTEMPT_COINS);
   });
 });
 

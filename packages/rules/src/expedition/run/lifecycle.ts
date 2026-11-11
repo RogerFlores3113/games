@@ -8,7 +8,7 @@ import { EVENTS } from "../content/events/registry";
 import { applyEvent, drawEventId } from "./events";
 import { draftOfferFor } from "./draft";
 import { currentStamp, ownerOf } from "./usage";
-import { PURSE_START, SUPPLIES_START, objectiveSlotsFor, payoutFor } from "./balance";
+import { FAILED_ATTEMPT_COINS, PURSE_START, SUPPLIES_START, objectiveSlotsFor, payoutFor } from "./balance";
 import { campIndex, isFinalCamp } from "./plan";
 import { firstCampSpec, planOf, routeOptions, type CampSpec } from "./route";
 import { attemptSeed } from "./rng";
@@ -149,11 +149,11 @@ function settleFailure(run: RunAt<"camp">, catalog: Catalog): RunState {
   const cost = rulesFor(run, catalog).failureCost(run);
   if (!Number.isInteger(cost) || cost < 0) throw new Error(`settleCamp: failureCost must be an integer >= 0, got ${cost}`);
   const spec = run.stage.camp;
-  const result: CampResult = { camp: spec.index, attempt: run.stage.attempt.attemptNumber, location: spec.location, weather: spec.weather, status: "failed", suppliesSpent: cost, coins: 0 };
+  const result: CampResult = { camp: spec.index, attempt: run.stage.attempt.attemptNumber, location: spec.location, weather: spec.weather, status: "failed", suppliesSpent: cost, coins: FAILED_ATTEMPT_COINS };
   const supplies = Math.max(0, run.supplies - cost);
-  const lastAttempt = recapOf(run, "failed", 0, supplyCostParts(run, catalog), catalog);
-  // A rule may take coins from the purse on a failure (Heavy Pack); the purse never goes below 0.
-  const purse = Math.max(0, run.purse - Math.max(0, rulesFor(run, catalog).failureCoins(run)));
+  const lastAttempt = recapOf(run, "failed", FAILED_ATTEMPT_COINS, supplyCostParts(run, catalog), catalog);
+  // The consolation is paid first; a rule may then take coins back (Heavy Pack), never below 0.
+  const purse = Math.max(0, run.purse + FAILED_ATTEMPT_COINS - Math.max(0, rulesFor(run, catalog).failureCoins(run)));
   const settled: RunState = { ...run, supplies, purse, history: [...run.history, result], lastAttempt };
   return supplies === 0 ? { ...settled, stage: { tag: "ended", result: "lost" } } : reopenCamp(settled, spec, catalog);
 }

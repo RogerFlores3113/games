@@ -9,7 +9,7 @@
 // exception escaping applyCampAction (WR-04).
 
 import { assertPlayerCount, buildObjectiveDeck, complementOf, dealHands } from "./deck";
-import { objectiveStatuses } from "./objectives";
+import { hasOpenWithoutConflict, objectiveStatuses } from "./objectives";
 import { baseRules, type CoreRules } from "./rules";
 import { mintCardId, seedToRngState } from "../shuffle";
 import type { CampOutcome, CampPhase, CampState, Goal, Objective, ObjectiveSlot } from "./state";
@@ -181,6 +181,24 @@ export function campPhase(state: CampState, rules: CoreRules = baseRules): CampP
   return anyUnowned ? "objective-pick" : "playing";
 }
 
+/** The seat that picks next: the scheduled picker, unless every open
+ * objective conflicts with one it already owns. Then the pick passes along
+ * the pick order to the first seat with an open objective that does not
+ * conflict for it; with none, the scheduled picker picks as before. */
+export function objectivePickerSeatId(state: CampState, rules: CoreRules = baseRules): string {
+  const ownedCount = state.objectives.filter((o) => o.ownerSeatId !== null).length;
+  const order: string[] = [];
+  for (let k = 0; k <= state.seatIds.length * 2 && order.length < state.seatIds.length; k++) {
+    const seat = rules.objectivePicker(state, ownedCount + k);
+    if (!state.seatIds.includes(seat)) {
+      throw new Error(`currentActorSeatId: objectivePicker returned unknown seat ${seat}`);
+    }
+    if (!order.includes(seat)) order.push(seat);
+  }
+  const scheduled = order[0]!;
+  return order.find((seat) => hasOpenWithoutConflict(state, seat)) ?? scheduled;
+}
+
 /** The seat that must act next, or null once the camp is decided (play
  * stops — see file header). */
 export function currentActorSeatId(state: CampState, rules: CoreRules = baseRules): string | null {
@@ -188,12 +206,7 @@ export function currentActorSeatId(state: CampState, rules: CoreRules = baseRule
   if (phase === "ended") return null;
 
   if (phase === "objective-pick") {
-    const ownedCount = state.objectives.filter((o) => o.ownerSeatId !== null).length;
-    const picker = rules.objectivePicker(state, ownedCount);
-    if (!state.seatIds.includes(picker)) {
-      throw new Error(`currentActorSeatId: objectivePicker returned unknown seat ${picker}`);
-    }
-    return picker;
+    return objectivePickerSeatId(state, rules);
   }
 
   const leaderIndex = state.seatIds.indexOf(state.currentTrick.leaderSeatId);

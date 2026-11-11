@@ -219,7 +219,7 @@ describe("expeditionGame: autoPassRequest", () => {
     const passed = expeditionGame.applyAction(rescue!, "p0", expeditionGame.autoPassRequest!(rescue!, "p0"));
     if (!passed.ok) throw new Error(passed.error);
     expect(passed.state.stage.tag).toBe("shop");
-    expect(passed.state.history).toEqual([{ camp: 3, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 0 }]);
+    expect(passed.state.history).toEqual([{ camp: 3, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 2 }]);
     expect(expeditionGame.autoPassRequest!(passed.state, "p0")).toEqual({ type: "ready" });
   });
 
@@ -301,7 +301,7 @@ describe("expeditionGame: checkGameEnd", () => {
       history: [{ camp: campIndex(6), attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 5 }],
       stage: { tag: "ended", result: "won" },
     };
-    expect(expeditionGame.checkGameEnd(state)).toEqual({ outcome: "won", campReached: 6, suppliesLeft: 3 });
+    expect(expeditionGame.checkGameEnd(state)).toEqual({ outcome: "won", campReached: 6, suppliesLeft: 4 });
   });
 });
 

@@ -9,7 +9,7 @@ export const leader = defineCharacter({
   name: "The Leader",
   theme: "Communicates",
   power: "Megaphone",
-  text: "Whisper twice each camp.",
+  text: "Whisper once more each camp.",
   passive: { modifier: (owner) => extraWhisper(owner.seatId) },
   upgrades: [
     defineUpgrade({

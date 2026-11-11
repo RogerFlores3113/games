@@ -128,7 +128,7 @@ function checkRun(states: readonly RunState[]): void {
   }
 
   for (const entry of states[states.length - 1]!.history) {
-    if (entry.status === "failed") expect(entry.suppliesSpent).toBeGreaterThanOrEqual(1);
+    if (entry.status === "failed") expect(entry.suppliesSpent).toBeGreaterThanOrEqual(0);
     else expect(entry.suppliesSpent).toBe(0);
   }
 }

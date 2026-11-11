@@ -210,27 +210,36 @@ function weatherStatus(weather: string, location: string, players: number) {
 }
 
 describe("Rain", () => {
-  it("washes away the crew's first whisper at three players: spent, unseen, and told to everyone", () => {
-    const run = advanceTo(loadoutIn("rain"), "between-tricks", CATALOG);
+  const FOUR = ["p0", "p1", "p2", "p3"];
+
+  it("washes away the crew's first whisper at four players: spent, unseen, and told to everyone", () => {
+    const run = advanceTo(loadoutIn("rain", {}, "weather", "jungle", FOUR), "between-tricks", CATALOG);
     const washed = whisper(run, "p1", "p2");
     expect(attemptOf(washed)!.reveals).toEqual([]);
     expect(attemptOf(washed)!.log.at(-1)).toEqual({ event: "whisper-washed", actorSeatId: "p1", subjectSeatIds: ["p2"], sourceId: null, audience: "public" });
-    expect(applyRunAction(washed, "p1", { type: "whisper", targetSeatId: "p0", cardId: cardOf(washed, "p1") }, CATALOG)).toEqual({ ok: false, error: "no_whispers_left" });
-    const heard = whisper(washed, "p0", "p2");
-    expect(attemptOf(heard)!.reveals).toEqual([{ cardId: cardOf(washed, "p0"), fromSeatId: "p0", audience: ["p2"], source: "whisper", targetSeatId: "p2" }]);
+    const second = whisper(washed, "p1", "p0");
+    expect(attemptOf(second)!.reveals).toEqual([{ cardId: cardOf(washed, "p1"), fromSeatId: "p1", audience: ["p0"], source: "whisper", targetSeatId: "p0" }]);
+    expect(applyRunAction(second, "p1", { type: "whisper", targetSeatId: "p3", cardId: cardOf(second, "p1") }, CATALOG)).toEqual({ ok: false, error: "no_whispers_left" });
   });
 
-  it("washes away the player count less two, and two more on the Clifftop", () => {
+  it("washes nothing at three players", () => {
+    const run = advanceTo(loadoutIn("rain"), "between-tricks", CATALOG);
+    const heard = whisper(run, "p1", "p2");
+    expect(attemptOf(heard)!.log.map((entry) => entry.event)).toEqual(["whisper"]);
+    expect(attemptOf(heard)!.reveals.map((reveal) => reveal.targetSeatId)).toEqual(["p2"]);
+  });
+
+  it("washes away the player count less three, and two more on the Clifftop", () => {
     expect([3, 4, 5].map((players) => weatherStatus("rain", "jungle", players))).toEqual([
+      [{ kind: "washes", left: 0, of: 0 }],
       [{ kind: "washes", left: 1, of: 1 }],
       [{ kind: "washes", left: 2, of: 2 }],
-      [{ kind: "washes", left: 3, of: 3 }],
     ]);
-    expect(weatherStatus("rain", "clifftop", 3)).toEqual([{ kind: "washes", left: 3, of: 3 }]);
+    expect(weatherStatus("rain", "clifftop", 3)).toEqual([{ kind: "washes", left: 2, of: 2 }]);
   });
 
   it("counts down as whispers wash away, and stops washing once they are spent", () => {
-    const run = advanceTo(loadoutIn("rain", {}, "weather", "jungle", ["p0", "p1", "p2", "p3"]), "between-tricks", CATALOG);
+    const run = advanceTo(loadoutIn("rain", {}, "weather", "jungle", ["p0", "p1", "p2", "p3", "p4"]), "between-tricks", CATALOG);
     const once = whisper(run, "p0", "p1");
     const view = toExpeditionPlayerView(once, "p3", CATALOG);
     expect(view.stage.tag === "camp" ? view.stage.mods.find((mod) => mod.id === "rain")?.status : null).toEqual([{ kind: "washes", left: 1, of: 2 }]);
@@ -246,19 +255,19 @@ describe("Rain", () => {
 });
 
 describe("Downpour", () => {
-  it("washes away the player count less one, and three more on the Clifftop", () => {
+  it("washes away the player count less two, and three more on the Clifftop", () => {
     expect([3, 4, 5].map((players) => weatherStatus("downpour", "jungle", players))).toEqual([
+      [{ kind: "washes", left: 1, of: 1 }],
       [{ kind: "washes", left: 2, of: 2 }],
       [{ kind: "washes", left: 3, of: 3 }],
-      [{ kind: "washes", left: 4, of: 4 }],
     ]);
-    expect(weatherStatus("downpour", "clifftop", 3)).toEqual([{ kind: "washes", left: 5, of: 5 }]);
+    expect(weatherStatus("downpour", "clifftop", 3)).toEqual([{ kind: "washes", left: 4, of: 4 }]);
   });
 
-  it("washes away two whispers at three players before one is heard", () => {
+  it("washes away one whisper at three players before one is heard", () => {
     const run = advanceTo(loadoutIn("downpour"), "between-tricks", CATALOG);
-    const three = whisper(whisper(whisper(run, "p0", "p1"), "p1", "p2"), "p2", "p0");
-    expect(attemptOf(three)!.log.map((entry) => entry.event)).toEqual(["whisper-washed", "whisper-washed", "whisper"]);
+    const two = whisper(whisper(run, "p0", "p1"), "p1", "p2");
+    expect(attemptOf(two)!.log.map((entry) => entry.event)).toEqual(["whisper-washed", "whisper"]);
   });
 
   it("pairs like Rain at every location", () => {

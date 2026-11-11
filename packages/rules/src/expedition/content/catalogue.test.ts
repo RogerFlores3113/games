@@ -10,7 +10,7 @@ import { evaluateObjective } from "../objectives";
 import type { CampState, CompletedTrick, ExpeditionCard, Objective, StandardIdentity, StandardRank, Suit } from "../state";
 import { trickWinner } from "../trick";
 import { abilityStatus, useAbility } from "../run/abilities";
-import { FAILURE_COST } from "../run/balance";
+import { FAILED_ATTEMPT_COINS, FAILURE_COST } from "../run/balance";
 import { CATALOG } from "../run/catalog";
 import { rulesFor } from "../run/compose";
 import { attemptOf, withAttempt } from "../run/attempt";
@@ -220,9 +220,9 @@ describe("J.D.", () => {
 });
 
 describe("Leader", () => {
-  it("Megaphone lets the Leader whisper twice each camp", () => {
+  it("Megaphone lets the Leader whisper once more each camp", () => {
     const run = table({ character: "leader", mates: ["jd", "explorer"] });
-    expect(whisperAllowance(run)).toEqual([2, 1, 1]);
+    expect(whisperAllowance(run)).toEqual([3, 2, 2]);
   });
 
   it("Open Ears lets the Leader hear each teammate's first whisper of the camp, and only the first", () => {
@@ -237,21 +237,23 @@ describe("Leader", () => {
 
   it("Delegate hands one of the Leader's whispers to a teammate, until none are left", () => {
     const start = table({ character: "leader", kit: ["leader.delegate"], mates: ["jd", "explorer"] });
-    expect(whisperAllowance(start)).toEqual([3, 1, 1]);
+    expect(whisperAllowance(start)).toEqual([4, 2, 2]);
     const once = use(start, "p0", "leader.delegate", ["seat:p1"]);
-    expect(whisperAllowance(once)).toEqual([2, 2, 1]);
+    expect(whisperAllowance(once)).toEqual([3, 3, 2]);
     const thrice = use(use(once, "p0", "leader.delegate", ["seat:p2"]), "p0", "leader.delegate", ["seat:p2"]);
-    expect(whisperAllowance(thrice)).toEqual([0, 2, 3]);
-    expect(refusal(thrice, "p0", "leader.delegate", ["seat:p1"])).toBe("ability_spent");
+    expect(whisperAllowance(thrice)).toEqual([1, 3, 4]);
+    const all = use(thrice, "p0", "leader.delegate", ["seat:p1"]);
+    expect(whisperAllowance(all)).toEqual([0, 4, 4]);
+    expect(refusal(all, "p0", "leader.delegate", ["seat:p1"])).toBe("ability_spent");
   });
 
   it("Momentum gives the Leader a whisper per trick won, and no other bonus reaches them", () => {
     const start = table({ character: "leader", kit: ["leader.momentum", "smoke-signal"], mates: ["jd", "explorer"] });
-    expect(whisperAllowance(start)).toEqual([2, 1, 1]);
+    expect(whisperAllowance(start)).toEqual([3, 2, 2]);
     const smoked = use(start, "p0", "smoke-signal", []);
-    expect(whisperAllowance(smoked)).toEqual([2, 2, 2]);
+    expect(whisperAllowance(smoked)).toEqual([3, 3, 3]);
     const won = table({ character: "leader", kit: ["leader.momentum"], mates: ["jd", "explorer"], tricks: [WON_BY_P0] });
-    expect(whisperAllowance(won)).toEqual([3, 1, 1]);
+    expect(whisperAllowance(won)).toEqual([4, 2, 2]);
   });
 });
 
@@ -519,11 +521,11 @@ describe("Magician", () => {
 
   it("Double Act adds two swaps that trade with whispers, one count for both", () => {
     const start = table({ character: "magician", kit: ["magician.double-act"], hands });
-    expect([whisperAllowance(start)[0], remaining(start, "p0", "magician", CATALOG)]).toEqual([4, { kind: "whispers", left: 4 }]);
+    expect([whisperAllowance(start)[0], remaining(start, "p0", "magician", CATALOG)]).toEqual([5, { kind: "whispers", left: 5 }]);
     const swapped = use(start, "p0", "magician", ["card:a", "fan:p1:0"]);
-    expect([whisperAllowance(swapped)[0], remaining(swapped, "p0", "magician", CATALOG)]).toEqual([3, { kind: "whispers", left: 3 }]);
+    expect([whisperAllowance(swapped)[0], remaining(swapped, "p0", "magician", CATALOG)]).toEqual([4, { kind: "whispers", left: 4 }]);
     const whispered = whisper(swapped, "p0", "p2", handIds(swapped, "p0")[0]!);
-    expect(remaining(whispered, "p0", "magician", CATALOG)).toEqual({ kind: "whispers", left: 2 });
+    expect(remaining(whispered, "p0", "magician", CATALOG)).toEqual({ kind: "whispers", left: 3 });
   });
 
   it("Misdirection swaps cards between two teammates' hands, from the Magician's two swaps", () => {
@@ -553,9 +555,9 @@ describe("Perfumist", () => {
     expect(refusal(table({ character: "perfumist", leader: "p1" }), "p0", "perfumist", [])).toBe("ability_unavailable");
   });
 
-  it("the Perfumist can't whisper until upgraded", () => {
-    expect(whisperAllowance(table({ character: "perfumist" }))[0]).toBe(0);
-    expect(whisperAllowance(table({ character: "perfumist", kit: ["perfumist.turncoat", "rain-poncho"] }))[0]).toBe(2);
+  it("the Perfumist whispers once until upgraded", () => {
+    expect(whisperAllowance(table({ character: "perfumist" }))[0]).toBe(1);
+    expect(whisperAllowance(table({ character: "perfumist", kit: ["perfumist.turncoat", "rain-poncho"] }))[0]).toBe(3);
   });
 
   it("Turncoat changes the led suit mid-trick, so the next players follow the new suit", () => {
@@ -641,7 +643,7 @@ describe("Hermit", () => {
     const start = table({ character: "hermit", kit: ["hermit.alms"], objectives: [winCard("mine", ident("hearts", 9), "p0"), PENDING] });
     expect(refusal(start, "p0", "hermit.alms", ["seat:p1"])).toBe("ability_unavailable");
     const given = use(use(start, "p0", "hermit", ["objective:mine"]), "p0", "hermit.alms", ["seat:p1"]);
-    expect(whisperAllowance(given)).toEqual([2, 2, 1]);
+    expect(whisperAllowance(given)).toEqual([3, 3, 2]);
     expect(refusal(given, "p0", "hermit.alms", ["seat:p2"])).toBe("ability_unavailable");
   });
 });
@@ -724,11 +726,11 @@ describe("items", () => {
 
   it("Rain Poncho gives its owner one more whisper this camp, on each of its two charges", () => {
     const start = table({ kit: ["rain-poncho"] });
-    expect(whisperAllowance(start)).toEqual([1, 1, 1]);
+    expect(whisperAllowance(start)).toEqual([2, 2, 2]);
     const once = use(start, "p0", "rain-poncho", []);
-    expect(whisperAllowance(once)).toEqual([2, 1, 1]);
+    expect(whisperAllowance(once)).toEqual([3, 2, 2]);
     const twice = use(once, "p0", "rain-poncho", []);
-    expect(whisperAllowance(twice)).toEqual([3, 1, 1]);
+    expect(whisperAllowance(twice)).toEqual([4, 2, 2]);
     expect(twice.seats[0]!.items).toEqual([]);
     expect(refusal(twice, "p0", "rain-poncho", [])).toBe("not_owned");
   });
@@ -751,12 +753,12 @@ describe("items", () => {
 
   it("Smoke Signal gives everyone one more whisper, costs no supply, and has two charges", () => {
     const start = table({ kit: ["smoke-signal"], supplies: 3 });
-    expect(whisperAllowance(start)).toEqual([1, 1, 1]);
+    expect(whisperAllowance(start)).toEqual([2, 2, 2]);
     const run = use(start, "p0", "smoke-signal", []);
-    expect(whisperAllowance(run)).toEqual([2, 2, 2]);
+    expect(whisperAllowance(run)).toEqual([3, 3, 3]);
     expect(run.supplies).toBe(3);
     const twice = use(run, "p0", "smoke-signal", []);
-    expect(whisperAllowance(twice)).toEqual([3, 3, 3]);
+    expect(whisperAllowance(twice)).toEqual([4, 4, 4]);
     expect(twice.seats[0]!.items).toEqual([]);
   });
 
@@ -878,14 +880,14 @@ describe("items", () => {
       return { start, end: playOut(start) };
     };
     const packed = failing(["heavy-pack"], 5);
-    const plain = failing([], 5);
-    expect(whisperAllowance(packed.start)).toEqual([2, 1, 1]);
+    expect(whisperAllowance(packed.start)).toEqual([3, 2, 2]);
     expect(packed.end.history.at(-1)!.status).toBe("failed");
-    expect(packed.end.supplies).toBe(plain.end.supplies);
-    expect(packed.end.purse - plain.end.purse).toBe(-2);
+    expect(packed.end.supplies).toBe(failing([], 5).end.supplies);
+    // The consolation is paid first and the pack takes it back: a failed camp nets 0 coins.
+    expect(packed.end.purse).toBe(5);
+    expect(failing([], 5).end.purse).toBe(5 + FAILED_ATTEMPT_COINS);
     // The purse never goes below 0.
-    expect(failing(["heavy-pack"], 1).end.purse).toBeGreaterThanOrEqual(0);
-    expect(failing(["heavy-pack"], 0).end.purse).toBe(failing([], 0).end.purse);
+    expect(failing(["heavy-pack"], 0).end.purse).toBe(0);
   });
 
   it("Heavy Packs share one 2-coin loss across the crew, however many are equipped", () => {
@@ -899,11 +901,10 @@ describe("items", () => {
       totalTricks: 1,
       leader: "p0",
     });
-    expect(whisperAllowance(start)).toEqual([3, 2, 1]);
+    expect(whisperAllowance(start)).toEqual([4, 3, 2]);
     expect(rules(start).failureCoins(start)).toBe(2);
     expect(rules(start).failureCost(start)).toBe(FAILURE_COST);
-    const plain = playOut({ ...start, seats: start.seats.map((s) => ({ ...s, items: [], equipped: [] })) });
-    expect(playOut(start).purse - plain.purse).toBe(-2);
+    expect(playOut(start).purse).toBe(10);
     expect(playOut(start).supplies).toBe(4 - FAILURE_COST);
   });
 

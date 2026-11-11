@@ -47,8 +47,8 @@ describe("draftOfferFor", () => {
       kind: "standard",
       bundles: [
         ["trained-monkey", "trail-map"],
-        ["rope-ladder", "heavy-pack"],
-        ["rain-poncho", "parrot"],
+        ["rain-poncho", "conch-shell"],
+        ["puffball", "pack-mule"],
       ],
     });
   });

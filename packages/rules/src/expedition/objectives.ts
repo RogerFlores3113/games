@@ -285,4 +285,22 @@ export function nextObjectivePicker(
   return seatIds[(leaderIndex + pickedCount) % seatIds.length]!;
 }
 
+/** Two objectives conflict when one seat cannot complete both: winning no
+ * tricks rules out a card to win, an ordered card and an exact trick count. */
+export function objectivesConflict(a: Objective, b: Objective): boolean {
+  const noTricks = (o: Objective) => o.kind === "no-tricks";
+  if (noTricks(a) && noTricks(b)) return false;
+  return noTricks(a) || noTricks(b);
+}
+
+/** Whether `objective` conflicts with one `seatId` already owns. */
+export function conflictsForSeat(state: CampState, seatId: string, objective: Objective): boolean {
+  return state.objectives.some((owned) => owned.ownerSeatId === seatId && owned.id !== objective.id && objectivesConflict(owned, objective));
+}
+
+/** Whether some open objective would not conflict for `seatId`. */
+export function hasOpenWithoutConflict(state: CampState, seatId: string): boolean {
+  return state.objectives.some((o) => o.ownerSeatId === null && !conflictsForSeat(state, seatId, o));
+}
+
 export type { ObjectiveKind };

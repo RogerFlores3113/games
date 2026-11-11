@@ -4,7 +4,7 @@ import { defineItem } from "../content/source-def";
 import { toExpeditionPlayerView } from "../adapter/view";
 import { checkExpeditionViewForLeaks, secretsForExpeditionSeat } from "../adapter/view-leak-check";
 import { attemptOf, withAttempt } from "./attempt";
-import { FAILURE_COST } from "./balance";
+import { FAILED_ATTEMPT_COINS, FAILURE_COST } from "./balance";
 import { dealCamp, settleCamp } from "./lifecycle";
 import { supplyCostParts } from "./recap";
 import { applyRunAction } from "./stages/registry";
@@ -74,7 +74,7 @@ describe("the last attempt's recap", () => {
     const { last, settled } = failedCamp();
     const recap = settled.lastAttempt!;
     const camp = last.stage.attempt.camp;
-    expect(recap).toMatchObject({ camp: 1, attempt: 1, status: "failed", totalTricks: camp.totalTricks, coins: 0 });
+    expect(recap).toMatchObject({ camp: 1, attempt: 1, status: "failed", totalTricks: camp.totalTricks, coins: FAILED_ATTEMPT_COINS });
 
     // The final trick is the one that completed last; the play that settled it is in it.
     expect(recap.tricksPlayed).toBeGreaterThanOrEqual(camp.completedTricks.length);

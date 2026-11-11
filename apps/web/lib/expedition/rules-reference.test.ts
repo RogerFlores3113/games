@@ -51,7 +51,7 @@ describe("buildRulesReference", () => {
 
   it("states the supplies and the failure cost", () => {
     expect(byId(buildRulesReference(null), "goal").paragraphs[1]).toBe(
-      "A camp is cleared when every objective is done. A failed camp costs one supply and is replayed with a fresh deal. The crew starts with 3 supplies and holds at most 4. With none left, the run ends.",
+      "A camp is cleared when every objective is done. A failed camp costs one supply and is replayed with a fresh deal; the crew's purse gets 2 coins as consolation. The crew starts with 4 supplies and holds at most 5. With none left, the run ends.",
     );
   });
 
@@ -65,6 +65,10 @@ describe("buildRulesReference", () => {
     const tricks = byId(buildRulesReference(null), "tricks").paragraphs;
     expect(tricks).toContain("The Sun and Moon form their own two-card suit: if one is led, whoever holds the other must play it.");
     expect(tricks).toContain("If Bait stops the only card of the led suit from winning, the highest card left wins, and a tie goes to the card played first.");
+  });
+
+  it("says how many whispers each seat has per camp", () => {
+    expect(byId(buildRulesReference(null), "whisper").paragraphs[0]).toMatch(/^Twice per camp, between tricks/);
   });
 
   it("says when whispers can be sent", () => {
@@ -118,7 +122,7 @@ describe("buildRulesReference", () => {
 
   it("marks a passive-only source as always on", () => {
     const kit = byId(buildRulesReference(viewWith({ characterId: "leader" })), "kit");
-    expect(kit.items[0]!.body).toBe("Always on. Whisper twice each camp.");
+    expect(kit.items[0]!.body).toBe("Always on. Whisper once more each camp.");
   });
 
   it("skips kit ids missing from the catalogue and says so when nothing is left", () => {
