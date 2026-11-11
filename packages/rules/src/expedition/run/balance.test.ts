@@ -60,7 +60,7 @@ describe("SHOP_CAMPS", () => {
 
 describe("seatObjectivesAt", () => {
   it("adds each crew size's extras at the camps EXTRA_OBJECTIVES names", () => {
-    expect(EXTRA_OBJECTIVES.short).toEqual({ 3: [0, 0, 1, 1], 4: [0, 1, 0, 1], 5: [1, 1, 1, 2] });
+    expect(EXTRA_OBJECTIVES.short).toEqual({ 3: [0, 0, 1, 1], 4: [0, 0, 0, 1], 5: [1, 1, 1, 2] });
     expect(EXTRA_OBJECTIVES.standard).toEqual({ 3: [0, 0, 0, 0, 0, 0], 4: [0, 1, 1, 1, 1, 1], 5: [1, 2, 2, 2, 2, 2] });
     for (const length of Object.keys(RUN_LENGTHS) as RunLength[]) {
       for (const players of [3, 4, 5] as const) {
@@ -70,7 +70,7 @@ describe("seatObjectivesAt", () => {
         });
       }
     }
-    expect([1, 2, 3, 4].map((k) => seatObjectivesAt("short", k, 4))).toEqual([2, 4, 4, 4]);
+    expect([1, 2, 3, 4].map((k) => seatObjectivesAt("short", k, 4))).toEqual([2, 2, 3, 4]);
   });
 
   it("never returns more than MAX_SEAT_OBJECTIVES", () => {
@@ -133,8 +133,8 @@ describe("objectiveSlotsFor", () => {
 });
 
 describe("round 2 numbers", () => {
-  it("starts the crew with 4 supplies and holds 5 at most (A2)", () => {
-    expect([SUPPLIES_START, SUPPLIES_MAX]).toEqual([4, 5]);
+  it("starts the crew with 5 supplies and holds 6 at most (A2)", () => {
+    expect([SUPPLIES_START, SUPPLIES_MAX]).toEqual([5, 6]);
   });
 
   it("spares 3 players' whispers from Rain and 2 from a Downpour (A3)", () => {

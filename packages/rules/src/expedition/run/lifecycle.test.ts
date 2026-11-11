@@ -6,6 +6,7 @@
 // characters through testCatalog.
 
 import { describe, expect, it } from "vitest";
+import { SUPPLIES_START } from "./balance";
 import { campPhase, currentActorSeatId, guard } from "../camp";
 import { ability, defineCharacter, defineItem, defineUpgrade, itemAbility } from "../content/source-def";
 import { attemptOf, nextAttemptNumber, withAttempt } from "./attempt";
@@ -45,10 +46,10 @@ function clearedCamp(run: RunState, catalog: Catalog): RunAt<"camp"> {
 }
 
 describe("createRun", () => {
-  it("starts in muster with 4 supplies, an empty purse and no plan: no characters, no items, no offers, no ledger", () => {
+  it("starts in muster with 5 supplies, an empty purse and no plan: no characters, no items, no offers, no ledger", () => {
     const run = createRun({ seatIds: SEAT_IDS, seed: "s" });
     expect(run.stage).toEqual({ tag: "muster", ballots: {}, locked: {} });
-    expect(run.supplies).toBe(4);
+    expect(run.supplies).toBe(SUPPLIES_START);
     expect(run.purse).toBe(0);
     expect(run.plan).toBeNull();
     expect(run.lastVote).toBeNull();
@@ -179,7 +180,7 @@ describe("settling a failure", () => {
     const before = atCamp3({ items, cat }) as RunAt<"loadout">;
     const failed = readyAll(before, cat);
 
-    expect(failed.supplies).toBe(3);
+    expect(failed.supplies).toBe(SUPPLIES_START - 1);
     expect(failed.purse).toBe(2);
     expect(failed.history).toEqual([{ camp: 3, attempt: 1, location: "cave", weather: "fair", status: "failed", suppliesSpent: 1, coins: 2 }]);
     expect(failed.stage).toMatchObject({ tag: "shop", next: 3, camp: before.stage.camp, ready: {} });
@@ -429,7 +430,7 @@ describe("the rescue window", () => {
     expect(currentWindow(paused, rulesFor(paused, catalog))).toBe("rescue");
     expect(gatedPendingSeatIds(paused, catalog)).toEqual(["p0"]);
     expect(paused.history).toEqual([]);
-    expect(paused.supplies).toBe(4);
+    expect(paused.supplies).toBe(SUPPLIES_START);
     expect(applyRunAction(paused, "p1", { type: "skip-window" }, catalog)).toEqual({ ok: false, error: "nothing_to_skip" });
     const winner = attemptOf(paused)!.camp.completedTricks[0]!.winnerSeatId;
     expect(applyRunAction(paused, winner, { type: "whisper", targetSeatId: winner === "p0" ? "p1" : "p0", cardId: "x" }, catalog)).toEqual({
@@ -443,7 +444,7 @@ describe("the rescue window", () => {
     const winner = attemptOf(paused)!.camp.completedTricks[0]!.winnerSeatId;
     const passed = use(paused, "p0", { type: "skip-window" });
     expect(passed.stage.tag).toBe("loadout");
-    expect(passed.supplies).toBe(3);
+    expect(passed.supplies).toBe(SUPPLIES_START - 1);
     expect(passed.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 2 }]);
     expect(passed.seats[0]!.ledger).toEqual([{ kind: "passed", sourceKey: "it0", at: { camp: 1, attempt: 1, trick: 1 }, failedObjectiveIds: [`duck-${winner}`] }]);
   });
@@ -465,7 +466,7 @@ describe("the rescue window", () => {
   it("with no rescue holder the camp fails at once", () => {
     const failed = playTrick(everyoneDucks({}));
     expect(failed.stage.tag).toBe("loadout");
-    expect(failed.supplies).toBe(3);
+    expect(failed.supplies).toBe(SUPPLIES_START - 1);
     expect(failed.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 2 }]);
   });
 

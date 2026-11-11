@@ -15,7 +15,7 @@ export const RUN_LENGTHS: Readonly<Record<RunLength, { readonly camps: number; r
 
 /** Seat objectives per camp, before boss and temple slot layers. */
 export const OBJECTIVE_RAMP: Readonly<Record<RunLength, readonly number[]>> = {
-  short: [2, 3, 4, 3],
+  short: [2, 2, 3, 3],
   standard: [2, 3, 3, 4, 4, 4],
   long: [2, 3, 3, 4, 4, 4, 5, 4],
 };
@@ -24,7 +24,7 @@ export const OBJECTIVE_RAMP: Readonly<Record<RunLength, readonly number[]>> = {
  * entry per camp. The ramp is tuned for 3 players; bigger crews hold more
  * cards between them, so they get more to do, at the camps chosen here. */
 export const EXTRA_OBJECTIVES: Readonly<Record<RunLength, Readonly<Record<3 | 4 | 5, readonly number[]>>>> = {
-  short: { 3: [0, 0, 1, 1], 4: [0, 1, 0, 1], 5: [1, 1, 1, 2] },
+  short: { 3: [0, 0, 1, 1], 4: [0, 0, 0, 1], 5: [1, 1, 1, 2] },
   standard: { 3: [0, 0, 0, 0, 0, 0], 4: [0, 1, 1, 1, 1, 1], 5: [1, 2, 2, 2, 2, 2] },
   long: { 3: [0, 0, 0, 0, 0, 0, 0, 0], 4: [0, 1, 1, 1, 1, 1, 1, 1], 5: [1, 2, 2, 2, 2, 2, 2, 2] },
 };
@@ -42,8 +42,8 @@ export const EARLY_MIX_PLAYERS = 4;
  * camp with at least this many seat slots. */
 export const BOTH_MIX_MIN_SLOTS = 4;
 
-export const SUPPLIES_START = 4;
-export const SUPPLIES_MAX = 5;
+export const SUPPLIES_START = 5;
+export const SUPPLIES_MAX = 6;
 /** Coins for one supply at the shop. */
 export const SUPPLY_PRICE = 6;
 /** Supplies a failed camp costs before items add to it (Heavy Pack). */

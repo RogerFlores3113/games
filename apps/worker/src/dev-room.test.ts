@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BALANCE_DISPLAY } from "@games/rules";
 import { DevStateMessageSchema, type RoomCode, type RoomState } from "@games/schema";
 import { EXPEDITION_GAME_ID } from "@games/schema/games/expedition";
 import { applyDevCommand, devStateFrame, type DevInput } from "./dev-room";
@@ -143,7 +144,7 @@ describe("dev-room: shortcuts and states", () => {
     const room = startedWithBots(2);
     expect(applyDevCommand(room, "host", { kind: "shortcut", id: "set-supplies", params: { supplies: -1 } }, devInput())).toEqual({
       state: room,
-      reply: { ok: false, message: "supplies must be a whole number from 0 to 5" },
+      reply: { ok: false, message: `supplies must be a whole number from 0 to ${BALANCE_DISPLAY.suppliesMax}` },
     });
   });
 

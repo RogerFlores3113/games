@@ -6,6 +6,7 @@
 // short/word-shaped seed.
 
 import { describe, expect, it } from "vitest";
+import { SUPPLIES_MAX, SUPPLIES_START } from "../run/balance";
 import { currentActorSeatId } from "../camp";
 import { evaluateObjective } from "../objectives";
 import { rulesFor } from "../run/compose";
@@ -80,7 +81,7 @@ describe("toExpeditionPlayerView", () => {
     expect(view.stage).toMatchObject({ tag: "loadout", readySeatIds: ["p1"], camp: { index: 2, shop: false } });
     expect(Object.keys(view.stage).sort()).toEqual(["camp", "mods", "readySeatIds", "tag"]);
     expect(view.yourItemSlots).toBe(2);
-    expect([view.length, view.campCount, view.purse, view.supplies]).toEqual(["standard", 6, 0, { count: 4, max: 5 }]);
+    expect([view.length, view.campCount, view.purse, view.supplies]).toEqual(["standard", 6, 0, { count: SUPPLIES_START, max: SUPPLIES_MAX }]);
     expect(view.plan).toEqual([{ at: 3, tier: "animal", bossId: null }, { at: 6, tier: "temple", bossId: "temple" }]);
   });
 
@@ -209,7 +210,7 @@ describe("toExpeditionPlayerView", () => {
 
     const view = toExpeditionPlayerView(lost, "p0", CATALOG);
 
-    expect([view.runStatus, view.stage, view.supplies]).toEqual(["lost", { tag: "ended", result: "lost" }, { count: 0, max: 5 }]);
+    expect([view.runStatus, view.stage, view.supplies]).toEqual(["lost", { tag: "ended", result: "lost" }, { count: 0, max: SUPPLIES_MAX }]);
   });
 
   it("seats[] carry each seat's public character, upgrade, equipped and backpack items, and usage by key", () => {

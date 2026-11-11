@@ -3,6 +3,7 @@
 // throughout: plain characters plus one item per window.
 
 import { describe, expect, it } from "vitest";
+import { SUPPLIES_START } from "./balance";
 import { defineItem, itemAbility } from "../content/source-def";
 import { rulesFor } from "./compose";
 import { attemptOf } from "./attempt";
@@ -67,7 +68,7 @@ describe("setupRun", () => {
     expect(run.stage.tag).toBe("loadout");
     expect(run.stage.tag === "loadout" && run.stage.camp.index).toBe(4);
     expect(run.plan).toEqual({ length: "standard", bosses: [{ at: 3, tier: "animal", modId: "crocodile" }, { at: 6, tier: "temple", modId: "temple" }] });
-    expect(run.supplies).toBe(4);
+    expect(run.supplies).toBe(SUPPLIES_START);
     expect(run.seats.map((s) => s.offers)).toEqual([[], [], []]);
     expect(run.seats.map((s) => s.characterId)).toEqual(["plain-3", "plain-1", "plain-2"]);
     expect(run.seats.map((s) => s.upgradeId)).toEqual([null, "plain-1.b", null]);

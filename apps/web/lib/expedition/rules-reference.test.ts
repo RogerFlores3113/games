@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MOD_DISPLAY, SOURCE_DISPLAY, type ExpeditionView } from "@games/rules";
+import { BALANCE_DISPLAY, MOD_DISPLAY, SOURCE_DISPLAY, type ExpeditionView } from "@games/rules";
 import { REFERENCE_PAGES, buildModPages, buildRulesReference } from "./rules-reference";
 
 function viewWith(over: { characterId?: string | null; kit?: string[] }) {
@@ -51,7 +51,7 @@ describe("buildRulesReference", () => {
 
   it("states the supplies and the failure cost", () => {
     expect(byId(buildRulesReference(null), "goal").paragraphs[1]).toBe(
-      "A camp is cleared when every objective is done. A failed camp costs one supply and is replayed with a fresh deal; the crew's purse gets 2 coins as consolation. The crew starts with 4 supplies and holds at most 5. With none left, the run ends.",
+      `A camp is cleared when every objective is done. A failed camp costs one supply and is replayed with a fresh deal; the crew's purse gets 2 coins as consolation. The crew starts with ${BALANCE_DISPLAY.suppliesStart} supplies and holds at most ${BALANCE_DISPLAY.suppliesMax}. With none left, the run ends.`,
     );
   });
 

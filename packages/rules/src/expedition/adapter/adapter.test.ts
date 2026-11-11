@@ -4,6 +4,7 @@
 // independent Expedition-shaped suite instead, mirroring its shape.
 
 import { describe, expect, it } from "vitest";
+import { SUPPLIES_START } from "../run/balance";
 import fc from "fast-check";
 import { expeditionGame } from "./adapter";
 import { toExpeditionPlayerView } from "./view";
@@ -301,7 +302,7 @@ describe("expeditionGame: checkGameEnd", () => {
       history: [{ camp: campIndex(6), attempt: 1, location: "jungle", weather: "fair", status: "cleared", suppliesSpent: 0, coins: 5 }],
       stage: { tag: "ended", result: "won" },
     };
-    expect(expeditionGame.checkGameEnd(state)).toEqual({ outcome: "won", campReached: 6, suppliesLeft: 4 });
+    expect(expeditionGame.checkGameEnd(state)).toEqual({ outcome: "won", campReached: 6, suppliesLeft: SUPPLIES_START });
   });
 });
 

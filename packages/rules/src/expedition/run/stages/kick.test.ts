@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SUPPLIES_START } from "../balance";
 import { currentActorSeatId } from "../../camp";
 import { defineItem, itemAbility } from "../../content/source-def";
 import { absentSeatAction } from "../absent";
@@ -148,7 +149,7 @@ describe("a kick at each stage", () => {
     expect(currentWindow(paused, rulesFor(paused, ropeCatalog))).toBe("rescue");
     const kicked = kickSeat(paused, "p3", ropeCatalog);
     expect(kicked.stage.tag).toBe("loadout");
-    expect(kicked.supplies).toBe(4);
+    expect(kicked.supplies).toBe(SUPPLIES_START);
     expect(kicked.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "restarted", suppliesSpent: 0, coins: 0 }]);
     expect(kicked.seats[0]!.items).toEqual([{ uid: "it0", itemId: "test-rope" }]);
   });

@@ -7,6 +7,7 @@
 // Poncho (one more whisper for its owner) and Camouflage.
 
 import { describe, expect, it } from "vitest";
+import { SUPPLIES_START } from "./balance";
 import { abilityStatus } from "./abilities";
 import { guard } from "../camp";
 import { defineItem, itemAbility } from "../content/source-def";
@@ -96,8 +97,8 @@ describe("fail-then-replay resets every camp-scoped resource (RUN-06)", () => {
     run = act(run, sabotageSeat, { type: "use-ability", sourceKey: sabotage, targets: [] });
 
     expect(run.stage.tag).toBe("shop"); // camp 3 is a boss camp: its replay goes back through the shop
-    expect(suppliesBefore).toBe(4);
-    expect(run.supplies).toBe(3);
+    expect(suppliesBefore).toBe(SUPPLIES_START);
+    expect(run.supplies).toBe(SUPPLIES_START - 1);
     expect(run.seats.every((seat) => seat.offers.length === 0)).toBe(true); // D-01: no draft on a failure
     expect(run.seats.map((s) => s.items)).toEqual([[{ uid: poncho, itemId: "rain-poncho" }], [], []]); // single-use items are spent
     expect(run.seats.map((s) => s.ledger.map((e) => (e.kind === "used" ? e.sourceKey : e.kind)))).toEqual([[poncho, "explorer"], [camouflage], [sabotage]]);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SUPPLIES_MAX, SUPPLIES_START } from "../run/balance";
 import { CATALOG } from "../run/catalog";
 import { attemptOf } from "../run/attempt";
 import { createRun, runStatus } from "../run/lifecycle";
@@ -60,7 +61,7 @@ describe("dev shortcuts", () => {
 
   it("force-camp failed spends a supply, records the failure and reopens the loadout", () => {
     const failed = run("force-camp", fresh(), { outcome: "failed" });
-    expect(failed.supplies).toBe(3);
+    expect(failed.supplies).toBe(SUPPLIES_START - 1);
     expect(failed.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 2 }]);
     expect(failed.stage.tag).toBe("loadout");
   });
@@ -113,8 +114,8 @@ describe("dev shortcuts", () => {
   });
 
   it("set-supplies sets supplies within bounds", () => {
-    expect(run("set-supplies", fresh(), { supplies: 5 }).supplies).toBe(5);
-    expect(() => run("set-supplies", fresh(), { supplies: 6 })).toThrow("supplies must be a whole number from 0 to 5");
+    expect(run("set-supplies", fresh(), { supplies: SUPPLIES_MAX }).supplies).toBe(SUPPLIES_MAX);
+    expect(() => run("set-supplies", fresh(), { supplies: SUPPLIES_MAX + 1 })).toThrow(`supplies must be a whole number from 0 to ${SUPPLIES_MAX}`);
   });
 
   it("set-purse sets the purse within bounds", () => {
@@ -302,8 +303,8 @@ describe("dev shortcuts for a solo playtest", () => {
 
   it("add-coins adds ten, and add-supply adds one until supplies are full", () => {
     expect(run("add-coins", fresh()).purse).toBe(10);
-    expect(run("add-supply", fresh()).supplies).toBe(5);
-    expect(() => run("add-supply", run("add-supply", fresh()))).toThrow("supplies are full (5 of 5)");
+    expect(run("add-supply", fresh()).supplies).toBe(SUPPLIES_START + 1);
+    expect(() => run("add-supply", run("add-supply", fresh()))).toThrow(`supplies are full (${SUPPLIES_MAX} of ${SUPPLIES_MAX})`);
   });
 
   it("set-objective-status decides an objective done or failed whatever the tricks say, and back", () => {
@@ -322,7 +323,7 @@ describe("dev shortcuts for a solo playtest", () => {
     const cleared = ids.reduce((state, objective) => run("set-objective-status", state, { objective, status: "done" }), dealt);
     expect([cleared.stage.tag, cleared.history.at(-1)?.status]).toEqual(["draft", "cleared"]);
     const failed = run("set-objective-status", dealt, { objective: ids[0]!, status: "failed" });
-    expect([failed.stage.tag, failed.history.at(-1)?.status, failed.supplies]).toEqual(["loadout", "failed", 3]);
+    expect([failed.stage.tag, failed.history.at(-1)?.status, failed.supplies]).toEqual(["loadout", "failed", SUPPLIES_START - 1]);
     expect(() => run("set-objective-status", run("force-camp", dealt, { outcome: "cleared" }), { objective: ids[0]!, status: "done" })).toThrow("there is no dealt camp with objectives");
   });
 });

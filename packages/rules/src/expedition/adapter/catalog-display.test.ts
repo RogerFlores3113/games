@@ -4,6 +4,7 @@
 // per-entry values are literal, so a drift in what the client shows fails.
 
 import { describe, expect, it } from "vitest";
+import { SUPPLIES_MAX, SUPPLIES_START } from "../run/balance";
 import { CATALOG } from "../run/catalog";
 import { BALANCE_DISPLAY, CHARACTER_DISPLAY, MOD_DISPLAY, SOURCE_DISPLAY } from "./catalog-display";
 
@@ -138,8 +139,8 @@ describe("MOD_DISPLAY", () => {
 describe("BALANCE_DISPLAY", () => {
   it("carries the run's numbers as plain data", () => {
     expect(BALANCE_DISPLAY).toEqual({
-      suppliesStart: 4,
-      suppliesMax: 5,
+      suppliesStart: SUPPLIES_START,
+      suppliesMax: SUPPLIES_MAX,
       supplyPrice: 6,
       failureCost: 1,
       failedAttemptCoins: 2,
