@@ -17,6 +17,7 @@ const REFUSAL_TEXT: Readonly<Partial<Record<ExpeditionErrorCode, string>>> = {
   must_follow_suit: "You have to follow the led suit",
   card_not_in_hand: "That card is not in your hand any more",
   objective_not_available: "That objective is taken",
+  objective_conflict: "You can't finish that with an objective you hold",
   no_whispers_left: "No whispers left this camp",
   whisper_blocked: "Whispers are blocked right now",
   ability_spent: "That power is spent",

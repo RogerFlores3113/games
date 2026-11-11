@@ -7,6 +7,6 @@ export const downpour = defineMod({
   kind: "weather",
   name: "Downpour",
   weight: 1,
-  text: "Sheets of rain drown out the crew's first whispers, one for each player beyond the first.",
+  text: "Sheets of rain drown out the crew's first whispers, one for each player beyond two.",
   full: washingBody(WASHES.downpour),
 });

@@ -39,8 +39,8 @@ describe("dev shortcuts", () => {
 
     const short = run("jump-to-camp", fresh(), { length: "short", camp: 4, stage: "camp" });
     expect([short.stage.tag, short.stage.tag === "camp" && short.stage.camp.index, short.plan?.length]).toEqual(["camp", 4, "short"]);
-    expect(attemptOf(short)?.camp.objectives.map((o) => o.kind)).toEqual(["win-card", "win-card", "no-tricks", "win-card"]);
-    expect(attemptOf(short)?.camp.objectives[3]).toMatchObject({ kind: "win-card", target: { kind: "joker", joker: "sun" } });
+    expect(attemptOf(short)?.camp.objectives.map((o) => o.kind)).toEqual(["ordered", "ordered", "win-card", "no-tricks", "win-card"]);
+    expect(attemptOf(short)?.camp.objectives[4]).toMatchObject({ kind: "win-card", target: { kind: "joker", joker: "sun" } });
   });
 
   it("jump-to-camp refuses a camp past the length's last", () => {
@@ -60,8 +60,8 @@ describe("dev shortcuts", () => {
 
   it("force-camp failed spends a supply, records the failure and reopens the loadout", () => {
     const failed = run("force-camp", fresh(), { outcome: "failed" });
-    expect(failed.supplies).toBe(2);
-    expect(failed.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 0 }]);
+    expect(failed.supplies).toBe(3);
+    expect(failed.history).toEqual([{ camp: 1, attempt: 1, location: "jungle", weather: "fair", status: "failed", suppliesSpent: 1, coins: 2 }]);
     expect(failed.stage.tag).toBe("loadout");
   });
 
@@ -113,8 +113,8 @@ describe("dev shortcuts", () => {
   });
 
   it("set-supplies sets supplies within bounds", () => {
-    expect(run("set-supplies", fresh(), { supplies: 4 }).supplies).toBe(4);
-    expect(() => run("set-supplies", fresh(), { supplies: 5 })).toThrow("supplies must be a whole number from 0 to 4");
+    expect(run("set-supplies", fresh(), { supplies: 5 }).supplies).toBe(5);
+    expect(() => run("set-supplies", fresh(), { supplies: 6 })).toThrow("supplies must be a whole number from 0 to 5");
   });
 
   it("set-purse sets the purse within bounds", () => {
@@ -302,8 +302,8 @@ describe("dev shortcuts for a solo playtest", () => {
 
   it("add-coins adds ten, and add-supply adds one until supplies are full", () => {
     expect(run("add-coins", fresh()).purse).toBe(10);
-    expect(run("add-supply", fresh()).supplies).toBe(4);
-    expect(() => run("add-supply", run("add-supply", fresh()))).toThrow("supplies are full (4 of 4)");
+    expect(run("add-supply", fresh()).supplies).toBe(5);
+    expect(() => run("add-supply", run("add-supply", fresh()))).toThrow("supplies are full (5 of 5)");
   });
 
   it("set-objective-status decides an objective done or failed whatever the tricks say, and back", () => {
@@ -322,7 +322,7 @@ describe("dev shortcuts for a solo playtest", () => {
     const cleared = ids.reduce((state, objective) => run("set-objective-status", state, { objective, status: "done" }), dealt);
     expect([cleared.stage.tag, cleared.history.at(-1)?.status]).toEqual(["draft", "cleared"]);
     const failed = run("set-objective-status", dealt, { objective: ids[0]!, status: "failed" });
-    expect([failed.stage.tag, failed.history.at(-1)?.status, failed.supplies]).toEqual(["loadout", "failed", 2]);
+    expect([failed.stage.tag, failed.history.at(-1)?.status, failed.supplies]).toEqual(["loadout", "failed", 3]);
     expect(() => run("set-objective-status", run("force-camp", dealt, { outcome: "cleared" }), { objective: ids[0]!, status: "done" })).toThrow("there is no dealt camp with objectives");
   });
 });

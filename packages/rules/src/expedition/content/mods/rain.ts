@@ -24,6 +24,6 @@ export const rain = defineMod({
   kind: "weather",
   name: "Rain",
   weight: 3,
-  text: "Rain drowns out the crew's first whispers, one for each player beyond two.",
+  text: "Rain drowns out the crew's first whispers, one for each player beyond three.",
   full: washingBody(WASHES.rain),
 });

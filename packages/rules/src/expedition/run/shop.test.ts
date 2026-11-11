@@ -58,7 +58,7 @@ describe("the shop", () => {
   });
 
   it("refuses a supply at the cap as supplies_full", () => {
-    expect(refusal(shopRun({ supplies: 4 }), "p0", "supplies")).toEqual({ ok: false, error: "supplies_full" });
+    expect(refusal(shopRun({ supplies: 5 }), "p0", "supplies")).toEqual({ ok: false, error: "supplies_full" });
   });
 
   it("mints a bought item to the buyer, marks it sold, and refuses it after as sold_out", () => {

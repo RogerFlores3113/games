@@ -138,10 +138,12 @@ describe("MOD_DISPLAY", () => {
 describe("BALANCE_DISPLAY", () => {
   it("carries the run's numbers as plain data", () => {
     expect(BALANCE_DISPLAY).toEqual({
-      suppliesStart: 3,
-      suppliesMax: 4,
+      suppliesStart: 4,
+      suppliesMax: 5,
       supplyPrice: 6,
       failureCost: 1,
+      failedAttemptCoins: 2,
+      whispersPerCamp: 2,
       payout: { base: 5, riskyLocation: 2, riskyWeather: 2, perUnplayedTrick: 1, unplayedCap: 2 },
       plainGround: { locations: ["jungle", "clearing"], weathers: ["fair"] },
       shopCamps: { short: [3, 4], standard: [3, 6], long: [3, 6, 8] },
@@ -151,7 +153,7 @@ describe("BALANCE_DISPLAY", () => {
       upgradePrice: 8,
       whispersPerUpgrade: 1,
       fairWeatherChance: 80,
-      washes: { rain: { spared: 2, exposed: 2 }, downpour: { spared: 1, exposed: 3 } },
+      washes: { rain: { spared: 3, exposed: 2 }, downpour: { spared: 2, exposed: 3 } },
       strikes: { max: 2, exposed: 1 },
     });
   });

@@ -35,6 +35,7 @@ function kitSection(view: RulesView | null): RulesSection {
 
 const { short, standard, long } = RUN_LENGTH_DISPLAY;
 const B = BALANCE_DISPLAY;
+const timesWord = (n: number): string => (n === 1 ? "Once" : n === 2 ? "Twice" : `${n} times`);
 const count = (n: number, one: string, many: string): string => `${n === 1 ? "one" : n} ${n === 1 ? one : many}`;
 const nameList = (names: readonly string[]): string => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
 const plainNames = (ids: readonly string[]): string => nameList(ids.map((id) => `the ${MOD_DISPLAY[id]?.name ?? id}`));
@@ -50,7 +51,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       heading: "Goal",
       paragraphs: [
         `Before camp 1 the crew votes on the run: ${short.name} (${short.camps} camps), ${standard.name} (${standard.camps}) or ${long.name} (${long.camps}). The last camp is the temple.`,
-        `A camp is cleared when every objective is done. A failed camp costs ${count(B.failureCost, "supply", "supplies")} and is replayed with a fresh deal. The crew starts with ${B.suppliesStart} supplies and holds at most ${B.suppliesMax}. With none left, the run ends.`,
+        `A camp is cleared when every objective is done. A failed camp costs ${count(B.failureCost, "supply", "supplies")} and is replayed with a fresh deal; the crew's purse gets ${count(B.failedAttemptCoins, "coin", "coins")} as consolation. The crew starts with ${B.suppliesStart} supplies and holds at most ${B.suppliesMax}. With none left, the run ends.`,
         "A replay skips the draft, the event and the route vote: the crew goes back to the same camp's loadout, through the shop again before a boss camp.",
       ],
       items: [],
@@ -94,7 +95,7 @@ export function buildRulesReference(view: ExpeditionView | null): RulesSection[]
       id: "whisper",
       heading: "The Whisper",
       paragraphs: [
-        "Once per camp, between tricks, show one card from your hand to one teammate. Everyone sees that you whispered, but only they see the card.",
+        `${timesWord(B.whispersPerCamp)} per camp, between tricks, show one card from your hand to one teammate. Everyone sees that you whispered, but only they see the card.`,
         "Whispers go only between tricks, before the next lead: never while objectives are being picked, and never once a trick has started.",
         "In Rain or a Downpour the crew's first whispers each camp wash away: they are spent, everyone sees them wash away, and nobody sees the card.",
         "Need a moment between tricks? Press Hold on (once per gap, if you are not leading). The next lead waits until you whisper, use a power, or press Go ahead.",

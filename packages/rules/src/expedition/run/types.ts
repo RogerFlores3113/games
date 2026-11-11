@@ -121,7 +121,7 @@ export type LoadedDice = {
 };
 
 /** One per ended attempt, with the location and weather it was played at.
- * `coins` is the payout of a clear, 0 otherwise. A
+ * `coins` is the payout of a clear, or the consolation of a failed attempt, 0 otherwise. A
  * `restarted` attempt was abandoned when the crew kicked a seat: it costs
  * nothing and the camp's loadout reopens. */
 export type CampResult = {

@@ -107,6 +107,11 @@ describe("the trail's Last camp lines", () => {
     });
   });
 
+  it("a loss names the coins the failed attempt paid the purse", () => {
+    const [head] = lastCampStrip(recap({ coins: 2 }), nameOf)!.lines;
+    expect(head).toBe("Last camp: Camp 2 lost. Ana's 10♣ was won by Ben. -1 failed camp, -1 Heavy Pack. +2 coins consolation");
+  });
+
   it("a clear: the tricks it took and its coins, on a later try", () => {
     const cleared = recap({
       status: "cleared",

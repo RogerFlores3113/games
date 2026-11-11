@@ -105,8 +105,8 @@ describe("the temple", () => {
     }, run);
     if (dealt.stage.tag !== "camp") throw new Error("expected a dealt camp");
     const targets = dealt.stage.attempt.camp.objectives.map((o) => (o.kind === "win-card" ? o.target : o.kind));
-    expect(targets).toHaveLength(4);
-    expect(targets[3]).toEqual(SUN);
+    expect(targets).toHaveLength(5);
+    expect(targets[4]).toEqual(SUN);
   });
 });
 
