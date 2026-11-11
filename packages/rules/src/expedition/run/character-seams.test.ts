@@ -249,6 +249,19 @@ describe("draftShapes, shopPrice and the offers ops", () => {
     expect(view.stage.shop.stock.find((e) => e.stockId === item.stockId)!.price).toBe(item.price - 1);
   });
 
+  it("affords a haggled price from the seat's share plus the pot, and spends the share first", () => {
+    const haggler = seamCharacter("haggler", { passive: passive((self) => ({ shopPrice: (prev) => (run, seatId, price) => (seatId === self ? price - 1 : prev(run, seatId, price)) })) });
+    const catalog = catalogWith(haggler);
+    const shop = setupShop({ seatIds: SEATS, seed: "haggle", catalog, characters: { p0: "haggler" }, camp: 3, purse: 20 });
+    const item = shop.stage.stock.find((e) => e.what.kind === "item")!;
+    // p0 holds price - 2, p1 the same, and the pot has 1: p0 reaches the haggled price, p1 the full price short by one.
+    const tight = { ...shop, purse: 2 * (item.price - 2) + 1, stage: { ...shop.stage, shares: { p0: item.price - 2, p1: item.price - 2, p2: 0 } } };
+    const bought = act(tight, "p0", { type: "buy", stockId: item.stockId }, catalog);
+    expect(bought.stage.tag === "shop" && bought.stage.shares).toEqual({ p0: 0, p1: item.price - 2, p2: 0 });
+    expect(bought.purse).toBe(tight.purse - (item.price - 1));
+    expect(applyRunAction(tight, "p1", { type: "buy", stockId: item.stockId }, catalog)).toEqual({ ok: false, error: "cannot_afford" });
+  });
+
   it("queues special offers drawn with the ability's shape behind the standard one, never repeating a one-item option", () => {
     const mapper = seamCharacter("mapper", {
       active: ability({

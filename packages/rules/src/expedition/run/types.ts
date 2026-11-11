@@ -190,7 +190,7 @@ export type KickedSeat = { readonly seat: SeatRun; readonly position: number; re
 export type Stage =
   | { readonly tag: "muster"; readonly ballots: PerSeat<RunLength | null>; readonly locked: PerSeat<true> } // null abstains; a locked seat's pick and ballot are final
   /** Before shop camp `next`, after its route vote (or on a replay): `camp` is its spec. */
-  | { readonly tag: "shop"; readonly next: CampIndex; readonly camp: CampSpec; readonly stock: readonly StockEntry[]; readonly ready: PerSeat<true> }
+  | { readonly tag: "shop"; readonly next: CampIndex; readonly camp: CampSpec; readonly stock: readonly StockEntry[]; readonly shares: PerSeat<number>; readonly ready: PerSeat<true> }
   | { readonly tag: "draft"; readonly next: CampIndex }
   /** `gains` is what the event gave as it opened. */
   | { readonly tag: "event"; readonly next: CampIndex; readonly event: EventId; readonly gains: EventGains; readonly ready: PerSeat<true> }
@@ -230,6 +230,7 @@ export type RunAction =
   | { readonly type: "equip"; readonly itemUids: readonly string[] } // between camps; replaces the equipped set
   | { readonly type: "discard-item"; readonly itemUid: string } // between camps
   | { readonly type: "buy"; readonly stockId: string } // shop
+  | { readonly type: "give-coins"; readonly to: SeatId; readonly coins: number } // shop; moves coins from your share to a teammate's
   | { readonly type: "pick-bundle"; readonly bundle: number } // draft
   | { readonly type: "ready" } // shop, event, loadout
   | { readonly type: "use-ability"; readonly sourceKey: SourceKey; readonly targets: readonly string[] }
@@ -242,6 +243,7 @@ export type RunAction =
 export type RunError =
   | CampError
   | "not_a_seat"
+  | "not_a_teammate"
   | "run_over"
   | "wrong_stage"
   | "not_a_choice"

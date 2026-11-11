@@ -41,11 +41,11 @@ import type { StatusPart } from "../content/mods/mod-def";
 import { whispersUsedBy } from "../run/whisper";
 import { abilityStatus } from "../run/abilities";
 import { abilityKeys, abilityOf, activeOfKey, backpackOf, itemOf, remaining, usedThisAttempt, type Remaining } from "../run/usage";
-import { priceFor, upgradeOffers, type StockEntry } from "../run/shop";
+import { potOf, priceFor, shareOf, upgradeOffers, type StockEntry } from "../run/shop";
 import { currentWindow, gatedPendingSeatIds } from "../run/windows";
 import { holdLegality, holdingSeatIds } from "../run/hold";
 import type { RunRules } from "../run/run-rules";
-import type { ActiveEffect, AttemptState, Catalog, ItemInstance, LogEntry, ObjectiveRecap, PerSeat, Reveal, RunState, SeatRun, SupplyCostPart } from "../run/types";
+import type { ActiveEffect, AttemptState, Catalog, ItemInstance, LogEntry, ObjectiveRecap, PerSeat, Reveal, RunAt, RunState, SeatRun, SupplyCostPart } from "../run/types";
 import { rankOf } from "../trick";
 import type { CampState, CardIdentity, CompletedTrick, ExpeditionCard, Objective, ResolvedPlay, StandardIdentity } from "../state";
 import type {
@@ -71,6 +71,7 @@ import type {
   ExpeditionModView,
   ExpeditionObjectiveView,
   ExpeditionRankedCardView,
+  ExpeditionHandCardView,
   ExpeditionRemainingView,
   ExpeditionRevealView,
   ExpeditionSeatView,
@@ -325,11 +326,13 @@ function toStockView(entry: StockEntry, price: number): ExpeditionStockView {
 }
 
 /** Prices are what the viewer would pay (the composed shopPrice). */
-function toShopView(state: RunState, stock: readonly StockEntry[], ownSeat: SeatRun | undefined, catalog: Catalog): ExpeditionShopView {
+function toShopView(state: RunAt<"shop">, stock: readonly StockEntry[], ownSeat: SeatRun | undefined, catalog: Catalog): ExpeditionShopView {
   const price = (listed: number): number => (ownSeat === undefined ? listed : priceFor(state, ownSeat.seatId, listed, catalog));
   return {
     stock: stock.map((entry) => toStockView(entry, price(entry.price))),
     yourUpgrades: ownSeat === undefined ? [] : upgradeOffers(ownSeat, catalog).map((o) => ({ stockId: o.stockId, upgradeId: o.upgradeId, price: price(o.price) })),
+    shares: state.seatIds.map((seatId) => ({ seatId, coins: shareOf(state, seatId) })),
+    pot: potOf(state),
   };
 }
 
@@ -516,7 +519,8 @@ function toAttemptView(state: RunState, rawAttempt: AttemptState, seatId: string
       : null;
 
   const yourHandRaw = seated ? campState.hands.find((h) => h.seatId === seatId) : undefined;
-  const yourHand: ExpeditionRankedCardView[] = yourHandRaw !== undefined ? yourHandRaw.cards.map((card) => toRankedCardView(card, rules)) : [];
+  const yourHand: ExpeditionHandCardView[] =
+    yourHandRaw !== undefined ? yourHandRaw.cards.map((card) => ({ ...toRankedCardView(card, rules), warning: rules.playWarning(campState, seatId, card.id) })) : [];
 
   const handSizes: ExpeditionHandSizeView[] = campState.hands.map((hand) => ({ seatId: hand.seatId, size: hand.cards.length }));
 
@@ -584,7 +588,7 @@ function toStageView(state: RunState, seatId: string, ownSeat: SeatRun | undefin
         tag: "shop",
         next: stage.next,
         camp: toPreviewView(state, stage.camp, catalog, surveyOf(stage.camp)),
-        shop: toShopView(state, stage.stock, ownSeat, catalog),
+        shop: toShopView(state as RunAt<"shop">, stage.stock, ownSeat, catalog),
         readySeatIds: readySeatIds(state, stage.ready),
       };
     case "loadout":

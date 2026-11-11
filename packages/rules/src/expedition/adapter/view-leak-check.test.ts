@@ -149,7 +149,7 @@ describe("view-leak-check: canary suite", () => {
     const otherCard = otherHand.cards[0]!;
 
     const leaky = structuredClone(view);
-    attemptViewOf(leaky).camp.yourHand.push({ id: otherCard.id, identity: otherCard.identity as never, effectiveRank: null, countsAs: null });
+    attemptViewOf(leaky).camp.yourHand.push({ id: otherCard.id, identity: otherCard.identity as never, effectiveRank: null, countsAs: null, warning: null });
 
     const reasons = checkExpeditionViewForLeaks({ view: leaky, serialized: JSON.stringify(leaky), secrets });
     expect(reasons).toContain(`structural:hidden-id:${otherCard.id}`);

@@ -17,7 +17,7 @@ import { refitSlots } from "./items";
 import { nextAttemptNumber } from "./attempt";
 import { react } from "./react";
 import { campSlots } from "./stack";
-import { stockFor } from "./shop";
+import { splitPurse, stockFor } from "./shop";
 import { rejoinBack } from "./crew";
 import { recapOf, supplyCostParts } from "./recap";
 import type { CampIndex, CampResult, Catalog, RunAt, RunState, RunStatus, SeatRun } from "./types";
@@ -60,7 +60,7 @@ export function openLoadout(run: RunState, camp: CampSpec, catalog: Catalog): Ru
  * draws the stock afresh from the same streams, so a replay of a shop camp
  * offers the same stock, unsold. */
 export function openShop(run: RunState, camp: CampSpec, catalog: Catalog): RunAt<"shop"> {
-  return { ...run, stage: { tag: "shop", next: camp.index, camp, stock: stockFor(run.seed, camp.index, catalog), ready: {} } };
+  return { ...run, stage: { tag: "shop", next: camp.index, camp, stock: stockFor(run.seed, camp.index, catalog), shares: splitPurse(run), ready: {} } };
 }
 
 /** What follows the route vote that chose `camp`: its shop before a shop

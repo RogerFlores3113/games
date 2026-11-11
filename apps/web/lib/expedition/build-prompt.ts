@@ -28,6 +28,9 @@ export interface PromptSeat {
 export const PROMPT_MAX_CHARS = 56;
 const NAME_MAX_CHARS = 10;
 
+/** A play's warning too long for the prompt line (the full text rides on the card). */
+const PLAY_WARNING_SHORT = "Playing it now fails the camp. Play again to confirm";
+
 const HEAVY_PACK = "heavy-pack";
 /** Says what the item's own text says: the crew pays 1 more supply, once. */
 const HEAVY_PACK_WARNING = "Heavy Pack: fails cost 1 more supply";
@@ -287,6 +290,9 @@ export function buildPrompt(
   if (camp === null) return { text: "Dealing the cards…", tone: "waiting" };
 
   if (camp.campPhase === "ended") return campOverPrompt(camp, nameOf);
+
+  const pending = ui.pendingPlay === null ? undefined : camp.yourHand.find((c) => c.id === ui.pendingPlay);
+  if (pending?.warning != null) return { text: pending.warning.length <= PROMPT_MAX_CHARS ? pending.warning : PLAY_WARNING_SHORT, tone: "alert" };
 
   if (camp.campPhase === "objective-pick") {
     if (camp.currentActorSeatId !== null && camp.currentActorSeatId === view.yourSeatId) {

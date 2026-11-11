@@ -35,6 +35,7 @@ const ACTION_TYPES: Readonly<Record<RunAction["type"], true>> = {
   equip: true,
   "discard-item": true,
   buy: true,
+  "give-coins": true,
   "pick-bundle": true,
   ready: true,
   "use-ability": true,

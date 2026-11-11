@@ -78,6 +78,7 @@ describe("why a camp was lost", () => {
   it("a camp rule that failed is named, and more failures are counted", () => {
     expect(lossLine(recap({ objectives: [], failedGoalIds: ["hermit:s2"] }), nameOf)).toBe("Ana won a trick");
     expect(lossLine(recap({ objectives: [], failedGoalIds: ["temple"] }), nameOf)).toBe("The plates were not all pressed");
+    expect(lossLine(recap({ objectives: [], failedGoalIds: ["temple:sun"] }), nameOf)).toBe("The Sun was played before its plate");
     expect(lossLine(recap({ failedGoalIds: ["camouflage:s1"] }), nameOf)).toBe("Ana's 10♣ was won by Ben, and 1 more");
     expect(lossLine(recap({ status: "cleared" }), nameOf)).toBeNull();
   });

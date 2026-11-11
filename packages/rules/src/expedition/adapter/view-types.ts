@@ -55,6 +55,11 @@ export type ExpeditionCardView = { id: string; identity: ExpeditionCardIdentityV
 /** `effectiveRank` is set only when the composed rankOf differs from the
  * printed rank, and `countsAs` only when the composed identityOf differs
  * from the printed identity. */
+/** A card in the viewer's own hand: `warning` is what playing it now would
+ * cost the crew (a camp rule's heads-up), null when nothing. Never present
+ * on any card of another seat's hand. */
+export type ExpeditionHandCardView = ExpeditionRankedCardView & { warning: string | null };
+
 export type ExpeditionRankedCardView = {
   id: string;
   identity: ExpeditionCardIdentityView;
@@ -184,7 +189,7 @@ export type ExpeditionCampView = {
   goals: ExpeditionGoalView[];
   discards: ExpeditionDiscardView[];
   voidedTricks: ExpeditionVoidedTrickView[];
-  yourHand: ExpeditionRankedCardView[];
+  yourHand: ExpeditionHandCardView[];
   yourLegalCardIds: string[];
   handSizes: ExpeditionHandSizeView[];
   completedTricks: ExpeditionCompletedTrickView[];
@@ -328,6 +333,9 @@ export type ExpeditionStockView = {
 export type ExpeditionShopView = {
   stock: ExpeditionStockView[];
   yourUpgrades: { stockId: string; upgradeId: string; price: number }[];
+  /** Every seat's share of the purse (public) and the crew pot left over. */
+  shares: { seatId: string; coins: number }[];
+  pot: number;
 };
 
 export type ExpeditionEventGainsView = { coins: number; supplies: number; items: { seatId: string; itemId: string }[] };

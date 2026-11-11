@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CATALOG } from "../run/catalog";
+import { rulesFor } from "../run/compose";
 import { createRun, runStatus } from "../run/lifecycle";
 import { campIndex } from "../run/plan";
 import { campSpecAt } from "../run/route";
@@ -98,6 +99,16 @@ describe("botMove at the temple", () => {
     expect(botMove(run, [leader], CATALOG)).toEqual({ seatId: leader, request: { type: "play-card", cardId: "c4" } });
     const noClubs = temple([sun, spade]);
     expect(botMove(noClubs.run, [noClubs.leader], CATALOG)).toEqual({ seatId: noClubs.leader, request: { type: "play-card", cardId: "s9" } });
+  });
+
+  it("prefers a play with no warning: it never plays the warned Sun while another card is legal", () => {
+    const { run, leader } = temple([sun, spade]);
+    const hand = run.stage.attempt.camp.hands.find((h) => h.seatId === leader)!.cards;
+    const warnings = Object.fromEntries(hand.map((c) => [c.id, rulesFor(run, CATALOG).playWarning(run.stage.attempt.camp, leader, c.id)]));
+    expect(warnings.sun).not.toBeNull();
+    expect(warnings.s9).toBeNull();
+    const move = botMove(run, [leader], CATALOG);
+    expect(move?.request).toEqual({ type: "play-card", cardId: "s9" });
   });
 });
 

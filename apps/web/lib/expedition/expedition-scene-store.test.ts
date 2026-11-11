@@ -30,7 +30,7 @@ function makeCamp(overrides: Partial<ExpeditionCampView> = {}): ExpeditionCampVi
     goals: [],
     discards: [], voidedTricks: [],
     objectives: [],
-    yourHand: [{ id: "c-as", identity: AS, effectiveRank: null, countsAs: null }],
+    yourHand: [{ id: "c-as", identity: AS, effectiveRank: null, countsAs: null, warning: null }],
     yourLegalCardIds: ["c-as"],
     handSizes: [
       { seatId: "s1", size: 17 },

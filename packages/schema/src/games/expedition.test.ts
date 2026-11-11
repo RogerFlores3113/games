@@ -20,6 +20,7 @@ const EXPEDITION_ERROR_CODES = [
   "objective_reserved",
   "invalid_action",
   "not_a_seat",
+  "not_a_teammate",
   "run_over",
   "wrong_stage",
   "not_a_choice",
@@ -222,8 +223,8 @@ const midAttempt = {
       discards: [{ card: { id: "card-9", identity: { kind: "standard", suit: "diamonds", rank: 4 } }, afterTrick: 1 }],
       voidedTricks: [{ index: 2, leaderSeatId: "seat-1", plays: [{ seatId: "seat-1", card: { id: "card-10", identity: { kind: "standard", suit: "hearts", rank: 9 } } }] }],
       yourHand: [
-        { id: "card-1", identity: { kind: "standard", suit: "spades", rank: 14 }, effectiveRank: null, countsAs: null },
-        { id: "card-2", identity: { kind: "joker", joker: "sun" }, effectiveRank: null, countsAs: { kind: "standard", suit: "hearts", rank: 9 } },
+        { id: "card-1", identity: { kind: "standard", suit: "spades", rank: 14 }, effectiveRank: null, countsAs: null, warning: null },
+        { id: "card-2", identity: { kind: "joker", joker: "sun" }, effectiveRank: null, countsAs: { kind: "standard", suit: "hearts", rank: 9 }, warning: "Playing the Sun now fails the Temple: lead clubs first." },
       ],
       yourLegalCardIds: ["card-1"],
       handSizes: [
@@ -270,7 +271,7 @@ describe("ExpeditionViewSchema", () => {
 
   it.each([
     ["loadout", { tag: "loadout", camp: { ...preview, pairing: "steam" }, mods: CAMP_MODS, readySeatIds: ["seat-2"] }],
-    ["shop with no stock", { tag: "shop", next: 3, camp: { ...preview, index: 3, shop: true }, shop: { stock: [], yourUpgrades: [] }, readySeatIds: [] }],
+    ["shop with no stock", { tag: "shop", next: 3, camp: { ...preview, index: 3, shop: true }, shop: { stock: [], yourUpgrades: [], shares: [], pot: 0 }, readySeatIds: [] }],
     ["first draft", { tag: "draft", next: 1, cleared: 0, payout: 0, yourOffer: { kind: "standard", bundles: [["bait"], ["parrot"], ["whetstone"]] }, pendingSeatIds: [] }],
     [
       "shop",
@@ -284,6 +285,8 @@ describe("ExpeditionViewSchema", () => {
             { stockId: "item0", what: { kind: "item", itemId: "bait" }, price: 2, soldTo: "seat-2" },
           ],
           yourUpgrades: [{ stockId: "upgrade:explorer.reshape", upgradeId: "explorer.reshape", price: 8 }],
+          shares: [{ seatId: "seat-1", coins: 3 }, { seatId: "seat-2", coins: 3 }],
+          pot: 1,
         },
         readySeatIds: [],
       },
@@ -353,7 +356,7 @@ describe("ExpeditionViewSchema", () => {
           ...midAttempt,
           camp: {
             ...midAttempt.camp,
-            yourHand: [{ id: "card-1", identity: { kind: "standard", suit: "spades", rank: 14 }, effectiveRank: null, faceUp: true }],
+            yourHand: [{ id: "card-1", identity: { kind: "standard", suit: "spades", rank: 14 }, effectiveRank: null, countsAs: null, warning: null, faceUp: true }],
           },
         },
       },
@@ -400,7 +403,7 @@ describe("ExpeditionViewSchema", () => {
           ...midAttempt,
           camp: {
             ...midAttempt.camp,
-            yourHand: [{ id: "card-2", identity: { kind: "joker", joker: "sun", suit: "spades" }, effectiveRank: null }],
+            yourHand: [{ id: "card-2", identity: { kind: "joker", joker: "sun", suit: "spades" }, effectiveRank: null, countsAs: null, warning: null }],
           },
         },
       },
@@ -413,7 +416,7 @@ describe("ExpeditionViewSchema", () => {
           ...midAttempt,
           camp: {
             ...midAttempt.camp,
-            yourHand: [{ id: "card-1", identity: { kind: "standard", suit: "spades", rank: 15 }, effectiveRank: null }],
+            yourHand: [{ id: "card-1", identity: { kind: "standard", suit: "spades", rank: 15 }, effectiveRank: null, countsAs: null, warning: null }],
           },
         },
       },
@@ -426,7 +429,7 @@ describe("ExpeditionViewSchema", () => {
           ...midAttempt,
           camp: {
             ...midAttempt.camp,
-            yourHand: [{ id: "card-1", identity: { kind: "standard", suit: "spades", rank: 1 }, effectiveRank: null }],
+            yourHand: [{ id: "card-1", identity: { kind: "standard", suit: "spades", rank: 1 }, effectiveRank: null, countsAs: null, warning: null }],
           },
         },
       },
@@ -524,7 +527,7 @@ describe("ExpeditionErrorCodeSchema", () => {
   });
 
   it("has exactly 37 members", () => {
-    expect(ExpeditionErrorCodeSchema.options.length).toBe(37);
+    expect(ExpeditionErrorCodeSchema.options.length).toBe(38);
   });
 });
 

@@ -6,7 +6,7 @@ import { attemptOf } from "./attempt";
 import { settleCamp } from "./lifecycle";
 import { campIndex } from "./plan";
 import { plainItem, setupRun, setupShop, testCatalog } from "./run-test-support";
-import { stockFor } from "./shop";
+import { potOf, shareOf, splitPurse, stockFor } from "./shop";
 import { applyRunAction } from "./stages/registry";
 import type { RunAt, RunState } from "./types";
 
@@ -94,5 +94,64 @@ describe("the shop", () => {
     run = settleCamp(loadout as RunAt<"camp">, "failed", catalog);
     expect(run.stage).toMatchObject({ tag: "shop", next: 3, stock: first.stage.stock });
     expect(stockFor(SEED, campIndex(3), catalog)).toEqual(first.stage.stock);
+  });
+});
+
+describe("shop shares", () => {
+  const shares = (run: RunState) => (run.stage.tag === "shop" ? run.stage.shares : null);
+  const give = (run: RunState, seatId: string, to: string, coins: number) => applyRunAction(run, seatId, { type: "give-coins", to, coins }, catalog);
+
+  it("splits the purse when the shop opens: floor(purse / seats) each, the rest is the pot", () => {
+    const run = shopRun({ purse: 20 });
+    expect(shares(run)).toEqual({ p0: 6, p1: 6, p2: 6 });
+    expect(potOf(run)).toBe(2);
+    expect(splitPurse({ ...run, purse: 2 })).toEqual({ p0: 0, p1: 0, p2: 0 });
+    expect(potOf({ ...run, purse: 2, stage: { ...run.stage, shares: { p0: 0, p1: 0, p2: 0 } } })).toBe(2);
+  });
+
+  it("a buy spends the buyer's share first, then the pot", () => {
+    let run = act(shopRun({ purse: 20 }), "p0", { type: "buy", stockId: "item0" }); // 3
+    expect([run.purse, shares(run), potOf(run as RunAt<"shop">)]).toEqual([17, { p0: 3, p1: 6, p2: 6 }, 2]);
+    run = act(run, "p0", { type: "buy", stockId: "item1" }); // 4: 3 from the share, 1 from the pot
+    expect([run.purse, shares(run), potOf(run as RunAt<"shop">)]).toEqual([13, { p0: 0, p1: 6, p2: 6 }, 1]);
+    expect(shareOf(run as RunAt<"shop">, "p1")).toBe(6);
+  });
+
+  it("is cannot_afford when share plus pot falls short, whatever the purse holds", () => {
+    const run = shopRun({ purse: 20 }); // p0 has 6, the pot 2: 8 reaches an upgrade (8) but not twice
+    const bought = act(run, "p0", { type: "buy", stockId: "upgrade:plain-1.a" });
+    expect([bought.purse, shares(bought), potOf(bought as RunAt<"shop">)]).toEqual([12, { p0: 0, p1: 6, p2: 6 }, 0]);
+    expect(refusal(bought, "p0", "supplies")).toEqual({ ok: false, error: "cannot_afford" });
+    expect(refusal(bought, "p1", "supplies")).toEqual({ ok: true, state: expect.anything() });
+  });
+
+  it("give-coins moves coins from the giver's share to a teammate's, and a ready teammate may receive", () => {
+    let run = act(shopRun({ purse: 20 }), "p1", { type: "ready" });
+    run = act(run, "p0", { type: "give-coins", to: "p1", coins: 4 });
+    expect(shares(run)).toEqual({ p0: 2, p1: 10, p2: 6 });
+    expect(run.purse).toBe(20);
+  });
+
+  it("refuses give-coins: already_ready, not_a_teammate (self or unknown), cannot_afford (too little, zero), wrong_stage outside the shop", () => {
+    const run = shopRun({ purse: 20 });
+    expect(give(act(run, "p0", { type: "ready" }), "p0", "p1", 1)).toEqual({ ok: false, error: "already_ready" });
+    expect(give(run, "p0", "p0", 1)).toEqual({ ok: false, error: "not_a_teammate" });
+    expect(give(run, "p0", "nobody", 1)).toEqual({ ok: false, error: "not_a_teammate" });
+    expect(give(run, "p0", "toString", 1)).toEqual({ ok: false, error: "not_a_teammate" });
+    expect(give(run, "p0", "p1", 7)).toEqual({ ok: false, error: "cannot_afford" });
+    expect(give(run, "p0", "p1", 0)).toEqual({ ok: false, error: "cannot_afford" });
+    const plain = setupRun({ seatIds: SEATS, seed: SEED, catalog, camp: 2, purse: 20 });
+    expect(give(plain, "p0", "p1", 1)).toEqual({ ok: false, error: "wrong_stage" });
+  });
+
+  it("a replayed shop visit splits the purse afresh", () => {
+    let run: RunState = act(shopRun({ purse: 20 }), "p0", { type: "buy", stockId: "item0" });
+    let loadout = setupRun({ seatIds: SEATS, seed: SEED, catalog, camp: 3 });
+    loadout = { ...loadout, seats: run.seats, purse: run.purse, itemSerial: run.itemSerial };
+    for (const seatId of SEATS) loadout = act(loadout, seatId, { type: "ready" });
+    run = settleCamp(loadout as RunAt<"camp">, "failed", catalog);
+    expect(run.stage.tag).toBe("shop");
+    // 17 coins plus the failed attempt's consolation, split three ways.
+    expect(shares(run)).toEqual(splitPurse(run));
   });
 });

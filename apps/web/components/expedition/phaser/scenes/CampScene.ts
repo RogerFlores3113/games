@@ -47,6 +47,7 @@ import {
   selectTarget,
   setDrag,
   setHoveredCard,
+  setPendingPlay,
   setLastTrickOpen,
   setTooltipMateSource,
   setTooltipMod,
@@ -90,8 +91,15 @@ function buildHandlers(store: SceneDeps["store"], pointer: () => Point): CampHan
       if (pickForTargeting(store, "card", cardId)) return;
       const card = campModel(store)?.hand.find((c) => c.id === cardId) ?? null;
       if (card?.playable) {
+        // A warned play shows its warning first; the same card played again confirms.
+        if (card.warning !== null && state.localUi.pendingPlay !== cardId) {
+          state.updateLocalUi((ui) => setPendingPlay(ui, cardId));
+          return;
+        }
         state.dispatch({ type: "play-card", cardId });
+        return;
       }
+      state.updateLocalUi((ui) => setPendingPlay(ui, null));
     },
     onCardPress(cardId) {
       const state = store.getState();
